@@ -126,6 +126,9 @@ export function createCntsPeriodApi(api: ApiClient) {
     period: (id: string): Promise<FormsPeriodView> => unwrap(api.GET("/v1/forms/periods/{id}", { params: { path: { id }, query } })),
     previous: async (periodId: string, unit: string): Promise<FormsPrevious | null> =>
       (await unwrap(api.GET("/v1/forms/periods/{id}/previous", { params: { path: { id: periodId }, query: { ...query, unit } } }))).previous,
+    /** Lịch sử phiên bản bài nộp của đơn vị (mới trước) — khung Log (BF-CN-WEEKLY). */
+    submissions: async (periodId: string, unit: string): Promise<FormsSubmission[]> =>
+      (await unwrap(api.GET("/v1/forms/periods/{id}/submissions", { params: { path: { id: periodId }, query: { ...query, unit } } }))).items,
     submit: (periodId: string, body: SubmitBody): Promise<FormsSubmission> =>
       unwrap(api.POST("/v1/forms/periods/{id}/submissions", { params: { path: { id: periodId }, query, ...idem() }, body })),
     close: (periodId: string): Promise<FormsPeriodView> =>

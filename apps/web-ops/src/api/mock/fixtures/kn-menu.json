@@ -2163,7 +2163,7 @@
        {
         "key": "xa.cnts.cong_viec_tuan",
         "label": "Báo cáo công việc tuần",
-        "route": "/kn/cnts/bao-cao-ky",
+        "route": "/kn/cnts/cong-viec-tuan",
         "icon": "check",
         "badge_source": null,
         "enabled": true,

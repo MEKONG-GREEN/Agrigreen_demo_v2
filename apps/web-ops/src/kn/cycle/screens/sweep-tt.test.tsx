@@ -4,8 +4,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AssignmentEditScreen, UserCreateScreen } from "./AdminScreens";
-import { CoopCreateScreen, CoopsScreen, HouseholdCreateScreen, MachinesScreen, MaterialsScreen } from "./DataScreens";
-import { BatchesScreen, PublishScreen } from "./TinhScreens";
+import { CoopCreateScreen, CoopsScreen, HouseholdCreateScreen, MachinesScreen } from "./DataScreens";
+import { BatchesScreen } from "./TinhScreens";
 
 const push = vi.fn();
 const params: Record<string, string> = {};
@@ -49,6 +49,8 @@ beforeEach(() => {
     machines: vi.fn().mockResolvedValue({ commune_totals: [] }),
     coopMachines: vi.fn().mockResolvedValue({ cooperative_ref: "htx-1", name: "HTX Mỹ Hòa", lines: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", quantity: 2, note: null }], total: 2 }),
     putMachines: vi.fn().mockResolvedValue({ total: 3 }),
+    machineProfile: vi.fn().mockResolvedValue({ items: [{ machine_type: "may_gat", year_made: 2019 }] }),
+    putMachineProfile: vi.fn().mockResolvedValue({ items: [] }),
     materials: vi.fn().mockResolvedValue({ items: [] }),
     materialSummary: vi.fn().mockResolvedValue({ items: [] }),
     recordMaterials: vi.fn().mockResolvedValue({ items: [] }),
@@ -131,27 +133,7 @@ describe("Dữ liệu xã — Thêm HTX, nông hộ trên trang riêng (R-A2, R-
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(auth.collectApi.putMachines).toHaveBeenCalledWith("htx-1", [{ machine_type: "may_gat", quantity: 3, note: null }]));
   });
-
-  it("Vật tư: số lượng bắt buộc, không âm; bẫy đèn chỉ nhận số nguyên", async () => {
-    const u = userEvent.setup();
-    render(<MaterialsScreen />);
-    const form = screen.getByRole("region", { name: "Ghi nhận vật tư" });
-    await u.click(within(form).getByRole("button", { name: "Lưu" }));
-    expect(within(form).getByRole("alert")).toHaveTextContent("Bắt buộc nhập.");
-    await u.type(within(form).getByLabelText(/Số lượng/), "-3");
-    await u.click(within(form).getByRole("button", { name: "Lưu" }));
-    expect(within(form).getByRole("alert")).toHaveTextContent("Không được nhập số âm.");
-    await u.selectOptions(within(form).getByLabelText(/Loại vật tư/), "bay_den");
-    await u.clear(within(form).getByLabelText(/Số lượng/));
-    await u.type(within(form).getByLabelText(/Số lượng/), "2,5");
-    await u.click(within(form).getByRole("button", { name: "Lưu" }));
-    expect(within(form).getByRole("alert")).toHaveTextContent("Chỉ nhập số nguyên.");
-    expect(auth.collectApi.recordMaterials).not.toHaveBeenCalled();
-    await u.selectOptions(within(form).getByLabelText(/Loại vật tư/), "phan_ure");
-    await u.click(within(form).getByRole("button", { name: "Lưu" }));
-    await waitFor(() => expect(auth.collectApi.recordMaterials).toHaveBeenCalled());
-    expect(auth.collectApi.recordMaterials!.mock.calls[0]![0].lines[0].quantity).toBe("2.5");
-  });
+  // Vật tư (bảng nhập nhiều dòng, BF-TT-MAT #105): MaterialsScreen.test.tsx.
 });
 
 describe("Quản trị người dùng — trang riêng thay pop-up", () => {
@@ -216,59 +198,4 @@ describe("Phát hành — Đợt đã phát hành trên trang riêng", () => {
   });
 });
 
-// Codex review #100 (P2): ô "Tỉnh giao" của biểu đã bỏ chọn bị ẩn nhưng lỗi của nó vẫn chặn Xem trước / Phát hành.
-describe("Phát hành — Tỉnh giao chỉ kiểm/gửi cho biểu đang chọn", () => {
-  const FORMS = ["T01", "T02"].map((code) => ({ template_id: code, version_id: `${code}v1`, code, name: code, version: 1, report_types: ["weekly"], period_block: false, completeness: "complete", provincial_columns: [{ letter: "H", title: "Tỉnh giao", unit: "ha" }] }));
-  const PREVIEW = { report_type: "weekly", period_type: "week", period_rule: "week_start=wed", calendar_id: "trong_trot", calendar_version: 2, calendar_source: "builtin", deadline: { offset_days: 1, time: "12:00" }, close_after_days: 1, forms: FORMS.map((f) => ({ ...f, slots: 1 })), periods: [], communes: [{ commune_code: "91301", region_code: "LX", region_name: "Long Xuyên", officer_count: 1 }], communes_without_officer: [], provincial_columns: [], form_count: 2, commune_count: 1, period_count: 1, task_count: 2, warnings: [] };
-  const NEG = "Không được nhập số âm.";
-  const setup = async () => {
-    auth.role = "kn_tinh";
-    auth.cycleApi = { reportForms: vi.fn().mockResolvedValue({ items: FORMS }), batches: vi.fn().mockResolvedValue({ items: [] }), preview: vi.fn().mockResolvedValue(PREVIEW) };
-    const u = userEvent.setup();
-    render(<PublishScreen />);
-    await u.click(await screen.findByRole("checkbox", { name: "Chọn T01" }));
-    await u.click(screen.getByRole("checkbox", { name: "Chọn T02" }));
-    await u.click(screen.getByRole("button", { name: /Xem trước/ }));
-    await waitFor(() => expect(auth.cycleApi.preview).toHaveBeenCalledTimes(1));
-    return u;
-  };
-
-  it("bỏ chọn T02 có ô âm → Xem trước T01 vẫn gọi API, không gửi giá trị của T02", async () => {
-    const u = await setup();
-    await u.type(await screen.findByLabelText("T02 H 91301"), "-1");
-    await u.type(screen.getByLabelText("T01 H 91301"), "5");
-    await u.click(screen.getByRole("checkbox", { name: "Chọn T02" }));
-    expect(screen.queryByLabelText("T02 H 91301")).toBeNull();
-    await u.click(screen.getByRole("button", { name: /Xem trước/ }));
-    await waitFor(() => expect(auth.cycleApi.preview).toHaveBeenCalledTimes(2));
-    const sent = auth.cycleApi.preview!.mock.calls[1]![0];
-    expect(sent).toMatchObject({ template_ids: ["T01"], provincial_values: { T01: { "91301": { H: "5" } } } });
-    expect(sent.provincial_values).not.toHaveProperty("T02");
-    expect(screen.queryByText(NEG)).toBeNull();
-  });
-
-  it("biểu đang chọn có ô -1 → vẫn chặn, hiện lỗi dưới ô, không gọi API", async () => {
-    const u = await setup();
-    await u.type(await screen.findByLabelText("T02 H 91301"), "-1");
-    await u.click(screen.getByRole("button", { name: /Xem trước/ }));
-    expect(await screen.findByText(NEG)).toBeInTheDocument();
-    expect(screen.getByLabelText("T02 H 91301")).toHaveAttribute("aria-invalid", "true");
-    expect(auth.cycleApi.preview).toHaveBeenCalledTimes(1);
-  });
-
-  it("chọn lại T02 sau khi bỏ chọn → ô trống, không hồi sinh giá trị âm cũ hay lỗi cũ", async () => {
-    const u = await setup();
-    await u.type(await screen.findByLabelText("T02 H 91301"), "-1");
-    await u.click(screen.getByRole("button", { name: /Xem trước/ }));
-    expect(await screen.findByText(NEG)).toBeInTheDocument();
-    await u.click(screen.getByRole("checkbox", { name: "Chọn T02" }));
-    await u.click(screen.getByRole("checkbox", { name: "Chọn T02" }));
-    const field = await screen.findByLabelText("T02 H 91301");
-    expect(field).toHaveValue("");
-    expect(field).not.toHaveAttribute("aria-invalid");
-    expect(screen.queryByText(NEG)).toBeNull();
-    await u.click(screen.getByRole("button", { name: /Xem trước/ }));
-    await waitFor(() => expect(auth.cycleApi.preview).toHaveBeenCalledTimes(2));
-    expect(auth.cycleApi.preview!.mock.calls[1]![0]).toMatchObject({ template_ids: ["T01", "T02"] });
-  });
-});
+// Codex review #100 (P2) — Tỉnh giao chỉ kiểm/gửi cho biểu đang chọn: chuyển sang PublishWizard.test.tsx (wizard 5 bước, #106).

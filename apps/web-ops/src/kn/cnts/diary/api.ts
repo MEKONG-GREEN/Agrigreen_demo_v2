@@ -285,12 +285,13 @@ export const kindsOf = (form: Form): EntryKind[] => (form === "BM-19" ? ["growth
 /** Bảng phụ theo mẫu (sổ vịt xiêm 2026 không có phòng, trị bệnh và xuất bán — NC-16). */
 export const tablesOf = (form: Form): (keyof Tables)[] =>
   form === "BM-08"
-    ? ["feed_purchases", "treatments", "vaccinations", "sales", "officer_notes"]
+    ? ["feed_purchases", "feed_materials", "treatments", "vaccinations", "sales", "officer_notes"]
     : form === "BM-09"
-      ? ["feed_purchases", "vaccinations", "officer_notes"]
+      ? ["feed_purchases", "feed_materials", "vaccinations", "officer_notes"]
       : [];
 export const TABLE_LABEL: Record<keyof Tables, string> = {
-  feed_purchases: "Mua thức ăn (NC-09)",
+  feed_purchases: "Mua thức ăn chăn nuôi (NC-09)",
+  feed_materials: "Mua nguyên liệu thức ăn chăn nuôi (NC-09)",
   treatments: "Phòng và trị bệnh (NC-10)",
   vaccinations: "Tiêm phòng (NC-11)",
   sales: "Xuất bán (NC-13)",
@@ -314,6 +315,7 @@ export function metricErrors(form: Form, kind: EntryKind, m: Record<string, stri
     }
   }
   if (form === "BM-19" && m.ph && Number(m.ph) > 14) e.ph = "pH 0–14";
+  if (!e.age_week && m.age_week?.trim() && Number(m.age_week) > MAX_GROWTH_WEEK) e.age_week = `Tuần tuổi 0–${MAX_GROWTH_WEEK}`;
   return e;
 }
 
@@ -525,3 +527,246 @@ export function createCntsDiaryApi(api: ApiClient) {
 }
 
 export type CntsDiaryApi = ReturnType<typeof createCntsDiaryApi>;
+
+// ---------------------------------------------------------------------------
+// Đủ trường sổ gốc BM-08 / BM-09 2026 (BF-CN-DIARY #109 — CN-08, CN-12)
+// ---------------------------------------------------------------------------
+
+/** Vật tư mục 1 "Thông tin chung" của sổ (NC-03) — gợi ý; người ghi gõ thêm được. */
+export const SUPPLY_ITEMS: Record<Form, string[]> = {
+  "BM-08": ["Con giống", "Thức ăn gà con", "Thức ăn gà lớn", "Vaccine", "Chế phẩm Balasa N01"],
+  "BM-09": ["Con giống", "Thức ăn vịt con", "Thức ăn vịt lớn", "Vaccine"],
+  "BM-19": ["Con giống", "Thức ăn", "Chế phẩm", "Khác"],
+};
+
+/** Khoản chi thứ 6 của hạch toán (phần 2 mục 3): sổ gà ghi "Chế phẩm", sổ vịt xiêm ghi "Vaccine…". */
+export const cost6Label = (form: Form) => (form === "BM-09" ? "Vaccine" : "Chế phẩm");
+
+const num = (v: string | number | null | undefined) => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const round = (n: number, d: number) => Math.round(n * 10 ** d) / 10 ** d;
+
+/** Thành tiền (tự tính) của một dòng = số lượng × đơn giá, đồng nguyên; null khi thiếu số. */
+export function lineAmount(qty: string | number | null | undefined, price: string | number | null | undefined): number | null {
+  const q = num(qty),
+    p = num(price);
+  return q === null || p === null ? null : Math.round(q * p);
+}
+
+/** P (kg/con) của tổng thu = sản lượng / số con (phần 2 mục 3). */
+export function kgPerHead(outputKg: string | null | undefined, heads: number | null | undefined): number | null {
+  const o = num(outputKg);
+  return o === null || !heads ? null : round(o / heads, 2);
+}
+
+/** Tuần tuổi sổ ghi ở phần 2 mục 2 (tuần 1, 2, 3, 4, 6, 8, 10, 12). */
+export const GROWTH_WEEKS = [1, 2, 3, 4, 6, 8, 10, 12] as const;
+
+/**
+ * Tuần tuổi tối đa của bảng sinh trưởng — trùng `MaxAgeWeek` ở server (#109). Lần ghi quá ngưỡng (dữ liệu cũ nhập nhầm,
+ * hoặc ngày tuổi lúc nhận quá lớn) không sinh dòng mà được báo "dữ liệu tuần tuổi bất thường"; bảng tối đa
+ * 8 + (104 − 12) / 2 = 54 dòng.
+ */
+export const MAX_GROWTH_WEEK = 104;
+
+/** Tuần tuổi của lần ghi: lấy "Tuần tuổi (khi cân)" nếu có, không thì tính từ ngày tuổi lúc nhận + số ngày từ ngày nhận. */
+export function ageWeek(c: Pick<Cycle, "received_date" | "age_days">, e: Pick<Entry, "entry_date" | "metrics">): number {
+  const w = e.metrics.age_week;
+  if (w && /^\d+$/.test(w) && Number(w) > 0) return Number(w);
+  const days = Math.round((Date.parse(e.entry_date) - Date.parse(c.received_date)) / 86_400_000) + (c.age_days ?? 0);
+  return Math.max(1, Math.ceil(days / 7));
+}
+
+export interface GrowthRow {
+  week: number;
+  /** Số con sống ở lần ghi cuối của khoảng. */
+  alive: number | null;
+  /** Tỉ lệ sống so số con đầu kỳ (%). */
+  survival: number | null;
+  dead: number;
+  /** Nguyên nhân chết trong khoảng. */
+  causes: string;
+  /** Thức ăn sử dụng trong khoảng (kg). */
+  feedKg: number;
+  /** Tiêu tốn thức ăn lũy kế (kg thức ăn / kg tăng trọng). */
+  fcr: number | null;
+  /** Trọng lượng trung bình (kg/con) ở lần cân cuối của khoảng. */
+  weightKg: number | null;
+}
+
+export interface Growth {
+  rows: GrowthRow[];
+  total: { dead: number; feedKg: number; alive: number | null; survival: number | null; fcr: number | null };
+  avg: { weightKg: number | null; feedPerHead: number | null };
+  /** Lần ghi có tuần tuổi ngoài 1–MAX_GROWTH_WEEK: không đưa vào bảng (ngày ghi, tuần tuổi). */
+  outOfRange: { entry_date: string; week: number }[];
+}
+
+/**
+ * Chỉ tiêu sinh trưởng theo tuần tuổi (phần 2 mục 2 của sổ, NC-12) tính từ các lần ghi hằng ngày đã gửi (bỏ nháp). Dòng tuần
+ * W gộp các tuần sau dòng trước tới W (dòng "Tuần 6" gồm tuần 5–6…); quá tuần 12 thêm dòng mỗi 2 tuần, tới tối đa
+ * MAX_GROWTH_WEEK. Lần ghi có tuần tuổi ngoài ngưỡng không sinh dòng, trả ở `outOfRange` (#109). Số sống, tỉ lệ sống,
+ * tiêu tốn tự tính; trọng lượng lấy theo lần cân (NC-12 nhập).
+ */
+export function growthTable(
+  c: Pick<Cycle, "received_date" | "age_days" | "initial_count" | "initial_weight_g">,
+  entries: Pick<Entry, "entry_date" | "metrics" | "status">[],
+): Growth {
+  const outOfRange: Growth["outOfRange"] = [];
+  const es: Pick<Entry, "entry_date" | "metrics" | "status">[] = [];
+  const weekOf: number[] = [];
+  for (const e of entries.filter((x) => x.status !== "draft").sort((a, b) => a.entry_date.localeCompare(b.entry_date))) {
+    const w = ageWeek(c, e);
+    if (Number.isFinite(w) && w >= 1 && w <= MAX_GROWTH_WEEK) {
+      es.push(e);
+      weekOf.push(w);
+    } else outOfRange.push({ entry_date: e.entry_date, week: w });
+  }
+  const weeks: number[] = [...GROWTH_WEEKS];
+  const maxWeek = weekOf.reduce((m, w) => Math.max(m, w), 0);
+  while (weeks.at(-1)! < maxWeek) weeks.push(weeks.at(-1)! + 2);
+  const startKg = (num(c.initial_weight_g) ?? 0) / 1000;
+  const causeLabel = (v: string) => DEATH_CAUSES.find((x) => x[0] === v)?.[1] ?? v;
+  let prev = 0,
+    cumFeed = 0;
+  const rows: GrowthRow[] = weeks.map((week) => {
+    const inRow = es.filter((_, i) => weekOf[i]! > prev && weekOf[i]! <= week);
+    prev = week;
+    let alive: number | null = null,
+      weightKg: number | null = null,
+      dead = 0,
+      feedKg = 0;
+    const causes = new Set<string>();
+    for (const e of inRow) {
+      const a = num(e.metrics.alive);
+      if (a !== null) alive = a;
+      const w = num(e.metrics.weight_avg_g);
+      if (w !== null) weightKg = round(w / 1000, 3);
+      const d = num(e.metrics.dead) ?? 0;
+      dead += d;
+      if (d > 0 && e.metrics.death_cause) causes.add(causeLabel(e.metrics.death_cause));
+      feedKg += num(e.metrics.feed_kg) ?? 0;
+    }
+    cumFeed += feedKg;
+    const gain = alive !== null && weightKg !== null ? alive * weightKg - c.initial_count * startKg : 0;
+    return {
+      week,
+      alive,
+      survival: alive === null || !c.initial_count ? null : round((alive / c.initial_count) * 100, 1),
+      dead,
+      causes: [...causes].join(", "),
+      feedKg: round(feedKg, 2),
+      fcr: gain > 0 ? round(cumFeed / gain, 2) : null,
+      weightKg,
+    };
+  });
+  const lastAlive = [...rows].reverse().find((r) => r.alive !== null) ?? null;
+  const lastFcr = [...rows].reverse().find((r) => r.fcr !== null)?.fcr ?? null;
+  const weighed = rows.filter((r) => r.weightKg !== null).map((r) => r.weightKg!);
+  return {
+    rows,
+    total: {
+      dead: rows.reduce((n, r) => n + r.dead, 0),
+      feedKg: round(cumFeed, 2),
+      alive: lastAlive?.alive ?? null,
+      survival: lastAlive?.survival ?? null,
+      fcr: lastFcr,
+    },
+    avg: {
+      weightKg: weighed.length ? round(weighed.reduce((a, b) => a + b, 0) / weighed.length, 3) : null,
+      feedPerHead: c.initial_count ? round(cumFeed / c.initial_count, 2) : null,
+    },
+    outOfRange,
+  };
+}
+
+export interface TechTarget {
+  label: string;
+  unit: string;
+  target: string;
+  /** Giá trị thực tế từ bảng sinh trưởng (null khi chưa có số liệu). */
+  actual: (g: Growth) => number | null;
+  ok: (v: number) => boolean;
+}
+
+const rowAt = (g: Growth, week: number) => g.rows.find((r) => r.week === week);
+
+/** Các yêu cầu kỹ thuật cần đạt (phần 2 mục 1 của sổ) — so với số liệu thực tế. */
+export const TECH_TARGETS: Partial<Record<Form, TechTarget[]>> = {
+  "BM-08": [
+    { label: "Tỷ lệ sống của gà 4 tuần tuổi", unit: "%", target: "95", actual: (g) => rowAt(g, 4)?.survival ?? null, ok: (v) => v >= 95 },
+    { label: "Tỷ lệ nuôi sống đến 12 tuần tuổi", unit: "%", target: "90", actual: (g) => rowAt(g, 12)?.survival ?? null, ok: (v) => v >= 90 },
+    { label: "Tiêu tốn thức ăn", unit: "kg", target: "2,8", actual: (g) => g.total.fcr, ok: (v) => v <= 2.8 },
+    {
+      label: "Trọng lượng gà đến 12 tuần tuổi",
+      unit: "kg",
+      target: "1,6–1,8",
+      actual: (g) => rowAt(g, 12)?.weightKg ?? null,
+      ok: (v) => v >= 1.6 && v <= 1.8,
+    },
+  ],
+  "BM-09": [
+    // 70 ngày tuổi = tuần 10.
+    { label: "Tỉ lệ nuôi sống đến 70 ngày", unit: "%", target: "≥ 90", actual: (g) => rowAt(g, 10)?.survival ?? null, ok: (v) => v >= 90 },
+    { label: "Trọng lượng TB lúc 70 ngày", unit: "kg", target: "≥ 3", actual: (g) => rowAt(g, 10)?.weightKg ?? null, ok: (v) => v >= 3 },
+    { label: "Tiêu tốn thức ăn (thức ăn hỗn hợp hoàn chỉnh)", unit: "kg", target: "≤ 3", actual: (g) => g.total.fcr, ok: (v) => v <= 3 },
+  ],
+};
+
+/** Số kiểu Việt (dấu phẩy thập phân). */
+export const vn = (n: number | null | undefined) => (n === null || n === undefined ? "—" : String(n).replace(".", ","));
+
+/** Cột bảng phụ theo sổ gốc (mục 3–7, phần 3). */
+export type TableField = { key: string; label: string; type?: "date" | "number" | "text" };
+const PURCHASE = (name: string): TableField[] => [
+  { key: "date", label: "Ngày", type: "date" },
+  { key: "name", label: name },
+  { key: "quantity_kg", label: "Số lượng (kg)" },
+  { key: "unit_price", label: "Đơn giá (đ/kg)" },
+  { key: "note", label: "Ghi chú" },
+];
+export const TABLE_FIELDS: Record<keyof Tables, TableField[]> = {
+  feed_purchases: PURCHASE("Tên thức ăn"),
+  feed_materials: PURCHASE("Tên nguyên liệu thức ăn"),
+  treatments: [
+    { key: "date", label: "Ngày", type: "date" },
+    { key: "condition", label: "Thể trạng" },
+    { key: "symptoms", label: "Triệu chứng" },
+    { key: "drug", label: "Tên thuốc sử dụng" },
+    { key: "dosage", label: "Liều lượng, cách dùng" },
+    { key: "treater", label: "Người điều trị" },
+    { key: "withdrawal_days", label: "Thời gian ngưng thuốc (ngày)", type: "number" },
+    { key: "result", label: "Kết quả điều trị" },
+  ],
+  vaccinations: [
+    { key: "date", label: "Ngày tiêm phòng", type: "date" },
+    { key: "vaccine", label: "Tên vaccine" },
+    { key: "dosage", label: "Liều lượng" },
+    { key: "method", label: "Cách dùng" },
+    { key: "mfg_date", label: "Ngày sản xuất vaccine", type: "date" },
+    { key: "shot", label: "Lần (nếu có)", type: "number" },
+    { key: "note", label: "Ghi chú" },
+  ],
+  sales: [
+    { key: "date", label: "Ngày", type: "date" },
+    { key: "kind", label: "Loại" },
+    { key: "heads", label: "Số lượng bán (con)", type: "number" },
+    { key: "weight_kg", label: "Khối lượng (kg)" },
+    { key: "unit_price", label: "Đơn giá (đ/kg)" },
+  ],
+  officer_notes: [
+    { key: "date", label: "Ngày", type: "date" },
+    { key: "officer", label: "Họ và tên cán bộ" },
+    { key: "content", label: "Nội dung yêu cầu" },
+    { key: "farmer_opinion", label: "Ý kiến nông dân" },
+  ],
+};
+/** Cột (số lượng, đơn giá) để tính thành tiền tự động. */
+export const AMOUNT_OF: Partial<Record<keyof Tables, [string, string]>> = {
+  feed_purchases: ["quantity_kg", "unit_price"],
+  feed_materials: ["quantity_kg", "unit_price"],
+  sales: ["weight_kg", "unit_price"],
+};
