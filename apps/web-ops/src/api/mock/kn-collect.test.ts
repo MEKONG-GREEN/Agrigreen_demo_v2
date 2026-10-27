@@ -2,7 +2,8 @@
 // phạm vi xã phụ trách, SĐT che, vô hiệu hóa thay xóa, máy nguyên ≥ 0 không trùng loại, tổng xã = Σ HTX, vật tư + tổng hợp.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiProblem } from "@/api/problem";
-import { createCollectApi } from "@/kn/cycle/api";
+import { createCollectApi, RawFile } from "@/kn/cycle/api";
+import { materialTemplateCsv } from "@/kn/cycle/screens/MaterialsScreen";
 import { mockFetchNoDelay } from "./handler";
 import { resetKnCollect } from "./kn-collect";
 
@@ -61,6 +62,37 @@ describe("thu thập dữ liệu Cấp Xã giả lập (P7)", () => {
       ["91301", "bay_den", "10"],
     ]);
     expect((await xa.plots()).items.every((p) => ["91301", "91302"].includes(p.commune_code))).toBe(true);
+  });
+});
+
+// BF-TT-MAT (#105): bảng nhập vật tư — danh mục, lọc ngày, Nạp Excel (chỉ đọc), log bản ghi.
+describe("vật tư dạng bảng nhập giả lập (TT-12)", () => {
+  it("danh mục material khớp sổ; lọc from/to; nạp CSV không ghi; log bản ghi; Cấp Tỉnh không nạp", async () => {
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const cat = (await xa.materialCatalog()).items.map((m) => [m.code, m.attrs.unit]);
+    expect(cat).toEqual(expect.arrayContaining([["phan_ure", "tấn"], ["bay_den", "cái"]]));
+    const [rec] = (await xa.recordMaterials({ commune_code: "91301", recorded_on: "2026-09-30", lines: [{ material_code: "phan_ure", quantity: "2" }] })).items;
+    await xa.recordMaterials({ commune_code: "91301", recorded_on: "2026-09-01", lines: [{ material_code: "phan_ure", quantity: "1" }] });
+    expect((await xa.materials({ commune: "91301", from: "2026-09-30", to: "2026-09-30" })).items.map((m) => m.quantity)).toEqual(["2"]);
+    expect((await xa.materials({ commune: "91301" })).items).toHaveLength(2);
+    const log = await xa.materialLog(rec!.id);
+    expect(log.items.map((l) => l.event)).toEqual(["recorded"]);
+    const csv = ["Vật tư,Số lượng,Thời điểm,Ghi chú", "Phân urê,1.5,30/09/2026,Đợt 1", "bay_den,2.5,,", "khong_co,1,,", ""].join("\n");
+    const r = await xa.importMaterials(new RawFile(csv, "text/csv; charset=utf-8"));
+    expect([r.accepted, r.rejected]).toEqual([1, 2]);
+    expect(r.lines[0]).toMatchObject({ row: 2, material_code: "phan_ure", unit: "tấn", quantity: "1.5", recorded_on: "2026-09-30", note: "Đợt 1", status: "accepted" });
+    expect(r.lines[1]).toMatchObject({ material_code: "bay_den", quantity: null, status: "rejected" });
+    expect((await xa.materials({ commune: "91301" })).items).toHaveLength(2); // nạp tệp không ghi sổ
+    expect(await code(xa.importMaterials(new RawFile(["Ghi chú", "x", ""].join("\n"), "text/csv")))).toBe("422 extension.material_import_invalid");
+    const tw = await clientFor("kn-binh", "asg-binh-tinh");
+    expect(await code(tw.importMaterials(new RawFile(csv, "text/csv")))).toBe("403 extension.read_only");
+  });
+
+  it("Codex P2: tệp mẫu tải xuống nạp lại được — ô \"1,5\" bọc nháy, nhận 1 dòng số lượng 1.5", async () => {
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const r = await xa.importMaterials(new RawFile(materialTemplateCsv(), "text/csv; charset=utf-8"));
+    expect([r.accepted, r.rejected]).toEqual([1, 0]);
+    expect(r.lines[0]).toMatchObject({ row: 2, material_code: "phan_ure", unit: "tấn", quantity: "1.5", recorded_on: "2026-09-30", status: "accepted" });
   });
 });
 

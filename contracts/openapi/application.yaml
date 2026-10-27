@@ -7375,6 +7375,54 @@ paths:
         "403": {description: "extension.read_only | forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | extension.material_unknown | extension.material_quantity_invalid | extension.support_reason_required", $ref: "#/components/responses/Problem"}
         "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/materials/import:
+    post:
+      summary: "BF-TT-MAT (TT-12): Nạp Excel vật tư — đọc tệp CSV UTF-8/.xlsx thành dòng của bảng nhập, không ghi sổ"
+      description: |
+        Thân request là tệp (không multipart), đọc bằng shared/tabular (ô công thức → cả tệp bị từ chối). Cột bắt buộc
+        "Vật tư" (mã hoặc tên trong danh mục material đang dùng) và "Số lượng"; tùy chọn "ĐVT" (phải khớp danh mục),
+        "Thời điểm" (dd/mm/yyyy hoặc YYYY-MM-DD, không ở tương lai), "Ghi chú" (không SĐT/CCCD). Dòng lỗi có lý do không chứa
+        giá trị nhập; dòng khác vẫn nhận. Người dùng xem lại trong bảng rồi Lưu qua POST /v1/kn/materials (máy chủ kiểm lại).
+        Cùng quyền với ghi nhận (Cấp Xã, Admin). Tối đa 200 dòng, 2 MB.
+      operationId: knImportMaterials
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Dòng đọc được và kết quả kiểm từng dòng
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [lines, accepted, rejected]
+                properties:
+                  accepted: {type: integer}
+                  rejected: {type: integer}
+                  lines:
+                    type: array
+                    items:
+                      type: object
+                      required: [row, material_code, material_name, unit, quantity, recorded_on, note, status, reason]
+                      properties:
+                        row: {type: integer, description: "Số dòng trong tệp (tiêu đề = 1)"}
+                        material_code: {type: [string, "null"], description: "Mã danh mục nếu nhận ra (cả khi dòng bị loại)"}
+                        material_name: {type: [string, "null"]}
+                        unit: {type: [string, "null"]}
+                        quantity: {type: [string, "null"], description: "decimal đã chuẩn hóa; null nếu không hợp lệ"}
+                        recorded_on: {type: [string, "null"], format: date, description: "null = dùng Thời điểm đang chọn"}
+                        note: {type: [string, "null"]}
+                        status: {type: string, enum: [accepted, rejected]}
+                        reason: {type: [string, "null"], description: "Không chứa giá trị nhập"}
+        "403": {description: "extension.read_only | forbidden", $ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: extension.material_import_invalid, $ref: "#/components/responses/Problem"}
   /v1/kn/materials/summary:
     get:
       summary: "FN-XA-03.06 AC: tổng hợp vật tư hiện hành theo xã × vật tư (Cấp Tỉnh: các xã trong tỉnh)"
@@ -12794,6 +12842,24 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.plan_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: hrm.plan_closed, $ref: "#/components/responses/Problem"}
+  /v1/hrm/plans/{year}/remind:
+    parameters:
+      - $ref: "#/components/parameters/HrmPlanYear"
+    post:
+      summary: Nhắc các đơn vị CHƯA gửi kế hoạch (Phòng HCTH, Admin — phiên có quyền ghi) — sổ nhắc + sự kiện pf.hrm.plan.reminded cùng giao dịch; pf/notify gửi lãnh đạo các đơn vị đó tại Nút của phiên
+      operationId: hrmPlanRemind
+      tags: [hrm]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Đã nhắc
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HrmPlanReminder"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: hrm.plan_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "hrm.plan_closed | hrm.plan_all_submitted", $ref: "#/components/responses/Problem"}
   /v1/hrm/plans/{year}/units/{unit}:
     parameters:
       - $ref: "#/components/parameters/HrmPlanYear"
@@ -24147,6 +24213,24 @@ components:
         units: {type: array, items: {type: string}}
         submitted: {type: integer}
         opened_at: {type: string, format: date-time}
+    HrmPlanReminder:
+      type: object
+      required: [id, year, period_ref, units, due_at, reminded_at]
+      properties:
+        id: {type: string, format: uuid}
+        year: {type: integer}
+        period_ref: {type: string, format: uuid}
+        units:
+          type: array
+          description: Đơn vị nội bộ chưa gửi kế hoạch lúc nhắc
+          items:
+            type: object
+            required: [unit, unit_name]
+            properties:
+              unit: {type: string}
+              unit_name: {type: string}
+        due_at: {type: string, format: date-time}
+        reminded_at: {type: string, format: date-time}
     HrmPlanStatus:
       type: string
       description: "not_started Chưa lập · draft Đang lập · submitted Đã gửi · returned Yêu cầu điều chỉnh · accepted Đã xác nhận · closed Đã chốt · missed Không gửi"

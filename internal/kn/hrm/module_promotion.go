@@ -1,7 +1,7 @@
 package hrm
 
-// W11.25 — nối nâng bậc lương (FN-09, FN-10): thông báo kết quả job tính mốc, cổng ghi Word (W10.17), job
-// hrm_promotion_scan cho cmd/worker.
+// W11.25 — nối nâng bậc lương (FN-09, FN-10): cổng ghi Word (W10.17), job hrm_promotion_scan cho cmd/worker (thông báo kết
+// quả qua outbox — module_notify.go).
 
 import (
 	"context"
@@ -20,10 +20,10 @@ import (
 // JobPromotionScan là tên job tính mốc nâng bậc hằng ngày trong cmd/worker (-jobs).
 const JobPromotionScan = app.JobPromotionScan
 
-// UsePromotion nối bên nhận thông báo (pf/notify — nil: chỉ ghi sổ promotion_scan) và cổng ghi Word Mẫu số 1/2/4 (W10.17 —
-// nil: chỉ Excel).
-func (m *Module) UsePromotion(n port.PromotionNotifier, w port.PromotionWriter) {
-	m.svc.Promo = app.PromotionConfig{Notifier: n, Writer: w}
+// UsePromotion nối cổng ghi Word Mẫu số 1/2/4 (W10.17 — nil: chỉ Excel). Thông báo kết quả job cho Phòng HCTH đi qua outbox
+// (sự kiện pf.hrm.promotion_due.detected cùng giao dịch với sổ — NOTIFY-HCTH-KN #50), không qua cổng gọi trực tiếp.
+func (m *Module) UsePromotion(w port.PromotionWriter) {
+	m.svc.Promo = app.PromotionConfig{Writer: w}
 }
 
 // PromotionTenants trả bộ tìm tenant cho job từ pool vai ag_ops_jobs (worker, nối thẳng — chỉ đọc cột tenant_id).
@@ -51,5 +51,5 @@ func (m *Module) PromotionJobs(tenants func(context.Context) ([]uuid.UUID, error
 
 // PromotionScanRun chạy job cho một tenant tại now (kiểm thử, chạy tay).
 func (m *Module) PromotionScanRun(ctx context.Context, tid uuid.UUID, now time.Time) (app.ScanResult, error) {
-	return m.svc.PromotionScan(ctx, tid, now, m.svc.Promo.Notifier)
+	return m.svc.PromotionScan(ctx, tid, now)
 }

@@ -129,3 +129,46 @@ func InsertPlanAdjustment(ctx context.Context, tx pgx.Tx, tid uuid.UUID, x PlanE
 		x.ID, tid, x.PeriodRef, x.Unit, string(x.Values), x.Reason, at.UTC(), x.Actor, idem, domain.RuleVersion).Scan(&seq)
 	return seq, err
 }
+
+// --- NOTIFY-HCTH-KN (#50, pf 20261026125619): sổ nhắc lập kế hoạch. ---
+
+// PlanReminderRow là một lần nhắc các đơn vị chưa gửi kế hoạch của một kỳ.
+type PlanReminderRow struct {
+	ID         uuid.UUID
+	PeriodRef  uuid.UUID
+	Year       int
+	NodeRef    uuid.UUID
+	Units      []string
+	Actor      uuid.UUID
+	RecordedAt time.Time // event_time — đồng hồ nghiệp vụ
+}
+
+const planReminderCols = `id, period_ref, plan_year, node_ref, units, actor_ref, event_time`
+
+func scanPlanReminder(r pgx.CollectableRow) (PlanReminderRow, error) {
+	var x PlanReminderRow
+	err := r.Scan(&x.ID, &x.PeriodRef, &x.Year, &x.NodeRef, &x.Units, &x.Actor, &x.RecordedAt)
+	return x, err
+}
+
+// InsertPlanReminder ghi một lần nhắc (khóa idem trùng → unique_violation, bên gọi đọc lại bằng PlanReminderByIdem).
+func InsertPlanReminder(ctx context.Context, tx pgx.Tx, tid uuid.UUID, x PlanReminderRow, at time.Time, idem string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_hrm.plan_reminder (id, tenant_id, stream_key, period_ref, plan_year, node_ref, units, event_time,
+	    actor_ref, idem_key, rule_version)
+	  VALUES ($1, $2, 'remind:' || $3::uuid::text, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		x.ID, tid, x.PeriodRef, x.Year, x.NodeRef, x.Units, at.UTC(), x.Actor, idem, domain.RuleVersion)
+	return err
+}
+
+// PlanReminderByIdem trả lần nhắc đã ghi với khóa idem (nil nếu không có).
+func PlanReminderByIdem(ctx context.Context, tx pgx.Tx, idem string) (*PlanReminderRow, error) {
+	rows, err := tx.Query(ctx, `SELECT `+planReminderCols+` FROM pf_hrm.plan_reminder WHERE idem_key = $1 ORDER BY recorded_at DESC LIMIT 1`, idem)
+	if err != nil {
+		return nil, err
+	}
+	xs, err := pgx.CollectRows(rows, scanPlanReminder)
+	if err != nil || len(xs) == 0 {
+		return nil, err
+	}
+	return &xs[0], nil
+}

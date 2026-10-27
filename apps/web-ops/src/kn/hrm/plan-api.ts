@@ -15,6 +15,7 @@ export type HrmPlanInput = S["HrmPlanInput"];
 export type HrmPlanValues = S["HrmPlanValues"];
 export type HrmPlanPosition = S["HrmPlanPosition"];
 export type HrmPlanStatus = S["HrmPlanStatus"];
+export type HrmPlanReminder = S["HrmPlanReminder"];
 
 /** Nhãn trạng thái kế hoạch của đơn vị (prototype HCTH: Chưa lập, Đang lập, Đã gửi, Trễ hạn, Đã chốt). */
 export const PLAN_STATUS_LABEL: Record<HrmPlanStatus, string> = {
@@ -66,6 +67,13 @@ export function createPlanApi(api: ApiClient) {
     close: (year: number): Promise<HrmPlanSummary> =>
       unwrap(
         api.POST("/v1/hrm/plans/{year}/close", {
+          params: { path: { year }, header: idem() },
+        }),
+      ),
+    /** "Nhắc phòng chưa lập" (NOTIFY-HCTH-KN #50): nhắc lãnh đạo các đơn vị chưa gửi qua pf/notify. */
+    remind: (year: number): Promise<HrmPlanReminder> =>
+      unwrap(
+        api.POST("/v1/hrm/plans/{year}/remind", {
           params: { path: { year }, header: idem() },
         }),
       ),
