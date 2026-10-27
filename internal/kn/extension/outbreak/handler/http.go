@@ -31,6 +31,9 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.POST("/outbreaks/:ref/progress", h.updateOutbreak)
 	g.POST("/outbreaks/:ref/close", h.closeOutbreak)
 	g.POST("/outbreaks/:ref/reopen", h.reopenOutbreak)
+	g.POST("/outbreaks/:ref/word", h.exportWord) // BF-CN-OUTBREAK (UP-08): Word BM-10 qua pf/export
+	g.GET("/outbreaks/:ref/words", h.wordHistory)
+	g.GET("/outbreaks/:ref/words/:run/download", h.wordDownload)
 	g.GET("/suspects", h.listSuspects)
 	g.POST("/suspects", h.reportSuspect)
 	g.GET("/suspects/:ref", h.getSuspect)

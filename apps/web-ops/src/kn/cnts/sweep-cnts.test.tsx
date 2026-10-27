@@ -7,6 +7,7 @@ import { createApiClient, type ApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { AlertScreen } from "./alert/AlertScreen";
 import { ProjectsScreen } from "./model/ProjectsScreen";
+import { OutbreakCreateScreen } from "./outbreak/OutbreakCreateScreen";
 import { OutbreakScreen } from "./outbreak/OutbreakScreen";
 import { CntsPublishScreen } from "./periods/CntsPublishScreen";
 import { VaccinationScreen } from "./schedules/VaccinationScreen";
@@ -77,8 +78,10 @@ describe("Dịch bệnh — tin báo nghi dịch", () => {
     auth.role = "kn_xa";
     useApi("kn-an");
     const u = userEvent.setup();
-    render(<OutbreakScreen />);
-    await u.click(screen.getByRole("button", { name: "Lập báo cáo dịch bệnh" }));
+    // BF-CN-OUTBREAK (UP-08): lập báo cáo trên trang riêng; ô số mặc định 0.
+    render(<OutbreakCreateScreen />);
+    expect(screen.getByLabelText(/DB-06 Quy mô đàn/)).toHaveValue("0");
+    await u.clear(screen.getByLabelText(/DB-06 Quy mô đàn/));
     await u.type(screen.getByLabelText(/DB-06 Quy mô đàn/), "0");
     await u.clear(screen.getByLabelText(/DB-07 Số con chết/));
     await u.type(screen.getByLabelText(/DB-07 Số con chết/), "-1");

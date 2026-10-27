@@ -10834,6 +10834,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/outbreaks/{ref}/word": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xuất Word Báo cáo tình hình dịch bệnh BM-10 qua pf/export (BF-CN-OUTBREAK, UP-08): tự cấp số {n}/BC-TTKN — một số mỗi ổ dịch, dùng lại khi xuất lại; điền dòng địa danh, ngày */
+        post: operations["extensionCntsOutbreakWord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}/words": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử các lần xuất Word BM-10 của ổ dịch (mới nhất trước) */
+        get: operations["extensionCntsOutbreakWords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/outbreaks/{ref}/words/{run}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải lại tệp Word đã xuất (pf/export kiểm băm SHA-256) */
+        get: operations["extensionCntsOutbreakWordDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -23063,6 +23114,22 @@ export interface components {
         };
         CNTSDiaryBase: {
             base_version: number;
+        };
+        CNTSOutbreakWordRun: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            template: string;
+            template_version: number;
+            doc_number: string;
+            doc_number_auto: boolean;
+            file_name: string;
+            body_hash: string;
+            size: number;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
         };
     };
     responses: {
@@ -46337,6 +46404,88 @@ export interface operations {
             422: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsOutbreakWord: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lần xuất đã ghi sổ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSOutbreakWordRun"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_not_found | export.template_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsOutbreakWords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSOutbreakWordRun"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsOutbreakWordDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+                run: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .docx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_outbreak_not_found | export.run_not_found */
+            404: components["responses"]["Problem"];
         };
     };
 }
