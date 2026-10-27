@@ -4,7 +4,7 @@
 // chặn (409 geo.plot_overlap — giả lập so khung bao); sửa ranh giới = phiên bản mới thay supersedes_boundary_id, lý do
 // ≥ 10 ký tự; cây trồng bắt buộc, thuộc danh mục crop đang dùng, thửa ngừng dùng → 409.
 // ============================================================================
-import { m2ToHa, polygonAreaM2, type LngLat } from "@/gis/geometry";
+import { m2ToHa, polygonAreaM2, type LngLat } from "@/kn/cycle/plotGeometry";
 import { uuidv7 } from "../idempotency";
 import { CATALOGS } from "./data";
 import { json, problem, type Ctx, type Route } from "./http";

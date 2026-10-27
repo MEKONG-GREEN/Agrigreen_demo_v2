@@ -8,8 +8,7 @@ import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetKnCollect } from "@/api/mock/kn-collect";
 import { ApiProblem } from "@/api/problem";
 import { createCollectApi } from "@/kn/cycle/api";
-import type * as GisEditor from "@/gis/editor";
-import type { LngLat } from "@/gis/geometry";
+import type { LngLat } from "@/kn/cycle/plotGeometry";
 import { PlotCreateScreen, PlotEditScreen, PlotsScreen, drawnAreaHa, outerRing, plotDraftError, plotUpdateBody } from "./PlotScreens";
 
 const push = vi.fn();
@@ -19,8 +18,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, replace: vi.fn() }),
   useParams: () => params,
 }));
-// Bản đồ MapLibre không chạy trong jsdom: vẽ bằng ô "Thêm điểm theo toạ độ" của DrawPanel (đường bàn phím có sẵn).
-vi.mock("@/gis/editor", async (orig) => ({ ...(await orig<typeof GisEditor>()), EditorMap: () => null }));
+// Bản đồ MapLibre không chạy trong jsdom: vẽ bằng ô "Thêm điểm theo toạ độ" của PlotDrawPanel (đường bàn phím có sẵn).
+vi.mock("@/components/LayerMap", () => ({ LayerMap: () => null }));
 
 const auth: { role: string; collectApi: Record<string, ReturnType<typeof vi.fn>> } = { role: "kn_xa", collectApi: {} };
 vi.mock("@/auth/AuthProvider", () => ({

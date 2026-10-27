@@ -14,12 +14,12 @@ import { SelectField, TextField, validateForm, type FieldRule } from "@/componen
 import { DetailPage, LogPanel } from "@/components/patterns/detail";
 import { DataTable, FilterBar, PageHeader, RowActions, StatusPill, type Column } from "@/components/patterns/list";
 import type { AnyFeatureCollection } from "@/components/LayerMap";
-import { boundsOf, DrawSection, EditorMap } from "@/gis/editor";
-import { draftGeometry, m2ToHa, polygonAreaM2, validateDraft, type LngLat } from "@/gis/geometry";
 import { PiiHint } from "@/kn/pii";
+import { boundsOf, m2ToHa, polygonAreaM2, polygonGeometry, validatePolygon, type LngLat } from "../plotGeometry";
 import type { KnPlot, KnPlotDetail, KnPlotUpdate, PlotShapes } from "../api";
 import { LoadState, num, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { GapNotice, useCommuneFilter } from "./DataScreens";
+import { PlotDrawPanel, PlotEditorMap } from "./PlotMap";
 
 /** Khoảng diện tích máy chủ nhận cho thửa (geo.area_out_of_range: 0,001 – 1.000 ha). */
 export const PLOT_AREA_MIN_HA = 0.001;
@@ -33,7 +33,7 @@ export function drawnAreaHa(coords: readonly LngLat[]): number {
 /** Kiểm hình thửa trước khi lưu (≥ 3 điểm phân biệt, không thẳng hàng, diện tích trong khoảng máy chủ nhận). */
 export function plotDraftError(coords: readonly LngLat[]): string | undefined {
   if (coords.length === 0) return "Bắt buộc vẽ ranh giới thửa trên bản đồ.";
-  const bad = validateDraft("polygon", coords);
+  const bad = validatePolygon(coords);
   if (bad) return bad;
   const ha = drawnAreaHa(coords);
   if (ha < PLOT_AREA_MIN_HA) return "Diện tích phải từ 0,001 ha.";
@@ -203,7 +203,7 @@ export function PlotCreateScreen() {
         ...(b.cooperative_ref ? { cooperative_ref: b.cooperative_ref } : {}),
         ...(b.note.trim() ? { note: b.note.trim() } : {}),
         shape: "polygon",
-        geometry: draftGeometry("polygon", coords) as KnPlotDetail["geometry"],
+        geometry: polygonGeometry(coords) as KnPlotDetail["geometry"],
       });
       // Sau await: bọc bằng idem của CÙNG lượt để bấm lại sau mất phản hồi giữ khóa của mọi bước (#129).
       await idem(() => collectApi.putPlotCrop(p.ref, b.crop_code));
@@ -249,8 +249,8 @@ export function PlotCreateScreen() {
         <h2>
           Ranh giới thửa<span className="req" aria-hidden="true"> *</span>
         </h2>
-        <EditorMap label="Bản đồ vẽ thửa" context={context} drawing mode="polygon" coords={coords} onCoords={(c) => (setCoords(c), setErrors((x) => ({ ...x, geometry: undefined })))} focus={coords.length ? null : { key: `xa-${form.commune_code}`, bounds: shapesBounds(shapes.data) }} />
-        <DrawSection mode="polygon" coords={coords} onCoords={(c) => (setCoords(c), setErrors((x) => ({ ...x, geometry: undefined })))} />
+        <PlotEditorMap label="Bản đồ vẽ thửa" context={context} drawing coords={coords} onCoords={(c) => (setCoords(c), setErrors((x) => ({ ...x, geometry: undefined })))} focus={coords.length ? null : { key: `xa-${form.commune_code}`, bounds: shapesBounds(shapes.data) }} />
+        <PlotDrawPanel coords={coords} onCoords={(c) => (setCoords(c), setErrors((x) => ({ ...x, geometry: undefined })))} />
         {err("geometry") ? (
           <span className="err" role="alert">
             {err("geometry")}
@@ -302,7 +302,7 @@ export function PlotEditScreen() {
           const ok = await act.run(async (idem) => {
             // Ranh giới trước: chồng lấn (409) thì dừng, không ghi thuộc tính hay cây trồng. Mọi bước bọc idem của cùng
             // lượt (bước sau await) để bấm lại sau mất phản hồi dùng lại khóa cũ (#129).
-            if (redraw) await idem(() => collectApi.correctPlotBoundary(id, { supersedes_boundary_id: plot.boundary_id, geometry: draftGeometry("polygon", coords) as KnPlotDetail["geometry"], shape: "polygon", reason: f.reason.trim() }));
+            if (redraw) await idem(() => collectApi.correctPlotBoundary(id, { supersedes_boundary_id: plot.boundary_id, geometry: polygonGeometry(coords) as KnPlotDetail["geometry"], shape: "polygon", reason: f.reason.trim() }));
             if (body) await idem(() => collectApi.updatePlot(id, body));
             if (f.crop_code !== profile.crop_code) await idem(() => collectApi.putPlotCrop(id, f.crop_code));
             return true;
@@ -371,18 +371,17 @@ export function PlotEditScreen() {
                   </button>
                 )}
               </div>
-              <EditorMap
+              <PlotEditorMap
                 label="Bản đồ thửa"
                 context={context}
                 drawing={redraw}
-                mode="polygon"
                 coords={coords}
                 onCoords={(c) => (setCoords(c), setErrors((x) => ({ ...x, geometry: undefined })))}
                 focus={{ key: `thua-${plot.ref}-${redraw ? "ve" : "xem"}`, bounds: boundsOf(redraw && coords.length ? coords : outerRing(plot.geometry)) }}
               />
               {redraw ? (
                 <>
-                  <DrawSection mode="polygon" coords={coords} onCoords={(c) => (setCoords(c), setErrors((x) => ({ ...x, geometry: undefined })))} />
+                  <PlotDrawPanel coords={coords} onCoords={(c) => (setCoords(c), setErrors((x) => ({ ...x, geometry: undefined })))} />
                   {err("geometry") ? (
                     <span className="err" role="alert">
                       {err("geometry")}
