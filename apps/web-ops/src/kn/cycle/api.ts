@@ -290,6 +290,8 @@ export function createCycleApi(opts: KnHttpOptions) {
       call<RcSubmissionResult>("POST", `${X}/report-tasks/${id}/submissions`, body, undefined, idem),
     history: (id: string) => call<{ items: RcSubmission[] }>("GET", `${X}/report-tasks/${id}/history`),
     taskLog: (id: string) => call<{ items: RcLogEntry[] }>("GET", `${X}/report-tasks/${id}/log`),
+    /** BF-TT-FORMS "Nhập từ Excel": máy chủ đọc tệp (bố cục Tải mẫu Excel) thành dòng chữ cái cột → giá trị — không ghi. */
+    importGrid: (id: string, file: RawFile) => call<{ sheet: string; rows: { line: number; cells: Record<string, string> }[] }>("POST", `${X}/report-tasks/${id}/grid-import`, file),
     requestAdjustment: (id: string, reason: string) => call<{ task: RcTask }>("POST", `${X}/report-tasks/${id}/adjustment-request`, { reason }),
     confirm: (id: string, note?: string) => call<{ task: RcTask }>("POST", `${X}/report-tasks/${id}/confirm`, note ? { note } : {}),
     periods: (q: { report_type?: string; batch_id?: string; province?: string } = {}) => call<{ items: RcPeriod[] }>("GET", `${X}/kn-periods`, undefined, q),

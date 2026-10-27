@@ -2,6 +2,7 @@
 
 // Cấp Tỉnh (BRD §4.3): Phát hành biểu mẫu FN-TI-02.02, Trạng thái nộp FN-TI-02.03, Rà soát & chốt kỳ FN-TI-02.04.
 import Link from "next/link";
+import { TT_FORM_CODES } from "../common"; // BF-TT-FORMS #107: đủ T01–T07, M01, V01–V06
 import { useParams, useRouter } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
@@ -734,7 +735,7 @@ export function ReviewListScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: str
             { value: "", label: "Tất cả" },
           ]}
         />
-        <FilterChip label="Biểu" value={form} onChange={setForm} options={[{ value: "", label: "Tất cả" }, ...["T01", "T03", "T04", "T05", "T06"].map((x) => ({ value: x, label: x }))]} />
+        <FilterChip label="Biểu" value={form} onChange={setForm} options={[{ value: "", label: "Tất cả" }, ...TT_FORM_CODES.map((x) => ({ value: x, label: x }))]} />
       </FilterBar>
       <LoadState s={s}>
         {(d) => <DataTable caption="Báo cáo cần rà soát" columns={columns} rows={d.items.slice((page - 1) * 20, page * 20)} rowKey={(t) => t.id} page={page} pageSize={20} total={d.items.length} onPage={setPage} empty="Không có báo cáo cần rà soát." />}

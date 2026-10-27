@@ -2913,6 +2913,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/report-tasks/{id}/grid-import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * BF-TT-FORMS (UP-04): Nhập từ Excel trên màn nhập biểu Cấp Xã — đọc tệp thành dòng chữ cái cột → giá trị, không ghi
+         * @description Thân request là tệp (không multipart): .xlsx đúng bố cục "Tải mẫu Excel" (tiêu đề → hàng chữ cái A, B, C… → dòng loại cột
+         *     → dòng dữ liệu → "Yêu cầu biểu mẫu") hoặc CSV UTF-8 có hàng chữ cái. Lấy sheet hiển thị đầu tiên có hàng chữ cái; bỏ dòng
+         *     trống; ô công thức lấy giá trị đã lưu. Web ghép dòng với xã (cột tên xã) / chỉ tiêu và chỉ điền ô nhập được của kỳ đang
+         *     mở; người dùng xem lại rồi Lưu nháp / Gửi (máy chủ kiểm lại khi nộp). Cấp Xã, công việc trong phạm vi. Tối đa 4 MB,
+         *     2000 dòng.
+         */
+        post: operations["rcImportGrid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/report-tasks/{id}/history": {
         parameters: {
             query?: never;
@@ -28914,6 +28938,54 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    rcImportGrid: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Dòng dữ liệu của tệp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Sheet đã đọc (rỗng với CSV) */
+                        sheet: string;
+                        rows: {
+                            /** @description Số dòng trong tệp */
+                            line: number;
+                            /** @description chữ cái cột → giá trị (ô khác rỗng) */
+                            cells: {
+                                [key: string]: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description extension.read_only | forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.report_task_not_found */
+            404: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            /** @description extension.grid_import_invalid */
             422: components["responses"]["Problem"];
         };
     };

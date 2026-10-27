@@ -4139,6 +4139,48 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/report-tasks/{id}/grid-import:
+    post:
+      summary: "BF-TT-FORMS (UP-04): Nhập từ Excel trên màn nhập biểu Cấp Xã — đọc tệp thành dòng chữ cái cột → giá trị, không ghi"
+      description: |
+        Thân request là tệp (không multipart): .xlsx đúng bố cục "Tải mẫu Excel" (tiêu đề → hàng chữ cái A, B, C… → dòng loại cột
+        → dòng dữ liệu → "Yêu cầu biểu mẫu") hoặc CSV UTF-8 có hàng chữ cái. Lấy sheet hiển thị đầu tiên có hàng chữ cái; bỏ dòng
+        trống; ô công thức lấy giá trị đã lưu. Web ghép dòng với xã (cột tên xã) / chỉ tiêu và chỉ điền ô nhập được của kỳ đang
+        mở; người dùng xem lại rồi Lưu nháp / Gửi (máy chủ kiểm lại khi nộp). Cấp Xã, công việc trong phạm vi. Tối đa 4 MB,
+        2000 dòng.
+      operationId: rcImportGrid
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          text/csv: {schema: {type: string, format: binary}}
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Dòng dữ liệu của tệp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sheet, rows]
+                properties:
+                  sheet: {type: string, description: "Sheet đã đọc (rỗng với CSV)"}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [line, cells]
+                      properties:
+                        line: {type: integer, description: "Số dòng trong tệp"}
+                        cells: {type: object, additionalProperties: {type: string}, description: "chữ cái cột → giá trị (ô khác rỗng)"}
+        "403": {description: "extension.read_only | forbidden", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.report_task_not_found, $ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: extension.grid_import_invalid, $ref: "#/components/responses/Problem"}
   /v1/extension/report-tasks/{id}/history:
     get:
       summary: "Lịch sử sửa (mọi phiên bản)"

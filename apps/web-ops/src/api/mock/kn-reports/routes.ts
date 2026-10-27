@@ -210,6 +210,18 @@ export const reportCycleAppRoutes: Route[] = [
     }),
   },
   {
+    // BF-TT-FORMS (#107) Nhập từ Excel: giả lập chỉ đọc CSV UTF-8 có hàng chữ cái cột (máy chủ thật đọc cả .xlsx).
+    method: "POST",
+    pattern: re("/v1/extension/report-tasks/{id}/grid-import"),
+    handler: kn((ctx, c) => {
+      const deny = st.writer(c, "kn_xa");
+      if (deny) return deny;
+      const t = taskFor(c, ctx.params[0]);
+      if (t instanceof Response) return t;
+      return gridImport(ctx.body);
+    }),
+  },
+  {
     method: "POST",
     pattern: re("/v1/extension/report-tasks/{id}/submissions"),
     handler: kn((ctx, c) => {
@@ -518,4 +530,28 @@ function formsFor(dept: string, rt: string, at: string) {
     completeness: f.definition.completeness,
     provincial_columns: f.definition.columns.filter((c) => c.kind === "provincial").map((c) => ({ letter: c.letter, title: c.title, unit: c.unit ?? "" })),
   }));
+}
+
+/** Giả lập POST /v1/extension/report-tasks/{id}/grid-import: tìm hàng chữ cái A, B, C…, bỏ dòng loại cột, lấy dòng dữ liệu. */
+function gridImport(body: unknown): Response {
+  const invalid = (d: string) => problem(422, "extension.grid_import_invalid", "Tệp không đúng bố cục mẫu Excel của biểu", { detail: d });
+  if (typeof body !== "string") return invalid("Giả lập chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx");
+  const rows = body.replace(/^﻿/, "").split(/\r?\n/).map((l) => l.split(",").map((x) => x.trim()));
+  const letter = (n: number) => { let s = ""; for (let k = n; k > 0; k = Math.floor((k - 1) / 26)) s = String.fromCharCode(65 + ((k - 1) % 26)) + s; return s; };
+  const at = rows.findIndex((r) => r.length >= 3 && r.slice(0, 3).every((x, j) => x === letter(j + 1)));
+  if (at < 0) return invalid("Không thấy hàng chữ cái cột (A, B, C…) — dùng tệp \"Tải mẫu Excel\" của biểu");
+  const cols = rows[at]!.filter((x, j) => x === letter(j + 1));
+  const kinds = new Set(["cố định", "tỉnh giao", "nhập", "kỳ", "ƒx", "fx", "công thức"]);
+  const out: { line: number; cells: Record<string, string> }[] = [];
+  for (let i = at + 1; i < rows.length; i++) {
+    const r = rows[i]!;
+    const first = r.find((x) => x) ?? "";
+    if (!first) continue;
+    if (first.replace(/^\*/, "").startsWith("Yêu cầu biểu mẫu")) break;
+    if (i === at + 1 && r.filter(Boolean).every((x) => kinds.has(x.toLowerCase()))) continue;
+    const cells: Record<string, string> = {};
+    cols.forEach((l, j) => r[j] && (cells[l] = r[j]!));
+    if (Object.keys(cells).length) out.push({ line: i + 1, cells });
+  }
+  return json({ sheet: "", rows: out });
 }

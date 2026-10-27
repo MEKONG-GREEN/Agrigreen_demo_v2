@@ -32,5 +32,6 @@ export {
   type GridRow,
   type GridValues,
 } from "./model";
+export { mergeGridImport, normName, type GridImportResult, type ImportedRow } from "./importRows";
 export { Decimal, formatDecimalVi, normalizeNumberInput } from "./decimal";
 export { columnIndex, columnLetter } from "./letters";
