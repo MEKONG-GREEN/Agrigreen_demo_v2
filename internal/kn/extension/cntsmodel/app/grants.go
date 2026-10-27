@@ -5,8 +5,8 @@ package app
 // (BR-03 "mọi thay đổi quyền có log"). Người được cấp phải là tài khoản Cấp Xã CNTS có sẵn (Admin tạo, FN-04) — trừ vai
 // nông hộ (GĐ2, tài khoản App nông hộ).
 //
-// Quyền KN này điều khiển các thao tác của module KN (vd cán bộ theo dõi mô hình sửa hộ — UR-XA-04). Phạm vi phiên do
-// pf/accounts giải (giới hạn cơ sở/hộ W11.07) chưa đọc sổ này — xem docs/kn/gia-dinh/W11.47.md.
+// Quyền KN này điều khiển các thao tác của module KN (vd cán bộ theo dõi mô hình sửa hộ — UR-XA-04) và, từ #71, phạm vi
+// phiên chủ KN của Cấp Xã CNTS (session_grants.go → biểu kỳ cap/forms) — xem docs/kn/gia-dinh/W11.47.md.
 
 import (
 	"context"

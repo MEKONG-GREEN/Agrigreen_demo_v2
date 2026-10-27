@@ -371,6 +371,22 @@ func ListHouseholds(ctx context.Context, tx pgx.Tx, f HouseholdFilter) ([]Househ
 	return collect(rows, err, scanHousehold)
 }
 
+// CoveredHouseholds trả bản hiện hành của các hộ có mã trong refs HOẶC thuộc điểm trong sites (phạm vi quyền theo dõi
+// mô hình của phiên — #71). Hai danh sách rỗng → không truy vấn.
+func CoveredHouseholds(ctx context.Context, tx pgx.Tx, refs, sites []uuid.UUID) ([]Household, error) {
+	if len(refs) == 0 && len(sites) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx, "SELECT "+householdCols+` FROM (
+	    SELECT DISTINCT ON (household_ref) * FROM pf_extension.cnts_model_household
+	    WHERE household_ref IN (SELECT household_ref FROM pf_extension.cnts_model_household
+	      WHERE household_ref = ANY ($1::text[]::uuid[]) OR site_ref = ANY ($2::text[]::uuid[]))
+	    ORDER BY household_ref, seq DESC) h
+	  WHERE h.household_ref = ANY ($1::text[]::uuid[]) OR h.site_ref = ANY ($2::text[]::uuid[])
+	  ORDER BY household_ref`, refStrings(refs), refStrings(sites))
+	return collect(rows, err, scanHousehold)
+}
+
 // ---------------------------------------------------------------------------
 // Cấp quyền
 // ---------------------------------------------------------------------------
@@ -439,6 +455,15 @@ func GrantByIdem(ctx context.Context, tx pgx.Tx, key string) (*Grant, error) {
 func GrantVersions(ctx context.Context, tx pgx.Tx, ref uuid.UUID) ([]Grant, error) {
 	rows, err := tx.Query(ctx, "SELECT "+grantCols+" FROM pf_extension.cnts_grant WHERE grant_ref = $1 ORDER BY seq", ref)
 	return collect(rows, err, scanGrant)
+}
+
+// GranteeEverGranted cho biết grantee đã TỪNG có quyền CNTS (vai khác nông hộ) ở BẤT KỲ phiên bản nào trong tenant — kể
+// cả quyền đã sửa thu hẹp, thu hồi, hết hạn (#71: quyết định phạm vi tường minh của phiên, chỉ đọc).
+func GranteeEverGranted(ctx context.Context, tx pgx.Tx, grantee uuid.UUID) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_extension.cnts_grant WHERE grantee_ref = $1 AND role <> $2)`,
+		grantee, domain.RoleFarmer).Scan(&ok)
+	return ok, err
 }
 
 // ListGrants trả bản hiện hành của mọi quyền; grantee khác nil → chỉ của người đó.
