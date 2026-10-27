@@ -160,6 +160,142 @@ describe("màn Khai thác thủy sản tuần", () => {
     });
   });
 
+  // #112 P2 (Codex): gửi nhiều xã trong một lượt — mỗi bước ghi giữ Idempotency-Key của lượt; lỗi giữa chừng đọc lại trạng thái,
+  // giữ số chưa gửi; bấm lại phát lại đúng khóa, không 409.
+  type Write = { unit: string; base: number; key: string | null; status: number | "lost" | "dropped" | "conflict" };
+  function flakyApi(fail: (n: number) => "lost" | "dropped" | "conflict" | null) {
+    const writes: Write[] = [];
+    let n = 0;
+    const network = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const req = input instanceof Request ? input : new Request(input, init);
+      const isSubmit = req.method === "POST" && new URL(req.url).pathname.endsWith("/submissions");
+      if (!isSubmit) return mockFetchNoDelay(req);
+      const body = (await req.clone().json()) as { unit: string; base_version: number };
+      const key = req.headers.get("Idempotency-Key");
+      const mode = fail(++n);
+      if (mode === "dropped") {
+        writes.push({ unit: body.unit, base: body.base_version, key, status: "dropped" });
+        throw new TypeError("mất mạng trước khi tới máy chủ");
+      }
+      if (mode === "conflict") {
+        writes.push({ unit: body.unit, base: body.base_version, key, status: "conflict" });
+        return new Response(JSON.stringify({ type: "about:blank", title: "Conflict", status: 409, code: "forms.submission_conflict" }), {
+          status: 409,
+          headers: { "Content-Type": "application/problem+json" },
+        });
+      }
+      const r = await mockFetchNoDelay(req);
+      writes.push({ unit: body.unit, base: body.base_version, key, status: mode === "lost" ? "lost" : r.status });
+      if (mode === "lost") throw new TypeError("mất phản hồi sau khi máy chủ đã lưu");
+      return r;
+    };
+    return { writes, api: createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-an", getContextId: () => xaCtx, fetch: network }) };
+  }
+  const statusOf = (xa: string) => screen.getByText(xa, { selector: "strong" }).closest("li")!;
+
+  it("mất phản hồi ở xã thứ hai: bấm lại phát lại cả hai bằng đúng khóa cũ, hoàn tất, cả hai hiện đã nộp", async () => {
+    auth.role = "kn_xa";
+    const f = flakyApi((n) => (n === 2 ? "lost" : null));
+    auth.api = f.api;
+    const u = userEvent.setup();
+    render(<CatchScreen />);
+    const submit = await screen.findByRole("button", { name: "Gửi tuần" });
+    await u.click(submit);
+    // Lỗi giữa chừng → đọc lại trạng thái: cả hai xã đã lưu hiện "Đã nộp" ngay, không còn "Chưa nhập".
+    await waitFor(() => {
+      expect(within(statusOf("Mỹ Hòa Hưng")).getByText("Đã nộp")).toBeInTheDocument();
+      expect(within(statusOf("Bình Đức")).getByText("Đã nộp")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Lần gửi trước dừng giữa chừng/)).toBeInTheDocument();
+    await u.click(submit);
+    expect(await screen.findByText("Đã gửi số liệu khai thác 2 xã của tuần.")).toBeInTheDocument();
+    const [a1, b1, a2, b2] = f.writes;
+    expect(f.writes).toHaveLength(4);
+    expect([a1!.unit, b1!.unit, a2!.unit, b2!.unit]).toEqual(["91301", "91302", "91301", "91302"]);
+    // Khóa ổn định qua lần bấm lại, mỗi xã một khóa riêng; máy chủ phát lại (201), không 409.
+    expect(a2!.key).toBe(a1!.key);
+    expect(b2!.key).toBe(b1!.key);
+    expect(a1!.key).not.toBe(b1!.key);
+    expect([a2!.status, b2!.status]).toEqual([201, 201]);
+    expect([a2!.base, b2!.base]).toEqual([0, 0]);
+    const saved = (await createCntsPeriodApi(apiOf("kn-an", xaCtx)).tasks("CNTS-BM17")).filter((t) => t.label === labels[1]);
+    expect(saved.map((t) => t.version)).toEqual([1, 1]); // không ghi lần hai
+  });
+
+  it("lỗi mạng ở xã thứ hai: xã đã lưu hiện đã nộp, số chưa gửi giữ nguyên, bấm lại gửi tiếp không 409", async () => {
+    auth.role = "kn_xa";
+    const f = flakyApi((n) => (n === 2 ? "dropped" : null));
+    auth.api = f.api;
+    const u = userEvent.setup();
+    render(<CatchScreen />);
+    const submit = await screen.findByRole("button", { name: "Gửi tuần" });
+    const cell = (xa: string) => screen.getByRole("textbox", { name: `Đánh bắt cá các loại ${xa} ${labels[1]} (tấn)` });
+    await u.clear(cell("Mỹ Hòa Hưng"));
+    await u.type(cell("Mỹ Hòa Hưng"), "2");
+    await u.clear(cell("Bình Đức"));
+    await u.type(cell("Bình Đức"), "3,5");
+    await u.click(submit);
+    await waitFor(() => expect(within(statusOf("Mỹ Hòa Hưng")).getByText("Đã nộp")).toBeInTheDocument());
+    expect(within(statusOf("Bình Đức")).queryByText("Đã nộp")).toBeNull();
+    expect(cell("Bình Đức")).toHaveValue("3,5"); // số chưa gửi giữ nguyên
+    expect(cell("Mỹ Hòa Hưng")).toHaveValue("2");
+    await u.click(submit);
+    expect(await screen.findByText("Đã gửi số liệu khai thác 2 xã của tuần.")).toBeInTheDocument();
+    expect(f.writes.map((w) => [w.unit, w.status])).toEqual([
+      ["91301", 201],
+      ["91302", "dropped"],
+      ["91301", 201],
+      ["91302", 201],
+    ]);
+    expect(f.writes[2]!.key).toBe(f.writes[0]!.key);
+    expect(f.writes[3]!.key).toBe(f.writes[1]!.key);
+    const saved = (await createCntsPeriodApi(apiOf("kn-an", xaCtx)).tasks("CNTS-BM17")).filter((t) => t.label === labels[1]);
+    expect(saved.find((t) => t.unit === "91301")).toMatchObject({ version: 1, values: { ca: "2" } });
+    expect(saved.find((t) => t.unit === "91302")).toMatchObject({ version: 1, values: { ca: "3.5" } });
+  });
+
+  it("sửa số xã đã lưu sau lỗi giữa chừng: gửi bài mới trên phiên bản đọc lại, không 409", async () => {
+    auth.role = "kn_xa";
+    const f = flakyApi((n) => (n === 2 ? "lost" : null));
+    auth.api = f.api;
+    const u = userEvent.setup();
+    render(<CatchScreen />);
+    const submit = await screen.findByRole("button", { name: "Gửi tuần" });
+    await u.click(submit);
+    await waitFor(() => expect(within(statusOf("Bình Đức")).getByText("Đã nộp")).toBeInTheDocument());
+    const cell = screen.getByRole("textbox", { name: `Đánh bắt cá các loại Bình Đức ${labels[1]} (tấn)` });
+    await u.clear(cell);
+    await u.type(cell, "4");
+    await u.click(submit);
+    expect(await screen.findByText("Đã gửi số liệu khai thác 2 xã của tuần.")).toBeInTheDocument();
+    const last = f.writes[3]!;
+    expect(last).toMatchObject({ unit: "91302", base: 1, status: 201 });
+    expect(last.key).not.toBe(f.writes[1]!.key);
+    const saved = (await createCntsPeriodApi(apiOf("kn-an", xaCtx)).tasks("CNTS-BM17")).find((t) => t.label === labels[1] && t.unit === "91302");
+    expect(saved).toMatchObject({ version: 2, values: { ca: "4" } });
+  });
+
+  it("lỗi nghiệp vụ dứt khoát (409) ở xã thứ hai: khóa bước đó bị bỏ, bấm lại gửi bằng khóa mới", async () => {
+    auth.role = "kn_xa";
+    const f = flakyApi((n) => (n === 2 ? "conflict" : null));
+    auth.api = f.api;
+    const u = userEvent.setup();
+    render(<CatchScreen />);
+    const submit = await screen.findByRole("button", { name: "Gửi tuần" });
+    await u.click(submit);
+    await waitFor(() => expect(within(statusOf("Mỹ Hòa Hưng")).getByText("Đã nộp")).toBeInTheDocument());
+    await u.click(submit);
+    expect(await screen.findByText("Đã gửi số liệu khai thác 2 xã của tuần.")).toBeInTheDocument();
+    expect(f.writes.map((w) => [w.unit, w.status])).toEqual([
+      ["91301", 201],
+      ["91302", "conflict"],
+      ["91301", 201],
+      ["91302", 201],
+    ]);
+    expect(f.writes[2]!.key).toBe(f.writes[0]!.key);
+    expect(f.writes[3]!.key).not.toBe(f.writes[1]!.key);
+  });
+
   it("Cấp Tỉnh xem 4 sheet của mọi xã, không có ô nhập", async () => {
     auth.role = "kn_tinh";
     auth.api = apiOf("kn-binh", null);

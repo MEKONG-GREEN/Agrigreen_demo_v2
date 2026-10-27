@@ -11,7 +11,19 @@ import { Fragment, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, num, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
-import { createCntsPeriodApi, fieldErrors, isLate, payloadValues, STATUS_LABEL, STATUS_TONE, type CntsPeriodApi, type FormsTask } from "../periods/api";
+import { outcomeUnknown } from "@/api/idempotency";
+import { ApiProblem } from "@/api/problem";
+import {
+  createCntsPeriodApi,
+  fieldErrors,
+  isLate,
+  payloadValues,
+  STATUS_LABEL,
+  STATUS_TONE,
+  type CntsPeriodApi,
+  type FormsTask,
+  type SubmitBody,
+} from "../periods/api";
 import { CATCH_CODE, catchMatrix, draftOf, editableWeeks, sheetTotal, sheetValue, SHEETS, unitTotal, type CatchMatrix, type CatchSheet } from "./catch";
 
 const LIMITS = [
@@ -22,6 +34,11 @@ const LIMITS = [
 ] as const;
 
 type Key = CatchSheet["key"];
+
+/** Hai thân gửi cùng nội dung (bỏ qua base_version). */
+function sameContent(a: SubmitBody, b: SubmitBody): boolean {
+  return JSON.stringify({ ...a, base_version: 0 }) === JSON.stringify({ ...b, base_version: 0 });
+}
 
 export function CatchScreen() {
   const { api, kn } = useAuth();
@@ -75,15 +92,22 @@ function CatchBody({
   act: ReturnType<typeof useAction>;
   reload: () => void;
 }) {
-  const full = useMemo(() => catchMatrix(tasks), [tasks]);
+  // Trạng thái máy chủ đọc lại sau một lượt gửi lỗi giữa chừng (#112 P2): xã đã lưu hiện "Đã nộp" mà KHÔNG dựng lại phần
+  // thân, nên số chưa gửi của các xã còn lại vẫn giữ nguyên trên form.
+  const [fresh, setFresh] = useState<FormsTask[] | null>(null);
+  const view = fresh ?? tasks;
+  // Thân yêu cầu đã gửi gần nhất của từng xã (kể cả bước mất phản hồi). Bấm lại với cùng nội dung → gửi lại ĐÚNG thân đó
+  // (cùng base_version → cùng dấu vân tay → cùng Idempotency-Key → máy chủ phát lại kết quả cũ, không 409 dù đã lưu).
+  const [attempted, setAttempted] = useState<Record<string, SubmitBody>>({});
+  const full = useMemo(() => catchMatrix(view), [view]);
   const weeks = writer ? editableWeeks(full) : [];
   const [week, setWeek] = useState(weeks[0]?.periodId ?? "");
   const m = useMemo(() => {
-    const shown = catchMatrix(tasks, limit);
+    const shown = catchMatrix(view, limit);
     // Tuần đang nhập luôn hiện, kể cả khi ngoài số tuần đã chọn.
     const w = full.weeks.find((x) => x.periodId === week);
     return w && !shown.weeks.some((x) => x.periodId === week) ? { ...shown, weeks: [...shown.weeks, w] } : shown;
-  }, [tasks, limit, full, week]);
+  }, [view, limit, full, week]);
   const name = useCommuneNames(m.units);
   const [sheet, setSheet] = useState<Key>("ca");
   const open = writer ? m.units.map((u) => full.cell(week, u)).filter((t): t is FormsTask => !!t?.open) : [];
@@ -109,22 +133,50 @@ function CatchBody({
     if (late && !explanation.trim()) e.explanation = "Gửi sau hạn nộp phải ghi lý do trễ.";
     setErrs(e);
     if (Object.keys(e).length) return;
-    const done = await act.run(async () => {
+    const plan = open.map((t) => {
+      const body: SubmitBody = {
+        unit: t.unit,
+        values: payloadValues(t.fields, drafts[t.unit] ?? {}, !!nil[t.unit]),
+        base_version: t.version,
+        nil_report: !!nil[t.unit],
+        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(explanation.trim() ? { explanation: explanation.trim() } : {}),
+      };
+      const prev = attempted[`${t.period_id}|${t.unit}`];
+      // Cùng nội dung với lần gửi trước → phát lại đúng thân cũ (khóa cũ). Nội dung đã đổi → bài mới trên phiên bản mới nhất
+      // máy chủ trả về (khóa lạc quan giữ nguyên phía máy chủ).
+      return { t, body: prev && sameContent(prev, body) ? prev : body };
+    });
+    setAttempted((a) => ({ ...a, ...Object.fromEntries(plan.map(({ t, body }) => [`${t.period_id}|${t.unit}`, body])) }));
+    const done = await act.run(async (idem) => {
       let n = 0;
-      for (const t of open) {
-        await capi.submit(t.period_id, {
-          unit: t.unit,
-          values: payloadValues(t.fields, drafts[t.unit] ?? {}, !!nil[t.unit]),
-          base_version: t.version,
-          nil_report: !!nil[t.unit],
-          ...(note.trim() ? { note: note.trim() } : {}),
-          ...(explanation.trim() ? { explanation: explanation.trim() } : {}),
-        });
+      for (const { t, body } of plan) {
+        // P0-WEB-IDEMKEY: mọi bước ghi (kể cả sau await của xã trước) gắn với ĐÚNG lượt bấm này qua `idem`.
+        try {
+          await idem(() => capi.submit(t.period_id, body));
+        } catch (e) {
+          // Lỗi dứt khoát (4xx, vd 409 xung đột phiên bản): máy chủ KHÔNG lưu thân này, khóa đã bị bỏ → lần sau dựng bài
+          // mới trên phiên bản đọc lại. Chưa rõ kết quả (mạng/5xx) → giữ thân để phát lại đúng khóa.
+          if (e instanceof ApiProblem && !outcomeUnknown({ status: e.status, code: e.code })) {
+            const k = `${t.period_id}|${t.unit}`;
+            setAttempted((a) => Object.fromEntries(Object.entries(a).filter(([x]) => x !== k)));
+          }
+          throw e;
+        }
         n++;
       }
       return n;
     }, (n) => `Đã gửi số liệu khai thác ${n} xã của tuần.`);
-    if (done !== null) reload();
+    if (done !== null) {
+      reload();
+      return;
+    }
+    // Lỗi giữa chừng: đọc lại trạng thái để xã đã lưu hiện "Đã nộp"; giữ nguyên số đang nhập để bấm Gửi tuần lại.
+    try {
+      setFresh(await capi.tasks(CATCH_CODE));
+    } catch {
+      /* giữ trạng thái cũ; bấm lại vẫn phát lại đúng khóa */
+    }
   };
   const sheetErrs = (key: Key) => Object.keys(errs).filter((x) => x.endsWith(`.${key}`)).length;
   if (!m.weeks.length) {
@@ -192,6 +244,12 @@ function CatchBody({
                   {SHEETS.filter((s) => sheetErrs(s.key))
                     .map((s) => s.tab)
                     .join(", ")}
+                </p>
+              ) : null}
+              {fresh ? (
+                <p className="mute" role="status">
+                  Lần gửi trước dừng giữa chừng: trạng thái từng xã đã được đọc lại, số đang nhập được giữ nguyên. Bấm Gửi tuần để gửi
+                  tiếp — xã đã lưu được phát lại an toàn, không ghi lần hai.
                 </p>
               ) : null}
               <button className="btn btn-primary" disabled={act.busy || !open.length} onClick={() => void submit()}>
