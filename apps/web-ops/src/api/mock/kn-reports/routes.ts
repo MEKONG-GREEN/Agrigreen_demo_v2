@@ -542,7 +542,7 @@ function gridImport(body: unknown): Response {
   if (at < 0) return invalid("Không thấy hàng chữ cái cột (A, B, C…) — dùng tệp \"Tải mẫu Excel\" của biểu");
   const cols = rows[at]!.filter((x, j) => x === letter(j + 1));
   const kinds = new Set(["cố định", "tỉnh giao", "nhập", "kỳ", "ƒx", "fx", "công thức"]);
-  const out: { line: number; cells: Record<string, string> }[] = [];
+  const out: { line: number; cells: Record<string, string>; numeric: string[] }[] = [];
   for (let i = at + 1; i < rows.length; i++) {
     const r = rows[i]!;
     const first = r.find((x) => x) ?? "";
@@ -551,7 +551,7 @@ function gridImport(body: unknown): Response {
     if (i === at + 1 && r.filter(Boolean).every((x) => kinds.has(x.toLowerCase()))) continue;
     const cells: Record<string, string> = {};
     cols.forEach((l, j) => r[j] && (cells[l] = r[j]!));
-    if (Object.keys(cells).length) out.push({ line: i + 1, cells });
+    if (Object.keys(cells).length) out.push({ line: i + 1, cells, numeric: [] }); // CSV: mọi ô là chữ
   }
   return json({ sheet: "", rows: out });
 }

@@ -719,7 +719,11 @@ func (h Handler) gridImport(c *gin.Context) {
 	}
 	rows := make([]gin.H, 0, len(res.Rows))
 	for _, r := range res.Rows {
-		rows = append(rows, gin.H{"line": r.Line, "cells": r.Cells})
+		numeric := r.Numeric
+		if numeric == nil {
+			numeric = []string{}
+		}
+		rows = append(rows, gin.H{"line": r.Line, "cells": r.Cells, "numeric": numeric})
 	}
 	c.JSON(http.StatusOK, gin.H{"sheet": res.Sheet, "rows": rows})
 }

@@ -4,6 +4,7 @@ package app
 // tiêu đề → hàng chữ cái cột → dòng loại cột → dòng dữ liệu) hoặc CSV UTF-8 có hàng chữ cái, trả các dòng dữ liệu dạng
 // chữ cái cột → giá trị. CHỈ ĐỌC, không ghi: web ghép dòng với xã (cột tên xã) / chỉ tiêu, chỉ điền ô nhập được, người
 // dùng xem lại rồi Lưu nháp / Gửi (máy chủ kiểm lại khi nộp). Không đọc công thức (giá trị đã lưu của ô được dùng).
+// Ô số của .xlsx trả dạng thập phân dấu chấm và được đánh dấu `numeric` (xem markNumericCells).
 
 import (
 	"bytes"
@@ -11,7 +12,10 @@ import (
 	"encoding/csv"
 	"errors"
 	"io"
+	"math"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -33,10 +37,13 @@ const (
 // ErrGridImportInvalid: tệp không đọc được hoặc không có hàng chữ cái cột.
 var ErrGridImportInvalid = problem.New(http.StatusUnprocessableEntity, "extension.grid_import_invalid", "Tệp không đúng bố cục mẫu Excel của biểu")
 
-// GridImportRow là một dòng dữ liệu của tệp: số dòng trong tệp và ô khác rỗng theo chữ cái cột.
+// GridImportRow là một dòng dữ liệu của tệp: số dòng trong tệp và ô khác rỗng theo chữ cái cột. Numeric liệt kê (theo
+// thứ tự cột) các ô là ô SỐ của .xlsx: giá trị đã chuẩn hóa dạng thập phân dấu chấm ("1.234" là một phẩy hai ba bốn),
+// web KHÔNG được đọc lại kiểu số VN; ô còn lại là chữ (CSV luôn là chữ) — web mới chuẩn hóa "1.234,5" → 1234.5.
 type GridImportRow struct {
-	Line  int
-	Cells map[string]string
+	Line    int               `json:"line"`
+	Cells   map[string]string `json:"cells"`
+	Numeric []string          `json:"numeric"`
 }
 
 // GridImport là kết quả đọc tệp.
@@ -94,7 +101,11 @@ func ParseGridImport(data []byte) (GridImport, error) {
 			}
 			if out, ok := gridRows(rows); ok {
 				out.Sheet = sh
-				return out, checkGridSize(out)
+				if err := checkGridSize(out); err != nil {
+					return GridImport{}, err
+				}
+				markNumericCells(f, sh, out.Rows)
+				return out, nil
 			}
 		}
 		return GridImport{}, ErrGridImportInvalid.WithDetail("Không thấy hàng chữ cái cột (A, B, C…) — dùng tệp \"Tải mẫu Excel\" của biểu")
@@ -165,10 +176,52 @@ func gridRows(rows [][]string) (GridImport, bool) {
 			}
 		}
 		if len(cells) > 0 {
-			out.Rows = append(out.Rows, GridImportRow{Line: i + 1, Cells: cells})
+			out.Rows = append(out.Rows, GridImportRow{Line: i + 1, Cells: cells, Numeric: []string{}})
 		}
 	}
 	return out, true
+}
+
+// markNumericCells (Codex P1 #107): GetRows trả giá trị ĐÃ ĐỊNH DẠNG theo máy chủ ("1.234", "1,234.50"…), không phân
+// biệt ô số với ô chữ. Với mỗi ô của dòng dữ liệu, ô kiểu số (không có t / t="n", kể cả công thức ra số) được thay bằng
+// giá trị thô chuẩn hóa dạng thập phân dấu chấm, ngắn nhất mà vẫn đúng float64 (1.234 → "1.234", 1E-3 → "0.001",
+// 1234.5 định dạng "#,##0.00" → "1234.5") và ghi chữ cái cột vào Numeric. Ô chữ / chuỗi công thức / logic giữ nguyên.
+func markNumericCells(f *excelize.File, sh string, rows []GridImportRow) {
+	for i := range rows {
+		r := &rows[i]
+		for _, l := range sortedLetters(r.Cells) {
+			ref := l + strconv.Itoa(r.Line)
+			typ, err := f.GetCellType(sh, ref)
+			if err != nil || (typ != excelize.CellTypeUnset && typ != excelize.CellTypeNumber) {
+				continue
+			}
+			raw, err := f.GetCellValue(sh, ref, excelize.Options{RawCellValue: true})
+			if err != nil {
+				continue
+			}
+			v, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+			if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+				continue
+			}
+			r.Cells[l] = strconv.FormatFloat(v, 'f', -1, 64)
+			r.Numeric = append(r.Numeric, l)
+		}
+	}
+}
+
+// sortedLetters: chữ cái cột theo thứ tự cột (A, B, …, Z, AA, …).
+func sortedLetters(cells map[string]string) []string {
+	out := make([]string, 0, len(cells))
+	for l := range cells {
+		out = append(out, l)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if len(out[i]) != len(out[j]) {
+			return len(out[i]) < len(out[j])
+		}
+		return out[i] < out[j]
+	})
+	return out
 }
 
 func lettersOf(r []string) []string {

@@ -3,6 +3,7 @@ package kn77_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -420,6 +421,28 @@ func TestFN_TI_02_KN77FullCycle(t *testing.T) {
 	}
 	if n := len(arr(c.xa1.get("/v1/extension/report-tasks/"+t2c1+"/history").body, "items")); n != before {
 		t.Fatalf("nhập từ Excel không được ghi phiên bản: %d → %d", before, n)
+	}
+	// Codex P1 (#107): .xlsx qua API — ô SỐ 1.234 / 12.345 / 0.001 về dạng thập phân dấu chấm + `numeric` (web không đọc
+	// kiểu VN thành 1234); ô CHỮ "1.234,5" giữ nguyên, không đánh dấu (web mới chuẩn hóa → 1234.5). CSV: numeric rỗng.
+	if nm, _ := arr(gi.body, "rows")[0]["numeric"].([]any); nm == nil || len(nm) != 0 {
+		t.Fatalf("CSV phải có numeric rỗng: %s", string(gi.raw))
+	}
+	xf := excelize.NewFile()
+	for j, v := range []any{"A", "B", "C", "D", "E", "F", "Cố định", "Cố định", "Cố định", "Nhập", "Nhập", "Nhập", 1, "Xã A", 1.234, 12.345, 0.001, "1.234,5"} {
+		cell, _ := excelize.CoordinatesToCellName(j%6+1, j/6+1)
+		if err := xf.SetCellValue("Sheet1", cell, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var xb strings.Builder
+	if err := xf.Write(&xb); err != nil {
+		t.Fatal(err)
+	}
+	gx := c.xa1.must(gridImport(c.xa1, xb.String()), http.StatusOK, "nhập từ Excel .xlsx")
+	if rows := arr(gx.body, "rows"); len(rows) != 1 {
+		t.Fatalf("nhập .xlsx: %s", string(gx.raw))
+	} else if cl, nm := obj(rows[0], "cells"), fmt.Sprint(rows[0]["numeric"]); str(cl, "C") != "1.234" || str(cl, "D") != "12.345" || str(cl, "E") != "0.001" || str(cl, "F") != "1.234,5" || nm != "[A C D E]" {
+		t.Fatalf("nhập .xlsx ô số: %s", string(gx.raw))
 	}
 	c.xa1.fail(gridImport(c.xa1, csvOf("Xã,Diện tích", "A,1")), http.StatusUnprocessableEntity, "extension.grid_import_invalid", "tệp sai bố cục")
 	c.tinh.fail(gridImport(c.tinh, csvOf("A,B,C", "1,2,3")), http.StatusForbidden, "forbidden", "Cấp Tỉnh nhập lưới")

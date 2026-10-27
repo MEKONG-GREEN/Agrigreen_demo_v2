@@ -265,8 +265,8 @@ describe("Nhập từ Excel (grid-import) giả lập", () => {
     const csv = ["TIẾN ĐỘ", "A,B,C,D,E", "Cố định,Cố định,Cố định,Tỉnh giao,Nhập", "1,Long Xuyên,Mỹ Hòa Hưng,,12.5", "", "2,,Bình Đức,,3", "*Yêu cầu biểu mẫu: x", "9,,Lạ,,1"].join("\n");
     const r = await xa.importGrid(t.id, new RawFile(csv, "text/csv; charset=utf-8"));
     expect(r.rows).toEqual([
-      { line: 4, cells: { A: "1", B: "Long Xuyên", C: "Mỹ Hòa Hưng", E: "12.5" } },
-      { line: 6, cells: { A: "2", C: "Bình Đức", E: "3" } },
+      { line: 4, cells: { A: "1", B: "Long Xuyên", C: "Mỹ Hòa Hưng", E: "12.5" }, numeric: [] },
+      { line: 6, cells: { A: "2", C: "Bình Đức", E: "3" }, numeric: [] },
     ]);
     expect(await code(xa.importGrid(t.id, new RawFile("Xã,Diện tích\nA,1\n", "text/csv")))).toBe("422 extension.grid_import_invalid");
     const tinh = await clientFor("kn-binh", "asg-binh-tinh");

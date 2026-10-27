@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { FormDefinition } from "@/kn/forms/types";
-import { mergeGridImport, normName } from "./importRows";
+import { mergeGridImport, normName, type ImportedRow } from "./importRows";
 
 const col = (letter: string, kind: string, extra: Record<string, unknown> = {}) => ({ letter, key: letter.toLowerCase(), title: letter, kind, dtype: "number", ...extra });
 const base = {
@@ -58,6 +60,20 @@ describe("Nhập từ Excel — ghép dòng tệp vào lưới (UP-04)", () => {
     ], () => true);
     expect(r.values).toEqual({ "91301/ray_nau": { E: "10" }, "91301/dao_on": { E: "2" } });
     expect(r.skipped).toEqual([{ line: 11, reason: "chỉ tiêu không có trong biểu" }]);
+  });
+
+  // Codex P1 (#107): .xlsx → API (tệp mẫu do test Go TestParseGridImport_NumericCellsGolden sinh và so) → ghép lưới.
+  // Ô số Excel 1.234 / 12.345 / 0.001 giữ nguyên độ lớn (không ×1000); ô chữ kiểu VN "1.234,5" vẫn → 1234.5.
+  it("ô số của .xlsx giữ nguyên giá trị; chỉ ô chữ mới đọc kiểu số VN", () => {
+    const golden = JSON.parse(readFileSync(resolve(process.cwd(), "../../internal/kn/extension/reportcycle/app/testdata/grid_import_numeric.golden.json"), "utf8")) as { rows: ImportedRow[] };
+    const def = {
+      ...base,
+      rows: { kind: "per_commune", indicators: [] },
+      columns: [col("A", "fixed", { fixed_source: "row_no" }), col("B", "fixed", { fixed_source: "commune_name", dtype: "text" }), ...["C", "D", "E", "F", "G"].map((l) => col(l, "input"))],
+    } as unknown as FormDefinition;
+    const r = mergeGridImport(def, COMMUNES, {}, golden.rows, () => true);
+    expect(r.values).toEqual({ "91301": { C: "1.234", D: "12.345", E: "0.001", F: "1234.5", G: "1234.5" } });
+    expect(r.skipped).toEqual([]);
   });
 
   it("normName bỏ dấu và tiền tố đơn vị", () => {

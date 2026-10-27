@@ -2926,7 +2926,9 @@ export interface paths {
          * BF-TT-FORMS (UP-04): Nhập từ Excel trên màn nhập biểu Cấp Xã — đọc tệp thành dòng chữ cái cột → giá trị, không ghi
          * @description Thân request là tệp (không multipart): .xlsx đúng bố cục "Tải mẫu Excel" (tiêu đề → hàng chữ cái A, B, C… → dòng loại cột
          *     → dòng dữ liệu → "Yêu cầu biểu mẫu") hoặc CSV UTF-8 có hàng chữ cái. Lấy sheet hiển thị đầu tiên có hàng chữ cái; bỏ dòng
-         *     trống; ô công thức lấy giá trị đã lưu. Web ghép dòng với xã (cột tên xã) / chỉ tiêu và chỉ điền ô nhập được của kỳ đang
+         *     trống; ô công thức lấy giá trị đã lưu. Ô SỐ của .xlsx (kể cả công thức ra số) trả giá trị thô dạng thập phân dấu chấm
+         *     ("1.234" = một phẩy hai ba bốn, không theo định dạng hiển thị) và được liệt kê trong `numeric`; ô chữ (CSV luôn là chữ)
+         *     giữ nguyên chuỗi — web chỉ đọc kiểu số VN ("1.234,5" → 1234.5) cho ô chữ. Web ghép dòng với xã (cột tên xã) / chỉ tiêu và chỉ điền ô nhập được của kỳ đang
          *     mở; người dùng xem lại rồi Lưu nháp / Gửi (máy chủ kiểm lại khi nộp). Cấp Xã, công việc trong phạm vi. Tối đa 4 MB,
          *     2000 dòng.
          */
@@ -28976,6 +28978,8 @@ export interface operations {
                             cells: {
                                 [key: string]: string;
                             };
+                            /** @description Chữ cái cột (theo thứ tự cột) của ô số .xlsx — giá trị trong cells là thập phân dấu chấm chuẩn; CSV luôn rỗng */
+                            numeric: string[];
                         }[];
                     };
                 };

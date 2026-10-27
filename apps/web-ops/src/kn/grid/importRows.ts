@@ -8,6 +8,8 @@ import { communeRows, type GridCommune, type GridValues } from "./model";
 export interface ImportedRow {
   line: number;
   cells: Record<string, string>;
+  /** Chữ cái cột của ô SỐ trong .xlsx — giá trị đã là thập phân dấu chấm chuẩn ("1.234" = 1,234), không đọc kiểu VN. */
+  numeric?: readonly string[];
 }
 
 export interface GridImportResult {
@@ -29,7 +31,8 @@ export function normName(s: string): string {
     .trim();
 }
 
-/** Số kiểu Việt Nam "1.234,5" → "1234.5"; chuỗi khác giữ nguyên (máy chủ kiểm khi tính/nộp). */
+/** Ô CHỮ (CSV, ô chữ .xlsx): số kiểu Việt Nam "1.234,5" → "1234.5"; chuỗi khác giữ nguyên (máy chủ kiểm khi tính/nộp).
+ * Không dùng cho ô số .xlsx — "1.234" ở đó là một phẩy hai ba bốn, đọc kiểu VN sẽ thành 1234 (Codex P1 #107). */
 function normValue(v: string): string {
   const t = v.trim().replace(/\s/g, "");
   if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(t)) return t.replace(/\./g, "").replace(",", ".");
@@ -68,9 +71,10 @@ export function mergeGridImport(def: FormDefinition, communes: readonly GridComm
       key = row.key;
     }
     let n = 0;
+    const numeric = new Set(r.numeric ?? []);
     for (const [letter, v] of Object.entries(r.cells)) {
       if (!inputCols.has(letter) || !editable(letter)) continue;
-      values[key] = { ...(values[key] ?? {}), [letter]: normValue(v) };
+      values[key] = { ...(values[key] ?? {}), [letter]: numeric.has(letter) ? v.trim() : normValue(v) };
       n++;
     }
     if (n) applied++;
