@@ -2,7 +2,7 @@
 // Tỉnh phát hành → Xã nhập/gửi 2 xã → Tỉnh yêu cầu điều chỉnh → Xã gửi lại → "Cập nhật" có nhật ký ô → chốt
 // (Hệ thống tổng hợp) → TW xem dashboard chỉ đọc; Chi cục xuất + gửi (202); quy tắc lỗi như Go.
 import { beforeEach, describe, expect, it } from "vitest";
-import { createCycleApi } from "@/kn/cycle/api";
+import { createCycleApi, RawFile } from "@/kn/cycle/api";
 import { ApiProblem } from "@/api/problem";
 import { mockFetchNoDelay } from "../handler";
 import { resetMockForms } from "../forms/routes";
@@ -254,5 +254,22 @@ describe("W11.05b: kỳ ngày / tuần KSGM / quý ở Phát hành biểu + khó
       const q = await tinh.preview({ ...base, report_type: "monthly", template_ids: [monthly[0]!.template_id], period_type: "quarter", from_date: "2026-11-04", to_date: "2027-03-30" });
       expect(q.periods.map((p) => p.period_key)).toEqual(["2026-Q4", "2027-Q1"]);
     }
+  });
+});
+
+// BF-TT-FORMS (#107, UP-04): Nhập từ Excel trên màn nhập Cấp Xã — giả lập đọc CSV có hàng chữ cái, không ghi; Cấp Tỉnh không nhập.
+describe("Nhập từ Excel (grid-import) giả lập", () => {
+  it("đọc dòng dữ liệu sau hàng chữ cái + dòng loại cột, dừng ở Yêu cầu biểu mẫu; tệp sai bố cục → 422; Cấp Tỉnh → 403", async () => {
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const t = (await xa.tasks({ status: "" as never })).items[0]!;
+    const csv = ["TIẾN ĐỘ", "A,B,C,D,E", "Cố định,Cố định,Cố định,Tỉnh giao,Nhập", "1,Long Xuyên,Mỹ Hòa Hưng,,12.5", "", "2,,Bình Đức,,3", "*Yêu cầu biểu mẫu: x", "9,,Lạ,,1"].join("\n");
+    const r = await xa.importGrid(t.id, new RawFile(csv, "text/csv; charset=utf-8"));
+    expect(r.rows).toEqual([
+      { line: 4, cells: { A: "1", B: "Long Xuyên", C: "Mỹ Hòa Hưng", E: "12.5" }, numeric: [] },
+      { line: 6, cells: { A: "2", C: "Bình Đức", E: "3" }, numeric: [] },
+    ]);
+    expect(await code(xa.importGrid(t.id, new RawFile("Xã,Diện tích\nA,1\n", "text/csv")))).toBe("422 extension.grid_import_invalid");
+    const tinh = await clientFor("kn-binh", "asg-binh-tinh");
+    expect(await code(tinh.importGrid(t.id, new RawFile(csv, "text/csv")))).toMatch(/^403 /);
   });
 });

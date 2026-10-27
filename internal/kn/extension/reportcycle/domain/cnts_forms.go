@@ -13,9 +13,10 @@ package domain
 //   - BM-01 Báo cáo KSGM hằng ngày: đơn vị = CƠ SỞ GIẾT MỔ (facility_ref W11.41), kỳ ngày, hạn 09:00 D+1;
 //   - BM-04 Nhập liệu tuần chăn nuôi: đơn vị = xã, kỳ tuần mới (W11.03 v2), hạn 12:00 ngày sau ngày cuối tuần;
 //   - BM-17 Sản lượng khai thác thủy sản: như BM-04 (cùng kỳ, cùng hạn);
-//   - BM-05 Công việc & kế hoạch tuần: hai biểu (Phần I kết quả tuần làm việc Thứ Hai–Thứ Sáu, hạn 17:00 Thứ Hai
-//     sau tuần; Phần II kế hoạch tuần sau, hạn 17:00 Thứ Sáu trước tuần) — "mỗi phần là một kỳ riêng". Đơn vị = xã
-//     phụ trách của cán bộ tăng cường (đơn vị = người của cap/forms còn CHỪA CHỖ — giả định, xem gia-dinh W11.42).
+//   - BM-05 Công việc & kế hoạch tuần: hai biểu (Phần I kết quả tuần trước, hạn 08:00 Thứ Hai sau tuần; Phần II kế
+//     hoạch tuần sau, đăng ký Thứ Năm–Thứ Sáu, hạn 17:00 Thứ Sáu trước tuần) — "mỗi phần là một kỳ riêng". Bảng ngày
+//     Thứ Hai–Chủ Nhật (BF-CN-WEEKLY, PRD UP-06; Thứ Bảy, Chủ Nhật không bắt buộc). Đơn vị = xã phụ trách của cán bộ
+//     tăng cường (đơn vị = người của cap/forms còn CHỪA CHỖ — giả định, xem gia-dinh W11.42).
 
 import (
 	"fmt"
@@ -82,8 +83,16 @@ func cntsDec(key, label, unit, group string) CNTSField {
 // WorkTypes là lựa chọn loại công việc của BM-05 (CV-02, CV-04).
 var WorkTypes = []string{"Làm việc chuyên môn thường xuyên tại xã", "Công tác khác"}
 
-// WorkDays là 5 ngày làm việc của BM-05 (khóa trường, nhãn).
-var WorkDays = [5][2]string{{"t2", "Thứ Hai"}, {"t3", "Thứ Ba"}, {"t4", "Thứ Tư"}, {"t5", "Thứ Năm"}, {"t6", "Thứ Sáu"}}
+// WorkDays là các ngày của bảng BM-05 Thứ Hai–Chủ Nhật (khóa trường, nhãn) — BF-CN-WEEKLY (PRD UP-06 "bảng T2–CN").
+// Năm ngày đầu là ngày làm việc (bắt buộc); Thứ Bảy, Chủ Nhật chỉ điền khi có làm việc (WorkdayCount).
+var WorkDays = [7][2]string{{"t2", "Thứ Hai"}, {"t3", "Thứ Ba"}, {"t4", "Thứ Tư"}, {"t5", "Thứ Năm"}, {"t6", "Thứ Sáu"},
+	{"t7", "Thứ Bảy"}, {"cn", "Chủ Nhật"}}
+
+// WorkdayCount: số ngày đầu của WorkDays là ngày làm việc bắt buộc (Thứ Hai–Thứ Sáu).
+const WorkdayCount = 5
+
+// WorkTypeOther là loại "Công tác khác" — đi công tác ngoài cơ quan: Phần II bắt buộc Địa điểm (PRD UP-06, CV-06).
+var WorkTypeOther = WorkTypes[1]
 
 // Nhóm cột tiêm phòng của BM-04 (CN-02, mẫu 2026: 9 cột, "Dịch tả – THT heo" một cột) và loài so sánh (Mục III.5 —
 // bảng ánh xạ vaccine – loài: số liều trong tuần ≤ tổng đàn loài tương ứng). Loài so sánh là tổng các trường tổng đàn.
@@ -123,16 +132,16 @@ func bm04Fields() []CNTSField {
 
 func bm05Fields(plan bool) []CNTSField {
 	var fs []CNTSField
-	for _, d := range WorkDays {
-		k, l := d[0], d[1]
-		fs = append(fs, CNTSField{Key: k + "_loai", Label: "Loại công việc", Type: "choice", Required: true, Options: WorkTypes, Group: l},
+	for i, d := range WorkDays {
+		k, l, req := d[0], d[1], i < WorkdayCount
+		fs = append(fs, CNTSField{Key: k + "_loai", Label: "Loại công việc", Type: "choice", Required: req, Options: WorkTypes, Group: l},
 			CNTSField{Key: k + "_cong_tac_khac", Label: "Công tác khác (ghi rõ)", Type: "text", Group: l})
 		if plan {
-			fs = append(fs, CNTSField{Key: k + "_ke_hoach", Label: "Kế hoạch công việc", Type: "text", Required: true, Group: l},
-				CNTSField{Key: k + "_ket_qua_du_kien", Label: "Kết quả dự kiến", Type: "text", Required: true, Group: l},
+			fs = append(fs, CNTSField{Key: k + "_ke_hoach", Label: "Kế hoạch công việc", Type: "text", Required: req, Group: l},
+				CNTSField{Key: k + "_ket_qua_du_kien", Label: "Kết quả dự kiến", Type: "text", Required: req, Group: l},
 				CNTSField{Key: k + "_dia_diem", Label: "Địa điểm công tác", Type: "text", Group: l})
 		} else {
-			fs = append(fs, CNTSField{Key: k + "_ket_qua", Label: "Kết quả thực hiện", Type: "text", Required: true, Group: l})
+			fs = append(fs, CNTSField{Key: k + "_ket_qua", Label: "Kết quả thực hiện", Type: "text", Required: req, Group: l})
 		}
 	}
 	return fs
@@ -153,7 +162,7 @@ var CNTSForms = []CNTSForm{
 			cntsDec("tom", "TS-02 Tôm các loại", "tấn", "Sản lượng khai thác trong tuần"), cntsDec("muc", "TS-03 Mực", "tấn", "Sản lượng khai thác trong tuần"),
 			cntsDec("khac", "TS-04 Thủy sản khác", "tấn", "Sản lượng khai thác trong tuần")}},
 	{Code: CNTSBM05I, BM: "BM-05 Phần I", Title: "Kết quả công việc tuần (cán bộ tăng cường)", UnitKind: UnitCommune, PeriodType: PeriodWeek,
-		Deadline: Deadline{OffsetDays: 3, Time: "17:00"}, Due: "17:00 Thứ Hai sau tuần làm việc", NilLabel: "", Fields: bm05Fields(false)},
+		Deadline: Deadline{OffsetDays: 3, Time: "08:00"}, Due: "08:00 Thứ Hai sau tuần làm việc", NilLabel: "", Fields: bm05Fields(false)},
 	{Code: CNTSBM05II, BM: "BM-05 Phần II", Title: "Kế hoạch công việc tuần sau (cán bộ tăng cường)", UnitKind: UnitCommune,
 		PeriodType: PeriodWeek, Deadline: Deadline{OffsetDays: -3, Time: "17:00"}, Due: "17:00 Thứ Sáu trước tuần kế hoạch", NilLabel: "",
 		Fields: bm05Fields(true)},
@@ -239,8 +248,8 @@ func SplitCNTS(in CNTSSeriesInput) ([]CNTSPeriod, error) {
 	return out, nil
 }
 
-// splitWorkWeeks: tuần làm việc Thứ Hai – Thứ Sáu. Phần I hạn = Thứ Sáu + OffsetDays (mặc định Thứ Hai sau); Phần II
-// hạn = Thứ Hai + OffsetDays (âm — mặc định Thứ Sáu trước).
+// splitWorkWeeks: tuần làm việc Thứ Hai – Chủ Nhật (bảng T2–CN, UP-06; tuần có Thứ Hai–Thứ Sáu giao khoảng). Phần I hạn
+// = Thứ Sáu + OffsetDays (mặc định 08:00 Thứ Hai sau); Phần II hạn = Thứ Hai + OffsetDays (âm — mặc định Thứ Sáu trước).
 func splitWorkWeeks(f CNTSForm, from, to time.Time, dl Deadline, loc *time.Location) ([]CNTSPeriod, error) {
 	if dl.OffsetDays < -14 || dl.OffsetDays > 14 {
 		return nil, ErrPeriod{"deadline.offset_days", "−14…14 ngày"}
@@ -264,8 +273,9 @@ func splitWorkWeeks(f CNTSForm, from, to time.Time, dl Deadline, loc *time.Locat
 			return nil, ErrPeriod{"deadline.time", err.Error()}
 		}
 		y, w := d.ISOWeek()
+		sun := d.AddDate(0, 0, 6)
 		out = append(out, CNTSPeriod{Kind: PeriodWeek, Key: fmt.Sprintf("%d-LV%02d", y, w),
-			Label: fmt.Sprintf("Tuần làm việc %d/%d (%s)", w, y, rangeLabel(d, fri)), From: d, To: fri, DueAt: due, Rule: CNTSRuleWorkWeek})
+			Label: fmt.Sprintf("Tuần làm việc %d/%d (%s)", w, y, rangeLabel(d, sun)), From: d, To: sun, DueAt: due, Rule: CNTSRuleWorkWeek})
 	}
 	if len(out) == 0 {
 		return nil, ErrPeriod{"to_date", "khoảng ngày không chứa tuần làm việc nào"}
@@ -278,7 +288,8 @@ type CNTSIssue struct{ Field, Reason string }
 
 // ValidateCNTS kiểm quy tắc chặn của biểu CNTS (sau kiểm kiểu của cap/forms):
 //   - BM-04 (UR-XA-07, Mục III.5 quy tắc 4): số liều tiêm trong tuần của một cột > tổng đàn loài tương ứng → Chặn;
-//   - BM-05: mỗi ô văn bản tối đa 500 ký tự (CV-03, CV-05); "Công tác khác" phải ghi rõ.
+//   - BM-05: mỗi ô văn bản tối đa 500 ký tự (CV-03, CV-05); "Công tác khác" phải ghi rõ; Thứ Bảy/Chủ Nhật đã chọn loại
+//     công việc thì phải ghi nội dung; Phần II đi công tác ("Công tác khác") bắt buộc Địa điểm (UP-06, CV-06).
 //
 // Cảnh báo (biến động ±15 %, 50 %, lệch KSGM…) thuộc W11.43 — không chặn ở đây.
 func ValidateCNTS(code string, values map[string]string) []CNTSIssue {
@@ -306,9 +317,25 @@ func ValidateCNTS(code string, values map[string]string) []CNTSIssue {
 				out = append(out, CNTSIssue{k, "tối đa 500 ký tự"})
 			}
 		}
-		for _, d := range WorkDays {
-			if values[d[0]+"_loai"] == WorkTypes[1] && strings.TrimSpace(values[d[0]+"_cong_tac_khac"]) == "" {
-				out = append(out, CNTSIssue{d[0] + "_cong_tac_khac", "ghi rõ công tác khác"})
+		text := []string{"_ket_qua"}
+		if code == CNTSBM05II {
+			text = []string{"_ke_hoach", "_ket_qua_du_kien"}
+		}
+		for i, d := range WorkDays {
+			k := d[0]
+			loai := strings.TrimSpace(values[k+"_loai"])
+			if loai == WorkTypeOther && strings.TrimSpace(values[k+"_cong_tac_khac"]) == "" {
+				out = append(out, CNTSIssue{k + "_cong_tac_khac", "ghi rõ công tác khác"})
+			}
+			if i >= WorkdayCount && loai != "" {
+				for _, t := range text {
+					if strings.TrimSpace(values[k+t]) == "" {
+						out = append(out, CNTSIssue{k + t, "bắt buộc khi đã chọn loại công việc"})
+					}
+				}
+			}
+			if code == CNTSBM05II && loai == WorkTypeOther && strings.TrimSpace(values[k+"_dia_diem"]) == "" {
+				out = append(out, CNTSIssue{k + "_dia_diem", "bắt buộc khi đi công tác"})
 			}
 		}
 	}
@@ -321,4 +348,32 @@ func ratOf(s string) (*big.Rat, bool) {
 		return nil, false
 	}
 	return new(big.Rat).SetString(s)
+}
+
+// PlanDay là một ngày của kế hoạch tuần (BM-05 Phần II) — nguồn của Lịch công tác chờ duyệt (BF-CN-WEEKLY, UP-06).
+type PlanDay struct {
+	Offset   int    // số ngày tính từ Thứ Hai (0 = Thứ Hai … 6 = Chủ Nhật)
+	Label    string // "Thứ Hai"…
+	Kind     string // loại công việc
+	Other    string // công tác khác (ghi rõ)
+	Plan     string // kế hoạch công việc
+	Expected string // kết quả dự kiến
+	Place    string // địa điểm công tác
+}
+
+// PlanDays đọc các ngày có kế hoạch của bài nộp Phần II (đã chọn loại công việc hoặc có nội dung kế hoạch), theo thứ
+// tự Thứ Hai → Chủ Nhật. Giá trị đã được ValidateCNTS kiểm khi nộp; ở đây chỉ cắt khoảng trắng.
+func PlanDays(values map[string]string) []PlanDay {
+	var out []PlanDay
+	for i, d := range WorkDays {
+		k := d[0]
+		p := PlanDay{Offset: i, Label: d[1], Kind: strings.TrimSpace(values[k+"_loai"]), Other: strings.TrimSpace(values[k+"_cong_tac_khac"]),
+			Plan: strings.TrimSpace(values[k+"_ke_hoach"]), Expected: strings.TrimSpace(values[k+"_ket_qua_du_kien"]),
+			Place: strings.TrimSpace(values[k+"_dia_diem"])}
+		if p.Kind == "" && p.Plan == "" {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }

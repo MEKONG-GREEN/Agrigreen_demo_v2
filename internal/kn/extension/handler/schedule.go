@@ -37,7 +37,8 @@ func (h Handler) registerSchedule(rg *gin.RouterGroup) {
 	g.GET("/:id/log", h.scheduleLog)
 	g.POST("/:id/approve", h.approveSchedule)
 	g.POST("/:id/request-changes", h.requestChanges)
-	g.POST("/:id/items/:item_id/checkin", h.checkin) // W11.46 (CNTS CV-07)
+	g.POST("/:id/items/:item_id/checkin", h.checkin)                    // W11.46 (CNTS CV-07)
+	rg.POST("/extension/cnts/weekly-plan/schedule", h.scheduleFromPlan) // BF-CN-WEEKLY (UP-06)
 }
 
 // placeReq là địa điểm công tác trên bản đồ (W11.46, CV-06).

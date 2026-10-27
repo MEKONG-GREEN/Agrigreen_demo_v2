@@ -24,6 +24,12 @@ export const TASK_TONE: Record<RcTask["status"], PillTone> = {
   closed: "neutral",
 };
 
+/**
+ * Mã 14 biểu Trồng trọt Cấp Xã (PRD UP-04, thư mục 1.1/02. TRỒNG TRỌT): T01–T07 tuần ("Báo cáo cây lúa, rau màu hằng
+ * tuần" PL01, PL01B, PL02, PL03, PL04, PL05, PL07), M01 tháng (cây ăn trái), V01–V06 vụ ("áp dụng TBKT, CGH, CCG" PL1–PL6).
+ */
+export const TT_FORM_CODES = ["T01", "T02", "T03", "T04", "T05", "T06", "T07", "M01", "V01", "V02", "V03", "V04", "V05", "V06"] as const;
+
 export const TASK_STATUS_LABEL: Record<RcTask["status"], string> = {
   not_started: "Chưa nhập",
   draft: "Lưu nháp",

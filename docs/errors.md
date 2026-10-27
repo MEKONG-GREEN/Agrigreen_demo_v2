@@ -215,6 +215,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.form_no_structure` | pf/extension: mẫu chưa có cột nhập liệu — chặn phát hành (FN-TI-02.02) |
 | 422 | `extension.period_slots_exceeded` | pf/extension: số kỳ của đợt vượt số khe kỳ trên một dòng của mẫu nhiều kỳ (PL 01, 01B, 02, 07; tạm theo seed, chờ khách Q-01) |
 | 422 | `extension.provincial_import_invalid` | pf/extension: tệp nạp Tỉnh giao (`POST /v1/extension/report-batches/provincial-import`, W11.02) không đọc được (không phải CSV UTF-8/.xlsx, ô công thức, quá 500 dòng/2 MB), thiếu cột "Mã xã", không nhận ra cột Tỉnh giao nào hoặc hai cột trùng một cột Tỉnh giao — từ chối cả tệp; dòng lỗi riêng lẻ trả trong `rows` |
+| 422 | `extension.grid_import_invalid` | pf/extension BF-TT-FORMS (UP-04) Nhập từ Excel trên màn nhập biểu Cấp Xã: tệp không đọc được (.xls cũ, zip hỏng, CSV không UTF-8, quá 4 MB/2000 dòng) hoặc không có hàng chữ cái cột (A, B, C…) của tệp "Tải mẫu Excel" |
 | 422 | `extension.no_communes` | pf/extension: chưa chọn xã nhận, hoặc mã xã không phải Nút xã đang hoạt động của tỉnh |
 | 409 | `extension.batch_has_submissions` | pf/extension: thu hồi đợt khi đã có xã gửi báo cáo |
 | 409 | `extension.batch_withdrawn` | pf/extension: đợt đã thu hồi |

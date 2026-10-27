@@ -8,6 +8,10 @@ import { CATALOGS } from "./data";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
 import { calendarAt, DEPT_CNTS, ruleTag } from "./kn-reports/domain";
+import { callerOf, stableUuid, workScheduleStore } from "./kn-schedules";
+
+/** Mã mục lịch ổn định của ngày `day` trong kế hoạch tuần của xã `unit` (giả lập PlanItemID phía máy chủ: nguồn = tuần × xã). */
+const planItemId = (week: string, unit: string, day: string) => stableUuid(`cnts-plan:${week}:${unit}:${day}`);
 
 type S = components["schemas"];
 type Field = S["FormsField"];
@@ -17,20 +21,24 @@ const PROFILE = "kn_cnts";
 const int = (key: string, label: string, unit: string, group: string): Field => ({ key, label, type: "integer", required: true, unit, non_negative: true, group });
 const dec = (key: string, label: string, unit: string, group: string): Field => ({ key, label, type: "decimal", required: true, unit, non_negative: true, group });
 const WORK = ["Làm việc chuyên môn thường xuyên tại xã", "Công tác khác"];
-const DAYS: [string, string][] = [["t2", "Thứ Hai"], ["t3", "Thứ Ba"], ["t4", "Thứ Tư"], ["t5", "Thứ Năm"], ["t6", "Thứ Sáu"]];
+// BF-CN-WEEKLY (UP-06): bảng T2–CN; Thứ Bảy, Chủ Nhật không bắt buộc.
+const DAYS: [string, string][] = [["t2", "Thứ Hai"], ["t3", "Thứ Ba"], ["t4", "Thứ Tư"], ["t5", "Thứ Năm"], ["t6", "Thứ Sáu"], ["t7", "Thứ Bảy"], ["cn", "Chủ Nhật"]];
 
 function bm05(plan: boolean): Field[] {
-  return DAYS.flatMap(([k, g]) => [
-    { key: `${k}_loai`, label: "Loại công việc", type: "choice", required: true, options: WORK, group: g },
-    { key: `${k}_cong_tac_khac`, label: "Công tác khác (ghi rõ)", type: "text", required: false, group: g },
-    ...(plan
-      ? [
-          { key: `${k}_ke_hoach`, label: "Kế hoạch công việc", type: "text", required: true, group: g },
-          { key: `${k}_ket_qua_du_kien`, label: "Kết quả dự kiến", type: "text", required: true, group: g },
-          { key: `${k}_dia_diem`, label: "Địa điểm công tác", type: "text", required: false, group: g },
-        ]
-      : [{ key: `${k}_ket_qua`, label: "Kết quả thực hiện", type: "text", required: true, group: g }]),
-  ]) as Field[];
+  return DAYS.flatMap(([k, g], i) => {
+    const req = i < 5;
+    return [
+      { key: `${k}_loai`, label: "Loại công việc", type: "choice", required: req, options: WORK, group: g },
+      { key: `${k}_cong_tac_khac`, label: "Công tác khác (ghi rõ)", type: "text", required: false, group: g },
+      ...(plan
+        ? [
+            { key: `${k}_ke_hoach`, label: "Kế hoạch công việc", type: "text", required: req, group: g },
+            { key: `${k}_ket_qua_du_kien`, label: "Kết quả dự kiến", type: "text", required: req, group: g },
+            { key: `${k}_dia_diem`, label: "Địa điểm công tác", type: "text", required: false, group: g },
+          ]
+        : [{ key: `${k}_ket_qua`, label: "Kết quả thực hiện", type: "text", required: req, group: g }]),
+    ];
+  }) as Field[];
 }
 
 const HERD = "CN-01 Tổng đàn hiện có";
@@ -58,7 +66,7 @@ const FORMS: Omit<Form, "template_id" | "template_version" | "template_up_to_dat
     fields: ["ca:TS-01 Cá các loại", "tom:TS-02 Tôm các loại", "muc:TS-03 Mực", "khac:TS-04 Thủy sản khác"].map((x) =>
       dec(x.split(":")[0]!, x.split(":")[1]!, "tấn", "Sản lượng khai thác trong tuần")) },
   { code: "CNTS-BM05-I", bm: "BM-05 Phần I", title: "Kết quả công việc tuần (cán bộ tăng cường)", unit_kind: "commune", period_type: "week", deadline_offset_days: 3,
-    deadline_time: "17:00", due: "17:00 Thứ Hai sau tuần làm việc", nil_label: null, fields: bm05(false) },
+    deadline_time: "08:00", due: "08:00 Thứ Hai sau tuần làm việc", nil_label: null, fields: bm05(false) },
   { code: "CNTS-BM05-II", bm: "BM-05 Phần II", title: "Kế hoạch công việc tuần sau (cán bộ tăng cường)", unit_kind: "commune", period_type: "week",
     deadline_offset_days: -3, deadline_time: "17:00", due: "17:00 Thứ Sáu trước tuần kế hoạch", nil_label: null, fields: bm05(true) },
 ];
@@ -146,10 +154,11 @@ function split(f: Form, from: string, to: string, deadline?: { offset_days: numb
   if (f.code.startsWith("CNTS-BM05")) {
     for (let d = a - ((new Date(a).getUTCDay() + 6) % 7) * D; d <= b; d += 7 * D) {
       const fri = d + 4 * D;
+      const sun = d + 6 * D;
       if (fri < a) continue;
       const [y, w] = isoWeek(d);
-      out.push({ kind: "week", key: `${y}-LV${String(w).padStart(2, "0")}`, label: `Tuần làm việc ${w}/${y} (${dmy(d).slice(0, 5)}–${dmy(fri)})`, from_date: ymd(d),
-        to_date: ymd(fri), due_at: dueOf(off < 0 ? d : fri, off, time), rule: "cnts.work_week/v1", id: null });
+      out.push({ kind: "week", key: `${y}-LV${String(w).padStart(2, "0")}`, label: `Tuần làm việc ${w}/${y} (${dmy(d).slice(0, 5)}–${dmy(sun)})`, from_date: ymd(d),
+        to_date: ymd(sun), due_at: dueOf(off < 0 ? d : fri, off, time), rule: "cnts.work_week/v1", id: null });
     }
   } else if (f.period_type === "day") {
     for (let d = a; d <= b; d += D) out.push({ kind: "day", key: ymd(d), label: `Ngày ${dmy(d)}`, from_date: ymd(d), to_date: ymd(d), due_at: dueOf(d, off, time), rule: v2, id: null });
@@ -298,6 +307,55 @@ export const cntsPeriodRoutes: Route[] = [
     handler: (ctx) => {
       const p = findPeriod(ctx.params[0]!);
       return p ? json(periodView(p, who(ctx))) : problem(404, "forms.period_not_found", "Không tìm thấy kỳ");
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/forms\/periods\/([^/]+)\/submissions$/,
+    handler: (ctx) => {
+      const p = findPeriod(ctx.params[0]!);
+      const unit = ctx.url.searchParams.get("unit") ?? "";
+      if (!p) return problem(404, "forms.period_not_found", "Không tìm thấy kỳ");
+      if (!sees(who(ctx), p, unit)) return problem(403, "forbidden", `đơn vị ${unit} ngoài phạm vi`);
+      const items = [...(p.subs.get(unit) ?? [])].reverse().map((s) => ({ id: s.id, period_id: p.id, unit, version: s.version, values: s.values, submitter_ref: s.by,
+        event_time: s.at, status: "submitted", review: null, nil_report: s.nil_report, note: s.note || null, explanation: s.explanation || null, late: s.late, captured_at: null }));
+      return json({ items });
+    },
+  },
+  {
+    // BF-CN-WEEKLY (UP-06): kế hoạch BM-05 Phần II đã đăng ký → Lịch công tác chờ duyệt (sổ lịch giả lập kn-schedules).
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/weekly-plan\/schedule$/,
+    handler: (ctx) => {
+      const b = body<{ period_id?: string; unit?: string }>(ctx);
+      const p = findPeriod(b.period_id ?? "");
+      const w = who(ctx);
+      if (w.role !== "kn_xa") return problem(403, "forbidden", "chỉ cán bộ xã Phòng Chăn nuôi – Thủy sản đăng ký kế hoạch tuần");
+      const unit = b.unit ?? "";
+      if (!p || p.code !== "CNTS-BM05-II" || !p.subs.get(unit)?.length) {
+        return problem(409, "extension.cnts_plan_not_registered", "Chưa đăng ký kế hoạch tuần (BM-05 Phần II) của kỳ và xã này");
+      }
+      if (!sees(w, p, unit)) return problem(403, "forbidden", `xã ${unit} không thuộc các xã phụ trách`);
+      const sub = p.subs.get(unit)!.at(-1)!;
+      if (sub.by !== w.actor) return problem(403, "extension.cnts_plan_not_owner", "Kế hoạch tuần do cán bộ khác đăng ký");
+      const c = callerOf(ctx.persona, ctx.request.headers.get("X-AG-Context"));
+      if (!c.ok) return problem(c.status, c.code, c.title);
+      const store = workScheduleStore();
+      const mine = store.mine(c.body, p.from);
+      const cur = mine.ok ? mine.body.schedule : null;
+      const planIds = new Set(DAYS.map(([k]) => planItemId(p.from, unit, k)));
+      const keep = (cur?.items ?? []).filter((it) => !planIds.has(it.id));
+      const plan = DAYS.flatMap(([k], i) => {
+        const v = (x: string) => (sub.values[`${k}_${x}`] ?? "").trim();
+        if (!v("loai") && !v("ke_hoach")) return [];
+        const note = [v("loai") === WORK[1] && v("cong_tac_khac") ? `Công tác khác: ${v("cong_tac_khac")}` : "", v("ket_qua_du_kien") ? `Kết quả dự kiến: ${v("ket_qua_du_kien")}` : ""]
+          .filter(Boolean)
+          .join(" · ");
+        return [{ id: planItemId(p.from, unit, k), day: ymd(Date.parse(p.from + "T00:00:00Z") + i * D), session: "morning" as const, start_time: "07:00", end_time: "17:00",
+          content: v("ke_hoach") || v("loai"), commune_code: unit, location: v("dia_diem") || "Làm việc tại xã", note: note || null }];
+      });
+      const r = store.save(c.body, { week_start: p.from, action: "submit", base_version: cur?.schedule.version ?? null, items: [...keep, ...plan] });
+      return r.ok ? json(r.body, 201) : problem(r.status, r.code, r.title, r.extra ?? {});
     },
   },
   {
