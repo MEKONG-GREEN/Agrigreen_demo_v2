@@ -438,5 +438,26 @@ export function createCollectApi(opts: KnHttpOptions) {
       call<{ items: MaterialRecord[] }>("POST", "/v1/kn/materials", b, undefined, idem),
     materialSummary: (commune?: string) =>
       call<{ items: { commune_code: string; material_code: string; material_name: string; unit: string; quantity: string; records: number }[] }>("GET", "/v1/kn/materials/summary", undefined, { commune }),
+    // TT-11 (#104): thửa — hình, tên, chủ hộ ở pf/cooperative (/v1/kn/plots); cây trồng ở hồ sơ KN riêng (#119).
+    plot: (ref: string) => call<KnPlotDetail>("GET", `/v1/kn/plots/${ref}`),
+    plotLog: (ref: string) => call<A["KNRecordLogPage"]>("GET", `/v1/kn/plots/${ref}/log`),
+    /** GeoJSON thửa của một xã (có hình) — lớp ngữ cảnh khi vẽ/sửa. */
+    plotShapes: (commune: string) => call<PlotShapes>("GET", "/v1/kn/plots/export", undefined, { commune, format: "geojson" }),
+    createPlot: (b: A["KNPlotCreate"], idem?: string) => call<KnPlotDetail>("POST", "/v1/kn/plots", b, undefined, idem),
+    updatePlot: (ref: string, b: KnPlotUpdate, idem?: string) => call<KnPlotDetail>("PUT", `/v1/kn/plots/${ref}`, b, undefined, idem),
+    correctPlotBoundary: (ref: string, b: { supersedes_boundary_id: string; geometry: A["GeoJSONPolygonal"]; shape: "polygon"; reason: string }, idem?: string) =>
+      call<KnPlotDetail>("POST", `/v1/kn/plots/${ref}/boundary`, b, undefined, idem),
+    plotCrops: (commune?: string) => call<{ items: A["KNPlotCrop"][]; next_cursor: string | null }>("GET", "/v1/kn/plot-profiles", undefined, { commune, limit: 500 }),
+    plotProfile: (ref: string) => call<KnPlotProfile>("GET", `/v1/kn/plot-profiles/${ref}`),
+    putPlotCrop: (ref: string, crop_code: string, idem?: string) => call<KnPlotProfile>("PUT", `/v1/kn/plot-profiles/${ref}`, { crop_code }, undefined, idem),
+    /** Danh mục cây trồng đang dùng (masterdata `crop`). */
+    crops: () => call<{ items: A["CatalogItem"][] }>("GET", "/v1/masterdata/catalogs/crop", undefined, { limit: 200 }),
   };
 }
+
+/** Chi tiết thửa kèm hình (GeoJSON Polygon/MultiPolygon). */
+export type KnPlotDetail = KnPlot & { geometry: { type: "Polygon" | "MultiPolygon"; coordinates: unknown[] } };
+export type KnPlotProfile = A["KNPlotProfile"];
+/** PUT /v1/kn/plots/{ref}: trường vắng = giữ nguyên. */
+export type KnPlotUpdate = { lot_name?: string; note?: string | null; farmer_name?: string; cooperative_ref?: string | null; reason?: string };
+export type PlotShapes = { type: "FeatureCollection"; features: { type: "Feature"; geometry: unknown; properties: Record<string, unknown> | null }[] };

@@ -9,6 +9,7 @@ import { json, problem, type Ctx, type Route } from "./http";
 import { KN_COOPS } from "./kn-schedules";
 import { callerOf, isErr, type Caller } from "./kn-reports/store";
 import { vnDate } from "@/kn/schedule/week";
+import { knPlotRoutes, resetKnPlots } from "./kn-collect-plots";
 
 interface Coop {
   ref: string;
@@ -114,6 +115,7 @@ function seed(): void {
 /** Cho kiểm thử. */
 export function resetKnCollect(): void {
   seeded = false;
+  resetKnPlots();
   seed();
 }
 
@@ -290,35 +292,6 @@ export const knCollectRoutes: Route[] = [
   },
   {
     method: "GET",
-    pattern: re("/v1/kn/plots"),
-    handler: wrap(({ url }, c) => {
-      const commune = url.searchParams.get("commune");
-      if (commune && !inScope(c, commune)) return problem(403, "geo.out_of_scope", "Ngoài phạm vi phụ trách");
-      // Thửa v7.7 vẽ ở field-app (P7); bản giả lập web khởi đầu một thửa mẫu mỗi HTX của xã phụ trách.
-      const items = COOPS.filter((x) => inScope(c, x.commune_code) && (!commune || x.commune_code === commune) && (!url.searchParams.get("cooperative_ref") || x.ref === url.searchParams.get("cooperative_ref"))).map((x, i) => ({
-        ref: `01927b3e-0000-7000-8000-0000000d${String(i + 1).padStart(4, "0")}`,
-        code: `TH-${x.code}-01`,
-        lot_name: `Lô 1 ${x.name.replace(/^HTX /, "")}`,
-        commune_code: x.commune_code,
-        cooperative_ref: x.ref,
-        farmer: { label: "Nguyễn V. A." },
-        note: null,
-        area_ha: "2.15",
-        declared_area_ha: "2.2",
-        area_deviation_pct: "-2.3",
-        shape: "polygon",
-        department_code: "trong_trot",
-        status: "active",
-        needs_review: false,
-        version: 1,
-        boundary_id: `01927b3e-0000-7000-8000-0000000e${String(i + 1).padStart(4, "0")}`,
-        updated_at: "2026-09-10T02:00:00Z",
-      }));
-      return json({ items, next_cursor: null });
-    }),
-  },
-  {
-    method: "GET",
     pattern: re("/v1/kn/materials"),
     handler: wrap(({ url }, c) => {
       const commune = url.searchParams.get("commune");
@@ -364,4 +337,6 @@ export const knCollectRoutes: Route[] = [
       return json({ items: [...agg.values()].map((a) => ({ ...a, quantity: String(Math.round(a.quantity * 10000) / 10000) })) });
     }),
   },
+  // Thửa (pf/cooperative) + cây trồng (hồ sơ KN #119) — TT-11 #104.
+  ...knPlotRoutes(() => COOPS, wrap),
 ];
