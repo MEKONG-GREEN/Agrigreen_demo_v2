@@ -422,9 +422,10 @@ export function MachinesScreen() {
     const counts = rows.map((l) => ({ machine_type: l.machine_type, quantity: Number(normalizeNumberInput(l.quantity)), note: l.note.trim() || null }));
     const years = rows.map((l) => ({ machine_type: l.machine_type, year_made: Number(normalizeNumberInput(l.year_made)) }));
     const r = await act.run(
-      async () => {
+      async (idem) => {
         const saved = await collectApi.putMachines(ref, counts);
-        await collectApi.putMachineProfile(ref, years);
+        // Sau await: bọc bằng idem của CÙNG lượt để bấm lại sau mất phản hồi giữ khóa cho cả hai bước (#129).
+        await idem(() => collectApi.putMachineProfile(ref, years));
         return saved;
       },
       (r) => `Đã lưu khai báo máy (${r.total} máy).`,

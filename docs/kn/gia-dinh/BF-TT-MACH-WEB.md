@@ -6,7 +6,7 @@
   - Năm SX: số nguyên, 1900 ≤ năm ≤ năm hiện tại theo lịch Việt Nam (cùng mốc máy chủ #119).
   - Không trùng loại máy (lỗi ở dòng sau). Dòng mới chọn sẵn loại chưa khai báo, năm để trống.
 - **HTX/Chủ sở hữu bắt buộc:** phải chọn HTX ở bộ lọc thì bảng khai báo mới hiện, nên mọi dòng lưu đều gắn một HTX. Xã/phường lấy theo HTX.
-- **Lưu:** một lần bấm gọi lần lượt `PUT /v1/kn/machine-counts/{ref}` (số lượng, pf/mechanization) rồi `PUT /v1/kn/machine-profiles/{ref}` (năm, thay toàn bộ, loại vắng bị bỏ khỏi hồ sơ). Hai lời gọi nằm trong cùng một lượt thao tác (`useAction`, #129). Nếu lời gọi thứ hai lỗi, bấm Lưu lại sẽ phát lại lời gọi đầu bằng khóa cũ, máy chủ trả kết quả cũ, không ghi số lượng lần hai.
+- **Lưu:** một lần bấm gọi lần lượt `PUT /v1/kn/machine-counts/{ref}` (số lượng, pf/mechanization) rồi `PUT /v1/kn/machine-profiles/{ref}` (năm, thay toàn bộ, loại vắng bị bỏ khỏi hồ sơ). Hai lời gọi nằm trong cùng một lượt thao tác (`useAction`, #129); lời gọi thứ hai đứng sau `await` nên được bọc bằng `idem` của chính lượt đó (review Codex). Nếu lời gọi thứ hai lỗi hoặc mất phản hồi, màn không báo thành công. Bấm Lưu lại sẽ phát lại cả hai lời gọi bằng khóa cũ, máy chủ trả kết quả cũ, không ghi lần hai.
 - **Lỗi máy chủ theo trường** gắn vào ô của đúng dòng: `lines[i].quantity` → ô Số lượng dòng i; `lines.<loại máy>.year_made` | `.machine_type` → ô của dòng có loại đó.
 - **Giả định:**
   - Năm gắn theo **loại máy** của HTX (một năm cho mỗi dòng loại × số lượng), theo #119. Nếu khách cần năm theo từng chiếc thì phải đổi mô hình hồ sơ.
