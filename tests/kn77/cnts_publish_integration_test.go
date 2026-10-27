@@ -8,7 +8,10 @@ package kn77_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -257,4 +260,89 @@ func bm04Values() map[string]string {
 	}
 	v["tong_dan_heo"] = "10"
 	return v
+}
+
+// callAs gọi API với ngữ cảnh KN tường minh (phạm vi, Nút) — hồi quy phạm vi của review #108.
+func (f *aggFx) callAs(method, path string, k authz.KNContext) (int, []byte) {
+	f.t.Helper()
+	kj, _ := json.Marshal(k)
+	req := httptest.NewRequest(method, path, nil)
+	req.Header.Set("X-Test-KN", string(kj))
+	req.Header.Set("X-Test-Actor", ids.New().String())
+	w := httptest.NewRecorder()
+	f.eng.ServeHTTP(w, req)
+	return w.Code, w.Body.Bytes()
+}
+
+func (f *aggFx) trackedPeriods(k authz.KNContext, code string) []string {
+	f.t.Helper()
+	c, b := f.callAs(http.MethodGet, "/v1/extension/cnts/period-tracking?code="+code, k)
+	var tr pubTracking
+	f.ok(c, b, &tr)
+	out := []string{}
+	for _, p := range tr.Periods {
+		out = append(out, p.PeriodID)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// Review Codex #108 [P2]: màn theo dõi không được lộ metadata (period_id, publication_id, biểu, đối tượng, người phụ
+// trách) của lần phát hành ngoài phạm vi người gọi. Bao phép thử tái hiện của Codex (TestCodex108TrackingScope): xã X1
+// không thấy kỳ chỉ phát hành cho X2.
+func TestCNTSTrackingScope_BF_CN_PUBLISH(t *testing.T) {
+	facA, facB := ids.New(), ids.New()
+	f := newAggFx(t, facilityDir{facA: "X1", facB: "X2"}, func(fm *forms.Module, kn *extension.Module) {
+		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control()})
+	})
+	f.kn.UseReportCycle(extension.ReportCycleDeps{Regions: pubRegions{}})
+	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", authz.KNAdmin, nil)
+	f.ok(c, b, nil)
+	onlyX2 := f.publish("CNTS-BM04", "2026-10-13", "2026-10-19", "X2").Periods[0].ID
+	onlyX1 := f.publish("CNTS-BM04", "2026-10-20", "2026-10-26", "X1").Periods[0].ID
+	facX2 := f.publish("CNTS-BM01", "2026-10-01", "2026-10-01", facB.String()).Periods[0].ID
+	facX1 := f.publish("CNTS-BM01", "2026-10-02", "2026-10-02", facA.String()).Periods[0].ID
+	both := func(x, y string) []string { s := []string{x, y}; slices.Sort(s); return s }
+
+	xa := func(units ...string) authz.KNContext {
+		return authz.KNContext{Role: authz.KNXa, Department: aggDept, OrgRef: ids.New(), Scope: authz.Scope{Units: units}}
+	}
+	// Cấp Xã X1: chỉ kỳ có X1 (biểu theo xã và biểu theo cơ sở của xã X1), không thấy kỳ chỉ X2.
+	if got := f.trackedPeriods(xa("X1"), "CNTS-BM04"); !slices.Equal(got, []string{onlyX1}) {
+		t.Fatalf("xã X1 (BM-04): %v, muốn chỉ %s (không thấy %s)", got, onlyX1, onlyX2)
+	}
+	if got := f.trackedPeriods(xa("X1"), "CNTS-BM01"); !slices.Equal(got, []string{facX1}) {
+		t.Fatalf("xã X1 (BM-01): %v, muốn chỉ %s (không thấy %s)", got, facX1, facX2)
+	}
+	if got := f.trackedPeriods(xa("X2"), ""); !slices.Equal(got, both(onlyX2, facX2)) {
+		t.Fatalf("xã X2 (mọi biểu): %v", got)
+	}
+	if got := f.trackedPeriods(xa("X9"), ""); len(got) != 0 {
+		t.Fatalf("xã ngoài mọi đơn vị nhận: %v", got)
+	}
+	// Nháp: xã X1 không đọc nháp của đơn vị X2 trong kỳ chỉ X2.
+	if c, b := f.callAs(http.MethodGet, "/v1/extension/cnts/period-drafts/"+onlyX2+"?unit=X2", xa("X1")); c < 400 {
+		t.Fatalf("xã X1 đọc nháp kỳ X2: %d %s", c, b)
+	}
+	// Cấp Tỉnh cùng Nút: thấy mọi kỳ của Nút; Cấp Tỉnh Nút khác: không thấy.
+	tinh := authz.KNContext{Role: authz.KNTinh, Department: aggDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1", "X2"}}}
+	if got := f.trackedPeriods(tinh, "CNTS-BM04"); !slices.Equal(got, both(onlyX1, onlyX2)) {
+		t.Fatalf("Cấp Tỉnh cùng Nút: %v", got)
+	}
+	other := tinh
+	other.OrgRef = ids.New()
+	if got := f.trackedPeriods(other, ""); len(got) != 0 {
+		t.Fatalf("Cấp Tỉnh Nút khác: %v", got)
+	}
+	// Admin thấy mọi kỳ của tenant; tenant khác (kể cả Admin) không thấy gì.
+	admin := authz.KNContext{Role: authz.KNAdmin, Scope: authz.Scope{All: true}}
+	if got := f.trackedPeriods(admin, ""); len(got) != 4 {
+		t.Fatalf("Admin: %v", got)
+	}
+	f.tid = ids.New()
+	for _, k := range []authz.KNContext{admin, tinh, xa("X1", "X2")} {
+		if got := f.trackedPeriods(k, ""); len(got) != 0 {
+			t.Fatalf("tenant khác (%s): %v", k.Role, got)
+		}
+	}
 }

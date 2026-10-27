@@ -282,21 +282,27 @@ func (s *Service) CNTSTracking(ctx context.Context, code string, extra []uuid.UU
 	}
 	out := CNTSTracking{Periods: []CNTSTrackedPeriod{}, Drafts: []CNTSDraftMark{}}
 	var pubs []store.CNTSPublication
-	var drafts []store.CNTSDraft
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+	if err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		if pubs, e = store.CNTSPublications(ctx, tx, domain.DeptChanNuoiThuySan, code, org, s.now().Add(-trackingWindow), trackingLimit); e != nil {
-			return e
-		}
-		var periods []uuid.UUID
-		for _, p := range pubs {
-			periods = append(periods, p.PeriodRefs...)
-		}
-		periods = append(periods, extra...)
+		pubs, e = store.CNTSPublications(ctx, tx, domain.DeptChanNuoiThuySan, code, org, s.now().Add(-trackingWindow), trackingLimit)
+		return e
+	}); err != nil {
+		return out, err
+	}
+	// #108 review: lọc lần phát hành / kỳ theo phạm vi người gọi TRƯỚC khi xuất metadata hay tra tên người phụ trách.
+	// Cổng cap/forms (kỳ theo cơ sở) gọi ngoài giao dịch KN.
+	pubs = s.visibleCNTSPublications(ctx, a, pubs)
+	var periods []uuid.UUID
+	for _, p := range pubs {
+		periods = append(periods, p.PeriodRefs...)
+	}
+	periods = append(periods, extra...)
+	var drafts []store.CNTSDraft
+	if err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
+		var e error
 		drafts, e = store.CNTSDraftsOf(ctx, tx, periods)
 		return e
-	})
-	if err != nil {
+	}); err != nil {
 		return out, err
 	}
 	var owners []uuid.UUID
@@ -330,6 +336,44 @@ func (s *Service) CNTSTracking(ctx context.Context, code string, extra []uuid.UU
 		out.Drafts = append(out.Drafts, CNTSDraftMark{PeriodRef: d.PeriodRef, Unit: d.Unit, SavedAt: d.SavedAt})
 	}
 	return out, nil
+}
+
+// visibleCNTSPublications giữ các lần phát hành (và kỳ) trong phạm vi người gọi. Admin/TW: mọi lần phát hành của
+// tenant (RLS); Cấp Tỉnh: đã lọc theo Nút ở truy vấn; Cấp Xã: chỉ lần phát hành có đơn vị nhận thuộc xã phụ trách —
+// biểu theo xã so trực tiếp; biểu theo cơ sở (BM-01) hỏi cap/forms từng kỳ (cap/forms lọc đơn vị theo phạm vi; kỳ không
+// thấy hoặc không còn đơn vị nào → bỏ). Vai khác: không thấy gì.
+func (s *Service) visibleCNTSPublications(ctx context.Context, a actor, pubs []store.CNTSPublication) []store.CNTSPublication {
+	switch a.k.Role {
+	case port.SessionRoleAdmin, port.SessionRoleNational, port.SessionRoleProvince:
+		return pubs
+	case port.SessionRoleCommune:
+	default:
+		return nil
+	}
+	out := pubs[:0:0]
+	for _, p := range pubs {
+		if p.UnitKind != domain.UnitFacility {
+			if slices.ContainsFunc(p.Units, func(u string) bool { return draftVisible(a, u, u) }) {
+				out = append(out, p)
+			}
+			continue
+		}
+		if s.FormsControl == nil {
+			continue // không kiểm được xã của cơ sở → không lộ
+		}
+		var keep []uuid.UUID
+		for _, pr := range p.PeriodRefs {
+			pg, err := s.FormsControl.Progress(ctx, domain.ProfileCNTS, pr)
+			if err == nil && len(pg.Units) > 0 {
+				keep = append(keep, pr)
+			}
+		}
+		if len(keep) > 0 {
+			p.PeriodRefs = keep
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // draftVisible: dấu nháp trong phạm vi người gọi (Cấp Xã: xã phụ trách; Cấp Tỉnh: Nút xuống dưới; Admin/TW: mọi).
