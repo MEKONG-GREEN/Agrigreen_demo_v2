@@ -253,6 +253,44 @@ export const knCollectRoutes: Route[] = [
   },
   {
     method: "GET",
+    pattern: re("/v1/kn/machine-profiles/{id}"),
+    handler: wrap(({ params }, c) => {
+      const x = findCoop(c, params[0]);
+      return x ? json(profileWire(x, c)) : problem(404, "extension.kn_attrs_cooperative_not_found", "Không tìm thấy HTX");
+    }),
+  },
+  {
+    method: "PUT",
+    pattern: re("/v1/kn/machine-profiles/{id}"),
+    handler: wrap(({ params, body }, c) => {
+      const deny = canWrite(c, "extension.read_only");
+      if (deny) return deny;
+      const x = findCoop(c, params[0]);
+      if (!x) return problem(404, "extension.kn_attrs_cooperative_not_found", "Không tìm thấy HTX");
+      if (!x.active) return fieldErr("cooperative_ref", "HTX đã ngừng hoạt động");
+      const lines = ((body as { lines?: unknown[] } | undefined)?.lines ?? []) as { machine_type?: string; year_made?: unknown }[];
+      const maxYear = Number(todayVN().slice(0, 4));
+      const seen = new Set<string>();
+      for (const l of lines) {
+        const t = String(l.machine_type ?? "");
+        if (!MACHINE_TYPES[t]) return problem(422, "extension.kn_attrs_machine_type_unknown", "Loại máy không có trong danh mục", { errors: [{ field: `lines.${t}.machine_type`, reason: "không có hoặc đã ngừng dùng trong danh mục" }] });
+        if (seen.has(t)) return fieldErr(`lines.${t}.machine_type`, "loại máy trùng trong hồ sơ");
+        seen.add(t);
+        if (l.year_made === undefined || l.year_made === null) return fieldErr(`lines.${t}.year_made`, "bắt buộc");
+        const y = l.year_made;
+        if (typeof y !== "number" || !Number.isInteger(y) || y < 1900 || y > maxYear)
+          return problem(422, "extension.kn_attrs_year_invalid", "Năm sản xuất không hợp lệ", { errors: [{ field: `lines.${t}.year_made`, reason: `năm sản xuất phải là số nguyên từ 1900 đến ${maxYear}` }] });
+      }
+      const prev = YEARS.get(x.ref) ?? new Map();
+      YEARS.set(x.ref, new Map(lines.map((l) => {
+        const old = prev.get(l.machine_type!);
+        return [l.machine_type!, old && old.year_made === l.year_made ? old : { year_made: l.year_made as number, updated_at: now(), actor_ref: c.actor }];
+      })));
+      return json(profileWire(x, c));
+    }),
+  },
+  {
+    method: "GET",
     pattern: re("/v1/kn/machine-counts"),
     handler: wrap(({ url }, c) => {
       const commune = url.searchParams.get("commune");
@@ -298,44 +336,6 @@ export const knCollectRoutes: Route[] = [
       }
       MACH.set(x.ref, lines.map((l) => ({ machine_type: l.machine_type, machine_type_name: MACHINE_TYPES[l.machine_type]!, quantity: l.quantity as number, note: l.note ?? null, updated_at: now(), updated_by: c.actor })));
       return json(coopLines(x));
-    }),
-  },
-  {
-    method: "GET",
-    pattern: re("/v1/kn/machine-profiles/{id}"),
-    handler: wrap(({ params }, c) => {
-      const x = findCoop(c, params[0]);
-      return x ? json(profileWire(x, c)) : problem(404, "extension.kn_attrs_cooperative_not_found", "Không tìm thấy HTX");
-    }),
-  },
-  {
-    method: "PUT",
-    pattern: re("/v1/kn/machine-profiles/{id}"),
-    handler: wrap(({ params, body }, c) => {
-      const deny = canWrite(c, "extension.read_only");
-      if (deny) return deny;
-      const x = findCoop(c, params[0]);
-      if (!x) return problem(404, "extension.kn_attrs_cooperative_not_found", "Không tìm thấy HTX");
-      if (!x.active) return fieldErr("cooperative_ref", "HTX đã ngừng hoạt động");
-      const lines = ((body as { lines?: unknown[] } | undefined)?.lines ?? []) as { machine_type?: string; year_made?: unknown }[];
-      const maxYear = Number(todayVN().slice(0, 4));
-      const seen = new Set<string>();
-      for (const l of lines) {
-        const t = String(l.machine_type ?? "");
-        if (!MACHINE_TYPES[t]) return problem(422, "extension.kn_attrs_machine_type_unknown", "Loại máy không có trong danh mục", { errors: [{ field: `lines.${t}.machine_type`, reason: "không có hoặc đã ngừng dùng trong danh mục" }] });
-        if (seen.has(t)) return fieldErr(`lines.${t}.machine_type`, "loại máy trùng trong hồ sơ");
-        seen.add(t);
-        if (l.year_made === undefined || l.year_made === null) return fieldErr(`lines.${t}.year_made`, "bắt buộc");
-        const y = l.year_made;
-        if (typeof y !== "number" || !Number.isInteger(y) || y < 1900 || y > maxYear)
-          return problem(422, "extension.kn_attrs_year_invalid", "Năm sản xuất không hợp lệ", { errors: [{ field: `lines.${t}.year_made`, reason: `năm sản xuất phải là số nguyên từ 1900 đến ${maxYear}` }] });
-      }
-      const prev = YEARS.get(x.ref) ?? new Map();
-      YEARS.set(x.ref, new Map(lines.map((l) => {
-        const old = prev.get(l.machine_type!);
-        return [l.machine_type!, old && old.year_made === l.year_made ? old : { year_made: l.year_made as number, updated_at: now(), actor_ref: c.actor }];
-      })));
-      return json(profileWire(x, c));
     }),
   },
   {
