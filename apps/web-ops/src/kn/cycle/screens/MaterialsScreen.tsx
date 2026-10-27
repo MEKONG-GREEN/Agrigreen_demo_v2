@@ -11,6 +11,7 @@ import { parseNumberInput } from "@/components/form";
 import { Icon } from "@/components/Icon";
 import { DetailLayout, LogPanel, type LogEntry } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, type Column } from "@/components/patterns/list";
+import { toCsvText } from "@/lib/csv";
 import { saveBlob } from "@/lib/files";
 import { vnToday } from "@/lib/vnDate";
 import { PiiHint } from "@/kn/pii";
@@ -56,9 +57,14 @@ export function validateLines(lines: DraftLine[], units: Record<string, string>,
   return { errors, values };
 }
 
+/** Nội dung tệp mẫu: BOM + CSV RFC 4180 — ô "1,5" được bọc nháy để máy chủ đọc đúng 5 cột.
+ *  Golden dùng chung với test Go: internal/kn/extension/material/app/testdata/mau-vat-tu.csv. */
+export function materialTemplateCsv(): string {
+  return String.fromCharCode(0xfeff) + toCsvText([TEMPLATE_HEADER, ["Phân urê", "1,5", "tấn", "30/09/2026", ""]]);
+}
+
 function downloadTemplate() {
-  const csv = [TEMPLATE_HEADER, ["Phân urê", "1,5", "tấn", "30/09/2026", ""]].map((r) => r.join(",")).join("\r\n") + "\r\n";
-  saveBlob(new Blob([String.fromCharCode(0xfeff) + csv], { type: "text/csv;charset=utf-8" }), "mau-vat-tu.csv");
+  saveBlob(new Blob([materialTemplateCsv()], { type: "text/csv;charset=utf-8" }), "mau-vat-tu.csv");
 }
 
 const LOG_LABEL: Record<string, string> = { recorded: "Ghi nhận", corrected: "Sửa (bản ghi bù)" };

@@ -10,6 +10,7 @@ import { json, problem, type Ctx, type Route } from "./http";
 import { KN_COOPS } from "./kn-schedules";
 import { callerOf, isErr, type Caller } from "./kn-reports/store";
 import { vnDate } from "@/kn/schedule/week";
+import { parseCsvText } from "@/lib/csv";
 
 interface Coop {
   ref: string;
@@ -414,7 +415,8 @@ function materialImport(body: unknown): Response {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
-  const rows = body.split(/\r?\n/).filter((l) => l.trim()).map((l) => l.split(",").map((x) => x.trim()));
+  // Đọc CSV có ô bọc nháy ("1,5") như encoding/csv của máy chủ — không tách thô theo dấu phẩy.
+  const rows = parseCsvText(body);
   const keys = (rows[0] ?? []).map(norm);
   const col = (...names: string[]) => keys.findIndex((k) => names.includes(k));
   const ci = { m: col("vat_tu", "ma_vat_tu", "loai_vat_tu", "ten_vat_tu"), q: col("so_luong"), d: col("thoi_diem", "ngay", "ngay_ghi_nhan"), n: col("ghi_chu") };
@@ -426,7 +428,9 @@ function materialImport(body: unknown): Response {
     const m = code ? MATERIALS[code]! : null;
     const reasons: string[] = [];
     if (!m) reasons.push(raw ? "vật tư không có trong danh mục đang dùng" : "thiếu vật tư");
-    const q = (r[ci.q] ?? "").replace(/\s/g, "");
+    // Như máy chủ parseQuantity: "1,5" / "1.234,5" kiểu Việt Nam → dấu chấm thập phân.
+    const qRaw = (r[ci.q] ?? "").replace(/\s/g, "");
+    const q = qRaw.includes(",") ? qRaw.replace(/\./g, "").replace(",", ".") : qRaw;
     const okQ = m ? (m.countable ? /^\d+$/ : /^\d+(\.\d{1,4})?$/).test(q) : /^\d+(\.\d+)?$/.test(q);
     if (!q) reasons.push("thiếu số lượng");
     else if (!okQ) reasons.push(m?.countable ? "ĐVT đếm được: số lượng phải là số nguyên" : "số lượng không hợp lệ");

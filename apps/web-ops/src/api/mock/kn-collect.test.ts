@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiProblem } from "@/api/problem";
 import { createCollectApi, RawFile } from "@/kn/cycle/api";
+import { materialTemplateCsv } from "@/kn/cycle/screens/MaterialsScreen";
 import { mockFetchNoDelay } from "./handler";
 import { resetKnCollect } from "./kn-collect";
 
@@ -85,6 +86,13 @@ describe("vật tư dạng bảng nhập giả lập (TT-12)", () => {
     expect(await code(xa.importMaterials(new RawFile(["Ghi chú", "x", ""].join("\n"), "text/csv")))).toBe("422 extension.material_import_invalid");
     const tw = await clientFor("kn-binh", "asg-binh-tinh");
     expect(await code(tw.importMaterials(new RawFile(csv, "text/csv")))).toBe("403 extension.read_only");
+  });
+
+  it("Codex P2: tệp mẫu tải xuống nạp lại được — ô \"1,5\" bọc nháy, nhận 1 dòng số lượng 1.5", async () => {
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const r = await xa.importMaterials(new RawFile(materialTemplateCsv(), "text/csv; charset=utf-8"));
+    expect([r.accepted, r.rejected]).toEqual([1, 0]);
+    expect(r.lines[0]).toMatchObject({ row: 2, material_code: "phan_ure", unit: "tấn", quantity: "1.5", recorded_on: "2026-09-30", status: "accepted" });
   });
 });
 

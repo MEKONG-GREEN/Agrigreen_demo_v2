@@ -1,10 +1,13 @@
 // BF-TT-MAT (#105, PRD TT-12): Vật tư dạng bảng nhập — lọc Xã + Thời điểm, Thêm dòng, Lưu (gom theo Thời điểm),
 // ĐVT tự điền theo danh mục, số lượng không âm/nguyên theo ĐVT, Nạp Excel (máy chủ đọc tệp, không ghi), Lịch sử.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { vnToday } from "@/lib/vnDate";
-import { MaterialsScreen, validateLines } from "./MaterialsScreen";
+import { parseCsvText } from "@/lib/csv";
+import { MaterialsScreen, materialTemplateCsv, validateLines } from "./MaterialsScreen";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/kn/du-lieu/vat-tu", useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useParams: () => ({}) }));
 
@@ -184,5 +187,21 @@ describe("validateLines", () => {
     );
     expect(r.errors.a).toEqual({ material_code: "Vật tư không có trong danh mục đang dùng.", recorded_on: "Bắt buộc nhập." });
     expect(r.errors.b).toEqual({ recorded_on: "Không được ở tương lai." });
+  });
+});
+
+// Codex P2 (#105): tệp mẫu phải là CSV hợp lệ — "1,5" bọc nháy, đúng 5 cột. Golden dùng chung với test Go
+// TestParseImportTable_WebTemplateRoundTrip (nạp đúng các byte này qua shared/tabular + ParseImportTable thật).
+describe("tệp mẫu vật tư (CSV)", () => {
+  it("khớp từng byte với golden mà test Go nạp lại qua bộ đọc thật", () => {
+    const golden = readFileSync(resolve(process.cwd(), "../../internal/kn/extension/material/app/testdata/mau-vat-tu.csv"));
+    expect(Buffer.from(materialTemplateCsv(), "utf8").equals(golden)).toBe(true);
+  });
+
+  it("đọc lại đúng 5 cột, số lượng giữ nguyên 1,5", () => {
+    const rows = parseCsvText(materialTemplateCsv());
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.length)).toEqual([5, 5]);
+    expect(rows[1]).toEqual(["Phân urê", "1,5", "tấn", "30/09/2026", ""]);
   });
 });

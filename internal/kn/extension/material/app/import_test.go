@@ -2,6 +2,8 @@ package app
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -76,6 +78,31 @@ func TestParseImportTable_LinesAndReasons(t *testing.T) {
 	}
 	if l := res.Lines[9]; !strings.Contains(l.Reason, "thiếu số lượng") {
 		t.Fatalf("thiếu số lượng: %+v", l)
+	}
+}
+
+// BF-TT-MAT (#105, Codex P2): tệp mẫu web tải xuống (đúng từng byte — testdata/mau-vat-tu.csv, cũng là golden của
+// vitest MaterialsScreen "materialTemplateCsv") nạp lại qua bộ đọc thật phải nhận 1 dòng, số lượng 1.5. Trước đây
+// mẫu ghi `1,5` không bọc nháy → 6 cột, chính dòng mẫu bị loại.
+func TestParseImportTable_WebTemplateRoundTrip(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "mau-vat-tu.csv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tb, err := tabular.ReadBytes(data, tabular.Limits{MaxBytes: MaxImportBytes, MaxRows: MaxImportRows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := []mdport.CatalogItem{{Catalog: mdport.CatalogMaterial, Code: "phan_ure", Name: "Phân urê", Attrs: map[string]string{"unit": "tấn"}, Active: true}}
+	res, err := ParseImportTable(tb, catalog, importToday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Accepted != 1 || res.Rejected != 0 || len(res.Lines) != 1 {
+		t.Fatalf("tệp mẫu phải nhận đúng 1 dòng: %+v", res)
+	}
+	if l := res.Lines[0]; l.MaterialCode != "phan_ure" || l.Unit != "tấn" || l.Quantity != "1.5" || l.RecordedOn != "2026-09-30" || l.Status != ImportAccepted {
+		t.Fatalf("dòng mẫu: %+v", l)
 	}
 }
 
