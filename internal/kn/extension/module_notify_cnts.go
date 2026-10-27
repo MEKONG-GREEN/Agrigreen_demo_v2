@@ -100,16 +100,38 @@ func renderCNTSNotifications(eventType string, payload json.RawMessage, occurred
 		tpl := sourceNotificationTemplate{Kind: extport.KindCNTSFormReminder, Severity: notifyport.SeverityNormal, Title: title, Body: sourceNotificationTruncate(p.Message, 400),
 			DeepLink: cntsNotificationPeriodsLink, SubjectRef: sourceNotificationRef(p.PeriodRef), CreatedAt: sourceNotificationTime(p.EventTime, occurred)}
 		email := slices.Contains(p.Channels, "email")
+		// BF-CN-PUBLISH (CN-07): kênh Cấp Tỉnh chọn ở cấu hình nhắc của biểu là lựa chọn kênh tường minh (BF-NOTIFY-CNTS):
+		// bỏ "Đẩy thông báo Mobile" thì không push. Sự kiện cũ không có kênh → hành vi mặc định (hộp thư + push).
+		ch := reminderChannels(p.Channels)
 		out := make([]notifyport.NotificationDraft, 0, len(p.RecipientRefs))
 		for _, r := range sourceNotificationRecipients(p.RecipientRefs) {
 			n := tpl.For(r)
 			n.Email = email
+			if ch != nil {
+				c := *ch
+				n.Channels = &c
+			}
 			out = append(out, n)
 		}
 		if len(out) == 0 && p.CommuneCode != "" {
-			out = append(out, tpl.ForAudience(notifyport.DraftAudience{Units: []string{p.CommuneCode}, Roles: []string{partyport.RoleKNOfficer}}))
+			n := tpl.ForAudience(notifyport.DraftAudience{Units: []string{p.CommuneCode}, Roles: []string{partyport.RoleKNOfficer}})
+			if ch != nil {
+				c := *ch
+				c.Email = false // thông báo theo chủ đề không gửi email (không có người nhận cụ thể)
+				n.Channels = &c
+			}
+			out = append(out, n)
 		}
 		return out, nil
 	}
 	return nil, nil
+}
+
+// reminderChannels chuyển kênh của cấu hình nhắc (in_app, push, email) sang lựa chọn kênh của pf/notify; rỗng → nil
+// (hành vi cũ). Hộp thư luôn có (KN chuẩn hóa in_app; push của notify cũng kéo theo hộp thư).
+func reminderChannels(chs []string) *notifyport.DeliveryChannels {
+	if len(chs) == 0 {
+		return nil
+	}
+	return &notifyport.DeliveryChannels{InApp: true, Push: slices.Contains(chs, "push"), Email: slices.Contains(chs, "email")}
 }

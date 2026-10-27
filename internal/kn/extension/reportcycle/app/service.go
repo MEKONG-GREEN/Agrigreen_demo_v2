@@ -73,6 +73,8 @@ type Service struct {
 	// W11.44: số liệu kỳ native theo lô (tổng hợp BM-02, BM-18) và danh mục cơ sở giết mổ (tên, mộc dấu — tùy chọn).
 	FormsFigures   formsport.FiguresReader
 	CNTSFacilities CNTSFacilityCatalog
+	// BF-CN-PUBLISH: tiến độ kỳ native trong phạm vi người gọi (nháp của cán bộ xã chỉ ghi cho đơn vị của kỳ mình thấy).
+	FormsControl formsport.PeriodControl
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

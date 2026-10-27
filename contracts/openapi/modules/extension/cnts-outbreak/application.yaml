@@ -1,0 +1,74 @@
+paths:
+# @ag-order: 31210
+  /v1/extension/cnts/outbreaks/{ref}/word:
+    post:
+      summary: "Xuất Word Báo cáo tình hình dịch bệnh BM-10 qua pf/export (BF-CN-OUTBREAK, UP-08): tự cấp số {n}/BC-TTKN — một số mỗi ổ dịch, dùng lại khi xuất lại; điền dòng địa danh, ngày"
+      operationId: extensionCntsOutbreakWord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Lần xuất đã ghi sổ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSOutbreakWordRun"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_outbreak_not_found | export.template_not_found", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
+# @ag-order: 31211
+  /v1/extension/cnts/outbreaks/{ref}/words:
+    get:
+      summary: Lịch sử các lần xuất Word BM-10 của ổ dịch (mới nhất trước)
+      operationId: extensionCntsOutbreakWords
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSOutbreakWordRun"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 31212
+  /v1/extension/cnts/outbreaks/{ref}/words/{run}/download:
+    get:
+      summary: Tải lại tệp Word đã xuất (pf/export kiểm băm SHA-256)
+      operationId: extensionCntsOutbreakWordDownload
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: run, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .docx
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_outbreak_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 31213
+    CNTSOutbreakWordRun:
+      type: object
+      required: [id, seq, template, template_version, doc_number, doc_number_auto, file_name, body_hash, size, actor_ref, at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        template: {type: string}
+        template_version: {type: integer}
+        doc_number: {type: string}
+        doc_number_auto: {type: boolean}
+        file_name: {type: string}
+        body_hash: {type: string}
+        size: {type: integer}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}

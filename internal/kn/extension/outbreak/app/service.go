@@ -21,6 +21,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -64,6 +65,8 @@ type Service struct {
 	Catalogs port.CNTSCatalogs
 	// Names (tùy chọn): tên người thao tác cho lịch sử.
 	Names func() partyport.ActorNames
+	// Exporter (tùy chọn, BF-CN-OUTBREAK): xuất Word BM-10 qua pf/export. nil → route Word trả 503.
+	Exporter exportport.Exporter
 }
 
 func newID() uuid.UUID { return ids.New() }

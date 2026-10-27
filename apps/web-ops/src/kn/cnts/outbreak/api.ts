@@ -16,7 +16,8 @@ export type Suspect = S["CNTSSuspect"];
 export type SuspectInput = S["CNTSSuspectInput"];
 export type OutbreakStatus = Outbreak["status"];
 
-export const STATUS_LABEL: Record<OutbreakStatus, string> = { reported: "Đã gửi", monitoring: "Đang theo dõi", closed: "Đã kết thúc" };
+// BF-CN-OUTBREAK (UP-07): ổ dịch vừa gửi chờ Cấp Tỉnh xác nhận → "Chờ xác nhận".
+export const STATUS_LABEL: Record<OutbreakStatus, string> = { reported: "Chờ xác nhận", monitoring: "Đang theo dõi", closed: "Đã kết thúc" };
 export const STATUS_TONE: Record<OutbreakStatus, "neutral" | "ok" | "warn" | "bad" | "info"> = { reported: "bad", monitoring: "warn", closed: "ok" };
 export const SUSPECT_LABEL: Record<Suspect["status"], string> = { reported: "Chờ xác nhận", confirmed: "Đã xác nhận", dismissed: "Bác bỏ" };
 export const SOURCE_LABEL: Record<Outbreak["source"], string> = { ubnd_xa: "UBND xã", nong_ho: "Nông hộ báo", can_bo: "Cán bộ phát hiện" };
@@ -58,8 +59,9 @@ export interface OutbreakForm {
 export function emptyForm(commune = ""): OutbreakForm {
   return {
     commune_code: commune, disease_code: "", species_code: "", received_at: "", source: "", locality: "", lat: "", lon: "", accuracy_m: "",
-    location_source: "gps", herd_size: "", herd_age_days: "", dead: "0", symptoms: "", sample_date: "", lab_name: "", lab_result: "",
-    culled_head: "", culled_kg: "", chemical_liters: "", buffer_note: "", prevention_note: "", as_of: "", progress_note: "",
+    // UP-08: ô số mặc định 0 (không âm) — quy mô đàn vẫn phải > 0 khi gửi; ngày tuổi, sai số GPS để trống (không có nghĩa 0).
+    location_source: "gps", herd_size: "0", herd_age_days: "", dead: "0", symptoms: "", sample_date: "", lab_name: "", lab_result: "",
+    culled_head: "0", culled_kg: "0", chemical_liters: "0", buffer_note: "", prevention_note: "", as_of: "", progress_note: "",
   };
 }
 
@@ -194,3 +196,46 @@ export function createOutbreakApi(api: ApiClient) {
 }
 
 export type OutbreakApi = ReturnType<typeof createOutbreakApi>;
+
+export type WordRun = S["CNTSOutbreakWordRun"];
+
+/** Word BM-10 (pf/export): tạo lần xuất (tự cấp số) rồi tải tệp; lịch sử lần xuất. */
+export function createOutbreakWordApi(api: ApiClient) {
+  return {
+    export: (ref: string): Promise<WordRun> =>
+      unwrap(api.POST("/v1/extension/cnts/outbreaks/{ref}/word", { params: { path: { ref }, ...idem() } })),
+    history: async (ref: string): Promise<WordRun[]> =>
+      (await unwrap(api.GET("/v1/extension/cnts/outbreaks/{ref}/words", { params: { path: { ref } } }))).items,
+    download: async (ref: string, run: string): Promise<Blob> => {
+      const r = await api.GET("/v1/extension/cnts/outbreaks/{ref}/words/{run}/download", { params: { path: { ref, run } }, parseAs: "blob" });
+      if (r.error !== undefined || !r.data) await unwrap(Promise.resolve(r as never));
+      return r.data as Blob;
+    },
+  };
+}
+
+/** Mã hiển thị của ổ dịch (UP-07 cột "Mã"): "OD-" + 6 ký tự cuối của mã ổ dịch (UUID, duy nhất). */
+export function outbreakCode(ref: string): string {
+  return "OD-" + ref.replace(/-/g, "").slice(-6).toUpperCase();
+}
+
+/** Thẻ thống kê UP-07: Tổng, Chờ xác nhận, Đang theo dõi, Đã kết thúc (đếm trước khi lọc trạng thái). */
+export function statCards(byStatus: { key: string; count: number }[]): { key: OutbreakStatus | ""; label: string; count: number }[] {
+  const n = (k: string) => byStatus.find((c) => c.key === k)?.count ?? 0;
+  return [
+    { key: "", label: "Tổng ổ dịch", count: byStatus.reduce((a, c) => a + c.count, 0) },
+    { key: "reported", label: "Chờ xác nhận", count: n("reported") },
+    { key: "monitoring", label: "Đang theo dõi", count: n("monitoring") },
+    { key: "closed", label: "Đã kết thúc", count: n("closed") },
+  ];
+}
+
+/** Tìm kiếm trong danh sách (mã, bệnh, vật nuôi, xã, địa bàn) — không phân biệt hoa thường, dấu. */
+export function searchOutbreaks(items: Outbreak[], q: string, communeName: (c: string) => string): Outbreak[] {
+  const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
+  const k = fold(q.trim());
+  if (!k) return items;
+  return items.filter((o) =>
+    fold([outbreakCode(o.ref), o.disease_name, o.species_name, communeName(o.commune_code), o.commune_code, o.locality ?? ""].join(" ")).includes(k),
+  );
+}

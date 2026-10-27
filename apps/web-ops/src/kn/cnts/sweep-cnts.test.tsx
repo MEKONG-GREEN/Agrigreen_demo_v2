@@ -7,6 +7,7 @@ import { createApiClient, type ApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { AlertScreen } from "./alert/AlertScreen";
 import { ProjectsScreen } from "./model/ProjectsScreen";
+import { OutbreakCreateScreen } from "./outbreak/OutbreakCreateScreen";
 import { OutbreakScreen } from "./outbreak/OutbreakScreen";
 import { CntsPublishScreen } from "./periods/CntsPublishScreen";
 import { VaccinationScreen } from "./schedules/VaccinationScreen";
@@ -51,11 +52,13 @@ describe("Biểu kỳ CNTS — phát hành", () => {
     render(<CntsPublishScreen />);
     const table = await screen.findByRole("table", { name: "Biểu mẫu" });
     expect(within(table).getByRole("columnheader", { name: "STT" })).toBeInTheDocument();
+    await u.click(await screen.findByRole("radio", { name: /Chọn từng xã/ }));
     await u.clear(screen.getByLabelText(/Từ ngày/));
     await u.type(screen.getByLabelText(/Giờ hạn nộp/), "25:00");
-    await u.click(screen.getByRole("button", { name: "Xem trước" }));
-    expect(alerts()).toEqual(expect.arrayContaining(["Bắt buộc nhập.", "Chọn ít nhất một đơn vị nhận.", "Giờ dạng HH:MM, vd 16:00."]));
-    expect(writes("/preview")).toHaveLength(0);
+    const before = writes("/preview").length; // màn nạp danh sách xã bằng một lần xem trước "Tất cả xã"
+    await u.click(screen.getByRole("button", { name: /Xem trước/ }));
+    expect(alerts()).toEqual(expect.arrayContaining(["Bắt buộc nhập.", "Chọn ít nhất một đơn vị nhận.", "Giờ dạng HH:MM, vd 16:00.", "Chọn cán bộ tỉnh phụ trách biểu."]));
+    expect(writes("/preview")).toHaveLength(before);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
@@ -77,8 +80,10 @@ describe("Dịch bệnh — tin báo nghi dịch", () => {
     auth.role = "kn_xa";
     useApi("kn-an");
     const u = userEvent.setup();
-    render(<OutbreakScreen />);
-    await u.click(screen.getByRole("button", { name: "Lập báo cáo dịch bệnh" }));
+    // BF-CN-OUTBREAK (UP-08): lập báo cáo trên trang riêng; ô số mặc định 0.
+    render(<OutbreakCreateScreen />);
+    expect(screen.getByLabelText(/DB-06 Quy mô đàn/)).toHaveValue("0");
+    await u.clear(screen.getByLabelText(/DB-06 Quy mô đàn/));
     await u.type(screen.getByLabelText(/DB-06 Quy mô đàn/), "0");
     await u.clear(screen.getByLabelText(/DB-07 Số con chết/));
     await u.type(screen.getByLabelText(/DB-07 Số con chết/), "-1");
