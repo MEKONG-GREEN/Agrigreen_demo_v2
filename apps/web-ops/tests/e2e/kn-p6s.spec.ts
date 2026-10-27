@@ -61,16 +61,22 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await enter(page, "binh.tt@angiang.gov.vn", /^Cấp Tỉnh/);
     await go(page, "Phát hành biểu mẫu", /Nhiệm vụ/);
     await expect(page.getByRole("heading", { level: 1, name: "Phát hành biểu mẫu báo cáo" })).toBeVisible();
+    // BF-TT-PUBLISH (#106): wizard 5 bước — B1 biểu, B2 chọn xã từ danh sách, B3 kỳ, B4 Tỉnh giao, B5 xem trước.
+    const nextStep = () => page.getByRole("button", { name: "Tiếp →" }).click();
     await page.getByLabel("Chọn T01").check();
+    await nextStep();
     await page.getByRole("radio", { name: "Chọn từng xã" }).click();
-    await page.getByLabel("Mã xã (cách nhau dấu phẩy)").fill("91301,91302");
+    await page.getByRole("checkbox", { name: /91301/ }).check();
+    await page.getByRole("checkbox", { name: /91302/ }).check();
+    await nextStep();
     // BF-UI-KIT (#97) TextField: dấu * bắt buộc chỉ hiển thị (aria-hidden), trường đánh dấu aria-required.
-    await expect(page.getByLabel("Tên vụ / đợt")).toHaveAttribute("aria-required", "true");
-    await page.getByLabel("Tên vụ / đợt").fill("Đợt E2E");
-    await page.getByRole("button", { name: /Xem trước/ }).click();
-    await expect(page.getByTestId("task-count")).toHaveText("8");
+    await expect(page.getByLabel("Vụ / đợt")).toHaveAttribute("aria-required", "true");
+    await page.getByLabel("Vụ / đợt").fill("Đợt E2E");
+    await nextStep();
     await page.getByLabel("T01 D 91301").fill("126");
     await page.getByLabel("T01 D 91302").fill("290");
+    await nextStep();
+    await expect(page.getByTestId("task-count")).toHaveText("8");
     await page.getByRole("button", { name: "Phát hành", exact: true }).click();
     await expect(page.getByText(/Đã phát hành 8 công việc cho 2 xã, 4 kỳ/)).toBeVisible();
     await logout(page);
