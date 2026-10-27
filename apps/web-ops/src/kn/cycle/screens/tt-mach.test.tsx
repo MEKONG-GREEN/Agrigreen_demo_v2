@@ -3,7 +3,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { IDEMPOTENCY_HEADER } from "@/api/idempotency";
+import { mockFetchNoDelay } from "@/api/mock/handler";
+import { resetKnCollect } from "@/api/mock/kn-collect";
 import { ApiProblem } from "@/api/problem";
+import { createCollectApi } from "@/kn/cycle/api";
 import { MachinesScreen, machineServerErrors, machineYearError, validateMachineLines, vnYear } from "./DataScreens";
 
 vi.mock("next/navigation", () => ({
@@ -15,7 +19,7 @@ vi.mock("next/navigation", () => ({
 const auth: { role: string; collectApi: Record<string, ReturnType<typeof vi.fn>> } = { role: "kn_xa", collectApi: {} };
 vi.mock("@/auth/AuthProvider", () => ({
   useAuth: () => ({
-    api: {},
+    api: { GET: async () => ({ data: { name: "Mỹ Hòa Hưng" } }) },
     kn: { context: { role: auth.role, communes: [{ code: "91301", name: "Mỹ Hòa Hưng" }], department_code: "trong_trot" } },
     collectApi: auth.collectApi,
   }),
@@ -148,5 +152,50 @@ describe("Máy móc HTX — màn hình (TT-10)", () => {
     await openCoop();
     expect(screen.getByLabelText("Năm sản xuất dòng 1")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Lưu" })).toBeNull();
+  });
+});
+
+// Codex review #103 (P2): lệnh lưu năm đứng sau await lưu số lượng phải dùng idem của CÙNG lượt (#129).
+describe("Máy móc HTX — bấm Lưu lại sau mất phản hồi giữ khóa của cả hai bước", () => {
+  it("bước năm đã ghi nhưng mất phản hồi → không báo thành công; Lưu lại dùng lại khóa cũ cho số lượng và năm", async () => {
+    resetKnCollect();
+    const r = await mockFetchNoDelay(
+      new Request("http://mock/v1/me/context", {
+        method: "POST",
+        headers: { Authorization: "Bearer mock.kn-an", "Content-Type": "application/json", "Idempotency-Key": `ctx-${Math.random()}` },
+        body: JSON.stringify({ assignment_id: "asg-an-xa", department_code: "trong_trot" }),
+      }),
+    );
+    const ctx = ((await r.json()) as { context_id: string }).context_id;
+    const writes: { path: string; key: string }[] = [];
+    let lose = true;
+    const fetch = async (req: Request): Promise<Response> => {
+      const path = new URL(req.url).pathname;
+      if (req.method !== "GET") writes.push({ path, key: req.headers.get(IDEMPOTENCY_HEADER) ?? "" });
+      const res = await mockFetchNoDelay(req);
+      if (req.method === "PUT" && path.startsWith("/v1/kn/machine-profiles/") && lose) {
+        lose = false; // máy chủ đã xử lý, phản hồi mất
+        throw new TypeError("Failed to fetch");
+      }
+      return res;
+    };
+    auth.collectApi = createCollectApi({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-an", getContextId: () => ctx, fetch }) as unknown as typeof auth.collectApi;
+    const u = userEvent.setup();
+    render(<MachinesScreen />);
+    const htx = screen.getByLabelText("HTX");
+    await waitFor(() => expect(within(htx).getAllByRole("option").length).toBeGreaterThan(1));
+    await u.selectOptions(htx, within(htx).getAllByRole("option")[1]!);
+    await screen.findByRole("table", { name: "Khai báo máy" });
+    await u.click(screen.getByRole("button", { name: "+ Thêm dòng" }));
+    for (const input of screen.getAllByLabelText(/^Năm sản xuất dòng/)) if (!(input as HTMLInputElement).value) await u.type(input, "2020");
+    await u.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(writes).toHaveLength(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Lưu" })).toBeEnabled());
+    expect(screen.queryByText(/Đã lưu khai báo máy/)).toBeNull();
+    await u.click(screen.getByRole("button", { name: "Lưu" }));
+    expect(await screen.findByText(/Đã lưu khai báo máy/)).toBeInTheDocument();
+    expect(writes.map((w) => w.path.split("/")[3])).toEqual(["machine-counts", "machine-profiles", "machine-counts", "machine-profiles"]);
+    expect(writes[2]!.key).toBe(writes[0]!.key);
+    expect(writes[3]!.key).toBe(writes[1]!.key);
   });
 });
