@@ -3,7 +3,8 @@
 // FN-11 Kế hoạch nhân lực năm (BRD HCTH v3.0; W11.27, dom/hrm — kỳ native cap/forms profile hrm_plan). Bố cục theo
 // prototype HCTH (Khuyen_nong_so_HCTH.html, SC.kh / SC['kh.d']):
 //   - Phòng HCTH/Admin: bảng tổng hợp đơn vị × chỉ tiêu (Hiện có, Dự kiến nghỉ hưu, Dự kiến nghỉ/chuyển khác, Cần bổ sung,
-//     Nhu cầu theo kế hoạch, Trạng thái) + dòng "Toàn Trung tâm"; mở kỳ năm, Xuất Excel, Chốt kế hoạch; bấm đơn vị xem chi tiết.
+//     Nhu cầu theo kế hoạch, Trạng thái) + dòng "Toàn Trung tâm"; mở kỳ năm, Nhắc phòng chưa lập (#50), Xuất Excel, Chốt kế
+//     hoạch; bấm đơn vị xem chi tiết.
 //   - Chi tiết đơn vị: "Số liệu hiện có (tự động)", "Kế hoạch của phòng" (nhập), "Nhu cầu theo vị trí" (thêm/xóa dòng),
 //     Lưu nháp / Gửi Phòng HCTH / Sao chép năm trước; HCTH: Xác nhận, Yêu cầu điều chỉnh, Điều chỉnh sau chốt (có lý do);
 //     khung lịch sử bên phải.
@@ -212,6 +213,22 @@ function PlanSummaryView({ year, onChanged }: { year: number; onChanged: () => v
               >
                 Xuất Excel
               </button>
+              {s.can_manage ? (
+                <button
+                  type="button"
+                  className="btn btn-o btn-sm"
+                  disabled={chot || act.busy || pending.length === 0}
+                  onClick={() =>
+                    void act.run(
+                      () => pa.remind(year),
+                      (r) =>
+                        `Đã nhắc ${r.units.length} đơn vị chưa gửi kế hoạch (${r.units.map((u) => u.unit_name).join(", ")}).`,
+                    )
+                  }
+                >
+                  Nhắc phòng chưa lập
+                </button>
+              ) : null}
               {s.can_manage ? (
                 <button type="button" className="btn btn-p btn-sm" disabled={chot || act.busy} onClick={() => setConfirm(true)}>
                   Chốt kế hoạch

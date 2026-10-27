@@ -2913,6 +2913,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/report-tasks/{id}/grid-import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * BF-TT-FORMS (UP-04): Nhập từ Excel trên màn nhập biểu Cấp Xã — đọc tệp thành dòng chữ cái cột → giá trị, không ghi
+         * @description Thân request là tệp (không multipart): .xlsx đúng bố cục "Tải mẫu Excel" (tiêu đề → hàng chữ cái A, B, C… → dòng loại cột
+         *     → dòng dữ liệu → "Yêu cầu biểu mẫu") hoặc CSV UTF-8 có hàng chữ cái. Lấy sheet hiển thị đầu tiên có hàng chữ cái; bỏ dòng
+         *     trống; ô công thức lấy giá trị đã lưu. Ô SỐ của .xlsx (kể cả công thức ra số) trả giá trị thô dạng thập phân dấu chấm
+         *     ("1.234" = một phẩy hai ba bốn, không theo định dạng hiển thị) và được liệt kê trong `numeric`; ô chữ (CSV luôn là chữ)
+         *     giữ nguyên chuỗi — web chỉ đọc kiểu số VN ("1.234,5" → 1234.5) cho ô chữ. Web ghép dòng với xã (cột tên xã) / chỉ tiêu và chỉ điền ô nhập được của kỳ đang
+         *     mở; người dùng xem lại rồi Lưu nháp / Gửi (máy chủ kiểm lại khi nộp). Cấp Xã, công việc trong phạm vi. Tối đa 4 MB,
+         *     2000 dòng.
+         */
+        post: operations["rcImportGrid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/report-tasks/{id}/history": {
         parameters: {
             query?: never;
@@ -5141,6 +5167,30 @@ export interface paths {
         put?: never;
         /** FN-XA-03.06: ghi nhận vật tư của xã (Cấp Xã, Admin), 1–200 dòng */
         post: operations["knRecordMaterials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/materials/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * BF-TT-MAT (TT-12): Nạp Excel vật tư — đọc tệp CSV UTF-8/.xlsx thành dòng của bảng nhập, không ghi sổ
+         * @description Thân request là tệp (không multipart), đọc bằng shared/tabular (ô công thức → cả tệp bị từ chối). Cột bắt buộc
+         *     "Vật tư" (mã hoặc tên trong danh mục material đang dùng) và "Số lượng"; tùy chọn "ĐVT" (phải khớp danh mục),
+         *     "Thời điểm" (dd/mm/yyyy hoặc YYYY-MM-DD, không ở tương lai), "Ghi chú" (không SĐT/CCCD). Dòng lỗi có lý do không chứa
+         *     giá trị nhập; dòng khác vẫn nhận. Người dùng xem lại trong bảng rồi Lưu qua POST /v1/kn/materials (máy chủ kiểm lại).
+         *     Cùng quyền với ghi nhận (Cấp Xã, Admin). Tối đa 200 dòng, 2 MB.
+         */
+        post: operations["knImportMaterials"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9094,6 +9144,26 @@ export interface paths {
         put?: never;
         /** Chốt kế hoạch năm — ảnh chụp đóng băng cap/forms; đơn vị chưa gửi thành "Không gửi"; trả bảng tổng hợp */
         post: operations["hrmPlanClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/plans/{year}/remind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhắc các đơn vị CHƯA gửi kế hoạch (Phòng HCTH, Admin — phiên có quyền ghi) — sổ nhắc + sự kiện pf.hrm.plan.reminded cùng giao dịch; pf/notify gửi lãnh đạo các đơn vị đó tại Nút của phiên */
+        post: operations["hrmPlanRemind"];
         delete?: never;
         options?: never;
         head?: never;
@@ -20613,6 +20683,22 @@ export interface components {
             /** Format: date-time */
             opened_at: string;
         };
+        HrmPlanReminder: {
+            /** Format: uuid */
+            id: string;
+            year: number;
+            /** Format: uuid */
+            period_ref: string;
+            /** @description Đơn vị nội bộ chưa gửi kế hoạch lúc nhắc */
+            units: {
+                unit: string;
+                unit_name: string;
+            }[];
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            reminded_at: string;
+        };
         /**
          * @description not_started Chưa lập · draft Đang lập · submitted Đã gửi · returned Yêu cầu điều chỉnh · accepted Đã xác nhận · closed Đã chốt · missed Không gửi
          * @enum {string}
@@ -22366,8 +22452,11 @@ export interface components {
             items: components["schemas"]["CNTSGrantCandidate"][];
         };
         CNTSDiarySupply: {
+            /** @description Vật tư (mục 1 sổ: con giống, thức ăn con/lớn, vaccine, chế phẩm…); dòng cũ chỉ có chủng loại */
+            item?: string;
             /** Format: date */
             date: string;
+            /** @description Chủng loại vật tư */
             kind: string;
             quantity: string;
             unit: string;
@@ -22525,6 +22614,22 @@ export interface components {
             project_code: string;
             owner_label: string | null;
             can_edit: boolean;
+            /** @description Đầu sổ NC-01: mô hình */
+            project_name: string;
+            /**
+             * Format: date
+             * @description Thời gian thực hiện — từ
+             */
+            project_start: string;
+            /**
+             * Format: date
+             * @description Thời gian thực hiện — đến
+             */
+            project_end: string | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            /** @description Cán bộ theo dõi điểm */
+            officer_display: string | null;
             accounting: components["schemas"]["CNTSDiaryAccounting"];
             suggest: components["schemas"]["CNTSDiarySuggest"];
             version: number;
@@ -22603,6 +22708,22 @@ export interface components {
             project_code: string;
             owner_label: string | null;
             can_edit: boolean;
+            /** @description Đầu sổ NC-01: mô hình */
+            project_name: string;
+            /**
+             * Format: date
+             * @description Thời gian thực hiện — từ
+             */
+            project_start: string;
+            /**
+             * Format: date
+             * @description Thời gian thực hiện — đến
+             */
+            project_end: string | null;
+            /** Format: uuid */
+            officer_ref: string | null;
+            /** @description Cán bộ theo dõi điểm */
+            officer_display: string | null;
             accounting: components["schemas"]["CNTSDiaryAccounting"];
             suggest: components["schemas"]["CNTSDiarySuggest"];
             version: number;
@@ -22788,12 +22909,14 @@ export interface components {
         };
         CNTSDiaryVaccination: {
             vaccine: string;
+            /** @description Lần tiêm; 0 = không ghi (sổ giấy 2026 không có cột lần) */
             shot: number;
             /** Format: date */
             date: string;
             dosage?: string;
             method?: string;
             mfg_date?: string;
+            note?: string;
         };
         CNTSMapLayers: {
             /** Format: date */
@@ -22826,11 +22949,16 @@ export interface components {
         CNTSDiaryOfficerNote: {
             /** Format: date */
             date: string;
+            /** @description Họ và tên cán bộ (phần 3 của sổ) */
+            officer?: string;
             content: string;
             farmer_opinion?: string;
         };
         CNTSDiaryTables: {
+            /** @description NC-09 mục 3 — mua thức ăn chăn nuôi */
             feed_purchases?: components["schemas"]["CNTSDiaryFeedPurchase"][];
+            /** @description NC-09 mục 4 — mua nguyên liệu thức ăn chăn nuôi (BM-08, BM-09) */
+            feed_materials?: components["schemas"]["CNTSDiaryFeedPurchase"][];
             treatments?: components["schemas"]["CNTSDiaryTreatment"][];
             vaccinations?: components["schemas"]["CNTSDiaryVaccination"][];
             sales?: components["schemas"]["CNTSDiarySale"][];
@@ -28934,6 +29062,56 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    rcImportGrid: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Dòng dữ liệu của tệp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Sheet đã đọc (rỗng với CSV) */
+                        sheet: string;
+                        rows: {
+                            /** @description Số dòng trong tệp */
+                            line: number;
+                            /** @description chữ cái cột → giá trị (ô khác rỗng) */
+                            cells: {
+                                [key: string]: string;
+                            };
+                            /** @description Chữ cái cột (theo thứ tự cột) của ô số .xlsx — giá trị trong cells là thập phân dấu chấm chuẩn; CSV luôn rỗng */
+                            numeric: string[];
+                        }[];
+                    };
+                };
+            };
+            /** @description extension.read_only | forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.report_task_not_found */
+            404: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            /** @description extension.grid_import_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
     rcHistory: {
         parameters: {
             query?: never;
@@ -33475,6 +33653,62 @@ export interface operations {
             422: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
+        };
+    };
+    knImportMaterials: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": string;
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Dòng đọc được và kết quả kiểm từng dòng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        accepted: number;
+                        rejected: number;
+                        lines: {
+                            /** @description Số dòng trong tệp (tiêu đề = 1) */
+                            row: number;
+                            /** @description Mã danh mục nếu nhận ra (cả khi dòng bị loại) */
+                            material_code: string | null;
+                            material_name: string | null;
+                            unit: string | null;
+                            /** @description decimal đã chuẩn hóa; null nếu không hợp lệ */
+                            quantity: string | null;
+                            /**
+                             * Format: date
+                             * @description null = dùng Thời điểm đang chọn
+                             */
+                            recorded_on: string | null;
+                            note: string | null;
+                            /** @enum {string} */
+                            status: "accepted" | "rejected";
+                            /** @description Không chứa giá trị nhập */
+                            reason: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description extension.read_only | forbidden */
+            403: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            /** @description extension.material_import_invalid */
+            422: components["responses"]["Problem"];
         };
     };
     knMaterialSummary: {
@@ -42030,6 +42264,37 @@ export interface operations {
             /** @description hrm.plan_not_found */
             404: components["responses"]["Problem"];
             /** @description hrm.plan_closed */
+            409: components["responses"]["Problem"];
+        };
+    };
+    hrmPlanRemind: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Năm kế hoạch (W11.27) */
+                year: components["parameters"]["HrmPlanYear"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đã nhắc */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmPlanReminder"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description hrm.plan_not_found */
+            404: components["responses"]["Problem"];
+            /** @description hrm.plan_closed | hrm.plan_all_submitted */
             409: components["responses"]["Problem"];
         };
     };

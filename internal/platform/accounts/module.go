@@ -153,6 +153,9 @@ func (m *Module) RoleHolders() port.RoleHolders { return m.svc }
 // ScopedDutyHolders provides a read-only recipient query restricted to one issuer node.
 func (m *Module) ScopedDutyHolders() port.ScopedDutyHolders { return app.ScopedDutyReader{Svc: m.svc} }
 
+// UnitManagers provides a read-only leader query per internal unit at one owning node (NOTIFY-HCTH #48).
+func (m *Module) UnitManagers() port.UnitManagers { return app.UnitManagerReader{Svc: m.svc} }
+
 // XaScopes (W11.46) cho lịch trực KSGM BM-03 của pf/extension: cán bộ Cấp Xã của phòng ban kèm xã phụ trách, giới hạn
 // cơ sở/hộ (tenant tường minh).
 func (m *Module) XaScopes() port.XaScopes { return m.svc }

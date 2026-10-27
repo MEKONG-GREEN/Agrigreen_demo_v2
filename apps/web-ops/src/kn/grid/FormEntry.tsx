@@ -91,14 +91,21 @@ export function FormEntry({
         </button>
       </div>
       <div className="card fentry-body" role="tabpanel">
-        {definition.requirements ? (
-          <div className="alert alert-warn freq" role="note">
-            <div>
-              <b>*Yêu cầu biểu mẫu:</b>
-              <div>- {definition.requirements}</div>
-            </div>
+        {/* UP-04: khung "Yêu cầu biểu mẫu" luôn có (như ô A1 của tệp gốc); mẫu chưa ghi yêu cầu thì nói rõ. */}
+        <div className="alert alert-warn freq" role="note" aria-label="Yêu cầu biểu mẫu">
+          <div>
+            <b>*Yêu cầu biểu mẫu:</b>
+            {definition.requirements ? (
+              definition.requirements
+                .split(/\r?\n/)
+                .map((l) => l.replace(/^\s*-\s*/, "").trim())
+                .filter(Boolean)
+                .map((l, i) => <div key={i}>- {l}</div>)
+            ) : (
+              <div className="mute">- Mẫu chưa ghi yêu cầu riêng.</div>
+            )}
           </div>
-        ) : null}
+        </div>
         <FormGrid
           definition={definition}
           rows={rows}

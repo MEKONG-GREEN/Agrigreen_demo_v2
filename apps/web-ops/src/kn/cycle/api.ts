@@ -3,7 +3,7 @@
 // assignments, log, support-sessions, /v1/departments, /v1/regions, /v1/orgs/tree). Kiểu = kiểu sinh từ OpenAPI.
 // fetch(Request) thuần (như src/kn/client.ts): Bearer, X-AG-Context, Idempotency-Key, và X-AG-Reason ở chế độ hỗ trợ
 // (FN-AD-04.07: mọi thao tác ghi bắt buộc lý do ≥ 10 ký tự, mã hóa phần trăm).
-import type { components as AppC } from "@/api/generated/application";
+import type { components as AppC, paths as AppPaths } from "@/api/generated/application";
 import type { components as AdmC } from "@/api/generated/admin";
 import { beginAttempt, currentIdempotentRun, requestFingerprint, type IdempotencyAttempt } from "@/api/idempotency";
 import { ApiProblem, networkProblem, toProblem } from "@/api/problem";
@@ -290,6 +290,8 @@ export function createCycleApi(opts: KnHttpOptions) {
       call<RcSubmissionResult>("POST", `${X}/report-tasks/${id}/submissions`, body, undefined, idem),
     history: (id: string) => call<{ items: RcSubmission[] }>("GET", `${X}/report-tasks/${id}/history`),
     taskLog: (id: string) => call<{ items: RcLogEntry[] }>("GET", `${X}/report-tasks/${id}/log`),
+    /** BF-TT-FORMS "Nhập từ Excel": máy chủ đọc tệp (bố cục Tải mẫu Excel) thành dòng chữ cái cột → giá trị — không ghi. */
+    importGrid: (id: string, file: RawFile) => call<{ sheet: string; rows: { line: number; cells: Record<string, string>; numeric: string[] }[] }>("POST", `${X}/report-tasks/${id}/grid-import`, file),
     requestAdjustment: (id: string, reason: string) => call<{ task: RcTask }>("POST", `${X}/report-tasks/${id}/adjustment-request`, { reason }),
     confirm: (id: string, note?: string) => call<{ task: RcTask }>("POST", `${X}/report-tasks/${id}/confirm`, note ? { note } : {}),
     periods: (q: { report_type?: string; batch_id?: string; province?: string } = {}) => call<{ items: RcPeriod[] }>("GET", `${X}/kn-periods`, undefined, q),
@@ -415,6 +417,10 @@ export type KnCoopMachines = A["KNCoopMachines"];
 export type KnMachineOverview = A["KNMachineOverview"];
 export type KnPlot = A["KNPlot"];
 export type MaterialRecord = A["MaterialRecord"];
+export type MaterialQuery = { commune?: string; from?: string; to?: string; material_code?: string };
+export type MaterialImport = AppPaths["/v1/kn/materials/import"]["post"]["responses"]["200"]["content"]["application/json"];
+/** Hồ sơ KN riêng (#119 BF-SRV-KN-ATTRS): năm sản xuất theo loại máy của HTX (TT-10). */
+export type KnMachineProfile = A["KNMachineProfile"];
 
 export type CollectApi = ReturnType<typeof createCollectApi>;
 
@@ -432,11 +438,41 @@ export function createCollectApi(opts: KnHttpOptions) {
     coopMachines: (ref: string) => call<KnCoopMachines>("GET", `/v1/kn/machine-counts/${ref}`),
     putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[], idem?: string) =>
       call<KnCoopMachines>("PUT", `/v1/kn/machine-counts/${ref}`, { lines }, undefined, idem),
+    machineProfile: (ref: string) => call<KnMachineProfile>("GET", `/v1/kn/machine-profiles/${ref}`),
+    /** Thay toàn bộ năm sản xuất theo loại máy (loại vắng = bỏ khỏi hồ sơ). */
+    putMachineProfile: (ref: string, lines: { machine_type: string; year_made: number }[], idem?: string) =>
+      call<KnMachineProfile>("PUT", `/v1/kn/machine-profiles/${ref}`, { lines }, undefined, idem),
     plots: (q: { commune?: string; cooperative_ref?: string } = {}) => call<{ items: KnPlot[]; next_cursor: string | null }>("GET", "/v1/kn/plots", undefined, q),
-    materials: (commune?: string) => call<{ items: MaterialRecord[]; next_cursor: string | null }>("GET", "/v1/kn/materials", undefined, { commune }),
+    materials: (q: MaterialQuery = {}) => call<{ items: MaterialRecord[]; next_cursor: string | null }>("GET", "/v1/kn/materials", undefined, { ...q, limit: 500 }),
     recordMaterials: (b: { commune_code: string; recorded_on: string; lines: { material_code: string; quantity: string; note?: string }[] }, idem?: string) =>
       call<{ items: MaterialRecord[] }>("POST", "/v1/kn/materials", b, undefined, idem),
-    materialSummary: (commune?: string) =>
-      call<{ items: { commune_code: string; material_code: string; material_name: string; unit: string; quantity: string; records: number }[] }>("GET", "/v1/kn/materials/summary", undefined, { commune }),
+    materialSummary: (q: Omit<MaterialQuery, "material_code"> = {}) =>
+      call<{ items: { commune_code: string; material_code: string; material_name: string; unit: string; quantity: string; records: number }[] }>("GET", "/v1/kn/materials/summary", undefined, q),
+    /** Danh mục vật tư đang dùng (masterdata `material`, ĐVT = attrs.unit) cho cột "Loại vật tư". */
+    materialCatalog: () => call<{ items: A["CatalogItem"][]; next_cursor: string | null }>("GET", "/v1/masterdata/catalogs/material", undefined, { limit: 200 }),
+    materialLog: (id: string) => call<A["KNRecordLogPage"]>("GET", `/v1/kn/materials/${id}/log`),
+    /** BF-TT-MAT "Nạp Excel": máy chủ đọc tệp CSV/.xlsx thành dòng của bảng nhập — không ghi sổ. */
+    importMaterials: (file: RawFile) => call<MaterialImport>("POST", "/v1/kn/materials/import", file),
+    // TT-11 (#104): thửa — hình, tên, chủ hộ ở pf/cooperative (/v1/kn/plots); cây trồng ở hồ sơ KN riêng (#119).
+    plot: (ref: string) => call<KnPlotDetail>("GET", `/v1/kn/plots/${ref}`),
+    plotLog: (ref: string) => call<A["KNRecordLogPage"]>("GET", `/v1/kn/plots/${ref}/log`),
+    /** GeoJSON thửa của một xã (có hình) — lớp ngữ cảnh khi vẽ/sửa. */
+    plotShapes: (commune: string) => call<PlotShapes>("GET", "/v1/kn/plots/export", undefined, { commune, format: "geojson" }),
+    createPlot: (b: A["KNPlotCreate"], idem?: string) => call<KnPlotDetail>("POST", "/v1/kn/plots", b, undefined, idem),
+    updatePlot: (ref: string, b: KnPlotUpdate, idem?: string) => call<KnPlotDetail>("PUT", `/v1/kn/plots/${ref}`, b, undefined, idem),
+    correctPlotBoundary: (ref: string, b: { supersedes_boundary_id: string; geometry: A["GeoJSONPolygonal"]; shape: "polygon"; reason: string }, idem?: string) =>
+      call<KnPlotDetail>("POST", `/v1/kn/plots/${ref}/boundary`, b, undefined, idem),
+    plotCrops: (commune?: string) => call<{ items: A["KNPlotCrop"][]; next_cursor: string | null }>("GET", "/v1/kn/plot-profiles", undefined, { commune, limit: 500 }),
+    plotProfile: (ref: string) => call<KnPlotProfile>("GET", `/v1/kn/plot-profiles/${ref}`),
+    putPlotCrop: (ref: string, crop_code: string, idem?: string) => call<KnPlotProfile>("PUT", `/v1/kn/plot-profiles/${ref}`, { crop_code }, undefined, idem),
+    /** Danh mục cây trồng đang dùng (masterdata `crop`). */
+    crops: () => call<{ items: A["CatalogItem"][] }>("GET", "/v1/masterdata/catalogs/crop", undefined, { limit: 200 }),
   };
 }
+
+/** Chi tiết thửa kèm hình (GeoJSON Polygon/MultiPolygon). */
+export type KnPlotDetail = KnPlot & { geometry: { type: "Polygon" | "MultiPolygon"; coordinates: unknown[] } };
+export type KnPlotProfile = A["KNPlotProfile"];
+/** PUT /v1/kn/plots/{ref}: trường vắng = giữ nguyên. */
+export type KnPlotUpdate = { lot_name?: string; note?: string | null; farmer_name?: string; cooperative_ref?: string | null; reason?: string };
+export type PlotShapes = { type: "FeatureCollection"; features: { type: "Feature"; geometry: unknown; properties: Record<string, unknown> | null }[] };

@@ -215,6 +215,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.form_no_structure` | pf/extension: mẫu chưa có cột nhập liệu — chặn phát hành (FN-TI-02.02) |
 | 422 | `extension.period_slots_exceeded` | pf/extension: số kỳ của đợt vượt số khe kỳ trên một dòng của mẫu nhiều kỳ (PL 01, 01B, 02, 07; tạm theo seed, chờ khách Q-01) |
 | 422 | `extension.provincial_import_invalid` | pf/extension: tệp nạp Tỉnh giao (`POST /v1/extension/report-batches/provincial-import`, W11.02) không đọc được (không phải CSV UTF-8/.xlsx, ô công thức, quá 500 dòng/2 MB), thiếu cột "Mã xã", không nhận ra cột Tỉnh giao nào hoặc hai cột trùng một cột Tỉnh giao — từ chối cả tệp; dòng lỗi riêng lẻ trả trong `rows` |
+| 422 | `extension.grid_import_invalid` | pf/extension BF-TT-FORMS (UP-04) Nhập từ Excel trên màn nhập biểu Cấp Xã: tệp không đọc được (.xls cũ, zip hỏng, CSV không UTF-8, quá 4 MB/2000 dòng) hoặc không có hàng chữ cái cột (A, B, C…) của tệp "Tải mẫu Excel" |
 | 422 | `extension.no_communes` | pf/extension: chưa chọn xã nhận, hoặc mã xã không phải Nút xã đang hoạt động của tỉnh |
 | 409 | `extension.batch_has_submissions` | pf/extension: thu hồi đợt khi đã có xã gửi báo cáo |
 | 409 | `extension.batch_withdrawn` | pf/extension: đợt đã thu hồi |
@@ -230,6 +231,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 404 | `extension.material_record_not_found` | pf/extension KN v7.7 (FN-XA-03.06): bản ghi vật tư không có, của tenant khác, ngoài phạm vi xã hoặc của phòng ban khác |
 | 422 | `extension.material_unknown` | pf/extension KN v7.7: vật tư không có / đã ngừng dùng trong danh mục masterdata `material`, hoặc mục danh mục thiếu `attrs.unit` (lỗi theo trường `lines.<i>.material_code`) |
 | 422 | `extension.material_quantity_invalid` | pf/extension KN v7.7: số lượng sai theo ĐVT — âm, > 1 000 000 000, ĐVT đếm được (`bao, cái, chai, gói, con, chiếc, cây, hộp`) mà không nguyên, hoặc > 4 chữ số lẻ (tạm, chờ khách); lỗi theo trường `lines.<i>.quantity` / `quantity` |
+| 422 | `extension.material_import_invalid` | pf/extension BF-TT-MAT (TT-12) Nạp Excel vật tư: tệp không đọc được (ô công thức, .xls cũ, quá 2 MB/200 dòng) hoặc thiếu cột bắt buộc "Vật tư", "Số lượng"; lỗi từng dòng trả trong `lines[].reason`, không chặn cả tệp |
 | 409 | `extension.material_superseded` | pf/extension KN v7.7: sửa (`POST /v1/kn/materials/{id}/correct`) một bản ghi đã bị bản bù khác thay — hãy sửa bản hiện hành |
 | 404 | `extension.kn_attrs_cooperative_not_found` | pf/extension BF-SRV-KN-ATTRS (TT-10): HTX không có, không phải HTX, của tenant khác hoặc ngoài xã phụ trách (`/v1/kn/machine-profiles/{cooperative_ref}`) |
 | 404 | `extension.kn_attrs_plot_not_found` | pf/extension BF-SRV-KN-ATTRS (TT-11): thửa không có, của tenant khác hoặc ngoài xã phụ trách (`/v1/kn/plot-profiles/{plot_ref}`) |

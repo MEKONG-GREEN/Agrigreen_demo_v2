@@ -130,3 +130,75 @@ func TestTransitionAndAccounting(t *testing.T) {
 		t.Fatalf("gợi ý hạch toán: %d %s %s %s", h, kg, amt, tb.FeedCost())
 	}
 }
+
+// BF-CN-DIARY (#109): đủ trường sổ gốc BM-08/BM-09 2026 — mục 1 vật tư (vật tư + chủng loại), mục 4 mua nguyên liệu thức
+// ăn, mục 5 ghi chú tiêm phòng (không có cột "lần"), phần 3 họ tên cán bộ.
+func TestPaperFormFields(t *testing.T) {
+	cy := Cycle{Form: FormBM09, Breed: "Vịt xiêm Pháp", ReceivedDate: d0, InitialCount: 300,
+		Supplies: []Supply{{Item: "Thức ăn vịt con", Date: "2027-10-12", Quantity: "200", Unit: "kg"}, {Date: "2027-10-12", Kind: "Cám 551", Quantity: "1"}, {Date: "2027-10-12", Quantity: "1"}}}
+	es := cy.Normalize(d0)
+	if len(es) != 1 || es[0].Field != "supplies[2].item" {
+		t.Fatalf("vật tư hoặc chủng loại bắt buộc (dòng cũ chỉ có chủng loại vẫn hợp lệ): %v", es)
+	}
+	for _, form := range []string{FormBM08, FormBM09} {
+		en := Entry{Kind: KindDaily, EntryDate: d0, Metrics: map[string]string{"alive": "10", "feed_kg": "1"}, Tables: Tables{
+			FeedPurchases: []FeedPurchase{{Date: "2027-10-12", Name: "Cám vịt con", QtyKg: "25", UnitPrice: "12000"}},
+			FeedMaterials: []FeedPurchase{{Date: "2027-10-12", Name: "Bắp", QtyKg: "10.5", UnitPrice: "8000", Note: "mua chợ"}},
+			Vaccinations:  []Vaccination{{Vaccine: "Dịch tả vịt", Date: "2027-10-12", Dosage: "1 liều", Method: "tiêm dưới da", MfgDate: "2027-09-01", Note: "lô A"}},
+			OfficerNotes:  []OfficerNote{{Date: "2027-10-12", Officer: "Nguyễn Văn A", Content: "Vệ sinh máng", FarmerOpinion: "Đồng ý"}},
+		}}
+		if es := en.Normalize(form); len(es) > 0 {
+			t.Fatalf("%s đủ trường sổ gốc: %v", form, es)
+		}
+		if got := en.Tables.FeedCost().String(); got != "384000" { // 25×12.000 + 10,5×8.000
+			t.Fatalf("%s chi thức ăn gồm mục 3 + mục 4: %s", form, got)
+		}
+	}
+	bad := Entry{Kind: KindDaily, EntryDate: d0, Metrics: map[string]string{"alive": "10", "feed_kg": "1"}, Tables: Tables{
+		FeedMaterials: []FeedPurchase{{Date: "x", QtyKg: "-1", UnitPrice: "1"}},
+		Vaccinations:  []Vaccination{{Vaccine: "V", Shot: 21, Date: "2027-10-12"}}}}
+	es = bad.Normalize(FormBM08)
+	var fields []string
+	for _, x := range es {
+		fields = append(fields, x.Field)
+	}
+	want := []string{"tables.feed_materials[0].date", "tables.feed_materials[0].name", "tables.feed_materials[0].quantity_kg", "tables.vaccinations[0].shot"}
+	if !slices.Equal(fields, want) {
+		t.Fatalf("lỗi trường: %v", fields)
+	}
+	fish := Entry{Kind: KindEnv, EntryDate: d0, Metrics: map[string]string{"loss": "0", "ph": "7.8", "do_mgl": "5", "feed_kg": "1"},
+		Tables: Tables{FeedMaterials: []FeedPurchase{{Date: "2027-10-12", Name: "Bắp", QtyKg: "1", UnitPrice: "1"}}}}
+	if es := fish.Normalize(FormBM19); len(es) != 1 || es[0].Field != "tables.feed_materials" {
+		t.Fatalf("BM-19 không có mục nguyên liệu thức ăn: %v", es)
+	}
+}
+
+// #109 (Codex P2): "Tuần tuổi (khi cân)" phi thực tế bị chặn ở server; tuần bình thường và quá tuần 12 vẫn nhận.
+func TestEntryAgeWeekBound(t *testing.T) {
+	entry := func(w string) *Entry {
+		return &Entry{Kind: KindDaily, Metrics: map[string]string{"alive": "100", "feed_kg": "1", "age_week": w}}
+	}
+	for _, form := range []string{FormBM08, FormBM09} {
+		for _, w := range []string{"0", "1", "6", "12", "13", "14", "20", "52", "104"} {
+			e := entry(w)
+			if es := e.Normalize(form); len(es) > 0 || e.Metrics["age_week"] != w {
+				t.Fatalf("%s age_week=%s: %v", form, w, es)
+			}
+		}
+		for _, w := range []string{"105", "10000", "100000000"} {
+			es := entry(w).Normalize(form)
+			if len(es) != 1 || es[0].Field != "metrics.age_week" {
+				t.Fatalf("%s age_week=%s phải bị chặn: %v", form, w, es)
+			}
+		}
+	}
+	// Vượt cả giới hạn số nguyên chung: một lỗi, không trùng.
+	if es := entry("100000001").Normalize(FormBM08); len(es) != 1 || es[0].Field != "metrics.age_week" {
+		t.Fatalf("age_week quá lớn: %v", es)
+	}
+	// BM-19 không có chỉ số tuần tuổi.
+	fish := &Entry{Kind: KindGrowthEnv, Metrics: map[string]string{"age_week": "5"}}
+	if es := fish.Normalize(FormBM19); !slices.ContainsFunc(es, func(x FieldErr) bool { return x.Field == "metrics.age_week" }) {
+		t.Fatalf("BM-19 phải từ chối age_week: %v", es)
+	}
+}
