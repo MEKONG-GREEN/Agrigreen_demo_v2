@@ -127,6 +127,41 @@ describe("Danh sách thửa", () => {
     expect(screen.queryByRole("link", { name: "Thêm thửa" })).toBeNull();
     expect(within(table).getByRole("link", { name: "Xem thửa TH-01" })).toBeInTheDocument();
   });
+
+  // Review Codex #104 [P2]: máy chủ chỉ cho Cấp Xã/Admin ghi thửa và cây trồng — Cấp Tỉnh cũng chỉ xem.
+  it("Cấp Tỉnh chỉ xem: không có Thêm thửa/Sửa, chỉ liên kết Xem", async () => {
+    auth.role = "kn_tinh";
+    render(<PlotsScreen />);
+    const table = await screen.findByRole("table", { name: "Thửa ruộng" });
+    expect(screen.queryByRole("link", { name: "Thêm thửa" })).toBeNull();
+    expect(within(table).queryByRole("link", { name: /^Sửa thửa/ })).toBeNull();
+    expect(within(table).getByRole("link", { name: "Xem thửa TH-01" })).toHaveAttribute("href", "/kn/du-lieu/ve-thua/plot-1");
+  });
+});
+
+describe("Thửa — Cấp Tỉnh chỉ xem (review Codex #104)", () => {
+  it("vào thẳng URL Thêm thửa: không có form, không có nút Lưu, không gọi API ghi", async () => {
+    auth.role = "kn_tinh";
+    render(<PlotCreateScreen />);
+    expect(await screen.findByText(/Chỉ Cấp Xã được thêm thửa/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Lưu" })).toBeNull();
+    expect(screen.queryByLabelText(/Tên thửa/)).toBeNull();
+    expect(auth.collectApi.createPlot).not.toHaveBeenCalled();
+  });
+
+  it("trang thửa: xem được dữ liệu, ô bị khóa, không có Lưu/Sửa ranh giới", async () => {
+    auth.role = "kn_tinh";
+    params.id = "plot-1";
+    render(<PlotEditScreen />);
+    const name = await screen.findByLabelText(/Tên thửa/);
+    expect(name).toHaveValue("Lô 1");
+    expect(name).toBeDisabled();
+    expect(screen.getByLabelText(/Cây trồng/)).toBeDisabled();
+    expect(screen.getByText(/Chỉ xem — chỉ Cấp Xã sửa thửa/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Lưu" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sửa ranh giới" })).toBeNull();
+    expect(screen.getByRole("heading", { name: /^Thửa TH-01/ })).toBeInTheDocument();
+  });
 });
 
 describe("Thêm thửa", () => {

@@ -106,6 +106,17 @@ function useCropOptions() {
   return (s.data?.items ?? []).filter((c) => c.active !== false && c.attrs?.is_group !== "true").map((c) => ({ value: c.code, label: c.name }));
 }
 
+/**
+ * Chỉ xem thửa ruộng: theo máy chủ (cooperative/plot knWriter và hồ sơ cây trồng #119) chỉ Cấp Xã/Admin ghi thửa.
+ * Admin ghi qua chế độ hỗ trợ (vai đóng = kn_xa); ngoài đó đã chỉ xem theo useCycleReadOnly. Nên Cấp Tỉnh và
+ * Cấp Quốc gia chỉ xem. Không đổi useCycleReadOnly chung vì Cấp Tỉnh còn quyền ghi ở màn khác (review Codex #104).
+ */
+export function usePlotReadOnly(): boolean {
+  const { kn } = useAuth();
+  const cycleReadOnly = useCycleReadOnly();
+  return cycleReadOnly || kn.context?.role !== "kn_xa";
+}
+
 /** Diện tích tự tính — chỉ đọc (TT-11: không nhập). */
 function AreaReadout({ ha, note }: { ha: string; note: string }) {
   return (
@@ -120,7 +131,7 @@ function AreaReadout({ ha, note }: { ha: string; note: string }) {
 /** FN-XA-03.05 Vẽ thửa ruộng — danh sách thửa (diện tích tự tính, cây trồng ở hồ sơ KN); Thêm/Sửa trên trang riêng. */
 export function PlotsScreen() {
   const { collectApi } = useAuth();
-  const readOnly = useCycleReadOnly();
+  const readOnly = usePlotReadOnly();
   const f = useCommuneFilter();
   const [page, setPage] = useState(1);
   const s = useLoad(async () => {
@@ -165,7 +176,7 @@ export function PlotsScreen() {
 export function PlotCreateScreen() {
   const { collectApi } = useAuth();
   const router = useRouter();
-  const readOnly = useCycleReadOnly();
+  const readOnly = usePlotReadOnly();
   const { communes } = useCommuneFilter();
   const act = useAction();
   const crops = useCropOptions();
@@ -201,6 +212,13 @@ export function PlotCreateScreen() {
     if (r) router.push(`/kn/du-lieu/ve-thua/${r.ref}`);
   };
   const ha = drawnAreaHa(coords);
+  // Vào thẳng URL khi không có quyền ghi thửa (Cấp Tỉnh/Quốc gia/Admin ngoài hỗ trợ): không hiện form, không có Lưu.
+  if (readOnly)
+    return (
+      <DetailPage back={{ href: "/kn/du-lieu/ve-thua", label: "Vẽ thửa ruộng" }} title="Thêm thửa">
+        <p className="alert alert-warn">Chỉ Cấp Xã được thêm thửa. Tài khoản của bạn chỉ xem danh sách thửa.</p>
+      </DetailPage>
+    );
   return (
     <DetailPage
       back={{ href: "/kn/du-lieu/ve-thua", label: "Vẽ thửa ruộng" }}
@@ -210,7 +228,7 @@ export function PlotCreateScreen() {
           <Link className="btn btn-o" href="/kn/du-lieu/ve-thua">
             Hủy
           </Link>
-          <button type="button" className="btn btn-p" disabled={readOnly || act.busy} onClick={() => void save()}>
+          <button type="button" className="btn btn-p" disabled={act.busy} onClick={() => void save()}>
             Lưu
           </button>
         </>
@@ -248,7 +266,7 @@ export function PlotEditScreen() {
   const { id } = useParams<{ id: string }>();
   const { collectApi } = useAuth();
   const router = useRouter();
-  const readOnly = useCycleReadOnly();
+  const readOnly = usePlotReadOnly();
   const act = useAction();
   const crops = useCropOptions();
   const s = useLoad(async () => {
@@ -313,8 +331,8 @@ export function PlotEditScreen() {
           >
             {act.view}
             <OverlapNotice problem={act.problem} />
-            {plot.status === "retired" ? <p className="mute">Thửa đã ngừng dùng — chỉ xem.</p> : null}
-            {!profile.crop_code ? <p className="alert alert-warn">Thửa chưa khai báo cây trồng — chọn cây trồng rồi Lưu.</p> : null}
+            {plot.status === "retired" ? <p className="mute">Thửa đã ngừng dùng — chỉ xem.</p> : readOnly ? <p className="mute">Chỉ xem — chỉ Cấp Xã sửa thửa.</p> : null}
+            {!profile.crop_code && !locked ? <p className="alert alert-warn">Thửa chưa khai báo cây trồng — chọn cây trồng rồi Lưu.</p> : null}
             <div className="grid2">
               <div className="field">
                 <label htmlFor="plot-commune">
