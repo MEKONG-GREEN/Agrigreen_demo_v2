@@ -104,7 +104,9 @@ func ParseGridImport(data []byte) (GridImport, error) {
 				if err := checkGridSize(out); err != nil {
 					return GridImport{}, err
 				}
-				markNumericCells(f, sh, out.Rows)
+				if err := markNumericCells(f, sh, out.Rows); err != nil {
+					return GridImport{}, err
+				}
 				return out, nil
 			}
 		}
@@ -186,7 +188,9 @@ func gridRows(rows [][]string) (GridImport, bool) {
 // biệt ô số với ô chữ. Với mỗi ô của dòng dữ liệu, ô kiểu số (không có t / t="n", kể cả công thức ra số) được thay bằng
 // giá trị thô chuẩn hóa dạng thập phân dấu chấm bằng decimal (canonicalNumber; 1.234 → "1.234", 1E-3 → "0.001",
 // 1234.5 định dạng "#,##0.00" → "1234.5") và ghi chữ cái cột vào Numeric. Ô chữ / chuỗi công thức / logic giữ nguyên.
-func markNumericCells(f *excelize.File, sh string, rows []GridImportRow) {
+// Ô số ngoài giới hạn Excel (Codex P2 #107: "1E100000", chuỗi chữ số rất dài…) → ErrGridImportInvalid nêu đúng ô, không
+// cắt bớt giá trị.
+func markNumericCells(f *excelize.File, sh string, rows []GridImportRow) error {
 	for i := range rows {
 		r := &rows[i]
 		for _, l := range sortedLetters(r.Cells) {
@@ -199,34 +203,128 @@ func markNumericCells(f *excelize.File, sh string, rows []GridImportRow) {
 			if err != nil {
 				continue
 			}
-			v, ok := canonicalNumber(raw)
-			if !ok {
+			v, err := normalizeExcelNumber(raw)
+			if errors.Is(err, errNumberOutOfRange) {
+				return ErrGridImportInvalid.WithDetail("Ô " + ref + ": số ngoài giới hạn Excel (tối đa 64 ký tự, giá trị tuyệt đối từ 2,2250738585072014E-308 đến 1,7976931348623157E+308)")
+			}
+			if err != nil {
 				continue
 			}
 			r.Cells[l] = v
 			r.Numeric = append(r.Numeric, l)
 		}
 	}
+	return nil
 }
 
 // excelSignificantDigits: Excel chỉ giữ 15 chữ số có nghĩa; phần đuôi kiểu "0.30000000000000004" là nhiễu nhị phân.
 const excelSignificantDigits = 15
 
-// canonicalNumber chuẩn hóa giá trị thô của ô số .xlsx bằng decimal (R-10: không float trong reportcycle): đọc chuỗi
-// ("1.234", "1E-3", "1.2340000000000001"), làm tròn còn 15 chữ số có nghĩa như Excel, in dạng thập phân dấu chấm, bỏ số 0
-// thừa ("1.234", "0.001", "1234.5"). Chuỗi không phải số (rỗng, NaN, INF…) → false.
+// Giới hạn ô số .xlsx (Codex P2 #107: "<v>1E100000</v>" 8 ký tự từng nở thành chuỗi 100 001 ký tự). Ô số Excel là số
+// thực IEEE double: |x| ≤ 1.7976931348623157E+308, số khác 0 nhỏ nhất Excel giữ là số chuẩn 2.2250738585072014E-308
+// (nhỏ hơn Excel tự về 0). Excel ghi tối đa 17 chữ số có nghĩa ("-1.7976931348623157E+308" là 24 ký tự) nên chuỗi thô
+// quá 64 ký tự hay số mũ quá 4 chữ số chắc chắn không phải số Excel lưu. Trong khoảng này dạng thập phân dấu chấm sau
+// làm tròn dài tối đa 325 ký tự ("-0." + 307 số 0 + 15 chữ số) — vẫn giữ dạng thập phân (web/biểu đọc dạng này, không
+// đọc dạng khoa học), maxCanonicalNumberLen chỉ là chốt chặn phòng thủ.
+const (
+	maxRawNumberLen       = 64
+	maxRawExponentDigits  = 4
+	maxCanonicalNumberLen = 330
+)
+
+var (
+	excelMaxNumber = decimal.RequireFromString("1.7976931348623157E+308")
+	excelMinNumber = decimal.RequireFromString("2.2250738585072014E-308")
+
+	errNotNumber        = errors.New("không phải số")
+	errNumberOutOfRange = errors.New("số ngoài giới hạn Excel")
+)
+
+// canonicalNumber chuẩn hóa giá trị thô của ô số .xlsx (xem normalizeExcelNumber). Không phải số hoặc ngoài giới hạn → false.
 func canonicalNumber(raw string) (string, bool) {
-	d, err := decimal.NewFromString(strings.TrimSpace(raw))
+	v, err := normalizeExcelNumber(raw)
+	return v, err == nil
+}
+
+// normalizeExcelNumber chuẩn hóa giá trị thô của ô số .xlsx bằng decimal (R-10: không float trong reportcycle): đọc chuỗi
+// ("1.234", "1E-3", "1.2340000000000001"), làm tròn còn 15 chữ số có nghĩa như Excel, in dạng thập phân dấu chấm, bỏ số 0
+// thừa ("1.234", "0.001", "1234.5"). Chuỗi không đúng cú pháp số (rỗng, NaN, INF, "1,234"…) → errNotNumber (ô giữ dạng
+// chữ như trước). Chuỗi số nhưng quá dài, số mũ quá lớn, |x| > 1.7976931348623157E+308 hoặc 0 < |x| < 2.2250738585072014E-308
+// → errNumberOutOfRange; các giới hạn kiểm TRƯỚC khi decimal đọc / Round / String nên không tốn CPU/bộ nhớ theo số mũ.
+func normalizeExcelNumber(raw string) (string, error) {
+	s := strings.TrimSpace(raw)
+	mantissaDigits, expDigits, ok := scanNumberSyntax(s)
+	if !ok {
+		return "", errNotNumber
+	}
+	if len(s) > maxRawNumberLen {
+		return "", errNumberOutOfRange
+	}
+	if strings.Trim(mantissaDigits, "0.") == "" {
+		return "0", nil
+	}
+	if len(strings.TrimLeft(expDigits, "0")) > maxRawExponentDigits {
+		return "", errNumberOutOfRange
+	}
+	d, err := decimal.NewFromString(s)
 	if err != nil {
-		return "", false
+		return "", errNotNumber
 	}
-	if d.IsZero() {
-		return "0", true
-	}
-	// Vị trí chữ số có nghĩa đầu tiên: 10^msd ≤ |d| < 10^(msd+1).
+	// Vị trí chữ số có nghĩa đầu tiên: 10^msd ≤ |d| < 10^(msd+1). Hệ số ≤ 64 chữ số, số mũ ≤ 9999 → không tràn int64.
 	coef := d.Coefficient() // bản sao
-	msd := int32(len(coef.Abs(coef).String())) - 1 + d.Exponent()
-	return d.Round(excelSignificantDigits - 1 - msd).String(), true
+	msd := int64(len(coef.Abs(coef).String())) - 1 + int64(d.Exponent())
+	if msd > 308 || msd < -308 {
+		return "", errNumberOutOfRange
+	}
+	if a := d.Abs(); a.GreaterThan(excelMaxNumber) || a.LessThan(excelMinNumber) {
+		return "", errNumberOutOfRange
+	}
+	out := d.Round(int32(excelSignificantDigits - 1 - msd)).String()
+	if len(out) > maxCanonicalNumberLen {
+		return "", errNumberOutOfRange
+	}
+	return out, nil
+}
+
+// scanNumberSyntax kiểm cú pháp [+-]chữ số[.chữ số][(e|E)[+-]chữ số] (ít nhất một chữ số phần định trị, không đọc giá trị),
+// trả phần định trị (chữ số và dấu chấm) và chữ số của số mũ.
+func scanNumberSyntax(s string) (mantissa, exp string, ok bool) {
+	i := 0
+	if i < len(s) && (s[i] == '+' || s[i] == '-') {
+		i++
+	}
+	start, digits, dot := i, 0, false
+	for ; i < len(s); i++ {
+		c := s[i]
+		if c >= '0' && c <= '9' {
+			digits++
+		} else if c == '.' && !dot {
+			dot = true
+		} else {
+			break
+		}
+	}
+	if digits == 0 {
+		return "", "", false
+	}
+	mantissa = s[start:i]
+	if i == len(s) {
+		return mantissa, "", true
+	}
+	if s[i] != 'e' && s[i] != 'E' {
+		return "", "", false
+	}
+	i++
+	if i < len(s) && (s[i] == '+' || s[i] == '-') {
+		i++
+	}
+	expStart := i
+	for ; i < len(s) && s[i] >= '0' && s[i] <= '9'; i++ {
+	}
+	if i == expStart || i != len(s) {
+		return "", "", false
+	}
+	return mantissa, s[expStart:], true
 }
 
 // sortedLetters: chữ cái cột theo thứ tự cột (A, B, …, Z, AA, …).
