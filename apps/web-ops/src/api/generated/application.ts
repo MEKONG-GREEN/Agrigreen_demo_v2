@@ -5461,6 +5461,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/period-drafts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nháp còn hiệu lực của đơn vị trong kỳ native (null nếu chưa có hoặc đã gửi sau lần lưu nháp) */
+        get: operations["extensionCntsPeriodDraft"];
+        /** Cán bộ Cấp Xã lưu nháp báo cáo kỳ (UR-XA-13) — Cấp Tỉnh thấy trạng thái Nháp trên màn theo dõi */
+        put: operations["extensionCntsSavePeriodDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-reminders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cấp Tỉnh bấm Nhắc trên một kỳ biểu kỳ CNTS (CN-07): nhắc đơn vị chưa gửi / bị trả lại theo cấu hình nhắc của biểu; mỗi đơn vị tối đa một lượt mỗi giờ */
+        post: operations["extensionCntsRemindPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/period-series": {
         parameters: {
             query?: never;
@@ -5472,6 +5507,23 @@ export interface paths {
         put?: never;
         /** Phát hành lô kỳ native cap/forms của một biểu (một giao dịch; Cấp Tỉnh phòng CNTS; cơ sở phải thuộc xã) */
         post: operations["extensionCntsPublishSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/period-tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** BF-CN-PUBLISH (CN-07): phần KN của màn theo dõi biểu kỳ — người phụ trách, giờ chốt, dấu nháp (trạng thái từng đơn vị ở /v1/forms/tasks) */
+        get: operations["extensionCntsPeriodTracking"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -17809,13 +17861,27 @@ export interface components {
             from_date: string;
             /** Format: date */
             to_date: string;
-            /** @description Mã xã (BM-04/05/17) hoặc facility_ref cơ sở giết mổ (BM-01) */
+            /** @description Mã xã (target communes) hoặc facility_ref cơ sở giết mổ (BM-01, target facilities). Nhóm xã (province/regions/aquaculture/model): máy chủ tự giải — bỏ qua */
             units: string[];
             /** @description Hạn khác mặc định: ngày cuối kỳ + offset_days lúc time (BM-05 Phần II: offset âm tính từ Thứ Hai) */
             deadline?: {
                 offset_days: number;
                 time: string;
             };
+            /**
+             * @description BF-CN-PUBLISH (CN-07) đối tượng: chọn từng xã (mặc định biểu xã) / tất cả xã của tỉnh / theo khu vực / xã có nuôi thủy sản (điểm nhật ký BM-19) / xã có mô hình (điểm trình diễn đang hoạt động) / cơ sở giết mổ (BM-01, mặc định)
+             * @enum {string}
+             */
+            target?: "communes" | "province" | "regions" | "aquaculture" | "model" | "facilities";
+            /** @description Mã khu vực (target regions) */
+            regions?: string[];
+            /**
+             * Format: uuid
+             * @description Cán bộ Cấp Tỉnh phụ trách biểu (lần gán Cấp Tỉnh CNTS còn hiệu lực, cùng Nút)
+             */
+            owner_ref?: string | null;
+            /** @description Giờ chốt = hạn nộp của kỳ + số giờ (null = không đặt) */
+            close_after_hours?: number | null;
         };
         CNTSSeriesPeriod: {
             /**
@@ -17834,6 +17900,18 @@ export interface components {
             due_at: string;
             rule: string;
         };
+        CNTSPeriodDraft: {
+            /** Format: uuid */
+            period_id: string;
+            unit: string;
+            values: {
+                [key: string]: string;
+            };
+            nil_report: boolean;
+            note: string;
+            /** Format: date-time */
+            saved_at: string;
+        };
         CNTSSeries: {
             code: string;
             /** @description Lịch tuần của phòng (D8) — mã phòng, vd chan_nuoi_thuy_san; null với tuần làm việc BM-05 */
@@ -17845,6 +17923,47 @@ export interface components {
             /** @description Số công việc sẽ sinh (kỳ × đơn vị) */
             tasks: number;
             periods: components["schemas"]["CNTSSeriesPeriod"][];
+            /** @enum {string} */
+            target: "communes" | "province" | "regions" | "aquaculture" | "model" | "facilities";
+            regions: string[];
+            /** Format: uuid */
+            owner_ref: string | null;
+            close_after_hours: number | null;
+            /** @description Xã đang hoạt động của tỉnh kèm khu vực (biểu xã; rỗng nếu không giải được) — để chọn khu vực / từng xã */
+            communes: {
+                commune_code: string;
+                region_code: string;
+                region_name: string;
+            }[];
+            /**
+             * Format: uuid
+             * @description Lần phát hành (sổ cnts_publication) — sau phát hành
+             */
+            publication_id: string | null;
+        };
+        CNTSTracking: {
+            periods: {
+                /** Format: uuid */
+                period_id: string;
+                /** Format: uuid */
+                publication_id: string;
+                template_code: string;
+                target: string;
+                regions: string[];
+                /** Format: uuid */
+                owner_ref: string | null;
+                owner_name: string | null;
+                /** @description Giờ chốt = hạn của kỳ + số giờ (null = không đặt) */
+                close_after_hours: number | null;
+            }[];
+            /** @description Dấu nháp của đơn vị trong phạm vi người gọi (nháp cũ hơn lần gửi cuối được màn bỏ qua) */
+            drafts: {
+                /** Format: uuid */
+                period_id: string;
+                unit: string;
+                /** Format: date-time */
+                saved_at: string;
+            }[];
         };
         /** @description Tọa độ WGS84 (độ thập phân, chuỗi) — DB-05; trong lãnh thổ Việt Nam (vĩ độ 8–24, kinh độ 102–118) */
         CNTSLocation: {
@@ -34165,6 +34284,120 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    extensionCntsPeriodDraft: {
+        parameters: {
+            query: {
+                unit: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        draft: components["schemas"]["CNTSPeriodDraft"] | null;
+                    };
+                };
+            };
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description forms.unit_not_in_period */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsSavePeriodDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    unit: string;
+                    values: {
+                        [key: string]: string;
+                    };
+                    nil_report?: boolean;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã lưu nháp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSPeriodDraft"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.period_closed */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | forms.unit_not_in_period */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsRemindPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    period_id: string;
+                    /** @description Rỗng = mọi đơn vị cần nhắc trong phạm vi */
+                    units?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã nhắc */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        reminded: number;
+                        /** @description Đơn vị đã được nhắc tay trong giờ này */
+                        skipped: string[];
+                    };
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description forms.period_not_found */
+            404: components["responses"]["Problem"];
+            /** @description conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
     extensionCntsPublishSeries: {
         parameters: {
             query?: never;
@@ -34195,6 +34428,33 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description validation_failed | forms.facility_invalid */
             422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsPeriodTracking: {
+        parameters: {
+            query?: {
+                /** @description Mã biểu (rỗng = mọi biểu) */
+                code?: string;
+                /** @description Kỳ khác cần dấu nháp (UUID cách nhau dấu phẩy, ≤ 400) */
+                period_ids?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Theo dõi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSTracking"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
         };
     };
     extensionCntsGetDutyRoster: {

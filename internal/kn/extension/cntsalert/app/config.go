@@ -314,8 +314,15 @@ func reminderSlots(cfg domain.FormReminder, due, now time.Time, loc *time.Locati
 func emitReminded(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p formsport.PeriodProgress, u formsport.UnitProgress, slot string,
 	cfg domain.FormReminder, recips []uuid.UUID, now time.Time, loc *time.Location) error {
 	kind := slot
-	if len(slot) > 7 && slot[:7] == "repeat:" {
+	switch {
+	case strings.HasPrefix(slot, "repeat:"):
 		kind = port.CNTSReminderRepeat
+	case strings.HasPrefix(slot, "manual:"):
+		// BF-CN-PUBLISH: Cấp Tỉnh bấm Nhắc — sự kiện giữ lượt before/overdue của hợp đồng v1 (như nhắc đợt điều tra W11.50).
+		kind = port.CNTSReminderBefore
+		if !now.Before(p.DueAt) {
+			kind = port.CNTSReminderOverdue
+		}
 	}
 	if recips == nil {
 		recips = []uuid.UUID{}
@@ -368,6 +375,12 @@ func (s *Service) lateStreaks(ctx context.Context, tx pgx.Tx, tid uuid.UUID, ps 
 		first, last := xs[streak-1], xs[0]
 		province := s.provinceOf(ctx, last.u.Parent, now)
 		rs := &resolver{s: s, tid: tid, province: province}
+		// BF-CN-PUBLISH: kỳ phát hành có người phụ trách → báo đúng người đó (thay mọi người có cờ phụ trách biểu).
+		if owner, err := store.PublicationOwner(ctx, tx, last.p.ID); err != nil {
+			return n, err
+		} else if owner != nil {
+			rs.owner = *owner
+		}
 		kind, _ := domain.KindOf(domain.KindLateStreak)
 		subjKind := "commune"
 		if last.u.Parent != "" && last.u.Parent != last.u.Unit {

@@ -82,6 +82,21 @@ interface Period {
 const TEMPLATES = new Map<string, Tpl>();
 const PERIODS: Period[] = [];
 
+// BF-CN-PUBLISH (CN-07): xã của tỉnh giả lập kèm khu vực, nhóm "có nuôi thủy sản" / "có mô hình", lần phát hành (người
+// phụ trách, giờ chốt), nháp của xã, lượt nhắc tay.
+const MOCK_COMMUNES: { commune_code: string; region_code: string; region_name: string }[] = [
+  { commune_code: "91301", region_code: "KV1", region_name: "Khu vực 1 — Châu Đốc" },
+  { commune_code: "91302", region_code: "KV1", region_name: "Khu vực 1 — Châu Đốc" },
+  { commune_code: "91303", region_code: "KV2", region_name: "Khu vực 2 — Long Xuyên" },
+  { commune_code: "91304", region_code: "KV2", region_name: "Khu vực 2 — Long Xuyên" },
+  { commune_code: "91305", region_code: "KV3", region_name: "Khu vực 3 — Tri Tôn" },
+];
+const AQUA_COMMUNES = ["91302", "91304"];
+const MODEL_COMMUNES = ["91301", "91302", "91305"];
+interface Publication { id: string; template_code: string; target: string; regions: string[]; owner_ref: string | null; close_after_hours: number | null }
+const PUBLICATIONS = new Map<string, Publication>(); // kỳ → lần phát hành
+const DRAFTS = new Map<string, { period_id: string; unit: string; values: Record<string, string>; nil_report: boolean; note: string; saved_at: string }>();
+const MANUAL = new Set<string>(); // kỳ|đơn vị|giờ
 /** W11.44: kỳ đã phát hành (chưa hủy) kèm bài cuối từng đơn vị — giả lập tổng hợp BM-02, BM-18 đọc. */
 export function cntsPeriodFigures(code: string) {
   return PERIODS.filter((p) => p.code === code && p.status !== "cancelled").map((p) => ({
@@ -94,6 +109,9 @@ export function cntsPeriodFigures(code: string) {
 export function resetCntsPeriods() {
   TEMPLATES.clear();
   PERIODS.length = 0;
+  PUBLICATIONS.clear();
+  DRAFTS.clear();
+  MANUAL.clear();
 }
 
 function viewForm(f: (typeof FORMS)[number]): Form {
@@ -212,16 +230,29 @@ export const cntsPeriodRoutes: Route[] = [
       method: "POST",
       pattern: kind ? /^\/v1\/extension\/cnts\/period-series\/preview$/ : /^\/v1\/extension\/cnts\/period-series$/,
       handler: (ctx) => {
-        const b = body<S["CNTSSeriesInput"]>(ctx);
-        const f = FORMS.map(viewForm).find((x) => x.code === b.code);
+        const b0 = body<S["CNTSSeriesInput"]>(ctx);
+        const f = FORMS.map(viewForm).find((x) => x.code === b0.code);
         if (!f) return validation([{ field: "code", reason: "biểu kỳ CNTS không có" }]);
-        if (!b.units?.length) return validation([{ field: "units", reason: "chọn ít nhất một đơn vị nhận" }]);
+        const target = b0.target ?? (f.unit_kind === "facility" ? "facilities" : "communes");
+        if ((f.unit_kind === "facility") !== (target === "facilities")) return validation([{ field: "target", reason: "đối tượng không hợp với đơn vị nhập của biểu" }]);
+        const regions = b0.regions ?? [];
+        if (target === "regions" && !regions.length) return validation([{ field: "regions", reason: "chọn ít nhất một khu vực" }]);
+        if (b0.close_after_hours != null && (b0.close_after_hours < 0 || b0.close_after_hours > 720)) return validation([{ field: "close_after_hours", reason: "0–720 giờ sau hạn nộp" }]);
+        const pick: Record<string, (c: (typeof MOCK_COMMUNES)[number]) => boolean> = {
+          province: () => true, regions: (c) => regions.includes(c.region_code), aquaculture: (c) => AQUA_COMMUNES.includes(c.commune_code),
+          model: (c) => MODEL_COMMUNES.includes(c.commune_code),
+        };
+        const units = pick[target] ? MOCK_COMMUNES.filter(pick[target]).map((c) => c.commune_code) : [...new Set(b0.units ?? [])];
+        const b = { ...b0, units };
+        if (!b.units.length) return validation([{ field: "units", reason: "chọn ít nhất một đơn vị nhận" }]);
         if (!(b.from_date <= b.to_date)) return validation([{ field: "to_date", reason: "phải không trước from_date" }]);
         const periods = split(f, b.from_date, b.to_date, b.deadline ?? undefined);
         const workWeek = f.code.startsWith("CNTS-BM05");
         const cal = calendarAt(DEPT_CNTS, b.from_date);
         const series = { code: f.code, calendar_id: workWeek ? null : cal.calendar_id, calendar_version: workWeek ? null : cal.calendar_version,
-          unit_kind: f.unit_kind, units: b.units, tasks: periods.length * b.units.length, periods };
+          unit_kind: f.unit_kind, units: b.units, tasks: periods.length * b.units.length, periods, target: target as S["CNTSSeries"]["target"], regions,
+          owner_ref: b0.owner_ref ?? null, close_after_hours: b0.close_after_hours ?? null, communes: f.unit_kind === "commune" ? MOCK_COMMUNES : [],
+          publication_id: null as string | null };
         if (kind) return json(series);
         const deny = tinhOnly(who(ctx));
         if (deny) return deny;
@@ -237,6 +268,9 @@ export const cntsPeriodRoutes: Route[] = [
             template_id: t.id, template_version: t.version, unit_kind: f.unit_kind, units: b.units, parents: parents as string[], status: "open", reopen_units: [],
             subs: new Map() });
         }
+        const pub: Publication = { id: uuidv7(), template_code: f.code, target, regions, owner_ref: b0.owner_ref ?? null, close_after_hours: b0.close_after_hours ?? null };
+        for (const p of periods) PUBLICATIONS.set(p.id as unknown as string, pub);
+        series.publication_id = pub.id;
         return json(series, 201);
       },
     }),
@@ -389,4 +423,78 @@ export const cntsPeriodRoutes: Route[] = [
       },
     }),
   ),
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/period-tracking$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      const code = ctx.url.searchParams.get("code");
+      const extra = (ctx.url.searchParams.get("period_ids") ?? "").split(",").filter(Boolean);
+      const periods = [...PUBLICATIONS].filter(([, p]) => !code || p.template_code === code).map(([id, p]) => ({
+        period_id: id, publication_id: p.id, template_code: p.template_code, target: p.target, regions: p.regions, owner_ref: p.owner_ref,
+        owner_name: p.owner_ref ? "Cán bộ tỉnh phụ trách (giả lập)" : null, close_after_hours: p.close_after_hours }));
+      const ids = new Set([...periods.map((p) => p.period_id), ...extra]);
+      const drafts = [...DRAFTS.values()].filter((d) => {
+        const p = findPeriod(d.period_id);
+        return ids.has(d.period_id) && !!p && sees(w, p, d.unit);
+      }).map((d) => ({ period_id: d.period_id, unit: d.unit, saved_at: d.saved_at }));
+      return json({ periods, drafts });
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/period-drafts\/([^/]+)$/,
+    handler: (ctx) => {
+      const p = findPeriod(ctx.params[0]!);
+      const unit = ctx.url.searchParams.get("unit") ?? "";
+      if (!p || !p.units.includes(unit) || !sees(who(ctx), p, unit)) return problem(404, "forms.period_not_found", "Không tìm thấy kỳ");
+      const d = DRAFTS.get(`${p.id}|${unit}`);
+      const last = p.subs.get(unit)?.at(-1);
+      return json({ draft: d && (!last || d.saved_at > last.at) ? d : null });
+    },
+  },
+  {
+    method: "PUT",
+    pattern: /^\/v1\/extension\/cnts\/period-drafts\/([^/]+)$/,
+    handler: (ctx) => {
+      const p = findPeriod(ctx.params[0]!);
+      const w = who(ctx);
+      const b = body<{ unit: string; values: Record<string, string>; nil_report?: boolean; note?: string }>(ctx);
+      if (!p || !p.units.includes(b.unit) || !sees(w, p, b.unit)) return problem(404, "forms.period_not_found", "Không tìm thấy kỳ");
+      if (w.role !== "kn_xa") return problem(403, "forbidden", "chỉ cán bộ Cấp Xã lưu nháp báo cáo kỳ");
+      if (p.status !== "open" && p.status !== "reopened") return problem(409, "extension.period_closed", "Kỳ đã chốt");
+      const d = { period_id: p.id, unit: b.unit, values: b.values ?? {}, nil_report: !!b.nil_report, note: (b.note ?? "").trim(), saved_at: new Date().toISOString() };
+      DRAFTS.set(`${p.id}|${b.unit}`, d);
+      return json(d);
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/period-reminders$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      const deny = tinhOnly(w);
+      if (deny) return deny;
+      const b = body<{ period_id: string; units?: string[] }>(ctx);
+      const p = findPeriod(b.period_id);
+      if (!p) return problem(404, "forms.period_not_found", "Không tìm thấy kỳ");
+      if (p.status !== "open" && p.status !== "reopened") return problem(409, "conflict", "kỳ đã chốt hoặc đã hủy — không nhắc");
+      const hour = new Date().toISOString().slice(0, 13);
+      let reminded = 0;
+      const skipped: string[] = [];
+      for (const u of p.units) {
+        if (b.units?.length && !b.units.includes(u)) continue;
+        const st = unitStatus(p, u);
+        if (!((st === "not_submitted" || st === "overdue") && !p.subs.get(u)?.length) && st !== "returned") continue;
+        const k = `${p.id}|${u}|${hour}`;
+        if (MANUAL.has(k)) skipped.push(u);
+        else {
+          MANUAL.add(k);
+          reminded++;
+        }
+      }
+      if (!reminded && !skipped.length) return validation([{ field: "period_id", reason: "không có đơn vị cần nhắc (mọi đơn vị đã gửi)" }]);
+      return json({ reminded, skipped });
+    },
+  },
 ];
