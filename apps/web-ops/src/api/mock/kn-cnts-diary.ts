@@ -9,7 +9,21 @@ import { cntsMockHousehold } from "./kn-cnts-model";
 import { vnDate } from "@/kn/schedule/week";
 
 type S = components["schemas"];
-type CycleCore = Omit<S["CNTSDiaryCycle"], "status" | "site_name" | "project_code" | "owner_label" | "can_edit" | "suggest" | "updated_by_display">;
+type CycleCore = Omit<
+  S["CNTSDiaryCycle"],
+  | "status"
+  | "site_name"
+  | "project_code"
+  | "owner_label"
+  | "can_edit"
+  | "suggest"
+  | "updated_by_display"
+  | "project_name"
+  | "project_start"
+  | "project_end"
+  | "officer_ref"
+  | "officer_display"
+>;
 type EntryCore = Omit<
   S["CNTSDiaryEntry"],
   | "site_name"
@@ -90,8 +104,16 @@ function seed(ctx: Ctx) {
       age_days: 1,
       supplies: [
         {
+          item: "Con giống",
           date: addDays(today(), -20),
-          kind: "Thức ăn gà con",
+          kind: "Gà lai Mía 1 ngày tuổi",
+          quantity: "500",
+          unit: "con",
+        },
+        {
+          item: "Thức ăn gà con",
+          date: addDays(today(), -20),
+          kind: "Cám hỗn hợp gà con",
           quantity: "200",
           unit: "kg",
         },
@@ -153,7 +175,13 @@ function seed(ctx: Ctx) {
       captured_at: `${addDays(today(), -day)}T01:30:00Z`,
     });
   };
-  mk(1, 3, "498", "2");
+  mk(1, 3, "498", "2", {
+    tables: {
+      feed_purchases: [{ date: addDays(today(), -3), name: "Cám gà con", quantity_kg: "25", unit_price: "12000" }],
+      feed_materials: [{ date: addDays(today(), -3), name: "Tấm gạo", quantity_kg: "10", unit_price: "9000", note: "tự trộn" }],
+      officer_notes: [{ date: addDays(today(), -3), officer: "Viên chức xã (giả lập)", content: "Vệ sinh máng uống", farmer_opinion: "Đồng ý" }],
+    },
+  });
   mk(2, 2, "497", "1", {
     metrics: {
       alive: "497",
@@ -203,7 +231,7 @@ function suggest(cycle: string): S["CNTSDiarySuggest"] {
   for (const e of es) {
     counts[e.status] = (counts[e.status] ?? 0) + 1;
     if (e.status === "draft") continue;
-    for (const f of e.tables.feed_purchases ?? []) feed += Number(f.quantity_kg) * Number(f.unit_price);
+    for (const f of [...(e.tables.feed_purchases ?? []), ...(e.tables.feed_materials ?? [])]) feed += Number(f.quantity_kg) * Number(f.unit_price);
     for (const s of e.tables.sales ?? []) {
       heads += s.heads;
       kg += Number(s.weight_kg);
@@ -239,6 +267,11 @@ function cycleView(ctx: Ctx, c: CycleCore): S["CNTSDiaryCycle"] | null {
     site_name: a.site.name,
     project_code: a.project.code,
     owner_label: a.household.owner_label,
+    project_name: a.project.name,
+    project_start: a.project.start_date,
+    project_end: a.project.end_date,
+    officer_ref: a.site.officer_ref,
+    officer_display: a.officer_display,
     can_edit: a.keeper || (c.event === "closed" && a.reviewer),
     suggest: suggest(c.ref),
     updated_by_display: null,
