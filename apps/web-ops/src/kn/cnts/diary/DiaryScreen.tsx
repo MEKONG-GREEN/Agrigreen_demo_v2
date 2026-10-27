@@ -14,24 +14,32 @@ import { ReasonBox } from "@/kn/cnts/model/parts";
 import {
   accounting,
   compressImage,
+  cost6Label,
   createCntsDiaryApi,
   currentFix,
   dmy,
   expectedAlive,
   FORM_LABEL,
+  kgPerHead,
   KIND_LABEL,
   kindsOf,
+  lineAmount,
   metricErrors,
   metricsOf,
   money,
   PHOTO_KIND_LABEL,
   soldOn,
+  SUPPLY_ITEMS,
+  AMOUNT_OF,
+  TABLE_FIELDS,
   TABLE_LABEL,
   tablesOf,
+  vn,
   waterWarnings,
   type CntsDiaryApi,
   type CycleClose,
   type CycleDetail,
+  type CycleSave,
   type EntryDetail,
   type EntryKind,
   type EntrySave,
@@ -39,7 +47,7 @@ import {
   type Photo,
   type Tables,
 } from "./api";
-import { Checks, LocationInfo, MetricsTable, Photos, StatusBadge } from "./parts";
+import { Checks, CycleHeader, GrowthSection, LocationInfo, MetricsTable, Photos, StatusBadge, SuppliesView, TablesView } from "./parts";
 
 const todayYmd = () => new Date().toLocaleDateString("sv-SE");
 
@@ -154,8 +162,13 @@ function CycleForm({ dapi, household, onDone }: { dapi: CntsDiaryApi; household:
     age_days: "",
     note: "",
   });
+  const [supplies, setSupplies] = useState<Supply[]>([]);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
-  const bad = !f.breed.trim() || !/^\d+$/.test(f.initial_count) || Number(f.initial_count) < 1;
+  const bad =
+    !f.breed.trim() ||
+    !/^\d+$/.test(f.initial_count) ||
+    Number(f.initial_count) < 1 ||
+    supplies.some((s) => (!s.item?.trim() && !s.kind.trim()) || !s.date || !/^\d+(\.\d+)?$/.test(s.quantity));
   return (
     <div className="card sec" aria-label="Mở lứa nuôi">
       <h4>Mở lứa nuôi (NC-02)</h4>
@@ -197,6 +210,7 @@ function CycleForm({ dapi, household, onDone }: { dapi: CntsDiaryApi; household:
           <input value={f.note} onChange={set("note")} maxLength={1000} />
         </label>
       </div>
+      <SupplyRows form={(f.form || "BM-08") as Form} rows={supplies} onChange={setSupplies} received={f.received_date} />
       <div className="row">
         <button
           className="btn btn-primary"
@@ -211,6 +225,7 @@ function CycleForm({ dapi, household, onDone }: { dapi: CntsDiaryApi; household:
                 initial_count: Number(f.initial_count),
                 initial_weight_g: f.initial_weight_g || null,
                 age_days: f.age_days ? Number(f.age_days) : null,
+                supplies: supplies.map((s) => ({ ...s, item: s.item?.trim() ?? "", kind: s.kind.trim() })),
                 note: f.note,
               }),
             );
@@ -224,6 +239,46 @@ function CycleForm({ dapi, household, onDone }: { dapi: CntsDiaryApi; household:
         </button>
       </div>
     </div>
+  );
+}
+
+type Supply = NonNullable<CycleSave["supplies"]>[number];
+
+/** Mục 1 "Thông tin chung" của sổ (NC-03): vật tư, ngày nhận, số lượng, chủng loại vật tư. */
+function SupplyRows({ form, rows, onChange, received }: { form: Form; rows: Supply[]; onChange: (r: Supply[]) => void; received: string }) {
+  const set = (i: number, k: keyof Supply, v: string) => onChange(rows.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const listId = `supply-items-${form}`;
+  return (
+    <fieldset>
+      <legend>Vật tư nhận (NC-03, mục 1 của sổ)</legend>
+      <datalist id={listId}>
+        {SUPPLY_ITEMS[form].map((x) => (
+          <option key={x} value={x} />
+        ))}
+      </datalist>
+      {rows.map((r, i) => (
+        <div className="row" key={i}>
+          <input aria-label={`Vật tư ${i + 1}`} placeholder="Vật tư" list={listId} value={r.item ?? ""} onChange={(e) => set(i, "item", e.target.value)} maxLength={200} />
+          <input aria-label={`Vật tư ${i + 1} ngày nhận`} type="date" value={r.date} onChange={(e) => set(i, "date", e.target.value)} />
+          <input aria-label={`Vật tư ${i + 1} số lượng`} placeholder="Số lượng" inputMode="decimal" value={r.quantity} onChange={(e) => set(i, "quantity", e.target.value)} />
+          <input aria-label={`Vật tư ${i + 1} đơn vị`} placeholder="Đơn vị" value={r.unit} onChange={(e) => set(i, "unit", e.target.value)} maxLength={20} />
+          <input aria-label={`Vật tư ${i + 1} chủng loại`} placeholder="Chủng loại vật tư" value={r.kind} onChange={(e) => set(i, "kind", e.target.value)} maxLength={200} />
+          <button className="btn" onClick={() => onChange(rows.filter((_, j) => j !== i))}>
+            Xóa dòng
+          </button>
+        </div>
+      ))}
+      <div className="row">
+        <button className="btn" onClick={() => onChange([...rows, { item: "", date: received, quantity: "", unit: "", kind: "" }])}>
+          Thêm vật tư
+        </button>
+        {!rows.length ? (
+          <button className="btn" onClick={() => onChange(SUPPLY_ITEMS[form].map((item) => ({ item, date: received, quantity: "", unit: "", kind: "" })))}>
+            Điền danh mục vật tư theo sổ
+          </button>
+        ) : null}
+      </div>
+    </fieldset>
   );
 }
 
@@ -242,16 +297,21 @@ function CyclePanel({ dapi, cycleRef, onChanged }: { dapi: CntsDiaryApi; cycleRe
           <h3>
             {c.breed} · {FORM_LABEL[c.form]} {c.status === "closed" ? <StatusPill tone="neutral">Đã kết thúc</StatusPill> : null}
           </h3>
+          <CycleHeader c={c} />
           <p className="mute">
-            {c.project_code} · {c.site_name} · nhận giống {dmy(c.received_date)} · {c.initial_count} con đầu kỳ
-            {c.suggest.current_heads !== null ? ` · hiện có ${c.suggest.current_heads} con` : ""}
+            {c.suggest.current_heads !== null ? `Hiện có ${c.suggest.current_heads} con` : "Chưa có lần ghi"}
             {c.suggest.last_entry_date ? ` · ghi gần nhất ${dmy(c.suggest.last_entry_date)}` : ""}
           </p>
+          <SuppliesView supplies={c.supplies} />
           {act.view}
           {c.status === "closed" ? (
             <p>
-              Hạch toán: tổng chi {money(c.accounting.total_cost)} · tổng thu {money(c.accounting.revenue_amount)} · lợi nhuận{" "}
-              <b>{money(c.accounting.profit)}</b>
+              Hạch toán: tổng chi {money(c.accounting.total_cost)} · tổng thu {money(c.accounting.revenue_amount)}
+              {c.accounting.revenue_heads ? ` · ${c.accounting.revenue_heads} con` : ""}
+              {kgPerHead(c.accounting.revenue_output_kg, c.accounting.revenue_heads) !== null
+                ? ` · P ${vn(kgPerHead(c.accounting.revenue_output_kg, c.accounting.revenue_heads))} kg/con`
+                : ""}{" "}
+              · lợi nhuận <b>{money(c.accounting.profit)}</b>
               {c.accounting.unit_cost ? ` · giá thành ${money(c.accounting.unit_cost)}/kg` : ""}
             </p>
           ) : null}
@@ -333,6 +393,7 @@ function CyclePanel({ dapi, cycleRef, onChanged }: { dapi: CntsDiaryApi; cycleRe
             )}
           </LoadState>
           {editing && editing !== "new" ? <EntryPanel key={editing} dapi={dapi} c={c} entryRef={editing} onChanged={reload} /> : null}
+          {c.form !== "BM-19" && entries.data ? <GrowthSection c={c} entries={entries.data} /> : null}
         </section>
       )}
     </LoadState>
@@ -367,9 +428,9 @@ function CloseForm({ dapi, c, onDone }: { dapi: CntsDiaryApi; c: CycleDetail; on
         {money0("cost_depreciation", "Khấu hao chuồng trại (đ)")}
         {money0("cost_transport", "Vận chuyển (đ)")}
         {money0("cost_vet", "Thuốc thú y (đ)")}
-        {money0("cost_probiotic", "Chế phẩm (đ)")}
+        {money0("cost_probiotic", `${cost6Label(c.form)} (đ)`)}
         <label>
-          Số con bán
+          Số con hiện tại / bán
           <input
             inputMode="numeric"
             value={f.revenue_heads ?? ""}
@@ -389,7 +450,8 @@ function CloseForm({ dapi, c, onDone }: { dapi: CntsDiaryApi; c: CycleDetail; on
         {money0("revenue_amount", "Tổng thu (đ)")}
       </div>
       <p>
-        Tổng chi {money(sum.total)} · lợi nhuận {sum.profit === null ? "—" : money(sum.profit)}
+        Tổng chi {money(sum.total)} · P {vn(kgPerHead(f.revenue_output_kg, f.revenue_heads))} kg/con · lợi nhuận{" "}
+        {sum.profit === null ? "—" : money(sum.profit)}
       </p>
       <div className="row">
         <button
@@ -425,45 +487,11 @@ function CloseForm({ dapi, c, onDone }: { dapi: CntsDiaryApi; c: CycleDetail; on
   );
 }
 
-type Field = { key: string; label: string; type?: "date" | "number" | "text" };
-const TABLE_FIELDS: Record<keyof Tables, Field[]> = {
-  feed_purchases: [
-    { key: "date", label: "Ngày", type: "date" },
-    { key: "name", label: "Tên thức ăn" },
-    { key: "quantity_kg", label: "Số lượng (kg)" },
-    { key: "unit_price", label: "Đơn giá (đ/kg)" },
-  ],
-  treatments: [
-    { key: "date", label: "Ngày", type: "date" },
-    { key: "symptoms", label: "Triệu chứng" },
-    { key: "drug", label: "Tên thuốc" },
-    { key: "dosage", label: "Liều lượng" },
-    { key: "withdrawal_days", label: "Ngưng thuốc (ngày)", type: "number" },
-    { key: "result", label: "Kết quả" },
-  ],
-  vaccinations: [
-    { key: "vaccine", label: "Vaccine" },
-    { key: "shot", label: "Lần", type: "number" },
-    { key: "date", label: "Ngày tiêm", type: "date" },
-    { key: "dosage", label: "Liều lượng" },
-  ],
-  sales: [
-    { key: "date", label: "Ngày", type: "date" },
-    { key: "heads", label: "Số con", type: "number" },
-    { key: "weight_kg", label: "Khối lượng (kg)" },
-    { key: "unit_price", label: "Đơn giá (đ/kg)" },
-  ],
-  officer_notes: [
-    { key: "date", label: "Ngày", type: "date" },
-    { key: "content", label: "Nội dung yêu cầu" },
-    { key: "farmer_opinion", label: "Ý kiến nông dân" },
-  ],
-};
-
 type Row = Record<string, string | number>;
 
 function TableRows({ name, rows, onChange }: { name: keyof Tables; rows: Row[]; onChange: (r: Row[]) => void }) {
   const fields = TABLE_FIELDS[name];
+  const amount = AMOUNT_OF[name];
   return (
     <fieldset>
       <legend>{TABLE_LABEL[name]}</legend>
@@ -491,6 +519,7 @@ function TableRows({ name, rows, onChange }: { name: keyof Tables; rows: Row[]; 
               }
             />
           ))}
+          {amount ? <span className="mute">Thành tiền {money(lineAmount(r[amount[0]], r[amount[1]]))}</span> : null}
           <button className="btn" onClick={() => onChange(rows.filter((_, j) => j !== i))}>
             Xóa dòng
           </button>
@@ -710,6 +739,7 @@ function EntryPanel({ dapi, c, entryRef, onChanged }: { dapi: CntsDiaryApi; c: C
             {e.status_reason ? <p className="alert alert-warn">Lý do: {e.status_reason}</p> : null}
             {act.view}
             <MetricsTable form={e.form} entry={e} previous={e.previous?.metrics} />
+            <TablesView form={e.form} tables={e.tables} />
             <Checks checks={e.checks} />
             <LocationInfo e={e} />
             <Photos dapi={dapi} photos={e.photos} />

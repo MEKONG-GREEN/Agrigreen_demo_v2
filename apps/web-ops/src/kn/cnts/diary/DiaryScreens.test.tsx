@@ -8,6 +8,8 @@ import { resetCntsModel } from "@/api/mock/kn-cnts-model";
 import type * as Common from "@/kn/cycle/common";
 import { DiaryScreen } from "./DiaryScreen";
 import { ReviewScreen } from "./ReviewScreen";
+import { GrowthSection } from "./parts";
+import type { Cycle } from "./api";
 
 const auth: { api: ApiClient | null } = { api: null };
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: auth.api, kn: { context: { role: "admin" } } }) }));
@@ -46,4 +48,44 @@ it("W11.48 Nhật ký sản xuất: chọn hộ → lứa → lần ghi bị ch�
   await user.type(within(form).getByLabelText(/Thức ăn sử dụng/), "12");
   await user.click(within(form).getByRole("button", { name: "Gửi" }));
   expect(await within(form).findByText(/NC-07/)).toBeInTheDocument();
+});
+
+it("BF-CN-DIARY #109: đầu sổ, vật tư mục 1, mục 4 nguyên liệu thức ăn, phần 3 họ tên cán bộ, phần 2 sinh trưởng", async () => {
+  const user = userEvent.setup();
+  render(<DiaryScreen />);
+  const hh = await screen.findByRole("combobox", { name: "Hộ mô hình" });
+  await screen.findByRole("option", { name: /Điểm ấp Bình Hòa/ });
+  await user.selectOptions(hh, within(hh).getAllByRole("option")[1]!);
+  await user.click(await screen.findByRole("button", { name: "Gà lai Mía" }));
+  const head = await screen.findByLabelText("Đầu sổ");
+  expect(within(head).getByText("Thời gian thực hiện")).toBeInTheDocument();
+  expect(within(head).getByText("Cán bộ theo dõi điểm")).toBeInTheDocument();
+  expect(within(head).getByText("Viên chức xã (giả lập)")).toBeInTheDocument();
+  const sup = screen.getByRole("table", { name: "Vật tư nhận" });
+  expect(within(sup).getByText("Thức ăn gà con")).toBeInTheDocument();
+  expect(within(sup).getByText("Cám hỗn hợp gà con")).toBeInTheDocument();
+  const growth = await screen.findByRole("table", { name: "Chỉ tiêu sinh trưởng theo tuần tuổi" });
+  expect(within(growth).getByText("Tuần 12")).toBeInTheDocument();
+  expect(screen.getByRole("table", { name: "Yêu cầu kỹ thuật cần đạt" })).toHaveTextContent("Tỷ lệ sống của gà 4 tuần tuổi");
+  // Lần ghi có mục 3, mục 4 và phần 3.
+  const day = new Date(Date.now() - 3 * 86_400_000).toLocaleDateString("sv-SE").split("-").reverse().join("/");
+  await user.click(await screen.findByRole("button", { name: day }));
+  const mat = await screen.findByRole("table", { name: "Mua nguyên liệu thức ăn chăn nuôi (NC-09)" });
+  expect(within(mat).getByText("Tấm gạo")).toBeInTheDocument();
+  expect(within(mat).getByText("90.000 đ")).toBeInTheDocument();
+  expect(screen.getByRole("table", { name: "Ý kiến cán bộ theo dõi (NC-14)" })).toHaveTextContent("Viên chức xã (giả lập)");
+  // Biểu ghi có mục 4 và cột họ tên cán bộ.
+  await user.click(screen.getByRole("button", { name: "Ghi nhật ký" }));
+  const form = await screen.findByLabelText("Ghi nhật ký", { selector: "div" });
+  expect(within(form).getByText("Mua nguyên liệu thức ăn chăn nuôi (NC-09)")).toBeInTheDocument();
+});
+
+it("BF-CN-DIARY #109 (Codex P2): tuần tuổi bất thường không sinh dòng, hiện ghi chú", () => {
+  const c = { form: "BM-08", received_date: "2027-01-01", age_days: 1, initial_count: 100, initial_weight_g: "40" } as unknown as Cycle;
+  const e = (d: string, week: string) => ({ entry_date: d, status: "submitted" as const, metrics: { alive: "99", dead: "0", feed_kg: "1", age_week: week } });
+  render(<GrowthSection c={c} entries={[e("2027-01-02", "1"), e("2027-01-03", "100000000")]} />);
+  const growth = screen.getByRole("table", { name: "Chỉ tiêu sinh trưởng theo tuần tuổi" });
+  expect(within(growth).getAllByText(/^Tuần \d+$/)).toHaveLength(8);
+  expect(screen.getByRole("note")).toHaveTextContent("Dữ liệu tuần tuổi bất thường: 1 lần ghi");
+  expect(screen.getByRole("note")).toHaveTextContent("ngày 03/01/2027 — tuần 100000000");
 });

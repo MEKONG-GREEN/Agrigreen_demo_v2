@@ -439,5 +439,6 @@ export function cntsMockHousehold(ctx: Ctx, ref: string) {
     keeper: !w.readOnly && (w.role === "admin" || w.role === "kn_xa") && h.event !== "withdrawn",
     reviewer: !w.readOnly && (w.role === "admin" || (w.role === "kn_tinh" && ["", "chu_nhiem", "lanh_dao_phong"].includes(w.group))),
     point: POINTS.get(h.ref) ?? POINTS.get(site.ref) ?? null,
+    officer_display: site.officer_ref ? NAMES[site.officer_ref] ?? null : null,
   };
 }
