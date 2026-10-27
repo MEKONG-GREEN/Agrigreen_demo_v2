@@ -50,6 +50,8 @@ type EntryView struct {
 	Weights   []WeightPoint // trọng lượng theo lần cân của lứa (biểu đồ tăng trọng)
 	Names     map[uuid.UUID]string
 	Replayed  bool
+
+	editInWindow bool // lần ghi đã gửi: người gọi được sửa nếu còn trong hạn — hạn tra sau giao dịch (withEditWindow)
 }
 
 // WeightPoint là một lần cân (biểu đồ tăng trọng UR-TINH-12).
@@ -77,8 +79,9 @@ type EntryInput struct {
 
 func idemEntry(k string) string { return "dentry:" + k }
 
-func (s *Service) entryView(c caller, hc *hctx, cy *store.Cycle, e store.Entry, editDays int) EntryView {
-	v := EntryView{Entry: e, SiteName: hc.x.Name, ProjectCode: hc.p.Code, EditableUntil: domain.EditableUntil(e.EntryDate, editDays)}
+// entryView dựng lần ghi cho API trong giao dịch; EditableUntil/CanEdit của lần ghi đã gửi điền sau bằng withEditWindow.
+func (s *Service) entryView(c caller, hc *hctx, cy *store.Cycle, e store.Entry) EntryView {
+	v := EntryView{Entry: e, SiteName: hc.x.Name, ProjectCode: hc.p.Code}
 	if cy != nil {
 		v.Breed = cy.Breed
 	}
@@ -88,12 +91,33 @@ func (s *Service) entryView(c caller, hc *hctx, cy *store.Cycle, e store.Entry, 
 	case domain.StatusDraft, domain.StatusReturned:
 		v.CanEdit, v.CanSubmit = keeper, keeper
 	case domain.StatusSubmitted:
-		v.CanEdit = keeper && !s.today().After(v.EditableUntil)
+		v.editInWindow = keeper
 		v.CanReview = c.reviewer(hc.p) && !authoredBy(e, c.me())
 	case domain.StatusVerified:
 		v.CanCorrect = keeper
 	}
 	return v
+}
+
+// withEditWindow điền hạn sửa theo phiên bản tham số có hiệu lực ở NGÀY GHI của từng lần ghi (PO 27/10, #85): đổi tham số
+// sau không đổi hạn của lần ghi đã có. Gọi NGOÀI giao dịch KN (pf/masterdata mở giao dịch riêng); mỗi ngày ghi tra một lần.
+func (s *Service) withEditWindow(ctx context.Context, vs ...*EntryView) error {
+	days := map[time.Time]int{}
+	for _, v := range vs {
+		d, ok := days[v.EntryDate]
+		if !ok {
+			var err error
+			if d, err = s.editDays(ctx, v.EntryDate); err != nil {
+				return err
+			}
+			days[v.EntryDate] = d
+		}
+		v.EditableUntil = domain.EditableUntil(v.EntryDate, d)
+		if v.editInWindow {
+			v.CanEdit = !s.today().After(v.EditableUntil)
+		}
+	}
+	return nil
 }
 
 // authoredBy: người gọi là người ghi lần ghi (bản hiện hành).
@@ -342,6 +366,14 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 			return EntryView{}, err
 		}
 	}
+	// Hạn sửa theo ngày ghi (#85): tra trước giao dịch để tham số hỏng trả 503 mà không ghi (bản trả về tra lại ở GetEntry).
+	day := domain.Day(in.CapturedAt.UTC(), clock.Zone())
+	if in.EntryDate != nil {
+		day = *in.EntryDate
+	}
+	if _, err := s.editDays(ctx, day); err != nil {
+		return EntryView{}, err
+	}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
 			if prev != nil {
@@ -454,9 +486,26 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 	if (act == domain.ActReturn || act == domain.ActCorrect) && !domain.ValidReason(in.Reason) {
 		return EntryView{}, problem.Validation.WithField("reason", "5–1000 ký tự")
 	}
-	editDays, err := s.editDays(ctx, s.now())
-	if err != nil {
-		return EntryView{}, err
+	// Sửa: hạn sửa theo phiên bản có hiệu lực ở ngày ghi (#85) — đọc ngày ghi rồi tra tham số NGOÀI giao dịch ghi; trong giao dịch
+	// ngày ghi của bản đã khóa phải khớp (đổi giữa chừng → xung đột, máy khách tải lại). Hành động khác không cần hạn sửa.
+	var editDate time.Time
+	editDays := -1
+	if act == domain.ActUpdate {
+		err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+			vs, err := store.EntryVersions(ctx, tx, ref)
+			if len(vs) > 0 {
+				editDate = vs[len(vs)-1].EntryDate
+			}
+			return err
+		})
+		if err != nil {
+			return EntryView{}, err
+		}
+		if !editDate.IsZero() {
+			if editDays, err = s.editDays(ctx, editDate); err != nil {
+				return EntryView{}, err
+			}
+		}
 	}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
@@ -498,8 +547,13 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 		if !versionOK(in.BaseVersion, e.Seq) {
 			return ErrEntryConflict
 		}
-		if act == domain.ActUpdate && e.Status == domain.StatusSubmitted && s.today().After(domain.EditableUntil(e.EntryDate, editDays)) {
-			return ErrEntryLocked.WithDetail("quá hạn sửa lần ghi đã gửi (" + itoa(editDays) + " ngày)")
+		if act == domain.ActUpdate && e.Status == domain.StatusSubmitted {
+			if editDays < 0 || !e.EntryDate.Equal(editDate) {
+				return ErrEntryConflict
+			}
+			if s.today().After(domain.EditableUntil(e.EntryDate, editDays)) {
+				return ErrEntryLocked.WithDetail("quá hạn sửa lần ghi đã gửi (" + itoa(editDays) + " ngày)")
+			}
 		}
 		n := *e
 		n.Meta, n.Event, n.Status, n.StatusReason, n.ReviewerRef = c.meta(s.now(), idemEntry(in.IdemKey)), event, next, "", nil
@@ -619,10 +673,6 @@ func (s *Service) ListEntries(ctx context.Context, q EntryQuery) (EntryList, err
 	if q.Review {
 		f.Statuses = []string{domain.StatusSubmitted}
 	}
-	editDays, err := s.editDays(ctx, s.now())
-	if err != nil {
-		return EntryList{}, err
-	}
 	out := EntryList{Items: []EntryView{}}
 	refs := []uuid.UUID{}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
@@ -655,12 +705,19 @@ func (s *Service) ListEntries(ctx context.Context, q EntryQuery) (EntryList, err
 				}
 				cys[e.CycleRef] = cy
 			}
-			out.Items = append(out.Items, s.entryView(c, hc, cy, e, editDays))
+			out.Items = append(out.Items, s.entryView(c, hc, cy, e))
 			refs = append(refs, e.AuthorRef)
 		}
 		return nil
 	})
 	if err != nil {
+		return EntryList{}, err
+	}
+	vs := make([]*EntryView, len(out.Items))
+	for i := range out.Items {
+		vs[i] = &out.Items[i]
+	}
+	if err := s.withEditWindow(ctx, vs...); err != nil {
 		return EntryList{}, err
 	}
 	out.Names = s.names(ctx, refs)
@@ -670,10 +727,6 @@ func (s *Service) ListEntries(ctx context.Context, q EntryQuery) (EntryList, err
 // GetEntry đọc chi tiết lần ghi: lịch sử, vị trí so với điểm, ảnh, lần ghi trước, biểu đồ tăng trọng.
 func (s *Service) GetEntry(ctx context.Context, ref uuid.UUID) (EntryView, error) {
 	c, err := s.reader(ctx)
-	if err != nil {
-		return EntryView{}, err
-	}
-	editDays, err := s.editDays(ctx, s.now())
 	if err != nil {
 		return EntryView{}, err
 	}
@@ -699,7 +752,7 @@ func (s *Service) GetEntry(ctx context.Context, ref uuid.UUID) (EntryView, error
 		if err != nil {
 			return err
 		}
-		v = s.entryView(c, hc, cy, cur, editDays)
+		v = s.entryView(c, hc, cy, cur)
 		v.Versions, person = vs, hc.h.PersonRef
 		if c.privileged(hc) {
 			if v.Fix, err = store.FixOf(ctx, tx, ref); err != nil {
@@ -738,6 +791,9 @@ func (s *Service) GetEntry(ctx context.Context, ref uuid.UUID) (EntryView, error
 		return nil
 	})
 	if err != nil {
+		return EntryView{}, err
+	}
+	if err := s.withEditWindow(ctx, &v); err != nil {
 		return EntryView{}, err
 	}
 	v.OwnerLabel = s.ownerLabel(ctx, person)

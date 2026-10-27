@@ -2,7 +2,8 @@ package cntsdiaryparams_test
 
 // KN-PARAMS-CNTS-DIARY-OWNER (#85): hạn sửa lần ghi đã gửi và hạn lưu tọa độ GPS của nhật ký nuôi CNTS (W11.48) đọc tham số
 // CÓ PHIÊN BẢN của pf/masterdata THẬT: đăng ký riêng nạp vào tenant (seed 7/365), đổi phiên bản qua luồng 4 mắt (người đặt ≠
-// người duyệt), áp dụng theo NGÀY NGHIỆP VỤ giờ Việt Nam của thời điểm sự việc; tenant khác không bị ảnh hưởng; phát lại giữ
+// người duyệt), áp dụng theo NGÀY NGHIỆP VỤ giờ Việt Nam của thời điểm sự việc (hạn sửa: ngày ghi — PO 27/10; hạn lưu: ngày
+// thiết bị ghi); tenant khác không bị ảnh hưởng; phát lại giữ
 // hạn lưu đã chốt; job dọn theo hạn đã chốt; giá trị đã duyệt sai → 503, không rơi về mặc định.
 
 import (
@@ -138,13 +139,14 @@ func TestCNTSDiary_VersionedParams_85(t *testing.T) {
 	e2 := want(t, officer.post(base+"diary-entries", entry(10.3812, map[string]any{"captured_at": "2027-10-14T10:00:00Z"})), 201, "",
 		"lần ghi ngoại tuyến 14/10")
 	r2 := str(e2, "ref")
-	if str(e2, "entry_date") != "2027-10-14" || purgeAfter(r2) != "2028-10-13" {
-		t.Fatalf("hạn lưu theo ngày thiết bị ghi (365): %v %s", e2, purgeAfter(r2))
+	// Hạn sửa theo phiên bản ở NGÀY GHI (PO 27/10): ghi ngày 14/10 → bản 1 (7 ngày) dù gửi lên sau ngày hiệu lực bản 2.
+	if str(e2, "entry_date") != "2027-10-14" || purgeAfter(r2) != "2028-10-13" || str(e2, "editable_until") != "2027-10-21" {
+		t.Fatalf("hạn lưu theo ngày thiết bị ghi (365), hạn sửa theo ngày ghi (7): %v %s", e2, purgeAfter(r2))
 	}
-	// 00:30 15/10 VN — ngày nghiệp vụ 15/10: hạn sửa 3 ngày → lần ghi 13/10 sửa tới 16/10.
+	// 00:30 15/10 VN — bản 2 đã hiệu lực nhưng lần ghi 13/10 vẫn theo bản ở ngày ghi (7 ngày → 20/10).
 	g := want(t, officer.get(base+"diary-entries/"+r1), 200, "", "xem 00:30 15/10")
-	if str(g, "editable_until") != "2027-10-16" || g["can_edit"] != true {
-		t.Fatalf("00:30 15/10 VN áp dụng bản 2 (3 ngày): %v", g)
+	if str(g, "editable_until") != "2027-10-20" || g["can_edit"] != true {
+		t.Fatalf("00:30 15/10 VN lần ghi 13/10 giữ hạn sửa bản 1 (7 ngày): %v", g)
 	}
 	if again := want(t, officer.postK(base+"diary-entries", k1, entry(10.3811, nil)), 201, "", "phát lại"); str(again, "ref") != r1 ||
 		purgeAfter(r1) != "2028-10-12" {
@@ -157,20 +159,24 @@ func TestCNTSDiary_VersionedParams_85(t *testing.T) {
 	if str(e3, "entry_date") != "2027-10-15" || purgeAfter(r3) != "2027-11-14" || str(e3, "editable_until") != "2027-10-18" {
 		t.Fatalf("lần ghi 15/10 — hạn lưu 30, hạn sửa 3: %v %s", e3, purgeAfter(r3))
 	}
-	// 23:59 16/10 VN còn sửa được; 00:30 17/10 VN quá hạn (3 ngày).
-	to(time.Date(2027, 10, 16, 16, 59, 0, 0, time.UTC))
-	if g := want(t, officer.get(base+"diary-entries/"+r1), 200, "", "23:59 16/10"); g["can_edit"] != true {
-		t.Fatalf("23:59 16/10 VN còn trong hạn: %v", g)
+	// Lần ghi 15/10 (bản 2, 3 ngày): 23:59 18/10 VN còn sửa được; 00:30 19/10 VN quá hạn — cùng lúc lần ghi 13/10 (bản 1) vẫn sửa được.
+	to(time.Date(2027, 10, 18, 16, 59, 0, 0, time.UTC))
+	if g := want(t, officer.get(base+"diary-entries/"+r3), 200, "", "23:59 18/10"); g["can_edit"] != true {
+		t.Fatalf("23:59 18/10 VN còn trong hạn: %v", g)
 	}
-	to(time.Date(2027, 10, 16, 17, 30, 0, 0, time.UTC))
-	g = want(t, officer.get(base+"diary-entries/"+r1), 200, "", "00:30 17/10")
+	to(time.Date(2027, 10, 18, 17, 30, 0, 0, time.UTC))
+	g = want(t, officer.get(base+"diary-entries/"+r3), 200, "", "00:30 19/10")
 	if g["can_edit"] != false {
-		t.Fatalf("00:30 17/10 VN hết hạn sửa: %v", g)
+		t.Fatalf("00:30 19/10 VN hết hạn sửa lần ghi 15/10: %v", g)
 	}
-	lk := want(t, officer.post(base+"diary-entries/"+r1, map[string]any{"base_version": json.Number(num(g, "version")), "entry_kind": "daily",
+	lk := want(t, officer.post(base+"diary-entries/"+r3, map[string]any{"base_version": json.Number(num(g, "version")), "entry_kind": "daily",
 		"metrics": map[string]any{"alive": "500", "dead": "0", "feed_kg": "11"}}), 409, "extension.cnts_diary_entry_locked", "quá 3 ngày")
 	if !strings.Contains(str(lk, "detail"), "3 ngày") {
 		t.Fatalf("thông báo hạn sửa theo tham số: %v", lk)
+	}
+	if g := want(t, officer.get(base+"diary-entries/"+r1), 200, "", "lần ghi 13/10 lúc 00:30 19/10"); g["can_edit"] != true ||
+		str(g, "editable_until") != "2027-10-20" {
+		t.Fatalf("lần ghi 13/10 theo bản ở ngày ghi (7 ngày) vẫn sửa được: %v", g)
 	}
 
 	// ----- Dọn tọa độ theo hạn đã chốt: ngày 15/11/2027 chỉ xóa tọa độ lần ghi 15/10 (hạn 14/11) -----
@@ -188,22 +194,27 @@ func TestCNTSDiary_VersionedParams_85(t *testing.T) {
 	approve(propose(knport.ParamCNTSDiaryEditWindowDays, "2.5", "2027-10-20"))
 	approve(propose(knport.ParamCNTSDiaryGPSRetentionDays, "0", "2027-10-20"))
 	to(time.Date(2027, 10, 20, 2, 0, 0, 0, time.UTC))
-	want(t, officer.get(base+"diary-entries/"+r1), 503, "extension.dependency_unavailable", "hạn sửa không nguyên")
-	want(t, officer.get(base+"diary-entries?cycle_ref="+cref), 503, "extension.dependency_unavailable", "danh sách")
 	want(t, officer.post(base+"diary-entries", entry(10.3814, map[string]any{"submit": false})), 503, "extension.dependency_unavailable",
 		"hạn lưu 0 ngày")
+	want(t, officer.post(base+"diary-entries", entry(10.3814, map[string]any{"submit": false, "location": nil})), 503,
+		"extension.dependency_unavailable", "hạn sửa không nguyên ở ngày ghi 20/10")
 	if n := f.count(`SELECT count(*) FROM pf_extension.cnts_diary_entry WHERE tenant_id = $1 AND entry_date = '2027-10-20'`, f.tenant); n != 0 {
-		t.Fatalf("không ghi khi không đọc được hạn lưu: %d", n)
+		t.Fatalf("không ghi khi không đọc được tham số: %d", n)
 	}
+	// Lần ghi cũ tra phiên bản ở ngày ghi của nó → không bị giá trị sai hiệu lực sau ảnh hưởng.
+	if g := want(t, officer.get(base+"diary-entries/"+r1), 200, "", "lần ghi 13/10 sau giá trị sai"); str(g, "editable_until") != "2027-10-20" {
+		t.Fatalf("lần ghi 13/10 không đổi: %v", g)
+	}
+	want(t, officer.get(base+"diary-entries?cycle_ref="+cref), 200, "", "danh sách lần ghi trước 20/10")
 	// Sửa tham số bằng phiên bản mới hợp lệ → hoạt động lại.
 	approve(propose(knport.ParamCNTSDiaryEditWindowDays, "5", "2027-10-21"))
 	approve(propose(knport.ParamCNTSDiaryGPSRetentionDays, "60", "2027-10-21"))
 	to(time.Date(2027, 10, 21, 2, 0, 0, 0, time.UTC))
-	if g := want(t, officer.get(base+"diary-entries/"+r3), 200, "", "sau khi sửa tham số"); str(g, "editable_until") != "2027-10-20" {
-		t.Fatalf("hạn sửa 5 ngày từ 15/10: %v", g)
+	if g := want(t, officer.get(base+"diary-entries/"+r3), 200, "", "sau khi sửa tham số"); str(g, "editable_until") != "2027-10-18" {
+		t.Fatalf("lần ghi 15/10 giữ hạn sửa bản ở ngày ghi (3 ngày): %v", g)
 	}
 	e4 := want(t, officer.post(base+"diary-entries", entry(10.3815, nil)), 201, "", "lần ghi 21/10")
-	if p := purgeAfter(str(e4, "ref")); p != "2027-12-20" {
-		t.Fatalf("hạn lưu 60 ngày từ 21/10: %s", p)
+	if p := purgeAfter(str(e4, "ref")); p != "2027-12-20" || str(e4, "editable_until") != "2027-10-26" {
+		t.Fatalf("hạn lưu 60 ngày, hạn sửa 5 ngày từ 21/10: %s %v", p, e4)
 	}
 }

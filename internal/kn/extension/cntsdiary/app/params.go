@@ -15,7 +15,8 @@ import (
 // Hạn sửa lần ghi đã gửi chưa xác thực (Mục III.5) và hạn lưu tọa độ GPS lúc ghi (giả định tạm Q-005) là tham số có phiên bản
 // của pf/masterdata (KN-PARAMS-CNTS-DIARY-OWNER #85; đăng ký ở extension.CNTSDiaryMasterdataParams). Hợp đồng đọc:
 //   - Đọc phiên bản ĐÃ DUYỆT có hiệu lực ở NGÀY NGHIỆP VỤ (giờ Việt Nam, clock.BusinessDay) của thời điểm sự việc:
-//     hạn sửa — ngày kiểm/hiển thị quyền sửa (hôm nay); hạn lưu GPS — ngày thiết bị ghi (captured_at). Hạn lưu đã tính được
+//     hạn sửa — NGÀY GHI của lần ghi (entry_date; PO 27/10: đổi tham số sau không đổi hạn sửa của lần ghi đã có);
+//     hạn lưu GPS — ngày thiết bị ghi (captured_at). Hạn lưu đã tính được
 //     lưu cùng tọa độ (purge_after) nên đổi phiên bản sau không đổi hạn của tọa độ đã ghi; phát lại (Idempotency-Key) trả
 //     bản đã lưu.
 //   - Đọc NGOÀI giao dịch KN (pf/masterdata mở giao dịch riêng — P0-POOL-KN): bên gọi tra trước khi mở giao dịch.
