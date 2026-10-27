@@ -821,7 +821,7 @@
                     "Icon": "water",
                     "BadgeSource": "",
                     "Requires": null,
-                    "ComingSoon": true,
+                    "ComingSoon": false,
                     "Needs": "",
                     "Children": null
                   },
@@ -977,7 +977,7 @@
               {
                 "Key": "xa.cnts.khai_thac_thuy_san",
                 "Label": "Khai thác thủy sản tuần",
-                "Route": "/kn/cnts/bao-cao-ky",
+                "Route": "/kn/cnts/khai-thac-thuy-san",
                 "Icon": "water",
                 "BadgeSource": "",
                 "Requires": null,

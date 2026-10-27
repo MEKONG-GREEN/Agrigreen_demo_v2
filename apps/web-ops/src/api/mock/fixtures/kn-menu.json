@@ -1950,9 +1950,7 @@
           "route": "/kn/cnts/so-lieu-xa/khai-thac-thuy-san",
           "icon": "water",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
@@ -2156,7 +2154,7 @@
        {
         "key": "xa.cnts.khai_thac_thuy_san",
         "label": "Khai thác thủy sản tuần",
-        "route": "/kn/cnts/bao-cao-ky",
+        "route": "/kn/cnts/khai-thac-thuy-san",
         "icon": "water",
         "badge_source": null,
         "enabled": true,

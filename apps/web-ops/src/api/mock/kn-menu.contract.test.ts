@@ -152,6 +152,9 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       "Dùng chung": ["Contact"],
     });
     expect(menuOf("kn_xa/chan_nuoi_thuy_san").default_route).toBe("/kn/cnts/bao-cao-ky");
+    // BF-CN-CATCH #112 (UP-09): "Khai thác thủy sản tuần" mở màn 4 sheet ĐÁNH BẮT riêng.
+    const bc = menuOf("kn_xa/chan_nuoi_thuy_san").groups.find((g) => g.label === "Báo cáo")!;
+    expect(bc.items.find((i) => i.label === "Khai thác thủy sản tuần")!.route).toBe("/kn/cnts/khai-thac-thuy-san");
   });
 
   it("UP-10 CNTS Cấp Tỉnh đúng hình khách gửi 23/10", () => {
@@ -166,7 +169,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     ]);
     expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ*", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);
     expect(g["Dữ liệu"]).toEqual([
-      ["Số liệu cấp xã", ["Nhập liệu tuần*", "Khai thác thủy sản*", "Nhật ký sản xuất*", "Lịch tiêm (thực tế)"]],
+      ["Số liệu cấp xã", ["Nhập liệu tuần*", "Khai thác thủy sản", "Nhật ký sản xuất*", "Lịch tiêm (thực tế)"]], // BF-CN-CATCH #112: Khai thác thủy sản có màn
       "Bản đồ vùng dịch",
       ["Dự án KNQG", ["Dự án, điểm trình diễn", "Mẫu biểu dự án*"]],
       "Quy trình, văn bản",

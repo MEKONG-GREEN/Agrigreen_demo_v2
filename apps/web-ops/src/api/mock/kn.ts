@@ -924,8 +924,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.so_lieu_xa.khai_thac_thuy_san",
                 "label": "Khai thác thủy sản",
                 "route": "/kn/cnts/so-lieu-xa/khai-thac-thuy-san",
-                "icon": "water",
-                "soon": true
+                "icon": "water"
               },
               {
                 "key": "tinh.cnts.so_lieu_xa.nhat_ky",
@@ -1021,7 +1020,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
           {
             "key": "xa.cnts.khai_thac_thuy_san",
             "label": "Khai thác thủy sản tuần",
-            "route": "/kn/cnts/bao-cao-ky",
+            "route": "/kn/cnts/khai-thac-thuy-san",
             "icon": "water"
           },
           {
