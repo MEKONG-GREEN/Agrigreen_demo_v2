@@ -35,6 +35,7 @@ import {
   ddmm,
   pastDue,
   pickTask,
+  planScheduleNote,
   validateWeekly,
   weekDays,
   weeklyPayload,
@@ -169,7 +170,7 @@ function WeeklyForm({
             body: { period_id: task.period_id, unit: task.unit },
           }),
         ),
-      "Đã tạo Lịch công tác tuần từ kế hoạch — chờ Cấp Tỉnh duyệt.",
+      (d) => planScheduleNote("Đã tạo Lịch công tác tuần từ kế hoạch — chờ Cấp Tỉnh duyệt.", d.schedule.conflict_count),
     );
     setScheduleFailed(r === null);
   };
@@ -201,13 +202,13 @@ function WeeklyForm({
     if (part === "II") {
       // Kế hoạch đã đăng ký → Lịch công tác chờ duyệt (UP-06). Lỗi ở bước này không làm mất bài đã đăng ký: cho bấm lại.
       try {
-        await unwrap(
+        const d = await unwrap(
           api.POST("/v1/extension/cnts/weekly-plan/schedule", {
             params: { header: { "Idempotency-Key": newIdempotencyKey() } },
             body: { period_id: task.period_id, unit: task.unit },
           }),
         );
-        act.setNote("Đã đăng ký kế hoạch tuần và gửi Lịch công tác chờ Cấp Tỉnh duyệt.");
+        act.setNote(planScheduleNote("Đã đăng ký kế hoạch tuần và gửi Lịch công tác chờ Cấp Tỉnh duyệt.", d.schedule.conflict_count));
       } catch {
         setScheduleFailed(true);
         act.setNote("Đã đăng ký kế hoạch tuần, nhưng chưa tạo được Lịch công tác — bấm \"Tạo lại Lịch công tác\".");

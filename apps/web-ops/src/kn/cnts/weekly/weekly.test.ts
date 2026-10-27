@@ -17,6 +17,7 @@ import {
   buildSuggestions,
   partKeys,
   pickTask,
+  planScheduleNote,
   validateWeekly,
   weekDays,
   weeklyPayload,
@@ -178,5 +179,17 @@ describe("giả lập: kế hoạch Phần II đã đăng ký → Lịch công t
     expect(d.items).toHaveLength(5);
     expect(d.items.find((i) => i.day === weekDays(from)[1]!.date)?.location).toBe("Sở NN&MT");
     expect((await xa.submissions(t.period_id, "91301")).map((s) => s.version)).toEqual([1]);
+  });
+});
+
+describe("planScheduleNote (#110: kế hoạch nhiều xã trùng giờ)", () => {
+  it("không trùng giờ → giữ nguyên thông báo", () => {
+    expect(planScheduleNote("Đã tạo.", 0)).toBe("Đã tạo.");
+    expect(planScheduleNote("Đã tạo.", undefined)).toBe("Đã tạo.");
+  });
+  it("có mục trùng giờ → nhắc chỉnh ở Lịch công tác", () => {
+    const n = planScheduleNote("Đã tạo.", 10);
+    expect(n).toContain("10 mục trùng giờ");
+    expect(n).toContain("Lịch công tác");
   });
 });

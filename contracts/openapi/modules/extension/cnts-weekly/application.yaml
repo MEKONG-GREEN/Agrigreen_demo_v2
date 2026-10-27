@@ -2,7 +2,7 @@ paths:
 # @ag-order: 31200
   /v1/extension/cnts/weekly-plan/schedule:
     post:
-      summary: "Kế hoạch tuần BM-05 Phần II đã đăng ký → gửi duyệt Lịch công tác tuần của người gọi (BF-CN-WEEKLY, PRD UP-06). Mục sinh từ kế hoạch có mã ổn định theo ngày; mục tự thêm ở Lịch công tác giữ nguyên"
+      summary: "Kế hoạch tuần BM-05 Phần II đã đăng ký → gửi duyệt Lịch công tác tuần của người gọi (BF-CN-WEEKLY, PRD UP-06). Mục sinh từ kế hoạch có mã ổn định theo xã và ngày — chỉ thay mục của kế hoạch xã này; mục của kế hoạch xã khác và mục tự thêm ở Lịch công tác giữ nguyên (trùng giờ chỉ cảnh báo, xem schedule.conflict_count)"
       operationId: extCntsWeeklyPlanSchedule
       tags: [extension]
       parameters:

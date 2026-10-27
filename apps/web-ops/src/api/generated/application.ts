@@ -10823,7 +10823,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Kế hoạch tuần BM-05 Phần II đã đăng ký → gửi duyệt Lịch công tác tuần của người gọi (BF-CN-WEEKLY, PRD UP-06). Mục sinh từ kế hoạch có mã ổn định theo ngày; mục tự thêm ở Lịch công tác giữ nguyên */
+        /** Kế hoạch tuần BM-05 Phần II đã đăng ký → gửi duyệt Lịch công tác tuần của người gọi (BF-CN-WEEKLY, PRD UP-06). Mục sinh từ kế hoạch có mã ổn định theo xã và ngày — chỉ thay mục của kế hoạch xã này; mục của kế hoạch xã khác và mục tự thêm ở Lịch công tác giữ nguyên (trùng giờ chỉ cảnh báo, xem schedule.conflict_count) */
         post: operations["extCntsWeeklyPlanSchedule"];
         delete?: never;
         options?: never;

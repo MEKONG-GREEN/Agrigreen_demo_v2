@@ -7,8 +7,12 @@ package app
 // của chính người gọi qua SaveSchedule (cùng kiểm Xã/Địa điểm, khóa tuần, người duyệt, thông báo chuông như đăng ký
 // lịch thường — R-B1, R-B2).
 //
-// Mục sinh từ kế hoạch có mã ổn định theo (người, tuần, ngày) — đăng ký lại thay đúng mục của ngày đó (lịch sử phiên
-// bản, "phần điều chỉnh chờ duyệt lại"), mục người dùng tự thêm ở Lịch công tác được giữ nguyên.
+// Mục sinh từ kế hoạch có mã ổn định theo NGUỒN (người, tuần, xã) và ngày — cán bộ phụ trách nhiều xã nộp một kế hoạch
+// cho mỗi xã, nên mỗi xã là một nguồn riêng (#110 review Codex P2). Đăng ký lại kế hoạch của một xã chỉ thay mục của
+// đúng xã đó (lịch sử phiên bản, "phần điều chỉnh chờ duyệt lại"); mục sinh từ kế hoạch xã khác và mục người dùng tự
+// thêm ở Lịch công tác được giữ nguyên. Hai nguồn cùng ngày (Thứ Hai–Thứ Sáu luôn bắt buộc ở mọi xã) cho mục trùng
+// giờ — Lịch công tác chứa được và đánh dấu "trùng giờ" (domain.Conflicts, FN-XA-03.08: cảnh báo, không chặn) để
+// người dùng chỉnh ở Lịch công tác trước khi tỉnh duyệt; không âm thầm xóa kế hoạch xã khác.
 
 import (
 	"context"
@@ -48,9 +52,11 @@ const (
 // planItemNS là không gian tên UUIDv5 của mục lịch sinh từ kế hoạch tuần.
 var planItemNS = uuid.MustParse("4b0f3c1e-6a52-5b8e-9d0c-2f7a1c3e5d10")
 
-// PlanItemID là mã mục lịch ổn định của ngày offset (0 = Thứ Hai) trong tuần week của người owner.
-func PlanItemID(owner uuid.UUID, week time.Time, offset int) uuid.UUID {
-	return uuid.NewSHA1(planItemNS, []byte(owner.String()+"|"+week.Format(time.DateOnly)+"|"+strconv.Itoa(offset)))
+// PlanItemID là mã mục lịch ổn định của ngày offset (0 = Thứ Hai) trong kế hoạch tuần week của người owner tại xã
+// commune (nguồn kế hoạch). Kỳ BM-05 Phần II ứng một-một với tuần nên (tuần, xã) xác định nguồn; kỳ cài lại cho cùng
+// tuần vẫn là cùng nguồn (thay, không nhân đôi).
+func PlanItemID(owner uuid.UUID, week time.Time, commune string, offset int) uuid.UUID {
+	return uuid.NewSHA1(planItemNS, []byte(owner.String()+"|"+week.Format(time.DateOnly)+"|"+commune+"|"+strconv.Itoa(offset)))
 }
 
 // planScheduleItems đổi các ngày có kế hoạch thành mục lịch công tác của xã commune.
@@ -76,7 +82,7 @@ func planScheduleItems(owner uuid.UUID, week time.Time, commune string, days []r
 		if content == "" {
 			content = d.Kind
 		}
-		out = append(out, domain.ScheduleItem{ItemID: PlanItemID(owner, week, d.Offset), Day: week.AddDate(0, 0, d.Offset),
+		out = append(out, domain.ScheduleItem{ItemID: PlanItemID(owner, week, commune, d.Offset), Day: week.AddDate(0, 0, d.Offset),
 			Session: domain.SessionMorning, Start: planStart, End: planEnd, Content: content, CommuneCode: commune, Location: loc, Note: n})
 	}
 	return out
@@ -141,7 +147,8 @@ func (s *Service) ScheduleFromCNTSPlan(ctx context.Context, periodID uuid.UUID, 
 	}
 	plan := planScheduleItems(a.ActorRef, week, unit, days)
 
-	// Lịch hiện hành của tuần: giữ mục người dùng tự thêm, thay mục sinh từ kế hoạch (mọi ngày của tuần).
+	// Lịch hiện hành của tuần: chỉ thay mục sinh từ kế hoạch CỦA XÃ NÀY (mọi ngày của tuần); giữ mục của kế hoạch xã
+	// khác và mục người dùng tự thêm.
 	var cur *domain.Schedule
 	var curItems []domain.ScheduleItem
 	err = tenant.WithTenantTx(ctx, s.DB, a.TenantID, func(tx pgx.Tx) error {
@@ -157,7 +164,7 @@ func (s *Service) ScheduleFromCNTSPlan(ctx context.Context, periodID uuid.UUID, 
 	}
 	planIDs := map[uuid.UUID]bool{}
 	for i := range rcdomain.WorkDays {
-		planIDs[PlanItemID(a.ActorRef, week, i)] = true
+		planIDs[PlanItemID(a.ActorRef, week, unit, i)] = true
 	}
 	items := make([]domain.ScheduleItem, 0, len(curItems)+len(plan))
 	for _, it := range curItems {

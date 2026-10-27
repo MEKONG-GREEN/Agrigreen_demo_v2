@@ -10,8 +10,8 @@ import { knContext } from "./kn";
 import { calendarAt, DEPT_CNTS, ruleTag } from "./kn-reports/domain";
 import { callerOf, stableUuid, workScheduleStore } from "./kn-schedules";
 
-/** Mã mục lịch ổn định của ngày `day` trong tuần kế hoạch (giả lập PlanItemID phía máy chủ). */
-const planItemId = (week: string, day: string) => stableUuid(`cnts-plan:${week}:${day}`);
+/** Mã mục lịch ổn định của ngày `day` trong kế hoạch tuần của xã `unit` (giả lập PlanItemID phía máy chủ: nguồn = tuần × xã). */
+const planItemId = (week: string, unit: string, day: string) => stableUuid(`cnts-plan:${week}:${unit}:${day}`);
 
 type S = components["schemas"];
 type Field = S["FormsField"];
@@ -309,7 +309,7 @@ export const cntsPeriodRoutes: Route[] = [
       const store = workScheduleStore();
       const mine = store.mine(c.body, p.from);
       const cur = mine.ok ? mine.body.schedule : null;
-      const planIds = new Set(DAYS.map(([k]) => planItemId(p.from, k)));
+      const planIds = new Set(DAYS.map(([k]) => planItemId(p.from, unit, k)));
       const keep = (cur?.items ?? []).filter((it) => !planIds.has(it.id));
       const plan = DAYS.flatMap(([k], i) => {
         const v = (x: string) => (sub.values[`${k}_${x}`] ?? "").trim();
@@ -317,7 +317,7 @@ export const cntsPeriodRoutes: Route[] = [
         const note = [v("loai") === WORK[1] && v("cong_tac_khac") ? `Công tác khác: ${v("cong_tac_khac")}` : "", v("ket_qua_du_kien") ? `Kết quả dự kiến: ${v("ket_qua_du_kien")}` : ""]
           .filter(Boolean)
           .join(" · ");
-        return [{ id: planItemId(p.from, k), day: ymd(Date.parse(p.from + "T00:00:00Z") + i * D), session: "morning" as const, start_time: "07:00", end_time: "17:00",
+        return [{ id: planItemId(p.from, unit, k), day: ymd(Date.parse(p.from + "T00:00:00Z") + i * D), session: "morning" as const, start_time: "07:00", end_time: "17:00",
           content: v("ke_hoach") || v("loai"), commune_code: unit, location: v("dia_diem") || "Làm việc tại xã", note: note || null }];
       });
       const r = store.save(c.body, { week_start: p.from, action: "submit", base_version: cur?.schedule.version ?? null, items: [...keep, ...plan] });

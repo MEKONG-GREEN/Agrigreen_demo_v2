@@ -163,3 +163,13 @@ export function applySuggestions(values: Record<string, string>, sugg: Record<st
   }
   return { values: next, filled };
 }
+
+/**
+ * Thông báo sau khi tạo Lịch công tác từ kế hoạch (#110): cán bộ phụ trách nhiều xã có kế hoạch mỗi xã cùng ngày → các
+ * mục trùng giờ được giữ cả (không ghi đè kế hoạch xã khác) và máy chủ đếm ở `schedule.conflict_count`; nhắc người dùng
+ * chỉnh ở Lịch công tác trước khi tỉnh duyệt.
+ */
+export function planScheduleNote(base: string, conflictCount: number | null | undefined): string {
+  if (!conflictCount) return base;
+  return `${base} Lịch có ${conflictCount} mục trùng giờ (kế hoạch các xã khác hoặc mục tự thêm vẫn được giữ) — xem và chỉnh ở Lịch công tác.`;
+}
