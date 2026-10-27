@@ -1,7 +1,7 @@
 "use client";
 
 // Cấp Xã › Dữ liệu (FN-XA-03.03..03.06) trên API P7 /v1/kn/*: HTX & nông hộ (thêm, vô hiệu hóa thay xóa, SĐT che),
-// máy móc theo HTX (khai báo thay toàn bộ, tổng xã = Σ HTX), thửa ruộng (danh sách; vẽ ở field-app), vật tư (ghi nhận,
+// máy móc theo HTX (khai báo thay toàn bộ, tổng xã = Σ HTX; năm SX ở hồ sơ KN riêng #119), thửa ruộng (danh sách; vẽ ở field-app), vật tư (ghi nhận,
 // tổng hợp theo xã). Cấp Tỉnh/Quốc gia chỉ xem (useCycleReadOnly + máy chủ 403 *.read_only).
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -14,9 +14,11 @@ import { NumberField, SelectField, TextField, parseNumberInput, validateForm } f
 import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPanel, RelatedTabs } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, RowActions, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import type { KnCooperative, KnPlot, MaterialRecord } from "../api";
-import { LoadState, dt, num, useAction, useCommuneNames, useCycleReadOnly, useLoad, ymdLocal } from "../common";
+import type { KnCooperative } from "../api";
+import { LoadState, num, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { PiiHint } from "@/kn/pii";
+import { vnDate } from "@/kn/schedule/week";
+import { normalizeNumberInput } from "@/lib/exactDecimal";
 
 /** Ghi chú phần còn ở nơi khác (nạp Excel, vẽ bản đồ ngoại tuyến…). */
 export function GapNotice({ what }: { what: string }) {
@@ -28,7 +30,8 @@ export function GapNotice({ what }: { what: string }) {
   );
 }
 
-function useCommuneFilter() {
+/** Bộ lọc Xã/phường theo các xã phụ trách của phiên KN (dùng chung các màn Dữ liệu xã). */
+export function useCommuneFilter() {
   const { kn } = useAuth();
   const communes = kn.context?.communes ?? [];
   const [commune, setCommune] = useState("");
@@ -300,9 +303,79 @@ export function HouseholdCreateScreen() {
   );
 }
 
-type MachineLine = { machine_type: string; quantity: string; note: string };
+type MachineLine = { machine_type: string; quantity: string; year_made: string; note: string };
+type MachineField = "type" | "quantity" | "year";
 
-/** FN-XA-03.04 Máy móc HTX: trái danh sách HTX + tổng xã theo loại; phải bảng khai báo của HTX đã chọn. */
+/** Năm hiện tại theo lịch Việt Nam — cùng mốc máy chủ #119 dùng cho "Năm SX ≤ năm hiện tại". */
+export const vnYear = (ms = Date.now()) => Number(vnDate(ms).slice(0, 4));
+/** TT-10 (R-A1): Số lượng là số nguyên 1 – 1.000.000 như pf/mechanization (#113 BF-SRV-GUARD). */
+export const MACHINE_QTY_RULE = { required: true, integer: true, positive: true, max: 1_000_000 } as const;
+/** Năm nhỏ nhất máy chủ nhận (giả định #119, chờ khách). */
+export const MACHINE_YEAR_MIN = 1900;
+
+/** TT-10: Năm SX bắt buộc, số nguyên, 1900 ≤ năm ≤ năm hiện tại (giờ VN). Trả lỗi tiếng Việt hoặc undefined. */
+export function machineYearError(raw: string, maxYear = vnYear()): string | undefined {
+  const p = parseNumberInput(raw, { required: true, integer: true, max: maxYear });
+  if (!p.ok) return p.error;
+  return Number(p.value) < MACHINE_YEAR_MIN ? `Không được nhỏ hơn ${MACHINE_YEAR_MIN}.` : undefined;
+}
+
+/** Kiểm cả bảng khai báo trước khi Lưu: lỗi theo `${dòng}.${trường}`; trùng loại máy báo ở dòng sau (máy chủ cũng chặn). */
+export function validateMachineLines(rows: MachineLine[], maxYear = vnYear()): Record<string, string> {
+  const errs: Record<string, string> = {};
+  const seen = new Set<string>();
+  rows.forEach((l, i) => {
+    if (!l.machine_type) errs[`${i}.type`] = "Bắt buộc nhập.";
+    else if (seen.has(l.machine_type)) errs[`${i}.type`] = "Trùng loại máy — sửa dòng đã có.";
+    seen.add(l.machine_type);
+    const q = parseNumberInput(l.quantity, MACHINE_QTY_RULE);
+    if (!q.ok) errs[`${i}.quantity`] = q.error;
+    const y = machineYearError(l.year_made, maxYear);
+    if (y) errs[`${i}.year`] = y;
+  });
+  return errs;
+}
+
+/**
+ * Lỗi theo trường máy chủ trả → ô của dòng: pf/mechanization `lines[i].quantity` (#113), hồ sơ KN
+ * `lines.<loại máy>.year_made` | `lines.<loại máy>.machine_type` (#119).
+ */
+export function machineServerErrors(fields: Record<string, string>, rows: { machine_type: string }[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [f, reason] of Object.entries(fields)) {
+    const byIdx = /^lines\[(\d+)\]\.(quantity|machine_type)$/.exec(f);
+    if (byIdx) {
+      out[`${byIdx[1]}.${byIdx[2] === "quantity" ? "quantity" : "type"}`] = reason;
+      continue;
+    }
+    const byType = /^lines\.(.+)\.(year_made|machine_type)$/.exec(f);
+    if (!byType) continue;
+    const i = rows.findIndex((r) => r.machine_type === byType[1]);
+    if (i >= 0) out[`${i}.${byType[2] === "year_made" ? "year" : "type"}`] = reason;
+  }
+  return out;
+}
+
+/** Ô nhập số trong bảng (số lượng, năm) — lỗi tiếng Việt ngay dưới ô (UI-KIT R-A1). */
+function CellInput({ label, value, error, disabled, onChange, onBlur }: { label: string; value: string; error?: string; disabled: boolean; onChange: (v: string) => void; onBlur: () => void }) {
+  return (
+    <>
+      <input className="input" aria-label={label} aria-required aria-invalid={error ? true : undefined} disabled={disabled} inputMode="numeric" value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
+      {error ? (
+        <span className="err" role="alert">
+          {error}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * FN-XA-03.04 Máy móc HTX: trái danh sách HTX + tổng xã theo loại; phải bảng khai báo của HTX đã chọn.
+ * TT-10 (#103): HTX bắt buộc chọn trước khi khai báo; mỗi dòng bắt buộc Loại máy, Số lượng > 0, Năm SX (1900 – năm hiện
+ * tại). Số lượng lưu ở pf/mechanization (/v1/kn/machine-counts), năm ở hồ sơ KN riêng (/v1/kn/machine-profiles, #119):
+ * lưu số lượng trước rồi năm trong cùng một lượt thao tác (bấm lại sau lỗi dùng lại khóa chống gửi trùng).
+ */
 export function MachinesScreen() {
   const { collectApi } = useAuth();
   const readOnly = useCycleReadOnly();
@@ -311,9 +384,17 @@ export function MachinesScreen() {
   const coops = useLoad(() => collectApi.cooperatives({ commune: f.commune || undefined }), [f.commune]);
   const overview = useLoad(() => collectApi.machines(f.commune || undefined), [f.commune, act.note]);
   const [ref, setRef] = useState("");
-  const cur = useLoad(ref ? () => collectApi.coopMachines(ref) : null, [ref, act.note]);
+  const cur = useLoad(
+    ref
+      ? async () => {
+          const [m, p] = await Promise.all([collectApi.coopMachines(ref), collectApi.machineProfile(ref)]);
+          return { ...m, years: new Map(p.items.map((x) => [x.machine_type, x.year_made])) };
+        }
+      : null,
+    [ref, act.note],
+  );
   const [lines, setLines] = useState<MachineLine[] | null>(null);
-  const rows = lines ?? (cur.data?.lines ?? []).map((l) => ({ machine_type: l.machine_type, quantity: String(l.quantity), note: l.note ?? "" }));
+  const rows = lines ?? (cur.data?.lines ?? []).map((l) => ({ machine_type: l.machine_type, quantity: String(l.quantity), year_made: String(cur.data?.years.get(l.machine_type) ?? ""), note: l.note ?? "" }));
   const name = useCommuneNames(overview.data?.commune_totals.map((t) => t.commune_code) ?? []);
   const TYPES = [
     ["may_cay", "Máy cày"],
@@ -324,65 +405,70 @@ export function MachinesScreen() {
     ["may_gat", "Máy gặt đập liên hợp"],
     ["may_say", "Máy sấy"],
   ];
-  // TT-10: Số lượng là số nguyên > 0 (R-A1). TODO(#103): Năm sản xuất (≤ năm hiện tại) và HTX/Chủ sở hữu bắt buộc — gói #103 thêm trường.
-  const [qtyErr, setQtyErr] = useState<Record<number, string>>({});
-  const QTY_RULE = { required: true, integer: true, positive: true } as const;
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const server = act.problem ? machineServerErrors(fieldErrorMap(act.problem), rows) : {};
+  const err = (i: number, k: MachineField) => errs[`${i}.${k}`] ?? server[`${i}.${k}`];
+  const setErr = (i: number, k: MachineField, e: string | undefined) =>
+    setErrs((x) => {
+      const next = { ...x };
+      if (e) next[`${i}.${k}`] = e;
+      else delete next[`${i}.${k}`];
+      return next;
+    });
   const setRow = (i: number, patch: Partial<MachineLine>) => setLines(rows.map((x, k) => (k === i ? { ...x, ...patch } : x)));
   const saveMachines = async () => {
-    const errs: Record<number, string> = {};
-    const out = rows.map((l, i) => {
-      const p = parseNumberInput(l.quantity, QTY_RULE);
-      if (!p.ok) errs[i] = p.error;
-      return { machine_type: l.machine_type, quantity: p.ok ? Number(p.value) : 0, note: l.note.trim() || null };
-    });
-    setQtyErr(errs);
-    if (Object.keys(errs).length) return;
-    if (await act.run(() => collectApi.putMachines(ref, out), (r) => `Đã lưu khai báo máy (${r.total} máy).`)) setLines(null);
+    const e = validateMachineLines(rows);
+    setErrs(e);
+    if (Object.keys(e).length) return;
+    const counts = rows.map((l) => ({ machine_type: l.machine_type, quantity: Number(normalizeNumberInput(l.quantity)), note: l.note.trim() || null }));
+    const years = rows.map((l) => ({ machine_type: l.machine_type, year_made: Number(normalizeNumberInput(l.year_made)) }));
+    const r = await act.run(
+      async (idem) => {
+        const saved = await collectApi.putMachines(ref, counts);
+        // Sau await: bọc bằng idem của CÙNG lượt để bấm lại sau mất phản hồi giữ khóa cho cả hai bước (#129).
+        await idem(() => collectApi.putMachineProfile(ref, years));
+        return saved;
+      },
+      (r) => `Đã lưu khai báo máy (${r.total} máy).`,
+    );
+    if (r) setLines(null);
   };
   const machineCols: Column<MachineLine & { i: number }>[] = [
     {
       key: "type",
       header: "Loại máy",
       cell: (l) => (
-        <select className="select" aria-label={`Loại máy dòng ${l.i + 1}`} disabled={readOnly} value={l.machine_type} onChange={(e) => setRow(l.i, { machine_type: e.target.value })}>
-          {TYPES.map(([v, t]) => (
-            <option key={v} value={v}>
-              {t}
-            </option>
-          ))}
-        </select>
+        <>
+          <select className="select" aria-label={`Loại máy dòng ${l.i + 1}`} aria-required aria-invalid={err(l.i, "type") ? true : undefined} disabled={readOnly} value={l.machine_type} onChange={(e) => (setRow(l.i, { machine_type: e.target.value }), setErr(l.i, "type", undefined))}>
+            {TYPES.map(([v, t]) => (
+              <option key={v} value={v}>
+                {t}
+              </option>
+            ))}
+          </select>
+          {err(l.i, "type") ? (
+            <span className="err" role="alert">
+              {err(l.i, "type")}
+            </span>
+          ) : null}
+        </>
       ),
     },
     {
       key: "qty",
       header: "Số lượng",
-      cell: (l) => (
-        <>
-          <input
-            className="input"
-            aria-label={`Số lượng dòng ${l.i + 1}`}
-            aria-invalid={qtyErr[l.i] ? true : undefined}
-            disabled={readOnly}
-            inputMode="numeric"
-            value={l.quantity}
-            onChange={(e) => setRow(l.i, { quantity: e.target.value })}
-            onBlur={() => {
-              const p = parseNumberInput(l.quantity, QTY_RULE);
-              setQtyErr((x) => {
-                const next = { ...x };
-                if (p.ok) delete next[l.i];
-                else next[l.i] = p.error;
-                return next;
-              });
-            }}
-          />
-          {qtyErr[l.i] ? (
-            <span className="err" role="alert">
-              {qtyErr[l.i]}
-            </span>
-          ) : null}
-        </>
-      ),
+      cell: (l) => {
+        const blur = () => {
+          const p = parseNumberInput(l.quantity, MACHINE_QTY_RULE);
+          setErr(l.i, "quantity", p.ok ? undefined : p.error);
+        };
+        return <CellInput label={`Số lượng dòng ${l.i + 1}`} value={l.quantity} error={err(l.i, "quantity")} disabled={readOnly} onChange={(v) => setRow(l.i, { quantity: v })} onBlur={blur} />;
+      },
+    },
+    {
+      key: "year",
+      header: "Năm SX",
+      cell: (l) => <CellInput label={`Năm sản xuất dòng ${l.i + 1}`} value={l.year_made} error={err(l.i, "year")} disabled={readOnly} onChange={(v) => setRow(l.i, { year_made: v })} onBlur={() => setErr(l.i, "year", machineYearError(l.year_made))} />,
     },
     { key: "note", header: "Ghi chú", cell: (l) => <input className="input" aria-label={`Ghi chú dòng ${l.i + 1}`} disabled={readOnly} value={l.note} onChange={(e) => setRow(l.i, { note: e.target.value })} /> },
     {
@@ -390,18 +476,20 @@ export function MachinesScreen() {
       header: "",
       cell: (l) =>
         readOnly ? null : (
-          <button type="button" className="btn btn-o btn-sm" aria-label={`Xóa dòng ${l.i + 1}`} onClick={() => (setLines(rows.filter((_, k) => k !== l.i)), setQtyErr({}))}>
+          <button type="button" className="btn btn-o btn-sm" aria-label={`Xóa dòng ${l.i + 1}`} onClick={() => (setLines(rows.filter((_, k) => k !== l.i)), setErrs({}))}>
             Xóa
           </button>
         ),
     },
   ];
+  // Dòng mới mặc định loại máy chưa khai báo (tránh trùng loại ngay khi thêm).
+  const nextType = TYPES.find(([v]) => !rows.some((r) => r.machine_type === v))?.[0] ?? "may_cay";
   return (
     <>
       <PageHeader title="Máy móc HTX" />
       <FilterBar>
         {f.chip}
-        <FilterChip label="HTX" value={ref} onChange={(v) => (setRef(v), setLines(null), setQtyErr({}))} options={[{ value: "", label: "Chọn HTX" }, ...(coops.data?.items ?? []).map((c) => ({ value: c.ref, label: c.name }))]} />
+        <FilterChip label="HTX" value={ref} onChange={(v) => (setRef(v), setLines(null), setErrs({}))} options={[{ value: "", label: "Chọn HTX" }, ...(coops.data?.items ?? []).map((c) => ({ value: c.ref, label: c.name }))]} />
       </FilterBar>
       {act.view}
       <DetailLayout
@@ -414,7 +502,7 @@ export function MachinesScreen() {
                   <DataTable caption="Khai báo máy" columns={machineCols} rows={rows.map((l, i) => ({ ...l, i }))} rowKey={(l) => String(l.i)} empty="HTX chưa khai báo máy." />
                   {readOnly ? null : (
                     <div className="row" style={{ gap: 8, marginTop: 8 }}>
-                      <button type="button" className="btn btn-o btn-sm" onClick={() => setLines([...rows, { machine_type: "may_cay", quantity: "1", note: "" }])}>
+                      <button type="button" className="btn btn-o btn-sm" onClick={() => setLines([...rows, { machine_type: nextType, quantity: "1", year_made: "", note: "" }])}>
                         + Thêm dòng
                       </button>
                       <button type="button" className="btn btn-p btn-sm" disabled={act.busy} onClick={() => void saveMachines()}>
@@ -426,7 +514,7 @@ export function MachinesScreen() {
               )}
             </LoadState>
           ) : (
-            <p className="mute">Chọn một HTX để khai báo máy.</p>
+            <p className="mute">Chọn một HTX để khai báo máy (bắt buộc).</p>
           )
         }
         log={
@@ -446,121 +534,7 @@ export function MachinesScreen() {
   );
 }
 
-/** FN-XA-03.05 Vẽ thửa ruộng — danh sách thửa v7.7 (diện tích tự tính so với khai báo); vẽ trên bản đồ ở field-app. */
-// TODO(#104): sửa thửa, bắt buộc Tên thửa/Chủ hộ/Xã/Cây trồng, chặn chồng lấn (TT-11) — màn này hiện chỉ có danh sách, không có ô nhập.
-export function PlotsScreen() {
-  const { collectApi } = useAuth();
-  const f = useCommuneFilter();
-  const [page, setPage] = useState(1);
-  const s = useLoad(() => collectApi.plots({ commune: f.commune || undefined }), [f.commune]);
-  const name = useCommuneNames(s.data?.items.map((p) => p.commune_code) ?? []);
-  const columns: Column<KnPlot>[] = [
-    { key: "code", header: "Mã thửa", cell: (p) => p.code },
-    { key: "lot", header: "Tên lô", cell: (p) => p.lot_name ?? "—" },
-    { key: "commune", header: "Xã", cell: (p) => name(p.commune_code) },
-    { key: "farmer", header: "Nông dân", cell: (p) => p.farmer?.label ?? "—" },
-    { key: "area", header: "Diện tích tự tính (ha)", cell: (p) => num(p.area_ha, 2), className: "num" },
-    { key: "decl", header: "Khai báo (ha)", cell: (p) => num(p.declared_area_ha, 2), className: "num" },
-    { key: "dev", header: "Chênh lệch", cell: (p) => (p.area_deviation_pct ? `${num(p.area_deviation_pct)} %` : "—") },
-    { key: "st", header: "Trạng thái", cell: (p) => <StatusPill tone={p.status === "active" ? "ok" : "neutral"}>{p.status === "active" ? "Đang dùng" : p.status === "draft" ? "Nháp" : "Ngừng"}</StatusPill> },
-  ];
-  return (
-    <>
-      <PageHeader title="Vẽ thửa ruộng" />
-      <GapNotice what="Vẽ lô mới (chấm điểm, hình tròn, hình vuông, chặn chồng lấn, ngoại tuyến) dùng ứng dụng di động Cán bộ xã; web xem danh sách thửa và tải GeoJSON/KML." />
-      <FilterBar>{f.chip}</FilterBar>
-      <LoadState s={s}>{(d) => <DataTable caption="Thửa ruộng" columns={columns} rows={d.items.slice((page - 1) * 20, page * 20)} rowKey={(p) => p.ref} page={page} pageSize={20} total={d.items.length} onPage={setPage} empty="Chưa có thửa." />}</LoadState>
-    </>
-  );
-}
+// FN-XA-03.05 Vẽ thửa ruộng (danh sách, thêm, sửa — TT-11 #104): xem PlotScreens.tsx.
 
-const MATERIAL_OPTIONS: [string, string][] = [
-  ["phan_ure", "Phân urê (tấn)"],
-  ["phan_npk", "Phân NPK (tấn)"],
-  ["thuoc_bvtv", "Thuốc BVTV (lít)"],
-  ["bay_den", "Bẫy đèn (cái)"],
-];
-
-/** FN-XA-03.06 Vật tư: ghi nhận theo xã + thời điểm; lịch sử; tổng hợp theo xã (Cấp Tỉnh xem). */
-export function MaterialsScreen() {
-  const { collectApi } = useAuth();
-  const readOnly = useCycleReadOnly();
-  const f = useCommuneFilter();
-  const act = useAction();
-  const [page, setPage] = useState(1);
-  const [line, setLine] = useState({ material_code: "phan_ure", quantity: "", note: "" });
-  const [day, setDay] = useState(() => ymdLocal(new Date()));
-  const list = useLoad(() => collectApi.materials(f.commune || undefined), [f.commune, act.note]);
-  const sum = useLoad(() => collectApi.materialSummary(f.commune || undefined), [f.commune, act.note]);
-  const name = useCommuneNames([...(list.data?.items.map((m) => m.commune_code) ?? []), ...(sum.data?.items.map((m) => m.commune_code) ?? [])]);
-  const commune = f.commune || f.communes[0]?.code || "";
-  // R-A1: số lượng ≥ 0, tối đa 4 chữ số lẻ; vật tư đếm được (bẫy đèn – cái) chỉ nhận số nguyên như máy chủ.
-  // TODO(#105): làm lại dạng bảng nhập nhiều dòng (lọc Xã + Thời điểm, ĐVT tự điền, Nạp Excel, Lịch sử) theo TT-12.
-  const qtyRule = { maxDecimals: 4, integer: line.material_code === "bay_den" };
-  const [errors, setErrors] = useState<Partial<Record<"day" | "material_code" | "quantity", string>>>({});
-  const dayErr = errors.day ?? (act.problem ? fieldErrorMap(act.problem).recorded_on : undefined);
-  const saveMaterial = async () => {
-    const v = validateForm(
-      { day, material_code: line.material_code, quantity: line.quantity },
-      { day: { kind: "text", required: true }, material_code: { kind: "text", required: true }, quantity: { kind: "number", required: true, ...qtyRule } },
-    );
-    setErrors(v.errors);
-    if (!v.valid) return;
-    const ok = await act.run(
-      () => collectApi.recordMaterials({ commune_code: commune, recorded_on: day, lines: [{ material_code: line.material_code, quantity: v.values.quantity, ...(line.note.trim() ? { note: line.note.trim() } : {}) }] }),
-      `Đã ghi nhận vật tư cho ${name(commune)}.`,
-    );
-    if (ok) setLine({ ...line, quantity: "", note: "" });
-  };
-  const columns: Column<MaterialRecord>[] = [
-    { key: "on", header: "Ngày ghi nhận", cell: (m) => m.recorded_on },
-    { key: "commune", header: "Xã", cell: (m) => name(m.commune_code) },
-    { key: "mat", header: "Vật tư", cell: (m) => m.material_name },
-    { key: "q", header: "Số lượng", cell: (m) => `${num(m.quantity, 4)} ${m.unit}` },
-    { key: "note", header: "Ghi chú", cell: (m) => m.note ?? "—" },
-    { key: "by", header: "Người ghi", cell: (m) => `${m.actor_display ?? "—"} · ${dt(m.recorded_at)}` },
-  ];
-  return (
-    <>
-      <PageHeader title="Vật tư" />
-      <FilterBar>{f.chip}</FilterBar>
-      {act.view}
-      {readOnly ? null : (
-        <section className="card sec row" style={{ gap: 8, flexWrap: "wrap", marginBottom: 12, alignItems: "flex-start" }} aria-label="Ghi nhận vật tư">
-          <div className="field">
-            <label htmlFor="mat-day">
-              Thời điểm ghi nhận
-              <span className="req" aria-hidden="true">
-                {" "}*
-              </span>
-            </label>
-            <input id="mat-day" className="input" type="date" aria-required value={day} onChange={(e) => setDay(e.target.value)} aria-invalid={dayErr ? true : undefined} />
-            {dayErr ? (
-              <span className="err" role="alert">
-                {dayErr}
-              </span>
-            ) : null}
-          </div>
-          <SelectField label="Loại vật tư" required value={line.material_code} onChange={(v) => setLine({ ...line, material_code: v })} error={errors.material_code} options={MATERIAL_OPTIONS.map(([value, label]) => ({ value, label }))} />
-          <NumberField label="Số lượng" required value={line.quantity} onChange={(v) => setLine({ ...line, quantity: v })} rule={qtyRule} error={errors.quantity} onBlurError={(e) => setErrors((x) => ({ ...x, quantity: e }))} />
-          <TextField label="Ghi chú" value={line.note} onChange={(v) => setLine({ ...line, note: v })} maxLength={500} hint={<PiiHint text={line.note} />} />
-          <button type="button" className="btn btn-p btn-sm" style={{ alignSelf: "flex-end" }} disabled={!commune || act.busy} onClick={() => void saveMaterial()}>
-            Lưu
-          </button>
-        </section>
-      )}
-      <section className="card sec" aria-label="Tổng hợp vật tư theo xã" style={{ marginBottom: 12 }}>
-        <h2>Tổng hợp theo xã</h2>
-        <ul className="list-plain">
-          {(sum.data?.items ?? []).map((x) => (
-            <li key={`${x.commune_code}-${x.material_code}`}>
-              {name(x.commune_code)} · {x.material_name}: <b>{num(x.quantity, 4)}</b> {x.unit} ({x.records} lần)
-            </li>
-          ))}
-          {!sum.data?.items.length ? <li className="mute">Chưa có ghi nhận.</li> : null}
-        </ul>
-      </section>
-      <LoadState s={list}>{(d) => <DataTable caption="Lịch sử ghi nhận" columns={columns} rows={d.items.slice((page - 1) * 20, page * 20)} rowKey={(m) => m.id} page={page} pageSize={20} total={d.items.length} onPage={setPage} empty="Chưa có ghi nhận vật tư." />}</LoadState>
-    </>
-  );
-}
+/** FN-XA-03.06 Vật tư — bảng nhập nhiều dòng (BF-TT-MAT #105) ở MaterialsScreen.tsx. */
+export { MaterialsScreen } from "./MaterialsScreen";
