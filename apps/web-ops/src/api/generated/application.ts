@@ -10814,6 +10814,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/weekly-plan/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kế hoạch tuần BM-05 Phần II đã đăng ký → gửi duyệt Lịch công tác tuần của người gọi (BF-CN-WEEKLY, PRD UP-06). Mục sinh từ kế hoạch có mã ổn định theo ngày; mục tự thêm ở Lịch công tác giữ nguyên */
+        post: operations["extCntsWeeklyPlanSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -46269,6 +46286,55 @@ export interface operations {
             /** @description extension.cnts_diary_photo_invalid */
             422: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extCntsWeeklyPlanSchedule: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Kỳ BM-05 Phần II (cap/forms, profile kn_cnts)
+                     */
+                    period_id: string;
+                    /** @description Mã xã phụ trách */
+                    unit: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Gọi lặp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            /** @description Lịch đã gửi duyệt (Chờ duyệt) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleDetail"];
+                };
+            };
+            /** @description forbidden | extension.cnts_plan_not_owner | extension.schedule_context_required */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_plan_not_registered | extension.schedule_version_conflict | extension.week_locked */
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };

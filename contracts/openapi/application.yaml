@@ -15263,6 +15263,38 @@ paths:
     post: {"summary":"Tải ảnh nhật ký (≤ 500 KB) — máy chủ mã hóa phong bì bằng khóa chủ hộ, lưu qua pf/evidence","operationId":"extensionCntsDiaryPhotoUpload","tags":["extension"],"parameters":[{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"multipart/form-data":{"schema":{"type":"object","required":["file","household_ref","kind"],"properties":{"file":{"type":"string","format":"binary"},"household_ref":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["weighing","test_kit","flock","other"]},"captured_at":{"type":"string","format":"date-time"},"id":{"type":"string","format":"uuid"}}}}}},"responses":{"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryPhoto"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"not_found | extension.cnts_diary_photo_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_photo_no_key","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_photo_invalid","$ref":"#/components/responses/Problem"},"503":{"description":"extension.dependency_unavailable","$ref":"#/components/responses/Problem"}}}
   /v1/extension/cnts/diary-photos/{ref}/content:
     get: {"summary":"Xem ảnh nhật ký — người ghi được, người rà soát được, Admin (mục đích extension.diary)","operationId":"extensionCntsDiaryPhotoContent","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Nội dung ảnh (Cache-Control no-store)","content":{"image/jpeg":{"schema":{"type":"string","format":"binary"}},"image/png":{"schema":{"type":"string","format":"binary"}},"image/webp":{"schema":{"type":"string","format":"binary"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"not_found | extension.cnts_diary_photo_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_photo_no_key","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_photo_invalid","$ref":"#/components/responses/Problem"},"503":{"description":"extension.dependency_unavailable","$ref":"#/components/responses/Problem"}}}
+  /v1/extension/cnts/weekly-plan/schedule:
+    post:
+      summary: "Kế hoạch tuần BM-05 Phần II đã đăng ký → gửi duyệt Lịch công tác tuần của người gọi (BF-CN-WEEKLY, PRD UP-06). Mục sinh từ kế hoạch có mã ổn định theo ngày; mục tự thêm ở Lịch công tác giữ nguyên"
+      operationId: extCntsWeeklyPlanSchedule
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period_id, unit]
+              properties:
+                period_id: {type: string, format: uuid, description: "Kỳ BM-05 Phần II (cap/forms, profile kn_cnts)"}
+                unit: {type: string, description: Mã xã phụ trách}
+      responses:
+        "201":
+          description: Lịch đã gửi duyệt (Chờ duyệt)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "200":
+          description: Gọi lặp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "403": {description: "forbidden | extension.cnts_plan_not_owner | extension.schedule_context_required", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_plan_not_registered | extension.schedule_version_conflict | extension.week_locked", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:

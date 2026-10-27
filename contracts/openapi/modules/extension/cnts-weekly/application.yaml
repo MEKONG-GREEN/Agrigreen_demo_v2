@@ -1,0 +1,34 @@
+paths:
+# @ag-order: 31200
+  /v1/extension/cnts/weekly-plan/schedule:
+    post:
+      summary: "Kế hoạch tuần BM-05 Phần II đã đăng ký → gửi duyệt Lịch công tác tuần của người gọi (BF-CN-WEEKLY, PRD UP-06). Mục sinh từ kế hoạch có mã ổn định theo ngày; mục tự thêm ở Lịch công tác giữ nguyên"
+      operationId: extCntsWeeklyPlanSchedule
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period_id, unit]
+              properties:
+                period_id: {type: string, format: uuid, description: "Kỳ BM-05 Phần II (cap/forms, profile kn_cnts)"}
+                unit: {type: string, description: Mã xã phụ trách}
+      responses:
+        "201":
+          description: Lịch đã gửi duyệt (Chờ duyệt)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "200":
+          description: Gọi lặp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleDetail"}
+        "403": {description: "forbidden | extension.cnts_plan_not_owner | extension.schedule_context_required", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_plan_not_registered | extension.schedule_version_conflict | extension.week_locked", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
