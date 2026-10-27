@@ -14,7 +14,7 @@ import { NumberField, SelectField, TextField, parseNumberInput, validateForm } f
 import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPanel, RelatedTabs } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, RowActions, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import type { KnCooperative, KnPlot } from "../api";
+import type { KnCooperative } from "../api";
 import { LoadState, num, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { PiiHint } from "@/kn/pii";
 import { vnDate } from "@/kn/schedule/week";
@@ -30,7 +30,8 @@ export function GapNotice({ what }: { what: string }) {
   );
 }
 
-function useCommuneFilter() {
+/** Bộ lọc Xã/phường theo các xã phụ trách của phiên KN (dùng chung các màn Dữ liệu xã). */
+export function useCommuneFilter() {
   const { kn } = useAuth();
   const communes = kn.context?.communes ?? [];
   const [commune, setCommune] = useState("");
@@ -533,33 +534,7 @@ export function MachinesScreen() {
   );
 }
 
-/** FN-XA-03.05 Vẽ thửa ruộng — danh sách thửa v7.7 (diện tích tự tính so với khai báo); vẽ trên bản đồ ở field-app. */
-// TODO(#104): sửa thửa, bắt buộc Tên thửa/Chủ hộ/Xã/Cây trồng, chặn chồng lấn (TT-11) — màn này hiện chỉ có danh sách, không có ô nhập.
-export function PlotsScreen() {
-  const { collectApi } = useAuth();
-  const f = useCommuneFilter();
-  const [page, setPage] = useState(1);
-  const s = useLoad(() => collectApi.plots({ commune: f.commune || undefined }), [f.commune]);
-  const name = useCommuneNames(s.data?.items.map((p) => p.commune_code) ?? []);
-  const columns: Column<KnPlot>[] = [
-    { key: "code", header: "Mã thửa", cell: (p) => p.code },
-    { key: "lot", header: "Tên lô", cell: (p) => p.lot_name ?? "—" },
-    { key: "commune", header: "Xã", cell: (p) => name(p.commune_code) },
-    { key: "farmer", header: "Nông dân", cell: (p) => p.farmer?.label ?? "—" },
-    { key: "area", header: "Diện tích tự tính (ha)", cell: (p) => num(p.area_ha, 2), className: "num" },
-    { key: "decl", header: "Khai báo (ha)", cell: (p) => num(p.declared_area_ha, 2), className: "num" },
-    { key: "dev", header: "Chênh lệch", cell: (p) => (p.area_deviation_pct ? `${num(p.area_deviation_pct)} %` : "—") },
-    { key: "st", header: "Trạng thái", cell: (p) => <StatusPill tone={p.status === "active" ? "ok" : "neutral"}>{p.status === "active" ? "Đang dùng" : p.status === "draft" ? "Nháp" : "Ngừng"}</StatusPill> },
-  ];
-  return (
-    <>
-      <PageHeader title="Vẽ thửa ruộng" />
-      <GapNotice what="Vẽ lô mới (chấm điểm, hình tròn, hình vuông, chặn chồng lấn, ngoại tuyến) dùng ứng dụng di động Cán bộ xã; web xem danh sách thửa và tải GeoJSON/KML." />
-      <FilterBar>{f.chip}</FilterBar>
-      <LoadState s={s}>{(d) => <DataTable caption="Thửa ruộng" columns={columns} rows={d.items.slice((page - 1) * 20, page * 20)} rowKey={(p) => p.ref} page={page} pageSize={20} total={d.items.length} onPage={setPage} empty="Chưa có thửa." />}</LoadState>
-    </>
-  );
-}
+// FN-XA-03.05 Vẽ thửa ruộng (danh sách, thêm, sửa — TT-11 #104): xem PlotScreens.tsx.
 
 /** FN-XA-03.06 Vật tư — bảng nhập nhiều dòng (BF-TT-MAT #105) ở MaterialsScreen.tsx. */
 export { MaterialsScreen } from "./MaterialsScreen";
