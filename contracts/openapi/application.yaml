@@ -7635,6 +7635,91 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/CNTSSeries"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/period-drafts/{id}:
+    get:
+      summary: Nháp còn hiệu lực của đơn vị trong kỳ native (null nếu chưa có hoặc đã gửi sau lần lưu nháp)
+      operationId: extensionCntsPeriodDraft
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: unit, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Nháp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [draft]
+                properties:
+                  draft:
+                    oneOf:
+                      - {$ref: "#/components/schemas/CNTSPeriodDraft"}
+                      - {type: "null"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "422": {description: forms.unit_not_in_period, $ref: "#/components/responses/Problem"}
+    put:
+      summary: Cán bộ Cấp Xã lưu nháp báo cáo kỳ (UR-XA-13) — Cấp Tỉnh thấy trạng thái Nháp trên màn theo dõi
+      operationId: extensionCntsSavePeriodDraft
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unit, values]
+              properties:
+                unit: {type: string}
+                values: {type: object, additionalProperties: {type: string}}
+                nil_report: {type: boolean}
+                note: {type: string, maxLength: 2000}
+      responses:
+        "200":
+          description: Đã lưu nháp
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSPeriodDraft"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: extension.period_closed, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | forms.unit_not_in_period", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/period-reminders:
+    post:
+      summary: "Cấp Tỉnh bấm Nhắc trên một kỳ biểu kỳ CNTS (CN-07): nhắc đơn vị chưa gửi / bị trả lại theo cấu hình nhắc của biểu; mỗi đơn vị tối đa một lượt mỗi giờ"
+      operationId: extensionCntsRemindPeriod
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period_id]
+              properties:
+                period_id: {type: string, format: uuid}
+                units: {type: array, items: {type: string}, description: "Rỗng = mọi đơn vị cần nhắc trong phạm vi"}
+      responses:
+        "200":
+          description: Đã nhắc
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reminded, skipped]
+                properties:
+                  reminded: {type: integer}
+                  skipped: {type: array, items: {type: string}, description: Đơn vị đã được nhắc tay trong giờ này}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: forms.period_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  # --- pf/extension W11.49 (D4 CN9, BRD CNTS v3.7 FN-11, UR-XA-10): Báo cáo dịch bệnh BM-10 (ổ dịch có phiên bản diễn biến)
+  # và báo nghi dịch. Phòng Chăn nuôi – Thủy sản: Cấp Xã lập/cập nhật, Cấp Tỉnh xem + kết thúc/mở lại, Cấp TW không có.
   /v1/extension/cnts/period-series:
     post:
       summary: Phát hành lô kỳ native cap/forms của một biểu (một giao dịch; Cấp Tỉnh phòng CNTS; cơ sở phải thuộc xã)
@@ -7656,8 +7741,21 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.template_not_found, $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | forms.facility_invalid", $ref: "#/components/responses/Problem"}
-  # --- pf/extension W11.49 (D4 CN9, BRD CNTS v3.7 FN-11, UR-XA-10): Báo cáo dịch bệnh BM-10 (ổ dịch có phiên bản diễn biến)
-  # và báo nghi dịch. Phòng Chăn nuôi – Thủy sản: Cấp Xã lập/cập nhật, Cấp Tỉnh xem + kết thúc/mở lại, Cấp TW không có.
+  /v1/extension/cnts/period-tracking:
+    get:
+      summary: "BF-CN-PUBLISH (CN-07): phần KN của màn theo dõi biểu kỳ — người phụ trách, giờ chốt, dấu nháp (trạng thái từng đơn vị ở /v1/forms/tasks)"
+      operationId: extensionCntsPeriodTracking
+      tags: [extension]
+      parameters:
+        - {name: code, in: query, required: false, schema: {type: string}, description: Mã biểu (rỗng = mọi biểu)}
+        - {name: period_ids, in: query, required: false, schema: {type: string}, description: "Kỳ khác cần dấu nháp (UUID cách nhau dấu phẩy, ≤ 400)"}
+      responses:
+        "200":
+          description: Theo dõi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSTracking"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/duty-rosters/{month}:
     get:
       summary: Lịch trực KSGM của tháng (BM-03, W11.46) — lưới cơ sở × viên chức × ngày, cảnh báo, lịch sử lưu (Cấp Tỉnh, Admin)
@@ -21396,7 +21494,7 @@ components:
         code: {type: string}
         from_date: {type: string, format: date}
         to_date: {type: string, format: date}
-        units: {type: array, minItems: 1, items: {type: string}, description: "Mã xã (BM-04/05/17) hoặc facility_ref cơ sở giết mổ (BM-01)"}
+        units: {type: array, items: {type: string}, description: "Mã xã (target communes) hoặc facility_ref cơ sở giết mổ (BM-01, target facilities). Nhóm xã (province/regions/aquaculture/model): máy chủ tự giải — bỏ qua"}
         deadline:
           type: object
           required: [offset_days, time]
@@ -21404,6 +21502,13 @@ components:
           properties:
             offset_days: {type: integer}
             time: {type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$"}
+        target:
+          type: string
+          enum: [communes, province, regions, aquaculture, model, facilities]
+          description: "BF-CN-PUBLISH (CN-07) đối tượng: chọn từng xã (mặc định biểu xã) / tất cả xã của tỉnh / theo khu vực / xã có nuôi thủy sản (điểm nhật ký BM-19) / xã có mô hình (điểm trình diễn đang hoạt động) / cơ sở giết mổ (BM-01, mặc định)"
+        regions: {type: array, items: {type: string}, description: "Mã khu vực (target regions)"}
+        owner_ref: {type: [string, "null"], format: uuid, description: "Cán bộ Cấp Tỉnh phụ trách biểu (lần gán Cấp Tỉnh CNTS còn hiệu lực, cùng Nút)"}
+        close_after_hours: {type: [integer, "null"], minimum: 0, maximum: 720, description: "Giờ chốt = hạn nộp của kỳ + số giờ (null = không đặt)"}
     CNTSSeriesPeriod:
       type: object
       required: [id, kind, key, label, from_date, to_date, due_at, rule]
@@ -21416,9 +21521,20 @@ components:
         to_date: {type: string, format: date}
         due_at: {type: string, format: date-time}
         rule: {type: string}
+    CNTSPeriodDraft:
+      type: object
+      required: [period_id, unit, values, nil_report, note, saved_at]
+      properties:
+        period_id: {type: string, format: uuid}
+        unit: {type: string}
+        values: {type: object, additionalProperties: {type: string}}
+        nil_report: {type: boolean}
+        note: {type: string}
+        saved_at: {type: string, format: date-time}
+    # --- pf/extension W11.49: Báo cáo dịch bệnh BM-10, báo nghi dịch ---
     CNTSSeries:
       type: object
-      required: [code, calendar_id, calendar_version, unit_kind, units, tasks, periods]
+      required: [code, calendar_id, calendar_version, unit_kind, units, tasks, periods, target, regions, owner_ref, close_after_hours, communes, publication_id]
       properties:
         code: {type: string}
         calendar_id: {type: [string, "null"], description: "Lịch tuần của phòng (D8) — mã phòng, vd chan_nuoi_thuy_san; null với tuần làm việc BM-05"}
@@ -21427,7 +21543,49 @@ components:
         units: {type: array, items: {type: string}}
         tasks: {type: integer, description: Số công việc sẽ sinh (kỳ × đơn vị)}
         periods: {type: array, items: {$ref: "#/components/schemas/CNTSSeriesPeriod"}}
-    # --- pf/extension W11.49: Báo cáo dịch bệnh BM-10, báo nghi dịch ---
+        target: {type: string, enum: [communes, province, regions, aquaculture, model, facilities]}
+        regions: {type: array, items: {type: string}}
+        owner_ref: {type: [string, "null"], format: uuid}
+        close_after_hours: {type: [integer, "null"]}
+        communes:
+          type: array
+          description: Xã đang hoạt động của tỉnh kèm khu vực (biểu xã; rỗng nếu không giải được) — để chọn khu vực / từng xã
+          items:
+            type: object
+            required: [commune_code, region_code, region_name]
+            properties:
+              commune_code: {type: string}
+              region_code: {type: string}
+              region_name: {type: string}
+        publication_id: {type: [string, "null"], format: uuid, description: "Lần phát hành (sổ cnts_publication) — sau phát hành"}
+    CNTSTracking:
+      type: object
+      required: [periods, drafts]
+      properties:
+        periods:
+          type: array
+          items:
+            type: object
+            required: [period_id, publication_id, template_code, target, regions, owner_ref, owner_name, close_after_hours]
+            properties:
+              period_id: {type: string, format: uuid}
+              publication_id: {type: string, format: uuid}
+              template_code: {type: string}
+              target: {type: string}
+              regions: {type: array, items: {type: string}}
+              owner_ref: {type: [string, "null"], format: uuid}
+              owner_name: {type: [string, "null"]}
+              close_after_hours: {type: [integer, "null"], description: "Giờ chốt = hạn của kỳ + số giờ (null = không đặt)"}
+        drafts:
+          type: array
+          description: Dấu nháp của đơn vị trong phạm vi người gọi (nháp cũ hơn lần gửi cuối được màn bỏ qua)
+          items:
+            type: object
+            required: [period_id, unit, saved_at]
+            properties:
+              period_id: {type: string, format: uuid}
+              unit: {type: string}
+              saved_at: {type: string, format: date-time}
     CNTSLocation:
       type: object
       required: [lat, lon]

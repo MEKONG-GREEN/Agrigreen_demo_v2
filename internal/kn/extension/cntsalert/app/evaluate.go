@@ -86,6 +86,9 @@ type resolver struct {
 	province string
 	officers []Officer
 	loaded   bool
+	// owner: cán bộ tỉnh phụ trách biểu của kỳ (BF-CN-PUBLISH, sổ cnts_publication) — khác Nil thì là người phụ trách
+	// biểu duy nhất, thay cho mọi người có cờ nhiệm vụ phu_trach_bieu.
+	owner uuid.UUID
 }
 
 func (r *resolver) load(ctx context.Context) {
@@ -106,7 +109,9 @@ func (r *resolver) resolve(ctx context.Context, roles []string, commune string, 
 		case domain.RecipSubmitter:
 			out = append(out, submitter)
 		case domain.RecipFormOwner:
-			if r.s.Dir != nil {
+			if r.owner != uuid.Nil {
+				out = append(out, r.owner)
+			} else if r.s.Dir != nil {
 				if refs, err := txdeps.Get(ctx, "form_owners:"+r.tid.String(), func(ctx context.Context) ([]uuid.UUID, error) {
 					return r.s.Dir.FormOwners(ctx, r.tid)
 				}); err == nil {

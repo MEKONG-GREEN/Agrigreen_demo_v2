@@ -4,7 +4,7 @@
 // nhập BM-01 (theo cơ sở, theo ngày), BM-04, BM-17 (theo xã, theo tuần), BM-05 (kết quả / kế hoạch tuần làm việc).
 // Hỗ trợ: sao chép kỳ trước, báo không phát sinh, ghi chú (H08), lý do trễ (H09), lưu nháp trên máy, khóa lạc quan —
 // người lưu sau được báo "Đã có người cập nhật lúc …" và phải tải bản mới (không ghi đè).
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { unwrap } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import type { CatalogItem } from "@/api/types";
@@ -156,8 +156,24 @@ function Entry({
   capi: ReturnType<typeof createCntsPeriodApi>;
   onDone: (reload: boolean) => void;
 }) {
-  const init: Draft = loadDraft(task) ?? { values: task.values, nil: task.nil_report, note: task.note, explanation: task.explanation };
+  const local = loadDraft(task);
+  const init: Draft = local ?? { values: task.values, nil: task.nil_report, note: task.note, explanation: task.explanation };
   const [d, setD] = useState<Draft>(init);
+  // BF-CN-PUBLISH (UR-XA-13): nháp đã lưu lên máy chủ (máy khác / phiên trước) khi trên máy này chưa có nháp.
+  useEffect(() => {
+    if (local || !task.open) return;
+    let alive = true;
+    capi.draft(task.period_id, task.unit).then(
+      (s) => {
+        if (alive && s) setD((x) => ({ ...x, values: { ...s.values }, nil: s.nil_report, note: s.note }));
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ nạp một lần khi mở công việc
+  }, [task.id]);
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState<string | null>(null);
   const act = useAction();
@@ -230,6 +246,11 @@ function Entry({
         </div>
       ) : null}
       {task.status === "awaiting_reopen" ? <p className="err">Chờ mở kỳ: bản gửi sau khi kỳ đã chốt — chờ Cấp Tỉnh mở lại kỳ.</p> : null}
+      {task.status === "returned" ? (
+        <p className="alert alert-warn" role="status">
+          Cấp Tỉnh trả lại, yêu cầu điều chỉnh{task.return_note ? `: ${task.return_note}` : "."} Sửa và gửi lại trước khi chốt kỳ.
+        </p>
+      ) : null}
       {!readOnly ? (
         <div className="row">
           <button
@@ -303,6 +324,20 @@ function Entry({
         error={errs.explanation}
       />
       <div className="row">
+        {!readOnly ? (
+          <button
+            className="btn"
+            disabled={act.busy}
+            onClick={() =>
+              void act.run(
+                () => capi.saveDraft(task.period_id, { unit: task.unit, values: d.values, nil_report: d.nil, ...(d.note ? { note: d.note } : {}) }),
+                "Đã lưu nháp — Cấp Tỉnh thấy trạng thái Nháp.",
+              )
+            }
+          >
+            Lưu nháp
+          </button>
+        ) : null}
         {!readOnly ? (
           <button className="btn btn-primary" disabled={act.busy} onClick={submit}>
             Gửi báo cáo

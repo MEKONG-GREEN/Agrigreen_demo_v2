@@ -43,6 +43,10 @@ func (m *Module) registerCNTSCampaigns(rg *gin.RouterGroup) {
 func (m *Module) UseCNTSCampaigns(d CNTSCampaignDeps) {
 	s := m.campaignSvc()
 	s.Forms, s.Control = d.Forms, d.Control
+	// BF-CN-PUBLISH (#108): cùng cổng tiến độ kỳ native cho nháp của biểu kỳ CNTS và nút Nhắc của màn theo dõi (gốc lắp
+	// ráp chỉ gọi UseCNTSCampaigns — không thêm lời gọi nối mới ngoài làn KN).
+	m.rc.FormsControl = d.Control
+	m.alert.Control = d.Control
 	if d.Figures != nil {
 		s.Figures = d.Figures
 	}
