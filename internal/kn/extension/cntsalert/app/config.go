@@ -329,7 +329,7 @@ func emitReminded(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p formsport.Per
 	}
 	pl := port.CNTSFormRemindedV1{PeriodRef: p.ID, TemplateCode: p.TemplateCode, PeriodLabel: p.Label, Unit: u.Unit, CommuneCode: u.Parent,
 		Slot: kind, DueAt: p.DueAt.UTC().Format(time.RFC3339), Message: cfg.Render(domain.FormLabel(p.TemplateCode), p.Label, p.DueAt, loc),
-		Channels: cfg.Channels, RecipientRefs: recips, Department: domain.Department, EventTime: now.UTC().Format(time.RFC3339)}
+		Channels: cfg.Channels, ChannelsExplicit: true, RecipientRefs: recips, Department: domain.Department, EventTime: now.UTC().Format(time.RFC3339)}
 	return outbox.Enqueue(ctx, tx, outbox.Event{ID: ids.New(), TenantID: tid, Type: port.EventCNTSFormReminded, SchemaVersion: 1, OccurredAt: now,
 		Producer: port.EventProducerName, Payload: pl})
 }
