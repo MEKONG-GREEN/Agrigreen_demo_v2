@@ -36,6 +36,8 @@ vi.mock("@/auth/AuthProvider", () => ({
 }));
 
 const coop = { ref: "htx-1", code: "HTX01", name: "HTX Mỹ Hòa", commune_code: "91301", active: true, area_ha: "120", household_count: 2, representative: null, updated_at: "2026-10-01T00:00:00Z" };
+// #67: hồ sơ KN riêng (màn HTX / nông hộ ghi qua /v1/kn/producer-records).
+const rec = { ref: "htx-1", kind: "cooperative", kind_label: "HTX", commune_code: "91301", name: "HTX Mỹ Hòa", display_name: "HTX Mỹ Hòa", representative: null, holder: null, parent_ref: null, parent_name: null, parent_kind: null, htx_ref: null, htx_name: null, area_ha: "120", tax_code: null, address: null, member_count: 2, status: "active", status_reason: null, version: 1, can_edit: true, updated_at: "2026-10-01T00:00:00Z", log: [] };
 
 beforeEach(() => {
   push.mockReset();
@@ -43,9 +45,10 @@ beforeEach(() => {
   auth.role = "kn_xa";
   auth.collectApi = {
     cooperatives: vi.fn().mockResolvedValue({ items: [coop] }),
-    cooperative: vi.fn().mockResolvedValue(coop),
-    createCooperative: vi.fn().mockResolvedValue({ ...coop, ref: "htx-new" }),
-    addHousehold: vi.fn().mockResolvedValue({ ref: "hh-1" }),
+    records: vi.fn().mockResolvedValue({ items: [rec] }),
+    record: vi.fn().mockResolvedValue(rec),
+    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
+    createRecord: vi.fn().mockImplementation(async (b: { kind: string }) => ({ ...rec, ref: b.kind === "household" ? "hh-1" : "htx-new", kind: b.kind })),
     machines: vi.fn().mockResolvedValue({ commune_totals: [] }),
     coopMachines: vi.fn().mockResolvedValue({ cooperative_ref: "htx-1", name: "HTX Mỹ Hòa", lines: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", quantity: 2, note: null }], total: 2 }),
     putMachines: vi.fn().mockResolvedValue({ total: 3 }),
@@ -75,7 +78,7 @@ describe("Dữ liệu xã — Thêm HTX, nông hộ trên trang riêng (R-A2, R-
     const alerts = screen.getAllByRole("alert").map((a) => a.textContent);
     expect(alerts.filter((t) => t === "Bắt buộc nhập.")).toHaveLength(4); // Tên, Xã/phường, Người đại diện, Điện thoại (TT-08)
     expect(alerts).toContain("Không được nhập số âm.");
-    expect(auth.collectApi.createCooperative).not.toHaveBeenCalled();
+    expect(auth.collectApi.createRecord).not.toHaveBeenCalled();
   });
 
   it("Thêm HTX hợp lệ: gửi số đã chuẩn hóa rồi mở chi tiết HTX mới", async () => {
@@ -88,7 +91,7 @@ describe("Dữ liệu xã — Thêm HTX, nông hộ trên trang riêng (R-A2, R-
     await u.type(screen.getByLabelText(/Điện thoại/), "0912345678");
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/kn/du-lieu/htx/htx-new"));
-    expect(auth.collectApi.createCooperative).toHaveBeenCalledWith({ name: "HTX Bình Đức", commune_code: "91302", area_ha: "1234.5", representative: { full_name: "Nguyễn Văn A", phone: "0912345678" } });
+    expect(auth.collectApi.createRecord).toHaveBeenCalledWith({ kind: "cooperative", name: "HTX Bình Đức", commune_code: "91302", area_ha: "1234.5", address: null, tax_code: null, htx_ref: null, representative: { full_name: "Nguyễn Văn A", phone: "0912345678" } });
   });
 
   it("Thêm nông hộ: diện tích âm bị chặn; hợp lệ thì gọi API và quay về chi tiết HTX", async () => {
@@ -97,16 +100,16 @@ describe("Dữ liệu xã — Thêm HTX, nông hộ trên trang riêng (R-A2, R-
     render(<HouseholdCreateScreen />);
     expect(await screen.findByRole("link", { name: /HTX Mỹ Hòa/ })).toHaveAttribute("href", "/kn/du-lieu/htx/htx-1");
     await u.type(screen.getByLabelText(/Chủ hộ/), "Trần Thị B");
-    await u.type(screen.getByLabelText(/Số điện thoại/), "0912000111");
+    await u.type(screen.getByLabelText(/Điện thoại/), "0912000111");
     await u.type(screen.getByLabelText(/Diện tích canh tác/), "-1");
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Không được nhập số âm.");
-    expect(auth.collectApi.addHousehold).not.toHaveBeenCalled();
+    expect(auth.collectApi.createRecord).not.toHaveBeenCalled();
     await u.clear(screen.getByLabelText(/Diện tích canh tác/));
     await u.type(screen.getByLabelText(/Diện tích canh tác/), "2,5");
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/kn/du-lieu/htx/htx-1"));
-    expect(auth.collectApi.addHousehold).toHaveBeenCalledWith("htx-1", { holder: { full_name: "Trần Thị B", phone: "0912000111" }, cultivated_area_ha: "2.5" });
+    expect(auth.collectApi.createRecord).toHaveBeenCalledWith({ kind: "household", commune_code: "91301", area_ha: "2.5", parent_ref: "htx-1", holder: { full_name: "Trần Thị B", phone: "0912000111" } });
   });
 
   it("Máy móc: bảng có STT; số lượng phải là số nguyên > 0 (TT-10) trước khi lưu", async () => {

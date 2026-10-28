@@ -14375,6 +14375,196 @@ paths:
         "409": {description: extension.kn_attrs_plot_retired, $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | extension.kn_attrs_crop_unknown", $ref: "#/components/responses/Problem"}
         "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-records:
+    get:
+      summary: "KNSPLIT-2-KN-RECORDS (#67) / TT-09: danh sách hồ sơ KN riêng theo loại — HTX, Nông hộ, Tổ hợp tác (mọi vai KN trong phạm vi)"
+      description: |
+        Hồ sơ thuộc KN (pf_extension.kn_producer), KHÔNG phải HTX nền tảng; thay đường legacy /v1/kn/cooperatives cho màn KN.
+        Phạm vi xã của ngữ cảnh phiên lọc trong SQL trước khi trả dữ liệu; xã ngoài phạm vi → 403 extension.out_of_scope.
+        Mỗi loại có bộ lọc riêng: HTX (xã, trạng thái, tên, htx_ref), Tổ hợp tác (xã, trạng thái, tên), Nông hộ (xã, trạng thái,
+        parent_ref = HTX/THT). Nông hộ không tìm theo tên (họ tên chủ hộ ở kho định danh).
+      operationId: knListProducerRecords
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: kind, in: query, required: true, schema: {$ref: "#/components/schemas/KNProducerKind"}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive, all], default: active}}
+        - {name: q, in: query, schema: {type: string, maxLength: 100}, description: "HTX, THT: tìm theo tên (không phân biệt hoa thường)"}
+        - {name: parent_ref, in: query, schema: {type: string, format: uuid}, description: "Nông hộ: thuộc HTX/THT (hồ sơ KN)"}
+        - {name: htx_ref, in: query, schema: {type: string, format: uuid}, description: "HTX: liên kết HTX đã công bố"}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang, theo ref tăng dần (thứ tự tạo)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNProducerRecord"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "TT-08: thêm hồ sơ HTX / Nông hộ / Tổ hợp tác (Cấp Xã, Admin) — bắt buộc Xã/phường, Loại, Tên, Người đại diện, Điện thoại"
+      description: |
+        HTX, THT: name, representative {full_name, phone} bắt buộc. Nông hộ: holder {full_name, phone} bắt buộc (tên hộ = chủ hộ,
+        lưu kho định danh), không nhận name/tax_code/address; parent_ref tùy chọn (HTX/THT đang hoạt động trong phạm vi).
+        area_ha: số thập phân thường ≥ 0, ≤ 1.000.000, tối đa 4 chữ số lẻ (không số mũ). Trùng tên cùng loại, cùng xã (đang hoạt
+        động) → 409; trùng chủ hộ → 409. htx_ref (chỉ HTX): HTX đã công bố, đang hoạt động, cùng xã — chỉ đối chiếu, KN không ghi
+        gì về HTX đó. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
+      operationId: knCreateProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNProducerRecordWrite"}
+      responses:
+        "201":
+          description: Hồ sơ đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "200":
+          description: Phát lại cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "403": {description: "extension.read_only | forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.kn_record_name_taken | extension.kn_record_household_exists", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-records/{ref}:
+    get:
+      summary: "Chi tiết hồ sơ KN riêng kèm nhật ký phiên bản (mới nhất trước)"
+      operationId: knGetProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Hồ sơ hiện hành
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "TT-08 (có sửa): sửa hồ sơ — thay toàn bộ trường nhập được, khóa lạc quan base_version; không đổi loại"
+      description: |
+        Trường tùy chọn vắng = xóa giá trị. representative/holder vắng = giữ người đại diện/chủ hộ hiện tại; có = ghi chủ thể
+        mới ở kho định danh. Hồ sơ ngừng hoạt động phải kích hoạt lại trước (409). Không đổi gì → không ghi sổ.
+      operationId: knUpdateProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: "#/components/schemas/KNProducerRecordWrite"}
+                - type: object
+                  required: [base_version]
+                  properties:
+                    base_version: {type: integer}
+      responses:
+        "200":
+          description: Hồ sơ sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "403": {description: "extension.read_only | forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.kn_record_version_conflict | extension.kn_record_state_conflict | extension.kn_record_name_taken | extension.kn_record_household_exists", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-records/{ref}/deactivate:
+    post:
+      summary: "Vô hiệu hóa hồ sơ (thay xóa) — lý do 10–1000 ký tự, không chứa SĐT/CCCD"
+      operationId: knDeactivateProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNProducerStatusChange"}
+      responses:
+        "200":
+          description: Hồ sơ sau khi vô hiệu hóa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.kn_record_version_conflict | extension.kn_record_state_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-records/{ref}/reactivate:
+    post:
+      summary: "Kích hoạt lại hồ sơ — lý do bắt buộc; trùng tên/chủ hộ với hồ sơ đang hoạt động → 409"
+      operationId: knReactivateProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNProducerStatusChange"}
+      responses:
+        "200":
+          description: Hồ sơ sau khi kích hoạt lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.kn_record_version_conflict | extension.kn_record_state_conflict | extension.kn_record_name_taken | extension.kn_record_household_exists", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-htx-candidates:
+    get:
+      summary: "HTX đã công bố (pf_party_pub.v1_org_tree), đang hoạt động, trong phạm vi — chỉ đọc, để liên kết đối chiếu htx_ref"
+      operationId: knListProducerHTXCandidates
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}, description: "Bắt buộc với phạm vi toàn quốc"}
+      responses:
+        "200":
+          description: Tối đa 200 HTX
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [htx_ref, name, commune_code, linked_ref]
+                      properties:
+                        htx_ref: {type: string, format: uuid}
+                        name: {type: string}
+                        commune_code: {type: string}
+                        linked_ref: {type: [string, "null"], format: uuid, description: "Hồ sơ KN đang liên kết (nếu có)"}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/campaigns:
     get:
       summary: "Danh sách đợt điều tra CNTS (W11.50 — FN-21) kèm tiến độ"
@@ -25274,6 +25464,91 @@ components:
         crop_name: {type: [string, "null"]}
         updated_at: {type: [string, "null"], format: date-time}
         actor_ref: {type: [string, "null"], format: uuid}
+    KNProducerKind:
+      type: string
+      enum: [cooperative, household, coop_group]
+      description: "cooperative = HTX, household = Nông hộ, coop_group = Tổ hợp tác"
+    KNProducerPerson:
+      type: object
+      required: [label, masked_phone]
+      properties:
+        label: {type: string, description: "Nhãn che (vd Nguyễn V. A.)"}
+        masked_phone: {type: [string, "null"]}
+    KNProducerRecord:
+      type: object
+      required: [ref, kind, kind_label, commune_code, name, display_name, representative, holder, parent_ref, parent_name, parent_kind,
+        htx_ref, htx_name, area_ha, tax_code, address, member_count, status, status_reason, version, can_edit, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        kind: {$ref: "#/components/schemas/KNProducerKind"}
+        kind_label: {type: string}
+        commune_code: {type: string}
+        name: {type: [string, "null"], description: "HTX, THT; null với Nông hộ"}
+        display_name: {type: string, description: "Tên HTX/THT, hoặc nhãn che của chủ hộ"}
+        representative: {oneOf: [{$ref: "#/components/schemas/KNProducerPerson"}, {type: "null"}]}
+        holder: {oneOf: [{$ref: "#/components/schemas/KNProducerPerson"}, {type: "null"}]}
+        parent_ref: {type: [string, "null"], format: uuid}
+        parent_name: {type: [string, "null"]}
+        parent_kind: {oneOf: [{$ref: "#/components/schemas/KNProducerKind"}, {type: "null"}]}
+        htx_ref: {type: [string, "null"], format: uuid}
+        htx_name: {type: [string, "null"]}
+        area_ha: {type: [string, "null"]}
+        tax_code: {type: [string, "null"]}
+        address: {type: [string, "null"]}
+        member_count: {type: integer, description: "Nông hộ đang hoạt động (HTX, THT)"}
+        status: {type: string, enum: [active, inactive]}
+        status_reason: {type: [string, "null"]}
+        version: {type: integer, description: "base_version cho lần sửa kế tiếp"}
+        can_edit: {type: boolean}
+        updated_at: {type: string, format: date-time}
+    KNProducerRecordDetail:
+      allOf:
+        - {$ref: "#/components/schemas/KNProducerRecord"}
+        - type: object
+          required: [log]
+          properties:
+            log:
+              type: array
+              items:
+                type: object
+                required: [version, event, at, actor_ref, actor_display, status_reason]
+                properties:
+                  version: {type: integer}
+                  event: {type: string, enum: [created, updated, deactivated, reactivated]}
+                  at: {type: string, format: date-time}
+                  actor_ref: {type: string, format: uuid}
+                  actor_display: {type: [string, "null"]}
+                  status_reason: {type: [string, "null"]}
+    KNProducerRecordWrite:
+      type: object
+      required: [kind, commune_code]
+      properties:
+        kind: {$ref: "#/components/schemas/KNProducerKind"}
+        commune_code: {type: string, maxLength: 20}
+        name: {type: [string, "null"], maxLength: 200}
+        area_ha: {type: [string, "null"], description: "Số thập phân thường, ≥ 0, ≤ 1000000, tối đa 4 chữ số lẻ"}
+        tax_code: {type: [string, "null"], description: "Chỉ HTX: 10 chữ số hoặc 10-3"}
+        address: {type: [string, "null"], maxLength: 300}
+        representative:
+          type: object
+          required: [full_name, phone]
+          properties:
+            full_name: {type: string, maxLength: 120}
+            phone: {type: string, maxLength: 20}
+        holder:
+          type: object
+          required: [full_name, phone]
+          properties:
+            full_name: {type: string, maxLength: 120}
+            phone: {type: string, maxLength: 20}
+        parent_ref: {type: [string, "null"], format: uuid}
+        htx_ref: {type: [string, "null"], format: uuid}
+    KNProducerStatusChange:
+      type: object
+      required: [reason, base_version]
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 1000}
+        base_version: {type: integer}
     CNTSCampaignInput: {"type":"object","required":["name","field","template_code","scope_mode","from_date","to_date","due_at"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"goal":{"type":"string","maxLength":2000},"field":{"type":"string","enum":["chan_nuoi","thu_y","thuy_san","khac"]},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"owner_ref":{"type":"string","format":"uuid"},"remind_before_hours":{"type":"integer","minimum":0,"maximum":168}},"additionalProperties":false}
     CNTSPoint: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"source":{"type":"string","enum":["gps","map"]}},"required":["lat","lng","source"],"additionalProperties":false}
     CNTSCampaignDueInput: {"type":"object","required":["due_at","reason"],"properties":{"due_at":{"type":"string","format":"date-time"},"reason":{"type":"string","minLength":10,"maxLength":500}},"additionalProperties":false}
