@@ -71,8 +71,14 @@ func (s *Service) current(ctx context.Context, tx pgx.Tx, c caller, id uuid.UUID
 //  3. giao dịch ngắn giữ khóa: bỏ ý định của token (hết hạn → nhận lại nếu không ai giữ; người khác giữ → ErrInterrupted,
 //     không ghi gì), kiểm lại trạng thái, phiên bản, số sự kiện; ghi sự kiện đợt (+ emit) cùng giao dịch.
 //
-// Lỗi ở 2 → bỏ ý định. Lỗi ở 3 → bù ở cap/forms (undo) rồi bỏ ý định. Trong lúc ý định còn hạn, trigger chặn sửa nháp và
+// Lỗi ở 2 → bỏ ý định. Lỗi ở 3 → wrapUp (bù/đối soát) rồi bỏ ý định. Trong lúc ý định còn hạn, trigger chặn sửa nháp và
 // mọi sự kiện đợt khác — thay khóa giữ suốt của bản cũ.
+//
+// Đối soát kỳ native (review Codex #156 [P2]): forms chưa có ghi có điều kiện (CAS/fence), nên lời gọi cap/forms của yêu cầu
+// đã MẤT ý định có thể đè kỳ native sau khi yêu cầu kế tiếp đã ghi xong. Yêu cầu nào biết mình mất ý định (hoặc lời gọi lỗi
+// không rõ kết quả, hoặc ghi sự kiện lỗi sau khi cap/forms đã đổi) đánh dấu lệch (stale_gen) SAU khi lời gọi của nó đã trả về;
+// người giữ ý định — chính nó nếu nhận lại được, không thì người đang giữ khi ghi xong, hoặc thao tác kế tiếp — đưa kỳ native
+// về đúng sổ đợt đã cam kết mới nhất (settle). Không bao giờ ghi lại giá trị của yêu cầu cũ: luôn ghi theo sổ đợt.
 func (s *Service) change(ctx context.Context, c caller, id uuid.UUID, act, idem string,
 	call func(ctx context.Context, cur Campaign) (step, error)) (Campaign, error) {
 	if idem == "" {
@@ -80,6 +86,7 @@ func (s *Service) change(ctx context.Context, c caller, id uuid.UUID, act, idem 
 	}
 	key := "cnts_campaign:" + act + ":" + id.String() + ":" + idem
 	lease := s.lease()
+	native := writesNative(act)
 	start := time.Now()
 	token := newID()
 	var cur Campaign
@@ -118,16 +125,19 @@ func (s *Service) change(ctx context.Context, c caller, id uuid.UUID, act, idem 
 	callCtx, cancel := context.WithDeadline(ctx, start.Add(lease-min(lease/4, maxLeaseMargin)))
 	st, err := call(callCtx, cur)
 	expired := errors.Is(callCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil
+	unknown := callCtx.Err() != nil // lời gọi bị cắt: cap/forms có thể vẫn đã ghi
 	cancel()
 	if err != nil {
-		s.release(ctx, c, id, token)
+		s.wrapUp(ctx, c, id, token, act, native && unknown, nil)
 		if expired {
 			return Campaign{}, ErrDependency.WithDetail("cap/forms không phản hồi kịp hạn thao tác — thử lại").WithCause(err)
 		}
 		return Campaign{}, err
 	}
 
+	settle := false
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+		settle = false
 		if err := store.Lock(ctx, tx, c.p.TenantID, id); err != nil {
 			return err
 		}
@@ -149,6 +159,13 @@ func (s *Service) change(ctx context.Context, c caller, id uuid.UUID, act, idem 
 			if _, err := store.Release(ctx, tx, c.p.TenantID, id, token, true); err != nil {
 				return err
 			}
+			// Lời gọi cap/forms của mình chạy khi KHÔNG giữ ý định: có thể đã ghi đè kỳ native sau một thao tác khác — đánh
+			// dấu lệch (review #156 [P2]); đối soát ngay dưới đây sau khi ghi sự kiện.
+			if native {
+				if err := store.MarkStale(ctx, tx, c.p.TenantID, id); err != nil {
+					return err
+				}
+			}
 		}
 		now, err := s.current(ctx, tx, c, id)
 		if err != nil {
@@ -164,21 +181,223 @@ func (s *Service) change(ctx context.Context, c caller, id uuid.UUID, act, idem 
 			return err
 		}
 		if st.emit != nil {
-			return st.emit(ctx, tx, ev.EventTime)
+			if err := st.emit(ctx, tx, ev.EventTime); err != nil {
+				return err
+			}
 		}
-		return nil
+		// Còn lần lệch kỳ native chưa đối soát (của mình hoặc yêu cầu khác đã mất ý định) → giữ lại ý định để đối soát.
+		_, dirty, err := store.StaleGen(ctx, tx, c.p.TenantID, id)
+		if err != nil || !dirty {
+			return err
+		}
+		settle, err = store.Claim(ctx, tx, c.p.TenantID, id, token, act, lease)
+		return err
 	})
 	if err != nil {
-		if st.undo != nil {
-			uctx, ucancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
-			st.undo(uctx)
-			ucancel()
-		}
-		s.release(ctx, c, id, token)
+		s.wrapUp(ctx, c, id, token, act, native, st.undo)
 		return Campaign{}, classify(err)
+	}
+	if settle {
+		s.settle(ctx, c, id, token)
 	}
 	return s.get(ctx, c, id)
 }
+
+// writesNative: thao tác ghi kỳ native ở cap/forms (nhắc nộp chỉ đọc tiến độ).
+func writesNative(act string) bool { return act != domain.ActReminded }
+
+// wrapUp kết thúc thao tác lỗi sau khi đã gọi cap/forms (chạy cả khi yêu cầu đã hủy). stale: lời gọi cap/forms có thể đã ghi
+// kỳ native mà thao tác không ghi được sự kiện (mất ý định, ghi lỗi, không rõ kết quả) → đánh dấu lệch. Rồi giữ lại ý định
+// (của mình còn hạn, hoặc nhận lại nếu không ai giữ): đợt còn Nháp → bù (phát hành: hủy kỳ native vừa tạo); còn lệch → đối
+// soát; không thì bỏ ý định. Người khác đang giữ ý định → không bù, không đối soát: người giữ đối soát khi ghi xong (thấy dấu
+// lệch), hoặc thao tác kế tiếp.
+func (s *Service) wrapUp(ctx context.Context, c caller, id, token uuid.UUID, act string, stale bool, undo func(context.Context)) {
+	ctx = context.WithoutCancel(ctx)
+	own, dirty, draft := false, false, false
+	tctx, cancel := context.WithTimeout(ctx, cleanupTimeout)
+	err := s.tx(tctx, c.p.TenantID, func(tx pgx.Tx) error {
+		own, dirty, draft = false, false, false
+		if err := store.Lock(tctx, tx, c.p.TenantID, id); err != nil {
+			return err
+		}
+		if stale {
+			if err := store.MarkStale(tctx, tx, c.p.TenantID, id); err != nil {
+				return err
+			}
+		}
+		var err error
+		if own, err = store.Renew(tctx, tx, c.p.TenantID, id, token, s.lease()); err != nil {
+			return err
+		}
+		if !own {
+			if own, err = store.Claim(tctx, tx, c.p.TenantID, id, token, act, s.lease()); err != nil || !own {
+				return err
+			}
+		}
+		if _, dirty, err = store.StaleGen(tctx, tx, c.p.TenantID, id); err != nil {
+			return err
+		}
+		now, err := s.current(tctx, tx, c, id)
+		if err != nil {
+			return err
+		}
+		draft = now.State == domain.StateDraft
+		return nil
+	})
+	cancel()
+	if err != nil || !own {
+		if own {
+			s.release(ctx, c, id, token)
+		}
+		return
+	}
+	if undo != nil && draft {
+		// Đợt vẫn Nháp và mình giữ ý định: kỳ native vừa tạo (khóa PublishBatch cố định theo đợt) không thuộc sự kiện nào.
+		uctx, ucancel := context.WithTimeout(ctx, cleanupTimeout)
+		undo(uctx)
+		ucancel()
+	}
+	if dirty {
+		s.settle(ctx, c, id, token)
+		return
+	}
+	s.release(ctx, c, id, token)
+}
+
+// settleRounds: số vòng đối soát tối đa của một yêu cầu (mỗi vòng: đọc sổ đợt, đưa kỳ native về đúng sổ, kiểm không có lần
+// lệch mới). Hết vòng mà còn lệch → bỏ ý định, dấu lệch còn — thao tác kế tiếp đối soát.
+const settleRounds = 3
+
+// actSync: thao tác ghi ở ý định khi đối soát nhận lại đợt.
+const actSync = "sync"
+
+// settle đưa kỳ native về đúng trạng thái đã cam kết ở sổ đợt (review #156 [P2]). Gọi khi token ĐANG giữ ý định; luôn bỏ ý
+// định trước khi trả về. Vì mọi sự kiện đợt bị chặn khi ý định còn hạn, sổ đợt đọc ở đầu vòng là kết quả cam kết mới nhất
+// trong suốt vòng; lần lệch đánh dấu trong vòng (stale_gen tăng) → vòng sau. Mất ý định giữa vòng → lời gọi đối soát của mình
+// cũng có thể lệch: đánh dấu, nhận lại nếu được, không thì để người giữ đối soát.
+func (s *Service) settle(ctx context.Context, c caller, id, token uuid.UUID) {
+	lease := s.lease()
+	ctx, stop := context.WithTimeout(context.WithoutCancel(ctx), settleRounds*(lease+cleanupTimeout))
+	defer stop()
+	for range settleRounds {
+		start := time.Now()
+		var cur Campaign
+		var gen int64
+		own := false
+		err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+			if err := store.Lock(ctx, tx, c.p.TenantID, id); err != nil {
+				return err
+			}
+			var err error
+			if own, err = store.Renew(ctx, tx, c.p.TenantID, id, token, lease); err != nil || !own {
+				return err
+			}
+			if gen, _, err = store.StaleGen(ctx, tx, c.p.TenantID, id); err != nil {
+				return err
+			}
+			cur, err = s.current(ctx, tx, c, id)
+			return err
+		})
+		if err != nil || !own {
+			if own {
+				s.release(ctx, c, id, token)
+			}
+			return
+		}
+		rctx, cancel := context.WithDeadline(ctx, start.Add(lease-min(lease/4, maxLeaseMargin)))
+		rerr := s.reconcile(rctx, c, cur, token)
+		cancel()
+		again := false
+		err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+			again = false
+			if err := store.Lock(ctx, tx, c.p.TenantID, id); err != nil {
+				return err
+			}
+			held, err := store.Renew(ctx, tx, c.p.TenantID, id, token, lease)
+			if err != nil {
+				return err
+			}
+			if !held {
+				if err := store.MarkStale(ctx, tx, c.p.TenantID, id); err != nil {
+					return err
+				}
+				again, err = store.Claim(ctx, tx, c.p.TenantID, id, token, actSync, lease)
+				return err
+			}
+			g, _, err := store.StaleGen(ctx, tx, c.p.TenantID, id)
+			if err != nil {
+				return err
+			}
+			if rerr == nil && g == gen {
+				if err := store.MarkSynced(ctx, tx, c.p.TenantID, id, gen); err != nil {
+					return err
+				}
+			}
+			again = rerr == nil && g != gen
+			if !again {
+				_, err = store.Release(ctx, tx, c.p.TenantID, id, token, false)
+			}
+			return err
+		})
+		if err != nil {
+			s.release(ctx, c, id, token)
+			return
+		}
+		if !again {
+			return
+		}
+	}
+	s.release(ctx, c, id, token)
+}
+
+// syncReason: lý do ghi ở cap/forms khi đối soát kỳ native theo sổ đợt.
+const syncReason = "Đồng bộ kỳ điều tra theo sổ đợt (thao tác chồng lấn)"
+
+// reconcile đưa kỳ native của đợt đã phát hành về đúng sổ đợt cur: Đang thu thập → kỳ nhận bài (mở lại nếu đang chốt) với
+// hạn = hạn hiện hành của đợt; Đã đóng → kỳ chốt. Đợt Nháp → không có kỳ native để đối soát.
+func (s *Service) reconcile(ctx context.Context, c caller, cur Campaign, token uuid.UUID) error {
+	if cur.Period == nil || cur.Period.FormsPeriodRef == nil {
+		return nil
+	}
+	pid := *cur.Period.FormsPeriodRef
+	p, err := s.Control.Progress(ctx, domain.Profile, pid)
+	if err != nil {
+		return err
+	}
+	key := "cnts_campaign:sync:" + token.String() + ":" + newID().String()
+	switch cur.State {
+	case domain.StateClosed:
+		if p.Status == periodOpen || p.Status == periodReopened {
+			return s.Control.ClosePeriod(ctx, domain.Profile, pid, key+":close")
+		}
+	case domain.StateCollecting:
+		switch p.Status {
+		case periodCancelled:
+			return ErrState.WithDetail("kỳ native của đợt đã bị hủy — không đối soát được")
+		case periodClosed:
+			ro, ok := s.Control.(Reopener)
+			if !ok {
+				return ErrDependency.WithDetail("cap/forms chưa có thao tác mở lại kỳ cho module nghiệp vụ")
+			}
+			if err := ro.ReopenPeriod(ctx, domain.Profile, pid, syncReason, key+":reopen"); err != nil {
+				return err
+			}
+			p.DueAt = time.Time{}
+		}
+		if !p.DueAt.Equal(cur.DueAt) {
+			return s.Control.ChangeDue(ctx, domain.Profile, pid, cur.DueAt, syncReason, key+":due")
+		}
+	}
+	return nil
+}
+
+// Trạng thái kỳ native (formsport.PeriodProgress.Status).
+const (
+	periodOpen      = "open"
+	periodClosed    = "closed"
+	periodReopened  = "reopened"
+	periodCancelled = "cancelled"
+)
 
 // release bỏ ý định của token sau lỗi (giao dịch riêng, chạy cả khi yêu cầu đã hủy). Token không còn giữ ý định → không có
 // gì để bỏ. Lỗi bỏ qua: ý định tự hết hạn.
@@ -234,8 +453,8 @@ func (s *Service) Publish(ctx context.Context, id uuid.UUID, idem string) (Campa
 		}
 		pid := pub[0].ID
 		seq, tv, due := v.Seq, ref.Version, v.DueAt
-		// Bù: khóa idempotent của PublishBatch cố định theo đợt nên kỳ native này chỉ của lần phát hành này — hủy an toàn
-		// kể cả khi ý định đã mất.
+		// Bù (wrapUp): chỉ khi mình giữ ý định và đợt vẫn Nháp — khóa idempotent của PublishBatch cố định theo đợt, nên khi
+		// người khác đang giữ đợt (cũng đang phát hành) kỳ native này cũng là của họ: không hủy.
 		undo := func(ctx context.Context) {
 			_ = s.Control.CancelPeriod(ctx, domain.Profile, pid, "Hủy tự động: ghi phát hành đợt điều tra không thành công",
 				"cnts_campaign:"+v.CampaignID.String()+":compensate")

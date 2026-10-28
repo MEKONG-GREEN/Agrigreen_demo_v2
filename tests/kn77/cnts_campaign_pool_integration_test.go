@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -509,4 +510,224 @@ func TestBFCNTSCampaignPool_PublishCompensatesOnRecordFailure(t *testing.T) {
 	if n := campIntentSQL(t, f, cv.ID, sqlCampLive); n != 0 {
 		t.Fatalf("ý định còn giữ sau bù: %d", n)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Review Codex #156 [P2]: lời gọi cap/forms của yêu cầu đã MẤT ý định không được để kỳ native lệch kết quả đã cam kết của
+// yêu cầu kế tiếp. Sau mọi xen kẽ dưới đây: kỳ native (trạng thái + hạn hiệu lực) = sổ đợt; không còn ý định giữ; không còn
+// dấu lệch chưa đối soát.
+// ---------------------------------------------------------------------------
+
+const sqlCampDirty = `SELECT count(*)::int FROM pf_extension.cnts_campaign_intent
+  WHERE tenant_id = $1 AND campaign_id = $2::uuid AND stale_gen > synced_gen`
+
+// nativeDue: hạn HIỆU LỰC của kỳ native (sổ phụ period_due).
+func (f *aggFx) nativeDue(pid string) string {
+	f.t.Helper()
+	rows := f.admin.query(`SELECT to_char(pf_forms.effective_due(tenant_id, id, due_at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+	  FROM pf_forms.period WHERE tenant_id = $1 AND id = $2::uuid ORDER BY seq DESC LIMIT 1`, f.tid, pid)
+	if len(rows) != 1 {
+		f.t.Fatalf("kỳ native %s: %v", pid, rows)
+	}
+	return fmt.Sprint(rows[0][0])
+}
+
+// assertNativeMatchesLedger: kỳ native khớp sổ đợt (Đang thu thập → kỳ nhận bài, hạn = hạn đợt; Đã đóng → kỳ chốt); ý định
+// trả; không còn dấu lệch.
+func assertNativeMatchesLedger(t *testing.T, f *aggFx, id, wantState, wantDue string) {
+	t.Helper()
+	got := f.getCampaign(id)
+	if got.State != wantState || got.DueAt != wantDue || got.FormsPeriodID == nil {
+		t.Fatalf("sổ đợt: state=%s due=%s, muốn %s %s", got.State, got.DueAt, wantState, wantDue)
+	}
+	st := f.formsPeriodStatus(*got.FormsPeriodID)
+	switch wantState {
+	case "collecting":
+		if st != "open" && st != "reopened" {
+			t.Fatalf("đợt Đang thu thập nhưng kỳ native %s", st)
+		}
+		if due := f.nativeDue(*got.FormsPeriodID); due != wantDue {
+			t.Fatalf("kỳ native lệch sổ đợt: hạn native %s, hạn đợt %s", due, got.DueAt)
+		}
+	case "closed":
+		if st != "closed" {
+			t.Fatalf("đợt Đã đóng nhưng kỳ native %s", st)
+		}
+	}
+	if n := campIntentSQL(t, f, id, sqlCampLive); n != 0 {
+		t.Fatalf("ý định còn giữ: %d", n)
+	}
+	if n := campIntentSQL(t, f, id, sqlCampDirty); n != 0 {
+		t.Fatalf("còn dấu lệch chưa đối soát: %d", n)
+	}
+}
+
+// Đúng xen kẽ Codex tái hiện: A gia hạn tới 12/10, mất ý định ngay trước ChangeDue; B gia hạn tới 13/10 xong (200); rồi
+// ChangeDue của A chạy. A → 409; kỳ native phải về 13/10 (kết quả cam kết của B), không phải 12/10.
+func TestBFCNTSCampaignPool_StaleExtendDoesNotOverwriteSuccessor(t *testing.T) {
+	f, h := newCampaignPoolFx(t, nil, 0)
+	cv := f.newCampaign("Đợt kiểm gia hạn cũ ghi đè")
+	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/publish", authz.KNTinh, false, nil)
+	f.ok(c, b, &cv)
+	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
+		if op != "due" {
+			return next(ctx)
+		}
+		h.set(nil)
+		campIntentSQL(t, f, cv.ID, sqlCampExpire)
+		sc, sb := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", authz.KNTinh, false,
+			map[string]any{"due_at": "2026-10-13T03:00:00Z", "reason": "Yêu cầu kế tiếp giữ kết quả hạn nộp"})
+		if sc != http.StatusOK {
+			return fmt.Errorf("yêu cầu kế tiếp HTTP %d %s", sc, sb)
+		}
+		return next(ctx)
+	})
+	c, b = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", authz.KNTinh, false,
+		map[string]any{"due_at": "2026-10-12T03:00:00Z", "reason": "Yêu cầu cũ không được đè yêu cầu kế tiếp"})
+	wantProblem(t, c, string(b), "extension.cnts_campaign_state", http.StatusConflict)
+	assertNativeMatchesLedger(t, f, cv.ID, "collecting", "2026-10-13T03:00:00Z")
+}
+
+// Như trên nhưng hạn của yêu cầu cũ LỚN hơn (20/10 sau 13/10): đối soát phải đưa hạn native lùi về sổ đợt.
+func TestBFCNTSCampaignPool_StaleLaterExtendDoesNotOverwriteSuccessor(t *testing.T) {
+	f, h := newCampaignPoolFx(t, nil, 0)
+	cv := f.newCampaign("Đợt kiểm gia hạn cũ dài hơn")
+	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/publish", authz.KNTinh, false, nil)
+	f.ok(c, b, &cv)
+	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
+		if op != "due" {
+			return next(ctx)
+		}
+		h.set(nil)
+		campIntentSQL(t, f, cv.ID, sqlCampExpire)
+		sc, sb := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", authz.KNTinh, false,
+			map[string]any{"due_at": "2026-10-13T03:00:00Z", "reason": "Yêu cầu kế tiếp giữ kết quả hạn nộp"})
+		if sc != http.StatusOK {
+			return fmt.Errorf("yêu cầu kế tiếp HTTP %d %s", sc, sb)
+		}
+		return next(ctx)
+	})
+	c, b = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", authz.KNTinh, false,
+		map[string]any{"due_at": "2026-10-20T03:00:00Z", "reason": "Yêu cầu cũ hạn dài hơn không được đè"})
+	wantProblem(t, c, string(b), "extension.cnts_campaign_state", http.StatusConflict)
+	assertNativeMatchesLedger(t, f, cv.ID, "collecting", "2026-10-13T03:00:00Z")
+}
+
+// Yêu cầu cũ ghi native SAU yêu cầu kế tiếp trong lúc yêu cầu kế tiếp còn GIỮ ý định: A không nhận lại được → 409
+// interrupted, chỉ đánh dấu lệch; B ghi xong thấy dấu lệch → đối soát → native = hạn của B.
+func TestBFCNTSCampaignPool_StaleWriteWhileSuccessorHolds(t *testing.T) {
+	f, h := newCampaignPoolFx(t, nil, 0)
+	cv := f.newCampaign("Đợt kiểm người giữ đối soát")
+	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/publish", authz.KNTinh, false, nil)
+	f.ok(c, b, &cv)
+	var n atomic.Int32
+	bWrote, aWrote, aDone := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	type res struct {
+		code int
+		body string
+		err  error
+	}
+	bRes := make(chan res, 1)
+	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
+		if op != "due" {
+			return next(ctx)
+		}
+		switch n.Add(1) {
+		case 1: // A: mất ý định, B nhận đợt và ghi native trước; rồi A ghi native.
+			campIntentSQL(t, f, cv.ID, sqlCampExpire)
+			go func() {
+				code, body, err := f.campaignCallCtx(context.Background(), http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", false,
+					map[string]any{"due_at": "2026-10-13T03:00:00Z", "reason": "Yêu cầu kế tiếp giữ kết quả hạn nộp"})
+				bRes <- res{code, body, err}
+			}()
+			select {
+			case <-bWrote:
+			case <-time.After(30 * time.Second):
+				return errors.New("B không ghi native")
+			}
+			err := next(ctx)
+			close(aWrote)
+			return err
+		case 2: // B: ghi native, chờ A ghi đè và A trả kết quả, rồi mới ghi sự kiện (vẫn giữ ý định).
+			err := next(ctx)
+			close(bWrote)
+			<-aWrote
+			select {
+			case <-aDone:
+			case <-time.After(30 * time.Second):
+			}
+			return err
+		}
+		return next(ctx)
+	})
+	c, b = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", authz.KNTinh, false,
+		map[string]any{"due_at": "2026-10-12T03:00:00Z", "reason": "Yêu cầu cũ không được đè yêu cầu kế tiếp"})
+	close(aDone)
+	wantProblem(t, c, string(b), "extension.cnts_campaign_interrupted", http.StatusConflict)
+	if n := campIntentSQL(t, f, cv.ID, sqlCampDirty); n != 1 {
+		t.Fatalf("A phải đánh dấu lệch cho người giữ: %d", n)
+	}
+	r := <-bRes
+	if r.err != nil || r.code != http.StatusOK {
+		t.Fatalf("B: HTTP %d err=%v %.300s", r.code, r.err, r.body)
+	}
+	h.set(nil)
+	assertNativeMatchesLedger(t, f, cv.ID, "collecting", "2026-10-13T03:00:00Z")
+}
+
+// Đóng đợt cũ: A đóng, mất ý định ngay trước ClosePeriod; B gia hạn tới 13/10 xong; rồi ClosePeriod của A chốt kỳ native.
+// Sổ đợt vẫn Đang thu thập → đối soát mở lại kỳ native và đặt hạn 13/10.
+func TestBFCNTSCampaignPool_StaleCloseDoesNotOverwriteSuccessor(t *testing.T) {
+	f, h := newCampaignPoolFx(t, nil, 0)
+	cv := f.newCampaign("Đợt kiểm đóng cũ ghi đè")
+	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/publish", authz.KNTinh, false, nil)
+	f.ok(c, b, &cv)
+	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
+		if op != "close" {
+			return next(ctx)
+		}
+		h.set(nil)
+		campIntentSQL(t, f, cv.ID, sqlCampExpire)
+		sc, sb := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", authz.KNTinh, false,
+			map[string]any{"due_at": "2026-10-13T03:00:00Z", "reason": "Gia hạn xong trong lúc lệnh đóng cũ treo"})
+		if sc != http.StatusOK {
+			return fmt.Errorf("yêu cầu kế tiếp HTTP %d %s", sc, sb)
+		}
+		return next(ctx)
+	})
+	c, b = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/close", authz.KNTinh, false, nil)
+	wantProblem(t, c, string(b), "extension.cnts_campaign_state", http.StatusConflict)
+	assertNativeMatchesLedger(t, f, cv.ID, "collecting", "2026-10-13T03:00:00Z")
+}
+
+// Mở lại đợt cũ: đợt Đã đóng; A mở lại (hạn 15/10), mất ý định ngay trước ReopenPeriod; B mở lại (16/10) rồi C đóng đợt, cả hai
+// xong; rồi ReopenPeriod + ChangeDue của A mở kỳ native. Sổ đợt Đã đóng → đối soát chốt lại kỳ native.
+func TestBFCNTSCampaignPool_StaleReopenDoesNotOverwriteSuccessor(t *testing.T) {
+	f, h := newCampaignPoolFx(t, nil, 0)
+	cv := f.newCampaign("Đợt kiểm mở lại cũ ghi đè")
+	for _, p := range []string{"/publish", "/close"} {
+		c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+p, authz.KNTinh, false, nil)
+		f.ok(c, b, &cv)
+	}
+	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
+		if op != "reopen" {
+			return next(ctx)
+		}
+		h.set(nil)
+		campIntentSQL(t, f, cv.ID, sqlCampExpire)
+		sc, sb := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/reopen", authz.KNTinh, true,
+			map[string]any{"due_at": "2026-10-16T03:00:00Z", "reason": "Mở lại xong trong lúc lệnh mở lại cũ treo"})
+		if sc != http.StatusOK {
+			return fmt.Errorf("mở lại kế tiếp HTTP %d %s", sc, sb)
+		}
+		sc, sb = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/close", authz.KNTinh, false, nil)
+		if sc != http.StatusOK {
+			return fmt.Errorf("đóng kế tiếp HTTP %d %s", sc, sb)
+		}
+		return next(ctx)
+	})
+	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/reopen", authz.KNTinh, true,
+		map[string]any{"due_at": "2026-10-15T03:00:00Z", "reason": "Lệnh mở lại cũ không được đè kết quả"})
+	wantProblem(t, c, string(b), "extension.cnts_campaign_state", http.StatusConflict)
+	assertNativeMatchesLedger(t, f, cv.ID, "closed", "2026-10-16T03:00:00Z")
 }

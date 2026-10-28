@@ -213,6 +213,44 @@ func Release(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, live bool
 	return tag.RowsAffected() == 1, nil
 }
 
+// Renew gia hạn ý định CÒN HẠN của token thêm lease (giờ DB). false: token không còn giữ ý định.
+func Renew(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, lease time.Duration) (bool, error) {
+	tag, err := tx.Exec(ctx, `UPDATE pf_extension.cnts_campaign_intent SET claim_until = now() + $4::interval, updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3 AND claim_until > now()`,
+		tid, id, token, strconv.FormatInt(int64(lease/time.Second), 10)+" seconds")
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// MarkStale ghi nhận kỳ native của đợt có thể lệch sổ đợt (review #156 [P2]): một lời gọi cap/forms ghi kỳ native đã trả về
+// mà yêu cầu gọi nó không còn giữ ý định (hoặc không rõ kết quả). Gọi trong giao dịch đã giữ Lock, SAU khi lời gọi đã trả về.
+func MarkStale(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_extension.cnts_campaign_intent (tenant_id, campaign_id, stale_gen, updated_at)
+	  VALUES ($1, $2, 1, now())
+	  ON CONFLICT (tenant_id, campaign_id) DO UPDATE SET stale_gen = cnts_campaign_intent.stale_gen + 1, updated_at = now()`, tid, id)
+	return err
+}
+
+// StaleGen đọc thế hệ lệch hiện tại; dirty = còn lần lệch chưa đối soát.
+func StaleGen(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) (gen int64, dirty bool, err error) {
+	var synced int64
+	err = tx.QueryRow(ctx, `SELECT stale_gen, synced_gen FROM pf_extension.cnts_campaign_intent WHERE tenant_id = $1 AND campaign_id = $2`,
+		tid, id).Scan(&gen, &synced)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	return gen, gen > synced, err
+}
+
+// MarkSynced ghi nhận kỳ native đã khớp sổ đợt tới thế hệ gen (đọc TRƯỚC khi đối soát).
+func MarkSynced(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID, gen int64) error {
+	_, err := tx.Exec(ctx, `UPDATE pf_extension.cnts_campaign_intent SET synced_gen = GREATEST(synced_gen, $3), updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2`, tid, id, gen)
+	return err
+}
+
 func strIDs(ids []uuid.UUID) []string {
 	out := make([]string, len(ids))
 	for i, id := range ids {

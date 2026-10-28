@@ -22,9 +22,16 @@ CREATE TABLE pf_extension.cnts_campaign_intent (
   claim_id    uuid        NULL,
   action      text        NULL,
   claim_until timestamptz NULL,
+  -- Đối soát kỳ native (review Codex #156 [P2]): lời gọi cap/forms của yêu cầu đã MẤT ý định có thể ghi đè kỳ native sau khi
+  -- yêu cầu kế tiếp đã ghi xong. Yêu cầu phát hiện mình mất ý định (hoặc không rõ kết quả lời gọi cap/forms) tăng stale_gen SAU
+  -- khi lời gọi đã trả về; người giữ ý định đưa kỳ native về đúng sổ đợt đã cam kết rồi đặt synced_gen = stale_gen đọc TRƯỚC
+  -- khi đối soát. stale_gen > synced_gen = kỳ native có thể lệch sổ đợt, còn phải đối soát.
+  stale_gen   bigint      NOT NULL DEFAULT 0,
+  synced_gen  bigint      NOT NULL DEFAULT 0,
   updated_at  timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (tenant_id, campaign_id),
-  CONSTRAINT cnts_campaign_intent_claim CHECK ((claim_id IS NULL) = (claim_until IS NULL) AND (claim_id IS NULL) = (action IS NULL))
+  CONSTRAINT cnts_campaign_intent_claim CHECK ((claim_id IS NULL) = (claim_until IS NULL) AND (claim_id IS NULL) = (action IS NULL)),
+  CONSTRAINT cnts_campaign_intent_gen CHECK (synced_gen >= 0 AND synced_gen <= stale_gen)
 );
 SELECT shared.apply_tenant_rls('pf_extension.cnts_campaign_intent');
 CREATE TRIGGER trg_no_delete BEFORE DELETE ON pf_extension.cnts_campaign_intent
