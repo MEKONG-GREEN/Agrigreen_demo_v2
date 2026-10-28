@@ -373,7 +373,7 @@ func (s *Service) GrantAssignment(ctx context.Context, user uuid.UUID, in domain
 		return AssignmentResult{}, err
 	}
 	key := "asg:grant:" + idem
-	if prev, err := s.asgReplay(ctx, a.p.TenantID, key); err != nil || prev != nil {
+	if prev, err := s.asgReplay(ctx, a, key, domain.AsgGranted, user, uuid.Nil); err != nil || prev != nil {
 		return derefAsg(prev), err
 	}
 	t, err := s.knTarget(ctx, a, user)
@@ -427,12 +427,17 @@ func optStr(s string) *string {
 	return &s
 }
 
-func (s *Service) asgReplay(ctx context.Context, tid uuid.UUID, key string) (*AssignmentResult, error) {
+// asgReplay phát lại theo sổ gán vai trò. Như replayFor (#154): khóa phải cùng thao tác, người gọi, tài khoản
+// (và lần gán khi id khác Nil) — khác thì 422; tài khoản phải còn trong phạm vi hiện hành của người gọi.
+func (s *Service) asgReplay(ctx context.Context, a *actor, key, action string, user, id uuid.UUID) (*AssignmentResult, error) {
 	var out *AssignmentResult
-	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+	err := tenant.WithTenantTx(ctx, s.DB, a.p.TenantID, func(tx pgx.Tx) error {
 		prev, err := store.AsgEventByIdem(ctx, tx, key)
 		if err != nil || prev == nil {
 			return err
+		}
+		if prev.Action != action || prev.ActorRef != a.p.ActorRef || prev.A.UserRef != user || (id != uuid.Nil && prev.A.ID != id) {
+			return problem.IdempotencyConflict
 		}
 		cur, err := store.AssignmentByID(ctx, tx, prev.A.ID, false)
 		if err != nil || cur == nil {
@@ -441,7 +446,13 @@ func (s *Service) asgReplay(ctx context.Context, tid uuid.UUID, key string) (*As
 		out = &AssignmentResult{Assignment: *cur, Seq: prev.Seq, Replayed: true}
 		return nil
 	})
-	return out, err
+	if err != nil || out == nil {
+		return nil, err
+	}
+	if _, err := s.target(ctx, a, user); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func derefAsg(r *AssignmentResult) AssignmentResult {
@@ -461,7 +472,7 @@ func (s *Service) ChangeAssignment(ctx context.Context, user, id uuid.UUID, in d
 		return AssignmentResult{}, err
 	}
 	key := "asg:change:" + idem
-	if prev, err := s.asgReplay(ctx, a.p.TenantID, key); err != nil || prev != nil {
+	if prev, err := s.asgReplay(ctx, a, key, domain.AsgChanged, user, id); err != nil || prev != nil {
 		return derefAsg(prev), err
 	}
 	t, err := s.knTarget(ctx, a, user)
@@ -514,7 +525,7 @@ func (s *Service) RevokeAssignment(ctx context.Context, user, id uuid.UUID, reas
 		return AssignmentResult{}, err
 	}
 	key := "asg:revoke:" + idem
-	if prev, err := s.asgReplay(ctx, a.p.TenantID, key); err != nil || prev != nil {
+	if prev, err := s.asgReplay(ctx, a, key, domain.AsgRevoked, user, id); err != nil || prev != nil {
 		if err == nil && prev.Assignment.Role == port.KNXa {
 			err = s.releaseKNXaVault(ctx, a, user, key+":vault") // lần trước lỗi giữa chừng → làm tiếp
 		}
@@ -637,7 +648,7 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 	if len(in.Assignments) == 0 {
 		return KNCreateResult{}, problem.Validation.WithField("assignments", "bắt buộc ít nhất một vai trò")
 	}
-	if prev, err := s.replay(ctx, a.p.TenantID, in.IdemKey); err != nil {
+	if prev, err := s.replayFor(ctx, a, in.IdemKey, domain.ActionCreated, uuid.Nil); err != nil {
 		return KNCreateResult{}, err
 	} else if prev != nil {
 		return s.knReplayed(ctx, a, *prev)

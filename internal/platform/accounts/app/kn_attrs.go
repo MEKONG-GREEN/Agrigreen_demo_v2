@@ -66,7 +66,7 @@ func (s *Service) SetAssignmentAttrs(ctx context.Context, user, id uuid.UUID, in
 		return AttrsResult{}, err
 	}
 	key := "asgattr:put:" + idem
-	if res, ok, err := s.attrsReplay(ctx, a.p.TenantID, key, id); err != nil || ok {
+	if res, ok, err := s.attrsReplay(ctx, a, key, user, id); err != nil || ok {
 		return res, err
 	}
 	if _, err := s.knTarget(ctx, a, user); err != nil {
@@ -159,10 +159,12 @@ func attrsJSON(a port.AssignmentAttrs) []byte {
 	return b
 }
 
-func (s *Service) attrsReplay(ctx context.Context, tid uuid.UUID, key string, id uuid.UUID) (AttrsResult, bool, error) {
+// attrsReplay phát lại theo sổ thuộc tính vai. Như replayFor (#154): lần gán phải thuộc đúng tài khoản trên đường
+// dẫn và tài khoản còn trong phạm vi hiện hành của người gọi (không tin kết quả đã lưu).
+func (s *Service) attrsReplay(ctx context.Context, a *actor, key string, user, id uuid.UUID) (AttrsResult, bool, error) {
 	var out AttrsResult
 	found := false
-	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+	err := tenant.WithTenantTx(ctx, s.DB, a.p.TenantID, func(tx pgx.Tx) error {
 		prev, ok, err := store.AttrEventByIdem(ctx, tx, key)
 		if err != nil || !ok {
 			return err
@@ -170,11 +172,24 @@ func (s *Service) attrsReplay(ctx context.Context, tid uuid.UUID, key string, id
 		if prev != id {
 			return problem.IdempotencyConflict
 		}
+		asg, err := store.AssignmentByID(ctx, tx, id, false)
+		if err != nil {
+			return err
+		}
+		if asg == nil || asg.UserRef != user {
+			return problem.IdempotencyConflict
+		}
 		cur, err := store.AttrsOf(ctx, tx, id, false)
 		out, found = AttrsResult{Attrs: cur, Replayed: true}, true
 		return err
 	})
-	return out, found, err
+	if err != nil || !found {
+		return AttrsResult{}, false, err
+	}
+	if _, err := s.target(ctx, a, user); err != nil {
+		return AttrsResult{}, false, err
+	}
+	return out, true, nil
 }
 
 // attrsByUser đọc thuộc tính các lần gán của một người (tenant từ context).
