@@ -6,6 +6,7 @@ package notify_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -23,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -41,6 +43,7 @@ type blockingPusher struct {
 	entered chan struct{}
 	release chan struct{}
 	calls   atomic.Int32
+	fail    atomic.Bool // sau release: lỗi tạm thời (không phải token hỏng)
 }
 
 func newBlockingPusher() *blockingPusher {
@@ -54,10 +57,13 @@ func (p *blockingPusher) Send(ctx context.Context, _ notify.PushMessage) error {
 	p.entered <- struct{}{}
 	select {
 	case <-p.release:
-		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+	if p.fail.Load() {
+		return errors.New("fixture FCM unavailable")
+	}
+	return nil
 }
 
 // sizedPool là pool app_platform cỡ n và module notify chạy trên đúng pool đó (như cmd/worker).
@@ -72,11 +78,20 @@ func (f *fixture) sized(n int32, pusher interface {
 	Send(context.Context, notify.PushMessage) error
 }) sizedPool {
 	f.t.Helper()
+	return f.sizedMail(n, pusher, f.mailer)
+}
+
+// sizedMail như sized nhưng kênh email theo người nhận là mailer.
+func (f *fixture) sizedMail(n int32, pusher interface {
+	Name() string
+	Send(context.Context, notify.PushMessage) error
+}, mailer channel.Mailer) sizedPool {
+	f.t.Helper()
 	pool := pgtest.Get(f.t).SizedPool(f.t, migrations.PF, dbadmin.AppPlatform, n)
 	mod := notify.New(pool, f.clk, notify.Deps{Kinds: []port.KindRegistration{extension.NotificationKinds(), price.NotificationKinds()},
 		Consumers: []port.ConsumerRegistration{extension.NotificationConsumers(), price.NotificationConsumers()},
 		Builders:  price.NotificationBuilders(f.desk), Scope: f.scope, Devices: f.devices, Staff: f.staff, Units: fakeUnits{},
-		Pusher: pusher, Emails: f.emails, EmailMailer: f.mailer, LinkBase: "https://kn.example.vn",
+		Pusher: pusher, Emails: f.emails, EmailMailer: mailer, LinkBase: "https://kn.example.vn",
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	return sizedPool{pool: pool, db: db.ForModule(pool, notify.DBModule), mod: mod}
 }
@@ -320,5 +335,181 @@ func TestBFNotifyPool_PushClaimLeaseExpires(t *testing.T) {
 	}
 	if rows := f.pushRows(batch); len(rows) != 1 || rows[0].status != "sent" || rows[0].claimed {
 		t.Fatalf("sau khi nhận lại: %+v", rows)
+	}
+}
+
+// takeOver mô phỏng worker B (review #155 P1): hạn giữ của lượt A hết (đồng hồ giả tiến quá DefaultDeliveryLease), B nhận
+// lại lần gửi của lô. done=false: B chết trước khi gửi/ghi — nhận của B còn hạn, lần gửi vẫn mở. done=true: B gửi xong.
+func (f *fixture) takeOver(table string, batch uuid.UUID, done bool) {
+	f.t.Helper()
+	f.clk.Advance(2 * time.Minute)
+	now := f.clk.Now()
+	q := `UPDATE pf_notify.` + table + ` SET claim_id = $1, claim_until = $2 + interval '1 minute'
+	  WHERE batch_id = $3 AND claim_id IS NOT NULL AND claim_until <= $2`
+	args := []any{ids.New(), now, batch}
+	if done {
+		q = `UPDATE pf_notify.` + table + ` SET status = 'sent', attempts = attempts + 1, sent_at = $1, finished_at = $1,
+		    claim_id = NULL, claim_until = NULL
+		  WHERE batch_id = $2 AND claim_id IS NOT NULL AND claim_until <= $1`
+		args = []any{now, batch}
+	}
+	if err := tenant.WithTenantTx(context.Background(), f.appDB, f.tenant, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(context.Background(), q, args...)
+		if err == nil && tag.RowsAffected() != 1 {
+			err = fmt.Errorf("worker B nhận lại %d lần gửi, muốn 1 (nhận của A phải đang giữ và đã hết hạn)", tag.RowsAffected())
+		}
+		return err
+	}); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+// deliveryRows trả trạng thái + còn nhận của các lần gửi trong lô (push_delivery | email_delivery).
+func (f *fixture) deliveryRows(table string, batch uuid.UUID) []pushRow {
+	f.t.Helper()
+	var out []pushRow
+	if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
+		rows, err := tx.Query(context.Background(), `SELECT status, claim_id IS NOT NULL FROM pf_notify.`+table+` WHERE batch_id = $1 ORDER BY id`, batch)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var r pushRow
+			if err := rows.Scan(&r.status, &r.claimed); err != nil {
+				return err
+			}
+			out = append(out, r)
+		}
+		return rows.Err()
+	}); err != nil {
+		f.t.Fatal(err)
+	}
+	return out
+}
+
+type processResult struct {
+	ok  bool
+	err error
+}
+
+func awaitProcess(t *testing.T, done <-chan processResult) processResult {
+	t.Helper()
+	select {
+	case r := <-done:
+		return r
+	case <-time.After(60 * time.Second):
+		t.Fatal("lượt xử lý không kết thúc")
+		return processResult{}
+	}
+}
+
+// Review #155 P1 (đẩy): A gửi lỗi tạm thời, ghi kết quả sau khi hạn giữ đã hết; B nhận lại rồi chết trước khi gửi/ghi.
+// A mất nhận → KHÔNG được ACK (lần gửi còn mở); hạn giữ của B hết → lượt giao lại nhận lại và gửi đúng một lần.
+func TestBFNotifyPool_PushLostClaimIsNotAcked(t *testing.T) {
+	f := newFixture(t)
+	batch := f.pushBatch()
+	bp := newBlockingPusher()
+	sp := f.sized(1, bp)
+	env := f.pushEnvelope(batch)
+	process := func() (bool, error) {
+		return inbox.Process(context.Background(), sp.db, port.ConsumerPush, env, sp.mod.PushHandler())
+	}
+	done := make(chan processResult, 1)
+	go func() { ok, err := process(); done <- processResult{ok, err} }()
+	waitPush(t, bp)
+	f.takeOver("push_delivery", batch, false)
+	bp.fail.Store(true)
+	close(bp.release)
+	if r := awaitProcess(t, done); r.err == nil || r.ok {
+		t.Fatalf("A mất nhận, lần gửi chưa gửi: không được ACK sự kiện, ok=%v err=%v", r.ok, r.err)
+	}
+	if rows := f.deliveryRows("push_delivery", batch); len(rows) != 1 || rows[0].status != "pending" || !rows[0].claimed {
+		t.Fatalf("A không được ghi đè nhận của B: %+v", rows)
+	}
+	f.clk.Advance(2 * time.Minute) // B đã chết: hạn giữ của B hết
+	bp.fail.Store(false)
+	if ok, err := process(); err != nil || !ok {
+		t.Fatalf("giao lại phải nhận lại (nhận của B đã hết hạn) và gửi: ok=%v err=%v", ok, err)
+	}
+	if n := bp.calls.Load(); n != 2 {
+		t.Fatalf("Pusher.Send %d lần, muốn 2 (lần lỗi của A + đúng một lần khi giao lại)", n)
+	}
+	if rows := f.deliveryRows("push_delivery", batch); len(rows) != 1 || rows[0].status != "sent" || rows[0].claimed {
+		t.Fatalf("sau khi giao lại: %+v", rows)
+	}
+	if ok, err := process(); err != nil || ok {
+		t.Fatalf("giao lại sau khi đã ghi inbox: ok=%v err=%v", ok, err)
+	}
+	if n := bp.calls.Load(); n != 2 {
+		t.Fatalf("gửi trùng sau khi đã ghi inbox: %d", n)
+	}
+}
+
+// A mất nhận nhưng B đã gửi xong (lần gửi kết thúc bền vững) → A ACK, không gửi lại, không ghi đè kết quả của B.
+func TestBFNotifyPool_PushLostClaimDoneByOtherAcks(t *testing.T) {
+	f := newFixture(t)
+	batch := f.pushBatch()
+	bp := newBlockingPusher()
+	sp := f.sized(1, bp)
+	env := f.pushEnvelope(batch)
+	done := make(chan processResult, 1)
+	go func() {
+		ok, err := inbox.Process(context.Background(), sp.db, port.ConsumerPush, env, sp.mod.PushHandler())
+		done <- processResult{ok, err}
+	}()
+	waitPush(t, bp)
+	f.takeOver("push_delivery", batch, true)
+	bp.fail.Store(true)
+	close(bp.release)
+	if r := awaitProcess(t, done); r.err != nil || !r.ok {
+		t.Fatalf("lần gửi đã kết thúc bởi B: A phải ACK, ok=%v err=%v", r.ok, r.err)
+	}
+	if rows := f.deliveryRows("push_delivery", batch); len(rows) != 1 || rows[0].status != "sent" || rows[0].claimed {
+		t.Fatalf("A ghi đè kết quả của B: %+v", rows)
+	}
+	if n := bp.calls.Load(); n != 1 {
+		t.Fatalf("Pusher.Send %d lần, muốn 1", n)
+	}
+}
+
+// Review #155 P1 (email): như đẩy — A mất nhận khi lần gửi email chưa gửi → không ACK; giao lại gửi đúng một lần.
+func TestBFNotifyPool_EmailLostClaimIsNotAcked(t *testing.T) {
+	f := newFixture(t)
+	batch, _ := f.emailBatch()
+	m := newBlockingMailer()
+	sp := f.sizedMail(1, f.pusher, m)
+	env := f.event(f.tenant, port.EventEmailRequested, port.EmailRequestedV1{BatchID: batch, Kind: "price", Deliveries: 1})
+	process := func() (bool, error) {
+		return inbox.Process(context.Background(), sp.db, port.ConsumerEmail, env, sp.mod.EmailHandler())
+	}
+	done := make(chan processResult, 1)
+	go func() { ok, err := process(); done <- processResult{ok, err} }()
+	waitEntered(t, m)
+	f.takeOver("email_delivery", batch, false)
+	m.fail.Store(true)
+	close(m.release)
+	if r := awaitProcess(t, done); !errors.Is(r.err, notify.ErrEmailRetry) || r.ok {
+		t.Fatalf("A mất nhận, email chưa gửi: phải trả ErrEmailRetry, không ACK; ok=%v err=%v", r.ok, r.err)
+	}
+	if rows := f.deliveryRows("email_delivery", batch); len(rows) != 1 || rows[0].status != "pending" || !rows[0].claimed {
+		t.Fatalf("A không được ghi đè nhận của B: %+v", rows)
+	}
+	f.clk.Advance(2 * time.Minute)
+	m.fail.Store(false)
+	if ok, err := process(); err != nil || !ok {
+		t.Fatalf("giao lại phải nhận lại và gửi email: ok=%v err=%v", ok, err)
+	}
+	if n := m.calls.Load(); n != 2 {
+		t.Fatalf("Mailer.Send %d lần, muốn 2 (lần lỗi của A + đúng một lần khi giao lại)", n)
+	}
+	if rows := f.deliveryRows("email_delivery", batch); len(rows) != 1 || rows[0].status != "sent" || rows[0].claimed {
+		t.Fatalf("sau khi giao lại: %+v", rows)
+	}
+	if ok, err := process(); err != nil || ok {
+		t.Fatalf("giao lại sau khi đã ghi inbox: ok=%v err=%v", ok, err)
+	}
+	if n := m.calls.Load(); n != 2 {
+		t.Fatalf("gửi email trùng sau khi đã ghi inbox: %d", n)
 	}
 }

@@ -100,6 +100,7 @@ func (s *Service) HandleEmail(ctx context.Context, _ pgx.Tx, env outbox.Envelope
 				return store.FinishEmailDelivery(ctx, tx, j.ID, token, status, code, now)
 			},
 			release: store.ReleaseEmailDelivery,
+			open:    store.EmailDeliveryOpen,
 		})
 	})
 	if err != nil {

@@ -66,6 +66,17 @@ func ReleaseEmailDelivery(ctx context.Context, tx pgx.Tx, id, token uuid.UUID) e
 	return err
 }
 
+// EmailDeliveryOpen: lần gửi email còn mở (pending/failed còn lượt) — đọc lại sau khi mất nhận (review #155 P1).
+func EmailDeliveryOpen(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bool, error) {
+	var open bool
+	err := tx.QueryRow(ctx, `SELECT status IN ('pending', 'failed') AND attempts < $2 FROM pf_notify.email_delivery WHERE id = $1`,
+		id, domain.MaxDeliveryAttempts).Scan(&open)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return open, err
+}
+
 // FinishEmailDelivery ghi kết quả một lần thử (finished_at = now, cùng UPDATE với status — mốc của delivery-health) và
 // xóa nhận — CHỈ khi nhận còn là của token (mất nhận → không ghi đè, trả false). lastErr chỉ là mã lỗi, không địa chỉ.
 func FinishEmailDelivery(ctx context.Context, tx pgx.Tx, id, token uuid.UUID, status string, lastErr *string, now time.Time) (bool, error) {

@@ -183,6 +183,17 @@ func ReleaseDelivery(ctx context.Context, tx pgx.Tx, id, token uuid.UUID) error 
 	return err
 }
 
+// DeliveryOpen: lần gửi còn mở (pending/failed còn lượt) — đọc lại sau khi mất nhận (review #155 P1). Không có dòng → false.
+func DeliveryOpen(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bool, error) {
+	var open bool
+	err := tx.QueryRow(ctx, `SELECT status IN ('pending', 'failed') AND attempts < $2 FROM pf_notify.push_delivery WHERE id = $1`,
+		id, domain.MaxDeliveryAttempts).Scan(&open)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return open, err
+}
+
 // FinishDelivery ghi kết quả một lần thử (finished_at = now, cùng UPDATE với status — mốc của delivery-health) và xóa nhận
 // — CHỈ khi nhận còn là của token (mất nhận: worker khác đã nhận lại sau khi hết hạn → không ghi đè, trả false).
 // lastErr chỉ là mã lỗi ngắn, không token.

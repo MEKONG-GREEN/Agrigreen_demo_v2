@@ -76,6 +76,7 @@ func (s *Service) pushLoop(batch uuid.UUID) sendLoop[domain.DeliveryJob] {
 			return true, nil
 		},
 		release: store.ReleaseDelivery,
+		open:    store.DeliveryOpen,
 	}
 }
 

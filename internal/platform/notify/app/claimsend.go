@@ -45,6 +45,8 @@ type sendLoop[J any] struct {
 	send    func(ctx context.Context, j J) (string, *string)
 	finish  func(ctx context.Context, tx pgx.Tx, j J, token uuid.UUID, status string, code *string, now time.Time) (bool, error)
 	release func(ctx context.Context, tx pgx.Tx, id, token uuid.UUID) error
+	// open: lần gửi còn mở (pending/failed còn lượt) — đọc lại sau khi mất nhận.
+	open func(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bool, error)
 }
 
 // runDeliveries gửi mọi lần gửi còn mở của lô; mỗi lần gửi tối đa một lần thử trong một lượt. Lần gửi đang do worker khác
@@ -89,7 +91,8 @@ func runDeliveries[J any](ctx context.Context, s *Service, tid uuid.UUID, l send
 }
 
 // claimAndSend nhận MỘT lần gửi (giao dịch riêng), gửi không giữ kết nối, rồi ghi kết quả (giao dịch riêng).
-// claimed=false: lần gửi đã xong hoặc đang do worker khác giữ.
+// claimed=false: lần gửi đã xong hoặc đang do worker khác giữ. retry=true: lần gửi còn mở sau lượt này (lỗi tạm thời
+// còn lượt, hoặc mất nhận mà lần gửi chưa kết thúc) — thông điệp phải được giao lại, không ACK.
 func claimAndSend[J any](ctx context.Context, s *Service, tid uuid.UUID, l sendLoop[J], j J) (retry, claimed bool, err error) {
 	lease := DefaultDeliveryLease
 	// Hạn lời gọi ra ngoài tính từ TRƯỚC giao dịch nhận (cùng mốc với claim_until = now + lease) — chờ kết nối lâu vẫn
@@ -123,9 +126,24 @@ func claimAndSend[J any](ctx context.Context, s *Service, tid uuid.UUID, l sendL
 		return false, true, err
 	}
 	if !ok {
+		// Mất nhận (hết hạn giữ, worker khác đã nhận lại): KHÔNG coi là xong (review #155 P1). Đọc lại trạng thái bền vững —
+		// lần gửi đã kết thúc (sent/dropped/hết lượt) → xong; còn mở (worker kia có thể đã chết trước khi gửi/ghi) → báo
+		// thử lại để inbox KHÔNG ACK và thông điệp được giao lại; lượt giao lại nhận lại khi hạn giữ của worker kia hết.
+		var open bool
+		if err := tenant.WithTenantTx(wctx, s.DB, tid, func(tx pgx.Tx) error {
+			var e error
+			open, e = l.open(wctx, tx, l.id(j))
+			return e
+		}); err != nil {
+			return false, true, err
+		}
+		outcome := "claim_lost_done"
+		if open {
+			outcome = "claim_lost_retry"
+		}
 		s.Log.WarnContext(ctx, "không ghi kết quả gửi: nhận việc đã thuộc worker khác", "event", "notify."+l.name,
-			"delivery_id", l.id(j).String(), "outcome", "claim_lost")
-		return false, true, nil
+			"delivery_id", l.id(j).String(), "outcome", outcome)
+		return open, true, nil
 	}
 	return status == domain.DeliveryFailed && attempts+1 < domain.MaxDeliveryAttempts, true, nil
 }
