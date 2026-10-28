@@ -101,7 +101,7 @@ func (s *Service) create(ctx context.Context, a *actor, in CreateInput) (Result,
 	if err != nil {
 		return Result{}, err
 	}
-	if prev, err := s.replay(ctx, a.p.TenantID, in.IdemKey); err != nil {
+	if prev, err := s.replayFor(ctx, a, in.IdemKey, domain.ActionCreated, uuid.Nil); err != nil {
 		return Result{}, err
 	} else if prev != nil {
 		return s.replayed(ctx, *prev)
@@ -192,7 +192,7 @@ func (s *Service) lock(ctx context.Context, a *actor, in LockInput) (Result, err
 	if err := domain.CheckReason(in.Reason); err != nil {
 		return Result{}, fieldProblem(err)
 	}
-	if prev, err := s.replay(ctx, a.p.TenantID, in.IdemKey); err != nil || prev != nil {
+	if prev, err := s.replayFor(ctx, a, in.IdemKey, domain.ActionLocked, in.UserID); err != nil || prev != nil {
 		return Result{Account: derefAcc(prev), Event: derefEv(prev), Replayed: prev != nil}, err
 	}
 	if in.UserID == a.p.ActorRef {
@@ -256,7 +256,8 @@ func (s *Service) unlock(ctx context.Context, a *actor, in LockInput) (Result, e
 	if err := domain.CheckReason(in.Reason); err != nil {
 		return Result{}, fieldProblem(err)
 	}
-	if prev, err := s.replay(ctx, a.p.TenantID, in.IdemKey); err != nil || prev != nil {
+	// BF-ACC-REPLAY-SCOPE #154: phát lại theo sổ kiểm lại phạm vi hiện hành, không tin kết quả đã lưu.
+	if prev, err := s.replayFor(ctx, a, in.IdemKey, domain.ActionUnlocked, in.UserID); err != nil || prev != nil {
 		return Result{Account: derefAcc(prev), Event: derefEv(prev), Replayed: prev != nil}, err
 	}
 	if in.UserID == a.p.ActorRef {
@@ -330,7 +331,7 @@ func (s *Service) resend(ctx context.Context, a *actor, in ResendInput) (Result,
 	if err != nil {
 		return Result{}, fieldProblem(err)
 	}
-	if prev, err := s.replay(ctx, a.p.TenantID, in.IdemKey); err != nil || prev != nil {
+	if prev, err := s.replayFor(ctx, a, in.IdemKey, domain.ActionActionsSent, in.UserID); err != nil || prev != nil {
 		return Result{Account: derefAcc(prev), Event: derefEv(prev), Replayed: prev != nil, ActivationSent: prev != nil}, err
 	}
 	t, err := s.target(ctx, a, in.UserID)
@@ -377,7 +378,7 @@ func (s *Service) Assign(ctx context.Context, in AssignInput) (Result, error) {
 	if in.OrgRef == uuid.Nil && in.Roles == nil {
 		return Result{}, problem.Validation.WithField("org_ref", "cần org_ref hoặc roles")
 	}
-	if prev, err := s.replay(ctx, a.p.TenantID, in.IdemKey); err != nil || prev != nil {
+	if prev, err := s.replayFor(ctx, a, in.IdemKey, domain.ActionAssignmentChanged, in.UserID); err != nil || prev != nil {
 		return Result{Account: derefAcc(prev), Event: derefEv(prev), Replayed: prev != nil}, err
 	}
 	if in.UserID == a.p.ActorRef {

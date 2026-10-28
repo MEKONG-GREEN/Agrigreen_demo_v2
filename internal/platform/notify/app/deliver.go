@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"time"
+
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
@@ -12,7 +15,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // ErrPushRetry: còn lần gửi lỗi tạm thời — trả cho inbox để hàng đợi giao lại (tối
@@ -21,10 +24,11 @@ var ErrPushRetry = errors.New("notify: còn lần gửi đẩy lỗi tạm thờ
 
 // HandlePush là inbox.Handler của pf.notify.push.requested: gửi từng thiết bị của lô.
 //
-// Kết quả từng lần gửi được ghi bằng giao dịch RIÊNG trên pool của module (không
-// phải tx của inbox) để khi trả lỗi cho hàng đợi giao lại, các thiết bị đã gửi
-// thành công không bị gửi lặp. Một thiết bị lỗi không chặn thiết bị khác
-// (HTX US-NEWS-03); token bị nhà cung cấp báo hỏng → ngừng dùng, không thử lại.
+// BF-NOTIFY-POOL (#155): đọc lô, gửi FCM và ghi kết quả chạy NGOÀI giao dịch inbox (txdeps.Get → runDeliveries, hợp đồng
+// #143) — trước đây handler giữ giao dịch inbox rồi chờ kết nối thứ hai trên cùng pool. Mỗi lần gửi: nhận (giao dịch
+// ngắn) → gửi → kết (giao dịch ngắn), nên khi trả lỗi cho hàng đợi giao lại, các thiết bị đã gửi thành công không bị gửi
+// lặp. Một thiết bị lỗi không chặn thiết bị khác (HTX US-NEWS-03); token bị nhà cung cấp báo hỏng → ngừng dùng, không
+// thử lại. Thân giao dịch inbox chỉ ghi nhận kết quả (inbox cùng commit, R-61).
 func (s *Service) HandlePush(ctx context.Context, _ pgx.Tx, env outbox.Envelope) error {
 	if env.EventType != port.EventPushRequested {
 		return nil
@@ -36,36 +40,44 @@ func (s *Service) HandlePush(ctx context.Context, _ pgx.Tx, env outbox.Envelope)
 	if s.Pusher == nil {
 		return fmt.Errorf("notify: %w: chưa cấu hình kênh đẩy", ErrDependency)
 	}
-	var jobs []domain.DeliveryJob
-	if err := tenant.WithTenantTx(ctx, s.DB, env.TenantID, func(tx pgx.Tx) error {
-		var e error
-		jobs, e = store.OpenDeliveries(ctx, tx, p.BatchID)
-		return e
-	}); err != nil {
+	tid, batch := env.TenantID, p.BatchID
+	res, err := txdeps.Get(ctx, "notify.push:"+env.EventID.String(), func(ctx context.Context) (deliveryOutcome, error) {
+		return runDeliveries(ctx, s, tid, s.pushLoop(batch))
+	})
+	if err != nil {
 		return err
 	}
-	retry := false
-	for _, j := range jobs {
-		status, code := s.sendOne(ctx, j)
-		if status == domain.DeliveryFailed && j.Attempts+1 < domain.MaxDeliveryAttempts {
-			retry = true
-		}
-		err := tenant.WithTenantTx(ctx, s.DB, env.TenantID, func(tx pgx.Tx) error {
-			if status == domain.DeliveryDropped && code != nil && *code == "token_invalid" {
-				if _, err := store.DisableDevice(ctx, tx, j.DeviceID, domain.TokenDisabledInvalid, s.now()); err != nil {
-					return err
-				}
-			}
-			return store.FinishDelivery(ctx, tx, j.ID, status, code, s.now())
-		})
-		if err != nil {
-			return err
-		}
-	}
-	if retry {
+	if res.retry {
 		return ErrPushRetry
 	}
 	return nil
+}
+
+// pushLoop là các bước nhận–gửi–kết của kênh đẩy cho lô batch.
+func (s *Service) pushLoop(batch uuid.UUID) sendLoop[domain.DeliveryJob] {
+	return sendLoop[domain.DeliveryJob]{
+		name: "push",
+		list: func(ctx context.Context, tx pgx.Tx) ([]domain.DeliveryJob, error) {
+			return store.OpenDeliveries(ctx, tx, batch)
+		},
+		id:    func(j domain.DeliveryJob) uuid.UUID { return j.ID },
+		claim: store.ClaimDelivery,
+		send:  s.sendOne,
+		finish: func(ctx context.Context, tx pgx.Tx, j domain.DeliveryJob, token uuid.UUID, status string, code *string, now time.Time) (bool, error) {
+			ok, err := store.FinishDelivery(ctx, tx, j.ID, token, status, code, now)
+			if err != nil || !ok {
+				return ok, err
+			}
+			if status == domain.DeliveryDropped && code != nil && *code == "token_invalid" {
+				if _, err := store.DisableDevice(ctx, tx, j.DeviceID, domain.TokenDisabledInvalid, now); err != nil {
+					return false, err
+				}
+			}
+			return true, nil
+		},
+		release: store.ReleaseDelivery,
+		open:    store.DeliveryOpen,
+	}
 }
 
 func (s *Service) sendOne(ctx context.Context, j domain.DeliveryJob) (string, *string) {

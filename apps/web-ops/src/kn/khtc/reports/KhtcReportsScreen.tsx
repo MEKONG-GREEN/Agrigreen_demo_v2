@@ -6,6 +6,7 @@ import { LoadState, dt, useAction, useLoad } from "@/kn/cycle/common";
 import { DEPT_LABEL, TEMPLATE_LABEL } from "../api";
 import { REPORT_TYPES, createKhtcPeriodApi } from "../periods/api";
 import { createReportApi, filterRows, type ReportApi, type ReportDetail, type ReportFilter } from "./api";
+import { ExternalCells } from "../external/ExternalCells";
 const ADMIN: Record<string, string> = { document_no: "Số văn bản", place: "Địa danh", report_date: "Ngày báo cáo", recipient: "Kính gửi", basis: "Căn cứ", recipients: "Nơi nhận", authority: "Thẩm quyền ký", signer_title: "Chức vụ", signer: "Người ký" };
 function saveFile(file: {
     blob: Blob;
@@ -93,6 +94,7 @@ function ReportEditor({ d, api, mode, reload }: {
     <label>Xã/điểm <select value={filter.commune ?? ""} onChange={e => setFilter({ ...filter, commune: e.target.value })}><option value="">Tất cả</option>{communes.map(x => <option key={x} value={x}>{x}</option>)}</select></label>
    </div>}
    <div className="table-wrap"><table><thead><tr>{["CT/DA, hạng mục", "ĐVT", "Kế hoạch", "Trong kỳ", "Điều chỉnh", "Lũy kế năm", "% KH", "Nội dung"].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map(r => <tr key={r.ref}><td>{r.roman} {r.name}{r.missing && " — Chưa gửi số liệu"}</td><td>{r.unit}</td><td>{r.planned ?? "–"}</td><td>{r.in_period}</td><td>{r.adjustment}</td><td>{r.year_to_date}</td><td>{r.percent ?? "–"}</td><td>{r.content}</td></tr>)}</tbody></table></div>
+   <ExternalCells items={data.external}/>
    <details><summary>Số liệu nguồn và phiếu đã gửi</summary>{(data.metrics ?? []).map(m => <details key={m.key}><summary>{m.label}: {m.value.Cumulative ?? m.value.Sum ?? m.value.Min ?? "–"} {m.unit}</summary><p>{m.value.Closed ? "Đã chốt" : "Tạm tính"} · Lũy kế năm KHTC {m.value.YearToDate ?? "–"} · Chưa xác nhận {m.value.Unconfirmed ?? "–"}</p><p>Trong kỳ {m.value.Increment ?? m.value.Sum ?? "–"} · Gốc {m.value.Base ?? "–"} · Cách lấy gốc: {m.value.BaseRef || "–"}</p>{(m.value.PriceDays ?? []).map(day => <p key={day.Day}>{day.Day}: {day.Min} – {day.Max} {m.unit}</p>)}<ul>{(m.trace ?? []).map((t, i) => <li key={i}>{t.module} · {t.calendar} · {t.native_key} · {t.from?.slice(0, 10)} – {t.to?.slice(0, 10)} · {t.closed ? "Đã chốt" : "Chưa chốt"} · Tuần KHTC {t.target_key}</li>)}</ul></details>)}<p>Ảnh chụp nguồn v{data.sources?.version ?? "–"} · {dt(data.captured_at)}</p><ul>{(data.submissions ?? []).map(s => <li key={s.submission_id}>{DEPT_LABEL[s.department] ?? s.department} · lần gửi {s.attempt} · mã bảng {s.sheet_id}</li>)}</ul></details>
    {!d.final && d.editable && <div>
     {(data.template === "mau_5" || mode === "progress") && <label><input type="checkbox" checked={exportFiltered} onChange={e => setExportFiltered(e.target.checked)}/> Xuất theo bộ lọc đang chọn</label>}
