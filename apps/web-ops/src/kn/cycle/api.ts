@@ -422,18 +422,38 @@ export type MaterialImport = AppPaths["/v1/kn/materials/import"]["post"]["respon
 /** Hồ sơ KN riêng (#119 BF-SRV-KN-ATTRS): năm sản xuất theo loại máy của HTX (TT-10). */
 export type KnMachineProfile = A["KNMachineProfile"];
 
+/**
+ * KNSPLIT-2-KN-RECORDS (#67): hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (pf_extension, /v1/kn/producer-records) — thay
+ * đường ghi legacy /v1/kn/cooperatives: KN không tạo/sửa HTX nền tảng. HTX đã công bố chỉ để liên kết đối chiếu (htx_ref).
+ */
+export type KnProducerKind = A["KNProducerKind"];
+export type KnProducer = A["KNProducerRecord"];
+export type KnProducerDetail = A["KNProducerRecordDetail"];
+export type KnProducerWrite = A["KNProducerRecordWrite"];
+export type KnProducerQuery = { kind: KnProducerKind; commune?: string; status?: "active" | "inactive" | "all"; q?: string; parent_ref?: string; htx_ref?: string };
+/** Một trang danh sách hồ sơ: `cursor` = next_cursor của trang trước (không gửi = trang đầu), `limit` ≤ 200. */
+export type KnProducerPageQuery = KnProducerQuery & { cursor?: string; limit?: number };
+export type KnProducerPage = { items: KnProducer[]; next_cursor: string | null };
+export type KnHTXCandidate = { htx_ref: string; name: string; commune_code: string; linked_ref: string | null };
+
 export type CollectApi = ReturnType<typeof createCollectApi>;
 
 export function createCollectApi(opts: KnHttpOptions) {
   const call = knHttp(opts);
   return {
+    // Hồ sơ KN riêng (#67) — mọi thao tác ghi HTX / Nông hộ / Tổ hợp tác của màn KN đi qua đây.
+    // Một trang theo con trỏ (máy chủ: limit 1–200, mặc định 50; next_cursor null = hết). Đọc hết → loadAllRecords.
+    records: (q: KnProducerPageQuery) => call<KnProducerPage>("GET", "/v1/kn/producer-records", undefined, q),
+    record: (ref: string) => call<KnProducerDetail>("GET", `/v1/kn/producer-records/${ref}`),
+    createRecord: (b: KnProducerWrite, idem?: string) => call<KnProducerDetail>("POST", "/v1/kn/producer-records", b, undefined, idem),
+    updateRecord: (ref: string, b: KnProducerWrite & { base_version: number }, idem?: string) => call<KnProducerDetail>("POST", `/v1/kn/producer-records/${ref}`, b, undefined, idem),
+    setRecordStatus: (ref: string, deactivate: boolean, b: { reason: string; base_version: number }, idem?: string) =>
+      call<KnProducerDetail>("POST", `/v1/kn/producer-records/${ref}/${deactivate ? "deactivate" : "reactivate"}`, b, undefined, idem),
+    /** HTX đã công bố trong phạm vi (chỉ đọc) — chọn để liên kết đối chiếu khi thêm hồ sơ HTX. */
+    htxCandidates: (commune?: string) => call<{ items: KnHTXCandidate[] }>("GET", "/v1/kn/producer-htx-candidates", undefined, { commune }),
+    // Đọc HTX nền tảng (legacy GET, chỉ đọc) — bộ chọn HTX của màn Máy móc/Thửa (khai báo máy, thửa vẫn ở module nền).
+    // Chuyển sang publication ở ticket con của #67; KHÔNG dùng các route ghi /v1/kn/cooperatives nữa.
     cooperatives: (q: { commune?: string; status?: "active" | "inactive" | "all"; q?: string } = {}) => call<A["KNCooperativeList"]>("GET", "/v1/kn/cooperatives", undefined, { ...q, limit: 200 }),
-    createCooperative: (b: A["KNCooperativeCreate"], idem?: string) => call<KnCooperative>("POST", "/v1/kn/cooperatives", b, undefined, idem),
-    cooperative: (ref: string) => call<KnCooperative>("GET", `/v1/kn/cooperatives/${ref}`),
-    deactivate: (ref: string, reason: string) => call<A["KNCooperativeDeactivated"]>("POST", `/v1/kn/cooperatives/${ref}/deactivate`, { reason }),
-    households: (ref: string) => call<A["KNHouseholdList"]>("GET", `/v1/kn/cooperatives/${ref}/households`),
-    addHousehold: (ref: string, b: { holder: { full_name: string; phone: string }; cultivated_area_ha?: string }, idem?: string) =>
-      call<KnHousehold>("POST", `/v1/kn/cooperatives/${ref}/households`, b, undefined, idem),
     machines: (commune?: string) => call<KnMachineOverview>("GET", "/v1/kn/machine-counts", undefined, { commune }),
     coopMachines: (ref: string) => call<KnCoopMachines>("GET", `/v1/kn/machine-counts/${ref}`),
     putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[], idem?: string) =>
