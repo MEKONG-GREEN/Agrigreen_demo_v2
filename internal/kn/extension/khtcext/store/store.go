@@ -1,4 +1,4 @@
-// Package store: SQL của "Số liệu nguồn ngoài" KHTC (pf 20261028050959 — pf_extension.khtc_ext_indicator,
+// Package store: SQL của "Số liệu nguồn ngoài" KHTC (pf 20261028152846 — pf_extension.khtc_ext_indicator,
 // khtc_ext_evidence, khtc_ext_figure, khtc_ext_import) trên pool vai của pf/extension, luôn trong giao dịch có ngữ cảnh
 // tenant (RLS). Mọi bảng chỉ ghi thêm; sửa = bản ghi bù.
 package store
