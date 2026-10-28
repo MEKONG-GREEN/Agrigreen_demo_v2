@@ -78,7 +78,7 @@ func TestCNTSReminderAndOutbreakChannels_BF_NOTIFY_KN_ADAPTER(t *testing.T) {
 	}
 
 	officer := f.user(authz.Scope{Units: []string{prov91}}, partyport.RoleKNProvinceAdmin)
-	officer.device("cnts-outbreak-token")
+	officer.device("cnts-outbreak-push-token")
 	f.emails.set(officer.actor, "cnts-outbreak@example.invalid")
 	foreign := f.asActor(ids.New(), ids.New(), officer.actor, partyport.RoleKNProvinceAdmin)
 	alert := extport.CNTSAlertChangedV1{AlertRef: ids.New(), Action: "raised", Kind: "outbreak", Level: "urgent",
