@@ -1856,9 +1856,7 @@
         "route": "/kn/cnts/bao-cao-dinh-ky",
         "icon": "report",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -2528,6 +2526,15 @@
         "key": "tinh.khtc.da_xuat",
         "label": "Báo cáo đã xuất",
         "route": "/kn/khtc/bao-cao-da-xuat",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.bao_cao_den",
+        "label": "Báo cáo đến",
+        "route": "/kn/bao-cao-den",
         "icon": "report",
         "badge_source": null,
         "enabled": true,
@@ -3556,6 +3563,15 @@
         "key": "tinh.hcth.bao_cao_so",
         "label": "Biểu mẫu báo cáo Sở",
         "route": "/kn/nhan-su/bao-cao-so",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.bao_cao_den",
+        "label": "Báo cáo đến",
+        "route": "/kn/bao-cao-den",
         "icon": "report",
         "badge_source": null,
         "enabled": true,

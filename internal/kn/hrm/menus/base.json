@@ -209,6 +209,17 @@
                 "ComingSoon": false,
                 "Needs": "",
                 "Children": null
+              },
+              {
+                "Key": "tinh.bao_cao_den",
+                "Label": "Báo cáo đến",
+                "Route": "/kn/bao-cao-den",
+                "Icon": "report",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
               }
             ]
           },

@@ -69,8 +69,9 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/commune-reports", h.communeReports)
 	g.GET("/commune-reports/stats", h.communeStats)
 
-	h.registerCNTS(g)    // W11.42
-	h.registerCNTSAgg(g) // W11.44
+	h.registerCNTS(g)     // W11.42
+	h.registerCNTSAgg(g)  // W11.44
+	h.registerCNTSBM11(g) // W11.45
 }
 
 func bind(c *gin.Context, v any) bool {

@@ -881,8 +881,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.cnts.bao_cao_dinh_ky",
             "label": "Báo cáo định kỳ",
             "route": "/kn/cnts/bao-cao-dinh-ky",
-            "icon": "report",
-            "soon": true
+            "icon": "report"
           },
           {
             "key": "tinh.cnts.ksgm",
@@ -1255,6 +1254,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.khtc.da_xuat",
             "label": "Báo cáo đã xuất",
             "route": "/kn/khtc/bao-cao-da-xuat",
+            "icon": "report"
+          },
+          {
+            "key": "tinh.bao_cao_den",
+            "label": "Báo cáo đến",
+            "route": "/kn/bao-cao-den",
             "icon": "report"
           },
           {
@@ -1750,6 +1755,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.hcth.bao_cao_so",
             "label": "Biểu mẫu báo cáo Sở",
             "route": "/kn/nhan-su/bao-cao-so",
+            "icon": "report"
+          },
+          {
+            "key": "tinh.bao_cao_den",
+            "label": "Báo cáo đến",
+            "route": "/kn/bao-cao-den",
             "icon": "report"
           }
         ]

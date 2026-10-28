@@ -750,7 +750,7 @@
                 "Icon": "report",
                 "BadgeSource": "",
                 "Requires": null,
-                "ComingSoon": true,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               },
@@ -1367,6 +1367,17 @@
                 "Key": "tinh.khtc.da_xuat",
                 "Label": "Báo cáo đã xuất",
                 "Route": "/kn/khtc/bao-cao-da-xuat",
+                "Icon": "report",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.bao_cao_den",
+                "Label": "Báo cáo đến",
+                "Route": "/kn/bao-cao-den",
                 "Icon": "report",
                 "BadgeSource": "",
                 "Requires": null,

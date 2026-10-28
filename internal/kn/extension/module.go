@@ -133,6 +133,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
 		Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.rc.BM11Programs = m.bm11Programs // W11.45: kết quả CT/DA cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()
 	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs)
 	return m

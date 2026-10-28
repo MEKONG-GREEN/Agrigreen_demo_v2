@@ -15784,6 +15784,273 @@ paths:
               schema: {type: string, format: binary}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {description: "extension.cnts_knqg_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports:
+    get:
+      summary: "Báo cáo phòng CNTS BM-11 (W11.45, UR-TINH-16, FN-16): danh sách báo cáo tuần/tháng/quý/năm của phòng (Admin, Cấp Tỉnh/Cấp Quốc gia CNTS; Admin/TW truyền province)"
+      operationId: extensionCntsBM11List
+      tags: [extension]
+      parameters:
+        - {name: province, in: query, schema: {type: string}}
+        - {name: type, in: query, schema: {type: string, enum: [week, month, quarter, year]}}
+        - {name: status, in: query, schema: {type: string, enum: [draft, pending, returned, sent]}}
+      responses:
+        "200":
+          description: Danh sách (mới nhất trước) + quyền tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11List"}
+        "403": {description: "forbidden", $ref: "#/components/responses/Problem"}
+    post:
+      summary: "Lập báo cáo BM-11 của kỳ (Cấp Tỉnh CNTS): tính phần tự động từ BM-04/BM-17/BM-18 đã nộp (hoặc số đã chốt khi mọi kỳ nguồn đã chốt) và CT/DA; chỉ lập sau hạn nộp của tuần cuối và khi tỷ lệ xã đã nộp của từng biểu đạt mức Cấp Tỉnh đặt hoặc kỳ đã chốt (quy tắc 13); một báo cáo mỗi kỳ"
+      operationId: extensionCntsBM11Create
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSBM11CreateInput"}
+      responses:
+        "201":
+          description: Báo cáo Đang soạn
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "200":
+          description: Gửi lặp cùng Idempotency-Key — báo cáo đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "403": {description: "forbidden", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_bm11_exists | extension.cnts_bm11_not_ready", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/preview:
+    get:
+      summary: "Tính thử phần tự động của một kỳ BM-11 (khóa rỗng = kỳ vừa kết thúc): số liệu, Tổng hợp từ n/N xã, xã thiếu, lập được chưa và lý do"
+      operationId: extensionCntsBM11Preview
+      tags: [extension]
+      parameters:
+        - {name: province, in: query, schema: {type: string}}
+        - {name: type, in: query, required: true, schema: {type: string, enum: [week, month, quarter, year]}}
+        - {name: key, in: query, schema: {type: string, description: "YYYY-Www | YYYY-MM | YYYY-Qn | YYYY"}}
+      responses:
+        "200":
+          description: Kết quả tính thử
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11Preview"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/inbox:
+    get:
+      summary: "Hộp \"Báo cáo đến\" của phòng nhận (HCTH, KHTC, Ban Giám đốc — Cấp Tỉnh): báo cáo BM-11 đã gửi tới phòng mình (AC-02)"
+      operationId: extensionCntsBM11Inbox
+      tags: [extension]
+      responses:
+        "200":
+          description: Báo cáo đã gửi tới phòng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11List"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}:
+    get:
+      summary: Chi tiết báo cáo BM-11 (nội dung phiên bản hiện hành, nơi nhận, lịch sử, quyền thao tác)
+      operationId: extensionCntsBM11Get
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Báo cáo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_bm11_not_found", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/sections:
+    put:
+      summary: "Sửa phần viết (mục theo loại báo cáo; đoạn chương trình: chủ nhiệm, người lập, Lãnh đạo phòng) — báo cáo Đang soạn/Trả lại; phần tự động không sửa tay (BR-01)"
+      operationId: extensionCntsBM11Edit
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSBM11EditInput"}
+      responses:
+        "200":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_bm11_version_conflict | extension.cnts_bm11_state", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/refresh:
+    post:
+      summary: Làm mới số liệu tự động (giữ phần viết) — báo cáo Đang soạn/Trả lại
+      operationId: extensionCntsBM11Refresh
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSBM11SeqInput"}
+      responses:
+        "200":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_bm11_version_conflict | extension.cnts_bm11_state", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/submit:
+    post:
+      summary: Trình duyệt (Cấp Tỉnh CNTS)
+      operationId: extensionCntsBM11Submit
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSBM11SeqInput"}
+      responses:
+        "200":
+          description: Chờ duyệt
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_bm11_version_conflict | extension.cnts_bm11_state", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/approve:
+    post:
+      summary: "Lãnh đạo phòng duyệt — duyệt xong tự gửi theo nơi nhận (BR-03); Ban Giám đốc không duyệt (BR-05)"
+      operationId: extensionCntsBM11Approve
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSBM11SeqInput"}
+      responses:
+        "200":
+          description: Đã gửi
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_bm11_version_conflict | extension.cnts_bm11_state", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/return:
+    post:
+      summary: "Lãnh đạo phòng trả lại báo cáo Chờ duyệt — bắt buộc ý kiến (AC-04)"
+      operationId: extensionCntsBM11Return
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSBM11SeqInput"}
+      responses:
+        "200":
+          description: Trả lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_bm11_version_conflict | extension.cnts_bm11_state", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation — thiếu ý kiến", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/receive:
+    post:
+      summary: "Phòng nhận bấm \"Đã nhận\" (HCTH/KHTC Cấp Tỉnh, mỗi nơi nhận một lần)"
+      operationId: extensionCntsBM11Receive
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Báo cáo (nơi nhận đã xác nhận)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_bm11_state", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/word:
+    post:
+      summary: "Xuất Word BM-11 qua pf/export: báo cáo đã gửi nhận số {n}/BC-CNTS (một số mỗi báo cáo, dùng lại khi xuất lại); bản chưa gửi in …/BC-CNTS"
+      operationId: extensionCntsBM11Word
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Lần xuất đã ghi sổ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSBM11WordRun"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_bm11_not_found | export.template_not_found", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/words:
+    get:
+      summary: Lịch sử các lần xuất Word của báo cáo (mới nhất trước)
+      operationId: extensionCntsBM11Words
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSBM11WordRun"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/bm11/reports/{id}/words/{run}/download:
+    get:
+      summary: Tải lại tệp Word đã xuất (pf/export kiểm băm SHA-256)
+      operationId: extensionCntsBM11WordDownload
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: run, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .docx
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_bm11_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -25485,6 +25752,213 @@ components:
         base_version: {type: integer}
         reason: {type: string, maxLength: 1000}
     CNTSKNQGWordRun:
+      type: object
+      required: [id, seq, template, template_version, doc_number, doc_number_auto, file_name, body_hash, size, actor_ref, at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        template: {type: string}
+        template_version: {type: integer}
+        doc_number: {type: string}
+        doc_number_auto: {type: boolean}
+        file_name: {type: string}
+        body_hash: {type: string}
+        size: {type: integer}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+    CNTSBM11CreateInput:
+      type: object
+      required: [type, period_key]
+      properties:
+        type: {type: string, enum: [week, month, quarter, year]}
+        period_key: {type: string, description: "YYYY-Www | YYYY-MM | YYYY-Qn | YYYY"}
+        recipients: {type: array, maxItems: 3, items: {type: string, enum: [bgd, hcth, khtc]}, description: "Rỗng = mặc định (tuần: bgd, hcth; tháng/quý/năm: bgd, khtc)"}
+    CNTSBM11EditInput:
+      type: object
+      required: [expected_seq]
+      properties:
+        expected_seq: {type: integer, format: int64}
+        sections: {type: object, additionalProperties: {type: string, maxLength: 8000}}
+        programs: {type: object, additionalProperties: {type: string, maxLength: 8000}, description: "mã CT/DA → đoạn viết"}
+    CNTSBM11SeqInput:
+      type: object
+      required: [expected_seq]
+      properties:
+        expected_seq: {type: integer, format: int64}
+        comment: {type: string, maxLength: 2000, description: "Ý kiến khi trả lại (bắt buộc)"}
+    CNTSBM11Summary:
+      type: object
+      required: [id, province, type, period_key, label, from, to, recipients, status, seq, last_event, last_at, created_by]
+      properties:
+        id: {type: string, format: uuid}
+        province: {type: string}
+        type: {type: string, enum: [week, month, quarter, year]}
+        period_key: {type: string}
+        label: {type: string}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        recipients: {type: array, items: {type: string, enum: [bgd, hcth, khtc]}}
+        status: {type: string, enum: [draft, pending, returned, sent]}
+        seq: {type: integer, format: int64}
+        last_event: {type: string, enum: [created, refreshed, edited, submitted, returned, approved, received]}
+        last_at: {type: string, format: date-time}
+        created_by: {type: string}
+    CNTSBM11List:
+      type: object
+      required: [items, can_create]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Summary"}}
+        can_create: {type: boolean}
+    CNTSBM11Coverage:
+      type: object
+      required: [form, expected, reported, missing, missing_names, periods, closed]
+      properties:
+        form: {type: string}
+        expected: {type: integer}
+        reported: {type: integer}
+        missing: {type: array, items: {type: string}}
+        missing_names: {type: array, items: {type: string}}
+        periods: {type: integer}
+        closed: {type: integer}
+    CNTSBM11Line:
+      type: object
+      required: [key, group, label, unit, sub, value]
+      properties:
+        key: {type: string}
+        group: {type: string}
+        label: {type: string}
+        unit: {type: string}
+        sub: {type: boolean}
+        value: {type: string, description: Số thập phân dạng chuỗi}
+    CNTSBM11Fishery:
+      type: object
+      required: [catch_cur, catch_ytd, aqua_cur, aqua_ytd, total_cur, total_ytd, groups]
+      properties:
+        catch_cur: {type: string}
+        catch_ytd: {type: string}
+        aqua_cur: {type: string}
+        aqua_ytd: {type: string}
+        total_cur: {type: string}
+        total_ytd: {type: string}
+        groups: {type: object, additionalProperties: {type: string}}
+    CNTSBM11Key:
+      type: object
+      required: [key, label]
+      properties:
+        key: {type: string}
+        label: {type: string}
+    CNTSBM11Preview:
+      type: object
+      required: [type, period_key, label, from, to, weeks, due_at, min_pct, ready, reasons, basis, communes, coverage, groups, lines, fishery, recipients, existing_id]
+      properties:
+        type: {type: string, enum: [week, month, quarter, year]}
+        period_key: {type: string}
+        label: {type: string}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        weeks: {type: array, items: {type: string}}
+        due_at: {type: string, format: date-time}
+        min_pct: {type: integer}
+        ready: {type: boolean}
+        reasons: {type: array, items: {type: string}}
+        basis: {type: string, enum: [submitted, closed]}
+        communes: {type: string}
+        coverage: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Coverage"}}
+        groups: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Key"}}
+        lines: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Line"}}
+        fishery: {$ref: "#/components/schemas/CNTSBM11Fishery"}
+        recipients: {type: array, items: {type: string}}
+        existing_id: {type: [string, "null"], format: uuid}
+    CNTSBM11:
+      allOf:
+        - $ref: "#/components/schemas/CNTSBM11Summary"
+        - type: object
+          required: [version, content_hash, basis, communes, coverage, groups, lines, fishery, programs, sections, supplement, return_comment, recipient_list, history, can, replayed]
+          properties:
+            version: {type: integer, format: int64}
+            content_hash: {type: string}
+            basis: {type: string, enum: [submitted, closed]}
+            communes: {type: string, description: "Tổng hợp từ n/N xã"}
+            coverage: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Coverage"}}
+            groups: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Key"}}
+            lines: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Line"}}
+            fishery: {$ref: "#/components/schemas/CNTSBM11Fishery"}
+            programs:
+              type: array
+              items:
+                type: object
+                required: [ref, code, name, kind, manager_ref, sites, households, text, manager_name, can_edit]
+                properties:
+                  ref: {type: string}
+                  code: {type: string}
+                  name: {type: string}
+                  kind: {type: string}
+                  manager_ref: {type: string}
+                  sites: {type: integer}
+                  households: {type: integer}
+                  text: {type: string}
+                  manager_name: {type: string}
+                  can_edit: {type: boolean}
+            sections:
+              type: array
+              items:
+                type: object
+                required: [key, label, text]
+                properties:
+                  key: {type: string}
+                  label: {type: string}
+                  text: {type: string}
+            supplement:
+              type: array
+              items:
+                type: object
+                required: [period, key, label, unit, sent, now]
+                properties:
+                  period: {type: string}
+                  key: {type: string}
+                  label: {type: string}
+                  unit: {type: string}
+                  sent: {type: string}
+                  now: {type: string}
+            return_comment: {type: string}
+            recipient_list:
+              type: array
+              items:
+                type: object
+                required: [code, label, received, received_at, actor_name]
+                properties:
+                  code: {type: string, enum: [bgd, hcth, khtc]}
+                  label: {type: string}
+                  received: {type: boolean}
+                  received_at: {type: [string, "null"], format: date-time}
+                  actor_name: {type: string}
+            history:
+              type: array
+              items:
+                type: object
+                required: [seq, event, status, comment, recipient, content_hash, actor_name, at]
+                properties:
+                  seq: {type: integer, format: int64}
+                  event: {type: string}
+                  status: {type: string}
+                  comment: {type: string}
+                  recipient: {type: string}
+                  content_hash: {type: string}
+                  actor_name: {type: string}
+                  at: {type: string, format: date-time}
+            can:
+              type: object
+              required: [edit, refresh, submit, approve, return, receive, word]
+              properties:
+                edit: {type: boolean}
+                refresh: {type: boolean}
+                submit: {type: boolean}
+                approve: {type: boolean}
+                return: {type: boolean}
+                receive: {type: boolean}
+                word: {type: boolean}
+            replayed: {type: boolean}
+    CNTSBM11WordRun:
       type: object
       required: [id, seq, template, template_version, doc_number, doc_number_auto, file_name, body_hash, size, actor_ref, at]
       properties:
