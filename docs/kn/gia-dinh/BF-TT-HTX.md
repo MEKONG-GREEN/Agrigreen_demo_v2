@@ -1,0 +1,14 @@
+## BF-TT-HTX — HTX / Nông hộ / Tổ hợp tác: ba danh sách, validate, có sửa (TT-08, TT-09, #102)
+
+- **Nguồn:** log bug khách, PRD `kn-bugfix-brd-alignment`: TT-08 "Danh mục HTX validate theo R-A4 — bắt buộc Xã/phường, Loại, Tên, Người đại diện, Điện thoại; STT tự sinh"; TT-09 "Tách ba danh sách HTX, Nông hộ, Tổ hợp tác — ba màn hoặc ba tab riêng, mỗi cái có bộ lọc riêng". Phụ thuộc #67 (hồ sơ KN riêng `/v1/kn/producer-records`) — KN không ghi dữ liệu HTX.
+- **TT-09 — ba danh sách:** ba trang dưới mục menu "Danh sách HTX" (giữ nhãn menu UP-01, không đổi menu), có thanh tab HTX | Nông hộ | Tổ hợp tác:
+  - HTX `/kn/du-lieu/htx`: lọc Xã/phường, Trạng thái, tìm theo tên; cột Tên HTX, Xã/phường, Người đại diện, Điện thoại (che), Diện tích, số Nông hộ, Trạng thái.
+  - Nông hộ `/kn/du-lieu/htx/nong-ho`: lọc Xã/phường, Trạng thái, **Thuộc HTX/THT** (không tìm theo tên vì họ tên chủ hộ ở kho định danh, chỉ hiện nhãn che); cột Chủ hộ, Xã/phường, Thuộc HTX/THT, Điện thoại, Diện tích canh tác.
+  - Tổ hợp tác `/kn/du-lieu/htx/to-hop-tac`: như HTX (không MST, không liên kết HTX đã công bố).
+  - Mỗi trang giữ bộ lọc riêng (đổi tab không mang bộ lọc theo). Bảng có STT (UI-KIT `DataTable`, R-A5). Biểu tượng Xem/Sửa trên dòng.
+- **TT-08 — thêm:** trang Thêm (R-A2) có ô **Loại** bắt buộc (HTX / Nông hộ / Tổ hợp tác), mặc định theo tab đang xem; trường bắt buộc đổi theo loại: Xã/phường, Tên (HTX, THT), Người đại diện (HTX, THT) hoặc Chủ hộ (Nông hộ), Điện thoại. SĐT kiểm 10 chữ số bắt đầu bằng 0 ở web; máy chủ kiểm theo quy tắc kho định danh. Diện tích không âm, tối đa 4 chữ số lẻ, ≤ 1.000.000 ha (R-A1; máy chủ chặn số mũ/chuỗi dài). Nông hộ chọn tùy chọn HTX/THT cha; từ chi tiết HTX/THT có "Thêm nông hộ".
+- **TT-08 — có sửa:** trang Sửa cho cả ba loại (`…/{id}/sua`), điền sẵn; người đại diện/chủ hộ để trống = giữ người hiện tại (họ tên, SĐT không hiện rõ); gửi `base_version` — người khác vừa sửa → 409, tải lại. Loại không đổi sau khi tạo. Hồ sơ ngừng hoạt động phải kích hoạt lại trước khi sửa. Vô hiệu hóa/kích hoạt lại có lý do (≥ 10 ký tự, pop-up ngắn theo ui-kit).
+- **Quyền web:** chỉ Cấp Xã thấy nút Thêm/Sửa/Vô hiệu hóa; Cấp Tỉnh, Quốc gia, Admin chỉ xem (máy chủ: Cấp Tỉnh 403, Quốc gia 403 read_only).
+- **Mock:** `apps/web-ops/src/api/mock/kn-collect-records.ts` (#67) có sẵn HTX demo (liên kết HTX giả lập), 2 Tổ hợp tác, nông hộ thuộc HTX/THT.
+- **Không đổi:** menu (mục "Danh sách HTX" vẫn trỏ `/kn/du-lieu/htx`), route API (#67).
+- **Câu hỏi PO:** (1) Nhãn menu giữ "Danh sách HTX" hay đổi thành "HTX, Nông hộ, Tổ hợp tác"? (2) Nông hộ có cần tìm theo SĐT (tra kho định danh) không?
