@@ -5,6 +5,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -179,6 +180,37 @@ func Events(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID][]Ev
 func Lock(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) error {
 	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('cnts_campaign:' || $1::text || ':' || $2::text, 0))`, tid.String(), id.String())
 	return err
+}
+
+// Claim ghi ý định thao tác của đợt (BF-CNTS-CAMPAIGN-POOL, #156; pf 20261028034338) hạn lease tính bằng giờ DB; ý định khác
+// còn hạn → false. Gọi trong giao dịch đã giữ Lock.
+func Claim(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, action string, lease time.Duration) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_campaign_intent (tenant_id, campaign_id, claim_id, action, claim_until, updated_at)
+	  VALUES ($1, $2, $3, $4, now() + $5::interval, now())
+	  ON CONFLICT (tenant_id, campaign_id) DO UPDATE SET claim_id = EXCLUDED.claim_id, action = EXCLUDED.action,
+	    claim_until = EXCLUDED.claim_until, updated_at = now()
+	  WHERE cnts_campaign_intent.claim_until IS NULL OR cnts_campaign_intent.claim_until <= now()
+	  RETURNING true`, tid, id, token, action, strconv.FormatInt(int64(lease/time.Second), 10)+" seconds").Scan(&ok)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return ok, err
+}
+
+// Release bỏ ý định của token. live → chỉ khi ý định CÒN HẠN (giờ DB). released=false: token không còn giữ ý định (hết hạn /
+// người khác đã nhận) — bên gọi quyết định đó có phải lỗi (ghi kết quả: có; bỏ khi lỗi: không, ý định đã tự hết).
+func Release(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, live bool) (released bool, err error) {
+	q := `UPDATE pf_extension.cnts_campaign_intent SET claim_id = NULL, action = NULL, claim_until = NULL, updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3`
+	if live {
+		q += ` AND claim_until > now()`
+	}
+	tag, err := tx.Exec(ctx, q, tid, id, token)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
 }
 
 func strIDs(ids []uuid.UUID) []string {
