@@ -105,7 +105,9 @@ type ext struct {
 	labels   map[uuid.UUID]string // person_ref → nhãn chủ hộ
 }
 
-func (s *Service) ext(ctx context.Context, pc *pctx, form string) ext {
+// ext tra tên chủ nhiệm, tên xã; nhãn chủ hộ (kho định danh) chỉ khi lập Mẫu 05 (Phụ lục I điền sẵn) — labels=false ở lần sửa,
+// chuyển trạng thái (không gọi kho định danh thừa).
+func (s *Service) ext(ctx context.Context, pc *pctx, form string, labels bool) ext {
 	e := ext{communes: map[string]string{}, labels: map[uuid.UUID]string{}}
 	e.manager = s.names(ctx, []uuid.UUID{pc.p.ManagerRef})[pc.p.ManagerRef]
 	for _, x := range pc.sites {
@@ -113,7 +115,7 @@ func (s *Service) ext(ctx context.Context, pc *pctx, form string) ext {
 			e.communes[x.CommuneCode] = s.unitName(ctx, x.CommuneCode)
 		}
 	}
-	if form == domain.Form05 && s.Vault != nil {
+	if labels && form == domain.Form05 && s.Vault != nil {
 		if v := s.Vault(); v != nil {
 			for i, h := range pc.hhs {
 				if i >= 200 {
@@ -438,7 +440,7 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (DocView, error) {
 	if err := s.checkProject(c, pc, in.Site); err != nil {
 		return DocView{}, err
 	}
-	e := s.ext(ctx, pc, in.Form) // ngoài giao dịch
+	e := s.ext(ctx, pc, in.Form, true) // ngoài giao dịch
 	ref := ids.New()
 	if in.Ref != nil && *in.Ref != uuid.Nil {
 		ref = *in.Ref
@@ -604,7 +606,7 @@ func (s *Service) Update(ctx context.Context, in UpdateInput) (DocView, error) {
 	if err := noPII(content.Texts()); err != nil {
 		return DocView{}, err
 	}
-	e := s.ext(ctx, pc, cur.Form)
+	e := s.ext(ctx, pc, cur.Form, false)
 	return s.write(ctx, c, *cur, in.BaseVersion, idem, func(fresh *pctx, diary *domain.DiaryFacts, d *store.Doc) error {
 		spec.Fill(&content, facts(fresh, d.SiteRef, diary, e))
 		d.Event, d.Content = domain.EventUpdated, content
@@ -724,7 +726,7 @@ func (s *Service) transition(ctx context.Context, in ActInput, scan *store.Scan)
 	if !versionOK(in.BaseVersion, cur.Seq) {
 		return DocView{}, ErrDocConflict
 	}
-	e := s.ext(ctx, pc, cur.Form)
+	e := s.ext(ctx, pc, cur.Form, false)
 	return s.write(ctx, c, *cur, in.BaseVersion, idem, func(fresh *pctx, diary *domain.DiaryFacts, d *store.Doc) error {
 		if step.NewRev {
 			d.Revision++
