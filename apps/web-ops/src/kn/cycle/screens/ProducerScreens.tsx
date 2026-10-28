@@ -16,7 +16,7 @@ import { DataTable, FilterBar, FilterChip, PageHeader, RowActions, SearchBox, St
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import { PiiHint } from "@/kn/pii";
 import type { KnProducer, KnProducerDetail, KnProducerKind, KnProducerWrite } from "../api";
-import { LoadState, num, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
+import { LoadState, num, useAction, useCommuneNames, useLoad } from "../common";
 import { useCommuneFilter } from "./DataScreens";
 
 /** Cấu hình theo loại: nhãn, tiêu đề danh sách, đường dẫn gốc (TT-09: ba danh sách riêng). */
@@ -25,6 +25,12 @@ export const PRODUCER_KINDS: Record<KnProducerKind, { label: string; list: strin
   household: { label: "Nông hộ", list: "Danh sách Nông hộ", base: "/kn/du-lieu/htx/nong-ho", nameLabel: "Chủ hộ", empty: "Xã phụ trách chưa có nông hộ." },
   coop_group: { label: "Tổ hợp tác", list: "Danh sách Tổ hợp tác", base: "/kn/du-lieu/htx/to-hop-tac", nameLabel: "Tên Tổ hợp tác", empty: "Xã phụ trách chưa có tổ hợp tác." },
 };
+
+/** Chỉ Cấp Xã thêm/sửa hồ sơ trên web (máy chủ: Cấp Xã, Admin; Cấp Tỉnh 403 forbidden, Cấp Quốc gia 403 read_only). */
+export function useProducerReadOnly(): boolean {
+  const { kn } = useAuth();
+  return kn.context?.role !== "kn_xa";
+}
 
 const EVENT_LABEL: Record<string, string> = { created: "Tạo hồ sơ", updated: "Sửa hồ sơ", deactivated: "Vô hiệu hóa", reactivated: "Kích hoạt lại" };
 
@@ -59,7 +65,7 @@ export function ProducerTabs({ current }: { current: KnProducerKind }) {
 /** Danh sách một loại hồ sơ, bộ lọc riêng của loại (TT-09). */
 export function ProducerListScreen({ kind, title, actions }: { kind: KnProducerKind; title?: string; actions?: ReactNode }) {
   const { collectApi } = useAuth();
-  const readOnly = useCycleReadOnly();
+  const readOnly = useProducerReadOnly();
   const f = useCommuneFilter();
   const cfg = PRODUCER_KINDS[kind];
   const [status, setStatus] = useState<"active" | "inactive" | "all">("active");
@@ -135,7 +141,7 @@ export function ProducerListScreen({ kind, title, actions }: { kind: KnProducerK
 export function ProducerDetailScreen({ kind }: { kind: KnProducerKind }) {
   const { id } = useParams<{ id: string }>();
   const { collectApi } = useAuth();
-  const readOnly = useCycleReadOnly();
+  const readOnly = useProducerReadOnly();
   const act = useAction();
   const cfg = PRODUCER_KINDS[kind];
   const s = useLoad(async () => {
@@ -292,7 +298,7 @@ export function producerBody(kind: KnProducerKind, b: Form, withPerson: boolean)
 export function ProducerFormScreen({ kind: fixedKind, kinds, parentRef, editRef, back }: { kind?: KnProducerKind; kinds?: KnProducerKind[]; parentRef?: string; editRef?: string; back: { href: string; label: string } }) {
   const { collectApi } = useAuth();
   const router = useRouter();
-  const readOnly = useCycleReadOnly();
+  const readOnly = useProducerReadOnly();
   const { communes } = useCommuneFilter();
   const act = useAction();
   const cur = useLoad(editRef ? () => collectApi.record(editRef) : null, [editRef]);
