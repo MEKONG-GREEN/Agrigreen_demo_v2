@@ -23,27 +23,59 @@ const code = (p: Promise<unknown>) => p.then(() => "ok", (e: unknown) => (e inst
 beforeEach(() => resetKnCollect());
 
 describe("thu thập dữ liệu Cấp Xã giả lập (P7)", () => {
-  it("FN-XA-03.03: HTX trong xã phụ trách, SĐT che, thêm + vô hiệu hóa thay xóa; Cấp Tỉnh chỉ xem", async () => {
+  it("FN-XA-03.03 / #67: hồ sơ KN riêng HTX, Nông hộ, THT trong xã phụ trách, SĐT che, thêm + sửa + vô hiệu hóa; Cấp Tỉnh chỉ xem", async () => {
     const xa = await clientFor("kn-an", "asg-an-xa");
-    const list = (await xa.cooperatives()).items;
+    const list = (await xa.records({ kind: "cooperative" })).items;
     expect(new Set(list.map((c) => c.commune_code))).toEqual(new Set(["91301", "91302"]));
     expect(list[0]!.representative?.masked_phone).toMatch(/•••/);
-    expect(await code(xa.cooperatives({ commune: "91304" }))).toBe("403 party.out_of_scope");
-    const c = await xa.createCooperative({ name: "HTX Mới Bình Đức", commune_code: "91302", area_ha: "12.5", representative: { full_name: "Nguyễn Văn Tư", phone: "0912000111" } });
+    expect(list[0]!.htx_ref).toBeTruthy(); // hồ sơ demo liên kết HTX đã công bố (chỉ đọc)
+    expect(await code(xa.records({ kind: "cooperative", commune: "91304" }))).toBe("403 extension.out_of_scope");
+    const c = await xa.createRecord({ kind: "cooperative", commune_code: "91302", name: "HTX Mới Bình Đức", area_ha: "12.5", representative: { full_name: "Nguyễn Văn Tư", phone: "0912000111" } });
     expect(c.representative).toEqual({ label: "Nguyễn V. T.", masked_phone: "0912•••111" });
-    expect(await code(xa.createCooperative({ name: "htx mới bình đức", commune_code: "91302" }))).toBe("409 party.cooperative_name_taken");
-    expect(await code(xa.createCooperative({ name: "HTX Âm", commune_code: "91302", area_ha: "-1" }))).toBe("422 validation_failed");
-    expect(await code(xa.addHousehold(c.ref, { holder: { full_name: "Lê Thị Năm", phone: "0987000222" }, cultivated_area_ha: "-2" }))).toBe("422 validation_failed"); // BF-SWEEP-TT: số âm bị chặn ở máy chủ giả lập
-    await xa.addHousehold(c.ref, { holder: { full_name: "Lê Thị Năm", phone: "0987000222" } });
-    expect(await code(xa.deactivate(c.ref, "ngắn"))).toBe("422 validation_failed");
-    const off = await xa.deactivate(c.ref, "HTX giải thể theo nghị quyết đại hội");
-    expect(off.warnings.households).toBe(1);
-    expect((await xa.cooperatives({ status: "inactive" })).items.map((x) => x.name)).toEqual(["HTX Mới Bình Đức"]);
+    expect(c.version).toBe(1);
+    expect(await code(xa.createRecord({ kind: "cooperative", commune_code: "91302", name: "htx mới  bình đức", representative: { full_name: "Lê Văn B", phone: "0912000999" } }))).toBe("409 extension.kn_record_name_taken");
+    expect(await code(xa.createRecord({ kind: "cooperative", commune_code: "91302", name: "HTX Âm", area_ha: "-1", representative: { full_name: "Lê Văn B", phone: "0912000998" } }))).toBe("422 validation_failed");
+    expect(await code(xa.createRecord({ kind: "cooperative", commune_code: "91302", name: "HTX Thiếu" }))).toBe("422 validation_failed");
+    expect(await code(xa.createRecord({ kind: "household", commune_code: "91302", parent_ref: c.ref, area_ha: "-2", holder: { full_name: "Lê Thị Năm", phone: "0987000222" } }))).toBe("422 validation_failed");
+    const h = await xa.createRecord({ kind: "household", commune_code: "91302", parent_ref: c.ref, holder: { full_name: "Lê Thị Năm", phone: "0987000222" } });
+    expect(h.parent_name).toBe("HTX Mới Bình Đức");
+    expect(await code(xa.createRecord({ kind: "household", commune_code: "91302", holder: { full_name: "Lê Thị Năm", phone: "0987000222" } }))).toBe("409 extension.kn_record_household_exists");
+    expect((await xa.record(c.ref)).member_count).toBe(1);
+    const u = await xa.updateRecord(c.ref, { kind: "cooperative", commune_code: "91302", name: "HTX Bình Đức Mới", area_ha: "13", base_version: 1 });
+    expect([u.name, u.version, u.representative?.masked_phone]).toEqual(["HTX Bình Đức Mới", 2, "0912•••111"]);
+    expect(await code(xa.updateRecord(c.ref, { kind: "cooperative", commune_code: "91302", name: "X", base_version: 1 }))).toBe("409 extension.kn_record_version_conflict");
+    expect(await code(xa.setRecordStatus(c.ref, true, { reason: "ngắn", base_version: 2 }))).toBe("422 validation_failed");
+    const off = await xa.setRecordStatus(c.ref, true, { reason: "HTX giải thể theo nghị quyết đại hội", base_version: 2 });
+    expect(off.status).toBe("inactive");
+    expect(off.log.map((e) => e.event)).toEqual(["deactivated", "updated", "created"]);
+    expect((await xa.records({ kind: "cooperative", status: "inactive" })).items.map((x) => x.name)).toEqual(["HTX Bình Đức Mới"]);
+    expect((await xa.records({ kind: "coop_group" })).items.length).toBeGreaterThan(0);
+    expect((await xa.records({ kind: "household", parent_ref: c.ref })).items.map((x) => x.ref)).toEqual([h.ref]);
     const tinh = await clientFor("kn-binh", "asg-binh-tinh");
-    expect((await tinh.cooperatives()).items.length).toBeGreaterThan(list.length);
-    expect(await code(tinh.createCooperative({ name: "X", commune_code: "91301" }))).toBe("403 party.read_only");
+    const all = (await tinh.records({ kind: "cooperative", status: "all" })).items;
+    expect(all.length).toBeGreaterThan(list.length);
+    // Phân trang theo con trỏ như máy chủ: limit nhỏ → next_cursor; đi hết các trang = đúng danh sách đầy đủ.
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const pg = await tinh.records({ kind: "cooperative", status: "all", limit: 1, ...(cursor ? { cursor } : {}) });
+      seen.push(...pg.items.map((x) => x.ref));
+      if (!pg.next_cursor) break;
+      cursor = pg.next_cursor;
+    }
+    expect(seen).toEqual(all.map((x) => x.ref));
+    expect(await code(tinh.records({ kind: "cooperative", limit: 201 }))).toBe("422 validation_failed");
+    expect(await code(tinh.createRecord({ kind: "cooperative", commune_code: "91301", name: "X", representative: { full_name: "A B", phone: "0912000777" } }))).toBe("403 forbidden");
   });
 
+  it("#67: liên kết HTX đã công bố chỉ đọc — ứng viên trong phạm vi, khác xã bị chặn", async () => {
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const cands = (await xa.htxCandidates("91301")).items;
+    expect(cands.length).toBeGreaterThan(0);
+    expect(cands.every((x) => x.commune_code === "91301" && x.linked_ref)).toBe(true); // hồ sơ demo đã liên kết
+    const other = (await xa.htxCandidates("91302")).items[0]!;
+    expect(await code(xa.createRecord({ kind: "cooperative", commune_code: "91301", name: "HTX Liên Kết Sai", htx_ref: other.htx_ref, representative: { full_name: "Lê Văn C", phone: "0912000555" } }))).toBe("422 validation_failed");
+  });
   it("FN-XA-03.04 / 03.06: khai báo máy (nguyên, không trùng loại, tổng xã = Σ HTX); vật tư + tổng hợp theo xã", async () => {
     const xa = await clientFor("kn-an", "asg-an-xa");
     const coop = (await xa.cooperatives({ commune: "91301" })).items[0]!;
@@ -100,12 +132,12 @@ describe("vật tư dạng bảng nhập giả lập (TT-12)", () => {
 describe("thu thập Cấp Xã theo ngày VN", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("Thứ Hai 00:30 VN: hộ mới vào HTX từ hôm nay; vật tư ghi hôm nay hợp lệ, ngày mai bị chặn", async () => {
+  it("Thứ Hai 00:30 VN: vật tư ghi hôm nay hợp lệ, ngày mai bị chặn", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-25T17:30:00Z") });
     const xa = await clientFor("kn-an", "asg-an-xa");
     const coop = (await xa.cooperatives({ commune: "91301" })).items[0]!;
-    const h = await xa.addHousehold(coop.ref, { holder: { full_name: "Lê Thị Năm", phone: "0987000222" } });
-    expect(h.since_date).toBe("2026-10-26");
+    // #67: nông hộ là hồ sơ KN riêng (không còn since_date của HTX); phần ngày VN còn lại là vật tư.
+    expect(coop.ref).toBeTruthy();
     const line = [{ material_code: "phan_ure", quantity: "1" }];
     expect(await code(xa.recordMaterials({ commune_code: "91301", recorded_on: "2026-10-26", lines: line }))).toBe("ok");
     expect(await code(xa.recordMaterials({ commune_code: "91301", recorded_on: "2026-10-27", lines: line }))).toBe("422 validation_failed");

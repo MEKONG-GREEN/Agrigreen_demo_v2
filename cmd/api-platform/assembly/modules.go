@@ -370,6 +370,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseRoleHolders(acc.RoleHolders())     // W11.46: người theo dõi lịch công tác
 	kn.UseXaScopes(acc.XaScopes())           // W11.46: viên chức Cấp Xã CNTS của lịch trực KSGM BM-03
 	kn.UseCNTSModelVault(ext.Vault)          // W11.47: chủ hộ mô hình CNTS ở kho định danh
+	kn.UseKNRecordsVault(ext.Vault)          // #67: người đại diện / chủ hộ của hồ sơ KN riêng HTX/Nông hộ/THT
 	wireCNTSDiary(kn, ev, ext.Vault)         // W11.48: ảnh nhật ký nuôi CNTS qua pf/evidence
 	kn.UseCNTSMapGeometry(g.AdminGeometry()) // W11.52: cảnh báo vùng vẽ ngoài địa giới xã (bản đồ CNTS)
 

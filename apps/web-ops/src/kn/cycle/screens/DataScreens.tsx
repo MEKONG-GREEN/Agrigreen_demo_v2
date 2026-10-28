@@ -1,24 +1,19 @@
 "use client";
 
-// Cấp Xã › Dữ liệu (FN-XA-03.03..03.06) trên API P7 /v1/kn/*: HTX & nông hộ (thêm, vô hiệu hóa thay xóa, SĐT che),
+// Cấp Xã › Dữ liệu (FN-XA-03.03..03.06) trên API P7 /v1/kn/*: HTX & nông hộ (hồ sơ KN riêng #67 — ProducerScreens.tsx),
 // máy móc theo HTX (khai báo thay toàn bộ, tổng xã = Σ HTX; năm SX ở hồ sơ KN riêng #119), thửa ruộng (danh sách; vẽ ở field-app), vật tư (ghi nhận,
 // tổng hợp theo xã). Cấp Tỉnh/Quốc gia chỉ xem (useCycleReadOnly + máy chủ 403 *.read_only).
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { fieldErrorMap } from "@/api/problem";
 import { useAuth } from "@/auth/AuthProvider";
-import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
-import { NumberField, SelectField, TextField, parseNumberInput, validateForm } from "@/components/form";
-import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPanel, RelatedTabs } from "@/components/patterns/detail";
-import { DataTable, FilterBar, FilterChip, PageHeader, RowActions, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
-import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import type { KnCooperative } from "../api";
-import { LoadState, num, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
-import { PiiHint } from "@/kn/pii";
+import { parseNumberInput } from "@/components/form";
+import { DetailLayout } from "@/components/patterns/detail";
+import { DataTable, FilterBar, FilterChip, PageHeader, type Column } from "@/components/patterns/list";
+import { LoadState, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { vnDate } from "@/kn/schedule/week";
 import { normalizeNumberInput } from "@/lib/exactDecimal";
+import { HouseholdAddRoute, ProducerDetailScreen, ProducerFormScreen, ProducerListScreen } from "./ProducerScreens";
 
 /** Ghi chú phần còn ở nơi khác (nạp Excel, vẽ bản đồ ngoại tuyến…). */
 export function GapNotice({ what }: { what: string }) {
@@ -39,268 +34,27 @@ export function useCommuneFilter() {
   return { commune, chip, communes };
 }
 
-/** FN-XA-03.03 Danh sách HTX (Hình 16a). */
+// FN-XA-03.03 HTX & nông hộ: từ KNSPLIT-2-KN-RECORDS (#67) chạy trên hồ sơ KN riêng /v1/kn/producer-records (ProducerScreens.tsx)
+// — KN không còn ghi HTX qua /v1/kn/cooperatives. Giữ tên export cũ cho các trang app/kn/du-lieu/htx/*.
+
+/** FN-XA-03.03 Danh sách HTX (Hình 16a) — hồ sơ KN loại HTX. */
 export function CoopsScreen() {
-  const { collectApi } = useAuth();
-  const readOnly = useCycleReadOnly();
-  const f = useCommuneFilter();
-  const [status, setStatus] = useState<"active" | "inactive" | "all">("active");
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const s = useLoad(() => collectApi.cooperatives({ commune: f.commune || undefined, status, q: q || undefined }), [f.commune, status, q]);
-  const name = useCommuneNames(s.data?.items.map((c) => c.commune_code) ?? []);
-  const columns: Column<KnCooperative>[] = [
-    { key: "name", header: "Tên HTX", cell: (c) => c.name },
-    { key: "commune", header: "Xã/phường", cell: (c) => name(c.commune_code) },
-    { key: "rep", header: "Người đại diện", cell: (c) => c.representative?.label ?? "—" },
-    { key: "phone", header: "SĐT", cell: (c) => c.representative?.masked_phone ?? "—" },
-    { key: "area", header: "Diện tích (ha)", cell: (c) => num(c.area_ha), className: "num" },
-    { key: "hh", header: "Nông hộ", cell: (c) => c.household_count, className: "num" },
-    { key: "st", header: "Trạng thái", cell: (c) => <StatusPill tone={c.active ? "ok" : "neutral"}>{c.active ? "Hoạt động" : "Ngừng hoạt động"}</StatusPill> },
-    { key: "act", header: "Thao tác", cell: (c) => <RowActions label={`HTX ${c.name}`} viewHref={`/kn/du-lieu/htx/${c.ref}`} /> },
-  ];
-  return (
-    <>
-      <PageHeader
-        title="Danh sách HTX"
-        actions={
-          readOnly ? null : (
-            <Link className="btn btn-p" href="/kn/du-lieu/htx/them-moi">
-              Thêm HTX
-            </Link>
-          )
-        }
-      />
-      <FilterBar onReset={() => (setStatus("active"), setQ(""), setPage(1))}>
-        {f.chip}
-        <FilterChip
-          label="Trạng thái"
-          value={status}
-          defaultValue="active"
-          onChange={(v) => (setStatus(v as typeof status), setPage(1))}
-          options={[
-            { value: "active", label: "Hoạt động" },
-            { value: "inactive", label: "Ngừng hoạt động" },
-            { value: "all", label: "Tất cả" },
-          ]}
-        />
-        <SearchBox value={q} onChange={(v) => (setQ(v), setPage(1))} placeholder="Tìm theo tên, mã HTX" />
-      </FilterBar>
-      <LoadState s={s}>
-        {(d) => <DataTable caption="Danh sách HTX" columns={columns} rows={d.items.slice((page - 1) * 10, page * 10)} rowKey={(c) => c.ref} page={page} pageSize={10} total={d.items.length} onPage={setPage} empty="Xã phụ trách chưa có HTX." />}
-      </LoadState>
-    </>
-  );
+  return <ProducerListScreen kind="cooperative" />;
 }
 
-/** FN-XA-03.03 Chi tiết HTX (Hình 16b): Thông tin chung, Nông hộ, Máy móc, Thửa; Thêm nông hộ, Vô hiệu hóa. */
+/** FN-XA-03.03 Chi tiết HTX (Hình 16b): Thông tin chung, Nông hộ, Máy móc/Thửa (HTX đã liên kết); Log. */
 export function CoopDetailScreen() {
-  const { id } = useParams<{ id: string }>();
-  const { collectApi } = useAuth();
-  const readOnly = useCycleReadOnly();
-  const act = useAction();
-  const s = useLoad(async () => {
-    const [c, hh, mm, pl] = await Promise.all([collectApi.cooperative(id), collectApi.households(id), collectApi.coopMachines(id).catch(() => null), collectApi.plots({ cooperative_ref: id }).catch(() => null)]);
-    return { c, hh: hh.items, mm, pl: pl?.items ?? [] };
-  }, [id, act.note]);
-  const [off, setOff] = useState(false);
-  const [reason, setReason] = useState("");
-  const [reasonErr, setReasonErr] = useState<string | undefined>();
-  useBreadcrumbTail(s.data ? [{ label: s.data.c.name }] : []);
-  const name = useCommuneNames(s.data ? [s.data.c.commune_code] : []);
-  return (
-    <>
-      <BackLink href="/kn/du-lieu/htx">Danh sách HTX</BackLink>
-      <LoadState s={s}>
-        {({ c, hh: households, mm, pl }) => (
-          <>
-            <PageHeader title={c.name} badge={<StatusPill tone={c.active ? "ok" : "neutral"}>{c.active ? "Hoạt động" : "Ngừng hoạt động"}</StatusPill>} />
-            {readOnly || !c.active ? null : (
-              <ActionBar>
-                <Link className="btn btn-p btn-sm" href={`/kn/du-lieu/htx/${id}/them-nong-ho`}>
-                  Thêm nông hộ
-                </Link>
-                <button type="button" className="btn btn-o btn-sm" onClick={() => setOff(true)}>
-                  Vô hiệu hóa
-                </button>
-              </ActionBar>
-            )}
-            {act.view}
-            <DetailLayout
-              main={
-                <>
-                  <LabelValueBlock title="Thông tin chung" items={[{ label: "Mã HTX", value: c.code }, { label: "Người đại diện", value: c.representative ? `${c.representative.label} · ${c.representative.masked_phone ?? ""}` : "—" }, { label: "Mã số thuế", value: c.tax_code }, { label: "Lý do ngừng", value: c.status_reason }]} />
-                  <LabelValueBlock title="Địa bàn – sản xuất" items={[{ label: "Xã/phường", value: name(c.commune_code) }, { label: "Diện tích (ha)", value: num(c.area_ha) }, { label: "Trụ sở", value: c.head_office }]} />
-                  <RelatedTabs
-                    tabs={[
-                      {
-                        id: "hh",
-                        label: `Nông hộ (${households.length})`,
-                        content: (
-                          <ul className="list-plain">
-                            {households.map((h) => (
-                              <li key={h.ref}>
-                                {h.holder.label} · {h.holder.masked_phone ?? "—"} · {num(h.cultivated_area_ha)} ha {h.active ? "" : "(ngừng)"}
-                              </li>
-                            ))}
-                          </ul>
-                        ),
-                      },
-                      { id: "mm", label: `Máy móc (${mm?.total ?? 0})`, content: <ul className="list-plain">{(mm?.lines ?? []).map((l) => <li key={l.machine_type}>{l.machine_type_name}: {l.quantity}</li>)}</ul> },
-                      { id: "pl", label: `Thửa ruộng (${pl.length})`, content: <ul className="list-plain">{pl.map((p) => <li key={p.ref}>{p.lot_name ?? p.code} · {num(p.area_ha, 2)} ha</li>)}</ul> },
-                    ]}
-                  />
-                </>
-              }
-              log={<LogPanel entries={[{ event: "Cập nhật hồ sơ", actor_display: "—", at: c.updated_at }]} />}
-            />
-            {off ? (
-              <Dialog
-                title="Vô hiệu hóa HTX"
-                onClose={() => setOff(false)}
-                actions={
-                  <button
-                    type="button"
-                    className="btn btn-p"
-                    disabled={act.busy}
-                    onClick={async () => {
-                      // Nhập lý do ngắn là việc còn được làm trong pop-up (ui-kit.md). Máy chủ cũng kiểm ≥ 20 ký tự.
-                      const err = reason.trim() === "" ? "Bắt buộc nhập." : reason.trim().length < 20 ? "Tối thiểu 20 ký tự." : undefined;
-                      setReasonErr(err);
-                      if (err) return;
-                      if (await act.run(() => collectApi.deactivate(id, reason.trim()), (r) => `Đã vô hiệu hóa (không xóa). Liên kết: ${r.warnings.households} nông hộ, ${r.warnings.machines ?? 0} máy.`)) setOff(false);
-                    }}
-                  >
-                    Vô hiệu hóa
-                  </button>
-                }
-              >
-                <p className="small">HTX có nông hộ, máy, thửa liên kết vẫn giữ dữ liệu — vô hiệu hóa thay xóa.</p>
-                <TextField label="Lý do (≥ 20 ký tự)" required multiline value={reason} onChange={setReason} error={reasonErr} hint={<PiiHint text={reason} />} />
-              </Dialog>
-            ) : null}
-          </>
-        )}
-      </LoadState>
-    </>
-  );
+  return <ProducerDetailScreen kind="cooperative" />;
 }
 
-type CoopForm = { name: string; commune_code: string; area_ha: string; rep: string; phone: string };
-
-/**
- * FN-XA-03.03 Thêm HTX trên trang riêng (R-A2, thay pop-up cũ). Bắt buộc theo TT-08: Xã/phường, Tên, Người đại diện, Điện thoại.
- * TODO(#102): trường "Loại" (HTX / Nông hộ / Tổ hợp tác) chưa có trong form và API — gói #102 bổ sung.
- */
+/** FN-XA-03.03 Thêm HTX trên trang riêng (R-A2). Bắt buộc theo TT-08: Xã/phường, Tên, Người đại diện, Điện thoại. */
 export function CoopCreateScreen() {
-  const { collectApi } = useAuth();
-  const router = useRouter();
-  const readOnly = useCycleReadOnly();
-  const { communes } = useCommuneFilter();
-  const act = useAction();
-  const [form, setForm] = useState<CoopForm>(() => ({ name: "", commune_code: communes.length === 1 ? communes[0]!.code : "", area_ha: "", rep: "", phone: "" }));
-  const [errors, setErrors] = useState<Partial<Record<keyof CoopForm, string>>>({});
-  const server = act.problem ? fieldErrorMap(act.problem) : {};
-  const set = (k: keyof CoopForm) => (v: string) => setForm((x) => ({ ...x, [k]: v }));
-  const save = async () => {
-    const v = validateForm(form, {
-      name: { kind: "text", required: true, maxLength: 200 },
-      commune_code: { kind: "text", required: true },
-      area_ha: { kind: "number", maxDecimals: 4 },
-      rep: { kind: "text", required: true, maxLength: 120 },
-      phone: { kind: "text", required: true, maxLength: 20 },
-    });
-    setErrors(v.errors);
-    if (!v.valid) return;
-    const b = v.values;
-    const r = await act.run(() =>
-      collectApi.createCooperative({
-        name: b.name.trim(),
-        commune_code: b.commune_code,
-        ...(b.area_ha ? { area_ha: b.area_ha } : {}),
-        representative: { full_name: b.rep.trim(), phone: b.phone.trim() },
-      }),
-    );
-    if (r) router.push(`/kn/du-lieu/htx/${r.ref}`);
-  };
-  return (
-    <DetailPage
-      back={{ href: "/kn/du-lieu/htx", label: "Danh sách HTX" }}
-      title="Thêm HTX"
-      actions={
-        <>
-          <Link className="btn btn-o" href="/kn/du-lieu/htx">
-            Hủy
-          </Link>
-          <button type="button" className="btn btn-p" disabled={readOnly || act.busy} onClick={() => void save()}>
-            Lưu
-          </button>
-        </>
-      }
-    >
-      {act.view}
-      <div className="grid2">
-        <TextField label="Tên HTX" required value={form.name} onChange={set("name")} error={errors.name ?? server.name} maxLength={200} />
-        <SelectField label="Xã/phường" required value={form.commune_code} onChange={set("commune_code")} error={errors.commune_code ?? server.commune_code} options={communes.map((c) => ({ value: c.code, label: c.name }))} />
-        <NumberField label="Diện tích" unit="ha" value={form.area_ha} onChange={set("area_ha")} rule={{ maxDecimals: 4 }} error={errors.area_ha ?? server.area_ha} onBlurError={(e) => setErrors((x) => ({ ...x, area_ha: e }))} />
-        <TextField label="Người đại diện" required value={form.rep} onChange={set("rep")} error={errors.rep ?? server["representative.full_name"]} maxLength={120} />
-        <TextField label="Điện thoại người đại diện" required value={form.phone} onChange={set("phone")} error={errors.phone ?? server["representative.phone"]} maxLength={20} hint="Lưu ở kho định danh, hiển thị che." />
-      </div>
-    </DetailPage>
-  );
+  return <ProducerFormScreen kind="cooperative" back={{ href: "/kn/du-lieu/htx", label: "Danh sách HTX" }} />;
 }
 
-type HouseholdForm = { full_name: string; phone: string; area: string };
-
-/** FN-XA-03.03 Thêm nông hộ vào HTX trên trang riêng (R-A2, thay pop-up cũ). */
+/** FN-XA-03.03 Thêm nông hộ vào HTX trên trang riêng (R-A2) — hồ sơ KN loại Nông hộ thuộc HTX. */
 export function HouseholdCreateScreen() {
-  const { id } = useParams<{ id: string }>();
-  const { collectApi } = useAuth();
-  const router = useRouter();
-  const readOnly = useCycleReadOnly();
-  const act = useAction();
-  const coop = useLoad(() => collectApi.cooperative(id), [id]);
-  const [form, setForm] = useState<HouseholdForm>({ full_name: "", phone: "", area: "" });
-  const [errors, setErrors] = useState<Partial<Record<keyof HouseholdForm, string>>>({});
-  const server = act.problem ? fieldErrorMap(act.problem) : {};
-  const back = `/kn/du-lieu/htx/${id}`;
-  const set = (k: keyof HouseholdForm) => (v: string) => setForm((x) => ({ ...x, [k]: v }));
-  const save = async () => {
-    const v = validateForm(form, {
-      full_name: { kind: "text", required: true, maxLength: 120 },
-      phone: { kind: "text", required: true, maxLength: 20 },
-      area: { kind: "number", maxDecimals: 4 },
-    });
-    setErrors(v.errors);
-    if (!v.valid) return;
-    const b = v.values;
-    const r = await act.run(() => collectApi.addHousehold(id, { holder: { full_name: b.full_name.trim(), phone: b.phone.trim() }, ...(b.area ? { cultivated_area_ha: b.area } : {}) }));
-    if (r) router.push(back);
-  };
-  const coopName = coop.data?.name ?? "HTX";
-  return (
-    <DetailPage
-      back={{ href: back, label: coopName }}
-      title="Thêm nông hộ"
-      actions={
-        <>
-          <Link className="btn btn-o" href={back}>
-            Hủy
-          </Link>
-          <button type="button" className="btn btn-p" disabled={readOnly || act.busy || coop.data?.active === false} onClick={() => void save()}>
-            Lưu
-          </button>
-        </>
-      }
-    >
-      {act.view}
-      <div className="grid2">
-        <TextField label="Chủ hộ" required value={form.full_name} onChange={set("full_name")} error={errors.full_name ?? server.holder} maxLength={120} />
-        <TextField label="Số điện thoại" required value={form.phone} onChange={set("phone")} error={errors.phone ?? server.holder} maxLength={20} />
-        <NumberField label="Diện tích canh tác" unit="ha" value={form.area} onChange={set("area")} rule={{ maxDecimals: 4 }} error={errors.area ?? server.cultivated_area_ha} onBlurError={(e) => setErrors((x) => ({ ...x, area: e }))} />
-      </div>
-    </DetailPage>
-  );
+  return <HouseholdAddRoute parentKind="cooperative" />;
 }
 
 type MachineLine = { machine_type: string; quantity: string; year_made: string; note: string };

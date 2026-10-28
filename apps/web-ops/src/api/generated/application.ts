@@ -10311,6 +10311,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/kn/producer-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * KNSPLIT-2-KN-RECORDS (#67) / TT-09: danh sách hồ sơ KN riêng theo loại — HTX, Nông hộ, Tổ hợp tác (mọi vai KN trong phạm vi)
+         * @description Hồ sơ thuộc KN (pf_extension.kn_producer), KHÔNG phải HTX nền tảng; thay đường legacy /v1/kn/cooperatives cho màn KN.
+         *     Phạm vi xã của ngữ cảnh phiên lọc trong SQL trước khi trả dữ liệu; xã ngoài phạm vi → 403 extension.out_of_scope.
+         *     Mỗi loại có bộ lọc riêng: HTX (xã, trạng thái, tên, htx_ref), Tổ hợp tác (xã, trạng thái, tên), Nông hộ (xã, trạng thái,
+         *     parent_ref = HTX/THT). Nông hộ không tìm theo tên (họ tên chủ hộ ở kho định danh).
+         */
+        get: operations["knListProducerRecords"];
+        put?: never;
+        /**
+         * TT-08: thêm hồ sơ HTX / Nông hộ / Tổ hợp tác (Cấp Xã, Admin) — bắt buộc Xã/phường, Loại, Tên, Người đại diện, Điện thoại
+         * @description HTX, THT: name, representative {full_name, phone} bắt buộc. Nông hộ: holder {full_name, phone} bắt buộc (tên hộ = chủ hộ,
+         *     lưu kho định danh), không nhận name/tax_code/address; parent_ref tùy chọn (HTX/THT đang hoạt động trong phạm vi).
+         *     area_ha: số thập phân thường ≥ 0, ≤ 1.000.000, tối đa 4 chữ số lẻ (không số mũ). Trùng tên cùng loại, cùng xã (đang hoạt
+         *     động) → 409; trùng chủ hộ → 409. htx_ref (chỉ HTX): HTX đã công bố, đang hoạt động, cùng xã — chỉ đối chiếu, KN không ghi
+         *     gì về HTX đó. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
+         */
+        post: operations["knCreateProducerRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/producer-records/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết hồ sơ KN riêng kèm nhật ký phiên bản (mới nhất trước) */
+        get: operations["knGetProducerRecord"];
+        put?: never;
+        /**
+         * TT-08 (có sửa): sửa hồ sơ — thay toàn bộ trường nhập được, khóa lạc quan base_version; không đổi loại
+         * @description Trường tùy chọn vắng = xóa giá trị. representative/holder vắng = giữ người đại diện/chủ hộ hiện tại; có = ghi chủ thể
+         *     mới ở kho định danh. Hồ sơ ngừng hoạt động phải kích hoạt lại trước (409). Không đổi gì → không ghi sổ.
+         */
+        post: operations["knUpdateProducerRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/producer-records/{ref}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vô hiệu hóa hồ sơ (thay xóa) — lý do 10–1000 ký tự, không chứa SĐT/CCCD */
+        post: operations["knDeactivateProducerRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/producer-records/{ref}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kích hoạt lại hồ sơ — lý do bắt buộc; trùng tên/chủ hộ với hồ sơ đang hoạt động → 409 */
+        post: operations["knReactivateProducerRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/producer-htx-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** HTX đã công bố (pf_party_pub.v1_org_tree), đang hoạt động, trong phạm vi — chỉ đọc, để liên kết đối chiếu htx_ref */
+        get: operations["knListProducerHTXCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/campaigns": {
         parameters: {
             query?: never;
@@ -22503,6 +22607,88 @@ export interface components {
             updated_at: string | null;
             /** Format: uuid */
             actor_ref: string | null;
+        };
+        /**
+         * @description cooperative = HTX, household = Nông hộ, coop_group = Tổ hợp tác
+         * @enum {string}
+         */
+        KNProducerKind: "cooperative" | "household" | "coop_group";
+        KNProducerPerson: {
+            /** @description Nhãn che (vd Nguyễn V. A.) */
+            label: string;
+            masked_phone: string | null;
+        };
+        KNProducerRecord: {
+            /** Format: uuid */
+            ref: string;
+            kind: components["schemas"]["KNProducerKind"];
+            kind_label: string;
+            commune_code: string;
+            /** @description HTX, THT; null với Nông hộ */
+            name: string | null;
+            /** @description Tên HTX/THT, hoặc nhãn che của chủ hộ */
+            display_name: string;
+            representative: components["schemas"]["KNProducerPerson"] | null;
+            holder: components["schemas"]["KNProducerPerson"] | null;
+            /** Format: uuid */
+            parent_ref: string | null;
+            parent_name: string | null;
+            parent_kind: components["schemas"]["KNProducerKind"] | null;
+            /** Format: uuid */
+            htx_ref: string | null;
+            htx_name: string | null;
+            area_ha: string | null;
+            tax_code: string | null;
+            address: string | null;
+            /** @description Nông hộ đang hoạt động (HTX, THT) */
+            member_count: number;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            status_reason: string | null;
+            /** @description base_version cho lần sửa kế tiếp */
+            version: number;
+            can_edit: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        KNProducerRecordDetail: components["schemas"]["KNProducerRecord"] & {
+            log: {
+                version: number;
+                /** @enum {string} */
+                event: "created" | "updated" | "deactivated" | "reactivated";
+                /** Format: date-time */
+                at: string;
+                /** Format: uuid */
+                actor_ref: string;
+                actor_display: string | null;
+                status_reason: string | null;
+            }[];
+        };
+        KNProducerRecordWrite: {
+            kind: components["schemas"]["KNProducerKind"];
+            commune_code: string;
+            name?: string | null;
+            /** @description Số thập phân thường, ≥ 0, ≤ 1000000, tối đa 4 chữ số lẻ */
+            area_ha?: string | null;
+            /** @description Chỉ HTX: 10 chữ số hoặc 10-3 */
+            tax_code?: string | null;
+            address?: string | null;
+            representative?: {
+                full_name: string;
+                phone: string;
+            };
+            holder?: {
+                full_name: string;
+                phone: string;
+            };
+            /** Format: uuid */
+            parent_ref?: string | null;
+            /** Format: uuid */
+            htx_ref?: string | null;
+        };
+        KNProducerStatusChange: {
+            reason: string;
+            base_version: number;
         };
         CNTSCampaignInput: {
             name: string;
@@ -45778,6 +45964,272 @@ export interface operations {
             /** @description extension.kn_attrs_plot_retired */
             409: components["responses"]["Problem"];
             /** @description validation_failed | extension.kn_attrs_crop_unknown */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knListProducerRecords: {
+        parameters: {
+            query: {
+                kind: components["schemas"]["KNProducerKind"];
+                commune?: string;
+                status?: "active" | "inactive" | "all";
+                /** @description HTX, THT: tìm theo tên (không phân biệt hoa thường) */
+                q?: string;
+                /** @description Nông hộ: thuộc HTX/THT (hồ sơ KN) */
+                parent_ref?: string;
+                /** @description HTX: liên kết HTX đã công bố */
+                htx_ref?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang, theo ref tăng dần (thứ tự tạo) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KNProducerRecord"][];
+                        /** Format: uuid */
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knCreateProducerRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNProducerRecordWrite"];
+            };
+        };
+        responses: {
+            /** @description Phát lại cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNProducerRecordDetail"];
+                };
+            };
+            /** @description Hồ sơ đã tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNProducerRecordDetail"];
+                };
+            };
+            /** @description extension.read_only | forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.kn_record_name_taken | extension.kn_record_household_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed | extension.support_reason_required */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knGetProducerRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Hồ sơ hiện hành */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNProducerRecordDetail"];
+                };
+            };
+            /** @description extension.kn_record_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    knUpdateProducerRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNProducerRecordWrite"] & {
+                    base_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Hồ sơ sau khi sửa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNProducerRecordDetail"];
+                };
+            };
+            /** @description extension.read_only | forbidden | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description extension.kn_record_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.kn_record_version_conflict | extension.kn_record_state_conflict | extension.kn_record_name_taken | extension.kn_record_household_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knDeactivateProducerRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNProducerStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Hồ sơ sau khi vô hiệu hóa */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNProducerRecordDetail"];
+                };
+            };
+            /** @description extension.kn_record_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.kn_record_version_conflict | extension.kn_record_state_conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knReactivateProducerRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-AG-Context": string;
+                "Idempotency-Key": string;
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNProducerStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Hồ sơ sau khi kích hoạt lại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNProducerRecordDetail"];
+                };
+            };
+            /** @description extension.kn_record_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.kn_record_version_conflict | extension.kn_record_state_conflict | extension.kn_record_name_taken | extension.kn_record_household_exists */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    knListProducerHTXCandidates: {
+        parameters: {
+            query?: {
+                /** @description Bắt buộc với phạm vi toàn quốc */
+                commune?: string;
+            };
+            header: {
+                "X-AG-Context": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tối đa 200 HTX */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            htx_ref: string;
+                            name: string;
+                            commune_code: string;
+                            /**
+                             * Format: uuid
+                             * @description Hồ sơ KN đang liên kết (nếu có)
+                             */
+                            linked_ref: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
             422: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
