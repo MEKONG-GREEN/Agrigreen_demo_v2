@@ -110,6 +110,8 @@ type Module struct {
 	campaigns *campaignService
 	// BF-SRV-KN-ATTRS (#119): hồ sơ KN riêng — năm sản xuất máy (TT-10), cây trồng thửa (TT-11) (module_knattrs.go).
 	attrs *kaapp.Service
+	// W11.53 (D4 CN13): mẫu biểu dự án KNQG Mẫu 01–07 (extension/cntsknqg, module_cntsknqg.go).
+	knqg *knqgService
 }
 
 // New tạo module với pool của vai extension_app.
@@ -208,6 +210,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerDeptHome(rg)                             // W11.54
 	m.registerCNTSCampaigns(rg)                        // W11.50
 	m.registerKNAttrs(rg)                              // BF-SRV-KN-ATTRS
+	m.registerCNTSKNQG(rg)                             // W11.53
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham
