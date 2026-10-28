@@ -8,6 +8,7 @@ import { knContext } from "./kn";
 import { khtcMockStore, type Stored } from "./kn-khtc-periods";
 import { khtcReportInputs } from "./kn-khtc-forms";
 import { khtcReportSource } from "./kn-khtc-sources";
+import { khtcExternalForPeriod } from "./kn-khtc-external";
 type S = components["schemas"];
 type Detail = S["KHTCReportDetail"];
 type Content = S["KHTCReportContent"];
@@ -76,7 +77,8 @@ function capture(ctx: Ctx, s: Stored, refresh: boolean): Content {
     if (state.values.some(v => v.provisional))
         provisional.push("Nguồn còn tạm tính");
     const now = new Date().toISOString();
-    return { data: { period: { id: p.id, no: p.no ?? null, scope: p.scope ?? null, type: p.report_type as S["KHTCReportPeriod"]["type"], year: p.year, name: p.name, from: p.from_date, to: p.to_date, cutoff: p.cutoff_date, departments: p.departments.map(d => d.code) }, template: ({ week: "mau_1", month: "mau_2", quarter: "mau_3", year: "mau_4", program: "mau_5" } as const)[p.report_type as "week"] ?? "mau_1", plan: { VersionID: p.id, Version: 1, Year: p.year, DecisionNo: "MINH HỌA", Entries: [] }, sources: state.snapshot ? { id: state.snapshot.id, version: state.snapshot.no, plan_version_id: null, figures_hash: state.snapshot.figures_hash, status_hash: state.snapshot.status_hash, closed: state.snapshot.closed, at: state.snapshot.taken_at } : null, metrics: [], submissions, rows, form_texts: texts, provisional, input_hash: JSON.stringify([submissions, state.snapshot?.id]), captured_at: now }, admin: Object.fromEntries(ADMIN.map(k => [k, { system: k === "report_date" ? now.slice(0, 10) : "", override: null, actor: null, at: null, system_changed: false }])), texts: Object.fromEntries(sections(p.report_type).filter(s => s.editable).map(s => [s.key, s.key === "D" ? "Không có." : ""])) };
+    const external = khtcExternalForPeriod(p.id);
+    return { data: { period: { id: p.id, no: p.no ?? null, scope: p.scope ?? null, type: p.report_type as S["KHTCReportPeriod"]["type"], year: p.year, name: p.name, from: p.from_date, to: p.to_date, cutoff: p.cutoff_date, departments: p.departments.map(d => d.code) }, template: ({ week: "mau_1", month: "mau_2", quarter: "mau_3", year: "mau_4", program: "mau_5" } as const)[p.report_type as "week"] ?? "mau_1", plan: { VersionID: p.id, Version: 1, Year: p.year, DecisionNo: "MINH HỌA", Entries: [] }, sources: state.snapshot ? { id: state.snapshot.id, version: state.snapshot.no, plan_version_id: null, figures_hash: state.snapshot.figures_hash, status_hash: state.snapshot.status_hash, closed: state.snapshot.closed, at: state.snapshot.taken_at } : null, metrics: [], submissions, rows, form_texts: texts, provisional, input_hash: JSON.stringify([submissions, state.snapshot?.id, external.map(x => [x.entry_id, x.version])]), captured_at: now, ...(external.length ? { external } : {}) }, admin: Object.fromEntries(ADMIN.map(k => [k, { system: k === "report_date" ? now.slice(0, 10) : "", override: null, actor: null, at: null, system_changed: false }])), texts: Object.fromEntries(sections(p.report_type).filter(s => s.editable).map(s => [s.key, s.key === "D" ? "Không có." : ""])) };
 }
 function load(ctx: Ctx, s: Stored) {
     let value = STORE.get(s.p.id);

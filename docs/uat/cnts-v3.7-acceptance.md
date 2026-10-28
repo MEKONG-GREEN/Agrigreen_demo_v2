@@ -62,7 +62,27 @@ Nguồn và giới hạn: [giả định W11.47](../kn/gia-dinh/W11.47.md) (Q-02
 | ★ FN-14 AC-01/AC-03, BR-02 (#71): quyền FN-14 vào phiên chủ KN ở request kế tiếp; BM-01 chỉ cơ sở được cấp; biểu được giao giới hạn biểu kỳ CNTS; tường minh rỗng/hết hạn/thu hồi/sửa thu hẹp xã = chặn (người đã từng có quyền không quay về W11.07); biên ngày tính cả ngày cuối; cùng người nhiều lần gán, phòng/tenant khác không nhận | `TestCNTSGrantOwnerSession_71`, `TestCNTSGrantNarrowingStaysExplicit_71`, `TestCNTSFormActorUsesOwnerGrantScope`, `TestCNTSGrant*` (port) | G1 |
 
 Chưa nghiệm thu: chuyển nháp nhật ký khi thu hồi, Cấp Xã chưa từng được cấp quyền vẫn theo thuộc tính W11.07 (câu hỏi mở #71),
-mẫu biểu dự án BM-12…BM-16 (W11.53), nạp Excel điểm/hộ, chọn tọa độ trên bản đồ (W11.52), nông hộ tự nhập (GĐ2).
+nạp Excel điểm/hộ, chọn tọa độ trên bản đồ (W11.52), nông hộ tự nhập (GĐ2).
+
+## Mẫu biểu dự án KNQG Mẫu 01–07 W11.53 (BM-12…BM-16)
+
+Nguồn và giới hạn: [giả định W11.53](../kn/gia-dinh/W11.53.md) (Q-055, Q-027 là giả định tạm; Mẫu 01 theo BRD vì phòng chưa gửi mẫu gốc).
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| ★ UR-TINH-20, BR-03: Mẫu 01 lập từ dự án (điền sẵn tên, mã, kinh phí, điểm), mỗi dự án × tháng một bản; trình → lãnh đạo phòng duyệt / trả lại (thiếu ý kiến → chặn); đã duyệt không sửa, điều chỉnh tạo bản mới trình lại; vật tư đã cấp > kế hoạch → cảnh báo (quy tắc 11) | `TestCNTSKNQG_W1153`, `TestTransitions`, `TestNormalize`; Vitest `src/kn/cnts/knqg/knqg.test.tsx` | G1 |
+| ★ UR-TINH-21: Mẫu 03 căn cứ, đoàn kiểm tra, đối tượng, danh mục hồ sơ theo mẫu (thêm được dòng), thực địa, nhận xét, kiến nghị; Word có số `{n}/BC-TTKN` | `TestCNTSKNQG_W1153`, `TestWordTemplatesRender` | G1 (ảnh thực địa: chưa) |
+| ★ UR-TINH-22: Mẫu 04 thành phần 3 bên, lớp, học viên, thời gian, tham quan, đánh giá; Đang lập → Chờ ký → Đã ký (scan) | `TestCNTSKNQG_W1153`, `TestWordTemplatesRender` | G1 |
+| ★ UR-TINH-23, quy tắc 9: Mẫu 05 mỗi điểm; thực tế lấy từ nhật ký đã xác thực, sửa phải ghi chú, không đạt phải ghi chú; ký có scan (PDF/JPG/PNG); đã ký không sửa, điều chỉnh phải ký lại; Cấp Xã xem/tải biên bản điểm xã mình, xã khác không thấy | `TestCNTSKNQG_W1153`, `TestPrefillAndComplete05`; Vitest `knqg-api.test.ts` | G1 |
+| ★ UR-TINH-24, AC-03, quy tắc 10: Mẫu 07 tổng hợp điểm từ Mẫu 05 đã ký; thiếu Mẫu 05 đã ký của một điểm (hoặc bản điều chỉnh chưa ký) → chặn gửi; trả lại không mở khóa Mẫu 05 | `TestCNTSKNQG_W1153`; Vitest `knqg-api.test.ts` | G1 |
+| ★ UR-QG-01, BR-02, AC-02: TW chỉ thấy dự án KNQG, thấy Mẫu 07 ngay khi gửi (không thấy bản chưa gửi), chỉ xem trừ xác nhận / trả lại (ý kiến); đã xác nhận khóa hẳn | `TestCNTSKNQG_W1153` | G1 (thông báo hộp thư TW: chưa) |
+| ★ FN-19 BR-01, AC-04: chủ nhiệm dự án khác, viên chức, Ban Giám đốc không lập/sửa/ký; chỉ dự án loại KNQG | `TestCNTSKNQG_W1153` | G1 |
+| ★ FN-19 B4, AC-01: Word 5 mẫu đủ mục, bảng của mẫu gốc (thành phần, chỉ tiêu, phụ lục, khối ký), bản điều chỉnh ghi rõ; lịch sử, tải lại có băm | `TestWordTemplatesRender`, `TestCNTSKNQG_W1153` (pf/export thật) | G1 |
+| Sổ chỉ ghi thêm, khóa lạc quan, phát lại theo Idempotency-Key | `TestCNTSKNQG_W1153` | G1 |
+| Menu Tỉnh "Mẫu biểu dự án", TW "Mẫu biểu, nghiệm thu năm (07)" | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
+
+Chưa nghiệm thu: thông báo hộp thư cho Cấp TW khi gửi Mẫu 07, ảnh thực địa Mẫu 03, nạp Excel điểm/hộ (FN-19 luồng phụ), luồng
+trình duyệt Playwright.
 
 ## Nhật ký nuôi BM-08/09/19 W11.48
 
@@ -80,7 +100,7 @@ Nguồn và giới hạn: [giả định W11.48](../kn/gia-dinh/W11.48.md) (Q-07
 | Menu Tỉnh "Rà soát nhật ký", Xã "Nhật ký sản xuất" | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
 
 Chưa nghiệm thu: ghi ngoại tuyến trên App xã (entity `pf/sync`), nông hộ tự ghi (W11.55), cảnh báo quá hạn ghi (dòng 10),
-NC-11 cập nhật lịch tiêm BM-07, chuẩn kỹ thuật theo mẫu (UR-TINH-07), Mẫu 05 lấy thực tế (W11.53), bản đồ vị trí (W11.52).
+NC-11 cập nhật lịch tiêm BM-07, chuẩn kỹ thuật theo mẫu (UR-TINH-07), bản đồ vị trí (W11.52). Mẫu 05 lấy thực tế: W11.53.
 
 ## Bản đồ vùng nuôi, vùng dịch W11.52
 
