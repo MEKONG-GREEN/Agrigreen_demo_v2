@@ -91,7 +91,9 @@ func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport
 	return out, nil
 }
 
-func (catalogs) FacilitiesAt(context.Context, time.Time, []string) ([]knport.SlaughterFacility, error) { return nil, nil }
+func (catalogs) FacilitiesAt(context.Context, time.Time, []string) ([]knport.SlaughterFacility, error) {
+	return nil, nil
+}
 
 type xaScopes struct {
 	mu   sync.Mutex
@@ -236,7 +238,7 @@ func (u user) do(method, path, idem string, body any) resp {
 }
 
 func (u user) post(path string, body any) resp { return u.do(http.MethodPost, path, key(), body) }
-func (u user) get(path string) resp             { return u.do(http.MethodGet, path, "", nil) }
+func (u user) get(path string) resp            { return u.do(http.MethodGet, path, "", nil) }
 
 func (u user) upload(path string, base int64, name string, data []byte) resp {
 	var buf bytes.Buffer

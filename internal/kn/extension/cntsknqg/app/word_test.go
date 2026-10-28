@@ -6,8 +6,8 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsknqg/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsknqg/store"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/docx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/doctpl"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/docx"
 )
 
 // FN-19 AC-01: mẫu Word của 5 mẫu hợp lệ, dựng được .docx có đủ mục và bảng của mẫu gốc.
