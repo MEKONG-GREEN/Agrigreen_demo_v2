@@ -1,0 +1,1 @@
+- [x] BF-TT-HTX (#102, 28/10/2026): TT-08, TT-09 trên hồ sơ KN riêng của #67 — ba danh sách HTX / Nông hộ / Tổ hợp tác (tab, bộ lọc riêng, STT), trang Thêm có ô Loại bắt buộc và trường bắt buộc theo loại, trang Chi tiết/Sửa cho cả ba loại (khóa lạc quan), vô hiệu hóa/kích hoạt lại có lý do. KN không ghi dữ liệu HTX. [Giả định](../../kn/gia-dinh/BF-TT-HTX.md).
