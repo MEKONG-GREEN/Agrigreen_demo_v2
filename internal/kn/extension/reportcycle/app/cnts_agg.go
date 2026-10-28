@@ -454,7 +454,8 @@ func ksgmLabel(w domain.Span) string {
 // neighbours trả khóa kỳ trước/sau của BM-02.
 func (s *Service) ksgmNeighbours(ctx context.Context, pt string, weeks []domain.Span) (string, string) {
 	if pt == domain.AggMonth {
-		f := weeks[0].From
+		// Neo ngày 1 trước khi lùi/tiến tháng — AddDate(0, ±1, 0) trên ngày 29–31 tràn sang tháng kế.
+		f := domain.Date(weeks[0].From.Year(), weeks[0].From.Month(), 1)
 		return f.AddDate(0, -1, 0).Format("2006-01"), f.AddDate(0, 1, 0).Format("2006-01")
 	}
 	w := weeks[0]

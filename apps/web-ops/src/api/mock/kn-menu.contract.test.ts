@@ -167,7 +167,8 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       ["Lịch", ["Lịch trực KSGM", "Lịch tiêm phòng", "Lịch công tác cán bộ xã", "Lịch công tác phòng"]],
       ["Chiến dịch điều tra", ["Quản lý chiến dịch", "Tạo chiến dịch*"]],
     ]);
-    expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ*", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);
+    // W11.45: Báo cáo định kỳ BM-11 có màn.
+    expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);
     expect(g["Dữ liệu"]).toEqual([
       ["Số liệu cấp xã", ["Nhập liệu tuần*", "Khai thác thủy sản", "Nhật ký sản xuất*", "Lịch tiêm (thực tế)"]], // BF-CN-CATCH #112: Khai thác thủy sản có màn
       "Bản đồ vùng dịch",
