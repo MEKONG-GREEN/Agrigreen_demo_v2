@@ -4,7 +4,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAction } from "@/kn/cycle/common";
-import { cntsBm11Routes, resetCntsBm11 } from "@/api/mock/kn-cnts-bm11";
+import { bm11DefaultKey, cntsBm11Routes, resetCntsBm11 } from "@/api/mock/kn-cnts-bm11";
 import { Bm11Detail } from "./Bm11Detail";
 import { changedTexts, periodKeyError, returnCommentError, type Bm11, type Bm11Api } from "./api";
 
@@ -16,6 +16,18 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("helpers", () => {
+  it("kỳ mặc định giả lập = kỳ vừa kết thúc theo ngày VN, không tràn cuối tháng", () => {
+    const at = (iso: string) => Date.parse(iso);
+    expect(bm11DefaultKey("month", at("2026-10-31T10:00:00Z"))).toBe("2026-09");
+    expect(bm11DefaultKey("month", at("2027-03-31T10:00:00Z"))).toBe("2027-02");
+    expect(bm11DefaultKey("month", at("2028-03-30T10:00:00Z"))).toBe("2028-02");
+    expect(bm11DefaultKey("month", at("2027-01-15T10:00:00Z"))).toBe("2026-12");
+    expect(bm11DefaultKey("month", at("2026-10-31T17:30:00Z"))).toBe("2026-10"); // 00:30 01/11 giờ VN
+    expect(bm11DefaultKey("quarter", at("2027-01-01T03:00:00Z"))).toBe("2026-Q4");
+    expect(bm11DefaultKey("quarter", at("2026-12-31T17:00:00Z"))).toBe("2026-Q4"); // 00:00 01/01/2027 VN
+    expect(bm11DefaultKey("quarter", at("2026-12-31T16:59:00Z"))).toBe("2026-Q3");
+    expect(bm11DefaultKey("year", at("2026-12-31T17:00:00Z"))).toBe("2026");
+  });
   it("khóa kỳ theo loại", () => {
     expect(periodKeyError("week", "2026-W40")).toBeNull();
     expect(periodKeyError("week", "")).toBeNull();

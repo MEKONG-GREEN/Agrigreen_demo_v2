@@ -181,21 +181,7 @@ func (s *Service) bm11Period(ctx context.Context, typ, key string) (domain.BM11P
 		return domain.BM11Period{Type: typ, Key: w.Key, Label: label, From: w.From, To: w.To, Weeks: []domain.Span{w}}, nil
 	}
 	if key == "" {
-		switch typ {
-		case domain.BM11Month:
-			key = now.AddDate(0, -1, 0).Format("2006-01")
-		case domain.BM11Quarter:
-			q := (int(now.Month())-1)/3 + 1
-			y := now.Year()
-			if q == 1 {
-				q, y = 4, y-1
-			} else {
-				q--
-			}
-			key = fmt.Sprintf("%d-Q%d", y, q)
-		default:
-			key = fmt.Sprintf("%d", now.Year()-1)
-		}
+		key = bm11PrevKey(typ, now)
 	}
 	from, to, label, err := domain.BM11CalendarRange(typ, key)
 	if err != nil {
@@ -210,6 +196,20 @@ func (s *Service) bm11Period(ctx context.Context, typ, key string) (domain.BM11P
 		return domain.BM11Period{}, problem.Validation.WithField("key", "kỳ không chứa tuần CNTS nào kết thúc trong kỳ")
 	}
 	return domain.BM11Period{Type: typ, Key: key, Label: label, From: from, To: to, Weeks: weeks}, nil
+}
+
+// bm11PrevKey trả khóa kỳ tháng/quý/năm vừa kết thúc theo NGÀY NGHIỆP VỤ VN của now (KN-VN-DATE). Neo về ngày 1 của
+// tháng/quý trước khi lùi: AddDate(0, -1, 0) trên ngày 31/10 chuẩn hóa thành 01/10 (tháng 9 chỉ có 30 ngày) — sai kỳ.
+func bm11PrevKey(typ string, now time.Time) string {
+	now = now.In(clock.Zone())
+	switch typ {
+	case domain.BM11Month:
+		return domain.Date(now.Year(), now.Month(), 1).AddDate(0, -1, 0).Format("2006-01")
+	case domain.BM11Quarter:
+		p := domain.Date(now.Year(), time.Month((int(now.Month())-1)/3*3+1), 1).AddDate(0, -3, 0)
+		return fmt.Sprintf("%d-Q%d", p.Year(), (int(p.Month())-1)/3+1)
+	}
+	return fmt.Sprintf("%d", now.Year()-1)
 }
 
 // bm11Calc là kết quả tính phần tự động của một kỳ.
