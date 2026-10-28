@@ -31,6 +31,7 @@ import (
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
 	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
+	krapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knrecords/app"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/handler"
 	obapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/app"
@@ -110,6 +111,8 @@ type Module struct {
 	campaigns *campaignService
 	// BF-SRV-KN-ATTRS (#119): hồ sơ KN riêng — năm sản xuất máy (TT-10), cây trồng thửa (TT-11) (module_knattrs.go).
 	attrs *kaapp.Service
+	// KNSPLIT-2-KN-RECORDS (#67): hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (module_knrecords.go).
+	records *krapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -134,6 +137,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.rc.BM11Programs = m.bm11Programs // W11.45: kết quả CT/DA cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()
 	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs)
+	m.records = m.newKNRecords(pool, db, clk, d.Units)
 	return m
 }
 
@@ -209,6 +213,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerDeptHome(rg)                             // W11.54
 	m.registerCNTSCampaigns(rg)                        // W11.50
 	m.registerKNAttrs(rg)                              // BF-SRV-KN-ATTRS
+	m.registerKNRecords(rg)                            // KNSPLIT-2-KN-RECORDS
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham
