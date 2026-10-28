@@ -2108,7 +2108,7 @@
     "status": "active",
     "menu_profile": "ke_hoach_tai_chinh"
    },
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2121,7 +2121,7 @@
     "menu_profile": "ke_hoach_tai_chinh"
    },
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2134,7 +2134,7 @@
     "menu_profile": "ke_hoach_tai_chinh"
    },
    "filter_traits": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2148,7 +2148,7 @@
    },
    "filter_traits": true,
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2165,7 +2165,7 @@
    "duties": [
     "qtnv_bao_gia"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2183,7 +2183,7 @@
     "qtnv_bao_gia"
    ],
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2199,7 +2199,7 @@
    "duties": [
     "qtnv_bao_gia"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2216,7 +2216,7 @@
     "qtnv_bao_gia"
    ],
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2258,7 +2258,7 @@
    "disabled": [
     "pf/hrm"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2279,7 +2279,7 @@
    "disabled": [
     "pf/price"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -2305,7 +2305,7 @@
     "pf/geo",
     "pf/mechanization"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/ke_hoach_tai_chinh",
@@ -4904,7 +4904,7 @@
     "status": "active",
     "menu_profile": "generic"
    },
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -4917,7 +4917,7 @@
     "menu_profile": "generic"
    },
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -4930,7 +4930,7 @@
     "menu_profile": "generic"
    },
    "filter_traits": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -4944,7 +4944,7 @@
    },
    "filter_traits": true,
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -4961,7 +4961,7 @@
    "duties": [
     "qtnv_bao_gia"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -4979,7 +4979,7 @@
     "qtnv_bao_gia"
    ],
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -4995,7 +4995,7 @@
    "duties": [
     "qtnv_bao_gia"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -5012,7 +5012,7 @@
     "qtnv_bao_gia"
    ],
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -5054,7 +5054,7 @@
    "disabled": [
     "pf/hrm"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -5075,7 +5075,7 @@
    "disabled": [
     "pf/price"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -5101,7 +5101,7 @@
     "pf/geo",
     "pf/mechanization"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/generic",
@@ -7001,7 +7001,7 @@
     "status": "active",
     "menu_profile": ""
    },
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7014,7 +7014,7 @@
     "menu_profile": ""
    },
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7027,7 +7027,7 @@
     "menu_profile": ""
    },
    "filter_traits": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7041,7 +7041,7 @@
    },
    "filter_traits": true,
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7058,7 +7058,7 @@
    "duties": [
     "qtnv_bao_gia"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7076,7 +7076,7 @@
     "qtnv_bao_gia"
    ],
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7092,7 +7092,7 @@
    "duties": [
     "qtnv_bao_gia"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7109,7 +7109,7 @@
     "qtnv_bao_gia"
    ],
    "forms": true,
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7151,7 +7151,7 @@
    "disabled": [
     "pf/hrm"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7172,7 +7172,7 @@
    "disabled": [
     "pf/price"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -7198,7 +7198,7 @@
     "pf/geo",
     "pf/mechanization"
    ],
-   "result": "3425443b621f6137"
+   "result": "13b80a9c6498ef44"
   },
   {
    "name": "department/kn_tw/ke_hoach_tai_chinh/",
@@ -13558,6 +13558,107 @@
     }
    ]
   },
+  "13b80a9c6498ef44": {
+   "menu_version": "kn.menu/v7",
+   "default_route": "/kn/khtc/bao-cao-da-xuat",
+   "groups": [
+    {
+     "key": "dieu_hanh",
+     "label": "Điều hành",
+     "items": [
+      {
+       "key": "tw.dashboard",
+       "label": "Dashboard",
+       "route": "/kn/dashboard",
+       "icon": "dashboard",
+       "badge_source": "",
+       "enabled": true,
+       "status": "",
+       "status_label": "",
+       "children": []
+      }
+     ]
+    },
+    {
+     "key": "bao_cao",
+     "label": "Báo cáo",
+     "items": [
+      {
+       "key": "tw.bao_cao.tuan",
+       "label": "Báo cáo tuần",
+       "route": "/kn/bao-cao/tuan",
+       "icon": "file",
+       "badge_source": "",
+       "enabled": true,
+       "status": "",
+       "status_label": "",
+       "children": []
+      },
+      {
+       "key": "tw.bao_cao.thang",
+       "label": "Báo cáo tháng",
+       "route": "/kn/bao-cao/thang",
+       "icon": "calendar",
+       "badge_source": "",
+       "enabled": true,
+       "status": "",
+       "status_label": "",
+       "children": []
+      },
+      {
+       "key": "tw.bao_cao.hang_vu",
+       "label": "Báo cáo hàng vụ",
+       "route": "/kn/bao-cao/vu",
+       "icon": "sprout",
+       "badge_source": "",
+       "enabled": true,
+       "status": "",
+       "status_label": "",
+       "children": []
+      },
+      {
+       "key": "tw.bao_cao.nam",
+       "label": "Báo cáo năm",
+       "route": "/kn/bao-cao/nam",
+       "icon": "chart",
+       "badge_source": "",
+       "enabled": true,
+       "status": "",
+       "status_label": "",
+       "children": []
+      },
+      {
+       "key": "tw.khtc.bao_cao_tinh",
+       "label": "Báo cáo Tỉnh (KHTC)",
+       "route": "/kn/khtc/bao-cao-da-xuat",
+       "icon": "report",
+       "badge_source": "",
+       "enabled": true,
+       "status": "",
+       "status_label": "",
+       "children": []
+      }
+     ]
+    },
+    {
+     "key": "dung_chung",
+     "label": "Dùng chung",
+     "items": [
+      {
+       "key": "chung.contact",
+       "label": "Contact",
+       "route": "/kn/dung-chung/contact",
+       "icon": "phone",
+       "badge_source": "",
+       "enabled": true,
+       "status": "",
+       "status_label": "",
+       "children": []
+      }
+     ]
+    }
+   ]
+  },
   "1436822b00e4a2f3": {
    "menu_version": "kn.menu/v7",
    "default_route": "/kn/tong-quan",
@@ -18650,107 +18751,6 @@
        "label": "Tài liệu của phòng",
        "route": "/kn/nhan-su/tai-lieu-phong",
        "icon": "library",
-       "badge_source": "",
-       "enabled": true,
-       "status": "",
-       "status_label": "",
-       "children": []
-      }
-     ]
-    }
-   ]
-  },
-  "3425443b621f6137": {
-   "menu_version": "kn.menu/v7",
-   "default_route": "/kn/dashboard",
-   "groups": [
-    {
-     "key": "dieu_hanh",
-     "label": "Điều hành",
-     "items": [
-      {
-       "key": "tw.dashboard",
-       "label": "Dashboard",
-       "route": "/kn/dashboard",
-       "icon": "dashboard",
-       "badge_source": "",
-       "enabled": true,
-       "status": "",
-       "status_label": "",
-       "children": []
-      }
-     ]
-    },
-    {
-     "key": "bao_cao",
-     "label": "Báo cáo",
-     "items": [
-      {
-       "key": "tw.bao_cao.tuan",
-       "label": "Báo cáo tuần",
-       "route": "/kn/bao-cao/tuan",
-       "icon": "file",
-       "badge_source": "",
-       "enabled": true,
-       "status": "",
-       "status_label": "",
-       "children": []
-      },
-      {
-       "key": "tw.bao_cao.thang",
-       "label": "Báo cáo tháng",
-       "route": "/kn/bao-cao/thang",
-       "icon": "calendar",
-       "badge_source": "",
-       "enabled": true,
-       "status": "",
-       "status_label": "",
-       "children": []
-      },
-      {
-       "key": "tw.bao_cao.hang_vu",
-       "label": "Báo cáo hàng vụ",
-       "route": "/kn/bao-cao/vu",
-       "icon": "sprout",
-       "badge_source": "",
-       "enabled": true,
-       "status": "",
-       "status_label": "",
-       "children": []
-      },
-      {
-       "key": "tw.bao_cao.nam",
-       "label": "Báo cáo năm",
-       "route": "/kn/bao-cao/nam",
-       "icon": "chart",
-       "badge_source": "",
-       "enabled": true,
-       "status": "",
-       "status_label": "",
-       "children": []
-      },
-      {
-       "key": "tw.khtc.bao_cao_tinh",
-       "label": "Báo cáo Tỉnh (KHTC)",
-       "route": "/kn/khtc/bao-cao-da-xuat",
-       "icon": "report",
-       "badge_source": "",
-       "enabled": false,
-       "status": "coming_soon",
-       "status_label": "Sắp có",
-       "children": []
-      }
-     ]
-    },
-    {
-     "key": "dung_chung",
-     "label": "Dùng chung",
-     "items": [
-      {
-       "key": "chung.contact",
-       "label": "Contact",
-       "route": "/kn/dung-chung/contact",
-       "icon": "phone",
        "badge_source": "",
        "enabled": true,
        "status": "",

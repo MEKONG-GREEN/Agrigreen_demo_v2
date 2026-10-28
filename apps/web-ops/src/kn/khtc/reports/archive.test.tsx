@@ -19,6 +19,8 @@ beforeEach(()=>{requests.length=0;vi.mocked(saveBlob).mockClear();auth.api=creat
 describe("W11.69 immutable exported archive",()=>{
  it("lists exported metadata without ever requesting a draft; downloads the frozen file",async()=>{
   render(<KhtcArchiveScreen/>);expect(await screen.findByText("12/BC-TTKN")).toBeInTheDocument();expect(screen.getByText("Bản cuối")).toBeInTheDocument();
+  expect(screen.getByRole("combobox",{name:"Năm"})).toBeInTheDocument();
+  expect(screen.getByRole("combobox",{name:"Loại báo cáo"})).toBeInTheDocument();
   expect(screen.queryByRole("button",{name:"Lưu bản soạn"})).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button",{name:"Tải Excel Tuần 41 v2"}));
   await waitFor(()=>expect(saveBlob).toHaveBeenCalledTimes(1));

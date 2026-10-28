@@ -36,8 +36,8 @@ export function KhtcArchiveScreen() {
   return <>
     <PageHeader title="Báo cáo KHTC đã xuất">Chỉ xem và tải tệp đã xuất trong phạm vi Trung tâm của phiên. Mặc định hiện Bản cuối của mỗi kỳ; nếu chưa có thì hiện bản xuất mới nhất.</PageHeader>
     <form className="card filters" aria-label="Bộ lọc báo cáo đã xuất" onSubmit={e => { e.preventDefault(); update({ q: search.trim() }); }}>
-      <label>Năm <select value={filter.year} onChange={e => update({ year: Number(e.target.value) })}>{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select></label>
-      <label>Loại báo cáo <select value={filter.kind ?? ""} onChange={e => update({ kind: e.target.value as ArchiveQuery["kind"] })}><option value="">Tất cả</option>{REPORT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
+      <label>Năm <select aria-label="Năm" value={filter.year} onChange={e => update({ year: Number(e.target.value) })}>{YEARS.map(y => <option key={y} value={y}>{y}</option>)}</select></label>
+      <label>Loại báo cáo <select aria-label="Loại báo cáo" value={filter.kind ?? ""} onChange={e => update({ kind: e.target.value as ArchiveQuery["kind"] })}><option value="">Tất cả</option>{REPORT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
       <label>Tên kỳ hoặc số văn bản <input type="search" maxLength={200} value={search} onChange={e => setSearch(e.target.value)} /></label>
       <button type="submit" className="btn btn-o">Tìm kiếm</button>
       <label><input type="checkbox" checked={filter.versions ?? false} onChange={e => update({ versions: e.target.checked })} /> Mọi phiên bản</label>
