@@ -25,6 +25,11 @@ const (
 	MaxImportRows   = 1000
 	MaxImportBytes  = 5 << 20
 	MinReason       = 10
+	// Giá trị số nhập (API, Excel): độ dài chuỗi, chữ số phần nguyên (|giá trị| < 10^17, khớp numeric(22,4) và CHECK
+	// của bảng) và chữ số thập phân.
+	MaxValueLen        = 64
+	MaxValueIntDigits  = 17
+	MaxValueFracDigits = 4
 )
 
 // Hành động của sổ số liệu.
@@ -103,7 +108,11 @@ func (in IndicatorInput) Normalize(gen func() string) (IndicatorInput, error) {
 }
 
 // ParseValue đọc giá trị số: "48215", "48215.5", "48.215,5" (kiểu Việt Nam), "26 400". Tối đa 4 chữ số thập phân.
+// Không nhận dạng số mũ; tối đa MaxValueLen byte (sau khi bỏ khoảng trắng đầu/cuối), |giá trị| < 10^17.
 func ParseValue(raw string) (decimal.Decimal, error) {
+	if len(strings.TrimSpace(raw)) > MaxValueLen {
+		return decimal.Zero, fmt.Errorf("tối đa %d ký tự", MaxValueLen)
+	}
 	s := strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(raw), " ", ""), " ", "")
 	if s == "" {
 		return decimal.Zero, errors.New("bắt buộc")
@@ -114,17 +123,49 @@ func ParseValue(raw string) (decimal.Decimal, error) {
 	} else if strings.Count(s, ".") > 1 {
 		s = strings.ReplaceAll(s, ".", "")
 	}
+	// Kiểm cú pháp và số chữ số trên chuỗi TRƯỚC mọi phép decimal (AUTO-REVIEW §4): không nhận số mũ (1e2, 1e100000).
+	intDigits, fracDigits, ok := scanPlainValue(s)
+	if !ok {
+		return decimal.Zero, errors.New("không phải số")
+	}
+	if len(strings.TrimRight(fracDigits, "0")) > MaxValueFracDigits {
+		return decimal.Zero, errors.New("tối đa 4 chữ số thập phân")
+	}
+	if len(strings.TrimLeft(intDigits, "0")) > MaxValueIntDigits {
+		return decimal.Zero, errors.New("giá trị quá lớn")
+	}
+	// s đã ≤ MaxValueLen byte, chỉ gồm dấu, chữ số và một dấu chấm → dựng decimal rẻ, |s| < 10^17.
 	d, err := decimal.NewFromString(s)
 	if err != nil {
 		return decimal.Zero, errors.New("không phải số")
 	}
-	if !d.Equal(d.Round(4)) {
-		return decimal.Zero, errors.New("tối đa 4 chữ số thập phân")
-	}
-	if d.Abs().GreaterThanOrEqual(decimal.New(1, 17)) {
-		return decimal.Zero, errors.New("giá trị quá lớn")
-	}
 	return d, nil
+}
+
+// scanPlainValue kiểm s (đã chuẩn hóa dấu phân cách) có dạng [+-]chữ số[.chữ số] với ít nhất một chữ số, không số mũ,
+// và trả phần nguyên, phần thập phân. Không đọc giá trị.
+func scanPlainValue(s string) (intDigits, fracDigits string, ok bool) {
+	i := 0
+	if i < len(s) && (s[i] == '+' || s[i] == '-') {
+		i++
+	}
+	start := i
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	intDigits = s[start:i]
+	if i < len(s) && s[i] == '.' {
+		i++
+		fs := i
+		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+			i++
+		}
+		fracDigits = s[fs:i]
+	}
+	if i != len(s) || intDigits == "" && fracDigits == "" {
+		return "", "", false
+	}
+	return intDigits, fracDigits, true
 }
 
 // ParseDate đọc ngày của nguồn: YYYY-MM-DD hoặc DD/MM/YYYY.
