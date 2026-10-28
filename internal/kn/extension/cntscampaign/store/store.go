@@ -182,7 +182,7 @@ func Lock(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) error {
 	return err
 }
 
-// Claim ghi ý định thao tác của đợt (BF-CNTS-CAMPAIGN-POOL, #156; pf 20261028081435) hạn lease tính bằng giờ DB; ý định khác
+// Claim ghi ý định thao tác của đợt (BF-CNTS-CAMPAIGN-POOL, #156; pf 20261028222212) hạn lease tính bằng giờ DB; ý định khác
 // còn hạn → false. Gọi trong giao dịch đã giữ Lock.
 func Claim(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, action string, lease time.Duration) (bool, error) {
 	var ok bool
