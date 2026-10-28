@@ -245,6 +245,39 @@ async function problemCode(res: Response): Promise<string | null> {
   }
 }
 
+/** Băm byte (SHA-256 khi có Web Crypto; ngoài ngữ cảnh an toàn thì hai làn FNV-1a) — không giải mã nhị phân thành chữ. */
+async function digestHex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  const subtle = typeof crypto !== "undefined" ? crypto.subtle : undefined;
+  if (subtle) {
+    try {
+      const d = new Uint8Array(await subtle.digest("SHA-256", bytes));
+      return `sha256:${Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+    } catch {
+      /* rơi xuống FNV */
+    }
+  }
+  let a = 0x811c9dc5;
+  let b = 0x01000193 ^ 0x9e3779b9;
+  for (let i = 0; i < bytes.length; i++) {
+    const x = bytes[i] ?? 0;
+    a = Math.imul(a ^ x, 0x01000193) >>> 0;
+    b = Math.imul(b ^ x, 0x01000193) >>> 0;
+  }
+  return `fnv:${a.toString(16)}${b.toString(16)}`;
+}
+
+/**
+ * Phần thân trong dấu vân tay. JSON/văn bản: nguyên văn (như trước). Thân nhị phân/multipart: độ dài + băm byte — giải mã
+ * tệp PDF/ảnh thành chữ làm mất byte (U+FFFD) nên hai tệp khác nhau có thể trùng dấu; và không giữ cả tệp làm khóa Map.
+ * Multipart chỉ ổn định khi thân tất định (src/api/multipart.ts): FormData của trình duyệt mang boundary ngẫu nhiên.
+ */
+export async function requestBodyFingerprint(request: Request): Promise<string> {
+  const type = (request.headers.get("Content-Type") ?? "").toLowerCase();
+  if (!type || type.includes("json") || type.startsWith("text/") || type.includes("x-www-form-urlencoded")) return request.clone().text();
+  const bytes = new Uint8Array(await request.clone().arrayBuffer());
+  return `bin:${type.split(";")[0]?.trim() ?? ""}:${bytes.length}:${await digestHex(bytes)}`;
+}
+
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH"]);
 /** Phiên thao tác bắt được lúc yêu cầu khởi phát (theo id yêu cầu của openapi-fetch). */
 const capturedRuns = new Map<string, OperationRun>();
@@ -276,7 +309,7 @@ export function idempotencyMiddleware(generate: () => string = newIdempotencyKey
       const run = capturedRuns.get(id) ?? currentIdempotentRun();
       capturedRuns.delete(id);
       if (run && WRITE_METHODS.has(method)) {
-        const body = await request.clone().text();
+        const body = await requestBodyFingerprint(request);
         const att = beginAttempt(run, requestFingerprint(method, request.url, request.headers.get("X-AG-Context"), body));
         attempts.set(id, att);
         request.headers.set(IDEMPOTENCY_HEADER, att.key);

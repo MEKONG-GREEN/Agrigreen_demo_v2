@@ -240,17 +240,27 @@ func (u user) do(method, path, idem string, body any) resp {
 func (u user) post(path string, body any) resp { return u.do(http.MethodPost, path, key(), body) }
 func (u user) get(path string) resp            { return u.do(http.MethodGet, path, "", nil) }
 
-func (u user) upload(path string, base int64, name string, data []byte) resp {
+func multipartBody(base int64, name string, data []byte) ([]byte, string) {
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
 	_ = w.WriteField("meta", fmt.Sprintf(`{"base_version": %d}`, base))
 	fw, _ := w.CreateFormFile("file", name)
 	_, _ = fw.Write(data)
 	_ = w.Close()
-	code, raw, _ := u.req(http.MethodPost, path, key(), w.FormDataContentType(), &buf)
+	return buf.Bytes(), w.FormDataContentType()
+}
+
+// send gửi đúng thân đã dựng với khóa cho trước (thử lại sau mất phản hồi).
+func (u user) send(path, idem, ct string, body []byte) resp {
+	code, raw, _ := u.req(http.MethodPost, path, idem, ct, bytes.NewReader(body))
 	out := resp{code: code, raw: raw}
 	_ = json.Unmarshal(raw, &out.body)
 	return out
+}
+
+func (u user) upload(path string, base int64, name string, data []byte) resp {
+	body, ct := multipartBody(base, name, data)
+	return u.send(path, key(), ct, body)
 }
 
 func want(t *testing.T, r resp, code int, problemCode, what string) map[string]any {
@@ -452,10 +462,24 @@ func TestCNTSKNQG_W1153(t *testing.T) {
 	want(t, upd(chu, r5, ver(w5), edited), 409, "extension.cnts_knqg_locked", "chờ ký không sửa")
 	want(t, chu.upload(base+"knqg-docs/"+r5+"/signed", ver(w5), "bb.exe", []byte("MZ")), 422, "extension.cnts_knqg_scan_invalid", "tệp không phải scan")
 	want(t, chu2.upload(base+"knqg-docs/"+r5+"/signed", ver(w5), "bb.pdf", pdf), 403, "", "chủ nhiệm khác không ký")
-	sg := want(t, chu.upload(base+"knqg-docs/"+r5+"/signed", ver(w5), "bien-ban-05.pdf", pdf), 200, "", "tải bản đã ký")
+	// Mất phản hồi sau khi đã ghi (#29 P2): gửi lại đúng thân multipart (cùng boundary — web dựng thân tất định) với cùng
+	// khóa → máy chủ phát lại kết quả đã ký, không ghi phiên bản thứ hai; cùng khóa mà khác tệp → lỗi khóa dùng lại.
+	signKey := key()
+	signBody, signCT := multipartBody(ver(w5), "bien-ban-05.pdf", pdf)
+	first := chu.send(base+"knqg-docs/"+r5+"/signed", signKey, signCT, signBody)
+	sg := want(t, first, 200, "", "tải bản đã ký")
 	if str(sg, "status") != "signed" || sg["signed"] == nil {
 		t.Fatalf("đã ký: %s", sg)
 	}
+	again := want(t, chu.send(base+"knqg-docs/"+r5+"/signed", signKey, signCT, signBody), 200, "", "bấm ký lại sau mất phản hồi")
+	if ver(again) != ver(sg) || str(again, "status") != "signed" || len(list(again, "versions")) != len(list(sg, "versions")) {
+		t.Fatalf("phát lại phải trả đúng kết quả đã ký, không ghi thêm: %v / %v", again, sg)
+	}
+	if cur := want(t, chu.get(base+"knqg-docs/"+r5), 200, "", "sau phát lại"); ver(cur) != ver(sg) || len(list(cur, "versions")) != len(list(sg, "versions")) {
+		t.Fatalf("phát lại không được ghi phiên bản mới: %v", cur)
+	}
+	otherBody, otherCT := multipartBody(ver(w5), "bien-ban-05-khac.pdf", append(bytes.Clone(pdf), '\n'))
+	want(t, chu.send(base+"knqg-docs/"+r5+"/signed", signKey, otherCT, otherBody), 422, "idempotency_key_reused", "cùng khóa, khác tệp")
 	code, body, hdr := officer.req(http.MethodGet, base+"knqg-docs/"+r5+"/signed", "", "", nil)
 	if code != 200 || !bytes.Equal(body, pdf) || hdr.Get("X-Content-SHA256") == "" {
 		t.Fatalf("Cấp Xã tải bản scan điểm xã mình: %d %s", code, body)

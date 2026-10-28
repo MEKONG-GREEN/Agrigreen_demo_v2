@@ -4,6 +4,7 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { stableMultipart } from "@/api/multipart";
 import { parseProblemResponse } from "@/api/problem";
 
 type S = components["schemas"];
@@ -155,19 +156,23 @@ export function createKnqgApi(api: ApiClient) {
           body: reason ? { base_version, reason } : { base_version },
         }),
       ),
-    sign: (ref: string, base_version: number, file: File): Promise<DocDetail> =>
-      unwrap(
+    // Thân multipart tất định (src/api/multipart.ts): bấm lại sau mất phản hồi trong cùng useAction gửi đúng từng byte cũ
+    // → cùng Idempotency-Key, máy chủ phát lại kết quả đã ký thay vì báo xung đột phiên bản (#29 P2).
+    sign: (ref: string, base_version: number, file: File): Promise<DocDetail> => {
+      const meta = JSON.stringify({ base_version });
+      const mp = stableMultipart([
+        ["meta", meta],
+        ["file", file],
+      ]);
+      return unwrap(
         api.POST("/v1/extension/cnts/knqg-docs/{ref}/signed", {
           params: { path: { ref }, ...idem() },
-          body: { meta: JSON.stringify({ base_version }), file: file as unknown as string },
-          bodySerializer: (b: { meta: string; file: string }) => {
-            const fd = new FormData();
-            fd.append("meta", b.meta);
-            fd.append("file", b.file as unknown as Blob, file.name);
-            return fd;
-          },
+          headers: { "Content-Type": mp.contentType },
+          body: { meta, file: file as unknown as string },
+          bodySerializer: () => mp.body,
         }),
-      ),
+      );
+    },
     async scan(ref: string, version?: number): Promise<Blob> {
       const res = await api.GET("/v1/extension/cnts/knqg-docs/{ref}/signed", { params: { path: { ref }, query: version ? { version } : {} }, parseAs: "blob" });
       if (!res.response.ok || !res.data) throw await parseProblemResponse(res.response);
