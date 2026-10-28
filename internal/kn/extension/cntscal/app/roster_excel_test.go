@@ -176,6 +176,21 @@ func TestReadBM03Rejects(t *testing.T) {
 	if _, _, err := ReadBM03(buf.Bytes(), m); !isImportInvalid(err, "quá 2000 dòng") {
 		t.Fatalf("quá dòng: %v", err)
 	}
+	// Dòng chỉ có định dạng sau giới hạn đọc được bỏ qua; có chữ sau giới hạn → từ chối (không lặng lẽ bỏ dữ liệu).
+	h := excelize.NewFile()
+	for col, v := range map[string]string{"A1": "STT", "B1": "TÊN CƠ SỞ GIẾT MỔ", "D1": "VIÊN CHỨC TRỰC KSGM", "F1": "1", "B2": "Lò", "D2": "X", "F2": "N"} {
+		_ = h.SetCellValue("Sheet1", col, v)
+	}
+	_ = h.SetRowHeight("Sheet1", domain.MaxImportScan+500, 20)
+	buf, _ = h.WriteToBuffer()
+	if _, sh, err := ReadBM03(buf.Bytes(), m); err != nil || len(sh.Rows) != 1 {
+		t.Fatalf("dòng trống có định dạng sau giới hạn: %v %+v", err, sh)
+	}
+	_ = h.SetCellValue("Sheet1", fmt.Sprintf("D%d", domain.MaxImportScan+10), "Y")
+	buf, _ = h.WriteToBuffer()
+	if _, _, err := ReadBM03(buf.Bytes(), m); !isImportInvalid(err, "quá 6000 dòng") {
+		t.Fatalf("có chữ sau giới hạn đọc: %v", err)
+	}
 	// Sheet ẩn bị bỏ qua.
 	g := excelize.NewFile()
 	_ = g.SetCellValue("Sheet1", "A1", "STT")

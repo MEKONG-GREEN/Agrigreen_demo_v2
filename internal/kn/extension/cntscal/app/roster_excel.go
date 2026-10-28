@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ const (
 	MaxRosterImportBytes = 4 << 20
 	maxUnzipBytes        = 64 << 20
 	maxUnzipXMLBytes     = 16 << 20
+	maxScanTail          = 200000 // dòng (kể cả dòng trống có định dạng) tối đa duyệt mỗi sheet
 )
 
 // ErrRosterImportInvalid: tệp không đọc được hoặc không đúng mẫu BM-03.
@@ -134,6 +136,9 @@ func ReadBM03(data []byte, m time.Time) (string, domain.ImportSheet, error) {
 			continue
 		}
 		rows, err := sheetRows(f, name)
+		if errors.Is(err, errSheetTooLong) {
+			return "", domain.ImportSheet{}, ErrRosterImportInvalid.WithDetail(fmt.Sprintf("Sheet \"%s\" quá %d dòng", name, domain.MaxImportScan))
+		}
 		if err != nil {
 			continue
 		}
@@ -165,7 +170,10 @@ func ReadBM03(data []byte, m time.Time) (string, domain.ImportSheet, error) {
 	return "", domain.ImportSheet{}, ErrRosterImportInvalid.WithDetail("Không thấy dòng tiêu đề cột STT | TÊN CƠ SỞ GIẾT MỔ | ĐỊA CHỈ | VIÊN CHỨC TRỰC KSGM | ĐT — dùng mẫu \"Lịch trực KSGM\"")
 }
 
+var errSheetTooLong = errors.New("sheet quá số dòng đọc")
+
 // sheetRows đọc tối đa MaxImportScan dòng × MaxImportCols cột, giá trị thô (không theo định dạng số: SĐT, ngày tiêu đề).
+// Sheet còn dòng sau MaxImportScan → errSheetTooLong (không lặng lẽ bỏ dữ liệu).
 func sheetRows(f *excelize.File, name string) ([][]string, error) {
 	it, err := f.Rows(name)
 	if err != nil {
@@ -173,13 +181,19 @@ func sheetRows(f *excelize.File, name string) ([][]string, error) {
 	}
 	defer func() { _ = it.Close() }()
 	var out [][]string
+	seen := 0
 	for it.Next() {
-		if len(out) >= domain.MaxImportScan {
-			break
-		}
+		seen++
 		cols, err := it.Columns(excelize.Options{RawCellValue: true})
 		if err != nil {
 			return nil, err
+		}
+		if len(out) >= domain.MaxImportScan {
+			// Dòng chỉ có định dạng (ô trống) sau giới hạn được bỏ qua; có chữ → từ chối.
+			if seen > maxScanTail || slices.ContainsFunc(cols, func(s string) bool { return strings.TrimSpace(s) != "" }) {
+				return nil, errSheetTooLong
+			}
+			continue
 		}
 		if len(cols) > domain.MaxImportCols {
 			cols = cols[:domain.MaxImportCols]
