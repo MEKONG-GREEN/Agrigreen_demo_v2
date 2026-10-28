@@ -2,9 +2,9 @@
 
 // Chương trình, dự án, điểm trình diễn (W11.47 — BRD CNTS v3.7 UR-TINH-19, FN-19 phần CT/DA; bố cục prototype A
 // "r-projects"): danh sách dự án, tạo/sửa (chủ nhiệm sửa dự án mình — FN-19 BR-01), chi tiết dự án với điểm trình diễn và
-// hộ tham gia, kết thúc/mở lại. Mẫu biểu dự án BM-12…BM-16 là gói W11.53 (GĐ2).
+// hộ tham gia, kết thúc/mở lại. Mẫu biểu dự án BM-12…BM-16 (Mẫu 01/03/04/05/07): màn /kn/cnts/du-an-mau-bieu (W11.53).
 // BF-SWEEP-CNTS (#101): kinh phí dùng NumberField (số nguyên, không âm), trường bắt buộc báo lỗi theo trường khi bấm Lưu,
-// bảng có STT. Mẫu KNQG 01/03/04/05/07 và bước xác nhận của TW — TODO(#29).
+// bảng có STT.
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { fieldErrorMap } from "@/api/problem";

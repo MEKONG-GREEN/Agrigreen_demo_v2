@@ -116,6 +116,8 @@ type Module struct {
 	campaigns *campaignService
 	// BF-SRV-KN-ATTRS (#119): hồ sơ KN riêng — năm sản xuất máy (TT-10), cây trồng thửa (TT-11) (module_knattrs.go).
 	attrs *kaapp.Service
+	// W11.53 (D4 CN13): mẫu biểu dự án KNQG Mẫu 01–07 (extension/cntsknqg, module_cntsknqg.go).
+	knqg *knqgService
 	// KNSPLIT-2-KN-RECORDS (#67): hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (module_knrecords.go).
 	records *krapp.Service
 }
@@ -219,6 +221,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerDeptHome(rg)                             // W11.54
 	m.registerCNTSCampaigns(rg)                        // W11.50
 	m.registerKNAttrs(rg)                              // BF-SRV-KN-ATTRS
+	m.registerCNTSKNQG(rg)                             // W11.53
 	m.registerKNRecords(rg)                            // KNSPLIT-2-KN-RECORDS
 }
 

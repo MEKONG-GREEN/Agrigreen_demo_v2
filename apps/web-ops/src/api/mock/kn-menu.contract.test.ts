@@ -172,7 +172,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     expect(g["Dữ liệu"]).toEqual([
       ["Số liệu cấp xã", ["Nhập liệu tuần*", "Khai thác thủy sản", "Nhật ký sản xuất*", "Lịch tiêm (thực tế)"]], // BF-CN-CATCH #112: Khai thác thủy sản có màn
       "Bản đồ vùng dịch",
-      ["Dự án KNQG", ["Dự án, điểm trình diễn", "Mẫu biểu dự án*"]],
+      ["Dự án KNQG", ["Dự án, điểm trình diễn", "Mẫu biểu dự án"]], // W11.53: Mẫu 01–07 có màn
       "Quy trình, văn bản",
     ]);
     // Số đếm lịch chờ duyệt giữ ở "Lịch công tác cán bộ xã".
@@ -200,7 +200,8 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     );
     expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài" /* W11.67 có màn */, "Quy trình, văn bản"]);
     expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành", "Mặt hàng*", "Quy trình, văn bản"]); // W11.78: Điều tra giá thành có màn
-    expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual(["Dự án KNQG"]);
+    // W11.53 (UR-QG-01): TW xem dự án KNQG và mẫu biểu, xác nhận/trả lại Mẫu 07.
+    expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual([["Dự án KNQG", ["Dự án tại An Giang", "Mẫu biểu, nghiệm thu năm (07)"]]]);
     // W11.54: Trang chủ phòng đầu Điều hành Cấp Tỉnh mọi phòng; Quy trình, văn bản (/kn/van-ban) cuối Dữ liệu; Cấp Xã/TW không có Trang chủ phòng.
     for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
       expect(leaves(`kn_tinh/${code}`)[0]).toBe("dieu_hanh:tinh.trang_chu");
