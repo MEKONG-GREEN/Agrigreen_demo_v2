@@ -13,7 +13,7 @@ import { DataTable, FilterBar, FilterChip, PageHeader, type Column } from "@/com
 import { LoadState, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { vnDate } from "@/kn/schedule/week";
 import { normalizeNumberInput } from "@/lib/exactDecimal";
-import { HouseholdAddRoute, ProducerDetailScreen, ProducerFormScreen, ProducerListScreen } from "./ProducerScreens";
+import { HouseholdAddRoute, ProducerCreateRoute, ProducerDetailScreen, ProducerListScreen } from "./ProducerScreens";
 
 /** Ghi chú phần còn ở nơi khác (nạp Excel, vẽ bản đồ ngoại tuyến…). */
 export function GapNotice({ what }: { what: string }) {
@@ -47,9 +47,12 @@ export function CoopDetailScreen() {
   return <ProducerDetailScreen kind="cooperative" />;
 }
 
-/** FN-XA-03.03 Thêm HTX trên trang riêng (R-A2). Bắt buộc theo TT-08: Xã/phường, Tên, Người đại diện, Điện thoại. */
+/**
+ * FN-XA-03.03 Thêm hồ sơ trên trang riêng (R-A2). Bắt buộc theo TT-08 (#102): Xã/phường, Loại (HTX / Nông hộ / Tổ hợp
+ * tác — mặc định HTX), Tên, Người đại diện, Điện thoại.
+ */
 export function CoopCreateScreen() {
-  return <ProducerFormScreen kind="cooperative" back={{ href: "/kn/du-lieu/htx", label: "Danh sách HTX" }} />;
+  return <ProducerCreateRoute kind="cooperative" />;
 }
 
 /** FN-XA-03.03 Thêm nông hộ vào HTX trên trang riêng (R-A2) — hồ sơ KN loại Nông hộ thuộc HTX. */

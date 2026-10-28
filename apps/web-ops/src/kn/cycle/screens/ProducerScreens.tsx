@@ -22,8 +22,8 @@ import { useCommuneFilter } from "./DataScreens";
 /** Cấu hình theo loại: nhãn, tiêu đề danh sách, đường dẫn gốc (TT-09: ba danh sách riêng). */
 export const PRODUCER_KINDS: Record<KnProducerKind, { label: string; list: string; base: string; nameLabel: string; empty: string }> = {
   cooperative: { label: "HTX", list: "Danh sách HTX", base: "/kn/du-lieu/htx", nameLabel: "Tên HTX", empty: "Xã phụ trách chưa có HTX." },
-  household: { label: "Nông hộ", list: "Danh sách Nông hộ", base: "/kn/du-lieu/nong-ho", nameLabel: "Chủ hộ", empty: "Xã phụ trách chưa có nông hộ." },
-  coop_group: { label: "Tổ hợp tác", list: "Danh sách Tổ hợp tác", base: "/kn/du-lieu/to-hop-tac", nameLabel: "Tên Tổ hợp tác", empty: "Xã phụ trách chưa có tổ hợp tác." },
+  household: { label: "Nông hộ", list: "Danh sách Nông hộ", base: "/kn/du-lieu/htx/nong-ho", nameLabel: "Chủ hộ", empty: "Xã phụ trách chưa có nông hộ." },
+  coop_group: { label: "Tổ hợp tác", list: "Danh sách Tổ hợp tác", base: "/kn/du-lieu/htx/to-hop-tac", nameLabel: "Tên Tổ hợp tác", empty: "Xã phụ trách chưa có tổ hợp tác." },
 };
 
 const EVENT_LABEL: Record<string, string> = { created: "Tạo hồ sơ", updated: "Sửa hồ sơ", deactivated: "Vô hiệu hóa", reactivated: "Kích hoạt lại" };
@@ -36,9 +36,24 @@ export function producerLog(d: KnProducerDetail): LogEntry[] {
 const person = (r: KnProducer) => r.representative ?? r.holder;
 const statusPill = (r: Pick<KnProducer, "status">) => <StatusPill tone={r.status === "active" ? "ok" : "neutral"}>{r.status === "active" ? "Hoạt động" : "Ngừng hoạt động"}</StatusPill>;
 
-/** Đường dẫn chi tiết của hồ sơ (Nông hộ chưa có trang riêng ở #67 → về HTX/THT cha). */
+/** Đường dẫn chi tiết của hồ sơ (BF-TT-HTX #102: mỗi loại có trang riêng dưới /kn/du-lieu/htx). */
 export function producerHref(r: Pick<KnProducer, "kind" | "ref">): string {
   return `${PRODUCER_KINDS[r.kind].base}/${r.ref}`;
+}
+
+const KIND_ORDER: KnProducerKind[] = ["cooperative", "household", "coop_group"];
+
+/** TT-09 (#102): ba danh sách riêng HTX / Nông hộ / Tổ hợp tác — thanh tab (liên kết tới ba trang, mỗi trang bộ lọc riêng). */
+export function ProducerTabs({ current }: { current: KnProducerKind }) {
+  return (
+    <div className="tabs" role="tablist" aria-label="Loại hồ sơ">
+      {KIND_ORDER.map((k) => (
+        <Link key={k} href={PRODUCER_KINDS[k].base} role="tab" aria-selected={k === current}>
+          {PRODUCER_KINDS[k].label}
+        </Link>
+      ))}
+    </div>
+  );
 }
 
 /** Danh sách một loại hồ sơ, bộ lọc riêng của loại (TT-09). */
@@ -75,14 +90,15 @@ export function ProducerListScreen({ kind, title, actions }: { kind: KnProducerK
     { key: "area", header: "Diện tích (ha)", cell: (c) => num(c.area_ha), className: "num" },
     ...(kind === "household" ? [] : [{ key: "hh", header: "Nông hộ", cell: (c: KnProducer) => c.member_count, className: "num" }]),
     { key: "st", header: "Trạng thái", cell: (c) => statusPill(c) },
-    { key: "act", header: "Thao tác", cell: (c) => <RowActions label={`${cfg.label} ${c.display_name}`} viewHref={c.kind === "household" ? (c.parent_ref ? `${c.parent_kind ? PRODUCER_KINDS[c.parent_kind].base : cfg.base}/${c.parent_ref}` : undefined) : producerHref(c)} /> },
+    { key: "act", header: "Thao tác", cell: (c) => <RowActions label={`${cfg.label} ${c.display_name}`} viewHref={producerHref(c)} editHref={!readOnly && c.can_edit && c.status === "active" ? `${producerHref(c)}/sua` : undefined} /> },
   ];
   return (
     <>
+      <ProducerTabs current={kind} />
       <PageHeader
         title={title ?? cfg.list}
         actions={
-          actions !== undefined ? actions : readOnly || kind === "household" ? null : (
+          actions !== undefined ? actions : readOnly ? null : (
             <Link className="btn btn-p" href={`${cfg.base}/them-moi`}>
               Thêm {cfg.label}
             </Link>
@@ -327,7 +343,7 @@ export function ProducerFormScreen({ kind: fixedKind, kinds, parentRef, editRef,
     if (Object.values(errs).some(Boolean) || !kind) return;
     const body = producerBody(kind, v.values, personTouched);
     const r = await act.run(() => (editing && cur.data ? collectApi.updateRecord(editRef!, { ...body, base_version: cur.data.version }) : collectApi.createRecord(body)));
-    if (r) router.push(r.kind === "household" ? (parentRef ? back.href : r.parent_ref && r.parent_kind ? `${PRODUCER_KINDS[r.parent_kind].base}/${r.parent_ref}` : PRODUCER_KINDS.household.base) : producerHref(r));
+    if (r) router.push(parentRef ? back.href : producerHref(r));
   };
   const title = editing ? `Sửa ${cur.data?.kind_label ?? ""} ${cur.data?.display_name ?? ""}`.replace(/\s+/g, " ").trim() : kind === "household" ? "Thêm nông hộ" : kind ? `Thêm ${PRODUCER_KINDS[kind].label}` : "Thêm hồ sơ";
   const kindOptions = (kinds ?? []).map((k) => ({ value: k, label: PRODUCER_KINDS[k].label }));
@@ -395,4 +411,17 @@ export function HouseholdAddRoute({ parentKind }: { parentKind: KnProducerKind }
   const { id } = useParams<{ id: string }>();
   const cfg = PRODUCER_KINDS[parentKind];
   return <ProducerFormScreen kind="household" parentRef={id} back={{ href: `${cfg.base}/${id}`, label: cfg.label }} />;
+}
+
+const ALL_KINDS: KnProducerKind[] = ["cooperative", "household", "coop_group"];
+
+/** TT-08 (#102): trang Thêm chung có ô "Loại" (bắt buộc), mặc định theo danh sách đang xem. */
+export function ProducerCreateRoute({ kind }: { kind: KnProducerKind }) {
+  const cfg = PRODUCER_KINDS[kind];
+  return <ProducerFormScreen kind={kind} kinds={ALL_KINDS} back={{ href: cfg.base, label: cfg.list }} />;
+}
+
+/** Trang chi tiết theo loại (Nông hộ, Tổ hợp tác — #102). */
+export function ProducerDetailRoute({ kind }: { kind: KnProducerKind }) {
+  return <ProducerDetailScreen kind={kind} />;
 }
