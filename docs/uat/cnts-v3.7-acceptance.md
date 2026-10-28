@@ -135,3 +135,20 @@ Nguồn và giới hạn: [giả định W11.50](../kn/gia-dinh/W11.50.md) (ch�
 | BR-01: mở lại chỉ Lãnh đạo phòng, lý do + thời hạn; sổ chỉ ghi thêm | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150`, `TestPeriodKeyAndState` | G1 |
 | Màn Cấp Tỉnh "Chiến dịch điều tra", menu `tinh.cnts.chien_dich.quan_ly` (mục "Tạo chiến dịch" còn Sắp có — tạo đợt ngay trên màn quản lý) | Vitest `campaign.test.ts`, `kn-menu.contract.test.ts`; `TestWebMenuFixture` | G1 |
 | AC-01 (102 xã thấy việc trong 1 phút), phạm vi theo hộ, nhắc tự động theo cấu hình đợt | — | Chưa nghiệm thu / chưa làm |
+
+## Báo cáo phòng BM-11 W11.45
+
+Nguồn và giới hạn: [giả định W11.45](../kn/gia-dinh/W11.45.md) (Q-046 giả định: BM-11 gửi để lưu; số liệu KHTC qua phiếu + nguồn đã chốt).
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| ★ UR-TINH-16, quy tắc 13: chỉ lập khi đã qua hạn nộp của tuần cuối và tỷ lệ xã đã nộp từng biểu nguồn ≥ mức Cấp Tỉnh đặt, hoặc mọi kỳ nguồn đã chốt (`extension.cnts_bm11_not_ready`) | `TestCNTSBM11_W1145` (quy tắc 13; tháng 9 sau chốt) | G1 |
+| ★ AC-01, BR-01: phần tự động = tổng số hợp lệ của kỳ (tổng đàn tuần cuối, tiêm phòng/hóa chất/KSGM cộng tuần, khai thác + nuôi trồng + lũy kế năm), không sửa tay | `TestCNTSBM11_W1145`, `TestBM11CoverageAndLivestock` | G1 |
+| ★ AC-03, BR-04: "Tổng hợp từ n/N xã" + danh sách xã thiếu, không ước tính | `TestCNTSBM11_W1145` ("Tổng hợp từ 1/2 xã", X2), `TestBM11CoverageAndLivestock`, `TestBM11WordTemplates` (99/102) | G1 |
+| ★ Vòng đời Đang soạn → Chờ duyệt → Trả lại → Đã gửi → Đã nhận; một báo cáo mỗi kỳ (kể cả tạo đồng thời); khóa lạc quan; sổ không UPDATE | `TestCNTSBM11_W1145`, `TestBM11Next` | G1 |
+| ★ AC-04: trả lại thiếu ý kiến không lưu được; chỉ Lãnh đạo phòng duyệt, BGĐ chỉ xem (BR-05) | `TestCNTSBM11_W1145`; Vitest `src/kn/cnts/bm11/bm11.test.tsx` | G1 |
+| ★ AC-02, BR-03: duyệt xong tự gửi; báo cáo có ngay trong hộp "Báo cáo đến" của HCTH (tuần), không lộ cho phòng không phải nơi nhận; "Đã nhận" một lần | `TestCNTSBM11_W1145` | G1 |
+| ★ BR-02: báo cáo đã gửi không sửa; số kỳ trước thay đổi sau khi gửi vào mục "Số liệu kỳ trước nộp bổ sung" | `TestCNTSBM11_W1145` (sửa sau gửi → 409), `TestBM11DiffAndText` | G1 |
+| ★ Xuất Word theo bố cục bản giấy (tuần A–D, tháng/quý/năm I–III), số `{n}/BC-CNTS` chỉ cho bản đã gửi, xuất lại dùng lại số | `TestCNTSBM11_W1145`, `TestBM11WordTemplates` | G1 |
+| Màn "Báo cáo định kỳ" (Cấp Tỉnh CNTS) và "Báo cáo đến" (HCTH, KHTC); menu | Vitest `bm11.test.tsx`, `kn-menu.contract.test.ts`; `TestWebMenuFixture` | G1 |
+| Email công vụ, thông báo cho phòng nhận, phụ lục kinh phí của báo cáo tháng, cấu hình nơi nhận theo loại trên màn riêng | — | Chưa làm |

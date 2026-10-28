@@ -53,16 +53,20 @@ const (
 //
 //ag:event pf.extension.cnts_form.reminded v1
 type CNTSFormRemindedV1 struct {
-	PeriodRef     uuid.UUID   `json:"period_ref"`
-	TemplateCode  string      `json:"template_code"`
-	PeriodLabel   string      `json:"period_label"`
-	Unit          string      `json:"unit"`
-	CommuneCode   string      `json:"commune_code"`
-	Slot          string      `json:"slot"`
-	DueAt         string      `json:"due_at"`
-	Message       string      `json:"message"`
-	Channels      []string    `json:"channels"`
-	RecipientRefs []uuid.UUID `json:"recipient_refs"`
-	Department    string      `json:"department"`
-	EventTime     string      `json:"event_time"`
+	PeriodRef    uuid.UUID `json:"period_ref"`
+	TemplateCode string    `json:"template_code"`
+	PeriodLabel  string    `json:"period_label"`
+	Unit         string    `json:"unit"`
+	CommuneCode  string    `json:"commune_code"`
+	Slot         string    `json:"slot"`
+	DueAt        string    `json:"due_at"`
+	Message      string    `json:"message"`
+	Channels     []string  `json:"channels"`
+	// ChannelsExplicit (BF-NOTIFY-KN-ADAPTER #121): Channels là lựa chọn kênh tường minh của cấu hình nhắc theo biểu (#108)
+	// → pf/notify gửi đúng các kênh đó. false/thiếu (sự kiện cũ, nhắc đợt điều tra) → hành vi cũ: hộp thư + push, email
+	// khi Channels có "email".
+	ChannelsExplicit bool        `json:"channels_explicit,omitempty"`
+	RecipientRefs    []uuid.UUID `json:"recipient_refs"`
+	Department       string      `json:"department"`
+	EventTime        string      `json:"event_time"`
 }

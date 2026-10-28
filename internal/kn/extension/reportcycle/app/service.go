@@ -18,6 +18,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
@@ -75,6 +76,9 @@ type Service struct {
 	CNTSFacilities CNTSFacilityCatalog
 	// BF-CN-PUBLISH: tiến độ kỳ native trong phạm vi người gọi (nháp của cán bộ xã chỉ ghi cho đơn vị của kỳ mình thấy).
 	FormsControl formsport.PeriodControl
+	// W11.45: Báo cáo phòng BM-11 — kết quả CT/DA của phòng (W11.47, nối ở module) và xuất Word qua pf/export (W10.17).
+	BM11Programs BM11ProgramSource
+	Exporter     exportport.Exporter
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
