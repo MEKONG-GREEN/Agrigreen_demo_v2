@@ -66,7 +66,7 @@ func (s *Service) SetAssignmentAttrs(ctx context.Context, user, id uuid.UUID, in
 		return AttrsResult{}, err
 	}
 	key := "asgattr:put:" + idem
-	if res, ok, err := s.attrsReplay(ctx, a, key, user, id); err != nil || ok {
+	if res, ok, err := s.attrsReplay(ctx, a, key, user, id, in, reason); err != nil || ok {
 		return res, err
 	}
 	if _, err := s.knTarget(ctx, a, user); err != nil {
@@ -159,17 +159,19 @@ func attrsJSON(a port.AssignmentAttrs) []byte {
 	return b
 }
 
-// attrsReplay phát lại theo sổ thuộc tính vai. Như replayFor (#154): lần gán phải thuộc đúng tài khoản trên đường
-// dẫn và tài khoản còn trong phạm vi hiện hành của người gọi (không tin kết quả đã lưu).
-func (s *Service) attrsReplay(ctx context.Context, a *actor, key string, user, id uuid.UUID) (AttrsResult, bool, error) {
+// attrsReplay phát lại theo sổ thuộc tính vai. Như replayFor (#154): dòng sổ phải do CHÍNH người gọi ghi cho đúng
+// tài khoản + lần gán trên đường dẫn, và nội dung yêu cầu (thuộc tính sau chuẩn hóa + lý do) phải trùng bản đã ghi
+// — khác thì 422 idempotency_key_reused. PUT không qua middleware cache HTTP (chỉ POST) nên đây là lớp chặn duy nhất.
+// Sau đó tài khoản phải còn trong phạm vi hiện hành của người gọi (không tin kết quả đã lưu).
+func (s *Service) attrsReplay(ctx context.Context, a *actor, key string, user, id uuid.UUID, in domain.AttrsInput, reason string) (AttrsResult, bool, error) {
 	var out AttrsResult
 	found := false
 	err := tenant.WithTenantTx(ctx, s.DB, a.p.TenantID, func(tx pgx.Tx) error {
-		prev, ok, err := store.AttrEventByIdem(ctx, tx, key)
-		if err != nil || !ok {
+		prev, err := store.AttrEventByIdem(ctx, tx, key)
+		if err != nil || prev == nil {
 			return err
 		}
-		if prev != id {
+		if prev.AssignmentID != id || prev.UserRef != user || prev.ActorRef != a.p.ActorRef || !sameReason(prev.Reason, reason) {
 			return problem.IdempotencyConflict
 		}
 		asg, err := store.AssignmentByID(ctx, tx, id, false)
@@ -177,6 +179,9 @@ func (s *Service) attrsReplay(ctx context.Context, a *actor, key string, user, i
 			return err
 		}
 		if asg == nil || asg.UserRef != user {
+			return problem.IdempotencyConflict
+		}
+		if !s.sameAttrs(asg.Role, in, prev.After) {
 			return problem.IdempotencyConflict
 		}
 		cur, err := store.AttrsOf(ctx, tx, id, false)
@@ -190,6 +195,30 @@ func (s *Service) attrsReplay(ctx context.Context, a *actor, key string, user, i
 		return AttrsResult{}, false, err
 	}
 	return out, true, nil
+}
+
+// sameAttrs: thuộc tính yêu cầu (chuẩn hóa như lúc ghi) trùng ảnh chụp SAU của dòng sổ. Không chuẩn hóa được hoặc
+// không đọc được ảnh chụp → coi là khác (đóng khi lỗi).
+func (s *Service) sameAttrs(role string, in domain.AttrsInput, after []byte) bool {
+	n, err := domain.NormalizeAttrsWithCatalog(role, in, s.AttributeCatalog())
+	if err != nil {
+		return false
+	}
+	var stored domain.AttrsSnapshot
+	if err := json.Unmarshal(after, &stored); err != nil {
+		return false
+	}
+	return stored == domain.AttrsSnapshotOf(port.AssignmentAttrs{ProvinceGroup: n.ProvinceGroup, Duties: n.Duties,
+		InternalUnit: n.InternalUnit, Facilities: n.Facilities, Households: n.Households})
+}
+
+// sameReason: lý do của yêu cầu (sau optStr) trùng lý do đã ghi (nil = không có).
+func sameReason(stored *string, reason string) bool {
+	r := optStr(reason)
+	if stored == nil || r == nil {
+		return stored == nil && r == nil
+	}
+	return *stored == *r
 }
 
 // attrsByUser đọc thuộc tính các lần gán của một người (tenant từ context).
@@ -236,15 +265,21 @@ func (s *Service) CreateDelegation(ctx context.Context, in domain.DelegationInpu
 	key := "deleg:grant:" + idem
 	var out DelegationResult
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
-		if prev, ok, err := store.DelegEventByIdem(ctx, tx, key); err != nil || ok {
+		if prev, err := store.DelegEventByIdem(ctx, tx, key); err != nil || prev != nil {
 			if err != nil {
 				return err
 			}
-			d, err := store.DelegationByID(ctx, tx, prev, false)
+			if prev.ActorRef != p.ActorRef {
+				return problem.IdempotencyConflict
+			}
+			d, err := store.DelegationByID(ctx, tx, prev.DelegationID, false)
 			if err != nil || d == nil {
 				return notFound(err, ErrDelegationNotFound)
 			}
-			if d.GrantorRef != p.ActorRef {
+			// #154: cùng khóa phải cùng nội dung (người nhận, phòng ban, quyền, hạn, lý do); valid_from bị kẹp về
+			// thời điểm gọi nên không so.
+			if d.GrantorRef != p.ActorRef || d.GranteeRef != in.GranteeRef || d.Department != in.Department || d.Power != in.Power ||
+				!d.ValidTo.Equal(in.ValidTo) || d.Reason != in.Reason {
 				return problem.IdempotencyConflict
 			}
 			out = DelegationResult{Delegation: *d, Replayed: true}
@@ -306,11 +341,13 @@ func (s *Service) RevokeDelegation(ctx context.Context, id uuid.UUID, reason, id
 	now := s.now()
 	var out DelegationResult
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
-		if prev, ok, err := store.DelegEventByIdem(ctx, tx, key); err != nil || ok {
+		if prev, err := store.DelegEventByIdem(ctx, tx, key); err != nil || prev != nil {
 			if err != nil {
 				return err
 			}
-			if prev != id {
+			// #154: khóa phải do chính người gọi ghi cho đúng ủy quyền với cùng lý do — không thì 422, không trả
+			// ủy quyền của người khác.
+			if prev.DelegationID != id || prev.ActorRef != p.ActorRef || prev.Reason != reason {
 				return problem.IdempotencyConflict
 			}
 			d, err := store.DelegationByID(ctx, tx, id, false)
