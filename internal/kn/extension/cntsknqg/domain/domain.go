@@ -91,11 +91,14 @@ const (
 	MaxText      = 300
 	MaxLong      = 4000
 	MaxNumberLen = 22
-	MaxReason    = 1000
-	MinReason    = 5
-	MaxContent   = 200 << 10 // byte JSON của nội dung một phiên bản
-	MaxScanBytes = 10 << 20  // bản scan đã ký ≤ 10 MB
-	MaxFileName  = 200
+	// Ô số (number/int): chỉ dạng thập phân thường, ≤ 18 chữ số phần nguyên (giá trị < 10^18), ≤ 4 số lẻ (review #29).
+	MaxIntDigits  = 18
+	MaxFracDigits = 4
+	MaxReason     = 1000
+	MinReason     = 5
+	MaxContent    = 200 << 10 // byte JSON của nội dung một phiên bản
+	MaxScanBytes  = 10 << 20  // bản scan đã ký ≤ 10 MB
+	MaxFileName   = 200
 )
 
 // Kiểu ô/cột.
@@ -255,11 +258,66 @@ func (e Errors) Error() string {
 func (e *Errors) add(field, reason string) { *e = append(*e, FieldErr{Field: field, Reason: reason}) }
 
 var (
-	dateRe   = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
-	monthRe  = regexp.MustCompile(`^(\d{4})-(0[1-9]|1[0-2])$`)
-	yearRe   = regexp.MustCompile(`^\d{4}$`)
-	maxValue = decimal.New(1, 18)
+	dateRe  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	monthRe = regexp.MustCompile(`^(\d{4})-(0[1-9]|1[0-2])$`)
+	yearRe  = regexp.MustCompile(`^\d{4}$`)
 )
+
+// scanPlainNumber đọc cú pháp số thập phân thường [+]chữ số[.chữ số] (không âm, không số mũ, không dấu phẩy, không
+// khoảng trắng bên trong), không dựng decimal. Trả phần nguyên đã bỏ số 0 đầu ("" nếu bằng 0) và phần lẻ nguyên văn
+// ("" nếu không có; số 0 cuối vẫn tính vào trần số lẻ như trước). Độ dài chuỗi do người gọi chặn trước (MaxNumberLen).
+func scanPlainNumber(s string) (intPart, frac string, ok bool) {
+	if s != "" && s[0] == '+' {
+		s = s[1:]
+	}
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	if i == 0 {
+		return "", "", false
+	}
+	intPart = s[:i]
+	if i < len(s) {
+		if s[i] != '.' || i+1 == len(s) {
+			return "", "", false
+		}
+		frac = s[i+1:]
+		for j := 0; j < len(frac); j++ {
+			if frac[j] < '0' || frac[j] > '9' {
+				return "", "", false
+			}
+		}
+	}
+	return strings.TrimLeft(intPart, "0"), frac, true
+}
+
+// canonicalPlain dựng dạng chuẩn (giống decimal.String) từ kết quả scanPlainNumber: "007.50" → "7.5", "0.0" → "0".
+func canonicalPlain(intPart, frac string) string {
+	frac = strings.TrimRight(frac, "0")
+	if intPart == "" {
+		intPart = "0"
+	}
+	if frac == "" {
+		return intPart
+	}
+	return intPart + "." + frac
+}
+
+// parsePlainDecimal đọc một giá trị số đã lưu theo đúng cú pháp của cell; ngoài cú pháp/giới hạn → false (không dựng
+// decimal từ chuỗi có số mũ).
+func parsePlainDecimal(s string) (decimal.Decimal, bool) {
+	s = strings.TrimSpace(s)
+	if len(s) > MaxNumberLen {
+		return decimal.Decimal{}, false
+	}
+	intPart, frac, ok := scanPlainNumber(s)
+	if !ok || len(intPart) > MaxIntDigits || len(frac) > MaxFracDigits {
+		return decimal.Decimal{}, false
+	}
+	d, err := decimal.NewFromString(canonicalPlain(intPart, frac))
+	return d, err == nil
+}
 
 // cell chuẩn hóa và kiểm một giá trị theo kiểu; trả giá trị đã chuẩn hóa và lý do lỗi ("" = hợp lệ).
 func cell(kind string, opts []Option, v string) (string, string) {
@@ -289,17 +347,20 @@ func cell(kind string, opts []Option, v string) (string, string) {
 		if len(v) > MaxNumberLen {
 			return v, "số quá dài"
 		}
-		d, err := decimal.NewFromString(v)
-		if err != nil || d.IsNegative() || d.GreaterThanOrEqual(maxValue) {
+		// Kiểm cú pháp chuỗi thô, KHÔNG dùng decimal (review #29): decimal.NewFromString nhận dạng khoa học
+		// ("1e-100000") và mọi so sánh sau đó rescale theo số mũ → CPU/RAM không giới hạn trước khi kịp trả 422.
+		// Chỉ nhận dạng thập phân thường như web (^\d+(\.\d+)?$, thêm dấu + đầu tùy chọn).
+		intPart, frac, ok := scanPlainNumber(v)
+		if !ok || len(intPart) > MaxIntDigits {
 			return v, "số không âm (dấu chấm thập phân)"
 		}
-		if kind == KindInt && !d.Equal(d.Truncate(0)) {
+		if kind == KindInt && strings.Trim(frac, "0") != "" {
 			return v, "số nguyên"
 		}
-		if d.Exponent() < -4 {
+		if len(frac) > MaxFracDigits {
 			return v, "tối đa 4 số lẻ"
 		}
-		v = d.String()
+		v = canonicalPlain(intPart, frac)
 	case KindChoice:
 		ok := false
 		for _, o := range opts {
@@ -574,9 +635,9 @@ func (s Spec) Warnings(c Content) []string {
 	var out []string
 	if s.Form == Form01 {
 		for _, r := range c.Tables["vat_tu"] {
-			plan, err1 := decimal.NewFromString(r["ke_hoach"])
-			done, err2 := decimal.NewFromString(r["da_cap"])
-			if err1 == nil && err2 == nil && done.GreaterThan(plan) {
+			plan, ok1 := parsePlainDecimal(r["ke_hoach"])
+			done, ok2 := parsePlainDecimal(r["da_cap"])
+			if ok1 && ok2 && done.GreaterThan(plan) {
 				name := r["ten"]
 				if name == "" {
 					name = "(chưa đặt tên)"
