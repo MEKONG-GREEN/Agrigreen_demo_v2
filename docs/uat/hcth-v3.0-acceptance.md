@@ -123,3 +123,11 @@ Nguồn giả định: [W11.27](../kn/gia-dinh/W11.27.md). Kỳ kế hoạch là
 
 Giới hạn: "Nhắc phòng chưa lập" (pf/notify) chưa làm; trạm/trại không có lãnh đạo có phiên chỉ được ghi qua điều chỉnh
 sau chốt; tuổi nghỉ hưu dùng tham số mẫu Q-070 tại ngày chốt (chưa theo lộ trình từng năm).
+
+## BF-SWEEP-OTHERS — phần đầu #117 (chờ review/gộp)
+
+1. Admin/HCTH có quyền sửa: mở Thông tin làm việc, bấm bút hoặc Sửa ở chi tiết. URL kết thúc `/[id]/sua`; không có dialog. Có Danh sách, Lưu/Hủy và Lịch sử.
+2. Xóa ngày vào làm rồi Lưu: lỗi ngay dưới trường, aria-invalid; không ghi sự kiện. Ngày nghỉ trước ngày vào làm và thiếu lý do nghỉ cũng bị chặn trước API.
+3. Nhập ngày nghỉ hợp lệ và lý do: Lưu về trang chi tiết, trạng thái/ngày nghỉ cùng ảnh hưởng NS01/NS02 đúng; lịch sử giữ dòng cũ. Hủy về danh sách.
+4. Cấp Xã truy cập trực tiếp route sửa: không có form ghi. Quyền của hồ sơ vẫn được kiểm từ máy chủ.
+5. Phần còn lại của sweep nằm ở #163/#164/#165; không đánh dấu đã nghiệm thu toàn bộ HCTH/KHTC/Báo giá bằng phần này.
