@@ -1,0 +1,11 @@
+{
+  "id": "kn-hrm-promotion",
+  "source": "./kn-hrm-promotion",
+  "app": [
+    {
+      "export": "hrmPromotionRoutes",
+      "order": 125
+    }
+  ],
+  "admin": []
+}

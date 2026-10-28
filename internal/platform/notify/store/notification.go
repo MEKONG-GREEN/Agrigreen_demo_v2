@@ -45,7 +45,7 @@ const visible = `(n.recipient_ref = $1 OR (n.recipient_ref IS NULL AND n.created
 
 const fromViewer = ` FROM pf_notify.notification n
   LEFT JOIN pf_notify.receipt r ON r.tenant_id = n.tenant_id AND r.notification_id = n.id AND r.actor_ref = $1
-  WHERE ` + visible
+  WHERE n.in_app AND ` + visible
 
 const notifCols = `n.id, n.recipient_ref, n.audience_national, n.audience_units, n.audience_org_ref, n.audience_roles,
   n.kind, n.severity, n.title, n.body, n.deep_link, n.subject_ref, n.source_event_id, n.source_event_type, n.created_at,
@@ -79,10 +79,10 @@ func collect(rows pgx.Rows, err error) ([]domain.Notification, error) {
 func InsertNotification(ctx context.Context, tx pgx.Tx, tid uuid.UUID, n domain.Notification) (bool, error) {
 	tag, err := tx.Exec(ctx, `INSERT INTO pf_notify.notification
 	    (tenant_id, id, recipient_ref, audience_national, audience_units, audience_org_ref, audience_roles, kind, severity,
-	     title, body, deep_link, subject_ref, source_event_id, source_event_type, created_at)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) ON CONFLICT DO NOTHING`,
+	     title, body, deep_link, subject_ref, source_event_id, source_event_type, created_at, in_app)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) ON CONFLICT DO NOTHING`,
 		tid, n.ID, n.RecipientRef, n.Audience.National, strs(n.Audience.Units), n.Audience.OrgRef, strs(n.Audience.Roles),
-		n.Kind, n.Severity, n.Title, n.Body, n.DeepLink, n.SubjectRef, n.SourceEventID, n.SourceEventType, n.CreatedAt.UTC())
+		n.Kind, n.Severity, n.Title, n.Body, n.DeepLink, n.SubjectRef, n.SourceEventID, n.SourceEventType, n.CreatedAt.UTC(), !n.SuppressInApp)
 	if err != nil {
 		return false, err
 	}
@@ -123,7 +123,7 @@ func UnreadCount(ctx context.Context, tx pgx.Tx, v domain.Viewer, since time.Tim
 // MarkPersonalRead đánh dấu đã đọc thông báo cá nhân (chưa đọc) và cấp số đồng bộ mới.
 func MarkPersonalRead(ctx context.Context, tx pgx.Tx, id, actor uuid.UUID, now time.Time) error {
 	_, err := tx.Exec(ctx, `UPDATE pf_notify.notification SET read_at = $3, sync_seq = nextval('pf_notify.sync_seq')
-	  WHERE id = $1 AND recipient_ref = $2 AND read_at IS NULL`, id, actor, now.UTC())
+	  WHERE id = $1 AND recipient_ref = $2 AND in_app AND read_at IS NULL`, id, actor, now.UTC())
 	return err
 }
 
@@ -137,7 +137,7 @@ func InsertReceipt(ctx context.Context, tx pgx.Tx, tid, id, actor uuid.UUID, now
 // ReadAll đánh dấu đã đọc mọi thông báo người xem thấy được; trả số đã đánh dấu.
 func ReadAll(ctx context.Context, tx pgx.Tx, v domain.Viewer, since, now time.Time) (int64, error) {
 	tag, err := tx.Exec(ctx, `UPDATE pf_notify.notification SET read_at = $2, sync_seq = nextval('pf_notify.sync_seq')
-	  WHERE recipient_ref = $1 AND read_at IS NULL`, v.ActorRef, now.UTC())
+	  WHERE recipient_ref = $1 AND in_app AND read_at IS NULL`, v.ActorRef, now.UTC())
 	if err != nil {
 		return 0, err
 	}

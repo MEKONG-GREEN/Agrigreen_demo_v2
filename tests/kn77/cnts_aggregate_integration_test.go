@@ -68,7 +68,8 @@ func (f *aggFx) adminExec(sql string) (struct{}, error) { return struct{}{}, f.a
 
 const aggDept = partyport.DeptChanNuoiThuySan
 
-func newAggFx(t *testing.T, facs facilityDir) *aggFx {
+// newAggFx dựng pf/forms + pf/extension thật; wire (tùy chọn) nối thêm cổng cho gói khác (W11.50 chiến dịch điều tra).
+func newAggFx(t *testing.T, facs facilityDir, wire ...func(*forms.Module, *extension.Module)) *aggFx {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	ops := env.Pool(t, migrations.PF, "platform_api")
@@ -82,6 +83,9 @@ func newAggFx(t *testing.T, facs facilityDir) *aggFx {
 	kn := extension.New(pool, clk, extension.Deps{Orgs: provinceOrgs{}})
 	kn.UseFormsPublisher(fm.Publisher())
 	kn.UseFormsFigures(fm.Figures())
+	for _, w := range wire {
+		w(fm, kn)
+	}
 	f := &khtcFx{t: t, clk: clk, tid: ids.New(), node: ids.New()}
 	f.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.Discard, nil)), 8<<20)
 	g := f.eng.Group("/v1", func(c *gin.Context) {

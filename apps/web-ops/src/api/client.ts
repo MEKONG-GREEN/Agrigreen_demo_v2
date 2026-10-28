@@ -1,7 +1,7 @@
 import createClient, { type Client, type Middleware } from "openapi-fetch";
 import type { paths as AdminGeneratedPaths } from "./generated/admin";
 import type { paths as GeneratedPaths } from "./generated/application";
-import { idempotencyMiddleware } from "./idempotency";
+import { idempotencyMiddleware, idempotencyScopeMiddleware } from "./idempotency";
 import { ApiProblem, networkProblem, toProblem } from "./problem";
 
 /** Application API: route của contracts/openapi/application.yaml — không còn route viết tay. */
@@ -56,6 +56,8 @@ function build<P extends object>(opts: ApiClientOptions): Client<P> {
     baseUrl: opts.baseUrl.replace(/\/+$/, ""),
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
   });
+  // Bắt phiên thao tác (P0-WEB-IDEMKEY) phải đứng đầu: chạy đồng bộ trước await của authMiddleware.
+  client.use(idempotencyScopeMiddleware());
   client.use(authMiddleware(opts.getAccessToken, opts.onUnauthenticated, opts.getContextId));
   client.use(idempotencyMiddleware());
   return client;

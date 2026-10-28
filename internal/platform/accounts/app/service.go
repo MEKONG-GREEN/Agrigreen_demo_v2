@@ -61,11 +61,22 @@ const DefaultActionsLifespan = 72 * time.Hour
 
 // Service là use case của module.
 type Service struct {
-	DB    tenant.Beginner // pool vai accounts_app
-	Clock clock.Clock
-	Dir   port.Directory          // nil → ErrDependency
-	Scope partyport.ScopeResolver // nil → ErrDependency
-	Orgs  partyport.Orgs          // nil → ErrDependency
+	AuditRegistry *port.AuditRegistry
+	AuditAccess   port.AuditAccess
+	// Attributes is trusted immutable application-owned catalog data. Nil is the
+	// temporary legacy bridge; a nonnil invalid snapshot never falls back.
+	Attributes *port.AttributeCatalog `json:"-"`
+	// Roles is an immutable server-configured realm-role catalog. Nil keeps the legacy bridge.
+	Roles           *port.RoleCatalog
+	Navigation      partyport.Navigation // final resolver errors never fall back
+	SessionPolicies port.SessionPolicies // instance configuration; no owner payload decoding here
+	// AssignmentRules is optional trusted owner policy; configured errors never fall back.
+	AssignmentRules port.AssignmentRules `json:"-"`
+	DB              tenant.Beginner      // pool vai accounts_app
+	Clock           clock.Clock
+	Dir             port.Directory          // nil → ErrDependency
+	Scope           partyport.ScopeResolver // nil → ErrDependency
+	Orgs            partyport.Orgs          // nil → ErrDependency
 	// ActionsLifespan: hạn liên kết kích hoạt; 0 → DefaultActionsLifespan.
 	ActionsLifespan time.Duration
 	// Households, Vault, Params: tài khoản nông dân (G2) — thành viên HTX của nông hộ
@@ -131,6 +142,19 @@ func fieldProblem(err error) error {
 	if errors.As(err, &fe) {
 		return problem.Validation.WithField(fe.Field, fe.Msg)
 	}
+	var rule port.AssignmentRuleError
+	if errors.As(err, &rule) {
+		return problem.Validation.WithField(rule.Field, rule.Msg)
+	}
+	var rulePtr *port.AssignmentRuleError
+	if errors.As(err, &rulePtr) {
+		if rulePtr == nil {
+			// A typed nil error is a broken configured provider, not validation.
+			// Do not attach it as a cause: its value-receiver Error method panics.
+			return ErrDependency.WithDetail("cấu hình quy tắc gán không hợp lệ")
+		}
+		return problem.Validation.WithField(rulePtr.Field, rulePtr.Msg)
+	}
 	return err
 }
 
@@ -147,6 +171,9 @@ func (s *Service) caller(ctx context.Context) (*actor, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !s.RoleCatalog().Valid() {
+		return nil, ErrDependency.WithDetail("chưa cấu hình danh mục vai hợp lệ")
+	}
 	if s.Dir == nil {
 		return nil, ErrDependency.WithCause(errNoDirectoryYet)
 	}
@@ -157,7 +184,7 @@ func (s *Service) caller(ctx context.Context) (*actor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &actor{p: p, sc: sc, grantable: port.Grantable(p.Roles), orgs: map[uuid.UUID]*partyport.Org{}}, nil
+	return &actor{p: p, sc: sc, grantable: s.RoleCatalog().Grantable(p.Roles), orgs: map[uuid.UUID]*partyport.Org{}}, nil
 }
 
 // org tra tổ chức (có đệm); nil nếu không có.
@@ -280,7 +307,7 @@ func (s *Service) target(ctx context.Context, a *actor, id uuid.UUID) (*target, 
 	if slices.Contains(all, authz.RolePlatformAdmin) && !a.p.Has(authz.RolePlatformAdmin) {
 		return nil, ErrNotGrantable.WithDetail("Tài khoản quản trị nền tảng chỉ quản trị nền tảng thao tác.")
 	}
-	managed := domain.ManagedOf(all)
+	managed := domain.ManagedOfWithCatalog(all, s.RoleCatalog())
 	if err := a.checkGrant(managed); err != nil {
 		return nil, err
 	}

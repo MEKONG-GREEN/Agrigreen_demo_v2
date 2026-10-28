@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 
 	contactport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/contact/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	hrmport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	accountsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -16,9 +18,10 @@ import (
 
 // KNContactAccess là cấu hình quyền pf/contact (`cap/directory`, W11.23) của App Khuyến nông — BRD HCTH v3.0 FN-13, §VI.4:
 // Cấp TW, Cấp Xã xem họ tên, năm sinh, SĐT; Cấp Tỉnh (mọi phòng ban), Admin xem đủ trường liên hệ; Cấp Tỉnh – HCTH cập
-// nhật liên hệ ngoài tỉnh; Admin quản lý toàn bộ. Không ngữ cảnh KN (menu cũ, ứng dụng khác — Q-072): quản trị nền tảng,
-// quản trị TTKN tỉnh xem đủ; vai KN khác xem ba trường.
+// nhật liên hệ ngoài tỉnh; Admin quản lý toàn bộ. Cấu hình KN bắt buộc phiên chủ KN; các Realm* vẫn là chính sách
+// cho cấu hình native riêng (Q-072), không cấp quyền thay thế khi cấu hình KN thiếu phiên.
 var KNContactAccess = contactport.Access{
+	Session:          extension.ContactSession,
 	FullBy:           []string{authz.KNTinh, authz.KNAdmin},
 	BasicBy:          []string{authz.KNTW, authz.KNXa},
 	ManageBy:         []string{authz.KNAdmin},
@@ -72,11 +75,17 @@ var _ contactport.Labels = KNContactLabels{}
 // UnitNames thực hiện contactport.Labels. Không có ngữ cảnh KN gắn Nút (Admin hệ thống) → rỗng (hiện mã).
 func (l KNContactLabels) UnitNames(ctx context.Context) (map[string]string, error) {
 	out := map[string]string{}
-	p, ok := authz.FromContext(ctx)
-	if l.Units == nil || !ok || p.KN == nil || p.KN.UnitRef == uuid.Nil {
+	if l.Units == nil {
 		return out, nil
 	}
-	xs, err := l.Units.UnitInternalUnits(ctx, p.KN.UnitRef, true)
+	_, k, err := extport.RequireSession(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if k.UnitRef == uuid.Nil {
+		return out, nil
+	}
+	xs, err := l.Units.UnitInternalUnits(ctx, k.UnitRef, true)
 	if err != nil {
 		return out, err
 	}

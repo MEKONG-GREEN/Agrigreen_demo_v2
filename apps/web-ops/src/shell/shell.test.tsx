@@ -25,7 +25,8 @@ const labels = (t: MenuTree) => menuLinks(t).map((l) => l.node.label);
 describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
   it("nhóm Điều hành / Báo cáo / Dữ liệu + Dùng chung (kn.menu/v3); Admin: Điều hành / Phòng ban / Quản trị hệ thống / Dùng chung", () => {
     expect(xa.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
-    expect(tinh.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dùng chung"]);
+    // BF-MENU (#98, UP-02): Cấp Tỉnh Trồng trọt có nhóm Dữ liệu (Thu thập dữ liệu).
+    expect(tinh.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dữ liệu", "Dùng chung"]);
     expect(tw.groups.map((g) => g.label)).toEqual(["Điều hành", "Báo cáo", "Dùng chung"]);
     expect(admin.groups.map((g) => g.label)).toEqual(["Điều hành", "Phòng ban", "Quản trị hệ thống", "Dùng chung"]);
   });
@@ -37,7 +38,7 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
     expect(labels(tw)).toEqual(["Dashboard", "Báo cáo tuần", "Báo cáo tháng", "Báo cáo hàng vụ", "Báo cáo năm", "Contact"]);
     expect(labels(xa)).toContain("Contact");
     expect(labels(tinh)).toEqual(
-      expect.arrayContaining(["Dashboard", "Phát hành biểu mẫu", "Trạng thái nộp", "Rà soát & chốt kỳ", "Báo cáo tổng hợp các xã", "Báo cáo Chi cục"]),
+      expect.arrayContaining(["Dashboard", "Phát hành biểu mẫu", "Trạng thái nộp", "Rà soát & chốt kỳ", "Lịch công tác", "Báo cáo tháng", "Báo cáo năm", "Báo cáo Chi cục", "Thửa ruộng"]),
     );
   });
 
@@ -55,7 +56,12 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
       ["2 phòng khác", "not_open"],
     ]);
     const hrefs = menuLinks(admin).map((l) => l.node.href);
-    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/quan-tri/to-chuc", "/quan-tri/tai-khoan", "/kn/phong-ban/trong_trot/danh-muc", "/quan-tri/mau-bao-cao"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/quan-tri/to-chuc", "/kn/phong-ban/trong_trot/danh-muc", "/quan-tri/mau-bao-cao"]));
+    // BF-ACC-KN-MENU (#120, TT-13): Admin KN quản lý người dùng qua /kn/quan-tri/nguoi-dung; bỏ liên kết native cũ.
+    expect(hrefs).not.toContain("/quan-tri/tai-khoan");
+    expect(menuLinks(admin).map((l) => l.node.label)).not.toContain("Tài khoản cán bộ (G1)");
+    expect(menuAllows(admin, "/kn/quan-tri/nguoi-dung")).toBe(true);
+    expect(menuAllows(admin, "/quan-tri/tai-khoan")).toBe(false);
   });
 
   it("khớp tiền tố dài nhất, breadcrumb mục cha / mục, kiểm đường dẫn theo menu", () => {
@@ -103,9 +109,9 @@ describe("<Sidebar> (Design Sample)", () => {
   it("thu gọn: chỉ icon, tên vẫn đọc được; mục cha mở flyout chứa menu con", async () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
-    render(<Sidebar menu={xa} pathname="/kn/bao-cao/tuan" collapsed onToggleCollapse={onToggle} />);
+    render(<Sidebar menu={xa} pathname="/kn/bao-cao/thang" collapsed onToggleCollapse={onToggle} />);
     expect(screen.getByRole("complementary", { name: "Điều hướng chính" })).toHaveAttribute("data-collapsed", "true");
-    expect(screen.getByRole("link", { name: "Báo cáo tuần" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Báo cáo tháng" })).toHaveAttribute("aria-current", "page");
     const parent = screen.getByRole("button", { name: /Thu thập dữ liệu/ });
     const flyEl = document.getElementById(parent.getAttribute("aria-controls")!);
     expect(flyEl).toHaveAttribute("hidden");
@@ -114,6 +120,47 @@ describe("<Sidebar> (Design Sample)", () => {
     expect(within(fly).getByRole("link", { name: "Vẽ thửa ruộng" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Mở rộng menu" }));
     expect(onToggle).toHaveBeenCalled();
+  });
+
+  it("menu 3 cấp (TT tỉnh, UP-02): mọi mục cha của mục active tự mở; breadcrumb đủ chuỗi; flyout có tiêu đề cấp giữa", async () => {
+    const deep: MenuTree = {
+      version: "t",
+      role: "kn_tinh",
+      department_code: "trong_trot",
+      groups: [
+        {
+          key: "bao_cao",
+          label: "Báo cáo",
+          items: [
+            {
+              key: "tong_hop",
+              label: "Báo cáo tổng hợp các xã",
+              icon: "report",
+              children: [
+                { key: "tuan", label: "Báo cáo tuần", icon: "report", children: [{ key: "t01", label: "T01 · Tiến độ XG", icon: "file", href: "/kn/bc/t01" }] },
+                { key: "thang", label: "Báo cáo tháng", icon: "report", href: "/kn/bc/thang" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(menuLinks(deep).map((l) => [l.node.label, l.ancestors.map((a) => a.key).join(">")])).toEqual([
+      ["T01 · Tiến độ XG", "tong_hop>tuan"],
+      ["Báo cáo tháng", "tong_hop"],
+    ]);
+    expect(crumbsFor(deep, "/kn/bc/t01")).toEqual(["Báo cáo tổng hợp các xã", "Báo cáo tuần", "T01 · Tiến độ XG"]);
+    const { unmount } = render(<Sidebar menu={deep} pathname="/kn/bc/t01" />);
+    expect(screen.getByRole("button", { name: /Báo cáo tổng hợp/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Báo cáo tuần/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: "T01 · Tiến độ XG" })).toHaveAttribute("aria-current", "page");
+    unmount();
+    const user = userEvent.setup();
+    render(<Sidebar menu={deep} pathname="/kn/bc/thang" collapsed />);
+    await user.hover(screen.getByRole("button", { name: /Báo cáo tổng hợp/ }).closest("li")!);
+    const fly = screen.getByRole("group", { name: "Báo cáo tổng hợp các xã" });
+    expect(within(fly).getByText("Báo cáo tuần")).toBeVisible();
+    expect(within(fly).getByRole("link", { name: "T01 · Tiến độ XG" })).toBeVisible();
   });
 
   it("Admin: phòng ban chưa mở không bấm được, nhãn Chưa mở", () => {

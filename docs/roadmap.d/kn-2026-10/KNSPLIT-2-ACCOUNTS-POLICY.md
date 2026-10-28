@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-ACCOUNTS-POLICY (#51): thêm cổng chính sách phiên accounts cho nhãn hỗ trợ và đơn vị mặc định; provider đã cấu hình lỗi không fallback legacy. Adapter KN thuộc #60; bridge chỉ gỡ sau rollout/kiểm thử chủ ứng dụng. Không đổi API/DDL.

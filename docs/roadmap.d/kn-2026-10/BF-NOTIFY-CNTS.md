@@ -1,0 +1,1 @@
+- [ ] BF-NOTIFY-CNTS (#115): cổng shared chọn app/push/email và mẫu biến plain text; owner #108/#111 cung cấp phạm vi/lịch/nội dung theo biểu, leo thang và ổ dịch Khẩn. Xem docs/dev/bf-notify-cnts-delivery.md. Chờ kiểm thật và review chéo.

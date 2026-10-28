@@ -57,6 +57,9 @@ func (s *Service) knCaller(ctx context.Context) (*actor, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !s.AttributeCatalog().Valid() {
+		return nil, ErrDependency.WithDetail("danh mục thuộc tính chưa sẵn sàng")
+	}
 	if s.Departments == nil {
 		return nil, ErrDependency.WithDetail("chưa nối phòng ban của pf/party")
 	}
@@ -96,12 +99,22 @@ type checkedAssignment struct {
 // vi người gọi; phòng ban thuộc đơn vị của Nút (chưa xóa); xã phụ trách ⊂ xã của Nút. targetRealm là vai
 // realm của tài khoản đích (Admin cần platform_admin).
 func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.AssignmentInput, targetRealm []string) (checkedAssignment, error) {
-	in, err := domain.NormalizeAssignment(in, s.now())
+	in, err := s.normalizeAssignment(in, s.now())
 	if err != nil {
 		return checkedAssignment{}, fieldProblem(err)
 	}
+	// Assignment write-policy ownership remains with #68/#72; this check only
+	// prevents writing a management code absent from this instance's readers.
+	// Preserve native normalization and error order before this restriction.
+	if in.MgmtLevel != "" && s.AttributeCatalog().LevelLabel(in.MgmtLevel) == "" {
+		return checkedAssignment{}, fieldProblem(domain.FieldError{Field: "mgmt_level", Msg: domain.MsgKNMgmtLevel})
+	}
 	out := checkedAssignment{in: in}
 	if in.Role == port.KNAdmin {
+		// This native scope invariant is not delegated to an owner provider.
+		if len(in.Departments) > 0 || len(in.Communes) > 0 {
+			return checkedAssignment{}, fieldProblem(domain.FieldError{Field: "department_codes", Msg: domain.MsgKNAdminScope})
+		}
 		if !a.p.Has(authz.RolePlatformAdmin) || !slices.Contains(targetRealm, authz.RolePlatformAdmin) {
 			return checkedAssignment{}, ErrKNAdminGrant
 		}
@@ -112,6 +125,11 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 			}
 			if o == nil {
 				return checkedAssignment{}, ErrOrgInvalid
+			}
+			if s.AssignmentRules != nil {
+				if err := s.validateAssignmentNodeKind(in.Role, string(o.Kind)); err != nil {
+					return checkedAssignment{}, fieldProblem(err)
+				}
 			}
 		}
 		return out, nil
@@ -126,7 +144,7 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 		}
 		return checkedAssignment{}, err
 	}
-	if err := domain.KNRoleFitsOrg(in.Role, string(o.Kind)); err != nil {
+	if err := s.validateAssignmentNodeKind(in.Role, string(o.Kind)); err != nil {
 		return checkedAssignment{}, fieldProblem(err)
 	}
 	unit, err := s.Departments.DepartmentUnit(ctx, o.Ref)
@@ -149,18 +167,19 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 		}
 	}
 	out.unit = unit
-	if in.Role == port.KNXa {
-		if len(in.Communes) == 0 {
-			out.warnings = append(out.warnings, warnNoCommunes)
-		} else {
-			sc, err := s.scopeOf(ctx, a.p.TenantID, o.Ref)
-			if err != nil {
-				return checkedAssignment{}, err
-			}
-			for _, c := range in.Communes {
-				if c == o.AdminUnitCode || !sc.Allows(c) {
-					return checkedAssignment{}, ErrCommuneInvalid.With("commune_code", c)
-				}
+	if in.Role == port.KNXa && len(in.Communes) == 0 {
+		out.warnings = append(out.warnings, warnNoCommunes)
+	}
+	// Every assigned commune stays inside the current node, including owner
+	// roles which a configured AssignmentRules provider permits to carry communes.
+	if len(in.Communes) > 0 {
+		sc, err := s.scopeOf(ctx, a.p.TenantID, o.Ref)
+		if err != nil {
+			return checkedAssignment{}, err
+		}
+		for _, c := range in.Communes {
+			if c == o.AdminUnitCode || !sc.Allows(c) {
+				return checkedAssignment{}, ErrCommuneInvalid.With("commune_code", c)
 			}
 		}
 	}
@@ -169,15 +188,16 @@ func (s *Service) checkAssignment(ctx context.Context, a *actor, in domain.Assig
 
 // knTarget là tài khoản đích của thao tác gán vai trò.
 type knTarget struct {
-	user  port.User
-	realm []string
-	tg    *target
+	catalog *port.RoleCatalog
+	user    port.User
+	realm   []string
+	tg      *target
 }
 
 // state là trạng thái tài khoản ở pf với vai do module quản lý theo realm hiện hành.
 func (t *knTarget) state() domain.Account {
 	acc := t.tg.state()
-	acc.Roles = domain.ManagedOf(t.realm)
+	acc.Roles = domain.ManagedOfWithCatalog(t.realm, t.catalog)
 	return acc
 }
 
@@ -196,7 +216,7 @@ func (s *Service) knTarget(ctx context.Context, a *actor, id uuid.UUID) (*knTarg
 	if t.acc != nil && !t.acc.Enabled {
 		return nil, ErrState.WithDetail("Tài khoản đang bị khóa.")
 	}
-	return &knTarget{user: t.user, realm: realm, tg: t}, nil
+	return &knTarget{user: t.user, realm: realm, tg: t, catalog: s.RoleCatalog()}, nil
 }
 
 // AssignmentResult là kết quả một thao tác gán vai trò.
@@ -641,7 +661,7 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 		return KNCreateResult{}, err
 	}
 	// D24: mọi tài khoản KN (kn_user) đăng ký TOTP ngay trong liên kết kích hoạt.
-	acts := domain.RequiredActions([]string{port.RoleKNUser})
+	acts := domain.RequiredActionsWithCatalog([]string{port.RoleKNUser}, s.RoleCatalog())
 	id, err := s.Dir.CreateUser(ctx, port.NewUser{Username: prof.Username, Email: prof.Email, FirstName: prof.FirstName,
 		LastName: prof.LastName, Phone: prof.Phone, TenantID: a.p.TenantID, RequiredActions: acts})
 	if err != nil {
@@ -675,7 +695,7 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 		if err != nil {
 			return KNCreateResult{}, err
 		}
-		acc.Roles = domain.ManagedOf(realm)
+		acc.Roles = domain.ManagedOfWithCatalog(realm, s.RoleCatalog())
 		vaultGranted = true
 	}
 	res := KNCreateResult{Warnings: warnings}

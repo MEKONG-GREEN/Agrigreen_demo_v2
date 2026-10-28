@@ -57,6 +57,7 @@ type Job struct {
 	Def             Definition
 	Format          string
 	Params          Params
+	SourceArgs      *FrozenSourceArgs `json:"-"`
 	ScopeAll        bool
 	ScopeUnits      []string
 	RequestedBy     uuid.UUID

@@ -5,10 +5,12 @@
   "replacements": [
     {
       "path": [
-        "deptBusiness",
+        "deptMenus",
         "ke_hoach_tai_chinh",
         "kn_tinh",
-        2
+        2,
+        "Items",
+        0
       ],
       "before": {
         "Key": "tinh.khtc.so_lieu_ngoai",

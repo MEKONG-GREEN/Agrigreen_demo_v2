@@ -7,7 +7,7 @@ import { resetCntsPeriods } from "@/api/mock/kn-cnts-periods";
 import { ApiProblem } from "@/api/problem";
 import { createKnAdminApi } from "@/kn/cycle/api";
 import { createCntsPeriodApi } from "../periods/api";
-import { adjustmentErrors, aquaValueError, createCntsAggApi } from "./api";
+import { adjustmentErrors, aquaValue, aquaValueError, createCntsAggApi, normalizeDeltas } from "./api";
 
 async function contextOf(personaId: string, assignmentId: string, dept: string | null) {
   const r = await mockFetchNoDelay(
@@ -27,11 +27,14 @@ const code = async (p: Promise<unknown>) => p.then(() => "ok", (e: unknown) => (
 describe("tổng hợp CNTS — kiểm phía máy khách", () => {
   it("dòng điều chỉnh, ô nuôi trồng", () => {
     expect(adjustmentErrors({ heo: "-3" }, "Trùng số ca đêm")).toEqual({});
-    expect(adjustmentErrors({ heo: "0" }, "ngắn")).toEqual({ deltas: "Nhập ít nhất một số khác 0", reason: "Lý do 10–500 ký tự" });
-    expect(adjustmentErrors({ heo: "1,5" }, "Lý do đủ dài ở đây")).toEqual({ heo: "Số (có thể âm, dấu chấm)" });
+    expect(adjustmentErrors({ heo: "0" }, "ngắn")).toEqual({ deltas: "Nhập ít nhất một số khác 0.", reason: "Lý do 10–500 ký tự." });
+    expect(adjustmentErrors({ heo: "abc", bo: "1,2345" }, "Lý do đủ dài ở đây")).toEqual({ heo: "Không phải số hợp lệ.", bo: "Tối đa 3 chữ số thập phân." });
+    expect(normalizeDeltas({ heo: "-1,5", bo: " ", ga: "2" })).toEqual({ heo: "-1.5", ga: "2" });
     expect(aquaValueError("")).toBeNull();
     expect(aquaValueError("7.25")).toBeNull();
-    expect(aquaValueError("-1")).toBe("Số không âm (dấu chấm)");
+    expect(aquaValueError("-1")).toBe("Không được nhập số âm.");
+    expect(aquaValue("7,25")).toBe("7.25");
+    expect(aquaValue("")).toBeNull();
   });
 });
 

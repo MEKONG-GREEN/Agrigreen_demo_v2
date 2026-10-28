@@ -3,7 +3,6 @@ package htxdata_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -136,47 +135,36 @@ func TestKNPublishedProductionPrincipalScopes(t *testing.T) {
 	f := newFixture(t)
 	r := extension.NewPublishedHTXProduction(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform))
 	for _, tid := range []uuid.UUID{f.tid, f.other} {
-		for _, n := range []int{990, 991, 101, 102, 103, 104, 105} {
-			kind, unit := "cooperative", "89001"
-			if n >= 990 {
-				kind, unit = "ttkn_province", "89"
-			}
-			if n == 103 {
-				unit = "92001"
-			}
-			f.exec(`INSERT INTO k_ref.org(tenant_id,ref,kind,code,admin_unit_code,active,source_seq) VALUES($1,$2,$3,$4,$5,true,1)`, tid, ref(n), kind, fmt.Sprintf("N%d", n), unit)
-			f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$2,0)", tid, ref(n))
-			if n < 990 {
-				root := 990
-				if n >= 103 {
-					root = 991
-				}
-				f.exec("INSERT INTO k_ref.node_closure(tenant_id,ancestor,descendant,depth)VALUES($1,$2,$3,1)", tid, ref(root), ref(n))
-			}
-		}
+		f.seedPrincipalScopeProjection(tid)
 		principals := []authz.Principal{
 			{ActorRef: ref(900), OrgRef: ref(990), Roles: []string{kn.RoleKNOfficer}},
 			{ActorRef: ref(900), OrgRef: ref(101), Roles: []string{kn.RoleCoopManager}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(990), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(998), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
+			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNXa, OrgRef: ref(997), Department: "trong_trot", Communes: []string{"89001"}, Scope: authz.Scope{Units: []string{"89001"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNTinh, OrgRef: ref(990), Department: "trong_trot", Scope: authz.Scope{Units: []string{"89"}}}},
 			{ActorRef: ref(900), KN: &authz.KNContext{Role: authz.KNAdmin, Scope: authz.Scope{All: true}}},
 		}
 		for _, p := range principals {
 			p.TenantID = tid
 			ctx := authz.WithPrincipal(tenant.WithID(context.Background(), tid), p)
+			unprojected := p.KN != nil && p.KN.OrgRef == ref(997)
 			for _, sc := range []authz.Scope{{All: true}, {Units: []string{"89001"}}, {Units: []string{"92001"}}} {
 				for flags := 0; flags < 8; flags++ {
 					q := cropcyclesrc.ProductionQuery{TenantID: tid, Scope: sc, ByCooperative: flags&1 != 0, BySeason: flags&2 != 0, ByVariety: flags&4 != 0}
 					d := compareProduction(t, f, r, ctx, q)
-					if tid == f.tid && p.KN != nil && p.KN.Role == authz.KNXa && sc.All && d.Totals.Seasons != 2 {
+					// #130 fail-closed: no caller projection, no seasons.
+					if unprojected && (d.Totals.Seasons != 0 || len(d.Rows) != 0) {
+						t.Fatalf("unprojected caller escaped RLS: %+v", d)
+					}
+					if tid == f.tid && p.KN != nil && p.KN.Role == authz.KNXa && !unprojected && sc.All && d.Totals.Seasons != 2 {
 						t.Fatalf("KN commune escaped actual node RLS: %+v", d)
 					}
 				}
 			}
 		}
 	}
-	t.Log("288 reconciliations under real node RLS, including KN context with no node projection")
+	t.Log("336 reconciliations under real node RLS, including a KN caller with no node projection (denied)")
 }
 
 type productionUnavailableDB struct {

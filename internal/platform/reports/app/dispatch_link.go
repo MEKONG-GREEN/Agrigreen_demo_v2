@@ -95,8 +95,11 @@ func (s *Service) OpenDispatchLink(ctx context.Context, token, ip string) (LinkF
 	var size int64
 	outcome := ""
 	egressDenied := false
-	err := s.tx(ctx, tid, func(tx pgx.Tx) error {
+	// check đọc liên kết + tệp và tính kết quả từ chối (chỉ đọc). Chạy ở giao dịch đọc trước khi mở kho đối tượng và chạy
+	// LẠI trong giao dịch ghi "served" (liên kết có thể vừa bị thu hồi/hết hạn trong lúc mở kho).
+	check := func(tx pgx.Tx) error {
 		var err error
+		outcome = ""
 		if l, err = store.DispatchLinkByID(ctx, tx, linkID); err != nil || l == nil {
 			return err
 		}
@@ -124,28 +127,38 @@ func (s *Service) OpenDispatchLink(ctx context.Context, token, ip string) (LinkF
 		if !found {
 			return ErrLinkNotFound
 		}
-		profile, err := s.dispatchProfile()
-		if err != nil {
-			return err
-		}
-		// Điểm kiểm soát xuất: bên nhận = người nhận Chi cục (mã danh bạ), nguồn = lần gửi.
-		if err := s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: tid, ActorRef: l.RecipientRef, TemplateKey: dispatchFileKey(profile, file.FormCode),
-			Format: file.Format, JobID: l.DispatchID}); err != nil {
-			egressDenied = true
-			return err
-		}
-		// Mở tệp TRƯỚC khi ghi "served": kho đối tượng lỗi → giao dịch hủy, không có dòng sổ/export_audit cho lần tải
-		// không thành.
-		body, info, err := s.Store.Get(ctx, file.ObjectKey)
-		if err != nil {
-			return err
+		return nil
+	}
+	err := s.tx(ctx, tid, check)
+	if err == nil && l != nil && outcome == "" {
+		// P0-POOL-SHARED-2 (#143): mở tệp ở kho đối tượng NGOÀI giao dịch, TRƯỚC khi ghi "served": kho lỗi → không có dòng
+		// sổ/export_audit cho lần tải không thành (như trước), nhưng không giữ kết nối DB trong lúc gọi kho.
+		body, info, gerr := s.Store.Get(ctx, file.ObjectKey)
+		if gerr != nil {
+			return LinkFile{}, gerr
 		}
 		rc, size = body, info.Size
-		outcome = store.LinkServed
-		return s.logLinkAccess(ctx, tx, tid, *l, outcome, got, ip, now)
-	})
-	if err != nil && rc != nil {
-		_ = rc.Close()
+		err = s.tx(ctx, tid, func(tx pgx.Tx) error {
+			if err := check(tx); err != nil || l == nil || outcome != "" {
+				return err
+			}
+			profile, err := s.dispatchProfile()
+			if err != nil {
+				return err
+			}
+			// Điểm kiểm soát xuất: bên nhận = người nhận Chi cục (mã danh bạ), nguồn = lần gửi.
+			if err := s.egress(ctx, tx, Egress{Kind: EgressDownload, TenantID: tid, ActorRef: l.RecipientRef, TemplateKey: dispatchFileKey(profile, file.FormCode),
+				Format: file.Format, JobID: l.DispatchID}); err != nil {
+				egressDenied = true
+				return err
+			}
+			outcome = store.LinkServed
+			return s.logLinkAccess(ctx, tx, tid, *l, outcome, got, ip, now)
+		})
+		if err != nil || outcome != store.LinkServed {
+			_ = rc.Close()
+			rc = nil
+		}
 	}
 	if l == nil && err == nil {
 		return LinkFile{}, ErrLinkNotFound

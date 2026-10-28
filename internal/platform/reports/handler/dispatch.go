@@ -182,7 +182,7 @@ func (h Handler) deactivateDispatchRecipient(c *gin.Context) {
 	c.JSON(http.StatusOK, toRecipient(r, false))
 }
 
-func dispatchDTO(v app.DispatchView) gin.H {
+func (h Handler) dispatchDTO(v app.DispatchView) gin.H {
 	d := v.Dispatch
 	files := make([]gin.H, 0, len(v.Files))
 	for _, f := range v.Files {
@@ -194,10 +194,12 @@ func dispatchDTO(v app.DispatchView) gin.H {
 		logs = append(logs, gin.H{"event": "dispatch." + e.Action, "actor_ref": e.ActorRef, "at": ts(e.EventTime), "on_behalf_of": e.OnBehalfOf,
 			"detail": json.RawMessage(e.Payload)})
 	}
-	return gin.H{"dispatch": dispatchRow(d), "files": files, "log": logs}
+	return gin.H{"dispatch": h.dispatchRow(d), "files": files, "log": logs}
 }
 
-func dispatchRow(d store.Dispatch) gin.H {
+func (h Handler) dispatchRow(d store.Dispatch) gin.H {
+	// Review #128: "Gửi lại" khi "Đang gửi" quá hạn nhận việc — máy chủ tính, web không tự đoán hạn.
+	rs := h.Svc.DispatchResendState(d)
 	missing := d.Missing
 	if missing == nil {
 		missing = []string{}
@@ -206,7 +208,7 @@ func dispatchRow(d store.Dispatch) gin.H {
 		"run_ids": d.RunIDs, "forms": d.Forms, "formats": d.Formats, "provisional": d.Provisional, "missing_communes": missing, "status": d.Status,
 		"recipient_ids": nonNilIDs(d.Recipients), "cc_ids": nonNilIDs(d.CC), "subject": d.Subject, "body": d.Body, "link_only": d.LinkOnly,
 		"attempts": d.Attempts, "last_error": d.LastError, "sent_at": tsp(d.SentAt), "created_by": d.CreatedBy, "created_at": ts(d.CreatedAt),
-		"updated_at": ts(d.UpdatedAt)}
+		"updated_at": ts(d.UpdatedAt), "can_resend": rs.CanSend, "resumable_at": tsp(rs.ResumableAt)}
 }
 
 func nonNilIDs(v []uuid.UUID) []uuid.UUID {
@@ -237,7 +239,7 @@ func (h Handler) createDispatch(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, dispatchDTO(v))
+	c.JSON(http.StatusCreated, h.dispatchDTO(v))
 }
 
 func (h Handler) listDispatches(c *gin.Context) {
@@ -277,7 +279,7 @@ func (h Handler) listDispatches(c *gin.Context) {
 	}
 	items := make([]gin.H, 0, len(ds))
 	for _, d := range ds {
-		items = append(items, dispatchRow(d))
+		items = append(items, h.dispatchRow(d))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": next})
 }
@@ -292,7 +294,7 @@ func (h Handler) getDispatch(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, dispatchDTO(v))
+	c.JSON(http.StatusOK, h.dispatchDTO(v))
 }
 
 type sendReq struct {
@@ -338,7 +340,7 @@ func (h Handler) sendDispatch(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusAccepted, dispatchDTO(v))
+	c.JSON(http.StatusAccepted, h.dispatchDTO(v))
 }
 
 func (h Handler) dispatchDownload(c *gin.Context) {

@@ -16,6 +16,7 @@ import {
   FilterBar,
   FilterChip,
   PageHeader,
+  RowActions,
   SearchBox,
   StatusPill,
   type Column,
@@ -24,6 +25,7 @@ import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import { vnDecimal } from "./api";
+import { useHrmApi } from "./CatalogScreen";
 import {
   createStaffApi,
   EVENT_LABEL,
@@ -49,6 +51,8 @@ import {
 
 const PAGE = 20;
 const DETAIL = "/kn/nhan-su/ho-so";
+/** FN-08 Thông tin làm việc (W11.29) — đặt dưới tiền tố menu "Hồ sơ nhân sự" (`/kn/nhan-su/ho-so`) nên không cần mục menu mới (menu sinh từ `internal/kn/hrm/menus`). */
+const WORK_ROUTE = "/kn/nhan-su/ho-so/thong-tin-lam-viec";
 
 export function useStaffApi(): StaffApi {
   const { api } = useAuth();
@@ -116,6 +120,15 @@ export function HrmStaffListScreen({
   const units = useLoad(enabled ? () => sa.units() : null, [enabled]);
   const unitName = (code: string) =>
     units.data?.items.find((u) => u.code === code)?.name ?? code;
+  // W11.29: tên chức vụ, ngạch, trình độ theo danh mục FN-19 (bộ lọc và cột như màn `hs` của prototype HCTH).
+  const ha = useHrmApi();
+  const positions = useLoad(enabled ? () => ha.list("position") : null, [enabled]);
+  const grades = useLoad(enabled ? () => ha.list("grade") : null, [enabled]);
+  const levels = useLoad(enabled ? () => ha.list("education_level") : null, [enabled]);
+  const nameOf = (
+    l: { items: { code: string; name: string }[] } | null,
+    code: string,
+  ) => (code ? (l?.items.find((x) => x.code === code)?.name ?? code) : "—");
   const set = (patch: StaffFilter) => {
     setF((x) => ({ ...x, ...patch }));
     setPage(1);
@@ -146,7 +159,11 @@ export function HrmStaffListScreen({
             ? `Xã ${r.current.commune} · ${unitName(r.current.mgmt_unit)}`
             : "—",
     },
-    { key: "pos", header: "Chức vụ", cell: (r) => r.current.position || "—" },
+    {
+      key: "pos",
+      header: "Chức vụ",
+      cell: (r) => nameOf(positions.data, r.current.position),
+    },
     { key: "grade", header: "Ngạch - Bậc", cell: (r) => gradeText(r.current) },
     {
       key: "coef",
@@ -155,9 +172,26 @@ export function HrmStaffListScreen({
       cell: (r) => vnDecimal(r.current.coefficient),
     },
     {
+      key: "degree",
+      header: "Trình độ cao nhất",
+      cell: (r) => nameOf(levels.data, r.current.top_degree),
+    },
+    {
+      key: "phone",
+      header: "Số điện thoại",
+      cell: (r) => r.masked_phone || "—",
+    },
+    {
       key: "status",
       header: "Trạng thái",
       cell: (r) => <StatusTag s={r.current.status} />,
+    },
+    {
+      key: "acts",
+      header: "",
+      cell: (r) => (
+        <RowActions label={`hồ sơ ${r.code}`} viewHref={`${DETAIL}/${r.id}`} />
+      ),
     },
   ];
   return (
@@ -184,6 +218,11 @@ export function HrmStaffListScreen({
                 >
                   Xuất CSV
                 </button>
+              ) : null}
+              {mode === "all" ? (
+                <Link className="btn btn-o btn-sm" href={WORK_ROUTE}>
+                  Thông tin làm việc
+                </Link>
               ) : null}
               {mode === "all" &&
               access.data.perms["profile.edit"] !== "none" ? (
@@ -221,6 +260,8 @@ export function HrmStaffListScreen({
                     type: undefined,
                     status: undefined,
                     unit: undefined,
+                    position: undefined,
+                    grade: undefined,
                     q: undefined,
                   })
                 }
@@ -268,6 +309,30 @@ export function HrmStaffListScreen({
                     })),
                   ]}
                   onChange={(v) => set({ unit: v || undefined })}
+                />
+                <FilterChip
+                  label="Chức vụ"
+                  value={f.position ?? ""}
+                  options={[
+                    { value: "", label: "Tất cả" },
+                    ...(positions.data?.items ?? []).map((x) => ({
+                      value: x.code,
+                      label: x.name,
+                    })),
+                  ]}
+                  onChange={(v) => set({ position: v || undefined })}
+                />
+                <FilterChip
+                  label="Ngạch/CDNN"
+                  value={f.grade ?? ""}
+                  options={[
+                    { value: "", label: "Tất cả" },
+                    ...(grades.data?.items ?? []).map((x) => ({
+                      value: x.code,
+                      label: `${x.name} (${x.code})`,
+                    })),
+                  ]}
+                  onChange={(v) => set({ grade: v || undefined })}
                 />
                 <label className="small">
                   Ngày chốt{" "}

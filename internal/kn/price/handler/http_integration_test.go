@@ -33,7 +33,7 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 func TestPriceFrameHTTP_W1171(t *testing.T) {
 	env := pgtest.Get(t)
 	now := time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC) // 10:00 giờ VN
-	prof := port.Profile{Name: "kn", Department: "thong_tin_truyen_thong", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA"},
+	prof := port.Profile{Session: testOwnerSession, Name: "kn", Department: "thong_tin_truyen_thong", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA"},
 		ManageBy: []string{"admin"}}
 	svc, err := app.NewService(db.ForModule(env.Pool(t, migrations.PF, dbadmin.AppPlatform), app.DBModule), clock.NewFixed(now),
 		[]port.Profile{prof})
@@ -54,7 +54,7 @@ func TestPriceFrameHTTP_W1171(t *testing.T) {
 	}
 	r.Use(func(c *gin.Context) {
 		if p, ok := who[c.GetHeader("X-Test-As")]; ok {
-			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
 		}
 	})
 	Handler{Svc: svc}.RegisterApp(r.Group("/v1"))
@@ -73,7 +73,7 @@ func TestPriceFrameHTTP_W1171(t *testing.T) {
 	}
 
 	call("", http.MethodGet, "/v1/price/status", http.StatusUnauthorized)
-	call("nobody", http.MethodGet, "/v1/price/status", http.StatusForbidden)
+	call("nobody", http.MethodGet, "/v1/price/status", http.StatusPreconditionRequired)
 	call("tw", http.MethodGet, "/v1/price/status", http.StatusForbidden) // profile thử không có kn_tw
 	call("tinh", http.MethodGet, "/v1/price/status?profile=htx", http.StatusNotFound)
 	st := call("tinh", http.MethodGet, "/v1/price/status", http.StatusOK)
@@ -99,10 +99,11 @@ func TestPriceFrameHTTP_W1171(t *testing.T) {
 		t.Fatalf("nhóm đầu: %v", g)
 	}
 	// Trước ngày hiệu lực: rỗng (BR-02 — áp dụng từ ngày báo giá ghi trong valid_from).
-	if c := call("realm", http.MethodGet, "/v1/price/catalog?at=2026-10-11", http.StatusOK); len(c["groups"].([]any)) != 0 {
+	if c := call("xa", http.MethodGet, "/v1/price/catalog?at=2026-10-11", http.StatusOK); len(c["groups"].([]any)) != 0 {
 		t.Fatalf("trước hiệu lực: %v", c)
 	}
 	call("xa", http.MethodGet, "/v1/price/catalog?at=12/10/2026", http.StatusUnprocessableEntity)
+	call("realm", http.MethodGet, "/v1/price/status", http.StatusPreconditionRequired)
 	// Tenant khác không thấy (RLS p_tenant).
 	if c := call("other", http.MethodGet, "/v1/price/catalog", http.StatusOK); len(c["groups"].([]any)) != 0 || len(c["units"].([]any)) != 0 {
 		t.Fatalf("tenant khác: %v", c)

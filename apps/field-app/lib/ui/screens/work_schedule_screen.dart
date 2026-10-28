@@ -91,6 +91,7 @@ class _WorkScheduleScreenState extends ConsumerState<WorkScheduleScreen> {
           day: day,
           session: session,
           communeCodes: v.communeCodes,
+          communeNames: v.communeNames,
           newId: _svc.newItemId,
           readOnly: !v.editable,
         ),
@@ -384,6 +385,7 @@ class _WorkScheduleScreenState extends ConsumerState<WorkScheduleScreen> {
                         done: 'Đã check-in — vị trí, thời điểm không sửa được.',
                       )
                     : null,
+          checkinNote: (i) => v.checkinBlockedReason(i, DateTime.now()),
         ),
       );
     }
@@ -610,6 +612,7 @@ class _DayCard extends StatelessWidget {
     required this.onAdd,
     required this.onOpen,
     this.onCheckin,
+    this.checkinNote,
   });
   final DateTime day;
   final int index;
@@ -618,6 +621,9 @@ class _DayCard extends StatelessWidget {
   final void Function(WsSession) onAdd;
   final void Function(WsItem) onOpen;
   final VoidCallback? Function(WsItem)? onCheckin;
+
+  /// Lý do chưa check-in được (R-B3), hiện dưới mục.
+  final String? Function(WsItem)? checkinNote;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -657,6 +663,7 @@ class _DayCard extends StatelessWidget {
                   item: i,
                   onTap: () => onOpen(i),
                   onCheckin: onCheckin?.call(i),
+                  checkinNote: checkinNote?.call(i),
                 ),
             if (!items.any((i) => i.session == s))
               const Padding(
@@ -671,9 +678,17 @@ class _DayCard extends StatelessWidget {
 }
 
 class _ItemTile extends StatelessWidget {
-  const _ItemTile({required this.item, required this.onTap, this.onCheckin});
+  const _ItemTile({
+    required this.item,
+    required this.onTap,
+    this.onCheckin,
+    this.checkinNote,
+  });
   final WsItem item;
   final VoidCallback onTap;
+
+  /// Lý do chưa check-in được (R-B3).
+  final String? checkinNote;
 
   /// Khác null: hiện nút "Check-in" (W11.46).
   final VoidCallback? onCheckin;
@@ -711,6 +726,7 @@ class _ItemTile extends StatelessWidget {
                 if (i.conflict) 'Trùng thời gian',
                 if (i.changed) 'Điều chỉnh',
                 if (i.checkin != null) i.checkin!.label,
+                ?checkinNote,
               ].join(' · '),
             ),
             trailing: onCheckin != null
@@ -752,6 +768,7 @@ class WorkScheduleItemScreen extends StatefulWidget {
     this.day,
     this.session,
     this.communeCodes = const [],
+    this.communeNames = const {},
     this.readOnly = false,
   });
 
@@ -759,7 +776,13 @@ class WorkScheduleItemScreen extends StatefulWidget {
   final WsItem? item;
   final DateTime? day;
   final WsSession? session;
+
+  /// Xã chọn được (cán bộ xã: xã phụ trách; cán bộ tỉnh: mọi xã của tỉnh).
+  /// Xã/phường luôn bắt buộc và luôn hiện ô chọn (R-B1, PO 25/10/2026).
   final List<String> communeCodes;
+
+  /// Tên xã theo mã; thiếu → hiện mã.
+  final Map<String, String> communeNames;
   final String Function() newId;
   final bool readOnly;
 
@@ -788,6 +811,10 @@ class _WorkScheduleItemScreenState extends State<WorkScheduleItemScreen> {
     _day = widget.item?.day ?? widget.day ?? widget.weekStart;
     _session = widget.item?.session ?? widget.session ?? WsSession.morning;
     _commune = widget.item?.communeCode;
+    // Mục mới khi chỉ có một xã chọn được: chọn sẵn xã đó.
+    if (widget.item == null && widget.communeCodes.length == 1) {
+      _commune = widget.communeCodes.first;
+    }
   }
 
   @override
@@ -918,27 +945,35 @@ class _WorkScheduleItemScreenState extends State<WorkScheduleItemScreen> {
               errorText: _err('content'),
             ),
           ),
-          if (communes.isNotEmpty) ...[
-            DropdownButtonFormField<String?>(
-              key: const ValueKey('ws-f-commune'),
-              initialValue: _commune,
-              decoration: const InputDecoration(labelText: 'Xã/phường'),
-              items: [
-                const DropdownMenuItem<String?>(child: Text('—')),
-                for (final c in communes)
-                  DropdownMenuItem<String?>(value: c, child: Text(c)),
-              ],
-              onChanged: ro ? null : (c) => setState(() => _commune = c),
+          DropdownButtonFormField<String?>(
+            key: const ValueKey('ws-f-commune'),
+            initialValue: _commune,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'Xã/phường *',
+              helperText: communes.isEmpty
+                  ? 'Chưa tải được danh sách xã — cần có mạng.'
+                  : null,
+              errorText: _err('commune_code'),
             ),
-            const SizedBox(height: 12),
-          ],
+            items: [
+              const DropdownMenuItem<String?>(child: Text('—')),
+              for (final c in communes)
+                DropdownMenuItem<String?>(
+                  value: c,
+                  child: Text(widget.communeNames[c] ?? c),
+                ),
+            ],
+            onChanged: ro ? null : (c) => setState(() => _commune = c),
+          ),
+          const SizedBox(height: 12),
           TextField(
             key: const ValueKey('ws-f-location'),
             controller: _location,
             readOnly: ro,
             maxLength: 200,
             decoration: InputDecoration(
-              labelText: 'Địa điểm (ấp, cánh đồng, HTX…)',
+              labelText: 'Địa điểm * (ấp, cánh đồng, HTX…)',
               errorText: _err('location'),
             ),
           ),
@@ -971,6 +1006,7 @@ class _WorkScheduleItemScreenState extends State<WorkScheduleItemScreen> {
                 'start_time',
                 'end_time',
                 'content',
+                'commune_code',
                 'location',
                 'participants',
                 'note',

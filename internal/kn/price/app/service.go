@@ -85,7 +85,7 @@ type caller struct {
 	steward bool
 }
 
-// resolve tìm profile (rỗng → profile đầu tiên) và vai của người gọi trong đó: vai ngữ cảnh KN nếu có, không thì vai realm.
+// resolve tìm profile rồi dùng bộ giải phiên đã cấu hình; nil chỉ dùng vai realm của cấu hình native.
 func (s *Service) resolve(ctx context.Context, name string) (port.Profile, caller, error) {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
@@ -100,8 +100,14 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, calle
 	}
 	c := caller{ref: p.ActorRef, tenant: p.TenantID}
 	roles := p.Roles
-	if p.KN != nil {
-		roles = []string{p.KN.Role}
+	var session port.SessionContext
+	if prof.Session != nil {
+		var err error
+		session, err = prof.Session(ctx)
+		if err != nil {
+			return prof, c, err
+		}
+		roles = []string{session.Role}
 	}
 	for _, r := range roles {
 		if l, ok := prof.Roles[r]; ok && c.level == "" {
@@ -111,7 +117,7 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, calle
 			c.manage = true
 		}
 	}
-	c.steward = c.manage || (c.level == "TINH" && prof.StewardDuty != "" && p.KN != nil && p.KN.HasDuty(prof.StewardDuty))
+	c.steward = c.manage || (c.level == "TINH" && prof.StewardDuty != "" && prof.Session != nil && !session.ReadOnly && slices.Contains(session.Duties, prof.StewardDuty))
 	if c.level == "" && !c.manage {
 		return prof, c, problem.Forbidden.WithDetail("vai của người gọi không thuộc cấu hình giá " + name)
 	}

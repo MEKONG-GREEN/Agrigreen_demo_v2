@@ -958,6 +958,17 @@ func (s *Service) ImportForm(ctx context.Context, data []byte, in ImportInput, i
 	}
 	res := ImportResult{ImportID: ids.New()}
 	now := s.now()
+	// P0-POOL-SHARED (#126): ghi tệp vào kho đối tượng TRƯỚC giao dịch — không giữ kết nối DB khi gọi kho. Khóa có mã
+	// lần nạp (ghi một lần); lần nạp lỗi/hủy để lại đối tượng mồ côi vô hại, dòng form_import chỉ trỏ tới tệp khi nạp được.
+	var storedKey *string
+	if s.Store != nil {
+		key := fmt.Sprintf("reports/%s/form-imports/%s.xlsx", p.TenantID, res.ImportID)
+		if _, err := s.Store.Put(ctx, key, bytes.NewReader(data), int64(len(data)), hex.EncodeToString(sum[:]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); err != nil {
+			s.log().Warn("không lưu được tệp nạp mẫu", "event", "reports.form_import.store_failed", "import_id", res.ImportID)
+		} else {
+			storedKey = &key
+		}
+	}
 	var failure error
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var tpl *store.FormTemplate
@@ -1029,14 +1040,7 @@ func (s *Service) ImportForm(ctx context.Context, data []byte, in ImportInput, i
 				return err
 			}
 		}
-		if s.Store != nil {
-			key := fmt.Sprintf("reports/%s/form-imports/%s.xlsx", p.TenantID, res.ImportID)
-			if _, err := s.Store.Put(ctx, key, bytes.NewReader(data), int64(len(data)), imp.FileSHA256, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); err != nil {
-				s.log().Warn("không lưu được tệp nạp mẫu", "event", "reports.form_import.store_failed", "import_id", res.ImportID)
-			} else {
-				imp.ObjectKey = &key
-			}
-		}
+		imp.ObjectKey = storedKey
 		v := store.FormVersion{ID: ids.New(), TemplateID: tpl.ID, Status: port.FormDraft, Def: def, Origin: "import", ImportID: &res.ImportID,
 			CreatedBy: p.ActorRef, CreatedAt: now, UpdatedBy: p.ActorRef, UpdatedAt: now}
 		if err := store.InsertFormVersion(ctx, tx, p.TenantID, &v); err != nil {

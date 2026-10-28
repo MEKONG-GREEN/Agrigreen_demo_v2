@@ -215,6 +215,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.form_no_structure` | pf/extension: mẫu chưa có cột nhập liệu — chặn phát hành (FN-TI-02.02) |
 | 422 | `extension.period_slots_exceeded` | pf/extension: số kỳ của đợt vượt số khe kỳ trên một dòng của mẫu nhiều kỳ (PL 01, 01B, 02, 07; tạm theo seed, chờ khách Q-01) |
 | 422 | `extension.provincial_import_invalid` | pf/extension: tệp nạp Tỉnh giao (`POST /v1/extension/report-batches/provincial-import`, W11.02) không đọc được (không phải CSV UTF-8/.xlsx, ô công thức, quá 500 dòng/2 MB), thiếu cột "Mã xã", không nhận ra cột Tỉnh giao nào hoặc hai cột trùng một cột Tỉnh giao — từ chối cả tệp; dòng lỗi riêng lẻ trả trong `rows` |
+| 422 | `extension.grid_import_invalid` | pf/extension BF-TT-FORMS (UP-04) Nhập từ Excel trên màn nhập biểu Cấp Xã: tệp không đọc được (.xls cũ, zip hỏng, CSV không UTF-8, quá 4 MB/2000 dòng) hoặc không có hàng chữ cái cột (A, B, C…) của tệp "Tải mẫu Excel" |
 | 422 | `extension.no_communes` | pf/extension: chưa chọn xã nhận, hoặc mã xã không phải Nút xã đang hoạt động của tỉnh |
 | 409 | `extension.batch_has_submissions` | pf/extension: thu hồi đợt khi đã có xã gửi báo cáo |
 | 409 | `extension.batch_withdrawn` | pf/extension: đợt đã thu hồi |
@@ -230,7 +231,14 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 404 | `extension.material_record_not_found` | pf/extension KN v7.7 (FN-XA-03.06): bản ghi vật tư không có, của tenant khác, ngoài phạm vi xã hoặc của phòng ban khác |
 | 422 | `extension.material_unknown` | pf/extension KN v7.7: vật tư không có / đã ngừng dùng trong danh mục masterdata `material`, hoặc mục danh mục thiếu `attrs.unit` (lỗi theo trường `lines.<i>.material_code`) |
 | 422 | `extension.material_quantity_invalid` | pf/extension KN v7.7: số lượng sai theo ĐVT — âm, > 1 000 000 000, ĐVT đếm được (`bao, cái, chai, gói, con, chiếc, cây, hộp`) mà không nguyên, hoặc > 4 chữ số lẻ (tạm, chờ khách); lỗi theo trường `lines.<i>.quantity` / `quantity` |
+| 422 | `extension.material_import_invalid` | pf/extension BF-TT-MAT (TT-12) Nạp Excel vật tư: tệp không đọc được (ô công thức, .xls cũ, quá 2 MB/200 dòng) hoặc thiếu cột bắt buộc "Vật tư", "Số lượng"; lỗi từng dòng trả trong `lines[].reason`, không chặn cả tệp |
 | 409 | `extension.material_superseded` | pf/extension KN v7.7: sửa (`POST /v1/kn/materials/{id}/correct`) một bản ghi đã bị bản bù khác thay — hãy sửa bản hiện hành |
+| 404 | `extension.kn_attrs_cooperative_not_found` | pf/extension BF-SRV-KN-ATTRS (TT-10): HTX không có, không phải HTX, của tenant khác hoặc ngoài xã phụ trách (`/v1/kn/machine-profiles/{cooperative_ref}`) |
+| 404 | `extension.kn_attrs_plot_not_found` | pf/extension BF-SRV-KN-ATTRS (TT-11): thửa không có, của tenant khác hoặc ngoài xã phụ trách (`/v1/kn/plot-profiles/{plot_ref}`) |
+| 409 | `extension.kn_attrs_plot_retired` | pf/extension BF-SRV-KN-ATTRS (TT-11): đặt cây trồng cho thửa đã ngừng dùng |
+| 422 | `extension.kn_attrs_year_invalid` | pf/extension BF-SRV-KN-ATTRS (TT-10): năm sản xuất không phải số nguyên hoặc ngoài 1900 – năm hiện tại (giờ Việt Nam); lỗi theo trường `lines.<loại máy>.year_made` |
+| 422 | `extension.kn_attrs_machine_type_unknown` | pf/extension BF-SRV-KN-ATTRS (TT-10): loại máy không có / đã ngừng dùng trong danh mục masterdata `machine_type` (trường `lines.<loại máy>.machine_type`) |
+| 422 | `extension.kn_attrs_crop_unknown` | pf/extension BF-SRV-KN-ATTRS (TT-11): cây trồng không có / đã ngừng dùng trong danh mục masterdata `crop` (trường `crop_code`) |
 | 403 | `self_approval_forbidden` | pf/extension (P4): người đã nhập thay bản nộp (on_behalf_of) tự rà soát/xác nhận/chốt kỳ có bản đó (gap §4.6) |
 
 Vật tư KN v7.7 dùng lại `extension.read_only` (Cấp Quốc gia ghi vật tư), `extension.out_of_scope`, `extension.support_reason_required`, `extension.dependency_unavailable` (chưa nối danh mục vật tư / đơn vị hành chính).
@@ -276,7 +284,7 @@ Phản hồi phát lại theo Idempotency-Key có header `Idempotent-Replayed: t
 | 409 | `reports.dispatch_recipient_duplicate` | pf/reports: địa chỉ hộp thư đã có trong danh bạ đang dùng |
 | 409 | `reports.dispatch_no_data` | pf/reports: kỳ chưa có lần tổng hợp — bấm "Cập nhật" ở Báo cáo tổng hợp các xã trước |
 | 409 | `reports.gsheet_disabled` | pf/reports: tạo link Google Sheet khi bộ chuyển đang TẮT (mặc định; ADR-0026 "Đề xuất", RB-7) |
-| 409 | `reports.dispatch_sending` | pf/reports: đang gửi — chờ kết quả rồi mới gửi lại |
+| 409 | `reports.dispatch_sending` | pf/reports: đang gửi — chờ kết quả rồi mới gửi lại (quá hạn nhận việc `AG_REPORT_DISPATCH_LEASE`, mặc định 15 phút → "Gửi lại" tiếp tục cùng lượt, P0-WORKER-REPORTS) |
 | 422 | `reports.dispatch_no_recipients` | pf/reports: chưa chọn người nhận và chưa có người nhận mặc định |
 | 422 | `reports.gsheet_valve_blocked` | pf/reports: van mặc định chặn — mẫu có cột không phải số/nhãn tổ chức, không được đưa ra ngoài lãnh thổ |
 | 422 | `reports.format_unsupported` | pf/reports: mẫu không hỗ trợ định dạng đã chọn (`xlsx`/`pdf`) |

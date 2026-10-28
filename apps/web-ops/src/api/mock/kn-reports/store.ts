@@ -11,6 +11,7 @@ import { problem } from "../http";
 import { KN_ACCOUNTS, findKnAccount } from "../kn-accounts";
 import { stableUuid, WS_ROSTER } from "../kn-schedules";
 import { knStoredContext, type StoredContext } from "../kn";
+import { vnDate } from "@/kn/schedule/week";
 import { evaluateGrid } from "../forms/evaluate";
 import { exportXlsx } from "../forms/xlsx";
 import { layout } from "../forms/layout";
@@ -479,6 +480,8 @@ function emptyState(now: () => number): State {
 }
 
 export const nowMs = () => S.now();
+/** Kỳ đã bắt đầu tại `now`: from_date là ngày lịch Việt Nam (UTC+7), không phải 00:00 UTC. */
+const periodStarted = (p: Pick<Period, "from_date">, now: number) => p.from_date <= vnDate(now);
 
 // ---------------------------------------------------------------------------
 // Mẫu (engine giả lập)
@@ -1174,7 +1177,7 @@ export function confirmTask(c: Caller, t: Task, body: unknown, at = nowMs()): Re
 // ---------------------------------------------------------------------------
 export function defaultPeriod(batchId: string, now = nowMs()): Period | undefined {
   const ps = periodsOf(batchId);
-  return [...ps].reverse().find((p) => Date.parse(p.from_date) <= now) ?? ps[0];
+  return [...ps].reverse().find((p) => periodStarted(p, now)) ?? ps[0];
 }
 
 export function statusBoard(b: Batch, p: Period, q: { template_id?: string | null; status?: string | null }, now = nowMs()) {
@@ -1574,7 +1577,7 @@ export function dashboard(c: Caller, q: { province?: string | null; region?: str
     period = periods.find((p) => p.id === q.period_id);
     if (!period) return problem(404, "extension.report_period_not_found", "Không tìm thấy kỳ báo cáo");
   } else {
-    const started = periods.filter((p) => Date.parse(p.from_date) <= now);
+    const started = periods.filter((p) => periodStarted(p, now));
     period = started.find((p) => S.runs.some((r) => r.period_id === p.id)) ?? started[0];
   }
   const regionNames = Object.fromEntries(AG_REGIONS.map((r) => [r.code, r.name]));
@@ -1688,9 +1691,9 @@ export function badgesFor(c: Caller, now = nowMs()): Record<string, number> {
     const p = periodOf(t.period_id)!;
     const adhoc = b.report_type === "adhoc";
     if (c.role === "kn_xa") {
-      if (taskPending({ status: t.stored }) && Date.parse(p.from_date) <= now) counts[adhoc ? "extension.report_tasks.ad_hoc_todo" : "extension.report_tasks.todo"]!++;
+      if (taskPending({ status: t.stored }) && periodStarted(p, now)) counts[adhoc ? "extension.report_tasks.ad_hoc_todo" : "extension.report_tasks.todo"]!++;
     } else {
-      if (taskPending({ status: t.stored }) && Date.parse(p.from_date) <= now) counts[adhoc ? "extension.report_status.ad_hoc_pending" : "extension.report_status.not_submitted"]!++;
+      if (taskPending({ status: t.stored }) && periodStarted(p, now)) counts[adhoc ? "extension.report_status.ad_hoc_pending" : "extension.report_status.not_submitted"]!++;
       if (t.stored === "submitted") counts["extension.submissions.pending_review"]!++;
     }
   }
@@ -1841,8 +1844,21 @@ export function createDispatch(c: Caller, body: unknown, at = nowMs()): Result<D
   return d;
 }
 
+/** Hạn nhận việc gửi Chi cục như Go (dispatch.DefaultSendLease 15 phút). Mock không có claim: mốc = updated_at + hạn. */
+export const MOCK_SEND_LEASE_MS = 15 * 60_000;
+
+/** Mốc từ đó "Gửi lại" lần "Đang gửi" được chấp nhận (Go: Service.resumableAt). */
+const resumableAt = (d: Dispatch) => Date.parse(d.updated_at) + MOCK_SEND_LEASE_MS;
+
+/** Kiểm thử: worker giả chết giữa chừng — lần gửi kẹt "Đang gửi" cho đến khi quá hạn và được "Gửi lại". */
+export function stallDispatch(d: Dispatch): void {
+  d.deliver_at = null;
+}
+
 export function sendDispatch(c: Caller, d: Dispatch, body: unknown, at = nowMs()): Result<Dispatch> {
-  if (d.status === "sending") return problem(409, "reports.dispatch_sending", "Đang gửi — chờ kết quả trước khi gửi lại");
+  // Như Go (review #128): "Đang gửi" còn hạn → 409; quá hạn → tiếp tục CÙNG lượt (không tăng attempts).
+  const resume = d.status === "sending";
+  if (resume && resumableAt(d) > at) return problem(409, "reports.dispatch_sending", "Đang gửi — chờ kết quả trước khi gửi lại");
   const x = (body ?? {}) as { recipient_ids?: string[]; cc_ids?: string[]; subject?: string; body?: string };
   let to = Array.isArray(x.recipient_ids) ? x.recipient_ids : [];
   let cc = Array.isArray(x.cc_ids) ? x.cc_ids : [];
@@ -1856,9 +1872,9 @@ export function sendDispatch(c: Caller, d: Dispatch, body: unknown, at = nowMs()
   if ([...subject].length > 300 || /\n/.test(subject)) return fieldErr("subject", "tối đa 300 ký tự, một dòng");
   if ((x.body ?? "").length > 5000) return fieldErr("body", "tối đa 5000 ký tự");
   const iso = rfc3339(at);
-  Object.assign(d, { status: "sending", recipient_ids: to, cc_ids: cc, subject, body: x.body ?? null, attempts: d.attempts + 1, updated_at: iso, deliver_at: at + 1500 });
+  Object.assign(d, { status: "sending", recipient_ids: to, cc_ids: cc, subject, body: x.body ?? null, attempts: resume ? d.attempts : d.attempts + 1, updated_at: iso, deliver_at: at + 1500 });
   for (const r of S.recipients) if ([...to, ...cc].includes(r.id)) Object.assign(r, { is_default: true, last_used_at: iso });
-  d.log.push({ event: "dispatch.send_requested", actor_ref: c.actor, at: iso, on_behalf_of: c.support?.onBehalfOf ?? null, detail: { recipient_ids: to, cc_ids: cc, attempt: d.attempts, subject } });
+  d.log.push({ event: "dispatch.send_requested", actor_ref: c.actor, at: iso, on_behalf_of: c.support?.onBehalfOf ?? null, detail: { recipient_ids: to, cc_ids: cc, attempt: d.attempts, subject, resumed: resume } });
   return d;
 }
 
@@ -1866,9 +1882,14 @@ export const dispatchOf = (id: string) => S.dispatches.find((d) => d.id === id);
 export const dispatchesOf = (c: Caller, q: { period_id?: string | null; province?: string | null }) =>
   S.dispatches.filter((d) => (c.province === null || d.province_code === c.province) && (c.role === "admin" || d.department_code === c.dept) && (!q.period_id || d.period_id === q.period_id) && (!q.province || d.province_code === q.province)).reverse();
 
-export function dispatchWire(d: Dispatch) {
+export function dispatchWire(d: Dispatch, now = nowMs()) {
   const { files, log, ...rest } = d;
-  const dispatch: Partial<Dispatch> = { ...rest };
+  const sending = d.status === "sending";
+  const dispatch: Partial<Dispatch> & { can_resend: boolean; resumable_at: string | null } = {
+    ...rest,
+    can_resend: !sending || resumableAt(d) <= now,
+    resumable_at: sending ? rfc3339(resumableAt(d)) : null,
+  };
   delete dispatch.deliver_at;
   return { dispatch, files, log };
 }

@@ -9,7 +9,7 @@ import { unwrap } from "@/api/client";
 import { collectPages } from "@/api/pagination";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
 import {
   SHIFT_LABEL,
@@ -75,30 +75,25 @@ function MyDutiesView({ capi, month }: { capi: CntsCalApi; month: string }) {
           d.items.length === 0 ? (
             <p className="mute">{d.version === 0 ? "Tháng này chưa có lịch trực." : "Bạn không có ca trực trong tháng."}</p>
           ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Ngày</th>
-                  <th>Ca</th>
-                  <th>Cơ sở giết mổ</th>
-                  <th>Trực cùng</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.items.map((x) => (
-                  <tr key={`${x.date}-${x.facility.ref}`}>
-                    <td>
-                      {weekdayLabel(month, Number(x.date.slice(8)))} {x.date.split("-").reverse().join("/")}
-                    </td>
-                    <td title={SHIFT_TITLE[x.shift]}>
+            <DataTable
+              caption="Ca trực của tôi"
+              rows={d.items}
+              rowKey={(x) => `${x.date}-${x.facility.ref}`}
+              columns={[
+                { key: "date", header: "Ngày", cell: (x) => `${weekdayLabel(month, Number(x.date.slice(8)))} ${x.date.split("-").reverse().join("/")}` },
+                {
+                  key: "shift",
+                  header: "Ca",
+                  cell: (x) => (
+                    <span title={SHIFT_TITLE[x.shift]}>
                       <StatusPill tone={x.shift === "D" ? "info" : x.shift === "ND" ? "warn" : "ok"}>{SHIFT_LABEL[x.shift]}</StatusPill>
-                    </td>
-                    <td>{x.facility.name ?? x.facility.ref}</td>
-                    <td>{x.colleagues.map((c) => c.display ?? c.ref.slice(0, 8)).join(", ") || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </span>
+                  ),
+                },
+                { key: "fac", header: "Cơ sở giết mổ", cell: (x) => x.facility.name ?? x.facility.ref },
+                { key: "with", header: "Trực cùng", cell: (x) => x.colleagues.map((c) => c.display ?? c.ref.slice(0, 8)).join(", ") || "—" },
+              ]}
+            />
           )
         }
       </LoadState>
@@ -211,6 +206,7 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
         ) : null}
       </section>
 
+      {/* Lưới ca trực kiểu bảng tính (bấm ô đổi ca) — giữ nguyên như lưới nhập Excel, không đổi sang DataTable. */}
       <section className="card sec" aria-label="Lưới lịch trực">
         <div style={{ overflowX: "auto" }}>
           <table className="table table-compact">

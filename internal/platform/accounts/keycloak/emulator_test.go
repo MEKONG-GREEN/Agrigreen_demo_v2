@@ -336,13 +336,17 @@ func (e *emulator) logout(w http.ResponseWriter, r *http.Request, id uuid.UUID) 
 
 // bruteForce: GET /attack-detection/brute-force/users/{id} như Keycloak 26 (enabled giữ nguyên).
 func (e *emulator) bruteForce(w http.ResponseWriter, r *http.Request, id uuid.UUID) {
-	locked, err := e.mem.BruteForceLocked(r.Context(), id)
+	st, err := e.mem.LoginLockStatus(r.Context(), id)
 	if err != nil {
 		fail(w, err)
 		return
 	}
+	out := map[string]any{"disabled": st.Locked, "numFailures": 0, "lastFailure": 0, "lastIPFailure": "n/a"}
+	if st.Until != nil {
+		out["numFailures"], out["lastFailure"] = 5, st.Until.Add(-DefaultLockoutWait).UnixMilli()
+	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"disabled": locked, "numFailures": 5, "lastIPFailure": "n/a"})
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (e *emulator) clearBruteForce(w http.ResponseWriter, r *http.Request, id uuid.UUID) {

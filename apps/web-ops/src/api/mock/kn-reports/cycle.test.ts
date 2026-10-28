@@ -2,11 +2,11 @@
 // Tỉnh phát hành → Xã nhập/gửi 2 xã → Tỉnh yêu cầu điều chỉnh → Xã gửi lại → "Cập nhật" có nhật ký ô → chốt
 // (Hệ thống tổng hợp) → TW xem dashboard chỉ đọc; Chi cục xuất + gửi (202); quy tắc lỗi như Go.
 import { beforeEach, describe, expect, it } from "vitest";
-import { createCycleApi } from "@/kn/cycle/api";
+import { createCycleApi, RawFile } from "@/kn/cycle/api";
 import { ApiProblem } from "@/api/problem";
 import { mockFetchNoDelay } from "../handler";
 import { resetMockForms } from "../forms/routes";
-import { KSGM_WEEK_STARTS, resetReportCycle } from "./store";
+import { KSGM_WEEK_STARTS, defaultPeriod, resetReportCycle } from "./store";
 
 // Thứ Sáu 02/10/2026 10:00 giờ Việt Nam.
 let now = Date.parse("2026-10-02T03:00:00Z");
@@ -59,6 +59,32 @@ describe("vòng đời báo cáo giả lập (P4)", () => {
     const todo = await xa.tasks({ status: "" as never });
     expect(todo.items.every((t) => ["91301", "91302"].includes(t.commune_code))).toBe(true);
     expect(todo.counts.todo).toBeGreaterThan(0);
+  });
+
+  it("đầu tuần 00:00–07:00 giờ VN: kỳ tuần mới đã bắt đầu theo ngày VN (badge 'cần làm' và kỳ mặc định không lùi về tuần trước)", async () => {
+    const badges = async () => {
+      const ctxRes = await mockFetchNoDelay(
+        new Request("http://mock/v1/me/context", {
+          method: "POST",
+          headers: { Authorization: "Bearer mock.kn-an", "Content-Type": "application/json", "Idempotency-Key": `ctx-an-${Math.random()}` },
+          body: JSON.stringify({ assignment_id: "asg-an-xa", department_code: "trong_trot" }),
+        }),
+      );
+      const { context_id } = (await ctxRes.json()) as { context_id: string };
+      const res = await mockFetchNoDelay(new Request("http://mock/v1/me/menu-badges", { headers: { Authorization: "Bearer mock.kn-an", "X-AG-Context": context_id } }));
+      return ((await res.json()) as { counts: Record<string, number> }).counts["extension.report_tasks.todo"];
+    };
+    // Thứ Hai 26/10/2026 10:00 giờ VN: tuần hiện tại 26/10–01/11, 2 xã còn T04 (nháp / chưa nhập).
+    now = Date.parse("2026-10-26T03:00:00Z");
+    resetReportCycle(() => now);
+    expect(await badges()).toBe(2);
+    // Thứ Hai 26/10/2026 01:00 giờ VN (= Chủ Nhật 25/10 18:00 UTC): kỳ đã bắt đầu, số đếm phải như trên.
+    now = Date.parse("2026-10-25T18:00:00Z");
+    resetReportCycle(() => now);
+    expect(await badges()).toBe(2);
+    const tinh = await clientFor("kn-binh", "asg-binh-tinh");
+    const batch = (await tinh.batches()).items[0]!;
+    expect(defaultPeriod(batch.id, now)?.from_date).toBe("2026-10-26");
   });
 
   it("FN-TI-02.02 → 02.05 → TW: phát hành, nhập 2 xã, điều chỉnh, gửi lại, Cập nhật có nhật ký ô, chốt, TW chỉ xem", async () => {
@@ -228,5 +254,22 @@ describe("W11.05b: kỳ ngày / tuần KSGM / quý ở Phát hành biểu + khó
       const q = await tinh.preview({ ...base, report_type: "monthly", template_ids: [monthly[0]!.template_id], period_type: "quarter", from_date: "2026-11-04", to_date: "2027-03-30" });
       expect(q.periods.map((p) => p.period_key)).toEqual(["2026-Q4", "2027-Q1"]);
     }
+  });
+});
+
+// BF-TT-FORMS (#107, UP-04): Nhập từ Excel trên màn nhập Cấp Xã — giả lập đọc CSV có hàng chữ cái, không ghi; Cấp Tỉnh không nhập.
+describe("Nhập từ Excel (grid-import) giả lập", () => {
+  it("đọc dòng dữ liệu sau hàng chữ cái + dòng loại cột, dừng ở Yêu cầu biểu mẫu; tệp sai bố cục → 422; Cấp Tỉnh → 403", async () => {
+    const xa = await clientFor("kn-an", "asg-an-xa");
+    const t = (await xa.tasks({ status: "" as never })).items[0]!;
+    const csv = ["TIẾN ĐỘ", "A,B,C,D,E", "Cố định,Cố định,Cố định,Tỉnh giao,Nhập", "1,Long Xuyên,Mỹ Hòa Hưng,,12.5", "", "2,,Bình Đức,,3", "*Yêu cầu biểu mẫu: x", "9,,Lạ,,1"].join("\n");
+    const r = await xa.importGrid(t.id, new RawFile(csv, "text/csv; charset=utf-8"));
+    expect(r.rows).toEqual([
+      { line: 4, cells: { A: "1", B: "Long Xuyên", C: "Mỹ Hòa Hưng", E: "12.5" }, numeric: [] },
+      { line: 6, cells: { A: "2", C: "Bình Đức", E: "3" }, numeric: [] },
+    ]);
+    expect(await code(xa.importGrid(t.id, new RawFile("Xã,Diện tích\nA,1\n", "text/csv")))).toBe("422 extension.grid_import_invalid");
+    const tinh = await clientFor("kn-binh", "asg-binh-tinh");
+    expect(await code(tinh.importGrid(t.id, new RawFile(csv, "text/csv")))).toMatch(/^403 /);
   });
 });

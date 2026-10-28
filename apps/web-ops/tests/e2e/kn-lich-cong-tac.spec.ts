@@ -35,13 +35,15 @@ const statusBar = (page: Page) => page.getByRole("group", { name: "Tuần và tr
 const form = (page: Page) => page.getByRole("region", { name: "Mục công tác" });
 const log = (page: Page) => page.getByRole("complementary", { name: "Log" });
 
-async function addItem(page: Page, day: string, session: "Sáng" | "Chiều", content: string, opts: { start?: string; end?: string; commune?: string } = {}) {
+// BF-SCHED (#99): mỗi mục bắt buộc Xã/phường và Địa điểm (địa điểm cụ thể hoặc tọa độ).
+async function addItem(page: Page, day: string, session: "Sáng" | "Chiều", content: string, opts: { start?: string; end?: string; commune: string; location: string }) {
   await page.getByRole("button", { name: `Thêm mục ${dayColumnLabel(day)} ${session}` }).click();
   const f = form(page);
   if (opts.start) await f.getByLabel("Giờ bắt đầu").fill(opts.start);
   if (opts.end) await f.getByLabel("Giờ kết thúc").fill(opts.end);
   await f.getByLabel("Nội dung công việc").fill(content);
-  if (opts.commune) await f.getByLabel("Địa điểm: xã/phường").selectOption({ label: opts.commune });
+  await f.getByLabel("Địa điểm: xã/phường").selectOption({ label: opts.commune });
+  await f.getByLabel("Địa điểm cụ thể").fill(opts.location);
   await f.getByRole("button", { name: "Lưu mục" }).click();
   await expect(page.getByTestId("ws-item").filter({ hasText: content })).toBeVisible();
 }
@@ -62,12 +64,22 @@ test.describe("Lịch công tác tuần: Cấp Xã đăng ký → Cấp Tỉnh d
     await expect(statusBar(page)).toContainText("Hạn đăng ký:");
     await expect(page.getByRole("button", { name: "Gửi duyệt" })).toBeDisabled();
 
-    await addItem(page, tue, "Sáng", "Kiểm tra rầy nâu HTX Mỹ Hòa", { start: "07:30", end: "10:00", commune: "Mỹ Hòa Hưng" });
-    await addItem(page, tue, "Sáng", "Họp tổ khuyến nông", { start: "09:00", end: "11:00", commune: "Mỹ Hòa Hưng" });
+    // BF-SCHED (#99): thiếu Xã/phường hoặc Địa điểm thì không lưu được mục.
+    await page.getByRole("button", { name: `Thêm mục ${dayColumnLabel(tue)} Sáng` }).click();
+    await form(page).getByLabel("Nội dung công việc").fill("Mục thiếu địa điểm");
+    await form(page).getByRole("button", { name: "Lưu mục" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Xã/phường bắt buộc." })).toBeVisible();
+    await form(page).getByLabel("Địa điểm: xã/phường").selectOption({ label: "Mỹ Hòa Hưng" });
+    await form(page).getByRole("button", { name: "Lưu mục" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Địa điểm bắt buộc — nhập địa điểm cụ thể hoặc tọa độ." })).toBeVisible();
+    await expect(page.getByTestId("ws-item").filter({ hasText: "Mục thiếu địa điểm" })).toHaveCount(0);
+
+    await addItem(page, tue, "Sáng", "Kiểm tra rầy nâu HTX Mỹ Hòa", { start: "07:30", end: "10:00", commune: "Mỹ Hòa Hưng", location: "Ruộng HTX Mỹ Hòa" });
+    await addItem(page, tue, "Sáng", "Họp tổ khuyến nông", { start: "09:00", end: "11:00", commune: "Mỹ Hòa Hưng", location: "Trụ sở UBND xã" });
     // Trùng giờ: tô vàng + cảnh báo, vẫn lưu được.
     await expect(page.getByTestId("ws-item").filter({ hasText: "trùng giờ" })).toHaveCount(2);
     await expect(page.getByText(/Có 2 mục trùng thời gian/)).toBeVisible();
-    await addItem(page, thu, "Chiều", "Hướng dẫn kỹ thuật 1P5G", { commune: "Bình Đức" });
+    await addItem(page, thu, "Chiều", "Hướng dẫn kỹ thuật 1P5G", { commune: "Bình Đức", location: "Cánh đồng ấp Bình Hòa" });
 
     await page.getByRole("button", { name: "Lưu nháp" }).click();
     await expect(page.getByText("Đã lưu nháp.")).toBeVisible();

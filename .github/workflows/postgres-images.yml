@@ -1,0 +1,63 @@
+name: postgres-image-security
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - deploy/compose/postgres/**
+      - deploy/compose/backup/**
+      - scripts/test-postgres-images.sh
+      - scripts/test-postgres-logical-upgrade.sh
+      - .github/workflows/postgres-images.yml
+  push:
+    branches: [main, dev]
+    paths:
+      - deploy/compose/postgres/**
+      - deploy/compose/backup/**
+      - scripts/test-postgres-images.sh
+      - scripts/test-postgres-logical-upgrade.sh
+      - .github/workflows/postgres-images.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postgres-image-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-images:
+    name: Nonroot, health, persist and backup (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [postgres, backup]
+    env:
+      P0_IMAGE_TAG: agrigreen/p0-sec-ci-${{ matrix.variant }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Real image build, initialization, health and restore
+        run: sh scripts/test-postgres-images.sh '${{ matrix.variant }}'
+      - name: Trivy — image CRITICAL/HIGH with fixes blocks integration
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.P0_IMAGE_TAG }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+  logical-upgrade:
+    name: Logical PostGIS 3.5 to 3.6, old-volume refusal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Keep independent Docker contexts on the same compatibility contract
+        run: |
+          cmp deploy/compose/postgres/agrigreen-entrypoint.sh deploy/compose/backup/agrigreen-entrypoint.sh
+          cmp deploy/compose/postgres/00-runtime-compat.sh deploy/compose/backup/00-runtime-compat.sh
+      - name: Actual logical restore into a clean volume and PostgreSQL checks
+        run: sh scripts/test-postgres-logical-upgrade.sh

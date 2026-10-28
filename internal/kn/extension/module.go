@@ -20,9 +20,17 @@ import (
 	alerthandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/handler"
 	calapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/app"
 	calhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/handler"
+	diaryapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/app"
+	diaryhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/handler"
+	zmapapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/app"
+	zmaphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/handler"
+	modelapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/app"
+	modelhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/handler"
+	dhapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/depthome/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/handler"
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
+	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/handler"
 	obapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/app"
@@ -95,10 +103,23 @@ type Module struct {
 	alert *alertapp.Service
 	// W11.46 (D4 CN6): lịch trực KSGM BM-03, lịch tiêm phòng BM-07 (extension/cntscal).
 	cal *calapp.Service
+	// W11.47 (D4 CN7): CT/DA, điểm trình diễn, hộ mô hình, cấp quyền CNTS (extension/cntsmodel, module_cntsmodel.go).
+	model *modelapp.Service
+	// W11.48 (D4 CN8): nhật ký nuôi BM-08/09/19 (extension/cntsdiary, module_cntsdiary.go).
+	diary *diaryapp.Service
+	// W11.52 (D4 CN12): bản đồ vùng nuôi, vùng dịch (extension/cntsmap, module_cntsmap.go).
+	zmap *zmapapp.Service
+	// W11.54 (D4 CN14): trang chủ phòng + kho văn bản phòng (extension/depthome, module_depthome.go).
+	home *dhapp.Service
+	// W11.50 (D4 CN10): chiến dịch điều tra mở rộng (extension/cntscampaign, module_cntscampaign.go).
+	campaigns *campaignService
+	// BF-SRV-KN-ATTRS (#119): hồ sơ KN riêng — năm sản xuất máy (TT-10), cây trồng thửa (TT-11) (module_knattrs.go).
+	attrs *kaapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	pool := db
 	db = forModule(db)
 	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
@@ -110,6 +131,13 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.ob = &obapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.alert = &alertapp.Service{DB: db, Clock: clk, Params: d.Params, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.cal = &calapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.model = &modelapp.Service{DB: db, Clock: clk, Units: d.Units, Programs: khtcapp.Ports{Svc: m.khtc},
+		Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
+		Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.home = m.newDeptHome()
+	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs)
 	return m
 }
 
@@ -145,10 +173,13 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 
 // UseCNTSCatalogs nối danh mục CNTS theo ngày của pf/masterdata (W11.41) cho Báo cáo dịch bệnh BM-10 (W11.49: bệnh,
 // vật nuôi). Chưa nối → lập/cập nhật ổ dịch, báo nghi dịch trả 503 extension.dependency_unavailable.
-func (m *Module) UseCNTSCatalogs(c port.CNTSCatalogs) { m.ob.Catalogs, m.cal.Catalogs = c, c }
+func (m *Module) UseCNTSCatalogs(c port.CNTSCatalogs) {
+	m.ob.Catalogs, m.cal.Catalogs, m.model.Catalogs, m.zmap.Catalogs = c, c, c, c
+}
 
 // UseXaScopes (W11.46) nối danh sách cán bộ Cấp Xã CNTS kèm phạm vi (pf/accounts) cho lưới lịch trực KSGM BM-03.
-func (m *Module) UseXaScopes(x accport.XaScopes) { m.cal.Officers = x }
+// W11.47: cùng danh bạ cho người được cấp quyền, cán bộ theo dõi điểm, người ghi nhật ký của hộ mô hình.
+func (m *Module) UseXaScopes(x accport.XaScopes) { m.cal.Officers, m.model.Officers = x, x }
 
 // UseTablePDF nối bộ dựng PDF bảng (pf/reports) cho "Xuất PDF" lịch công tác.
 func (m *Module) UseTablePDF(p port.TablePDF) { m.svc.TablePDF = p }
@@ -177,6 +208,12 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerKHTCExternal(rg)                         // W11.67
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
+	modelhandler.Handler{Svc: m.model}.RegisterApp(rg) // W11.47
+	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg) // W11.48
+	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)   // W11.52
+	m.registerDeptHome(rg)                             // W11.54
+	m.registerCNTSCampaigns(rg)                        // W11.50
+	m.registerKNAttrs(rg)                              // BF-SRV-KN-ATTRS
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

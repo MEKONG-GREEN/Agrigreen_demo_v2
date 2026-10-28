@@ -100,6 +100,10 @@ const (
 )
 
 func newKNFixture(t *testing.T, registries ...*authz.SessionRegistry) *knFix {
+	return newKNFixtureWithCatalog(t, nil, registries...)
+}
+
+func newKNFixtureWithCatalog(t *testing.T, catalog *port.AttributeCatalog, registries ...*authz.SessionRegistry) *knFix {
 	sessions := fixtureSessionRegistry(t)
 	if len(registries) > 1 {
 		t.Fatal("one registry override expected")
@@ -119,7 +123,7 @@ func newKNFixture(t *testing.T, registries ...*authz.SessionRegistry) *knFix {
 	f.depts.depts[f.national] = []partyport.Department{mk(f.national, deptTT, "Phòng Trồng trọt", partyport.DeptActive)}
 
 	ops := f.env.Pool(t, migrations.PF, "platform_api")
-	f.kmod = accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts, Sessions: sessions})
+	f.kmod = accounts.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{Directory: f.dir, Scope: f.party, Orgs: f.party, Departments: f.depts, Sessions: sessions, SessionPolicies: fixtureSessionPolicies(), Attributes: catalog})
 	log := telemetry.NewLogger("test", io.Discard)
 	app := httpx.NewEngine(log, 1<<20)
 	ag := app.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.kmod.Middleware(), idempotency.Middleware(ops))
@@ -808,7 +812,16 @@ func fixtureSessionRegistry(t *testing.T) *authz.SessionRegistry {
 			scope.OnBehalfOfRef = p.KN.Support.OnBehalfOf
 		}
 		binding, err := authz.NewSession("fixture", p.KN.ID, scope)
-		return binding, true, err
+		if err != nil {
+			return binding, true, err
+		}
+		data := fixturePolicyPayload{UnitRef: p.KN.UnitRef}
+		if p.KN.Support != nil {
+			data.Audit = &port.SupportAuditContext{ContextID: p.KN.ID, SessionID: p.KN.Support.SessionID, OnBehalfOf: p.KN.Support.OnBehalfOf,
+				Audience: p.KN.Role, Department: p.KN.Department, Reason: p.KN.Support.Reason}
+		}
+		raw, err := json.Marshal(data)
+		return binding.WithPayload(raw), true, err
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -858,5 +871,43 @@ func TestSelectedMiddlewareRequiresRegisteredProjection(t *testing.T) {
 				t.Fatal("unselected native request changed")
 			}
 		})
+	}
+}
+
+// The kernel fixture owns this generic payload; it does not import KN code.
+type fixturePolicyPayload struct {
+	UnitRef uuid.UUID
+	Audit   *port.SupportAuditContext
+}
+
+func fixtureSessionPolicies() port.SessionPolicies {
+	read := func(ctx context.Context) (fixturePolicyPayload, error) {
+		p, ok := authz.FromContext(ctx)
+		if !ok || p.SelectedSession == nil || !p.SelectedSession.Valid() || p.SelectedSession.Profile() != "fixture" {
+			return fixturePolicyPayload{}, errors.New("missing fixture session")
+		}
+		var data fixturePolicyPayload
+		err := json.Unmarshal(p.SelectedSession.Payload(), &data)
+		return data, err
+	}
+	return port.SessionPolicies{
+		SupportAudit: func(ctx context.Context) (port.SupportAuditContext, error) {
+			data, err := read(ctx)
+			if err != nil {
+				return port.SupportAuditContext{}, err
+			}
+			if data.Audit == nil {
+				return port.SupportAuditContext{}, errors.New("missing fixture support")
+			}
+			return *data.Audit, nil
+		},
+		DefaultUnit: func(ctx context.Context) (uuid.UUID, bool, error) {
+			p, ok := authz.FromContext(ctx)
+			if ok && p.SelectedSession == nil && p.KN == nil {
+				return uuid.Nil, false, nil
+			}
+			data, err := read(ctx)
+			return data.UnitRef, true, err
+		},
 	}
 }

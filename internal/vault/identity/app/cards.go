@@ -4,7 +4,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -39,7 +38,16 @@ func (s *Service) Cards(ctx context.Context, purpose client.Purpose, refs []uuid
 		want[f] = true
 	}
 	tid := p.TenantID
-	out := make([]client.Card, 0, len(refs))
+	// P0-POOL-SHARED (#126): giao dịch 1 chỉ đọc bản mã; KMS + giải mã ngoài giao dịch; giao dịch 2 ghi sổ mọi chủ thể.
+	type pending struct {
+		ref           uuid.UUID
+		erased        bool
+		identity      sealedIdentity
+		card, profile *store.Section
+	}
+	wantIdentity := want[domain.CardFullName] || want[domain.CardPhone]
+	wantSections := want[domain.CardBirthYear] || want[domain.CardEmail]
+	var rows []pending
 	seen := map[uuid.UUID]bool{}
 	err = tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
 		for _, ref := range refs {
@@ -54,83 +62,82 @@ func (s *Service) Cards(ctx context.Context, purpose client.Purpose, refs []uuid
 			if subj == nil {
 				continue // ref lạ: bỏ qua, không lộ chủ thể của tenant khác (RLS) — không ghi sổ
 			}
-			c := client.Card{Ref: ref}
-			if subj.ErasedAt != nil {
-				c.Erased = true
-				out = append(out, c)
-				if err := s.logAccess(ctx, tx, p, &ref, true, domain.OpCard, purpose, domain.OutcomeErased); err != nil {
+			r := pending{ref: ref, erased: subj.ErasedAt != nil}
+			if !r.erased && wantIdentity {
+				if r.identity, err = fetchIdentity(ctx, tx, ref); err != nil {
 					return err
 				}
-				continue
 			}
-			if want[domain.CardFullName] || want[domain.CardPhone] {
-				pl, err := s.decrypt(ctx, tx, tid, ref)
-				if err != nil {
+			if !r.erased && wantSections {
+				if r.card, err = store.GetSection(ctx, tx, ref, domain.SectionContactCard); err != nil {
 					return err
 				}
-				if want[domain.CardFullName] {
-					c.FullName = pl.FullName
-				}
-				if want[domain.CardPhone] {
-					c.Phone = pl.Phone
-				}
-				clearPlain(&pl)
-			}
-			if want[domain.CardBirthYear] || want[domain.CardEmail] {
-				card, err := s.openSection(ctx, tx, tid, ref, domain.SectionContactCard)
-				if err != nil {
+				if r.profile, err = store.GetSection(ctx, tx, ref, domain.SectionHRMProfile); err != nil {
 					return err
 				}
-				prof := map[string]string{}
-				if card["birth_year"] == "" || card["email"] == "" {
-					if prof, err = s.openSection(ctx, tx, tid, ref, domain.SectionHRMProfile); err != nil {
-						return err
-					}
-				}
-				if want[domain.CardBirthYear] {
-					if c.BirthYear = domain.BirthYear(card["birth_year"]); c.BirthYear == "" {
-						c.BirthYear = domain.BirthYear(prof["birth_date"])
-					}
-				}
-				if want[domain.CardEmail] {
-					if c.Email = card["email"]; c.Email == "" {
-						c.Email = prof["email"]
-					}
-				}
-				clear(card)
-				clear(prof)
 			}
-			out = append(out, c)
-			if err := s.logAccess(ctx, tx, p, &ref, true, domain.OpCard, purpose, domain.OutcomeOK); err != nil {
-				return err
-			}
+			rows = append(rows, r)
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
-}
-
-// openSection giải mã một ngăn trong giao dịch (chưa ghi → map rỗng). Dùng nội bộ cho phép chiếu của thẻ danh bạ — KHÔNG
-// trả nguyên ngăn ra ngoài.
-func (s *Service) openSection(ctx context.Context, tx pgx.Tx, tid, ref uuid.UUID, section string) (map[string]string, error) {
-	out := map[string]string{}
-	row, err := store.GetSection(ctx, tx, ref, section)
-	if err != nil || row == nil {
-		return out, err
+	out := make([]client.Card, 0, len(rows))
+	for _, r := range rows {
+		c := client.Card{Ref: r.ref, Erased: r.erased}
+		if !r.erased && wantIdentity {
+			pl, err := s.openIdentity(ctx, tid, r.ref, r.identity)
+			if err != nil {
+				return nil, err
+			}
+			if want[domain.CardFullName] {
+				c.FullName = pl.FullName
+			}
+			if want[domain.CardPhone] {
+				c.Phone = pl.Phone
+			}
+			clearPlain(&pl)
+		}
+		if !r.erased && wantSections {
+			card, err := s.openSectionRow(ctx, tid, r.ref, domain.SectionContactCard, r.card)
+			if err != nil {
+				return nil, err
+			}
+			prof := map[string]string{}
+			if card["birth_year"] == "" || card["email"] == "" {
+				if prof, err = s.openSectionRow(ctx, tid, r.ref, domain.SectionHRMProfile, r.profile); err != nil {
+					return nil, err
+				}
+			}
+			if want[domain.CardBirthYear] {
+				if c.BirthYear = domain.BirthYear(card["birth_year"]); c.BirthYear == "" {
+					c.BirthYear = domain.BirthYear(prof["birth_date"])
+				}
+			}
+			if want[domain.CardEmail] {
+				if c.Email = card["email"]; c.Email == "" {
+					c.Email = prof["email"]
+				}
+			}
+			clear(card)
+			clear(prof)
+		}
+		out = append(out, c)
 	}
-	key, err := s.KMS.Unwrap(ctx, row.KEKID, row.WrappedKey, domain.AAD(useSectionKey(section), tid, ref))
+	err = tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+		for _, r := range rows {
+			outcome := domain.OutcomeOK
+			if r.erased {
+				outcome = domain.OutcomeErased
+			}
+			if err := s.logAccess(ctx, tx, p, &r.ref, true, domain.OpCard, purpose, outcome); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-	defer clear(key)
-	plain, err := openField(key, domain.AAD(useSectionData(section), tid, ref), row.PayloadCT)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal([]byte(plain), &out); err != nil {
 		return nil, err
 	}
 	return out, nil

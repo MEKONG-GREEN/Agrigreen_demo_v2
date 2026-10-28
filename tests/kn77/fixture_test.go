@@ -174,6 +174,11 @@ type fixture struct {
 
 type fixtureOpts struct {
 	communes int // số xã của tỉnh 89 (mặc định 3)
+	// sharedPool > 0 (P0-POOL-KN): pf/extension và pf/reports dùng CHUNG một pool vai đăng nhập app_platform với
+	// MaxConns = sharedPool, như gốc lắp ráp thật (ADR-0028) — để bắt giao dịch lồng nhau làm cạn pool.
+	sharedPool int32
+	// wrapStore (P0-POOL-SHARED-2): bọc kho đối tượng của pf/reports (vd chặn Store.Get để kiểm không giữ giao dịch).
+	wrapStore func(objstore.Store) objstore.Store
 }
 
 func newFixture(t *testing.T, o fixtureOpts) *fixture {
@@ -209,14 +214,24 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	extPool := env.Pool(t, migrations.PF, extension.DBRole)
-	repPool := env.Pool(t, migrations.PF, reports.DBRole)
+	var store objstore.Store = st
+	if o.wrapStore != nil {
+		store = o.wrapStore(st)
+	}
+	var extPool, repPool tenant.Beginner
+	if o.sharedPool > 0 {
+		extPool = sharedUnitPool(t, env, o.sharedPool)
+		repPool = extPool
+	} else {
+		extPool = env.Pool(t, migrations.PF, extension.DBRole)
+		repPool = env.Pool(t, migrations.PF, reports.DBRole)
+	}
 	f.repPool, f.extPool = repPool, extPool
 	f.extParams = &extParams{v: map[string]extParam{extport.ParamPeriodRule: {from: time.Date(2026, 11, 4, 0, 0, 0, 0, clock.Zone()),
 		text: "kn.period_rule/v2;week_start=wed;week=year;month=week_end"}}}
 	f.ext = extension.New(extPool, f.clk, extension.Deps{Orgs: og, Units: units{names: names}, Params: f.extParams})
 	f.repParams = &repParams{v: map[string]decimal.Decimal{}}
-	f.rep = reports.New(repPool, f.clk, reports.Deps{FormSeeds: []repport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: f.ext.ReportData(), Orgs: og, Units: units{names: names}, Clock: f.clk}), Catalog: []repport.CatalogRegistration{extension.ReportCatalog()}, Policies: []repport.Policy{extension.ReportPolicy()}, ResolveSession: extension.ReportSessionResolver(og), Orgs: og, Units: units{names: names}, Store: st, Mailer: f.mail, Getenv: func(string) string { return "" },
+	f.rep = reports.New(repPool, f.clk, reports.Deps{FormSeeds: []repport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: f.ext.ReportData(), Orgs: og, Units: units{names: names}, Clock: f.clk}), Catalog: []repport.CatalogRegistration{extension.ReportCatalog()}, Policies: []repport.Policy{extension.ReportPolicy()}, ResolveSession: extension.ReportSessionResolver(og), Orgs: og, Units: units{names: names}, Store: store, Mailer: f.mail, Getenv: func(string) string { return "" },
 		Params: f.repParams})
 	f.ext.UseReportCycle(extension.ReportCycleDeps{Forms: f.rep.Forms(), Regions: rg, Assignments: f.asg})
 	f.ext.UseDispatchHistory(f.rep.DispatchHistory())

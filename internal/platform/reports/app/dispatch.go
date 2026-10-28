@@ -18,9 +18,11 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/dispatch"
@@ -33,6 +35,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // EgressDispatch là đường xuất "Báo cáo Chi cục" qua điểm kiểm soát.
@@ -543,8 +546,18 @@ func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, 
 		if d == nil || !a.allows(d.Province, d.Department) {
 			return ErrDispatchNotFound
 		}
+		// P0-WORKER-REPORTS (#128): "Đang gửi" chỉ chặn khi còn trong hạn nhận việc (worker đang giữ, hoặc sự kiện mới xếp
+		// chưa ai nhận). Quá hạn (worker chết giữa chừng / sự kiện vào DLQ) → TIẾP TỤC CÙNG LƯỢT: giữ số lượt để dấu
+		// recipient_mailed của người đã nhận vẫn khớp — không gửi trùng.
+		resume := false
+		// Review #128: "Gửi lại" sau "Gửi lỗi" là lượt mới (attempts+1) nhưng TIẾP TỤC VÒNG GỬI cũ — dấu người đã nhận
+		// (khóa theo vòng, không theo lượt) vẫn giữ nên người đã nhận không nhận lần hai. Vòng mới chỉ bắt đầu sau "sent".
+		continuesRound := d.Status == dispatch.StatusFailed
 		if d.Status == dispatch.StatusSending {
-			return ErrDispatchSending
+			if !s.sendingStale(*d, now) {
+				return ErrDispatchSending
+			}
+			resume = true
 		}
 		all, err := store.Recipients(ctx, tx, d.Province, d.Department, true)
 		if err != nil {
@@ -587,7 +600,12 @@ func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, 
 		if len([]rune(body)) > 5000 {
 			return problem.Validation.WithField("body", "tối đa 5000 ký tự")
 		}
-		d.Status, d.Recipients, d.CC, d.Subject, d.Attempts, d.LastError, d.UpdatedAt = dispatch.StatusSending, to, cc, &subj, d.Attempts+1, nil, now
+		attempt := d.Attempts + 1
+		if resume {
+			attempt = d.Attempts
+		}
+		d.Status, d.Recipients, d.CC, d.Subject, d.Attempts, d.LastError, d.UpdatedAt = dispatch.StatusSending, to, cc, &subj, attempt, nil, now
+		d.ClaimUntil = nil // UpdateDispatchSend nhả việc quá hạn — lượt mới xếp khóa tới updated_at + hạn.
 		if body != "" {
 			d.Body = &body
 		} else {
@@ -605,7 +623,8 @@ func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, 
 				return err
 			}
 		}
-		payload, _ := json.Marshal(map[string]any{"recipient_ids": to, "cc_ids": cc, "attempt": d.Attempts, "subject": subj})
+		payload, _ := json.Marshal(map[string]any{"recipient_ids": to, "cc_ids": cc, "attempt": d.Attempts, "subject": subj, "resumed": resume,
+			"continues_round": continuesRound})
 		ev := store.DispatchEvent{ID: ids.New(), DispatchID: d.ID, Action: "send_requested", Payload: payload, Department: d.Department, Province: d.Province,
 			OnBehalfOf: a.onBehalf(), EventTime: now, ActorRef: a.p.ActorRef, IdemKey: idemOr(idem, "send")}
 		if err := store.InsertDispatchEvent(ctx, tx, a.p.TenantID, &ev); err != nil {
@@ -622,9 +641,21 @@ func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, 
 }
 
 // HandleDispatchRequested là inbox.Handler của consumer port.DispatchConsumer: gửi email Chi cục kèm tệp (hoặc chỉ
-// liên kết khi vượt giới hạn), ghi "sent"/"failed" trong CÙNG giao dịch inbox. Lỗi SMTP không làm hỏng consumer
-// (ghi "Gửi lỗi" để người dùng gửi lại) — tránh gửi trùng do giao lại.
-func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
+// liên kết khi vượt giới hạn). Lỗi SMTP không làm hỏng consumer (ghi "Gửi lỗi" để người dùng gửi lại).
+//
+// P0-WORKER-REPORTS (#128) — gửi "đúng một lần" trong thực tế:
+//  1. NHẬN VIỆC: một câu UPDATE … WHERE status='sending' AND attempts=$n AND (chưa ai giữ hoặc hạn giữ đã qua), giao
+//     dịch riêng commit TRƯỚC khi gửi — worker thứ hai (giao lặp, nhiều bản worker, "Gửi lại" sau hạn) không gửi song song.
+//  2. Mỗi người nhận: gia hạn việc + đọc mới dấu recipient_mailed (giao dịch riêng) → mất quyền giữ thì dừng, đã có dấu
+//     thì bỏ qua; gửi; ghi dấu ngay (giao dịch riêng, không theo ctx bị hủy).
+//  3. Kết quả sent/failed ghi có điều kiện còn giữ đúng token rồi nhả việc (giao dịch riêng): giao dịch inbox hủy sau đó
+//     → giao lại thấy "sent" → không gửi lại.
+//
+// P0-POOL-SHARED-2 (#143): toàn bộ lượt gửi (đọc, nhận việc, đọc kho, SMTP, ghi dấu, ghi kết quả — mỗi bước một giao
+// dịch ngắn riêng) chạy NGOÀI giao dịch inbox qua txdeps.Get: inbox.Process hủy giao dịch inbox, chạy lượt gửi khi KHÔNG
+// giữ kết nối nào, rồi chạy lại handler — lần này chỉ trả kết quả đã nhớ và commit dòng inbox. Trước đây giao dịch inbox
+// mở suốt lượt gửi (giữ một kết nối trong khi chờ kết nối thứ hai cho giao dịch riêng, và trong lúc SMTP/kho chạy).
+func (s *Service) HandleDispatchRequested(ctx context.Context, _ pgx.Tx, env outbox.Envelope) error {
 	var p port.DispatchRequestedV1
 	if err := json.Unmarshal(env.Payload, &p); err != nil {
 		return err
@@ -633,9 +664,24 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if err != nil {
 		return err
 	}
+	if s.DB == nil {
+		return ErrDependency.WithDetail("chưa nối pool DB của pf/reports (worker)")
+	}
+	_, err = txdeps.Get(ctx, "reports.dispatch:"+env.EventID.String(), func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, s.sendDispatch(ctx, env, p, id)
+	})
+	return err
+}
+
+// sendDispatch là một lượt gửi email Chi cục (ngoài giao dịch inbox; mỗi bước DB là giao dịch ngắn riêng).
+func (s *Service) sendDispatch(ctx context.Context, env outbox.Envelope, p port.DispatchRequestedV1, id uuid.UUID) error {
 	tid := env.TenantID
-	d, err := store.DispatchByID(ctx, tx, id, true)
-	if err != nil || d == nil {
+	var d *store.Dispatch
+	if err := s.tx(ctx, tid, func(tx pgx.Tx) error {
+		var err error
+		d, err = store.DispatchByID(ctx, tx, id, false)
+		return err
+	}); err != nil || d == nil {
 		return err
 	}
 	if d.Status != dispatch.StatusSending || d.Attempts != p.Attempt {
@@ -646,23 +692,71 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 		return err
 	}
 	now := s.now()
-	fail := func(msg string) error {
-		d.Status, d.LastError, d.UpdatedAt = dispatch.StatusFailed, &msg, now
-		if err := store.UpdateDispatchSend(ctx, tx, *d); err != nil {
+	lease := s.sendLease()
+	token := ids.New()
+	var claimed bool
+	round, sentAttempt := 0, 0
+	var all []store.DispatchRecipient
+	var files []store.DispatchFile
+	if err := s.tx(ctx, tid, func(claimTx pgx.Tx) error {
+		var err error
+		claimed, err = store.ClaimDispatch(ctx, claimTx, d.ID, d.Attempts, token, now.Add(lease), now)
+		if err != nil || !claimed {
 			return err
 		}
+		// Đọc lại sau khi nhận: "Gửi lại" tiếp tục lượt có thể vừa đổi người nhận/tiêu đề.
+		fresh, err := store.DispatchByID(ctx, claimTx, id, false)
+		if err != nil {
+			return err
+		}
+		if fresh != nil {
+			d = fresh
+		}
+		// Vòng gửi = số lần đã "sent" (dòng sent chỉ ghi khi còn giữ việc): dấu người nhận khóa theo vòng (review #128).
+		if round, err = store.CountDispatchEvents(ctx, claimTx, d.ID, "sent"); err != nil {
+			return err
+		}
+		// Lượt của vòng gần nhất đã "sent": dấu dạng cũ chỉ có giá trị cho các lượt SAU đó (vòng chưa hoàn tất).
+		if sentAttempt, err = store.LastSentAttempt(ctx, claimTx, d.ID); err != nil {
+			return err
+		}
+		// Danh bạ và tệp đã xuất đọc cùng giao dịch nhận việc (trước đây đọc ở giao dịch inbox).
+		if all, err = store.Recipients(ctx, claimTx, d.Province, d.Department, false); err != nil {
+			return err
+		}
+		files, err = store.DispatchFiles(ctx, claimTx, d.ID)
+		return err
+	}); err != nil {
+		return err
+	}
+	if !claimed {
+		// Worker khác đang giữ lượt này (hoặc lượt vừa xong): không gửi song song. Worker đó chết → hết hạn giữ → "Gửi lại".
+		s.log().Info("lượt gửi báo cáo Chi cục đang do worker khác giữ", "event", "reports.dispatch.claim_busy", "dispatch_id", d.ID,
+			"attempt", d.Attempts, "outcome", "skipped")
+		return nil
+	}
+	// finish ghi kết quả + sổ trong giao dịch riêng, chỉ khi còn giữ việc; ctx hủy (dừng worker) không bỏ dở ghi kết quả.
+	finish := func(res store.Dispatch, ev store.DispatchEvent) error {
+		fctx := context.WithoutCancel(ctx)
+		return s.tx(fctx, tid, func(ftx pgx.Tx) error {
+			ok, err := store.FinishDispatchClaim(fctx, ftx, res, token)
+			if err != nil || !ok {
+				return err // !ok: đã mất quyền giữ — worker nhận lại sẽ ghi kết quả
+			}
+			return store.InsertDispatchEvent(fctx, ftx, tid, &ev)
+		})
+	}
+	fail := func(msg string) error {
+		res := *d
+		res.Status, res.LastError, res.UpdatedAt = dispatch.StatusFailed, &msg, now
 		payload, _ := json.Marshal(map[string]any{"attempt": d.Attempts, "error": msg})
 		ev := store.DispatchEvent{ID: ids.New(), DispatchID: d.ID, Action: "failed", Payload: payload, Department: d.Department, Province: d.Province,
 			EventTime: now, ActorRef: d.CreatedBy, IdemKey: "dispatch-failed:" + env.EventID.String()}
 		s.log().Warn("gửi báo cáo Chi cục lỗi", "event", "reports.dispatch.failed", "dispatch_id", d.ID, "outcome", "error")
-		return store.InsertDispatchEvent(ctx, tx, tid, &ev)
+		return finish(res, ev)
 	}
 	if s.Mailer == nil {
 		return fail("chưa cấu hình SMTP công vụ (AG_SMTP_*)")
-	}
-	all, err := store.Recipients(ctx, tx, d.Province, d.Department, false)
-	if err != nil {
-		return err
 	}
 	addr := map[uuid.UUID]string{}
 	for _, r := range all {
@@ -675,10 +769,6 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 		if a, ok := addr[x]; ok {
 			cc = append(cc, a)
 		}
-	}
-	files, err := store.DispatchFiles(ctx, tx, d.ID)
-	if err != nil {
-		return err
 	}
 	limitMB, err := s.attachmentLimit(ctx, now)
 	if err != nil {
@@ -707,6 +797,9 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	for _, f := range files {
 		if linkOnly {
 			continue
+		}
+		if s.Store == nil {
+			return fail("chưa cấu hình kho đối tượng")
 		}
 		rc, _, err := s.Store.Get(ctx, f.ObjectKey)
 		if err != nil {
@@ -744,26 +837,40 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 		subj = *d.Subject
 	}
 	// Email là tác dụng phụ không hoàn tác được: liên kết tải và dấu "đã gửi" của từng người nhận ghi ở GIAO DỊCH RIÊNG,
-	// commit quanh mỗi lần gửi. Giao dịch inbox này hủy (lỗi DB/commit) rồi giao lại → người đã nhận được bỏ qua (không
-	// gửi trùng) và liên kết trong email đã gửi vẫn mở được.
-	events, err := store.DispatchEvents(ctx, tx, d.ID)
-	if err != nil {
-		return err
-	}
-	mailed := map[string]bool{}
-	for _, e := range events {
-		if e.Action == ActionRecipientMailed {
-			mailed[e.IdemKey] = true
-		}
-	}
+	// commit quanh mỗi lần gửi — giao lại / worker nhận lại bỏ qua người đã nhận, liên kết trong email đã gửi vẫn mở được.
 	sent := 0
 	for _, x := range d.Recipients {
 		to, ok := addr[x]
 		if !ok {
 			continue
 		}
-		key := mailedKey(d.ID, d.Attempts, x)
-		if mailed[key] {
+		key := mailedKey(d.ID, round, x)
+		held, mailed := false, false
+		if err := s.tx(ctx, tid, func(rtx pgx.Tx) error {
+			var err error
+			if held, err = store.RenewDispatchClaim(ctx, rtx, d.ID, token, s.now().Add(lease)); err != nil || !held {
+				return err
+			}
+			if mailed, err = store.HasDispatchEvent(ctx, rtx, d.ID, key); err != nil || mailed {
+				return err
+			}
+			// Dấu dạng cũ (theo lượt, trước review #128) của MỌI lượt thuộc vòng chưa hoàn tất (sau lượt "sent" gần nhất, tới
+			// lượt đang chạy): lượt lỗi một phần trước nâng cấp rồi "Gửi lại" (lượt mới) vẫn không gửi trùng (review Codex
+			// #128 @59a4ec8f). Dấu của lượt ≤ lượt đã "sent" thuộc vòng cũ — vòng mới chủ động vẫn gửi mọi người.
+			mailed, err = store.HasAnyDispatchEvent(ctx, rtx, d.ID, legacyMailedKeys(d.ID, sentAttempt, d.Attempts, x))
+			return err
+		}); err != nil {
+			return err
+		}
+		// Hạn của lời gọi SMTP tính từ lúc vừa gia hạn (giờ thực — deadline của ctx là giờ thực), ngắn hơn hạn nhận việc
+		// một biên an toàn: SMTP treo bị cắt TRƯỚC khi worker khác được nhận lại (review #128), còn kịp ghi dấu.
+		sendBy := time.Now().Add(lease - dispatch.SendMargin(lease))
+		if !held {
+			s.log().Warn("mất quyền giữ lượt gửi báo cáo Chi cục (quá hạn, worker khác đã nhận) — dừng", "event", "reports.dispatch.claim_lost",
+				"dispatch_id", d.ID, "attempt", d.Attempts, "outcome", "skipped")
+			return nil
+		}
+		if mailed {
 			sent++
 			continue
 		}
@@ -783,15 +890,31 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 				return err
 			}
 		}
-		if err := s.Mailer.Send(ctx, port.Message{To: to, CC: cc, Subject: subj, Text: bodyFor(links), Attachments: atts}); err != nil {
+		sctx, cancel := context.WithDeadline(ctx, sendBy)
+		err := s.Mailer.Send(sctx, port.Message{To: to, CC: cc, Subject: subj, Text: bodyFor(links), Attachments: atts})
+		timedOut := errors.Is(sctx.Err(), context.DeadlineExceeded) && ctx.Err() == nil
+		cancel()
+		if err != nil {
+			if timedOut {
+				s.log().Warn("SMTP quá hạn của lượt gửi báo cáo Chi cục — cắt trước khi hết hạn nhận việc", "event", "reports.dispatch.send_timeout",
+					"dispatch_id", d.ID, "attempt", d.Attempts, "outcome", "error")
+				return fail("máy chủ thư không trả lời kịp (quá hạn gửi)")
+			}
 			return fail("máy chủ thư từ chối hoặc không kết nối được")
 		}
 		sent++
 		payload, _ := json.Marshal(map[string]any{"attempt": d.Attempts, "recipient_id": x, "links": len(links)})
 		ev := store.DispatchEvent{ID: ids.New(), DispatchID: d.ID, Action: ActionRecipientMailed, Payload: payload, Department: d.Department,
 			Province: d.Province, EventTime: now, ActorRef: d.CreatedBy, IdemKey: key}
-		if err := s.tx(ctx, tid, func(mtx pgx.Tx) error { return store.InsertDispatchEvent(ctx, mtx, tid, &ev) }); err != nil {
-			// Email đã đi nhưng chưa ghi được dấu: lần giao lại có thể gửi trùng người nhận này.
+		// Email đã đi: ghi dấu kể cả khi ctx vừa bị hủy (dừng worker / mất kết nối broker).
+		mctx := context.WithoutCancel(ctx)
+		if err := s.tx(mctx, tid, func(mtx pgx.Tx) error { return store.InsertDispatchEvent(mctx, mtx, tid, &ev) }); isUniqueViolation(err) {
+			// Worker khác đã gửi và ghi dấu cùng người nhận (SMTP của worker này sống quá hạn nhận việc): dấu đã có — không
+			// lỗi (NACK/giao lại không gỡ được email đã đi), nhưng ghi nhận lần gửi trùng để vận hành đếm.
+			s.log().Error("gửi trùng email Chi cục tới người đã có dấu (worker khác đã nhận lại lượt)", "event", "reports.dispatch.duplicate_send",
+				"dispatch_id", d.ID, "attempt", d.Attempts, "recipient_ref", x, "outcome", "duplicate")
+		} else if err != nil {
+			// Email đã đi nhưng chưa ghi được dấu: lần nhận lại có thể gửi trùng người nhận này.
 			s.log().Error("đã gửi email Chi cục nhưng không ghi được dấu người nhận", "event", "reports.dispatch.mark_failed",
 				"dispatch_id", d.ID, "recipient_ref", x, "outcome", "error", "error", err.Error())
 			return err
@@ -800,23 +923,84 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if sent == 0 {
 		return fail("không còn người nhận đang dùng")
 	}
-	d.Status, d.SentAt, d.LinkOnly, d.UpdatedAt = dispatch.StatusSent, &now, linkOnly, now
-	if err := store.UpdateDispatchSend(ctx, tx, *d); err != nil {
-		return err
-	}
+	res := *d
+	res.Status, res.SentAt, res.LinkOnly, res.UpdatedAt = dispatch.StatusSent, &now, linkOnly, now
 	payload, _ := json.Marshal(map[string]any{"attempt": d.Attempts, "recipients": sent, "cc": len(cc), "attachments": len(atts), "link_only": linkOnly})
 	ev := store.DispatchEvent{ID: ids.New(), DispatchID: d.ID, Action: "sent", Payload: payload, Department: d.Department, Province: d.Province,
 		EventTime: now, ActorRef: d.CreatedBy, IdemKey: "dispatch-sent:" + env.EventID.String()}
+	if err := finish(res, ev); err != nil {
+		return err
+	}
 	s.log().Info("đã gửi báo cáo Chi cục", "event", "reports.dispatch.sent", "dispatch_id", d.ID, "recipients", sent, "link_only", linkOnly, "outcome", "ok")
-	return store.InsertDispatchEvent(ctx, tx, tid, &ev)
+	return nil
+}
+
+// sendLease là hạn nhận việc gửi (P0-WORKER-REPORTS).
+func (s *Service) sendLease() time.Duration {
+	if s.DispatchLease > 0 {
+		return s.DispatchLease
+	}
+	return dispatch.DefaultSendLease
+}
+
+// sendingStale: lần gửi "Đang gửi" đã quá hạn nhận việc — worker giữ đã quá hạn, hoặc chưa ai nhận sau một hạn kể từ
+// lúc xếp gửi (sự kiện mất/vào DLQ).
+func (s *Service) sendingStale(d store.Dispatch, now time.Time) bool {
+	return !s.resumableAt(d).After(now)
+}
+
+// resumableAt là thời điểm lần gửi "Đang gửi" bắt đầu được "Gửi lại" (tiếp tục cùng lượt): hạn nhận việc của worker đang
+// giữ, hoặc updated_at + hạn khi chưa ai nhận. Cùng một nguồn cho SendDispatch (409 reports.dispatch_sending) và DTO đọc.
+func (s *Service) resumableAt(d store.Dispatch) time.Time {
+	if d.ClaimUntil != nil {
+		return *d.ClaimUntil
+	}
+	return d.UpdatedAt.Add(s.sendLease())
+}
+
+// ResendState là trạng thái nút "Gửi email/Gửi lại" tính tại máy chủ lúc đọc (review #128): CanSend = POST /send hiện
+// được chấp nhận (không 409 reports.dispatch_sending); ResumableAt chỉ có khi "Đang gửi" — mốc từ đó được tiếp tục.
+type ResendState struct {
+	CanSend     bool
+	ResumableAt *time.Time
+}
+
+// DispatchResendState tính ResendState của một lần xuất/gửi theo đồng hồ dịch vụ, cùng điều kiện với SendDispatch.
+func (s *Service) DispatchResendState(d store.Dispatch) ResendState {
+	if d.Status != dispatch.StatusSending {
+		return ResendState{CanSend: true}
+	}
+	at := s.resumableAt(d)
+	return ResendState{CanSend: !at.After(s.now()), ResumableAt: &at}
 }
 
 // ActionRecipientMailed là dòng sổ dispatch_event "đã gửi email tới một người nhận" của một lượt gửi (migration 000086).
 const ActionRecipientMailed = "recipient_mailed"
 
-// mailedKey là idem_key của dấu đã gửi: theo (lần gửi, lượt gửi, người nhận) — "Gửi lại" (lượt mới) gửi lại cho mọi người.
-func mailedKey(dispatchID uuid.UUID, attempt int, recipient uuid.UUID) string {
+// mailedKey là idem_key của dấu đã gửi: theo (lần gửi, VÒNG gửi, người nhận). Vòng = số lần đã "sent" — các lượt "Gửi
+// lại" sau "Gửi lỗi"/quá hạn cùng vòng giữ dấu (không gửi lại người đã nhận); "Gửi lại" sau "sent" là vòng mới (review #128).
+func mailedKey(dispatchID uuid.UUID, round int, recipient uuid.UUID) string {
+	return fmt.Sprintf("dispatch-mailed:%s:r%d:%s", dispatchID, round, recipient)
+}
+
+// legacyMailedKey là dạng khóa cũ (theo lượt attempts) — chỉ đọc, cho lượt dở dang ghi trước review #128.
+func legacyMailedKey(dispatchID uuid.UUID, attempt int, recipient uuid.UUID) string {
 	return fmt.Sprintf("dispatch-mailed:%s:%d:%s", dispatchID, attempt, recipient)
+}
+
+// legacyMailedKeys: khóa dạng cũ của các lượt (afterAttempt, upTo] — các lượt của vòng gửi chưa hoàn tất.
+func legacyMailedKeys(dispatchID uuid.UUID, afterAttempt, upTo int, recipient uuid.UUID) []string {
+	var keys []string
+	for a := max(afterAttempt+1, 1); a <= upTo; a++ {
+		keys = append(keys, legacyMailedKey(dispatchID, a, recipient))
+	}
+	return keys
+}
+
+// isUniqueViolation: lỗi trùng khóa (23505) — idem sổ đã có dòng.
+func isUniqueViolation(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "23505"
 }
 
 // DispatchHistory hiện thực extension/port.DispatchHistory (kỳ đã gửi Chi cục → cảnh báo khi mở lại kỳ).

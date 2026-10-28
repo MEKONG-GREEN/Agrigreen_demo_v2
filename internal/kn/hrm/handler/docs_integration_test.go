@@ -314,7 +314,7 @@ func TestHRMDocsHTTP_W1124(t *testing.T) {
 	}{
 		{"ld_tt", true}, {"ld_cn", false}, {"other", false}, {"xa", false},
 	} {
-		ctx := authz.WithPrincipal(context.Background(), f.who[tc.who])
+		ctx := authz.WithPrincipal(context.Background(), bindTestSession(t, f.who[tc.who]))
 		_, _, err := ff.OpenContent(ctx, docFile.Ref, string(client.PurposeHRRecords))
 		if (err == nil) != tc.allowed {
 			t.Fatalf("cổng tệp trực tiếp %s: %v", tc.who, err)

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -31,6 +32,7 @@ import (
 
 // Mã lỗi (docs/errors.md, mục pf/extension — KHTC W11.61).
 var (
+	ErrDependency      = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
 	ErrCatalogExists   = problem.New(http.StatusConflict, "extension.khtc_catalog_exists", "Mã đã có trong danh mục (kể cả mục đã ngừng dùng)")
 	ErrCatalogNotFound = problem.New(http.StatusNotFound, "extension.khtc_catalog_not_found", "Không có mục danh mục KHTC")
 	ErrDefaultConflict = problem.New(http.StatusConflict, "extension.khtc_default_conflict", "Mẫu đã có người ký mặc định đang dùng")
@@ -75,8 +77,14 @@ func (s *Service) today() time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
+// tx chạy fn trong giao dịch tenant. P0-POOL-KN-2 (#139): ctx mang txdeps (lưu Kế hoạch năm) → cổng của Kỳ KHTC / phiếu KHTC
+// (ClosedCutoff, EntryUsage — giao dịch riêng trên cùng pool) chỉ đọc NGOÀI giao dịch; thiếu thì hủy, nạp, chạy lại fn.
 func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
-	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
+	err := txdeps.Run(ctx, func(body func(pgx.Tx) error) error { return tenant.WithTenantTx(ctx, s.DB, tid, body) }, fn)
+	if errors.Is(err, txdeps.ErrExhausted) {
+		return ErrDependency.WithDetail("kỳ KHTC hoặc phiếu KHTC thay đổi liên tục — thử lại").WithCause(err)
+	}
+	return err
 }
 
 type caller struct {

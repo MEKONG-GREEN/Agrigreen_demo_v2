@@ -2,7 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AlertList, deltaPct, formatDelta, HotMetric, progressColor, sparkPath } from "./dashboard";
-import { LabelValueBlock, LogPanel, RelatedTabs } from "./detail";
+import { BreadcrumbTailProvider, useBreadcrumbTailValue } from "@/shell/Breadcrumb";
+import { DetailPage, LabelValueBlock, LogPanel, RelatedTabs } from "./detail";
 import { DataTable, FilterBar, FilterChip, pageItems, rangeText, RowActions } from "./list";
 
 describe("List", () => {
@@ -42,6 +43,13 @@ describe("List", () => {
     expect(onPage).toHaveBeenCalledWith(3);
   });
 
+  it("bảng không phân trang (thay <table> tự viết) vẫn có STT từ 1, không có thanh trang", () => {
+    render(<DataTable caption="Thử" columns={[{ key: "n", header: "Tên", cell: (r: { n: string }) => r.n }]} rows={[{ n: "a" }, { n: "b" }]} rowKey={(r) => r.n} />);
+    const rows = screen.getAllByRole("row");
+    expect(within(rows[2]!).getAllByRole("cell")[0]).toHaveTextContent("2");
+    expect(screen.queryByRole("navigation")).toBeNull();
+  });
+
   it("thẻ lọc tô xanh khi khác mặc định; Đặt lại", async () => {
     const user = userEvent.setup();
     const onReset = vi.fn();
@@ -71,6 +79,25 @@ describe("List", () => {
 });
 
 describe("Detail", () => {
+  it("DetailPage (R-A2): ← quay lại, tiêu đề h1, nút góc phải, mắt xích breadcrumb; không có Log thì một khối", () => {
+    function Tail() {
+      return <output aria-label="tail">{useBreadcrumbTailValue().map((c) => c.label).join(" / ")}</output>;
+    }
+    render(
+      <BreadcrumbTailProvider>
+        <Tail />
+        <DetailPage back={{ href: "/kn/du-lieu/htx", label: "Danh sách HTX" }} title="Thêm HTX" actions={<button type="button">Lưu</button>}>
+          <p>Nội dung form</p>
+        </DetailPage>
+      </BreadcrumbTailProvider>,
+    );
+    expect(screen.getByRole("link", { name: "Danh sách HTX" })).toHaveAttribute("href", "/kn/du-lieu/htx");
+    expect(screen.getByRole("heading", { level: 1, name: "Thêm HTX" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "tail" })).toHaveTextContent("Thêm HTX");
+    expect(document.querySelector(".detail-grid")).toBeNull();
+  });
+
   it("khối Nhãn – Giá trị, giá trị trống → —", () => {
     render(<LabelValueBlock title="Nội dung 1" items={[{ label: "Tên", value: "HTX A" }, { label: "Ghi chú", value: "" }]} />);
     expect(screen.getByRole("heading", { name: "Nội dung 1" })).toBeInTheDocument();

@@ -39,6 +39,13 @@ const DBRole = "accounts_app"
 
 // Deps là phụ thuộc của module.
 type Deps struct {
+	Attributes *port.AttributeCatalog `json:"-"` // nil selects a private legacy snapshot
+	// Roles is an immutable server-side realm-role catalog; nil retains compatibility.
+	Roles           *port.RoleCatalog
+	Navigation      partyport.Navigation // registered application context landing
+	SessionPolicies port.SessionPolicies // trusted application-owned request projections
+	// AssignmentRules validates normalized values without replacing native scope checks.
+	AssignmentRules port.AssignmentRules `json:"-"`
 	// Sessions contains trusted application-owned projections for selected requests.
 	Sessions *authz.SessionRegistry
 	// Directory: Keycloak Admin REST. Nil → mọi route trả 503 accounts.dependency_unavailable.
@@ -69,9 +76,23 @@ type Module struct {
 
 // New tạo module với pool của vai accounts_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	catalog := d.Attributes
+	if catalog == nil {
+		catalog = port.LegacyAttributeCatalog()
+	}
+	if !catalog.Valid() {
+		panic("accounts: invalid attribute catalog configuration")
+	}
+	catalog = catalog.Clone()
+	if d.Roles == nil {
+		d.Roles = port.LegacyRoleCatalog()
+	}
+	if !d.Roles.Valid() {
+		panic("accounts: invalid role catalog configuration")
+	}
 	db = forModule(db)
-	return &Module{svc: &app.Service{DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs,
-		Households: d.Households, Vault: d.Vault, Params: d.Params, Departments: d.Departments, Units: d.Units, Names: d.Names,
+	return &Module{svc: &app.Service{Attributes: catalog, DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation, Roles: d.Roles, AssignmentRules: d.AssignmentRules,
+		Households: d.Households, Vault: d.Vault, Params: d.Params, SessionPolicies: d.SessionPolicies, Departments: d.Departments, Units: d.Units, Names: d.Names,
 		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
 }
 
@@ -128,6 +149,12 @@ func (m *Module) Assignments() port.Assignments { return m.svc }
 // RoleHolders (gói NOTIF): tài khoản theo vai / cờ nhiệm vụ trên lần gán (vd Cấp Tỉnh, QTNV báo giá) — người nhận thông
 // báo của consumer worker (tenant tường minh).
 func (m *Module) RoleHolders() port.RoleHolders { return m.svc }
+
+// ScopedDutyHolders provides a read-only recipient query restricted to one issuer node.
+func (m *Module) ScopedDutyHolders() port.ScopedDutyHolders { return app.ScopedDutyReader{Svc: m.svc} }
+
+// UnitManagers provides a read-only leader query per internal unit at one owning node (NOTIFY-HCTH #48).
+func (m *Module) UnitManagers() port.UnitManagers { return app.UnitManagerReader{Svc: m.svc} }
 
 // XaScopes (W11.46) cho lịch trực KSGM BM-03 của pf/extension: cán bộ Cấp Xã của phòng ban kèm xã phụ trách, giới hạn
 // cơ sở/hộ (tenant tường minh).
@@ -239,3 +266,12 @@ type MemoryDirectory = keycloak.Memory
 
 // NewMemoryDirectory tạo Directory trong bộ nhớ (realm có mọi vai do module quản lý).
 func NewMemoryDirectory() *MemoryDirectory { return keycloak.NewMemory() }
+
+// NativeAuditSource exposes the sanitized native account ledger reader for startup registration.
+func (m *Module) NativeAuditSource() port.AuditSource { return m.svc.NativeAuditSource() }
+
+// UseAudit configures this instance at startup. Both owner authorization and a durable
+// recorder are mandatory; missing callbacks leave the new endpoint unavailable.
+func (m *Module) UseAudit(registry *port.AuditRegistry, access port.AuditAccess) {
+	m.svc.AuditRegistry, m.svc.AuditAccess = registry, access
+}

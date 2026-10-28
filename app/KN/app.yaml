@@ -11,6 +11,7 @@ modules:
   pf/cropcycle: ">=2.0 <3"     # xem mùa vụ HTX trong phạm vi (dom/cooperative shared-read)
   pf/evidence: ">=1.0 <2"      # cap/evidence: tệp minh chứng, Open(purpose) có nhật ký (W6.5)
   pf/extdata: ">=1.0 <2"       # lớp dữ liệu ngoài của bản đồ GIS
+  pf/export: ">=1.0 <2"        # cap/export: mẫu văn bản có phiên bản, xuất .docx có băm, số văn bản (W10.17, ADR-0051)
   pf/extension: ">=1.0 <2"     # nhiệm vụ, chỉ đạo, phòng ban (dom/extension)
   pf/forms: ">=1.0 <2"         # cap/forms: phát hành/nộp/rà soát/chốt kỳ + ảnh chụp (W6.2; KN v1 ghi song song)
   pf/geo: ">=2.0 <3"           # bản đồ khuyến nông, /v1/kn/* của geo
@@ -20,7 +21,7 @@ modules:
   pf/notify: ">=1.0 <2"
   pf/party: ">=2.0 <3"         # menu KN (/v1/menu), cây tổ chức, phòng ban, HTX/hộ trong phạm vi
   pf/price: ">=1.0 <2"         # cap/price: khung Báo giá nông sản — danh mục nền, /v1/price/* (W11.71, ADR-0049)
-  pf/reports: ">=1.0 <2"       # biểu mẫu, kỳ báo cáo (cap/export; engine mẫu KN P3)
+  pf/reports: ">=1.0 <2"       # biểu mẫu, kỳ báo cáo (engine mẫu KN P3; xuất bất đồng bộ cũ)
   pf/sync: ">=1.0 <2"          # đồng bộ ngoại tuyến của app hiện trường
   pf/workflow: ">=1.0 <2"      # cap/workflow: duyệt bốn mắt (tham số, cấp quyền chia sẻ — W6.1)
 roles:
@@ -41,6 +42,6 @@ landing: # FN-CH-00.01: accounts/domain.DefaultRoute, party/domain.defaultRoutes
   kn_tinh: /kn/dashboard
   kn_xa: /kn/nhiem-vu/cong-viec
   admin: /kn/tong-quan
-deployment_units: [api-platform, worker, formimport]
+deployment_units: [api-platform, worker, formimport, hrmimport] # hrmimport: chuyển đổi nhân sự HCTH một lần (W11.30), ghi qua /v1/hrm
 frontends: [apps/web-ops, apps/field-app]
 clients: [agrigreen-web-ops, agrigreen-field-app]

@@ -1,0 +1,277 @@
+paths:
+# @ag-order: 21000
+  /v1/extension/cnts/campaigns:
+    get:
+      summary: "Danh sách đợt điều tra CNTS (W11.50 — FN-21) kèm tiến độ"
+      operationId: extensionCntsListCampaigns
+      tags: [extension]
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {"$ref": "#/components/schemas/CNTSCampaign"}}}}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Tạo đợt điều tra (Nháp)"
+      operationId: extensionCntsCreateCampaign
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSCampaignInput"}
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaign"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaign"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21001
+  /v1/extension/cnts/campaigns/{id}:
+    get:
+      summary: "Chi tiết đợt điều tra, tiến độ theo khu vực/xã"
+      operationId: extensionCntsGetCampaign
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaign"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21002
+  /v1/extension/cnts/campaigns/{id}/draft:
+    post:
+      summary: "Sửa nội dung đợt Nháp (phiên bản mới)"
+      operationId: extensionCntsUpdateCampaign
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSCampaignInput"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaign"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21003
+  /v1/extension/cnts/campaigns/{id}/publish:
+    post:
+      summary: "Phát hành đợt: một kỳ native kn_cnts loại adhoc cho các xã"
+      operationId: extensionCntsPublishCampaign
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaign"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21004
+  /v1/extension/cnts/campaigns/{id}/extend:
+    post:
+      summary: "Gia hạn đợt (hạn mới, lý do bắt buộc)"
+      operationId: extensionCntsExtendCampaign
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSCampaignDueInput"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaign"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21005
+  /v1/extension/cnts/campaigns/{id}/close:
+    post:
+      summary: "Đóng đợt: chốt kỳ native, xã chưa gửi chuyển Không nộp"
+      operationId: extensionCntsCloseCampaign
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaign"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21006
+  /v1/extension/cnts/campaigns/{id}/reopen:
+    post:
+      summary: "Mở lại đợt (Lãnh đạo phòng, lý do + thời hạn)"
+      operationId: extensionCntsReopenCampaign
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSCampaignDueInput"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaign"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21007
+  /v1/extension/cnts/campaigns/{id}/remind:
+    post:
+      summary: "Nhắc xã chưa nộp"
+      operationId: extensionCntsRemindCampaign
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaignRemindResult"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21008
+  /v1/extension/cnts/campaigns/{id}/results:
+    get:
+      summary: "Kết quả tổng hợp của đợt (riêng, không vào lũy kế định kỳ)"
+      operationId: extensionCntsCampaignResults
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSCampaignResults"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 21009
+  /v1/extension/cnts/campaigns/{id}/results/xlsx:
+    get:
+      summary: "Xuất Excel kết quả đợt"
+      operationId: extensionCntsCampaignResultsXlsx
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp Excel
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 31000
+    CNTSCampaignInput: {"type":"object","required":["name","field","template_code","scope_mode","from_date","to_date","due_at"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"goal":{"type":"string","maxLength":2000},"field":{"type":"string","enum":["chan_nuoi","thu_y","thuy_san","khac"]},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"owner_ref":{"type":"string","format":"uuid"},"remind_before_hours":{"type":"integer","minimum":0,"maximum":168}},"additionalProperties":false}
+# @ag-order: 31001
+    CNTSCampaignDueInput: {"type":"object","required":["due_at","reason"],"properties":{"due_at":{"type":"string","format":"date-time"},"reason":{"type":"string","minLength":10,"maxLength":500}},"additionalProperties":false}
+# @ag-order: 31002
+    CNTSCampaignActor: {"type":"object","required":["ref","display"],"properties":{"ref":{"type":"string","format":"uuid"},"display":{"type":"string"}},"additionalProperties":false}
+# @ag-order: 31003
+    CNTSCampaignEvent: {"type":"object","required":["action","at","actor","due_at","reason","reminded"],"properties":{"action":{"type":"string","enum":["published","extended","closed","reopened","reminded"]},"at":{"type":"string","format":"date-time"},"actor":{"$ref":"#/components/schemas/CNTSCampaignActor"},"due_at":{"type":["string","null"],"format":"date-time"},"reason":{"type":["string","null"]},"reminded":{"type":["integer","null"]}},"additionalProperties":false}
+# @ag-order: 31004
+    CNTSCampaignProgress: {"type":"object","required":["period_status","total","submitted","pending","overdue","missed","returned","regions","units"],"properties":{"period_status":{"type":"string"},"total":{"type":"integer"},"submitted":{"type":"integer"},"pending":{"type":"integer"},"overdue":{"type":"integer"},"missed":{"type":"integer"},"returned":{"type":"integer"},"regions":{"type":"array","items":{"type":"object","required":["code","name","total","submitted","pending","overdue","missed"],"properties":{"code":{"type":"string"},"name":{"type":"string"},"total":{"type":"integer"},"submitted":{"type":"integer"},"pending":{"type":"integer"},"overdue":{"type":"integer"},"missed":{"type":"integer"}},"additionalProperties":false}},"units":{"type":"array","items":{"type":"object","required":["commune","commune_name","region_code","region_name","status","versions","late","last_submitted_at"],"properties":{"commune":{"type":"string"},"commune_name":{"type":"string"},"region_code":{"type":"string"},"region_name":{"type":"string"},"status":{"type":"string"},"versions":{"type":"integer"},"late":{"type":"boolean"},"last_submitted_at":{"type":["string","null"],"format":"date-time"}},"additionalProperties":false}}},"additionalProperties":false}
+# @ag-order: 31005
+    CNTSCampaign: {"type":"object","required":["id","version","name","goal","field","template_code","scope_mode","regions","communes","tasks","from_date","to_date","due_at","remind_before_hours","state","province_code","updated_by","updated_at","owner","forms_period_id","period_key","template_version","progress","events"],"properties":{"id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"name":{"type":"string"},"goal":{"type":["string","null"]},"field":{"type":"string"},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"tasks":{"type":"integer"},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"remind_before_hours":{"type":"integer"},"state":{"type":"string","enum":["draft","collecting","closed"]},"province_code":{"type":["string","null"]},"updated_by":{"$ref":"#/components/schemas/CNTSCampaignActor"},"updated_at":{"type":"string","format":"date-time"},"owner":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignActor"},{"type":"null"}]},"forms_period_id":{"type":["string","null"],"format":"uuid"},"period_key":{"type":["string","null"]},"template_version":{"type":["integer","null"]},"progress":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignProgress"},{"type":"null"}]},"events":{"type":"array","items":{"$ref":"#/components/schemas/CNTSCampaignEvent"}}},"additionalProperties":false}
+# @ag-order: 31006
+    CNTSCampaignRemindResult: {"type":"object","required":["campaign","reminded"],"properties":{"campaign":{"$ref":"#/components/schemas/CNTSCampaign"},"reminded":{"type":"integer"}},"additionalProperties":false}
+# @ag-order: 31007
+    CNTSCampaignResults: {"type":"object","required":["campaign_id","basis","fields","rows","total","units","reported","separate_from_cumulative","period_kind"],"properties":{"campaign_id":{"type":"string","format":"uuid"},"basis":{"type":"string","enum":["submitted","closed"]},"fields":{"type":"array","items":{"type":"object","required":["key","label","unit"],"properties":{"key":{"type":"string"},"label":{"type":"string"},"unit":{"type":"string"}},"additionalProperties":false}},"rows":{"type":"array","items":{"type":"object","required":["commune","commune_name","region_name","values","nil_report"],"properties":{"commune":{"type":"string"},"commune_name":{"type":"string"},"region_name":{"type":"string"},"values":{"type":"object","additionalProperties":{"type":"string"}},"nil_report":{"type":"boolean"}},"additionalProperties":false}},"total":{"type":"object","additionalProperties":{"type":"string"}},"units":{"type":"integer"},"reported":{"type":"integer"},"separate_from_cumulative":{"type":"boolean"},"period_kind":{"type":"string"}},"additionalProperties":false}

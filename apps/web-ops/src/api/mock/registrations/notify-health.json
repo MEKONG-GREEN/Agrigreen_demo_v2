@@ -1,0 +1,11 @@
+{
+  "id": "notify-health",
+  "source": "./notify-health",
+  "app": [],
+  "admin": [
+    {
+      "export": "notifyHealthAdminRoutes",
+      "order": 24
+    }
+  ]
+}

@@ -6,7 +6,9 @@
 import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import { formatDateTime } from "@/lib/format";
+import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import { Icon } from "../Icon";
+import { PageHeader } from "./list";
 
 export function BackLink({ href, children }: { href: string; children: ReactNode }) {
   return (
@@ -126,5 +128,36 @@ export function DetailLayout({ main, log }: { main: ReactNode; log: ReactNode })
       <div className="card detail-main">{main}</div>
       {log}
     </div>
+  );
+}
+
+/**
+ * Trang riêng cho Thêm / Sửa / Xem chi tiết (R-A2, System Design "Screens / Detail"), thay pop-up:
+ * breadcrumb thêm mắt xích cuối, "← Danh sách", tiêu đề (Noto Serif), nút thao tác góc phải, nội dung, Log bên phải.
+ * Pop-up (`Dialog`) chỉ còn cho xác nhận xóa và thông báo ngắn.
+ */
+export function DetailPage({
+  back,
+  title,
+  badge,
+  actions,
+  log,
+  children,
+}: {
+  back: { href: string; label: string };
+  title: string;
+  badge?: ReactNode;
+  actions?: ReactNode;
+  /** Khung Log (thường `LogPanel`); trang Thêm mới chưa có lịch sử thì bỏ trống. */
+  log?: ReactNode;
+  children: ReactNode;
+}) {
+  useBreadcrumbTail([{ label: title }]);
+  return (
+    <>
+      <BackLink href={back.href}>{back.label}</BackLink>
+      <PageHeader title={title} badge={badge} actions={actions} />
+      {log ? <DetailLayout main={children} log={log} /> : <div className="card detail-main">{children}</div>}
+    </>
   );
 }

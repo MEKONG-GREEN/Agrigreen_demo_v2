@@ -17,6 +17,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -99,6 +100,9 @@ type Service struct {
 	Egress     meter.Checkpoint
 	EgressMode meter.Mode
 	Log        *slog.Logger
+	// PlanFeed (tùy chọn, BF-CN-WEEKLY): đọc bài nộp BM-05 Phần II của cap/forms để dựng Lịch công tác từ kế hoạch tuần.
+	// Thiếu → route "tạo lịch từ kế hoạch" trả 503.
+	PlanFeed formsport.SubmissionFeed
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

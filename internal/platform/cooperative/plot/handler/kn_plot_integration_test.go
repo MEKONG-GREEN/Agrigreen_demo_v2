@@ -21,6 +21,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/plot/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/port/farmerid"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -106,7 +107,10 @@ func (f *knFix) user(tid uuid.UUID, role, dept string, units ...string) knUser {
 	switch role {
 	case authz.KNXa:
 		kc.Communes, kc.Scope = units, authz.Scope{Units: units}
-		kc.OrgRef = ids.New() // như P1: lần gán Cấp Xã luôn có Nút (db.ForModule đòi Nút — FD)
+		kc.OrgRef = ids.New() // P1 binds a real commune node; keep its existing KN scope unchanged.
+		if len(units) > 0 {
+			seedSourceOrg(f.t, tid, kc.OrgRef, partyport.OrgExtensionTeam, "KN-"+kc.OrgRef.String()[:30], units[0], uuid.Nil)
+		}
 	case authz.KNTW, authz.KNAdmin:
 		kc.Scope = authz.Scope{All: true}
 	default:
@@ -341,6 +345,14 @@ func TestFN_XA_03_05_OfflineSyncKNCaller(t *testing.T) {
 		"lot_name": "Lô ven sông", "note": "Vẽ ngoại tuyến", "farmer_name": "Trần Thị Bình", "shape": "circle", "declared_area_ha": "1.0"})
 	id := ids.New()
 	rec := syncRecord(id, "dev:"+dev.String()+":1", "create", payload, nil, nil, dev)
+	// TT-11 applies to offline creation too. A rejected incomplete plot must not
+	// appear in the Changes feed checked below after the one valid creation.
+	missingFarmer, _ := json.Marshal(map[string]any{"plot_ref": ids.New().String(), "commune_code": "31117",
+		"geometry": rect(600, 0, 50, 50), "lot_name": "Lô thiếu chủ hộ"})
+	bad := snk.Accept(xa.ctx(), scope, syncRecord(ids.New(), "dev:"+dev.String()+":missing-farmer", "create", missingFarmer, nil, nil, dev))
+	if bad.Status != "rejected" || bad.Code != "validation_failed" || len(bad.Errors) != 1 || bad.Errors[0].Field != "farmer_name" {
+		t.Fatalf("thiếu chủ hộ ngoại tuyến phải bị chặn, không ghi thửa: %+v", bad)
+	}
 	// Người dùng KN chỉ có vai realm kn_user: vẫn được đẩy nhờ ngữ cảnh kn_xa.
 	if res := snk.Accept(xa.ctx(), scope, rec); res.Status != "accepted" {
 		t.Fatalf("KN kn_xa đẩy ranh giới: %+v", res)
@@ -363,7 +375,7 @@ func TestFN_XA_03_05_OfflineSyncKNCaller(t *testing.T) {
 	}
 	// Ngoại tuyến không chặn chồng lấn: giữ bản ghi, mở xung đột (máy ngoại tuyến không thấy nhau).
 	p2, _ := json.Marshal(map[string]any{"plot_ref": ids.New().String(), "commune_code": "31117", "geometry": rect(50, 0, 100, 100),
-		"lot_name": "Lô chồng", "shape": "polygon"})
+		"lot_name": "Lô chồng", "farmer_name": "Trần Thị Bình", "shape": "polygon"})
 	if res := snk.Accept(xa.ctx(), scope, syncRecord(ids.New(), "dev:"+dev.String()+":2", "create", p2, nil, nil, dev)); res.Status != "conflict" || res.ConflictID == nil {
 		t.Fatalf("chồng lấn ngoại tuyến: %+v", res)
 	}
@@ -393,5 +405,101 @@ func TestFN_XA_03_05_OfflineSyncKNCaller(t *testing.T) {
 	g := xa.get("/v1/kn/plots/" + plot.String())
 	if str(g.body, "lot_name") != "Lô ven sông" || str(g.body, "shape") != "polygon" || get(g.body, "version") != float64(2) {
 		t.Fatalf("sau sửa ngoại tuyến: %s", g.raw)
+	}
+}
+
+// TT-11: missing or blank household names cannot create a plot or erase its
+// existing farmer reference. Rejected updates leave the event history intact.
+func TestTT11_FarmerRequiredCreateAndUpdate(t *testing.T) {
+	f := newKNFix(t)
+	xa := f.user(f.tenant, authz.KNXa, knDept, "31117")
+	body := knPlotBody("31117", rect(0, 0, 100, 100))
+	delete(body, "farmer_name")
+	rejected := xa.post("/v1/kn/plots", body)
+	wantCode(t, rejected, http.StatusUnprocessableEntity, "validation_failed", "thiếu chủ hộ")
+	fields := list(rejected.body, "errors")
+	if len(fields) != 1 || str(fields[0], "field") != "farmer_name" || str(fields[0], "reason") != "bắt buộc" {
+		t.Fatalf("missing Vietnamese field error: %s", rejected.raw)
+	}
+	if got := xa.get("/v1/kn/plots"); len(list(got.body, "items")) != 0 {
+		t.Fatalf("invalid creation persisted a plot: %s", got.raw)
+	}
+	created := xa.post("/v1/kn/plots", knPlotBody("31117", rect(0, 0, 100, 100)))
+	wantCode(t, created, http.StatusCreated, "", "chủ hộ hợp lệ")
+	path := "/v1/kn/plots/" + str(created.body, "ref")
+	before := xa.get(path + "/log")
+	wantCode(t, before, http.StatusOK, "", "lịch sử trước")
+	wantCode(t, xa.req(http.MethodPut, path, key(), map[string]any{"farmer_name": "  "}), http.StatusUnprocessableEntity, "validation_failed", "không xóa chủ hộ")
+	after := xa.get(path + "/log")
+	wantCode(t, after, http.StatusOK, "", "lịch sử sau")
+	if len(list(before.body, "items")) != len(list(after.body, "items")) {
+		t.Fatalf("rejected farmer update wrote ledger events: before=%s after=%s", before.raw, after.raw)
+	}
+	current := xa.get(path)
+	wantCode(t, current, http.StatusOK, "", "thửa sau lỗi")
+	if str(current.body, "farmer", "label") != str(created.body, "farmer", "label") {
+		t.Fatalf("rejected update changed farmer reference: %s", current.raw)
+	}
+}
+
+// R-A1/TT-11 (#113): số âm/0 và trường bắt buộc bị chặn ở máy chủ khi tạo và sửa thửa KN — 422 theo trường, không ghi
+// thửa, không ghi sổ, thửa hiện có giữ nguyên. Diện tích hình vẫn tính từ geometry; declared_area_ha chỉ là số khai
+// báo phụ. Cây trồng thuộc hồ sơ KN riêng (#119, /v1/kn/plot-profiles), không phải trường của thửa nền.
+func TestTT11_NumericAndRequiredGuards(t *testing.T) {
+	f := newKNFix(t)
+	xa := f.user(f.tenant, authz.KNXa, knDept, "31117")
+	fieldIs := func(r resp, field string) {
+		t.Helper()
+		errs := list(r.body, "errors")
+		if len(errs) != 1 || str(errs[0], "field") != field {
+			t.Fatalf("muốn lỗi trường %s: %s", field, r.raw)
+		}
+	}
+	for _, tc := range []struct {
+		mutate func(map[string]any)
+		field  string
+		what   string
+	}{
+		{func(b map[string]any) { b["declared_area_ha"] = "-1" }, "declared_area_ha", "diện tích khai báo âm"},
+		{func(b map[string]any) { b["declared_area_ha"] = "0" }, "declared_area_ha", "diện tích khai báo 0"},
+		{func(b map[string]any) { b["lot_name"] = "  " }, "lot_name", "tên thửa rỗng"},
+		{func(b map[string]any) { delete(b, "lot_name") }, "lot_name", "thiếu tên thửa"},
+		{func(b map[string]any) { b["commune_code"] = "" }, "commune_code", "thiếu xã"},
+	} {
+		body := knPlotBody("31117", rect(0, 0, 100, 100))
+		tc.mutate(body)
+		r := xa.post("/v1/kn/plots", body)
+		wantCode(t, r, http.StatusUnprocessableEntity, "validation_failed", tc.what)
+		fieldIs(r, tc.field)
+	}
+	if got := xa.get("/v1/kn/plots"); len(list(got.body, "items")) != 0 {
+		t.Fatalf("lần tạo bị từ chối đã ghi thửa: %s", got.raw)
+	}
+	created := xa.post("/v1/kn/plots", knPlotBody("31117", rect(0, 0, 100, 100)))
+	wantCode(t, created, http.StatusCreated, "", "thửa hợp lệ")
+	path := "/v1/kn/plots/" + str(created.body, "ref")
+	before := xa.get(path + "/log")
+	wantCode(t, before, http.StatusOK, "", "lịch sử trước")
+	for _, tc := range []struct {
+		body  map[string]any
+		field string
+		what  string
+	}{
+		{map[string]any{"declared_area_ha": "-0.5"}, "declared_area_ha", "sửa diện tích âm"},
+		{map[string]any{"declared_area_ha": "0"}, "declared_area_ha", "sửa diện tích 0"},
+		{map[string]any{"lot_name": ""}, "lot_name", "xóa tên thửa"},
+	} {
+		r := xa.req(http.MethodPut, path, key(), tc.body)
+		wantCode(t, r, http.StatusUnprocessableEntity, "validation_failed", tc.what)
+		fieldIs(r, tc.field)
+	}
+	after := xa.get(path + "/log")
+	if len(list(before.body, "items")) != len(list(after.body, "items")) {
+		t.Fatalf("sửa bị từ chối đã ghi sổ: trước=%s sau=%s", before.raw, after.raw)
+	}
+	current := xa.get(path)
+	if str(current.body, "lot_name") != str(created.body, "lot_name") || str(current.body, "declared_area_ha") != str(created.body, "declared_area_ha") ||
+		str(current.body, "area_ha") != str(created.body, "area_ha") {
+		t.Fatalf("thửa đổi sau lỗi: %s", current.raw)
 	}
 }

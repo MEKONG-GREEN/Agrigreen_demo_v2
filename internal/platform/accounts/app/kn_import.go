@@ -64,16 +64,13 @@ func knRoleOf(v string) string {
 }
 
 // mgmtOf nhận mã hoặc nhãn cấp quản lý (danh mục tạm Q-05).
-func mgmtOf(v string) string {
+func (s *Service) mgmtOf(v string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {
 		return ""
 	}
-	k := tabular.NormalizeHeader(v)
-	for _, l := range port.MgmtLevels {
-		if l.Code == k || tabular.NormalizeHeader(l.Label) == k {
-			return l.Code
-		}
+	if code, ok := s.AttributeCatalog().ManagementCode(v); ok {
+		return code
 	}
 	return v // để NormalizeAssignment báo lỗi danh mục
 }
@@ -210,7 +207,7 @@ func (s *Service) groupKNRows(ctx context.Context, a *actor, tb *tabular.Table, 
 			continue
 		}
 		in := domain.AssignmentInput{Role: role, OrgRef: org, Departments: splitList(rec.Get(col, "departments")),
-			MgmtLevel: mgmtOf(rec.Get(col, "mgmt_level")), Communes: splitList(rec.Get(col, "communes"))}
+			MgmtLevel: s.mgmtOf(rec.Get(col, "mgmt_level")), Communes: splitList(rec.Get(col, "communes"))}
 		if slices.ContainsFunc(g.asg, func(x domain.AssignmentInput) bool { return x.Role == in.Role && x.OrgRef == in.OrgRef }) {
 			bad("Trùng vai trò và Nút với dòng khác của cùng Email")
 			continue

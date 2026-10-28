@@ -48,10 +48,13 @@ var ErrNotConfigured = errors.New("mail: chưa cấu hình AG_SMTP_HOST")
 
 // ConfigFromEnv đọc AG_SMTP_HOST, AG_SMTP_PORT, AG_SMTP_USERNAME, AG_SMTP_PASSWORD,
 // AG_SMTP_FROM, AG_SMTP_TLS (starttls | tls; mặc định starttls). Không có chế độ bản rõ.
-func ConfigFromEnv() (Config, error) {
+func ConfigFromEnv() (Config, error) { return ConfigFrom(os.Getenv) }
+
+// ConfigFrom như ConfigFromEnv nhưng đọc biến qua getenv (kiểm thử theo AG_ENV).
+func ConfigFrom(getenv func(string) string) (Config, error) {
 	c := Config{
-		Host: os.Getenv("AG_SMTP_HOST"), Username: os.Getenv("AG_SMTP_USERNAME"), Password: os.Getenv("AG_SMTP_PASSWORD"),
-		From: os.Getenv("AG_SMTP_FROM"), TLS: strings.ToLower(os.Getenv("AG_SMTP_TLS")),
+		Host: getenv("AG_SMTP_HOST"), Username: getenv("AG_SMTP_USERNAME"), Password: getenv("AG_SMTP_PASSWORD"),
+		From: getenv("AG_SMTP_FROM"), TLS: strings.ToLower(getenv("AG_SMTP_TLS")),
 	}
 	if c.Host == "" {
 		return c, ErrNotConfigured
@@ -66,7 +69,7 @@ func ConfigFromEnv() (Config, error) {
 	if c.TLS == TLSImplicit {
 		c.Port = 465
 	}
-	if p := os.Getenv("AG_SMTP_PORT"); p != "" {
+	if p := getenv("AG_SMTP_PORT"); p != "" {
 		n, err := strconv.Atoi(p)
 		if err != nil || n <= 0 || n > 65535 {
 			return c, errors.New("mail: AG_SMTP_PORT không hợp lệ")

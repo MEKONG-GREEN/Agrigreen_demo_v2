@@ -43,6 +43,7 @@ composition_roots:
   - cmd/api-platform
   - cmd/worker
   - cmd/formimport
+  - cmd/hrmimport # W11.30: chuyển đổi nhân sự HCTH một lần — ghi qua HTTP /v1/hrm; kiểm thử dựng gốc module pf/hrm
   - cmd/seed-synthetic
 
 # Kiểm thử đầu-cuối/chấp nhận ngoài module — miễn mọi quy tắc Go/SQL.

@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-campaign",
+  "source": "./kn-cnts-campaign",
+  "app": [
+    {
+      "export": "cntsCampaignRoutes",
+      "order": 61
+    }
+  ],
+  "admin": []
+}

@@ -28,6 +28,10 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.POST("/exports", h.export)
 	g.GET("/exports/:exportID/download", h.download)
 	g.POST("/exports/:exportID/final", h.finalize)
+	// W10.17: Word (.docx) qua pf/export, dựng từ nội dung đóng băng của một bản Excel.
+	g.POST("/exports/:exportID/word", h.exportWord)
+	g.GET("/words", h.wordHistory)
+	g.GET("/words/:runID/download", h.wordDownload)
 }
 func path(c *gin.Context, name string) (uuid.UUID, bool) {
 	id, err := uuid.Parse(c.Param(name))

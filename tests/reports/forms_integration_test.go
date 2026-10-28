@@ -415,15 +415,28 @@ func TestFN_AD_04_06_ImportEndpoint(t *testing.T) {
 		t.Fatalf("sai Content-Type: %d", r3.status)
 	}
 	var parsed, failed int
+	var objectKey *string
 	ctx := context.Background()
 	if err := tenant.WithTenantTx(ctx, f.pool, f.tenant, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE status = 'parsed'), count(*) FILTER (WHERE status = 'failed') FROM pf_reports.form_import`).Scan(&parsed, &failed)
+		if err := tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE status = 'parsed'), count(*) FILTER (WHERE status = 'failed') FROM pf_reports.form_import`).Scan(&parsed, &failed); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, `SELECT object_key FROM pf_reports.form_import WHERE status = 'parsed'`).Scan(&objectKey)
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if parsed != 1 || failed != 1 {
 		t.Fatalf("form_import: parsed %d failed %d", parsed, failed)
 	}
+	// P0-POOL-SHARED: tệp ghi vào kho đối tượng trước giao dịch, dòng nạp được trỏ tới đúng tệp.
+	if objectKey == nil {
+		t.Fatal("form_import parsed thiếu object_key")
+	}
+	rc, info, err := f.store.Get(ctx, *objectKey)
+	if err != nil || info.Size != int64(len(xb)) {
+		t.Fatalf("tệp nạp trong kho: %v %+v", err, info)
+	}
+	_ = rc.Close()
 	lg := a.must(a.adminGet("/v1/reports/forms/"+tid+"/log"), http.StatusOK, "nhật ký")
 	evs := fmt.Sprint(items(lg))
 	if !strings.Contains(evs, "imported") || !strings.Contains(evs, "template_created") {

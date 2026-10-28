@@ -20,6 +20,8 @@ import (
 
 // Access là cấu hình quyền của bên dùng (KN: cmd/api-platform/assembly/hrm.go) — không so tên ứng dụng.
 type Access struct {
+	// Session is the configured owner policy. Nil selects native realm roles only.
+	Session SessionResolver `json:"-"`
 	// Department: mã phòng ban chủ (KN: hanh_chinh_tong_hop). Vai đọc phải có ngữ cảnh ở phòng ban này.
 	Department string
 	// ManageBy: vai ghi danh mục (FN-19: Admin — CRUD).
@@ -145,3 +147,34 @@ var (
 	ErrReportBlocked  = problem.New(http.StatusUnprocessableEntity, "hrm.report_blocked", "Số liệu không đạt quy tắc kiểm tra mức chặn — chưa xuất được biểu")
 	ErrExportNotFound = problem.New(http.StatusNotFound, "hrm.export_not_found", "Không có lần xuất báo cáo này")
 )
+
+// --- W11.25 (pf 20261021122821): nâng bậc lương (FN-09, FN-10). ---
+
+// Lỗi nâng bậc (docs/errors/pf-hrm-promotion.md).
+var (
+	ErrCaseNotFound = problem.New(http.StatusNotFound, "hrm.promotion_case_not_found",
+		"Không có kỳ nâng bậc này (đã xử lý hoặc dữ liệu hồ sơ đã đổi)")
+	ErrPromotionConflict = problem.New(http.StatusConflict, "hrm.promotion_conflict",
+		"Kỳ nâng bậc không ở trạng thái cho phép thao tác này")
+	ErrPromotionBlocked = problem.New(http.StatusUnprocessableEntity, "hrm.promotion_export_blocked",
+		"Danh sách không xuất được: có người bị chặn theo quy tắc nâng bậc")
+	ErrNLTHQuota = problem.New(http.StatusUnprocessableEntity, "hrm.nlth_quota_exceeded",
+		"Vượt chỉ tiêu nâng bậc trước thời hạn của năm")
+	ErrPromotionRules = problem.New(http.StatusUnprocessableEntity, "hrm.promotion_rules_missing",
+		"Chưa có tham số nâng bậc hoặc bảng quy đổi thành tích có hiệu lực (FN-19)")
+	ErrPromoExportNotFound = problem.New(http.StatusNotFound, "hrm.promotion_export_not_found", "Không có lần xuất danh sách nâng bậc này")
+	ErrDecisionNotFound    = problem.New(http.StatusNotFound, "hrm.decision_not_found", "Không có quyết định nâng bậc này")
+	ErrDecisionWarnings    = problem.New(http.StatusConflict, "hrm.decision_warnings",
+		"Quyết định có cảnh báo — gửi lại với acknowledge_warnings = true để lưu")
+	ErrDecisionStale = problem.New(http.StatusConflict, "hrm.decision_stale",
+		"Bậc trong hồ sơ đã đổi sau khi xuất danh sách — kiểm tra lại người trong quyết định")
+	ErrDecisionCancelled = problem.New(http.StatusConflict, "hrm.decision_cancelled", "Quyết định đã bị hủy")
+	ErrDecisionOrder     = problem.New(http.StatusConflict, "hrm.decision_cancel_order",
+		"Có quyết định nâng bậc sau cho cùng người — hủy quyết định sau trước")
+)
+
+// PromotionWriter là cổng ghi Word cho Mẫu số 1/2/4 (W10.17 `cap/export` nối sau). nil → chỉ xuất Excel.
+type PromotionWriter interface {
+	// RenderDocx dựng .docx của mẫu form từ bảng đã dựng (cột, dòng là chuỗi); trả tên tệp và nội dung.
+	RenderDocx(ctx context.Context, form string, title, period string, columns []string, rows [][]string) (string, []byte, error)
+}

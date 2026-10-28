@@ -37,7 +37,8 @@ func (h Handler) registerSchedule(rg *gin.RouterGroup) {
 	g.GET("/:id/log", h.scheduleLog)
 	g.POST("/:id/approve", h.approveSchedule)
 	g.POST("/:id/request-changes", h.requestChanges)
-	g.POST("/:id/items/:item_id/checkin", h.checkin) // W11.46 (CNTS CV-07)
+	g.POST("/:id/items/:item_id/checkin", h.checkin)                    // W11.46 (CNTS CV-07)
+	rg.POST("/extension/cnts/weekly-plan/schedule", h.scheduleFromPlan) // BF-CN-WEEKLY (UP-06)
 }
 
 // placeReq là địa điểm công tác trên bản đồ (W11.46, CV-06).
@@ -217,12 +218,17 @@ func (h Handler) mySchedule(c *gin.Context) {
 	if m.Detail != nil {
 		sched = toScheduleDetail(*m.Detail)
 	}
+	communes := make([]gin.H, len(m.CommuneOptions))
+	for i, r := range m.CommuneOptions {
+		communes[i] = gin.H{"code": r.Code, "name": r.Name}
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"week_start": m.Week.Format(time.DateOnly), "week_end": m.Week.AddDate(0, 0, 6).Format(time.DateOnly),
 		"submit_due_at": m.SubmitDue.UTC().Format(time.RFC3339), "review_due_at": m.ReviewDue.UTC().Format(time.RFC3339),
 		"locked": m.Locked, "late_now": m.LateNow, "schedule": sched,
 		"previous_week_start": m.PreviousWeek.Format(time.DateOnly), "previous_available": m.PreviousAvailable,
-		"checkin_enabled": m.CheckinEnabled,
+		"checkin_enabled": m.CheckinEnabled, "owner_level": m.OwnerLevel, "commune_codes": m.Communes,
+		"communes": communes,
 	})
 }
 

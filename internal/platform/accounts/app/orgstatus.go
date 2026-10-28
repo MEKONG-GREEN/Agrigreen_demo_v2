@@ -39,6 +39,9 @@ type OrgStatusResult struct {
 // lại an toàn (tài khoản đã tắt ở Keycloak mà pf còn ghi "đang hoạt động" được coi
 // là do lần chạy trước).
 func (s *Service) HandleOrgStatus(ctx context.Context, tx pgx.Tx, env outbox.Envelope) (OrgStatusResult, error) {
+	if !s.RoleCatalog().Valid() {
+		return OrgStatusResult{}, ErrDependency
+	}
 	if s.Dir == nil {
 		return OrgStatusResult{}, errNoDirectoryYet
 	}
@@ -120,7 +123,7 @@ func (s *Service) lockOrg(ctx context.Context, tx pgx.Tx, env outbox.Envelope, o
 			if err != nil {
 				return res, err
 			}
-			state.Roles = domain.ManagedOf(roles)
+			state.Roles = domain.ManagedOfWithCatalog(roles, s.RoleCatalog())
 		}
 		state.Enabled, state.LockCause = false, port.LockOrgDeactivated
 		ev := newEvent(env.TenantID, actorRef, state, domain.ActionLocked, s.now(), "org_deactivated:"+env.EventID.String()+":"+u.ID.String(), reasonOrgDeactivated)

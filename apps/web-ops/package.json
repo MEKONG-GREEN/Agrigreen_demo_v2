@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "maplibre-gl": "6.11.2",
-    "next": "16.3.8",
+    "next": "16.4.1",
     "oidc-client-ts": "3.5.0",
     "openapi-fetch": "0.17.0",
     "qrcode-generator": "2.0.4",
@@ -48,7 +48,7 @@
     "@vitejs/plugin-react": "6.1.1",
     "cross-env": "10.1.0",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.4.1",
     "jsdom": "30.1.1",
     "openapi-typescript": "7.13.0",
     "typescript": "5.9.3",

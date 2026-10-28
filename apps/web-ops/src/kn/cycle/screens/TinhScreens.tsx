@@ -2,481 +2,89 @@
 
 // Cấp Tỉnh (BRD §4.3): Phát hành biểu mẫu FN-TI-02.02, Trạng thái nộp FN-TI-02.03, Rà soát & chốt kỳ FN-TI-02.04.
 import Link from "next/link";
+import { TT_FORM_CODES } from "../common"; // BF-TT-FORMS #107: đủ T01–T07, M01, V01–V06
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/Dialog";
-import { ActionBar, BackLink, DetailLayout, LabelValueBlock, LogPanel } from "@/components/patterns/detail";
+import { TextField, validateForm } from "@/components/form";
+import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPanel } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, StatusPill, type Column } from "@/components/patterns/list";
 import { formLayout } from "@/kn/forms/api";
 import type { FormDefinition } from "@/kn/forms/types";
 import { FormGrid, communeRows } from "@/kn/grid";
+import { vnDate } from "@/kn/schedule/week";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import { RawFile, type RcBatchInput, type RcFormItem, type RcPreview, type RcProvincialImport, type RcStatusItem, type RcTask } from "../api";
-import {
-  LoadState,
-  REPORT_RULE_V2_FROM,
-  TaskPill,
-  dt,
-  reportWeekStart,
-  toLog,
-  useAction,
-  useCommuneNames,
-  useCycleReadOnly,
-  useLoad,
-  weekRangeName,
-  weekStartLocal,
-  weekStartOfRule,
-  ymdLocal,
-} from "../common";
+import { type RcLogEntry, type RcPeriod, type RcStatusItem, type RcTask } from "../api";
+import { LoadState, TaskPill, dt, toLog, useAction, useCommuneNames, useCycleReadOnly, useLoad, ymdLocal } from "../common";
 import { PiiHint } from "@/kn/pii";
+import { DateInput } from "./PublishWizard";
 
+/** FN-TI-02.02 Phát hành biểu mẫu — wizard 5 bước (BF-TT-PUBLISH #106) ở PublishWizard.tsx. */
+export { PublishScreen } from "./PublishWizard";
 
-// Hạn tính từ ngày cuối kỳ; "" = hạn mặc định của lịch kỳ máy chủ (v2: tuần → 12:00 Thứ Tư sau kỳ; W11.03).
-const DEADLINES = [
-  { value: "", label: "Mặc định theo lịch kỳ" },
-  { value: "1|12:00", label: "1 ngày sau ngày cuối kỳ, 12:00" },
-  { value: "1|17:00", label: "1 ngày sau ngày cuối kỳ, 17:00" },
-  { value: "0|17:00", label: "Ngày cuối kỳ, 17:00" },
-  { value: "2|11:00", label: "2 ngày sau ngày cuối kỳ, 11:00" },
-];
-
-type PublishReportType = "weekly" | "monthly" | "seasonal" | "adhoc";
-type PeriodChoice = "" | NonNullable<RcBatchInput["period_type"]>;
-
-/**
- * Cách chia kỳ theo loại báo cáo (W11.05b, như reportcycle/domain.ReportPeriodTypes): "" = mặc định của loại báo cáo.
- * Ngày / Tuần KSGM / Quý chỉ chia được với lịch kỳ v2 (đợt bắt đầu từ REPORT_RULE_V2_FROM); tuần KSGM theo ranh giới
- * tham số extension.ksgm_week_starts của từng tháng.
- */
-const PERIOD_CHOICES: Record<PublishReportType, { value: PeriodChoice; label: string }[]> = {
-  weekly: [
-    { value: "", label: "Tuần báo cáo" },
-    { value: "ksgm_week", label: "Tuần KSGM (4 tuần/tháng)" },
-    { value: "day", label: "Ngày" },
-  ],
-  monthly: [
-    { value: "", label: "Tháng" },
-    { value: "quarter", label: "Quý" },
-  ],
-  seasonal: [{ value: "", label: "Cả vụ (một kỳ)" }],
-  adhoc: [
-    { value: "", label: "Một kỳ" },
-    { value: "day", label: "Ngày" },
-  ],
-};
-
-/** FN-TI-02.02 Phát hành biểu mẫu báo cáo (Hình 7). */
-export function PublishScreen() {
-  const { cycleApi, kn } = useAuth();
-  const router = useRouter();
-  const ws = weekStartLocal(new Date(), reportWeekStart(new Date(), kn.context?.department_code)); // D8: lịch tuần của phòng
-  const [rt, setRt] = useState<PublishReportType>("weekly");
-  const [pt, setPt] = useState<PeriodChoice>("");
-  const [picked, setPicked] = useState<string[]>([]);
-  const [mode, setMode] = useState<"province" | "regions" | "communes">("province");
-  const [regions, setRegions] = useState<string[]>([]);
-  const [communes, setCommunes] = useState<string[]>([]);
-  const [from, setFrom] = useState(ymdLocal(ws));
-  const [to, setTo] = useState(ymdLocal(new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 27)));
-  const [season, setSeason] = useState("Thu Đông 2026");
-  const [deadline, setDeadline] = useState("");
-  const [closeAfter, setCloseAfter] = useState(1);
-  const [note, setNote] = useState("");
-  const [pv, setPv] = useState<Record<string, Record<string, Record<string, string>>>>({});
-  const [pvSource, setPvSource] = useState<"manual" | "excel">("manual");
-  const [pvImport, setPvImport] = useState<RcProvincialImport | null>(null);
-  const [preview, setPreview] = useState<RcPreview | null>(null);
-  const [showBatches, setShowBatches] = useState(false);
+/** FN-TI-02.02 Đợt đã phát hành — trang riêng (R-A2, thay pop-up cũ): xem trạng thái nộp, thu hồi đợt (lý do trong pop-up ngắn). */
+export function BatchesScreen() {
+  const { cycleApi } = useAuth();
+  const readOnly = useCycleReadOnly();
   const act = useAction();
-  const forms = useLoad(() => cycleApi.reportForms(rt, from), [rt, from]);
-  const batches = useLoad(() => cycleApi.batches(), [preview]);
-  const body = (): RcBatchInput => {
-    const [offset, time] = deadline.split("|");
-    return {
-      report_type: rt,
-      template_ids: picked,
-      ...(pt ? { period_type: pt } : {}),
-      scope: { mode, ...(mode === "regions" ? { regions } : {}), ...(mode === "communes" ? { communes } : {}) },
-      from_date: from,
-      to_date: to,
-      season_label: season,
-      ...(deadline ? { deadline: { offset_days: Number(offset), time: time! } } : {}),
-      close_after_days: closeAfter,
-      ...(note ? { note } : {}),
-      provincial_values: pv,
-      provincial_source: pvSource,
-    };
-  };
-  const doPreview = async () => {
-    const r = await act.run(() => cycleApi.preview(body()));
-    if (r) {
-      setPreview(r);
-    }
-  };
-  const provCols = (forms.data?.items ?? []).filter((f) => picked.includes(f.template_id)).flatMap((f) => f.provincial_columns.map((c) => ({ f, c })));
-  const previewCommunes = preview?.communes ?? [];
-  const name = useCommuneNames(previewCommunes.map((c) => c.commune_code));
-  /** UR-TI-02: tệp mẫu CSV UTF-8 (BOM) — cột Mã xã, Tên xã và mỗi cột Tỉnh giao "<Mã biểu> <Chữ cột>". */
-  const downloadPvTemplate = () => {
-    const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const head = ["Mã xã", "Tên xã", ...provCols.map(({ f, c }) => `${f.code} ${c.letter} ${c.title}${c.unit ? ` (${c.unit})` : ""}`)];
-    const lines = [head, ...previewCommunes.map((cm) => [cm.commune_code, name(cm.commune_code), ...provCols.map(({ f, c }) => pv[f.template_id]?.[cm.commune_code]?.[c.letter] ?? "")])];
-    const blob = new Blob([String.fromCharCode(0xfeff) + lines.map((l) => l.map(esc).join(",")).join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `tinh-giao-${rt}-${from}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-  const importPv = async (file: File) => {
-    const xlsx = /\.xlsx$/i.test(file.name);
-    const type = xlsx ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv; charset=utf-8";
-    const r = await act.run(
-      async () => cycleApi.provincialImport({ report_type: rt, from_date: from, template_ids: picked }, new RawFile(await file.arrayBuffer(), type)),
-      (x) => `Đã đọc ${x.accepted} dòng từ “${file.name}”${x.rejected ? `, ${x.rejected} dòng lỗi` : ""}.`,
-    );
-    if (!r) return;
-    setPvImport(r);
-    setPvSource("excel");
-    setPv((cur) => {
-      const next = { ...cur };
-      for (const [tpl, byCommune] of Object.entries(r.provincial_values)) next[tpl] = { ...(next[tpl] ?? {}), ...byCommune };
-      return next;
-    });
-  };
-  const inPreview = new Set(previewCommunes.map((c) => c.commune_code));
-  const outsideImport = pvImport ? pvImport.rows.filter((x) => x.status === "accepted" && previewCommunes.length > 0 && !inPreview.has(x.commune_code)) : [];
+  const s = useLoad(() => cycleApi.batches(), [act.note]);
+  const [withdraw, setWithdraw] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [reasonErr, setReasonErr] = useState<string | undefined>();
+  type Batch = NonNullable<typeof s.data>["items"][number];
+  const columns: Column<Batch>[] = [
+    { key: "season", header: "Vụ / đợt", cell: (b) => <b>{b.season_label}</b> },
+    { key: "forms", header: "Biểu", cell: (b) => b.forms.map((f) => f.code).join(", ") },
+    { key: "communes", header: "Số xã", cell: (b) => b.communes.length, className: "num" },
+    { key: "periods", header: "Số kỳ", cell: (b) => b.period_count, className: "num" },
+    { key: "st", header: "Trạng thái", cell: (b) => <StatusPill tone={b.status === "withdrawn" ? "neutral" : "ok"}>{b.status === "withdrawn" ? "Đã thu hồi" : "Đang áp dụng"}</StatusPill> },
+    {
+      key: "act",
+      header: "Thao tác",
+      cell: (b) => (
+        <span className="row" style={{ gap: 6 }}>
+          <Link className="btn btn-o btn-sm" href={`/kn/nhiem-vu/trang-thai-nop?dot=${b.id}`}>
+            Trạng thái nộp
+          </Link>
+          {b.status === "issued" && !readOnly ? (
+            <button type="button" className="btn btn-o btn-sm" onClick={() => (setReason(""), setReasonErr(undefined), setWithdraw(b.id))}>
+              Thu hồi
+            </button>
+          ) : null}
+        </span>
+      ),
+    },
+  ];
   return (
-    <>
-      <PageHeader
-        title="Phát hành biểu mẫu báo cáo"
-        actions={
-          <>
-            <button type="button" className="btn btn-o" onClick={() => setShowBatches(true)}>
-              Đợt đã phát hành ({batches.data?.items.length ?? 0})
-            </button>
-            <button type="button" className="btn btn-o" disabled={!picked.length || act.busy} onClick={() => void doPreview()}>
-              <Icon name="eye" size={15} /> Xem trước
-            </button>
+    <DetailPage back={{ href: "/kn/nhiem-vu/phat-hanh", label: "Phát hành biểu mẫu" }} title="Đợt đã phát hành">
+      {act.view}
+      <LoadState s={s}>{(d) => <DataTable caption="Đợt đã phát hành" columns={columns} rows={d.items} rowKey={(b) => b.id} empty="Chưa phát hành đợt nào." />}</LoadState>
+      {withdraw ? (
+        <Dialog
+          title="Thu hồi đợt"
+          onClose={() => setWithdraw(null)}
+          actions={
             <button
               type="button"
               className="btn btn-p"
-              disabled={!picked.length || act.busy}
+              disabled={act.busy}
               onClick={async () => {
-                const r = await act.run(() => cycleApi.issue(body()), (x) => `Đã phát hành ${x.batch.task_count.toLocaleString("vi-VN")} công việc cho ${x.batch.communes.length} xã, ${x.periods.length} kỳ.`);
-                if (r) {
-                  setPreview(null);
-                  batches.reload();
-                }
+                const e = reason.trim() === "" ? "Bắt buộc nhập." : reason.trim().length < 10 ? "Tối thiểu 10 ký tự." : undefined;
+                setReasonErr(e);
+                if (e) return;
+                if (await act.run(() => cycleApi.withdraw(withdraw, reason.trim()), "Đã thu hồi đợt.")) setWithdraw(null);
               }}
             >
-              <Icon name="send" size={15} /> Phát hành
+              Thu hồi
             </button>
-          </>
-        }
-      />
-      {act.view}
-      <div className="detail-grid">
-        <div className="stack">
-          <section className="card sec" aria-label="Bước 1 · Chọn biểu mẫu">
-            <h2>Bước 1 · Chọn biểu mẫu (cùng loại kỳ)</h2>
-            <LoadState s={forms}>
-              {(d) => (
-                <table className="dt">
-                  <thead>
-                    <tr>
-                      <th scope="col">Chọn</th>
-                      <th scope="col">Mã</th>
-                      <th scope="col">Tên biểu</th>
-                      <th scope="col">Mẫu</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {d.items.map((f: RcFormItem) => (
-                      <tr key={f.template_id}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            aria-label={`Chọn ${f.code}`}
-                            checked={picked.includes(f.template_id)}
-                            onChange={(e) => setPicked((p) => (e.target.checked ? [...p, f.template_id] : p.filter((x) => x !== f.template_id)))}
-                          />
-                        </td>
-                        <td>
-                          <b>{f.code}</b>
-                        </td>
-                        <td>{f.name}</td>
-                        <td>
-                          <StatusPill tone="info">v{f.version}</StatusPill>
-                        </td>
-                      </tr>
-                    ))}
-                    {!d.items.length ? (
-                      <tr>
-                        <td colSpan={4} className="empty">
-                          Chưa có mẫu đã phát hành gán cho loại báo cáo này (FN-AD-04.06).
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              )}
-            </LoadState>
-          </section>
-          <section className="card sec" aria-label="Bước 2 · Chọn xã/phường nhận">
-            <h2>Bước 2 · Chọn xã/phường nhận</h2>
-            <div className="row" role="radiogroup" aria-label="Phạm vi xã">
-              {(
-                [
-                  ["province", "Toàn tỉnh"],
-                  ["regions", "Theo Khu vực"],
-                  ["communes", "Chọn từng xã"],
-                ] as const
-              ).map(([v, l]) => (
-                <button key={v} type="button" role="radio" aria-checked={mode === v} className={`btn btn-sm ${mode === v ? "btn-p" : "btn-o"}`} onClick={() => setMode(v)}>
-                  {l}
-                </button>
-              ))}
-            </div>
-            {mode === "regions" ? (
-              <div className="row" style={{ marginTop: 8 }}>
-                {[
-                  ["LX", "Khu vực Long Xuyên"],
-                  ["CD", "Khu vực Châu Đốc"],
-                ].map(([c, n]) => (
-                  <label key={c} className="row" style={{ gap: 4 }}>
-                    <input type="checkbox" checked={regions.includes(c!)} onChange={(e) => setRegions((r) => (e.target.checked ? [...r, c!] : r.filter((x) => x !== c)))} /> {n}
-                  </label>
-                ))}
-              </div>
-            ) : null}
-            {mode === "communes" ? (
-              <label className="field" style={{ marginTop: 8 }}>
-                <span>Mã xã (cách nhau dấu phẩy)</span>
-                <input className="input" value={communes.join(",")} onChange={(e) => setCommunes(e.target.value.split(",").map((x) => x.trim()).filter(Boolean))} />
-              </label>
-            ) : null}
-            {preview ? (
-              <div className="alert alert-warn" role="status" style={{ marginTop: 10 }}>
-                <Icon name="alert" />
-                <span>
-                  {preview.commune_count} xã/phường · {preview.communes_without_officer.length} xã chưa có cán bộ phụ trách Phòng Trồng trọt
-                  {preview.communes_without_officer.length ? ` (${preview.communes_without_officer.map(name).join(", ")})` : ""}
-                </span>
-              </div>
-            ) : null}
-          </section>
-          {provCols.length ? (
-            <section className="card sec" aria-label="Bước 4 · Giá trị cột Tỉnh giao">
-              <h2>Bước 4 · Giá trị cột &quot;Tỉnh giao&quot; của biểu</h2>
-              {!previewCommunes.length ? <p className="mute">Bấm “Xem trước” để có danh sách xã nhận.</p> : null}
-              {previewCommunes.length ? (
-                <table className="dt">
-                  <thead>
-                    <tr>
-                      <th scope="col">Xã/phường</th>
-                      {provCols.map(({ f, c }) => (
-                        <th key={`${f.code}${c.letter}`} scope="col">
-                          {f.code} · cột {c.letter} “{c.title}” {c.unit ? `(${c.unit})` : ""}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {previewCommunes.map((cm) => (
-                      <tr key={cm.commune_code}>
-                        <td>
-                          {name(cm.commune_code)} · {cm.region_name}
-                        </td>
-                        {provCols.map(({ f, c }) => (
-                          <td key={`${f.code}${c.letter}`}>
-                            <input
-                              className="input"
-                              inputMode="decimal"
-                              aria-label={`${f.code} ${c.letter} ${cm.commune_code}`}
-                              value={pv[f.template_id]?.[cm.commune_code]?.[c.letter] ?? ""}
-                              onChange={(e) =>
-                                setPv((x) => ({ ...x, [f.template_id]: { ...(x[f.template_id] ?? {}), [cm.commune_code]: { ...(x[f.template_id]?.[cm.commune_code] ?? {}), [c.letter]: e.target.value } } }))
-                              }
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : null}
-              <div className="row" style={{ gap: 8, marginTop: 10 }} aria-label="Nạp Tỉnh giao từ Excel">
-                <button type="button" className="btn btn-o btn-sm" disabled={!previewCommunes.length} onClick={downloadPvTemplate}>
-                  <Icon name="download" size={14} /> Tải tệp mẫu
-                </button>
-                <label className="btn btn-o btn-sm">
-                  <Icon name="upload" size={14} /> Nạp từ Excel/CSV
-                  <input
-                    type="file"
-                    accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    aria-label="Tệp Tỉnh giao"
-                    style={{ display: "none" }}
-                    disabled={act.busy || !picked.length}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      if (file) void importPv(file);
-                    }}
-                  />
-                </label>
-                {pvSource === "excel" ? <StatusPill tone="info">Nguồn: Excel</StatusPill> : null}
-              </div>
-              {pvImport ? (
-                <div className="small" role="status" aria-label="Kết quả nạp Tỉnh giao" style={{ marginTop: 8 }}>
-                  <div>
-                    Cột nhận: {pvImport.columns.map((c) => `${c.form_code} ${c.letter}`).join(", ")}
-                    {pvImport.ignored_columns.length ? ` · bỏ qua: ${pvImport.ignored_columns.join(", ")}` : ""}
-                  </div>
-                  {pvImport.rows
-                    .filter((x) => x.status === "rejected")
-                    .map((x) => (
-                      <div key={x.row} style={{ color: "var(--danger)" }}>
-                        Dòng {x.row}
-                        {x.commune_code ? ` (${x.commune_code})` : ""}: {x.reason}
-                      </div>
-                    ))}
-                  {outsideImport.length ? (
-                    <div style={{ color: "var(--warn, #b45309)" }}>Xã không nhận đợt này (sẽ bị từ chối khi phát hành): {outsideImport.map((x) => x.commune_code).join(", ")}</div>
-                  ) : null}
-                </div>
-              ) : null}
-              <p className="small mute" style={{ marginTop: 8 }}>
-                Tệp một dòng một xã: cột “Mã xã” và mỗi cột Tỉnh giao có tiêu đề “&lt;Mã biểu&gt; &lt;Chữ cột&gt;” (vd “T01 E”). Ô công thức bị từ chối — dán giá trị. Cấp Xã thấy giá trị này ở dạng chỉ đọc.
-              </p>
-            </section>
-          ) : null}
-        </div>
-        <div className="stack">
-          <section className="card sec" aria-label="Bước 3 · Kỳ và hạn nộp">
-            <h2>Bước 3 · Kỳ và hạn nộp</h2>
-            <label className="field">
-              <span>Loại kỳ*</span>
-              <select className="input" value={rt} onChange={(e) => (setRt(e.target.value as typeof rt), setPt(""), setPicked([]), setPreview(null))}>
-                <option value="weekly">Tuần</option>
-                <option value="monthly">Tháng</option>
-                <option value="seasonal">Vụ</option>
-                <option value="adhoc">Đột xuất</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Chia kỳ theo</span>
-              <select className="input" value={pt} onChange={(e) => (setPt(e.target.value as PeriodChoice), setPreview(null))}>
-                {PERIOD_CHOICES[rt].map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {pt && from < REPORT_RULE_V2_FROM ? (
-              <p className="small" role="note" style={{ color: "var(--warn, #b45309)" }}>
-                Kỳ ngày / tuần KSGM / quý theo lịch kỳ hệ thống mới — đợt phải bắt đầu từ {REPORT_RULE_V2_FROM.split("-").reverse().join("/")}.
-              </p>
-            ) : null}
-            <label className="field">
-              <span>Từ ngày*</span>
-              <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Đến ngày*</span>
-              <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Tên vụ / đợt*</span>
-              <input className="input" value={season} onChange={(e) => setSeason(e.target.value)} />
-            </label>
-            <label className="field">
-              <span>Hạn nộp mỗi kỳ</span>
-              <select className="input" value={deadline} onChange={(e) => setDeadline(e.target.value)}>
-                {DEADLINES.map((d) => (
-                  <option key={d.value} value={d.value}>
-                    {d.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Chốt kỳ sau hạn (ngày)</span>
-              <input className="input" type="number" min={0} max={60} value={closeAfter} onChange={(e) => setCloseAfter(Number(e.target.value))} />
-            </label>
-            <label className="field">
-              <span>Ghi chú giao việc</span>
-              <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-              <PiiHint text={note} />
-            </label>
-          </section>
-          <section className="card sec" aria-label="Xem trước">
-            <h2>Xem trước</h2>
-            {preview ? (
-              <>
-                <dl className="kv">
-                  <dt>Số biểu</dt>
-                  <dd>{preview.form_count}</dd>
-                  <dt>Số xã</dt>
-                  <dd>{preview.commune_count}</dd>
-                  <dt>Số kỳ</dt>
-                  <dd>{preview.period_count}</dd>
-                  <dt>Lịch tuần</dt>
-                  <dd data-testid="calendar">
-                    {weekRangeName(weekStartOfRule(preview.period_rule))} ({preview.calendar_id} v{preview.calendar_version})
-                  </dd>
-                  <dt>Công việc sẽ tạo</dt>
-                  <dd data-testid="task-count">{preview.task_count.toLocaleString("vi-VN")}</dd>
-                </dl>
-                <ol className="list-plain small">
-                  {preview.periods.map((p) => (
-                    <li key={p.slot}>
-                      {p.label} ({p.range_label}){p.period_key ? ` · ${p.period_key}` : ""} — hạn {dt(p.due_at)}
-                    </li>
-                  ))}
-                </ol>
-                {preview.warnings.map((w) => (
-                  <p key={w} className="small" style={{ color: "var(--warn, #b45309)" }}>
-                    {w}
-                  </p>
-                ))}
-              </>
-            ) : (
-              <p className="mute">Chọn biểu, phạm vi, kỳ rồi bấm “Xem trước”.</p>
-            )}
-          </section>
-        </div>
-      </div>
-      {showBatches ? (
-        <Dialog title="Đợt đã phát hành" onClose={() => setShowBatches(false)}>
-          <ul className="list-plain">
-            {(batches.data?.items ?? []).map((b) => (
-              <li key={b.id} style={{ marginBottom: 8 }}>
-                <b>{b.season_label}</b> · {b.forms.map((f) => f.code).join(", ")} · {b.communes.length} xã · {b.period_count} kỳ · {b.status === "withdrawn" ? "Đã thu hồi" : "Đang áp dụng"}{" "}
-                <button type="button" className="btn btn-o btn-sm" onClick={() => router.push(`/kn/nhiem-vu/trang-thai-nop?dot=${b.id}`)}>
-                  Trạng thái nộp
-                </button>
-                {b.status === "issued" ? (
-                  <button
-                    type="button"
-                    className="btn btn-o btn-sm"
-                    onClick={async () => {
-                      const r = window.prompt("Lý do thu hồi đợt (≥ 10 ký tự):");
-                      if (r) await act.run(() => cycleApi.withdraw(b.id, r), "Đã thu hồi đợt.").then(() => batches.reload());
-                    }}
-                  >
-                    Thu hồi
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          }
+        >
+          <TextField label="Lý do thu hồi (≥ 10 ký tự)" required multiline value={reason} onChange={setReason} error={reasonErr} hint={<PiiHint text={reason} />} />
         </Dialog>
       ) : null}
-    </>
+    </DetailPage>
   );
 }
 
@@ -488,9 +96,10 @@ export function useBatchPeriod(initialBatch?: string | null, reportType?: string
   const active = batchId ?? batches.data?.items.find((b) => b.status === "issued")?.id ?? null;
   const detail = useLoad(active ? () => cycleApi.batch(active) : null, [active]);
   const [periodId, setPeriodId] = useState<string | null>(null);
-  const [now] = useState(() => Date.now());
+  // from_date là ngày lịch Việt Nam: so theo ngày VN (đầu tuần 00:00–07:00 giờ VN vẫn chọn kỳ hiện tại).
+  const [today] = useState(() => vnDate(Date.now()));
   const periods = detail.data?.periods ?? [];
-  const defPeriod = [...periods].reverse().find((p) => Date.parse(p.from_date) <= now) ?? periods[0];
+  const defPeriod = [...periods].reverse().find((p) => p.from_date <= today) ?? periods[0];
   const period = periods.find((p) => p.id === periodId) ?? defPeriod ?? null;
   return { batches, active, setBatchId: (id: string) => (setBatchId(id), setPeriodId(null)), detail, period, setPeriodId };
 }
@@ -615,6 +224,87 @@ export function StatusScreen() {
 
 /** FN-TI-02.04 Rà soát & chốt kỳ — danh sách báo cáo cần rà soát. */
 export function ReviewListScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: string }) {
+  const [tab, setTab] = useState<"review" | "closed">("review");
+  return (
+    <>
+      <PageHeader title="Rà soát & chốt kỳ" />
+      <div className="row" role="tablist" aria-label="Rà soát & chốt kỳ" style={{ gap: 8, marginBottom: 12 }}>
+        {(
+          [
+            ["review", "Báo cáo cần rà soát"],
+            ["closed", "Kỳ đã chốt"],
+          ] as const
+        ).map(([v, l]) => (
+          <button key={v} type="button" role="tab" aria-selected={tab === v} className={`btn btn-sm ${tab === v ? "btn-p" : "btn-o"}`} onClick={() => setTab(v)}>
+            {l}
+          </button>
+        ))}
+      </div>
+      {tab === "review" ? <ReviewTasks base={base} /> : <ClosedPeriods />}
+    </>
+  );
+}
+
+/** Người chốt kỳ: chốt tay → tên người thao tác ở log kỳ (sự kiện period.closed gần nhất); tự chốt → "Hệ thống". */
+function ClosedBy({ p }: { p: RcPeriod }) {
+  const { cycleApi } = useAuth();
+  const log = useLoad(p.close_mode === "manual" ? () => cycleApi.periodLog(p.id) : null, [p.id, p.close_mode, p.closed_at]);
+  if (p.close_mode !== "manual") return <>Hệ thống (tự chốt)</>;
+  const ev = [...(log.data?.items ?? [])].filter((x) => x.event === "period.closed").sort((a, b) => (a.at < b.at ? 1 : -1))[0] as (RcLogEntry & { actor_display?: string }) | undefined;
+  return <>{ev?.actor_display || (log.loading ? "…" : "—")}</>;
+}
+
+/** TT-04: danh sách kỳ đã chốt — xem lại ai chốt, lúc nào, cách chốt, trạng thái. */
+function ClosedPeriods() {
+  const { cycleApi } = useAuth();
+  const [rt, setRt] = useState("");
+  const [page, setPage] = useState(1);
+  const periods = useLoad(() => cycleApi.periods({ report_type: rt || undefined }), [rt]);
+  const batches = useLoad(() => cycleApi.batches(rt ? { report_type: rt } : {}), [rt]);
+  const byBatch = new Map((batches.data?.items ?? []).map((b) => [b.id, b]));
+  const rows = (periods.data?.items ?? []).filter((p) => p.status === "closed").sort((a, b) => ((a.closed_at ?? "") < (b.closed_at ?? "") ? 1 : -1));
+  const columns: Column<RcPeriod>[] = [
+    { key: "batch", header: "Đợt", cell: (p) => byBatch.get(p.batch_id)?.season_label ?? "—" },
+    { key: "forms", header: "Biểu", cell: (p) => byBatch.get(p.batch_id)?.forms.map((f) => f.code).join(", ") ?? "—" },
+    { key: "period", header: "Kỳ", cell: (p) => `${p.label} (${p.range_label})` },
+    { key: "at", header: "Chốt lúc", cell: (p) => dt(p.closed_at) },
+    { key: "by", header: "Người chốt", cell: (p) => <ClosedBy p={p} /> },
+    { key: "mode", header: "Cách chốt", cell: (p) => (p.close_mode === "auto" ? "Tự động sau hạn" : "Thủ công") },
+    { key: "st", header: "Trạng thái", cell: () => <StatusPill tone="neutral">Đã chốt</StatusPill> },
+    {
+      key: "act",
+      header: "Thao tác",
+      cell: (p) => (
+        <Link className="btn btn-o btn-sm" href={`/kn/nhiem-vu/trang-thai-nop?dot=${p.batch_id}`} aria-label={`Trạng thái nộp ${p.label}`}>
+          Trạng thái nộp
+        </Link>
+      ),
+    },
+  ];
+  return (
+    <>
+      <FilterBar onReset={() => (setRt(""), setPage(1))}>
+        <FilterChip
+          label="Loại báo cáo"
+          value={rt}
+          onChange={(v) => (setRt(v), setPage(1))}
+          options={[
+            { value: "", label: "Tất cả" },
+            { value: "weekly", label: "Tuần" },
+            { value: "monthly", label: "Tháng" },
+            { value: "seasonal", label: "Vụ" },
+            { value: "adhoc", label: "Đột xuất" },
+          ]}
+        />
+      </FilterBar>
+      <LoadState s={periods}>
+        {() => <DataTable caption="Kỳ đã chốt" columns={columns} rows={rows.slice((page - 1) * 20, page * 20)} rowKey={(p) => p.id} page={page} pageSize={20} total={rows.length} onPage={setPage} empty="Chưa có kỳ nào đã chốt." />}
+      </LoadState>
+    </>
+  );
+}
+
+function ReviewTasks({ base }: { base: string }) {
   const { cycleApi } = useAuth();
   const [status, setStatus] = useState("submitted");
   const [form, setForm] = useState("");
@@ -639,7 +329,6 @@ export function ReviewListScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: str
   ];
   return (
     <>
-      <PageHeader title="Rà soát & chốt kỳ" />
       <FilterBar onReset={() => (setStatus("submitted"), setForm(""))}>
         <FilterChip
           label="Trạng thái"
@@ -654,7 +343,7 @@ export function ReviewListScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: str
             { value: "", label: "Tất cả" },
           ]}
         />
-        <FilterChip label="Biểu" value={form} onChange={setForm} options={[{ value: "", label: "Tất cả" }, ...["T01", "T03", "T04", "T05", "T06"].map((x) => ({ value: x, label: x }))]} />
+        <FilterChip label="Biểu" value={form} onChange={setForm} options={[{ value: "", label: "Tất cả" }, ...TT_FORM_CODES.map((x) => ({ value: x, label: x }))]} />
       </FilterBar>
       <LoadState s={s}>
         {(d) => <DataTable caption="Báo cáo cần rà soát" columns={columns} rows={d.items.slice((page - 1) * 20, page * 20)} rowKey={(t) => t.id} page={page} pageSize={20} total={d.items.length} onPage={setPage} empty="Không có báo cáo cần rà soát." />}
@@ -671,7 +360,9 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
   const router = useRouter();
   const act = useAction();
   const [reason, setReason] = useState("");
+  const [reasonErr, setReasonErr] = useState<string | undefined>();
   const [reopen, setReopen] = useState(false);
+  const [reopenErr, setReopenErr] = useState<Partial<Record<"reason" | "until", string>>>({});
   const [reopenReason, setReopenReason] = useState("");
   const [reopenUntil, setReopenUntil] = useState(() => ymdLocal(new Date(Date.now() + 2 * 86_400_000)));
   const s = useLoad(async () => {
@@ -702,7 +393,12 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
               <PageHeader title={`${name(d.task.commune_code)} · ${d.task.form_code} · ${d.period.label}`} />
               {readOnly ? null : (
                 <ActionBar>
-                  <button type="button" className="btn btn-p btn-sm" disabled={act.busy || !sub} onClick={() => void act.run(() => cycleApi.requestAdjustment(id, reason), "Đã gửi yêu cầu điều chỉnh tới Cán bộ xã.")}>
+                  <button type="button" className="btn btn-p btn-sm" disabled={act.busy || !sub} onClick={() => {
+                      const err = reason.trim() ? undefined : "Bắt buộc nhập.";
+                      setReasonErr(err);
+                      if (!err) void act.run(() => cycleApi.requestAdjustment(id, reason.trim()), "Đã gửi yêu cầu điều chỉnh tới Cán bộ xã.");
+                    }}
+                  >
                     <Icon name="edit" size={15} /> Yêu cầu điều chỉnh
                   </button>
                   <button type="button" className="btn btn-o btn-sm" disabled={act.busy || !sub} onClick={() => void act.run(() => cycleApi.confirm(id), "Đã xác nhận báo cáo.")}>
@@ -756,11 +452,9 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                       <ul>{(sub?.issues ?? []).map((i, k) => <li key={k}>{i.letter ? `Cột ${i.letter}: ` : ""}{i.message}</li>)}</ul>
                     )}
                     {readOnly ? null : (
-                      <label className="field" style={{ marginTop: 10 }}>
-                        <span>Lý do yêu cầu điều chỉnh*</span>
-                        <textarea className="textarea" value={reason} onChange={(e) => setReason(e.target.value)} />
-                        <PiiHint text={reason} />
-                      </label>
+                      <div style={{ marginTop: 10 }}>
+                        <TextField label="Lý do yêu cầu điều chỉnh" required multiline value={reason} onChange={setReason} error={reasonErr} hint={<PiiHint text={reason} />} />
+                      </div>
                     )}
                   </>
                 }
@@ -799,6 +493,9 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                       type="button"
                       className="btn btn-p"
                       onClick={async () => {
+                        const v = validateForm({ reason: reopenReason, until: reopenUntil }, { reason: { kind: "text", required: true }, until: { kind: "text", required: true } });
+                        setReopenErr(v.errors);
+                        if (!v.valid) return;
                         const r = await act.run(
                           () => cycleApi.reopen(d.period.id, { communes: [d.task.commune_code], template_ids: [d.task.template_id], reason: reopenReason, until: new Date(`${reopenUntil}T17:00:00`).toISOString() }),
                           (x) => `Đã mở lại kỳ cho ${x.task_ids.length} công việc đến ${reopenUntil}.${x.dispatch_changed ? " Cảnh báo: kỳ đã gửi Chi cục — số liệu đã thay đổi." : ""}`,
@@ -810,15 +507,8 @@ export function ReviewDetailScreen({ base = "/kn/nhiem-vu/ra-soat" }: { base?: s
                     </button>
                   }
                 >
-                  <label className="field">
-                    <span>Lý do mở lại*</span>
-                    <textarea className="textarea" value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} />
-                    <PiiHint text={reopenReason} />
-                  </label>
-                  <label className="field">
-                    <span>Mở đến ngày* (17:00)</span>
-                    <input className="input" type="date" value={reopenUntil} onChange={(e) => setReopenUntil(e.target.value)} />
-                  </label>
+                  <TextField label="Lý do mở lại" required multiline value={reopenReason} onChange={setReopenReason} error={reopenErr.reason} hint={<PiiHint text={reopenReason} />} />
+                  <DateInput label="Mở đến ngày (17:00)" value={reopenUntil} onChange={setReopenUntil} error={reopenErr.until} />
                 </Dialog>
               ) : null}
             </>

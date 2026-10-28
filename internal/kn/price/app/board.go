@@ -15,6 +15,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strconv"
 	"strings"
@@ -425,6 +426,10 @@ func (s *TicketService) boardOp(ctx context.Context, profile string, in BoardInp
 		v, _, err = s.boardRead(ctx, tx, prof, c, day)
 		return err
 	})
+	var bb *boardBusy
+	if errors.As(err, &bb) {
+		return BoardView{}, s.busyErr(ctx, prof, c, bb.by)
+	}
 	if err != nil {
 		return BoardView{}, mapLedgerErr(err)
 	}
@@ -432,16 +437,27 @@ func (s *TicketService) boardOp(ctx context.Context, profile string, in BoardInp
 	return v, nil
 }
 
-// busy trả lỗi "đang duyệt bởi …" khi người khác giữ khóa còn hạn.
-func (s *TicketService) busy(ctx context.Context, prof port.Profile, c caller, v BoardView) error {
+// boardBusy: người khác giữ khóa duyệt còn hạn (lỗi trong giao dịch). Tên người giữ khóa tra SAU giao dịch (busyErr) —
+// P0-POOL-KN-2 (#139): danh bạ cán bộ là port của pf/accounts, mở giao dịch riêng trên CHUNG pool.
+type boardBusy struct{ by uuid.UUID }
+
+func (b *boardBusy) Error() string { return "price: bảng giá đang duyệt bởi cán bộ khác" }
+
+// busy trả lỗi "đang duyệt bởi …" khi người khác giữ khóa còn hạn (boardOp đổi thành port.ErrBoardBusy kèm tên).
+func (s *TicketService) busy(_ context.Context, _ port.Profile, c caller, v BoardView) error {
 	if v.State == domain.BoardApproving && v.LockedBy != c.ref {
-		name := s.officerNames(ctx, prof, c)[v.LockedBy]
-		if name == "" {
-			name = "cán bộ khác"
-		}
-		return port.ErrBoardBusy.WithDetail("Đang duyệt bởi " + name)
+		return &boardBusy{by: v.LockedBy}
 	}
 	return nil
+}
+
+// busyErr dựng lỗi "Đang duyệt bởi <tên>" — gọi NGOÀI giao dịch.
+func (s *TicketService) busyErr(ctx context.Context, prof port.Profile, c caller, by uuid.UUID) error {
+	name := s.officerNames(ctx, prof, c)[by]
+	if name == "" {
+		name = "cán bộ khác"
+	}
+	return port.ErrBoardBusy.WithDetail("Đang duyệt bởi " + name)
 }
 
 // ready kiểm điều kiện duyệt (FN-TI-02.05 điều kiện tiên quyết, luồng ngoại lệ).
@@ -507,6 +523,13 @@ func (s *TicketService) UnlockBoard(ctx context.Context, profile string, in Boar
 // phiên bản mới; ảnh chụp dòng bảng giá (CT-04) và phiếu tính vào; khóa tuần + số ngày báo giá theo lịch của tuần lưu lúc
 // duyệt; phát pf.price.board.published (outbox, cùng giao dịch).
 func (s *TicketService) ApproveBoard(ctx context.Context, profile string, in BoardInput, idem string) (BoardView, error) {
+	// P0-POOL-KN-2 (#139): tuần của ngày bảng giá tra lịch kỳ hệ thống (Weeks — pf/extension qua gốc lắp ráp, giao dịch riêng
+	// trên CHUNG pool) NGOÀI giao dịch duyệt; lỗi chỉ trả ở đúng bước cần như trước.
+	var wk domain.Week
+	var wkErr error
+	if !in.Day.IsZero() { // ngày rỗng: boardOp trả lỗi trước khi chạy thân
+		wk, wkErr = s.weekOf(ctx, domain.BusinessDay(in.Day))
+	}
 	return s.boardOp(ctx, profile, in, func(tx pgx.Tx, prof port.Profile, c caller, v BoardView, tickets []sentTicket) error {
 		if err := s.busy(ctx, prof, c, v); err != nil {
 			return err
@@ -517,9 +540,8 @@ func (s *TicketService) ApproveBoard(ctx context.Context, profile string, in Boa
 		if err := ready(v); err != nil {
 			return err
 		}
-		wk, err := s.weekOf(ctx, v.Day)
-		if err != nil {
-			return err
+		if wkErr != nil {
+			return wkErr
 		}
 		st, err := s.calendarState(ctx, tx, prof)
 		if err != nil {

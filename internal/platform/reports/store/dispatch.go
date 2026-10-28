@@ -136,15 +136,17 @@ type Dispatch struct {
 	CreatedBy   uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	// ClaimUntil (P0-WORKER-REPORTS): hạn nhận việc của worker đang gửi; nil = không ai giữ.
+	ClaimUntil *time.Time
 }
 
 const dispCols = `id, department_code, province_code, period_id, period_label, run_ids, forms, formats, provisional, missing_communes, status,
-  recipient_ids, cc_ids, subject, body, link_only, attempts, last_error, sent_at, created_by, created_at, updated_at`
+  recipient_ids, cc_ids, subject, body, link_only, attempts, last_error, sent_at, created_by, created_at, updated_at, claim_until`
 
 func scanDisp(r pgx.Row) (Dispatch, error) {
 	var d Dispatch
 	err := r.Scan(&d.ID, &d.Department, &d.Province, &d.PeriodID, &d.PeriodLabel, &d.RunIDs, &d.Forms, &d.Formats, &d.Provisional, &d.Missing, &d.Status,
-		&d.Recipients, &d.CC, &d.Subject, &d.Body, &d.LinkOnly, &d.Attempts, &d.LastError, &d.SentAt, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt)
+		&d.Recipients, &d.CC, &d.Subject, &d.Body, &d.LinkOnly, &d.Attempts, &d.LastError, &d.SentAt, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt, &d.ClaimUntil)
 	return d, err
 }
 
@@ -190,12 +192,84 @@ func Dispatches(ctx context.Context, tx pgx.Tx, province, dept string, periodID 
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Dispatch, error) { return scanDisp(r) })
 }
 
-// UpdateDispatchSend ghi trạng thái gửi.
+// UpdateDispatchSend ghi trạng thái gửi (xếp gửi / "Gửi lại"). Nhả việc đã quá hạn (claim_token/claim_until = NULL): lượt
+// vừa xếp chưa ai nhận nên "Gửi lại" khóa lại tới updated_at + hạn (review #128 — không mở ngay theo claim_until cũ), và
+// worker cũ còn sống muộn mất quyền gia hạn/ghi kết quả.
 func UpdateDispatchSend(ctx context.Context, tx pgx.Tx, d Dispatch) error {
 	_, err := tx.Exec(ctx, `UPDATE pf_reports.dispatch SET status = $2, recipient_ids = $3::uuid[], cc_ids = $4::uuid[], subject = $5, body = $6,
-	    link_only = $7, attempts = $8, last_error = $9, sent_at = $10, updated_at = $11 WHERE id = $1`,
+	    link_only = $7, attempts = $8, last_error = $9, sent_at = $10, updated_at = $11, claim_token = NULL, claim_until = NULL WHERE id = $1`,
 		d.ID, d.Status, idStrs(d.Recipients), idStrs(d.CC), d.Subject, d.Body, d.LinkOnly, d.Attempts, d.LastError, d.SentAt, d.UpdatedAt.UTC())
 	return err
+}
+
+// ClaimDispatch (P0-WORKER-REPORTS #128) nhận việc gửi một lượt bằng MỘT câu lệnh: chỉ khi lần gửi còn 'sending' đúng
+// lượt attempt và chưa ai giữ hoặc hạn giữ đã qua (≤ now). Trả false khi worker khác đang giữ hoặc lượt đã xong/đổi.
+// Gọi trong giao dịch riêng và commit TRƯỚC khi gửi email.
+func ClaimDispatch(ctx context.Context, tx pgx.Tx, id uuid.UUID, attempt int, token uuid.UUID, until, now time.Time) (bool, error) {
+	tag, err := tx.Exec(ctx, `UPDATE pf_reports.dispatch SET claim_token = $3, claim_until = $4
+	  WHERE id = $1 AND status = 'sending' AND attempts = $2 AND (claim_until IS NULL OR claim_until <= $5)`,
+		id, attempt, token, until.UTC(), now.UTC())
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// RenewDispatchClaim gia hạn việc đang giữ; false = đã mất quyền giữ (quá hạn và worker khác đã nhận, hoặc lượt đã xong).
+func RenewDispatchClaim(ctx context.Context, tx pgx.Tx, id, token uuid.UUID, until time.Time) (bool, error) {
+	tag, err := tx.Exec(ctx, `UPDATE pf_reports.dispatch SET claim_until = $3 WHERE id = $1 AND claim_token = $2 AND status = 'sending'`,
+		id, token, until.UTC())
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// FinishDispatchClaim ghi kết quả lượt gửi ('sent' hoặc 'failed') và nhả việc — chỉ khi còn giữ đúng token.
+func FinishDispatchClaim(ctx context.Context, tx pgx.Tx, d Dispatch, token uuid.UUID) (bool, error) {
+	tag, err := tx.Exec(ctx, `UPDATE pf_reports.dispatch SET status = $3, last_error = $4, sent_at = $5, link_only = $6, updated_at = $7,
+	    claim_token = NULL, claim_until = NULL
+	  WHERE id = $1 AND claim_token = $2 AND status = 'sending'`,
+		d.ID, token, d.Status, d.LastError, d.SentAt, d.LinkOnly, d.UpdatedAt.UTC())
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// HasDispatchEvent cho biết sổ lần gửi đã có dòng idem_key (vd dấu recipient_mailed) — đọc mới, không qua bộ nhớ đệm.
+func HasDispatchEvent(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID, idemKey string) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_reports.dispatch_event WHERE dispatch_id = $1::uuid AND idem_key = $2)`,
+		dispatchID, idemKey).Scan(&ok)
+	return ok, err
+}
+
+// CountDispatchEvents đếm dòng sổ của lần gửi theo action (vd 'sent' = số vòng gửi đã hoàn tất) — đọc mới.
+func CountDispatchEvents(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID, action string) (int, error) {
+	var n int
+	err := tx.QueryRow(ctx, `SELECT count(*) FROM pf_reports.dispatch_event WHERE dispatch_id = $1::uuid AND action = $2`,
+		dispatchID, action).Scan(&n)
+	return n, err
+}
+
+// LastSentAttempt trả lượt (payload attempt) của dòng 'sent' mới nhất của lần gửi, 0 nếu chưa vòng nào hoàn tất — đọc mới.
+func LastSentAttempt(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID) (int, error) {
+	var n int
+	err := tx.QueryRow(ctx, `SELECT COALESCE(max((payload->>'attempt')::int), 0) FROM pf_reports.dispatch_event
+	  WHERE dispatch_id = $1::uuid AND action = 'sent'`, dispatchID).Scan(&n)
+	return n, err
+}
+
+// HasAnyDispatchEvent cho biết lần gửi đã có dòng sổ với một trong các idem_key — đọc mới.
+func HasAnyDispatchEvent(ctx context.Context, tx pgx.Tx, dispatchID uuid.UUID, idemKeys []string) (bool, error) {
+	if len(idemKeys) == 0 {
+		return false, nil
+	}
+	var ok bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_reports.dispatch_event WHERE dispatch_id = $1::uuid AND idem_key = ANY($2::text[]))`,
+		dispatchID, idemKeys).Scan(&ok)
+	return ok, err
 }
 
 // SentForPeriod cho biết đã có lần gửi thành công cho kỳ.

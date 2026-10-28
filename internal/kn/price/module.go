@@ -28,6 +28,10 @@
 // PointLines, PublishedBetween); sự kiện pf.price.ticket.proxied (nhập thay → cán bộ Xã); xuất qua điểm kiểm soát xuất
 // (UseEgress).
 //
+// W11.78 (pf 20261024091116): điều tra giá thành sản xuất theo vụ — đợt, nhập tệp hai bước (xem trước → ghi nhận, chống
+// trùng), rà soát + cờ CT-06, chốt đợt, báo cáo giá thành (CT-05); họ tên, SĐT nông hộ / cán bộ điều tra ở kho định danh
+// (UseSurvey, cổng dữ liệu thật port.EnvSurveyPII — chờ DPIA Q-005).
+//
 // Module khác chỉ import price/port (R-02). Tệp này là gốc lắp ráp cho cmd/api-platform.
 package price
 
@@ -43,6 +47,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // DBModule: giao dịch của module chạy SET LOCAL ROLE r_price (ADR-0028).
@@ -53,6 +58,7 @@ type Module struct {
 	svc     *app.Service
 	items   *app.ItemService   // W11.73 mặt hàng theo thời kỳ
 	tickets *app.TicketService // W11.75 phiếu báo giá + xác minh
+	survey  *app.SurveyService // W11.78 điều tra giá thành
 }
 
 // New tạo module trên pool b — vai đăng nhập của đơn vị (app_platform), là thành viên r_price. Cấu hình bên dùng sai → lỗi.
@@ -66,6 +72,7 @@ func New(b tenant.Beginner, clk clock.Clock, profiles []port.Profile) (*Module, 
 	}
 	svc.Reminders = app.PointReminders{S: svc} // W11.72: nhắc cán bộ Xã phụ trách từng xã báo giá
 	m := &Module{svc: svc, items: app.NewItemService(svc), tickets: app.NewTicketService(svc)}
+	m.survey = app.NewSurveyService(m.tickets) // W11.78: dùng chung điểm kiểm soát xuất của báo cáo giá
 	// W11.75: "đã gửi phiếu" cho nhắc lần 2 / ngưng xã (W11.72), "đã có giá / đã có phiếu gửi" cho mặt hàng (W11.73).
 	svc.Points.Submitted = m.tickets.Submitted
 	m.items.Hooks.HasPrice = m.tickets.HasPrice
@@ -109,6 +116,22 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 	m.tickets.Egress, m.tickets.EgressMode, m.tickets.EgressLog = cp, mode, log
 }
 
+// UseSurvey nối kho định danh cho điều tra giá thành (W11.78): họ tên, SĐT nông hộ và cán bộ điều tra. enabled = cổng dữ liệu
+// thật (SurveyEnabled); false hoặc v nil → nhập tệp, khai báo cán bộ điều tra trả 503 price.survey_pii_disabled.
+func (m *Module) UseSurvey(v client.Client, enabled bool) { m.survey.Vault, m.survey.PII = v, enabled }
+
+// SurveyEnabled đọc cổng dữ liệu thật của điều tra giá thành (port.EnvSurveyPII): "1" bật, "0" tắt; vắng → bật ngoài
+// production, tắt ở production (chờ DPIA — Q-005 (iv)).
+func SurveyEnabled(getenv func(string) string, production bool) bool {
+	switch getenv(port.EnvSurveyPII) {
+	case "1":
+		return true
+	case "0":
+		return false
+	}
+	return !production
+}
+
 // Catalog cho module khác: danh mục nền (đơn vị tính, nhóm hàng) có hiệu lực theo ngày.
 func (m *Module) Catalog() port.Catalog { return m.svc }
 
@@ -131,6 +154,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.TicketHandler{Svc: m.tickets}.RegisterApp(rg) // W11.75
 	handler.BoardHandler{Svc: m.tickets}.RegisterApp(rg)  // W11.76
 	handler.ReportHandler{Svc: m.tickets}.RegisterApp(rg) // W11.77
+	handler.SurveyHandler{Svc: m.survey}.RegisterApp(rg)  // W11.78
 }
 
 // RegisterAdmin: không có route Admin API.

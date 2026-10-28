@@ -54,12 +54,21 @@ func (s *Service) CreateSchedule(ctx context.Context, in ScheduleInput) (domain.
 		if prev, err := store.ScheduleByIdemKey(ctx, tx, in.IdemKey); err != nil {
 			return err
 		} else if prev != nil {
+			if err := s.denySourceSchedule(ctx, tx, prev.TemplateKey); err != nil {
+				return err
+			}
+			if err := s.denySourceSchedule(ctx, tx, sch.TemplateKey); err != nil {
+				return err
+			}
 			sch, replayed = *prev, true
 			return nil
 		}
 		t, err := s.resolveTemplate(ctx, tx, strings.TrimSpace(sch.TemplateKey))
 		if err != nil {
 			return err
+		}
+		if _, enabled := s.Builders.jobPolicy(t.Def.Source); enabled {
+			return problem.Forbidden
 		}
 		if t.Status != domain.TemplateActive {
 			return ErrTemplateRetired
@@ -292,6 +301,9 @@ func (s *Service) fire(ctx context.Context, id, tid uuid.UUID, slotAt time.Time,
 		if err != nil {
 			return err
 		}
+		if _, enabled := s.Builders.jobPolicy(t.Def.Source); enabled {
+			return skip("nguồn báo cáo chưa hỗ trợ lịch gửi")
+		}
 		params := sch.Params
 		if s.sourceSpec(t.Def.Source).NeedsPeriod {
 			params.Period = sch.ReportPeriod(slotAt)
@@ -324,4 +336,22 @@ func (s *Service) fire(ctx context.Context, id, tid uuid.UUID, slotAt time.Time,
 		return err
 	})
 	return created, err
+}
+
+// denySourceSchedule also rejects replay of a schedule created before its source
+// became policy-enabled. No old snapshot may be reused for a new scheduled run.
+func (s *Service) denySourceSchedule(ctx context.Context, tx pgx.Tx, key string) error {
+	t, err := s.resolveTemplate(ctx, tx, strings.TrimSpace(key))
+	if errors.Is(err, ErrTemplateNotFound) {
+		// A legacy native replay must return its stored schedule even if a
+		// referenced template no longer exists. No new run is created here.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if _, enabled := s.Builders.jobPolicy(t.Def.Source); enabled {
+		return problem.Forbidden
+	}
+	return nil
 }

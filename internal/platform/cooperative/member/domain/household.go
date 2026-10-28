@@ -11,6 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
 
 // Household là hồ sơ nông hộ ở pf_coop: CHỈ mã tham chiếu và thuộc tính không
@@ -53,7 +55,8 @@ func ValidateHousehold(area *decimal.Decimal, since *time.Time, now time.Time) e
 	if area != nil && !ValidArea(*area) {
 		return FieldError{"cultivated_area_ha", ErrArea}
 	}
-	if since != nil && since.After(now) {
+	// member_since là ngày lịch VN (00:00 UTC): so với ngày VN của now (KN-VN-DATE #149).
+	if since != nil && since.After(clock.BusinessDay(now)) {
 		return FieldError{"member_since", ErrDate}
 	}
 	return nil

@@ -28,7 +28,8 @@ import (
 // notifyLazy dựng module pf/notify cho worker ở sự kiện đầu tiên: pool notify_app
 // (ghi kết quả gửi đẩy bằng giao dịch riêng), danh bạ cán bộ (extension_app),
 // đơn vị hành chính (masterdata_app) — mỗi module một vai (R-05) — và kênh đẩy từ
-// môi trường (AG_FCM_* → FCM HTTP v1; không đặt → chỉ ghi log).
+// môi trường (notify.ChannelsFromEnv: AG_FCM_* → FCM HTTP v1, AG_SMTP_* → SMTP; thiếu → kênh TẮT, bản gửi ghi
+// "dropped" — P0-NOTIFY-FAILCLOSED).
 type notifyLazy struct {
 	log  *slog.Logger
 	once sync.Once
@@ -69,7 +70,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	md := masterdata.New(mdPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 	knUnits := extension.NewPublishedAdminUnits(extPool)
 	kn := extension.New(extPool, clk, extension.Deps{Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs()})
-	log.Info("kênh thông báo", "event", "startup", "push", ch.Pusher.Name(), "email", ch.Mailer != nil, "outcome", "ok")
+	ch.LogStartup(log)
 	// pf/cooperative (W3.3): nông hộ có thửa theo xã (schema pf_coop, r_cooperative).
 	coop := cooperative.New(coopPool, clk, cooperative.Deps{})
 	// Gói NOTIF: email theo người nhận tra địa chỉ qua pf/accounts (Keycloak, AG_KC_*) lúc gửi; người nhận Cấp Tỉnh của
@@ -82,10 +83,12 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
 	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
 	d.Kinds, d.Digests = assembly.NotificationKinds(), assembly.NotificationDigests()
-	d.Builders = assembly.NotificationBuilders(ownedDesk, kn.Staff(), knUnits)
+	// NOTIFY-HCTH (#48): người nhận HCTH của pf/hrm — vai trên lần gán + lãnh đạo đơn vị nội bộ tại Nút (pf_accounts, chỉ đọc).
+	hrmDir := assembly.KNHRMNotifyDirectory{Holders: acc.RoleHolders(), Managers: acc.UnitManagers()}
+	d.Builders = assembly.NotificationBuilders(ownedDesk, kn.Staff(), knUnits, hrmDir)
 	d.Consumers, d.Renderers = assembly.NotificationConsumers(), assembly.NotificationRenderers()
 	d.Staff, d.Units, d.Farmers = kn.Staff(), md.AdminUnits(), farmers
-	d.Log, d.LinkBase = log, os.Getenv("AG_WEB_OPS_URL")
+	d.Log, d.LinkBase = log, ch.LinkBase
 	if dir := acc.MailDirectory(); dir != nil {
 		d.Emails = assembly.NotifyEmails{Dir: dir}
 	} else {
@@ -99,7 +102,7 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 func notifyConsumers(log *slog.Logger) []consumer {
 	lazy := &notifyLazy{log: log}
 	// Danh sách consumer và sự kiện lấy từ module (không cần DB để liệt kê).
-	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(nil, nil, nil)}).Consumers()
+	specs := notify.New(nil, clock.System{}, notify.Deps{Consumers: assembly.NotificationConsumers(), Renderers: assembly.NotificationRenderers(), Kinds: assembly.NotificationKinds(), Digests: assembly.NotificationDigests(), Builders: assembly.NotificationBuilders(nil, nil, nil, nil)}).Consumers()
 	out := make([]consumer, 0, len(specs))
 	for i := range specs {
 		sp := specs[i]

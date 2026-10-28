@@ -18,6 +18,7 @@ provides:
     - PeriodControl
     - Publisher
     - SubmissionFeed
+    - SystemProgressReader
     - Validator
   events: [pf.forms.period.closed/v1, pf.forms.submission.recorded/v1]
   internal_events: []

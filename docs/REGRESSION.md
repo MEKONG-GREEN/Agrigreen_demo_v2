@@ -1178,3 +1178,41 @@ Propagation rule: resolver precedence changed, native and registered authorizati
 
 
 CONTEXT-H actual evidence: source-composite0 preserves originalsourceaggregate1/roothelpercompilefailure plus verifiedKN77target1/2missing-provinceURL test cases. Unchangedproduction3f6: forms/app225.029 +forms/handler150.397 realPG, reports/app3.023 unit, extensionroot4.191, PFPUBClosedFigures11.38 actualPASS; reports/handler compile-only. Final45HTTP22885 actual0/211.732s/noSKIP aftersingleURLliteralfixda0f2c1d, privatePG removed. Fullstatic40421actual0/lint27006actual0/boundary314; currentKN77vet84710actual0+gofmt2old aftertestliteralfix. Full5 29844actual0/noFAILSKIP: dbadmin9.040/metrics208.548/KN77627.503/API212.962/worker3.977s, private51870/9c67707125be removed/GoH0.35goldens/SQL/contracts unchanged; helper9+extensionroot/reportsapp/fullKN77 still required beforedev. Do not replay passedsource/full5 solelyforquota interruption.
+
+## KHTC-REMINDER-PORT — cổng forms cho job không Principal
+
+Downstream consumers: forms Control/Feed/Publisher/Entry/Freezer; KHTC source và KN77 (profile KN, nháp/gửi/duyệt); module root/catalog sinh bởi modgen. Chưa có consumer job nhắc hạn mới.
+Dependency evidence: `rg -n 'progressOf|SystemProgress|OwnerRef|ActorRef|DuePeriods' internal/platform/forms internal/kn/extension tests/kn77 -g '*.go'`; stored OwnerRef là publisher node, khác ActorRef người phát hành.
+Regression acceptance command: privatePG/Go1.26.9 `go test -v -count=1 -p 1 -timeout 55m ./internal/platform/forms/... ./internal/kn/extension/khtcsource/... ./tests/kn77`; full static/build/vet/archlint/contract/docs/MFA/boundary/lint/gofmt. TEST-KHTC-SYSTEM-001/002 đối chiếu user Control.Progress với job context không Principal, SQL role/read-only, vòng đời/hạn/owner node, clone và tenant/profile/identity isolation; existing user gate không đổi.
+Propagation rule: cổng mới chỉ Go/server và phép chiếu dùng chung không đổi → kiểm forms nguồn và toàn bộ KN77 trực tiếp; không thêm route, DDL/ACL/hợp đồng HTTP/goldens. Native chưa gửi = not_submitted, nháp KN vẫn ở khtc_form_sheet. Job/reminders và phân trang vượt DuePeriods2000 còn mở; không coi cổng nền là nghiệm thu nhắc hạn. Root helper dev tuần tự, giữ main/worktrees.
+
+Bằng chứng trước helper: source session64862 actualexit0 trên Go1.26.9/privatePG, 73test cấp đầu PASS và không FAIL/SKIP/INFRA; forms/app216.708s, forms/domain0.841s, forms/handler134.488s, khtcsource/domain0.674s, toàn KN77/KHTC467.460s. Hai test mới đối chiếu lifecycle/owner/read-only6.98s và isolation0.15s đều PASS; KN77 gồm nháp/phiếu/phòng/kỳ/hạn/đóng/hủy và các luồng cũ. Các package không có test chỉ được tính biên dịch. Cluster53211/3211b9f0a6d2 đã dọn, session kết thúc0. Static59503 actualexit0, đủ build/vet/modgen/migrate/archlint/contract/docs/MFA/boundary314/lint0issues, formatter đúng hai fixture archlint cũ và diff-check0. Không đổi Go sau637fd033; 35goldens, migrations và contracts không diff so2e82dfb2. Prefix proof ngoài repo `%TEMP%\agrigreen-codex-khtcreminderport-*` gồm source-pg/static và log/exit từng cổng. Chờ root helper forms/app + toàn KN77 + chín cổng migration, không tự rebase/push; chưa tích hợp dev hay hiện thực job nhắc hạn.
+
+
+## KHTC-DEFAULT-NAV — context navigation owned by application profile
+Downstream consumers: accounts selected/current-context and middleware, party live menu/module filter, owner policy registration, APIassembly, KN77, mock context/support/menu, web login shell consumers (existing default_route only).
+Dependency evidence: `rg -n 'NavigationPolicy|ContextNavigation|NavigationRequest|default_route|DefaultRoute' internal/platform/accounts internal/platform/party internal/kn/extension cmd/api-platform/assembly apps/web-ops/src/api/mock -g '*.go' -g '*.ts'` against base2bfb471c.
+Regression acceptance command: Go1.26.9 pure navigation/registration tests; privatePG generate requiredwebmenu fixture then `go test -v -count=1 -p 1 -timeout 55m ./tests/kn77 -run '^TestKH_FN_CH_00_01_DefaultRouteKHTC$'`; source full accounts/party handlers +root/pure packages, staticall, full5 dbadmin/metrics/KN77/APIassembly/worker; web tsc/vitest/buildmock. Roothelper migration9 beforedev.
+Propagation rule: redirect policy affects auth context and menu; must prove signedJWT select→GETcontext→menu, customcode/profile, readonly/support, disablemodule and denial/nativecompat. Regenerated web fixture is featurebehavior contract, all35DBgoldens/migrations/ACL/OpenAPI unchanged. No success claim from compilation orSKIP. Own tree frozen whileGo/webchecks run. Evidence pending.
+
+## KNSPLIT-2-CONTEXT-I — Báo giá, HCTH, Contact
+
+Downstream consumers: API assembly (KN config và Contact→HRM), KN77/KHTC, worker price calendar; callback chỉ áp dụng đường request, job không tạo principal giả.
+Dependency evidence: `rg -n 'kn/(price|hrm|contact)|KNPriceProfile|KNHRMAccess|KNContactAccess' cmd tests/kn77 internal/kn` và `go run ./tools/modgen -check`.
+Regression acceptance command: `go test -v -count=1 -p 1 -timeout 55m ./internal/kn/price/... ./internal/kn/hrm/... ./internal/kn/contact/... ./tests/contextdata ./tests/kn77 ./cmd/api-platform/assembly ./cmd/worker` với PostgreSQL riêng thực.
+Propagation rule: production quyền/profile đổi → bắt buộc cả ba nguồn và các consumer trên; root chạy full5 và migration gate/helper sau rebase. Thiếu exit thật hoặc có SKIP không được coi xanh. Không đổi 35 golden/DDL/ACL/API.
+
+
+## KNSPLIT-2-CONTEXT-J
+
+Lịch công tác giải phiên owner trước resolver/realm; follower/manager không vay legacy. Lưu/sao chép/duyệt/check-in chỉ xem bị chặn trước I/O. Kiểm tra app policy, toàn handler lịch có dữ liệu, HTTP public root chín trạng thái phiên và contextdata/KN77/API. Không đổi SQL/ACL/OpenAPI/golden hay hành vi GPS. Đang chờ kết quả thực.
+
+KNSPLIT-2-CONTEXT-J: source35581/static65527/pure95493/currentstatic40610/full5-28682 đều actual0, chín HTTP cases PASS/noSKIP. Readonly hint guard99409f32 kiểm cả levels/follower. Hai cụm PG riêng đã dọn; 35 golden/DDL/ACL/API không đổi. Chờ review/ticket merge; log gốc mixed-encoding được giữ, normalized chỉ dùng xác minh marker ASCII.
+
+
+## PRICE-SURVEY-PII-NAME — cờ has_phone của phiếu điều tra giá thành (#150, nền dev 3a885de1)
+
+Downstream consumers: tests/e2e G1 bước 14 (`piiColumnQuery`) và ORG-PII-GUARD-001 dùng chung truy vấn; không đổi Go nghiệp vụ, DDL, ACL, OpenAPI, web.
+Dependency evidence: `rg -n 'has_phone|HasPhone' internal/kn/price migrations/pf` — chỉ `survey_import.go` (ghi/đọc cờ), `store/survey.go`, migration pf 20261024091116; `has_phone` của accounts là trường API, không phải cột.
+Regression acceptance command: `scripts/pg-ephemeral.ps1 run go test -v -count=1 -p 1 -timeout 55m ./tests/e2e ./internal/kn/price/... ./internal/vault/... ./migrations`.
+Propagation rule: miễn đúng `pf_price.survey_form` + partition qua pg_partition_tree, cột `has_phone`, kiểu boolean; quét giá trị PII vẫn gồm survey_form. PRICE-SURVEY-PII-GUARD-001 thêm `farmer_phone`, bảng `survey_form_probe.has_phone` và đổi has_phone sang text trong giao dịch rollback để chứng minh ngoại lệ không che PII khác. Không đổi tên cột (bảng sổ, ADR-0012) và không sửa migration đã áp (R-24).

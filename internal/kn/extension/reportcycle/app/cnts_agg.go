@@ -247,6 +247,11 @@ func (s *Service) sources(ctx context.Context, code string, from, to time.Time, 
 	}
 	out := make([]domain.SourcePeriod, 0, len(figs))
 	for _, f := range figs {
+		// W11.50 (FN-21 BR-02, AC-04): kỳ `adhoc` là đợt điều tra — số liệu riêng của đợt, không cộng vào tổng hợp/lũy kế
+		// định kỳ dù đợt dùng cùng mã biểu.
+		if f.Kind == domain.PeriodAdhoc {
+			continue
+		}
 		sp := domain.SourcePeriod{ID: f.ID, Key: f.Key, From: f.From, To: f.To, Status: f.Status, ClosedNo: f.ClosedNo, Parents: f.Parents,
 			Data: map[string]domain.SourceUnit{}}
 		commune := func(u string) string {

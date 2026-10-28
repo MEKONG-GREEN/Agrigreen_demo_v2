@@ -77,11 +77,12 @@ func (s *Service) docCaller(ctx context.Context, tx pgx.Tx) (dc, error) {
 	if !ok {
 		return dc{}, problem.Unauthenticated
 	}
-	if p.KN == nil {
-		return dc{}, problem.Forbidden.WithDetail("kho tài liệu nhân sự: cần ngữ cảnh phiên Khuyến nông")
+	k, err := s.recordSession(ctx)
+	if err != nil {
+		return dc{}, problem.Forbidden.WithDetail("kho tài liệu nhân sự: cần ngữ cảnh phiên Khuyến nông").WithCause(err)
 	}
-	c := dc{rc: rc{ref: p.ActorRef, tenant: p.TenantID, unitRef: p.KN.UnitRef, group: s.group(p.KN), unit: p.KN.InternalUnit,
-		readOnly: p.KN.ReadOnly()}, recordsOn: s.recordsOn(), mine: map[string]bool{}}
+	c := dc{rc: rc{ref: p.ActorRef, tenant: p.TenantID, unitRef: k.UnitRef, group: s.group(k), unit: k.InternalUnit,
+		readOnly: k.ReadOnly}, recordsOn: s.recordsOn(), mine: map[string]bool{}}
 	m, err := s.matrixOf(ctx, tx, c.group, c.ref)
 	if err != nil {
 		return dc{}, err
@@ -756,6 +757,7 @@ func (s *Service) UploadDoc(ctx context.Context, in DocInput, fileName string, c
 	}
 	row := store.DocRow{DocID: ids.New(), FolderID: in.FolderID, FileName: name, ContentType: ct, Size: int64(len(content)),
 		Status: "active", Change: "created"}
+	ctx = s.preloadUnits(ctx) // P0-POOL-KN-2: đơn vị nội bộ đọc ngoài giao dịch (checkDocRefs)
 	var tid uuid.UUID
 	check := func(tx pgx.Tx) (dc, error) {
 		c, err := s.docCaller(ctx, tx)
@@ -867,6 +869,7 @@ func (c dc) visibleDoc(t folderTree, d store.DocRow) (domain.Matrix, error) {
 
 // UpdateDoc sửa phân loại tài liệu (thư mục không đổi — bộ ba chủ thể của tệp gắn thư mục lúc tải lên).
 func (s *Service) UpdateDoc(ctx context.Context, id uuid.UUID, in DocInput, idem string) (DocResult, error) {
+	ctx = s.preloadUnits(ctx) // P0-POOL-KN-2: đơn vị nội bộ đọc ngoài giao dịch (checkDocRefs)
 	res := DocResult{DocID: id}
 	err := s.docTx(ctx, func(tx pgx.Tx) error {
 		c, err := s.docCaller(ctx, tx)

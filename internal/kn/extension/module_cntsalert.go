@@ -37,6 +37,7 @@ type CNTSAlertDeps struct {
 // UseCNTSAlerts nối cảnh báo CNTS.
 func (m *Module) UseCNTSAlerts(d CNTSAlertDeps) {
 	m.alert.Feed = d.Feed
+	m.svc.PlanFeed = d.Feed // BF-CN-WEEKLY: kế hoạch tuần BM-05 Phần II → Lịch công tác
 	if d.Directory != nil || d.Holders != nil {
 		m.alert.Dir = alertDirectory{dir: d.Directory, holders: d.Holders}
 	}

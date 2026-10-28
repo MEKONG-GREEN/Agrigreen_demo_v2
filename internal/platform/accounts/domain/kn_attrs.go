@@ -70,6 +70,19 @@ func dedupeRefs(in []uuid.UUID) ([]uuid.UUID, error) {
 // NormalizeAttrs chuẩn hóa và kiểm thuộc tính theo vai của lần gán: nhóm + cờ chỉ Cấp Tỉnh, cơ sở/hộ chỉ Cấp
 // Xã, mã thuộc danh mục có phiên bản (port.ProvinceGroups, port.Duties).
 func NormalizeAttrs(role string, in AttrsInput) (AttrsInput, error) {
+	return NormalizeAttrsWithCatalog(role, in, port.LegacyAttributeCatalog())
+}
+
+// NormalizeAttrsWithCatalog keeps structural/target safeguards native, with
+// membership and role capabilities from the same immutable catalog as readers.
+func NormalizeAttrsWithCatalog(role string, in AttrsInput, catalog *port.AttributeCatalog) (AttrsInput, error) {
+	if !catalog.Valid() {
+		return in, port.ErrAttributeCatalog
+	}
+	roleAttrs, known := catalog.Role(role)
+	if !known {
+		return in, FieldError{Field: "role", Msg: MsgKNRole}
+	}
 	in.ProvinceGroup = strings.TrimSpace(in.ProvinceGroup)
 	in.InternalUnit = strings.TrimSpace(in.InternalUnit)
 	duties := []string{}
@@ -78,17 +91,17 @@ func NormalizeAttrs(role string, in AttrsInput) (AttrsInput, error) {
 		if d == "" || slices.Contains(duties, d) {
 			continue
 		}
-		if port.CatalogLabel(port.Duties, d) == "" {
+		if catalog.DutyLabel(d) == "" {
 			return in, FieldError{Field: "duties", Msg: MsgAttrDuty}
 		}
 		duties = append(duties, d)
 	}
 	slices.Sort(duties)
 	in.Duties = duties
-	if in.ProvinceGroup != "" && port.CatalogLabel(port.ProvinceGroups, in.ProvinceGroup) == "" {
+	if in.ProvinceGroup != "" && catalog.GroupLabel(in.ProvinceGroup) == "" {
 		return in, FieldError{Field: "province_group", Msg: MsgAttrGroup}
 	}
-	if role != port.KNTinh && (in.ProvinceGroup != "" || len(in.Duties) > 0) {
+	if !roleAttrs.GroupAndDuties && (in.ProvinceGroup != "" || len(in.Duties) > 0) {
 		return in, FieldError{Field: "province_group", Msg: MsgAttrGroupRole}
 	}
 	if in.InternalUnit != "" && !unitCodeRe.MatchString(in.InternalUnit) {
@@ -101,7 +114,7 @@ func NormalizeAttrs(role string, in AttrsInput) (AttrsInput, error) {
 	if in.Households, err = dedupeRefs(in.Households); err != nil {
 		return in, FieldError{Field: "household_refs", Msg: MsgAttrTargetNil}
 	}
-	if role != port.KNXa && (len(in.Facilities) > 0 || len(in.Households) > 0) {
+	if !roleAttrs.ScopedTargets && (len(in.Facilities) > 0 || len(in.Households) > 0) {
 		return in, FieldError{Field: "facility_refs", Msg: MsgAttrTargetsRole}
 	}
 	if len(in.Facilities)+len(in.Households) > MaxScopeTargets {
@@ -138,28 +151,30 @@ func AttrsSnapshotOf(a port.AssignmentAttrs) AttrsSnapshot {
 // (ReadsAllDepartments) chọn được mọi phòng ban khác của đơn vị ở chế độ chỉ xem; nhóm Ban Giám đốc luôn chỉ
 // xem (và đọc được mọi phòng ban như Lãnh đạo đơn vị).
 func ViewOnlyDepartment(a port.Assignment, group, dept string) (viewOnly, ok bool) {
-	if a.Role != port.KNTinh {
-		return false, slices.Contains(a.Departments, dept)
-	}
-	l, _ := port.MgmtLevelOf(a.MgmtLevel)
-	readsAll := l.ReadsAllDepartments || group == port.GroupBanGiamDoc
-	own := slices.Contains(a.Departments, dept)
-	switch {
-	case own:
-		return group == port.GroupBanGiamDoc, true
-	case readsAll && dept != "":
-		return true, true
-	}
-	return false, false
+	viewOnly, ok, _ = ViewOnlyDepartmentWithCatalog(a, group, dept, port.LegacyAttributeCatalog())
+	return
 }
 
-// ReadsAllDepartments cho biết lần gán Cấp Tỉnh được liệt kê mọi phòng ban của đơn vị (chỉ xem).
-func ReadsAllDepartments(a port.Assignment, group string) bool {
-	if a.Role != port.KNTinh {
-		return false
+// ViewOnlyDepartmentWithCatalog never grants cross-department writes. Unknown
+// stored codes/configuration return an error rather than default capabilities.
+func ViewOnlyDepartmentWithCatalog(a port.Assignment, group, dept string, catalog *port.AttributeCatalog) (viewOnly, ok bool, err error) {
+	caps, err := catalog.Capabilities(a.Role, a.MgmtLevel, group)
+	if err != nil {
+		return false, false, err
 	}
-	l, _ := port.MgmtLevelOf(a.MgmtLevel)
-	return l.ReadsAllDepartments || group == port.GroupBanGiamDoc
+	if slices.Contains(a.Departments, dept) {
+		return caps.ForceReadOnly, true, nil
+	}
+	if caps.ReadsAllDepartments && dept != "" {
+		return true, true, nil
+	}
+	return false, false, nil
+}
+
+// ReadsAllDepartments keeps the legacy public helper during owner migration.
+func ReadsAllDepartments(a port.Assignment, group string) bool {
+	caps, err := port.LegacyAttributeCatalog().Capabilities(a.Role, a.MgmtLevel, group)
+	return err == nil && caps.ReadsAllDepartments
 }
 
 // DelegationInput là dữ liệu tạo ủy quyền.

@@ -47,9 +47,39 @@ func TestFN_XA_03_08_ItemRules(t *testing.T) {
 	if !cf[a.ItemID] || !cf[b.ItemID] || !cf[c.ItemID] || !cf[d.ItemID] || len(Conflicts([]ScheduleItem{a, c})) != 0 {
 		t.Fatalf("trùng giờ: 08–10 × 09:30 (1 giờ); chiều cả buổi × 16:30: %v", cf)
 	}
+	for _, it := range []*ScheduleItem{&a, &b, &c, &d} {
+		it.CommuneCode, it.Location = "30001", "UBND xã"
+	}
 	norm, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{c, a}, []string{"30001"}, uuid.New)
 	if err != nil || norm[0].ItemID != a.ItemID || norm[1].Position != 1 {
 		t.Fatalf("sắp theo ngày, buổi, giờ: %v %v", norm, err)
+	}
+	// Log bug TT-05/CN-04: cán bộ xã bắt buộc Xã/phường; mọi mục bắt buộc Địa điểm (chữ hoặc vị trí).
+	noCommune, noPlace, gpsOnly := a, a, a
+	noCommune.CommuneCode = " "
+	noPlace.Location = " "
+	gpsOnly.Location, gpsOnly.Place = "", &GeoPoint{Lat: 10, Lon: 105}
+	var fe FieldError
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{noCommune}, []string{"30001"}, uuid.New); !errors.Is(err, ErrItemCommuneReq) || !errors.As(err, &fe) || fe.Field != "items[0].commune_code" {
+		t.Fatalf("cán bộ xã thiếu xã: %v", err)
+	}
+	// Quyết định PO 25/10/2026 (R-B1): cán bộ tỉnh cũng bắt buộc Xã/phường; xã phải thuộc tỉnh (allowed = xã của tỉnh).
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{b, noCommune}, []string{"30001", "30002"}, uuid.New); !errors.Is(err, ErrItemCommuneReq) || !errors.As(err, &fe) || fe.Field != "items[1].commune_code" {
+		t.Fatalf("cán bộ tỉnh thiếu xã: %v", err)
+	}
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{noCommune}, nil, uuid.New); !errors.Is(err, ErrItemCommuneReq) {
+		t.Fatalf("không giới hạn xã (nil) vẫn bắt buộc xã: %v", err)
+	}
+	other := a
+	other.CommuneCode = "31001"
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{other}, []string{"30001", "30002"}, uuid.New); !errors.Is(err, ErrItemCommune) || !errors.As(err, &fe) || fe.Field != "items[0].commune_code" {
+		t.Fatalf("cán bộ tỉnh chọn xã ngoài tỉnh: %v", err)
+	}
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{noPlace}, nil, uuid.New); !errors.Is(err, ErrItemLocationReq) || !errors.As(err, &fe) || fe.Field != "items[0].location" {
+		t.Fatalf("thiếu địa điểm: %v", err)
+	}
+	if _, err := NormalizeItems(day("2026-09-21"), []ScheduleItem{gpsOnly}, []string{"30001"}, uuid.New); err != nil {
+		t.Fatalf("chỉ có vị trí trên bản đồ vẫn đủ địa điểm: %v", err)
 	}
 	bad := a
 	bad.Participants = "Chú Tư 0912345678"

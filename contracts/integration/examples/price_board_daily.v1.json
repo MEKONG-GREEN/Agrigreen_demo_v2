@@ -1,0 +1,74 @@
+{
+  "feed": "price_board_daily",
+  "contract_version": 1,
+  "cursor": "c2VxOjQw",
+  "next_cursor": "c2VxOjQz",
+  "has_more": false,
+  "as_of": "2026-10-08T13:15:00+07:00",
+  "max_age": "PT1H",
+  "dataset": {
+    "version": 12,
+    "built_at": "2026-10-08T13:15:00+07:00",
+    "admin_unit_as_of": null,
+    "k_used": null,
+    "contributors": 1,
+    "checksum": { "record_count": 412, "sha256": "9f2c4b1e0a7d5c3b8e6f1a2d4c7b9e0f3a5d6c8b1e2f4a7d9c0b3e5f6a8d1c2b" }
+  },
+  "snapshot": { "dataset": "price_board_daily", "version": 12, "href": "/v1/snapshots/price_board_daily/12" },
+  "items": [
+    {
+      "seq": 41,
+      "event_id": "019a0c41-0001-7000-8000-000000000041",
+      "entity_key": "89:2026-10-08:MH00001",
+      "op": "upsert",
+      "recorded_at": "2026-10-08T13:15:00+07:00",
+      "record": {
+        "province_code": "89",
+        "board_date": "2026-10-08",
+        "item_code": "MH00001",
+        "item_name": "Dưa leo (Loại 1)",
+        "group_code": "rau_mau",
+        "unit_code": "kg",
+        "price_min": "8000",
+        "price_max": "10000",
+        "price_avg": "9000",
+        "points_reported": 2,
+        "board_version": 1,
+        "approved_at": "2026-10-08T13:05:12+07:00",
+        "week_key": "2026-W41",
+        "updating": false
+      }
+    },
+    {
+      "seq": 42,
+      "event_id": "019a0c41-0001-7000-8000-000000000042",
+      "entity_key": "89:2026-10-07:MH00002",
+      "op": "upsert",
+      "recorded_at": "2026-10-08T13:15:00+07:00",
+      "record": {
+        "province_code": "89",
+        "board_date": "2026-10-07",
+        "item_code": "MH00002",
+        "item_name": "Heo hơi (Thịt)",
+        "group_code": "chan_nuoi",
+        "unit_code": "kg",
+        "price_min": "38000",
+        "price_max": "41000",
+        "price_avg": "39500",
+        "points_reported": 2,
+        "board_version": 2,
+        "approved_at": "2026-10-08T09:40:00+07:00",
+        "week_key": "2026-W41",
+        "updating": true
+      }
+    },
+    {
+      "seq": 43,
+      "event_id": "019a0c41-0001-7000-8000-000000000043",
+      "entity_key": "89:2026-10-07:MH00003",
+      "op": "retract",
+      "recorded_at": "2026-10-08T13:15:00+07:00",
+      "record": null
+    }
+  ]
+}

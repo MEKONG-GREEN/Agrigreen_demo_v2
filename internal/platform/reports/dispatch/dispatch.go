@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
+	"time"
 
 	"github.com/shopspring/decimal"
 
@@ -38,6 +39,51 @@ const (
 	KindTo = "to"
 	KindCC = "cc"
 )
+
+// DefaultSendLease (P0-WORKER-REPORTS #128): hạn nhận việc gửi email của một worker, gia hạn sau mỗi người nhận.
+// Quá hạn khi lần gửi còn "sending" (worker chết giữa chừng) → lượt gửi được nhận lại; người đã nhận không bị gửi lại.
+const DefaultSendLease = 15 * time.Minute
+
+// EnvSendLease là biến môi trường đặt hạn nhận việc (thời lượng Go, vd "15m"); rỗng → DefaultSendLease.
+const EnvSendLease = "AG_REPORT_DISPATCH_LEASE"
+
+// MinSendLease là hạn nhận việc nhỏ nhất chấp nhận khi khởi động (review #128): phải lớn hơn hạn xử lý một thông điệp
+// của inbox (2 phút) cộng biên an toàn, để một lời gọi SMTP (bị cắt theo hạn còn lại) không thể sống quá hạn nhận việc.
+const MinSendLease = 3 * time.Minute
+
+// maxSendMargin là biên an toàn tối đa giữa hạn của một lời gọi SMTP và hạn nhận việc.
+const maxSendMargin = 30 * time.Second
+
+// SendMargin là biên an toàn: lời gọi SMTP phải kết thúc trước hạn nhận việc ít nhất chừng này (¼ hạn, tối đa 30 giây)
+// — đủ để ghi dấu người nhận khi còn giữ việc, trước khi worker khác được nhận lại.
+func SendMargin(lease time.Duration) time.Duration {
+	return min(lease/4, maxSendMargin)
+}
+
+// ValidateSendLease kiểm hạn nhận việc so với hạn xử lý một thông điệp của consumer: lease ≥ handlerTimeout + biên.
+// handlerTimeout ≤ 0 (consumer không đặt hạn) → chỉ kiểm MinSendLease.
+func ValidateSendLease(lease, handlerTimeout time.Duration) error {
+	if lease < MinSendLease {
+		return fmt.Errorf("%s=%s quá ngắn (tối thiểu %s)", EnvSendLease, lease, MinSendLease)
+	}
+	if handlerTimeout > 0 && lease < handlerTimeout+SendMargin(lease) {
+		return fmt.Errorf("%s=%s phải ≥ hạn xử lý thông điệp %s + biên %s", EnvSendLease, lease, handlerTimeout, SendMargin(lease))
+	}
+	return nil
+}
+
+// SendLeaseFromEnv đọc AG_REPORT_DISPATCH_LEASE (3 phút – 24 giờ); sai định dạng/ngoài khoảng → lỗi khởi động.
+func SendLeaseFromEnv(getenv func(string) string) (time.Duration, error) {
+	v := strings.TrimSpace(getenv(EnvSendLease))
+	if v == "" {
+		return DefaultSendLease, nil
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < MinSendLease || d > 24*time.Hour {
+		return 0, fmt.Errorf("%s=%q không hợp lệ (thời lượng 3m–24h, vd 15m)", EnvSendLease, v)
+	}
+	return d, nil
+}
 
 // DefaultAttachmentLimitMB: tổng dung lượng đính kèm tối đa (tạm; tham số reports.dispatch_attachment_limit_mb).
 const DefaultAttachmentLimitMB = 10

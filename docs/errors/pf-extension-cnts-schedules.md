@@ -15,4 +15,5 @@ Dùng lại mã đã có của module: `extension.read_only`, `extension.out_of_
 | 409 | `extension.checkin_disabled` | Phòng ban của lịch không dùng check-in (`extension.work_schedule_checkin` = off, mặc định ngoài CNTS) |
 | 409 | `extension.checkin_exists` | Mục công tác đã check-in — check-in không sửa được (FN-12 BR-02); `checkin_id` trong phần mở rộng |
 | 409 | `extension.checkin_not_registered` | Lịch còn Nháp — gửi lịch trước khi check-in |
+| 409 | `extension.checkin_not_approved` | Lịch đã gửi nhưng chưa có bản nào được duyệt — chỉ check-in theo lịch đã duyệt (log bug TT-07/CN-06, 23/10/2026). Đang có điều chỉnh chờ duyệt lại thì check-in theo bản đã duyệt trước đó |
 | 404 | `extension.schedule_item_not_found` | Không có mục trong phiên bản hiện hành của lịch |

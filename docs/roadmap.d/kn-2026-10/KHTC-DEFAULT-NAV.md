@@ -1,0 +1,1 @@
+- [ ] KHTC-DEFAULT-NAV: trang mặc định theo owner profile; chờ HTTP/PG, web và cổng tích hợp thật.

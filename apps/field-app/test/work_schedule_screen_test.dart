@@ -128,6 +128,18 @@ void main() {
     );
     await tester.enterText(find.byKey(const ValueKey('ws-f-start')), '07:30');
     await tester.enterText(find.byKey(const ValueKey('ws-f-end')), '11:00');
+    // Log bug TT-05/CN-04: Địa điểm bắt buộc.
+    await tester.ensureVisible(find.byKey(const ValueKey('ws-f-save')));
+    await tester.tap(find.byKey(const ValueKey('ws-f-save')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Địa điểm bắt buộc — nhập địa điểm hoặc chọn vị trí.'),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('ws-f-location')),
+      'Cánh đồng ấp 1',
+    );
     await tester.enterText(
       find.byKey(const ValueKey('ws-f-participants')),
       'Cán bộ HTX 0912345678',
@@ -164,6 +176,10 @@ void main() {
       'Họp tổ khuyến nông',
     );
     await tester.enterText(find.byKey(const ValueKey('ws-f-start')), '10:00');
+    await tester.enterText(
+      find.byKey(const ValueKey('ws-f-location')),
+      'Trụ sở UBND xã',
+    );
     await tester.ensureVisible(find.byKey(const ValueKey('ws-f-save')));
     await tester.tap(find.byKey(const ValueKey('ws-f-save')));
     await tester.pumpAndSettle();
@@ -183,11 +199,149 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(find.byKey(const ValueKey('ws-log')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('ws-log')));
     await tester.pumpAndSettle();
     expect(find.text('Lịch sử'), findsOneWidget);
     expect(find.textContaining('Nguyễn Văn An'), findsOneWidget);
   });
+
+  testWidgets(
+    'R-B1 (PO 25/10/2026): cán bộ tỉnh chọn Xã/phường (bắt buộc) trong mọi xã của tỉnh, hiện tên xã',
+    (tester) async {
+      tester.view.physicalSize = const Size(720, 1600);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      Object? popped;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(),
+          home: Builder(
+            builder: (ctx) => TextButton(
+              onPressed: () async {
+                popped = await Navigator.of(ctx).push<Object?>(
+                  MaterialPageRoute(
+                    builder: (_) => WorkScheduleItemScreen(
+                      weekStart: _week,
+                      day: _week,
+                      newId: () => '01920000-0000-7000-8000-000000000098',
+                      communeCodes: const ['30280', '30281', '30282'],
+                      communeNames: const {
+                        '30280': 'Mỹ Hòa Hưng',
+                        '30281': 'Bình Đức',
+                        '30282': 'Núi Sam',
+                      },
+                    ),
+                  ),
+                );
+              },
+              child: const Text('mở'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('mở'));
+      await tester.pumpAndSettle();
+      expect(find.text('Xã/phường *'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('ws-f-content')),
+        'Kiểm tra mô hình lúa',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('ws-f-location')),
+        'Cánh đồng lớn',
+      );
+      await tester.ensureVisible(find.byKey(const ValueKey('ws-f-save')));
+      await tester.tap(find.byKey(const ValueKey('ws-f-save')));
+      await tester.pumpAndSettle();
+      expect(find.text('Xã/phường bắt buộc.'), findsOneWidget);
+      expect(popped, isNull);
+
+      await tester.ensureVisible(find.byKey(const ValueKey('ws-f-commune')));
+      await tester.tap(find.byKey(const ValueKey('ws-f-commune')));
+      await tester.pumpAndSettle();
+      expect(find.text('Bình Đức'), findsWidgets);
+      await tester.tap(find.text('Núi Sam').last);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('ws-f-save')));
+      await tester.tap(find.byKey(const ValueKey('ws-f-save')));
+      await tester.pumpAndSettle();
+      expect(popped, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'R-B1 (review #99): luôn thấy ô Xã/phường (bắt buộc), kể cả chưa có danh sách xã',
+    (tester) async {
+      _EditResultProbe? popped;
+      Future<void> open(List<String> communes) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            key: ValueKey(communes.length),
+            theme: buildTheme(),
+            home: Builder(
+              builder: (ctx) => TextButton(
+                onPressed: () async {
+                  final r = await Navigator.of(ctx).push<Object?>(
+                    MaterialPageRoute(
+                      builder: (_) => WorkScheduleItemScreen(
+                        weekStart: _week,
+                        day: _week,
+                        newId: () => '01920000-0000-7000-8000-000000000099',
+                        communeCodes: communes,
+                      ),
+                    ),
+                  );
+                  popped = r == null ? null : _EditResultProbe();
+                },
+                child: const Text('mở'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('mở'));
+        await tester.pumpAndSettle();
+      }
+
+      tester.view.physicalSize = const Size(720, 1600);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+
+      // Chưa tải được danh sách xã: ô vẫn hiện, bắt buộc, không cho lưu.
+      await open(const []);
+      expect(find.byKey(const ValueKey('ws-f-commune')), findsOneWidget);
+      expect(find.text('Xã/phường *'), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('ws-f-content')),
+        'Kiểm tra rầy nâu',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('ws-f-location')),
+        'Cánh đồng ấp 1',
+      );
+      await tester.ensureVisible(find.byKey(const ValueKey('ws-f-save')));
+      await tester.tap(find.byKey(const ValueKey('ws-f-save')));
+      await tester.pumpAndSettle();
+      expect(find.text('Xã/phường bắt buộc.'), findsOneWidget);
+      expect(popped, isNull);
+
+      // Một xã phụ trách: chọn sẵn, lưu được.
+      await open(const ['30280']);
+      await tester.enterText(
+        find.byKey(const ValueKey('ws-f-content')),
+        'Kiểm tra rầy nâu',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('ws-f-location')),
+        'Cánh đồng ấp 1',
+      );
+      await tester.ensureVisible(find.byKey(const ValueKey('ws-f-save')));
+      await tester.tap(find.byKey(const ValueKey('ws-f-save')));
+      await tester.pumpAndSettle();
+      expect(popped, isNotNull);
+    },
+  );
 
   testWidgets('xung đột phiên bản: báo tải lại, nút Tải lại bỏ bản trên máy', (
     tester,
@@ -226,3 +380,5 @@ void main() {
     expect(find.text('Lịch đã thay đổi trên máy chủ — tải lại'), findsNothing);
   });
 }
+
+class _EditResultProbe {}

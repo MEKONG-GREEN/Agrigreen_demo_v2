@@ -126,8 +126,17 @@ func (h Handler) Middleware() gin.HandlerFunc {
 			return
 		}
 		p.SelectedSession = &binding
-		// Dấu quyền lấy từ ngữ cảnh vừa giải ở server, gồm cả thuộc tính/ủy quyền/phạm vi mới nhất.
-		scope, err := json.Marshal(kc)
+		// Bind both the existing context and the complete registered owner projection.
+		// Owner payload may carry current grants absent from the compatibility context.
+		stamp, err := binding.AuthorizationStamp()
+		if err != nil {
+			httpx.Fail(c, app.ErrContextInvalid.WithCause(err))
+			return
+		}
+		scope, err := json.Marshal(struct {
+			Context *authz.KNContext
+			Owner   []byte
+		}{kc, stamp})
 		if err != nil {
 			httpx.Fail(c, err)
 			return
@@ -216,7 +225,7 @@ func toAssignmentDTO(v app.AssignmentView) assignmentDTO {
 		d.Departments = append(d.Departments, deptRefDTO{Code: x.Code, Name: x.Name, Description: strPtr(x.Description), Status: x.Status,
 			ReadOnly: x.ReadOnly})
 	}
-	d.Attributes = toAttrsDTO(v.Attrs)
+	d.Attributes = toAttrsDTO(v.Attrs, v.AttrsGroupLabel)
 	return d
 }
 
@@ -337,13 +346,23 @@ func (h Handler) mgmtLevels(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	items := make([]gin.H, 0, len(port.MgmtLevels))
-	for _, l := range port.MgmtLevels {
+	catalog := h.Svc.AttributeCatalog()
+	if !catalog.Valid() {
+		httpx.Fail(c, app.ErrDependency)
+		return
+	}
+	levels := catalog.Levels()
+	items := make([]gin.H, 0, len(levels))
+	for _, l := range levels {
 		items = append(items, gin.H{"code": l.Code, "label": l.Label, "manager": l.Manager, "reads_all_departments": l.ReadsAllDepartments})
 	}
 	// W11.07: danh mục phân quyền trong vai (Q-059) — cùng phiên bản, cùng trạng thái tạm.
-	c.JSON(http.StatusOK, gin.H{"items": items, "provisional": true, "version": port.MgmtCatalogVersion,
-		"province_groups": catalogDTO(port.ProvinceGroups), "duties": catalogDTO(port.Duties), "powers": catalogDTO(port.Powers),
+	groups := make([]port.CatalogItem, 0, len(catalog.Groups()))
+	for _, g := range catalog.Groups() {
+		groups = append(groups, port.CatalogItem{Code: g.Code, Label: g.Label})
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "provisional": catalog.Provisional(), "version": catalog.Version(),
+		"province_groups": catalogDTO(groups), "duties": catalogDTO(catalog.Duties()), "powers": catalogDTO(port.Powers),
 		"delegation_max_days": domain.DelegationMaxDays})
 }
 

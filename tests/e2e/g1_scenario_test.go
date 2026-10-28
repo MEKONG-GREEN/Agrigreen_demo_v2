@@ -1054,11 +1054,21 @@ func TestRB3ErasureEvidenceUnreadable(t *testing.T) {
 // ADR-0054: phone/address của thẻ đơn vị là thông tin công vụ, không phải cá nhân.
 // Ngoại lệ đúng hai cột trên bảng unit và các partition thực sự của nó. Quét giá trị
 // PII vẫn bao gồm mọi bảng, kể cả unit; không miễn toàn schema hay theo tiền tố tên.
+//
+// PRICE-SURVEY-PII-NAME (#150): pf_price.survey_form.has_phone (W11.78) là cờ boolean "dòng có SĐT"
+// để chống trùng; SĐT/họ tên nông hộ ở kho định danh (farmer_ref, mục đích price.cost_survey —
+// docs/kn/gia-dinh/W11.78.md Q-005). Không đổi tên được: survey_form là bảng sổ, row_hash băm
+// to_jsonb(dòng) nên RENAME COLUMN đứt chuỗi băm (ADR-0012, migratecheck CheckLedgerColumns), và
+// migration đã áp không sửa (R-24). Miễn đúng cột này, đúng cây partition của survey_form và chỉ
+// khi kiểu là boolean (không thể chứa SĐT). PRICE-SURVEY-PII-GUARD-001 chứng minh không che gì khác.
 const piiColumnQuery = `SELECT table_schema, table_name, column_name FROM information_schema.columns
 	  WHERE (table_schema LIKE 'pf\_%' OR table_schema = 'shared')
 	    AND column_name ~* '(full_?name|phone|national_?id|cccd|address|dia_chi|ho_ten)'
       AND NOT (table_schema = 'pf_contact' AND column_name IN ('phone', 'address')
        AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_contact.unit'::regclass) p
+        JOIN pg_class c ON c.oid = p.relid))
+      AND NOT (table_schema = 'pf_price' AND column_name = 'has_phone' AND data_type = 'boolean'
+       AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_price.survey_form'::regclass) p
         JOIN pg_class c ON c.oid = p.relid))`
 
 // ORG-PII-GUARD-001: ngoại lệ công vụ không che cột PII khác hay bảng tên gần giống.
@@ -1095,5 +1105,67 @@ func TestContactPublicColumnsDoNotHidePII_ORGUI(t *testing.T) {
 	}
 	if !rootName || !probePhone {
 		t.Fatal("ngoại lệ đã che dữ liệu cá nhân ngoài phạm vi")
+	}
+}
+
+// PRICE-SURVEY-PII-GUARD-001 (#150): ngoại lệ cờ has_phone của phiếu điều tra giá thành không che cột PII
+// khác trên survey_form, bảng tên gần giống, hay has_phone đổi sang kiểu chứa được SĐT.
+func TestPriceSurveyHasPhoneFlagDoesNotHidePII(t *testing.T) {
+	s := harness.New(t)
+	ctx := context.Background()
+	tx, err := s.AdminPF().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	flagged := func(q pgx.Tx) map[string]bool {
+		rows, err := q.Query(ctx, piiColumnQuery)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		got := map[string]bool{}
+		for rows.Next() {
+			var schema, table, col string
+			if err := rows.Scan(&schema, &table, &col); err != nil {
+				t.Fatal(err)
+			}
+			if schema == "pf_price" {
+				got[table+"."+col] = true
+			}
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	// Cờ boolean trên bảng cha và mọi partition: được miễn.
+	var parts int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM pg_partition_tree('pf_price.survey_form'::regclass)`).Scan(&parts); err != nil {
+		t.Fatal(err)
+	}
+	if parts < 2 {
+		t.Fatalf("survey_form phải có partition để kiểm ngoại lệ lan xuống: %d", parts)
+	}
+	for k := range flagged(tx) {
+		if strings.HasSuffix(k, ".has_phone") {
+			t.Fatalf("cờ boolean has_phone của survey_form không được nhận diện: %s", k)
+		}
+	}
+
+	if _, err = tx.Exec(ctx, `ALTER TABLE pf_price.survey_form ADD COLUMN farmer_phone text;
+	  CREATE TABLE pf_price.survey_form_probe (has_phone boolean)`); err != nil {
+		t.Fatal(err)
+	}
+	got := flagged(tx)
+	if !got["survey_form.farmer_phone"] || !got["survey_form_default.farmer_phone"] || !got["survey_form_probe.has_phone"] {
+		t.Fatalf("ngoại lệ has_phone đã che dữ liệu cá nhân ngoài phạm vi: %v", got)
+	}
+
+	if _, err = tx.Exec(ctx, `ALTER TABLE pf_price.survey_form ALTER COLUMN has_phone TYPE text USING has_phone::text`); err != nil {
+		t.Fatal(err)
+	}
+	if got := flagged(tx); !got["survey_form.has_phone"] || !got["survey_form_default.has_phone"] {
+		t.Fatalf("has_phone kiểu text phải bị bắt: %v", got)
 	}
 }

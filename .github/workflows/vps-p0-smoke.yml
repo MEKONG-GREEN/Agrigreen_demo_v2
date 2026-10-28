@@ -1,0 +1,34 @@
+name: P0 VPS operations smoke
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev]
+    paths:
+      - deploy/compose/**
+      - deploy/vps/**
+      - internal/shared/objstore/**
+      - scripts/test-vps-p0.sh
+      - .github/workflows/vps-p0-smoke.yml
+concurrency:
+  group: vps-p0-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  vps-p0:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AG_P0_SMOKE_DISPOSABLE: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Bootstrap and recovery harness regressions
+        run: python3 -m unittest discover -s deploy/vps -p 'test_*.py' -v
+      - name: Real Compose, Keycloak TOTP/reset and public S3 proxy
+        run: sh scripts/test-vps-p0.sh

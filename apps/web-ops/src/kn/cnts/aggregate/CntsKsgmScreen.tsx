@@ -3,12 +3,16 @@
 // BM-02 — KSGM tuần, tháng (W11.44, BRD CNTS v3.7 UR-TINH-14, FN-16): số theo cơ sở giết mổ tự cộng từ BM-01 đã gửi + dòng
 // điều chỉnh (chỉ ghi thêm, có lý do; không ghi đè số tự cộng), "Thiếu n ngày", dòng điều chỉnh "cần xem lại" khi BM-01 đổi,
 // chốt / mở lại tuần KSGM (số công bố cho KHTC), phiên bản tệp chia sẻ Chi cục (Excel).
+// BF-SWEEP-CNTS (#101): bảng danh sách có STT (DataTable); bảng BM-02 giữ bố cục biểu báo cáo (dòng cộng theo xã, dòng tổng).
+// Ô điều chỉnh dùng NumberField (được âm: cộng/trừ), lý do mở lại nhập trong pop-up ngắn thay `window.prompt`.
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { NumberField, SelectField, TextField } from "@/components/form";
+import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, num, useAction, useLoad } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
-import { AGG_STATE, adjustmentErrors, createCntsAggApi, type Basis, type CntsBM02 } from "./api";
+import { ReasonDialog } from "../ReasonDialog";
+import { AGG_STATE, DELTA_RULE, adjustmentErrors, createCntsAggApi, normalizeDeltas, type Basis, type CntsBM02 } from "./api";
 
 export function CntsKsgmScreen() {
   const { api, kn } = useAuth();
@@ -57,18 +61,16 @@ function Bm02Body({ v, writer, act, capi, reload }: {
   const [deltas, setDeltas] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
   const [errs, setErrs] = useState<Record<string, string>>({});
+  const [reopening, setReopening] = useState<string | null>(null);
   const facilities = v.rows.map((r) => ({ ref: r.facility_ref, name: r.facility_name }));
   const aggOf = (k: string) => v.aggregates.find((a) => a.key === k);
-  const askReason = () => {
-    const r = window.prompt("Lý do mở lại (10–500 ký tự)");
-    return r && r.trim().length >= 10 ? r.trim() : null;
-  };
   const submitAdj = async () => {
     const e = adjustmentErrors(deltas, reason);
-    if (!adjFac) e.facility = "Chọn cơ sở";
+    if (!adjWeek) e.week = "Bắt buộc nhập.";
+    if (!adjFac) e.facility = "Bắt buộc nhập.";
     setErrs(e);
     if (Object.keys(e).length) return;
-    const clean = Object.fromEntries(Object.entries(deltas).filter(([, x]) => x.trim()));
+    const clean = normalizeDeltas(deltas);
     if (await act.run(() => capi.adjust({ week_key: adjWeek, facility_ref: adjFac, deltas: clean, reason: reason.trim() }), "Đã thêm dòng điều chỉnh.")) {
       setDeltas({});
       setReason("");
@@ -83,39 +85,75 @@ function Bm02Body({ v, writer, act, capi, reload }: {
           Kỳ ngày BM-01 đã chốt: {v.sources.closed}/{v.sources.count} · Cơ sở có báo cáo: {v.units_reported}/{v.units_total} · Số liệu:{" "}
           {v.basis === "closed" ? "đã chốt" : "đã gửi"}
         </p>
-        <table className="dt" aria-label="Chốt tuần KSGM">
-          <thead>
-            <tr><th>Tuần KSGM</th><th>Khoảng ngày</th><th>Trạng thái</th><th>Lần chốt</th><th /></tr>
-          </thead>
-          <tbody>
-            {v.weeks.map((w) => {
-              const a = aggOf(w.key);
-              const st = AGG_STATE[a?.state ?? "none"];
-              return (
-                <tr key={w.key}>
-                  <td>{w.key}</td>
-                  <td>{w.from} – {w.to}</td>
-                  <td><StatusPill tone={st[1]}>{st[0]}</StatusPill>{a?.changed ? <StatusPill tone="warn">Nguồn đã thay đổi</StatusPill> : null}</td>
-                  <td>{a?.close_count ?? 0}{a?.last_at ? ` · ${dt(a.last_at)}` : ""}</td>
-                  <td>
+        <DataTable
+          caption="Chốt tuần KSGM"
+          rows={v.weeks}
+          rowKey={(w) => w.key}
+          columns={[
+            { key: "key", header: "Tuần KSGM", cell: (w) => w.key },
+            { key: "range", header: "Khoảng ngày", cell: (w) => `${w.from} – ${w.to}` },
+            {
+              key: "st",
+              header: "Trạng thái",
+              cell: (w) => {
+                const a = aggOf(w.key);
+                const st = AGG_STATE[a?.state ?? "none"];
+                return (
+                  <>
+                    <StatusPill tone={st[1]}>{st[0]}</StatusPill>
+                    {a?.changed ? <StatusPill tone="warn">Nguồn đã thay đổi</StatusPill> : null}
+                  </>
+                );
+              },
+            },
+            {
+              key: "closes",
+              header: "Lần chốt",
+              cell: (w) => {
+                const a = aggOf(w.key);
+                return `${a?.close_count ?? 0}${a?.last_at ? ` · ${dt(a.last_at)}` : ""}`;
+              },
+            },
+            {
+              key: "act",
+              header: "",
+              cell: (w) => {
+                const a = aggOf(w.key);
+                return (
+                  <>
                     {writer && a?.state !== "closed" ? (
                       <button className="btn btn-primary btn-sm" disabled={act.busy}
                         onClick={async () => (await act.run(() => capi.close("CNTS-BM02", w.key), `Đã chốt ${w.key}.`)) && reload()}>Chốt</button>
                     ) : null}
                     {writer && a?.state === "closed" ? (
-                      <button className="btn btn-o btn-sm" disabled={act.busy}
-                        onClick={async () => { const r = askReason(); if (r && (await act.run(() => capi.reopen("CNTS-BM02", w.key, r), `Đã mở lại ${w.key}.`))) reload(); }}>Mở lại</button>
+                      <button className="btn btn-o btn-sm" disabled={act.busy} onClick={() => setReopening(w.key)}>Mở lại</button>
                     ) : null}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </>
+                );
+              },
+            },
+          ]}
+        />
+        {reopening ? (
+          <ReasonDialog
+            title={`Mở lại ${reopening}`}
+            label="Lý do mở lại"
+            confirmLabel="Mở lại"
+            busy={act.busy}
+            onClose={() => setReopening(null)}
+            onConfirm={async (r) => {
+              if (await act.run(() => capi.reopen("CNTS-BM02", reopening, r), `Đã mở lại ${reopening}.`)) {
+                setReopening(null);
+                reload();
+              }
+            }}
+          />
+        ) : null}
       </section>
 
       <section className="card sec">
         <h2>Số lượng KSGM theo cơ sở</h2>
+        {/* Biểu BM-02: giữ bảng báo cáo (dòng cộng theo xã, dòng tổng cộng) như biểu gốc — không phải danh sách. */}
         <table className="dt" aria-label="Bảng BM-02">
           <thead>
             <tr>
@@ -168,54 +206,57 @@ function Bm02Body({ v, writer, act, capi, reload }: {
       <section className="card sec">
         <h2>Dòng điều chỉnh</h2>
         {v.adjustments.length === 0 ? <p className="mute">Chưa có dòng điều chỉnh.</p> : (
-          <table className="dt" aria-label="Dòng điều chỉnh">
-            <thead>
-              <tr><th>Tuần KSGM</th><th>Cơ sở</th>{v.species.map((s) => <th key={s.key} className="num">{s.label}</th>)}<th>Lý do</th><th>Người, thời điểm</th><th /></tr>
-            </thead>
-            <tbody>
-              {v.adjustments.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.week_key}</td>
-                  <td>{a.facility_name}</td>
-                  {v.species.map((s) => <td key={s.key} className="num">{a.deltas[s.key] && a.deltas[s.key] !== "0" ? num(a.deltas[s.key], 3) : ""}</td>)}
-                  <td>{a.reason}</td>
-                  <td>{a.actor_name} {dt(a.at)}</td>
-                  <td>{a.stale ? <StatusPill tone="bad">BM-01 đã đổi — xem lại</StatusPill> : null}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            caption="Dòng điều chỉnh"
+            rows={v.adjustments}
+            rowKey={(a) => a.id}
+            columns={[
+              { key: "week", header: "Tuần KSGM", cell: (a) => a.week_key },
+              { key: "fac", header: "Cơ sở", cell: (a) => a.facility_name },
+              ...v.species.map((s) => ({
+                key: `s:${s.key}`,
+                header: s.label,
+                className: "num",
+                cell: (a: (typeof v.adjustments)[number]) => (a.deltas[s.key] && a.deltas[s.key] !== "0" ? num(a.deltas[s.key], 3) : ""),
+              })),
+              { key: "reason", header: "Lý do", cell: (a) => a.reason },
+              { key: "who", header: "Người, thời điểm", cell: (a) => `${a.actor_name} ${dt(a.at)}` },
+              { key: "stale", header: "", cell: (a) => (a.stale ? <StatusPill tone="bad">BM-01 đã đổi — xem lại</StatusPill> : null) },
+            ]}
+          />
         )}
         {writer ? (
           <form className="ws-two" aria-label="Thêm dòng điều chỉnh" onSubmit={(e) => { e.preventDefault(); void submitAdj(); }}>
-            <label className="field">
-              <span>Tuần KSGM</span>
-              <select className="select" value={adjWeek} onChange={(e) => setAdjWeek(e.target.value)}>
-                {v.weeks.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
-              </select>
-            </label>
-            <label className="field">
-              <span>Cơ sở</span>
-              <select className="select" value={adjFac} onChange={(e) => setAdjFac(e.target.value)}>
-                <option value="">— Chọn cơ sở —</option>
-                {facilities.map((f) => <option key={f.ref} value={f.ref}>{f.name}</option>)}
-              </select>
-              {errs.facility ? <span className="err">{errs.facility}</span> : null}
-            </label>
+            <SelectField
+              label="Tuần KSGM"
+              required
+              value={adjWeek}
+              onChange={setAdjWeek}
+              error={errs.week}
+              options={v.weeks.map((w) => ({ value: w.key, label: w.label }))}
+            />
+            <SelectField
+              label="Cơ sở"
+              required
+              value={adjFac}
+              onChange={setAdjFac}
+              error={errs.facility}
+              placeholder="— Chọn cơ sở —"
+              options={facilities.map((f) => ({ value: f.ref, label: f.name }))}
+            />
             {v.species.map((s) => (
-              <label key={s.key} className="field">
-                <span>{s.label} (cộng/trừ)</span>
-                <input className="input" inputMode="decimal" aria-label={`Điều chỉnh ${s.label}`} value={deltas[s.key] ?? ""}
-                  onChange={(e) => setDeltas({ ...deltas, [s.key]: e.target.value })} />
-                {errs[s.key] ? <span className="err">{errs[s.key]}</span> : null}
-              </label>
+              <NumberField
+                key={s.key}
+                label={`Điều chỉnh ${s.label}`}
+                hint="Cộng/trừ; số âm để giảm"
+                rule={DELTA_RULE}
+                value={deltas[s.key] ?? ""}
+                onChange={(x) => setDeltas({ ...deltas, [s.key]: x })}
+                onBlurError={(m) => setErrs((e) => ({ ...e, [s.key]: m ?? "" }))}
+                error={errs[s.key]}
+              />
             ))}
-            <label className="field">
-              <span>Lý do</span>
-              <input className="input" aria-label="Lý do điều chỉnh" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
-              {errs.reason ? <span className="err">{errs.reason}</span> : null}
-              {errs.deltas ? <span className="err">{errs.deltas}</span> : null}
-            </label>
+            <TextField label="Lý do điều chỉnh" required value={reason} onChange={setReason} maxLength={500} error={errs.reason ?? errs.deltas} hint="10–500 ký tự" />
             <button className="btn btn-primary" type="submit" disabled={act.busy}>Thêm dòng điều chỉnh</button>
           </form>
         ) : null}
@@ -247,23 +288,27 @@ export function ShareSection({ shares, writer, act, create, download, reload }: 
       <h2>Chia sẻ Chi cục Chăn nuôi và Thú y</h2>
       <p className="mute">Mỗi lần số liệu thay đổi sau khi đã chia sẻ, tệp mới ghi số phiên bản, ngày giờ và ghi chú thay đổi so với bản đã gửi.</p>
       {shares.length === 0 ? <p className="mute">Chưa chia sẻ.</p> : (
-        <table className="dt" aria-label="Phiên bản đã chia sẻ">
-          <thead>
-            <tr><th>Phiên bản</th><th>Thời điểm</th><th>Số liệu</th><th>Ghi chú</th><th>Người tạo</th><th /></tr>
-          </thead>
-          <tbody>
-            {shares.map((s) => (
-              <tr key={s.id}>
-                <td>v{s.version}</td>
-                <td>{dt(s.at)}</td>
-                <td>{s.basis === "closed" ? "Đã chốt" : "Đã gửi"}</td>
-                <td>{s.note || "—"}</td>
-                <td>{s.actor_name || "—"}</td>
-                <td><button className="btn btn-o btn-sm" disabled={act.busy} onClick={() => void act.run(() => download(s.id, s.version))}>Tải Excel</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          caption="Phiên bản đã chia sẻ"
+          rows={shares}
+          rowKey={(s) => s.id}
+          columns={[
+            { key: "ver", header: "Phiên bản", cell: (s) => `v${s.version}` },
+            { key: "at", header: "Thời điểm", cell: (s) => dt(s.at) },
+            { key: "basis", header: "Số liệu", cell: (s) => (s.basis === "closed" ? "Đã chốt" : "Đã gửi") },
+            { key: "note", header: "Ghi chú", cell: (s) => s.note || "—" },
+            { key: "who", header: "Người tạo", cell: (s) => s.actor_name || "—" },
+            {
+              key: "dl",
+              header: "",
+              cell: (s) => (
+                <button className="btn btn-o btn-sm" disabled={act.busy} onClick={() => void act.run(() => download(s.id, s.version))}>
+                  Tải Excel
+                </button>
+              ),
+            },
+          ]}
+        />
       )}
       {writer ? (
         <button className="btn btn-primary" disabled={act.busy}

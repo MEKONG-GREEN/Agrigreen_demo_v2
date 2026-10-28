@@ -128,6 +128,14 @@ export const KN_ACCOUNTS: MockKnAccount[] = [
     identifiers: ["loc.pv@angiang.gov.vn", "0912345605"],
     assignments: [a("asg-loc-xa", "kn_xa", { departments: dept("chan_nuoi_thuy_san") })],
   },
+  {
+    // W11.29: Cấp Tỉnh – HCTH, Trưởng phòng (prototype HCTH `hung.tq`). Phòng HCTH mặc định "Chưa mở": Admin bật ở
+    // Quản trị › Phòng ban rồi mới vào được (tests/e2e/hc-nhan-su.spec.ts).
+    id: "kn-hung",
+    displayName: "Trần Quốc Hưng",
+    identifiers: ["hung.tq@angiang.gov.vn", "0912345606"],
+    assignments: [a("asg-hung-tinh", "kn_tinh", { mgmt_level: "Trưởng phòng", departments: dept("hanh_chinh_tong_hop") })],
+  },
 ];
 
 export function findKnAccount(id: string | null | undefined): MockKnAccount | undefined {

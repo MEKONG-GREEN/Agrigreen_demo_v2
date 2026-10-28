@@ -29,18 +29,18 @@ const (
 
 // Lỗi kiểm số lượng (handler/app ánh xạ sang problem).
 var (
-	ErrQuantityNotInteger = errors.New("số lượng phải là số nguyên ≥ 0")
-	ErrQuantityRange      = errors.New("số lượng phải trong khoảng 0–1.000.000")
+	ErrQuantityNotInteger = errors.New("số lượng phải là số nguyên lớn hơn 0")
+	ErrQuantityRange      = errors.New("số lượng phải trong khoảng 1–1.000.000")
 )
 
-// ParseQuantity đọc số lượng (chuỗi số JSON) — âm, không nguyên hoặc quá lớn → lỗi (BRD: "số lượng âm/không
-// nguyên → chặn").
+// ParseQuantity đọc số lượng khai báo (TT-10): phải là số nguyên lớn hơn 0.
+// Sự kiện removed vẫn dùng Quantity = 0; số 0 đó không phải dòng khai báo đầu vào.
 func ParseQuantity(s string) (int, error) {
 	d, err := decimal.NewFromString(strings.TrimSpace(s))
 	if err != nil || !d.IsInteger() {
 		return 0, ErrQuantityNotInteger
 	}
-	if d.IsNegative() {
+	if !d.IsPositive() {
 		return 0, ErrQuantityNotInteger
 	}
 	if d.GreaterThan(decimal.NewFromInt(MaxMachineQuantity)) {

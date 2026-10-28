@@ -630,8 +630,8 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 		t.Fatalf("mặc định tuần kế tiếp: %s", mine.raw)
 	}
 	ws := s.want(xa1.post("/v1/extension/work-schedules", map[string]any{"week_start": week, "action": "submit", "items": []any{
-		map[string]any{"day": "2026-09-07", "session": "morning", "start_time": "08:00", "end_time": "10:00", "content": "Kiểm tra đồng ruộng xã " + agC1},
-		map[string]any{"day": "2026-09-09", "session": "afternoon", "content": "Tập huấn IPM tại HTX"}}}), http.StatusCreated, "gửi duyệt lịch")
+		map[string]any{"day": "2026-09-07", "session": "morning", "start_time": "08:00", "end_time": "10:00", "content": "Kiểm tra đồng ruộng xã " + agC1, "commune_code": agC1, "location": "Cánh đồng ấp 1"},
+		map[string]any{"day": "2026-09-09", "session": "afternoon", "content": "Tập huấn IPM tại HTX", "commune_code": agC1, "location": "Hội trường HTX"}}}), http.StatusCreated, "gửi duyệt lịch")
 	wid := str(obj(ws.body, "schedule"), "id")
 	if l := s.want(tinh.get("/v1/extension/work-schedules?week_start="+week+"&status=pending"), http.StatusOK, "chờ duyệt"); len(arr(l.body, "items")) != 1 {
 		t.Fatalf("lịch hiện ngay ở Chờ duyệt: %s", l.raw)
@@ -690,9 +690,9 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 	s.want(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC1, "lot_name": "Lô bờ kênh", "farmer_name": "Võ Văn Em", "note": "Lúa OM18",
 		"declared_area_ha": "1.0", "shape": "square", "geometry": sq(0)}), http.StatusCreated, "vẽ thửa")
 	s.pii = append(s.pii, "Võ Văn Em")
-	s.wantCode(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC1, "lot_name": "Lô chồng", "declared_area_ha": "1.0", "shape": "square", "geometry": sq(0.0004)}),
+	s.wantCode(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC1, "lot_name": "Lô chồng", "farmer_name": "Võ Văn Em", "declared_area_ha": "1.0", "shape": "square", "geometry": sq(0.0004)}),
 		http.StatusConflict, "geo.plot_overlap", "thửa chồng lấn")
-	s.wantCode(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC3, "lot_name": "Lô xã khác", "declared_area_ha": "1.0", "shape": "square", "geometry": sq(0.01)}),
+	s.wantCode(xa1.post("/v1/kn/plots", map[string]any{"commune_code": agC3, "lot_name": "Lô xã khác", "farmer_name": "Võ Văn Em", "declared_area_ha": "1.0", "shape": "square", "geometry": sq(0.01)}),
 		http.StatusForbidden, "geo.out_of_scope", "thửa xã ngoài phạm vi")
 	s.want(xa1.post("/v1/kn/materials", map[string]any{"commune_code": agC1, "recorded_on": "2026-09-02", "lines": []any{map[string]any{"material_code": "PHAN_URE", "quantity": "120.5"}}}),
 		http.StatusCreated, "vật tư")

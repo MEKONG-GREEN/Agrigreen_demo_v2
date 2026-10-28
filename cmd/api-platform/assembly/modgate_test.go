@@ -89,3 +89,20 @@ func TestGated(t *testing.T) {
 		}
 	}
 }
+
+// Reports checks current owner authority before the HTTP idempotency response
+// cache. Its authorizer must receive the session resolved by accounts first.
+func TestAccountsSessionPrecedesReportsReplayAuthorization(t *testing.T) {
+	accountsAt, reportsAt := -1, -1
+	for i, module := range (Modules{}).Named() {
+		switch module.Name {
+		case "pf/accounts":
+			accountsAt = i
+		case "pf/reports":
+			reportsAt = i
+		}
+	}
+	if accountsAt < 0 || reportsAt < 0 || accountsAt >= reportsAt {
+		t.Fatal("accounts must resolve the current session before reports replay authorization")
+	}
+}

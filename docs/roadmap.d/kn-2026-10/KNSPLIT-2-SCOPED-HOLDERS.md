@@ -1,0 +1,1 @@
+- [ ] KNSPLIT-2-SCOPED-HOLDERS (#63): thêm port accounts tra nhiệm vụ và nút trên cùng assignment, tenant tường minh, DB chỉ đọc; không cấp duty từ delegation. Chưa triển khai job KN; chờ kiểm thử và Claude Review OK trước tích hợp.

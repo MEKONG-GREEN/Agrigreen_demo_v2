@@ -8,10 +8,12 @@ zones: [pf]
 version: 1.0.0
 depends:
   pf/evidence: ">=1.0 <2"
+  pf/forms: ">=1.0 <2"
+  pf/notify: ">=1.0 <2"
   vault/identity: ">=1.0 <2"
 provides:
-  ports: [Catalog, Directory, Units]
-  events: []
+  ports: [Catalog, Directory, NotifyDirectory, PromotionWriter, Units]
+  events: [pf.hrm.plan.reminded/v1, pf.hrm.promotion_due.detected/v1]
   internal_events: []
   publications: []
   data_products: []

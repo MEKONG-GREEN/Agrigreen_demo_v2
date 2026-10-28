@@ -55,6 +55,7 @@ function ReportEditor({ d, api, mode, reload }: {
     const [exportFiltered, setExportFiltered] = useState(false);
     const allItems = (data.rows ?? []).filter(r => r.kind === "item");
     const history = useLoad(() => api.history(id), [api, id]);
+    const words = useLoad(() => api.words(id), [api, id]);
     const act = useAction();
     const dirty = Object.keys(admin).length > 0 || Object.keys(texts).length > 0;
     const writable = d.editable && !act.busy;
@@ -104,10 +105,15 @@ function ReportEditor({ d, api, mode, reload }: {
   <h3>Lịch sử xuất</h3>
   <LoadState s={history}>{items => <ul>{items.map(x => <li key={x.id}>Phiên bản {x.version} · {dt(x.at)} · {x.provisional ? "Tạm tính" : d.final?.export_id === x.id ? "Bản cuối" : "Đã xuất"}{" "}
    <button className="btn" disabled={act.busy} onClick={() => act.run(async () => saveFile(await api.download(id, x.id)), "Đã tải tệp đã lưu")}>Tải Excel v{x.version}</button>{" "}
+   {d.terminal !== "cancelled" && (d.editable || !!d.final) && mode !== "history" && <button className="btn" disabled={act.busy} title="Word dựng từ đúng nội dung của bản Excel này; ô Số văn bản trống thì hệ thống tự cấp số" onClick={() => act.run(async () => { const w = await api.word(id, x.id); saveFile(await api.downloadWord(id, w.id)); words.reload(); }, "Đã xuất và lưu Word")}>Xuất Word v{x.version}</button>}{" "}
    {!d.final && d.editable && <button className="btn" disabled={act.busy || dirty || x.provisional || d.source_changed || !!d.source_error || x.draft_id !== d.draft_id} onClick={() => {
                         if (window.confirm("Đánh dấu Bản cuối sẽ khóa báo cáo và cập nhật nguồn của kỳ. Tiếp tục?"))
                             void act.run(async () => { await api.final(id, x.id); reload(); history.reload(); }, "Đã đánh dấu Bản cuối");
                     }}>Đánh dấu Bản cuối</button>}
   </li>)}{!items.length && <li>Chưa có bản xuất.</li>}</ul>}</LoadState>
+  <h3>Lịch sử Word</h3>
+  <LoadState s={words}>{items => <ul>{items.map(w => <li key={w.id}>Lần {w.seq} · {dt(w.at)} · Số {w.doc_number || "—"}{w.doc_number_auto ? " (tự cấp)" : ""} · <span title={w.body_hash}>SHA-256 {w.body_hash.slice(0, 12)}…</span>{" "}
+   <button className="btn" disabled={act.busy} onClick={() => act.run(async () => saveFile(await api.downloadWord(id, w.id)), "Đã tải tệp Word đã lưu")}>Tải Word</button>
+  </li>)}{!items.length && <li>Chưa xuất Word.</li>}</ul>}</LoadState>
  </section>;
 }

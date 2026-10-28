@@ -7,3 +7,5 @@
 | 409 | `extension.khtc_period_not_closable` | Đóng kỳ khi chưa Đủ dữ liệu và chưa Trễ hạn từ N ngày (`extension.khtc_close_late_days`, mặc định 3 — BR-DL-15) |
 | 409 | `extension.khtc_period_not_cancellable` | Hủy kỳ không ở Đã mở / Đang thu thập / Trễ hạn / Đủ dữ liệu, hoặc báo cáo đã có Bản cuối (BR-DL-18) |
 | 409 | `extension.khtc_period_terminal` | Sửa hạn, đóng, hủy kỳ đã đóng hoặc đã hủy (DB: `khtc_period_event_terminal`) |
+| 409 | `extension.khtc_period_cancelling` | Đóng kỳ, đánh dấu Bản cuối hoặc hủy kỳ lần nữa trong lúc kỳ đang được hủy (ý định hủy còn hạn — DB: `khtc_period_cancelling`, `khtc_report_cancelling`; P0-POOL-SHARED-2) |
+| 409 | `extension.khtc_period_cancel_interrupted` | Hủy kỳ: cap/forms đã hủy kỳ native nhưng ý định hủy hết hạn trước khi ghi sự kiện hủy và trong lúc đó báo cáo đã có Bản cuối — không tự hoàn tác; log `extension.khtc.cancel_intent_lost` (outcome=alert) để đối soát. Chưa có Bản cuối thì hệ thống tự nhận lại ý định và ghi sự kiện hủy (P0-POOL-SHARED-2, review #143 C1) |

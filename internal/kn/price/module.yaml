@@ -9,6 +9,7 @@ version: 1.0.0
 depends:
   pf/accounts: ">=1.0 <2"
   pf/notify: ">=1.0 <2"
+  vault/identity: ">=1.0 <2"
 provides:
   ports:
     - Boards
@@ -18,6 +19,7 @@ provides:
     - Officers
     - Points
     - PriceDesk
+    - PublicBoardFeed
     - ReminderTargets
     - TablePDF
     - Thresholds

@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // ListFilter là bộ lọc danh sách cảnh báo.
@@ -373,7 +374,9 @@ const overdueBatch = 200
 // EscalateOverdue ghi "overdue" cho cảnh báo quá hạn xử lý của tenant và báo Lãnh đạo phòng + người được giao.
 func (s *Service) EscalateOverdue(ctx context.Context, tid uuid.UUID, now time.Time) (int, error) {
 	n := 0
+	ctx = txdeps.With(ctx) // P0-POOL-KN-2: Lãnh đạo phòng nhận báo đọc ngoài giao dịch (service.go tx)
 	err := s.tx(ctx, tid, func(tx pgx.Tx) error {
+		n = 0 // thân giao dịch có thể chạy lại (txdeps)
 		as, err := store.Overdue(ctx, tx, now, overdueBatch)
 		if err != nil {
 			return err

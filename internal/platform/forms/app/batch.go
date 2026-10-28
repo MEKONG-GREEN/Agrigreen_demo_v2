@@ -152,7 +152,7 @@ func (pb Publisher) PublishBatch(ctx context.Context, in port.BatchInput, idem s
 		if err != nil {
 			return err
 		}
-		if t == nil || t.Profile != in.Profile {
+		if t == nil || t.Profile != in.Profile || !a.allowsTemplate(t.Code) {
 			return port.ErrTemplateNotFound
 		}
 		if t.Fixture && !prof.AllowFixtures {
@@ -206,7 +206,7 @@ func (s *Service) Previous(ctx context.Context, profile string, periodID uuid.UU
 		if err != nil {
 			return err
 		}
-		if p == nil || p.Profile != profile || !slices.Contains(p.Units, unit) {
+		if p == nil || p.Profile != profile || !a.allowsTemplate(p.TemplateCode) || !slices.Contains(p.Units, unit) {
 			return port.ErrPeriodNotFound
 		}
 		spec, err := store.SpecOf(ctx, tx, periodID)
@@ -275,13 +275,14 @@ func (s *Service) Tasks(ctx context.Context, profile string, f TaskFilter) ([]Ta
 			if err != nil {
 				return err
 			}
-			if v == nil || v.State.Status == domain.PeriodCancelled {
+			if v == nil || !a.allowsTemplate(v.Period.TemplateCode) || v.State.Status == domain.PeriodCancelled {
 				continue
 			}
+			a.filterTargets(v)
 			full := a.scope.All || a.owns(v.Period)
 			var tpl *store.Template
 			for _, u := range v.Units {
-				if !full && !a.allowsUnit(v.Spec, v.Period.Units, u.Unit) {
+				if (!full || a.targetFilter != nil) && !a.allowsUnit(v.Spec, v.Period.Units, u.Unit) {
 					continue
 				}
 				if tpl == nil {

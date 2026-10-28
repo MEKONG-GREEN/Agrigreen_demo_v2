@@ -48,7 +48,8 @@ function adminDepartments(items: readonly KnMenuItem[]): MenuNode[] {
     else closed.push(it);
   }
   for (const it of closed.slice(0, 2)) {
-    const code = it.key.slice(ADMIN_DEPARTMENT_GROUP.length + 1);
+    // KNSPLIT-2 (#122): Admin chưa gắn đơn vị, hai đơn vị trùng mã phòng ban → khóa thêm ".<org_ref>"; mã phòng ban không có dấu chấm.
+    const code = it.key.slice(ADMIN_DEPARTMENT_GROUP.length + 1).split(".")[0]!;
     out.push({ key: it.key, label: SHORT_DEPT_NAME[code] ?? it.label, icon: toNavIcon(it.icon), status: "not_open" });
   }
   if (closed.length > 2) {

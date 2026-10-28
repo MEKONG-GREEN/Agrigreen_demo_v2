@@ -4,14 +4,15 @@
 // nhập BM-01 (theo cơ sở, theo ngày), BM-04, BM-17 (theo xã, theo tuần), BM-05 (kết quả / kế hoạch tuần làm việc).
 // Hỗ trợ: sao chép kỳ trước, báo không phát sinh, ghi chú (H08), lý do trễ (H09), lưu nháp trên máy, khóa lạc quan —
 // người lưu sau được báo "Đã có người cập nhật lúc …" và phải tải bản mới (không ghi đè).
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { unwrap } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import type { CatalogItem } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { NumberField, SelectField, TextField } from "@/components/form";
+import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
-import { STATUS_LABEL, STATUS_TONE, createCntsPeriodApi, fieldErrors, groupFields, isLate, payloadValues, type FormsTask } from "./api";
+import { STATUS_LABEL, STATUS_TONE, createCntsPeriodApi, fieldErrors, groupFields, isLate, numberRule, payloadValues, type CntsDraft, type FormsTask } from "./api";
 
 interface Draft {
   values: Record<string, string>;
@@ -79,47 +80,46 @@ export function CntsEntryScreen() {
         </select>
         <LoadState s={tasks}>
           {(ts: FormsTask[]) => (
-            <table className="dt" aria-label="Công việc">
-              <thead>
-                <tr>
-                  <th>Biểu</th>
-                  <th>Kỳ</th>
-                  <th>Đơn vị</th>
-                  <th>Hạn nộp</th>
-                  <th>Trạng thái</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {ts.map((t) => (
-                  <tr key={t.id}>
-                    <td>{t.template_title}</td>
-                    <td>{t.label}</td>
-                    <td>
+            <DataTable
+              caption="Công việc"
+              rows={ts}
+              rowKey={(t) => t.id}
+              empty="Không có công việc."
+              columns={[
+                { key: "form", header: "Biểu", cell: (t) => t.template_title },
+                { key: "label", header: "Kỳ", cell: (t) => t.label },
+                {
+                  key: "unit",
+                  header: "Đơn vị",
+                  cell: (t) => (
+                    <>
                       {unitName(t)}
                       {t.unit_kind === "facility" ? <span className="mute"> · xã {communeName(t.parent)}</span> : null}
-                    </td>
-                    <td>{dt(t.due_at)}</td>
-                    <td>
+                    </>
+                  ),
+                },
+                { key: "due", header: "Hạn nộp", cell: (t) => dt(t.due_at) },
+                {
+                  key: "st",
+                  header: "Trạng thái",
+                  cell: (t) => (
+                    <>
                       <StatusPill tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</StatusPill>
                       {t.late ? <span className="mute"> · Nộp trễ</span> : null}
-                    </td>
-                    <td>
-                      <button className="btn btn-sm" onClick={() => setOpen(t)}>
-                        {!t.open ? "Xem" : t.version > 0 ? "Sửa" : "Nhập"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {ts.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="mute">
-                      Không có công việc.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                    </>
+                  ),
+                },
+                {
+                  key: "act",
+                  header: "",
+                  cell: (t) => (
+                    <button className="btn btn-sm" onClick={() => setOpen(t)}>
+                      {!t.open ? "Xem" : t.version > 0 ? "Sửa" : "Nhập"}
+                    </button>
+                  ),
+                },
+              ]}
+            />
           )}
         </LoadState>
       </section>
@@ -156,34 +156,64 @@ function Entry({
   capi: ReturnType<typeof createCntsPeriodApi>;
   onDone: (reload: boolean) => void;
 }) {
-  const init: Draft = loadDraft(task) ?? { values: task.values, nil: task.nil_report, note: task.note, explanation: task.explanation };
+  const local = loadDraft(task);
+  const init: Draft = local ?? { values: task.values, nil: task.nil_report, note: task.note, explanation: task.explanation };
   const [d, setD] = useState<Draft>(init);
+  // Người dùng đã sửa biểu (số liệu, không phát sinh, ghi chú, giải trình, sao chép kỳ trước) kể từ khi mở.
+  const edited = useRef(false);
+  // Nháp máy chủ về sau khi người dùng đã sửa: không ghi đè, chỉ báo và để người dùng chủ động nạp.
+  const [serverDraft, setServerDraft] = useState<CntsDraft | null>(null);
+  // BF-CN-PUBLISH (UR-XA-13): nháp đã lưu lên máy chủ (máy khác / phiên trước) khi trên máy này chưa có nháp.
+  // Nháp trên máy này luôn mới hơn (lưu sau mỗi thao tác) nên không hỏi máy chủ. Nháp máy chủ không mới hơn lần gửi
+  // gần nhất thì bỏ qua. Phản hồi đến sau khi người dùng đã nhập thì không ghi đè (#108 [P2] Codex).
+  useEffect(() => {
+    if (local || !task.open) return;
+    let alive = true;
+    capi.draft(task.period_id, task.unit).then(
+      (s) => {
+        if (!alive || !s) return;
+        if (task.submitted_at && !(Date.parse(s.saved_at) > Date.parse(task.submitted_at))) return;
+        if (edited.current) setServerDraft(s);
+        else setD((x) => ({ ...x, values: { ...s.values }, nil: s.nil_report, note: s.note }));
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ nạp một lần khi mở công việc
+  }, [task.id]);
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState<string | null>(null);
   const act = useAction();
   const late = isLate(task);
-  const update = (patch: Partial<Draft>) =>
+  const update = (patch: Partial<Draft>) => {
+    edited.current = true;
     setD((x) => {
       const n = { ...x, ...patch };
       saveDraft(task, n);
       return n;
     });
+  };
   const readOnly = !task.open;
 
   const submit = async () => {
     const fe = fieldErrors(task.fields, d.values, d.nil);
-    if (late && !d.explanation.trim()) fe.explanation = "Gửi sau hạn: bắt buộc ghi lý do trễ";
+    if (late && !d.explanation.trim()) fe.explanation = "Gửi sau hạn: bắt buộc ghi lý do trễ.";
     setErrs(fe);
     if (Object.keys(fe).length) return;
     try {
-      await capi.submit(task.period_id, {
-        unit: task.unit,
-        values: payloadValues(task.fields, d.values, d.nil),
-        base_version: task.version,
-        nil_report: d.nil,
-        note: d.note || undefined,
-        explanation: d.explanation || undefined,
-      });
+      // P0-WEB-IDEMKEY: trong phiên thao tác của act — gửi lại sau lỗi mạng dùng lại khóa cũ.
+      await act.idem(() =>
+        capi.submit(task.period_id, {
+          unit: task.unit,
+          values: payloadValues(task.fields, d.values, d.nil),
+          base_version: task.version,
+          nil_report: d.nil,
+          note: d.note || undefined,
+          explanation: d.explanation || undefined,
+        }),
+      );
       clearDraft(task);
       act.setNote("Đã gửi báo cáo.");
       onDone(true);
@@ -226,7 +256,26 @@ function Entry({
           </button>
         </div>
       ) : null}
+      {serverDraft && !readOnly ? (
+        <div className="alert alert-info" role="status">
+          <span>Có bản nháp đã lưu trên máy chủ lúc {dt(serverDraft.saved_at)}. Chưa nạp vì bạn đã sửa biểu; nạp sẽ thay số liệu, mục không phát sinh và ghi chú đang nhập.</span>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              update({ values: { ...serverDraft.values }, nil: serverDraft.nil_report, note: serverDraft.note });
+              setServerDraft(null);
+            }}
+          >
+            Nạp nháp máy chủ
+          </button>
+        </div>
+      ) : null}
       {task.status === "awaiting_reopen" ? <p className="err">Chờ mở kỳ: bản gửi sau khi kỳ đã chốt — chờ Cấp Tỉnh mở lại kỳ.</p> : null}
+      {task.status === "returned" ? (
+        <p className="alert alert-warn" role="status">
+          Cấp Tỉnh trả lại, yêu cầu điều chỉnh{task.return_note ? `: ${task.return_note}` : "."} Sửa và gửi lại trước khi chốt kỳ.
+        </p>
+      ) : null}
       {!readOnly ? (
         <div className="row">
           <button
@@ -254,47 +303,66 @@ function Entry({
               const numeric = f.type === "integer" || f.type === "decimal";
               const locked = readOnly || (d.nil && numeric);
               const v = d.nil && numeric ? "0" : (d.values[f.key] ?? "");
-              return (
-                <label key={f.key} className="field">
-                  <span>
-                    {f.label}
-                    {f.unit ? ` (${f.unit})` : ""}
-                    {f.required ? <span className="req"> *</span> : null}
-                  </span>
-                  {f.type === "choice" ? (
-                    <select className="select" aria-label={f.label + " " + (g.group ?? "")} disabled={locked} value={v} onChange={(e) => update({ values: { ...d.values, [f.key]: e.target.value } })}>
-                      <option value="">—</option>
-                      {(f.options ?? []).map((o) => (
-                        <option key={o}>{o}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="input"
-                      aria-label={f.label + " " + (g.group ?? "")}
-                      inputMode={numeric ? "decimal" : undefined}
-                      disabled={locked}
-                      value={v}
-                      onChange={(e) => update({ values: { ...d.values, [f.key]: e.target.value } })}
-                    />
-                  )}
-                  {errs[f.key] ? <span className="err">{errs[f.key]}</span> : null}
-                </label>
-              );
+              const set = (x: string) => update({ values: { ...d.values, [f.key]: x } });
+              if (numeric)
+                return (
+                  <NumberField
+                    key={f.key}
+                    label={f.label}
+                    unit={f.unit ?? undefined}
+                    rule={numberRule(f)}
+                    disabled={locked}
+                    value={v}
+                    onChange={set}
+                    error={errs[f.key]}
+                    onBlurError={(e) => setErrs((x) => ({ ...x, [f.key]: e ?? "" }))}
+                  />
+                );
+              if (f.type === "choice")
+                return (
+                  <SelectField
+                    key={f.key}
+                    label={f.label}
+                    required={!!f.required}
+                    disabled={locked}
+                    value={v}
+                    onChange={set}
+                    error={errs[f.key]}
+                    placeholder="—"
+                    options={(f.options ?? []).map((o) => ({ value: o, label: o }))}
+                  />
+                );
+              return <TextField key={f.key} label={f.unit ? `${f.label} (${f.unit})` : f.label} required={!!f.required} disabled={locked} value={v} onChange={set} error={errs[f.key]} />;
             })}
           </div>
         </fieldset>
       ))}
-      <label className="field">
-        <span>H08 Ghi chú chung</span>
-        <textarea className="input" aria-label="Ghi chú chung" maxLength={1000} disabled={readOnly} value={d.note} onChange={(e) => update({ note: e.target.value })} />
-      </label>
-      <label className="field">
-        <span>H09 Giải trình / lý do trễ{late ? <span className="req"> *</span> : null}</span>
-        <textarea className="input" aria-label="Giải trình" maxLength={1000} disabled={readOnly} value={d.explanation} onChange={(e) => update({ explanation: e.target.value })} />
-        {errs.explanation ? <span className="err">{errs.explanation}</span> : null}
-      </label>
+      <TextField label="H08 Ghi chú chung" multiline maxLength={1000} disabled={readOnly} value={d.note} onChange={(x) => update({ note: x })} />
+      <TextField
+        label="H09 Giải trình / lý do trễ"
+        required={late}
+        multiline
+        maxLength={1000}
+        disabled={readOnly}
+        value={d.explanation}
+        onChange={(x) => update({ explanation: x })}
+        error={errs.explanation}
+      />
       <div className="row">
+        {!readOnly ? (
+          <button
+            className="btn"
+            disabled={act.busy}
+            onClick={() =>
+              void act.run(
+                () => capi.saveDraft(task.period_id, { unit: task.unit, values: d.values, nil_report: d.nil, ...(d.note ? { note: d.note } : {}) }),
+                "Đã lưu nháp — Cấp Tỉnh thấy trạng thái Nháp.",
+              )
+            }
+          >
+            Lưu nháp
+          </button>
+        ) : null}
         {!readOnly ? (
           <button className="btn btn-primary" disabled={act.busy} onClick={submit}>
             Gửi báo cáo
@@ -307,3 +375,6 @@ function Entry({
     </section>
   );
 }
+
+// Cho kiểm thử hồi quy nạp nháp máy chủ (publish.test.tsx).
+export { Entry as CntsTaskEntry };

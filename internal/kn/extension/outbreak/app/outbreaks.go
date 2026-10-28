@@ -123,7 +123,7 @@ func (s *Service) ListOutbreaks(ctx context.Context, q OutbreakQuery) (OutbreakL
 			res.Items = append(res.Items, v)
 		}
 	}
-	labels := map[string]string{domain.StatusReported: "Đã gửi", domain.StatusMonitoring: "Đang theo dõi", domain.StatusClosed: "Đã kết thúc"}
+	labels := map[string]string{domain.StatusReported: "Chờ xác nhận", domain.StatusMonitoring: "Đang theo dõi", domain.StatusClosed: "Đã kết thúc"}
 	for _, st := range domain.Statuses {
 		res.ByStatus = append(res.ByStatus, Count{Key: st, Label: labels[st], N: byStatus[st]})
 	}

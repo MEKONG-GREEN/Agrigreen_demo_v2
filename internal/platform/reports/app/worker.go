@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -18,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // Render dựng tệp của một định dạng từ tập dữ liệu (xuất khẩu để kiểm thử dùng lại).
@@ -32,6 +34,10 @@ func Render(ds domain.Dataset, format string, j domain.Job) ([]byte, error) {
 // (consumer port.ExportConsumer, pool vai reports_app). Chạy trong giao dịch do
 // inbox.Process mở nên kết quả + inbox + outbox commit cùng nhau (R-61). Việc xuất
 // đã xong/hỏng → không làm gì (giao lặp an toàn, một tệp cho mỗi việc xuất).
+//
+// P0-POOL-SHARED-2 (#143): dựng tập dữ liệu (cổng của module nguồn tự mở giao dịch trên cùng pool) và ghi kho đối tượng
+// chạy NGOÀI giao dịch inbox qua txdeps.Get — inbox.Process hủy giao dịch, nạp/ghi, chạy lại handler; lần chạy lại chỉ
+// hoàn tất việc xuất + phát sự kiện khi tệp cùng băm đã ghi. Ghi kho lỗi → không ghi gì, giao lại.
 func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
 	var pl port.ExportRequestedV1
 	if err := json.Unmarshal(env.Payload, &pl); err != nil {
@@ -48,11 +54,24 @@ func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outb
 	if j == nil || j.Status != domain.JobQueued {
 		return nil
 	}
+	if _, _, policyErr := s.sourceJobPolicyState(*j); policyErr != nil {
+		return store.FailJob(ctx, tx, j.ID, sourceJobInvalidCode, s.now())
+	}
+	if policy, ok := s.Builders.jobPolicy(j.Def.Source); ok || j.SourceArgs != nil {
+		at, parseErr := time.Parse(time.RFC3339Nano, pl.RequestedAt)
+		if policy.Version < 1 || parseErr != nil || env.TenantID != j.TenantID || pl.RequestedBy != j.RequestedBy.String() ||
+			pl.TemplateKey != j.TemplateKey || pl.Format != j.Format || !at.Equal(j.RequestedAt) {
+			return store.FailJob(ctx, tx, j.ID, sourceJobInvalidCode, s.now())
+		}
+	}
 	if s.Store == nil {
 		return ErrDependency.WithDetail("chưa cấu hình kho đối tượng")
 	}
 	lg := s.log().With("event", "reports.export.render", "tenant_id", j.TenantID, "job_id", j.ID, "template_key", j.TemplateKey, "format", j.Format)
-	ds, err := s.buildDataset(ctx, *j)
+	job := *j
+	ds, err := txdeps.Get(ctx, "reports.export.dataset:"+j.ID.String(), func(ctx context.Context) (domain.Dataset, error) {
+		return s.buildDataset(ctx, job)
+	})
 	var p *problem.Problem
 	if errors.As(err, &p) && p.Status < 500 {
 		// Lỗi nghiệp vụ vĩnh viễn (vd chưa có kết quả cân đối của vụ): đánh dấu hỏng, không giao lại.
@@ -68,7 +87,10 @@ func (s *Service) HandleExportRequested(ctx context.Context, tx pgx.Tx, env outb
 	}
 	sha := objstore.SHA256Hex(body)
 	key := domain.ObjectKey(j.TenantID, j.ID, j.Format)
-	if _, err := s.Store.Put(ctx, key, bytes.NewReader(body), int64(len(body)), sha, domain.ContentType(j.Format)); err != nil {
+	ct := domain.ContentType(j.Format)
+	if _, err := txdeps.Get(ctx, "reports.export.put:"+key+":"+sha, func(ctx context.Context) (objstore.Info, error) {
+		return s.Store.Put(ctx, key, bytes.NewReader(body), int64(len(body)), sha, ct)
+	}); err != nil {
 		if errors.Is(err, objstore.ErrExists) {
 			// Đã có tệp khác nội dung dưới cùng khóa (dữ liệu đổi giữa hai lần giao) — không ghi đè.
 			return store.FailJob(ctx, tx, j.ID, "reports.object_conflict", s.now())

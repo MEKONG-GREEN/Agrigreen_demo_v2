@@ -38,7 +38,7 @@ var (
 	ErrCoopNotFound    = problem.New(http.StatusNotFound, "mechanization.cooperative_not_found", "Không tìm thấy HTX")
 	ErrTypeUnknown     = problem.New(http.StatusUnprocessableEntity, "mechanization.machine_type_unknown", "Loại máy không có trong danh mục Loại máy móc (hoặc đã ngừng dùng)")
 	ErrTypeDuplicate   = problem.New(http.StatusUnprocessableEntity, "mechanization.machine_type_duplicate", "Loại máy đã có trong khai báo của HTX — cập nhật dòng đã có thay vì thêm dòng mới")
-	ErrQuantityInvalid = problem.New(http.StatusUnprocessableEntity, "mechanization.machine_quantity_invalid", "Số lượng máy phải là số nguyên không âm")
+	ErrQuantityInvalid = problem.New(http.StatusUnprocessableEntity, "mechanization.machine_quantity_invalid", "Số lượng máy phải là số nguyên lớn hơn 0")
 )
 
 // DefaultDepartment là phòng ban mặc định của Admin khi không truyền tham số department (hợp đồng P7 §0).
@@ -268,7 +268,7 @@ func (s *Service) PutMachineCounts(ctx context.Context, in PutMachineCountsInput
 		if l.MachineType == "" {
 			return CoopMachines{}, problem.Validation.WithField("lines.machine_type", "bắt buộc")
 		}
-		if l.Quantity < 0 || l.Quantity > domain.MaxMachineQuantity {
+		if l.Quantity <= 0 || l.Quantity > domain.MaxMachineQuantity {
 			return CoopMachines{}, ErrQuantityInvalid.WithField("lines."+l.MachineType+".quantity", domain.ErrQuantityRange.Error())
 		}
 		if !domain.ValidNote(l.Note) {

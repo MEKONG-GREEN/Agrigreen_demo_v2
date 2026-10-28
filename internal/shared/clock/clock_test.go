@@ -25,6 +25,21 @@ func TestBusinessDateUsesVietnamTime(t *testing.T) {
 	}
 }
 
+func TestBusinessDayIsVietnamDateAtUTCMidnight(t *testing.T) {
+	for _, c := range []struct{ utc, want string }{
+		{"2026-10-25T16:59:59Z", "2026-10-25T00:00:00Z"}, // Chủ Nhật 23:59:59 VN
+		{"2026-10-25T17:00:00Z", "2026-10-26T00:00:00Z"}, // Thứ Hai 00:00 VN
+		{"2026-10-25T17:30:00Z", "2026-10-26T00:00:00Z"}, // Thứ Hai 00:30 VN
+		{"2026-10-26T16:59:59Z", "2026-10-26T00:00:00Z"},
+	} {
+		ts, _ := time.Parse(time.RFC3339, c.utc)
+		got := BusinessDay(ts)
+		if got.Format(time.RFC3339) != c.want || got.Location() != time.UTC {
+			t.Errorf("BusinessDay(%s) = %s, muốn %s (UTC)", c.utc, got.Format(time.RFC3339), c.want)
+		}
+	}
+}
+
 func TestStartOfBusinessDate(t *testing.T) {
 	got := StartOfBusinessDate(Date{2026, time.December, 3})
 	want := time.Date(2026, time.December, 2, 17, 0, 0, 0, time.UTC)

@@ -57,7 +57,7 @@ func (f fixedTargets) Targets(_ context.Context, _ uuid.UUID, _ string, _ time.T
 func TestPriceCalendarHTTP_W1174(t *testing.T) {
 	env := pgtest.Get(t)
 	now := time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC) // Thứ Hai 10:00 giờ VN
-	prof := port.Profile{Name: "kn", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA"}, ManageBy: []string{"admin"}}
+	prof := port.Profile{Session: testOwnerSession, Name: "kn", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA"}, ManageBy: []string{"admin"}}
 	if err := app.ValidateProfiles([]port.Profile{prof}); err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestPriceCalendarHTTP_W1174(t *testing.T) {
 	}
 	r.Use(func(c *gin.Context) {
 		if p, ok := who[c.GetHeader("X-Test-As")]; ok {
-			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
 		}
 	})
 	Handler{Svc: svc}.RegisterApp(r.Group("/v1"))
@@ -178,7 +178,7 @@ func TestPriceCalendarHTTP_W1174(t *testing.T) {
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"40"}`, http.StatusUnprocessableEntity) // chưa có nhóm
 	call("admin", http.MethodPost, "/v1/price/catalog/defaults", "", http.StatusCreated)
 	// W11.73: ngưng theo mặt hàng tham chiếu danh mục mặt hàng (mã MH#####, phải có trong sổ pf_price.item).
-	if _, err := app.NewItemService(svc).CreateItem(authz.WithPrincipal(context.Background(), who["admin"]), "", app.ItemInput{Name: "Heo hơi",
+	if _, err := app.NewItemService(svc).CreateItem(authz.WithPrincipal(context.Background(), bindTestSession(t, who["admin"])), "", app.ItemInput{Name: "Heo hơi",
 		Variety: "loại 1", GroupCode: "chan_nuoi", UnitCode: "kg", Kind: "basic"}, ""); err != nil {
 		t.Fatal(err)
 	}

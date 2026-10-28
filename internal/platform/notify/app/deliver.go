@@ -73,6 +73,12 @@ func (s *Service) sendOne(ctx context.Context, j domain.DeliveryJob) (string, *s
 	if j.Token == nil {
 		return domain.DeliveryDropped, code("no_active_token")
 	}
+	// P0-NOTIFY-FAILCLOSED: kênh đẩy tắt (chưa cấu hình FCM) → bỏ, ghi lý do; không thử lại, không bao giờ "sent".
+	if reason, off := channel.DisabledReason(s.Pusher); off {
+		s.Log.WarnContext(ctx, "kênh đẩy chưa cấu hình — không gửi", "event", "notify.push", "kind", j.Kind,
+			"delivery_id", j.ID.String(), "reason", reason, "outcome", "dropped")
+		return domain.DeliveryDropped, code(channel.DisabledCode(reason))
+	}
 	err := s.Pusher.Send(ctx, domain.PushMessage{Token: j.Token.Token, Platform: j.Token.Platform, Kind: j.Kind,
 		NotificationID: j.NotificationID, Urgent: j.Urgent, Entities: j.Entities})
 	switch {
@@ -80,6 +86,8 @@ func (s *Service) sendOne(ctx context.Context, j domain.DeliveryJob) (string, *s
 		return domain.DeliverySent, nil
 	case errors.Is(err, channel.ErrTokenInvalid):
 		return domain.DeliveryDropped, code("token_invalid")
+	case errors.Is(err, channel.ErrChannelDisabled):
+		return domain.DeliveryDropped, code(channel.CodeChannelDisabled)
 	}
 	s.Log.WarnContext(ctx, "gửi đẩy lỗi tạm thời", "event", "notify.push", "channel", s.Pusher.Name(), "kind", j.Kind,
 		"delivery_id", j.ID.String(), "attempt", j.Attempts+1, "outcome", "retry")

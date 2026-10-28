@@ -1,6 +1,7 @@
 // Định tuyến HTTP giả lập của vòng đời báo cáo KN v7.7 (application.yaml: /v1/extension/report-*, kn-periods,
 // consolidations, kn-dashboard, report-badges, commune-reports; /v1/reports/dispatch*). Quy tắc ở store.ts.
 import type { FormReportType } from "@/kn/forms/types";
+import { vnDate } from "@/kn/schedule/week";
 import { mockAssignedForms } from "../forms/routes";
 import { json, problem, type Ctx, type Route } from "../http";
 import { reason as checkReason } from "./domain";
@@ -69,7 +70,7 @@ export const reportCycleAppRoutes: Route[] = [
       const rt = q(ctx, "report_type");
       if (!rt) return st.fieldErr("report_type", "bắt buộc");
       const dept = c.dept ?? st.AG_DEPARTMENT;
-      const at = q(ctx, "from_date") ?? new Date(st.nowMs()).toISOString().slice(0, 10);
+      const at = q(ctx, "from_date") ?? vnDate(st.nowMs());
       const items = formsFor(dept, rt, at);
       return json({ items });
     }),
@@ -206,6 +207,18 @@ export const reportCycleAppRoutes: Route[] = [
     handler: kn((ctx, c) => {
       const t = taskFor(c, ctx.params[0]);
       return t instanceof Response ? t : json(st.taskDetail(t));
+    }),
+  },
+  {
+    // BF-TT-FORMS (#107) Nhập từ Excel: giả lập chỉ đọc CSV UTF-8 có hàng chữ cái cột (máy chủ thật đọc cả .xlsx).
+    method: "POST",
+    pattern: re("/v1/extension/report-tasks/{id}/grid-import"),
+    handler: kn((ctx, c) => {
+      const deny = st.writer(c, "kn_xa");
+      if (deny) return deny;
+      const t = taskFor(c, ctx.params[0]);
+      if (t instanceof Response) return t;
+      return gridImport(ctx.body);
     }),
   },
   {
@@ -458,7 +471,7 @@ function provincialImport(ctx: Ctx, c: st.Caller): Response {
   const rt = q(ctx, "report_type") ?? "";
   const ids = (q(ctx, "template_ids") ?? "").split(",").filter(Boolean);
   if (!ids.length) return st.fieldErr("template_ids", "chọn ít nhất một biểu");
-  const at = q(ctx, "from_date") ?? new Date(st.nowMs()).toISOString().slice(0, 10);
+  const at = q(ctx, "from_date") ?? vnDate(st.nowMs());
   const forms = formsFor(c.dept ?? st.AG_DEPARTMENT, rt, at).filter((f) => ids.includes(f.template_id));
   if (forms.length !== ids.length) return problem(422, "extension.form_not_assigned", "Mẫu chưa được gán cho loại báo cáo của phòng ban");
   if (typeof ctx.body !== "string") return invalid("Giả lập chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx");
@@ -517,4 +530,28 @@ function formsFor(dept: string, rt: string, at: string) {
     completeness: f.definition.completeness,
     provincial_columns: f.definition.columns.filter((c) => c.kind === "provincial").map((c) => ({ letter: c.letter, title: c.title, unit: c.unit ?? "" })),
   }));
+}
+
+/** Giả lập POST /v1/extension/report-tasks/{id}/grid-import: tìm hàng chữ cái A, B, C…, bỏ dòng loại cột, lấy dòng dữ liệu. */
+function gridImport(body: unknown): Response {
+  const invalid = (d: string) => problem(422, "extension.grid_import_invalid", "Tệp không đúng bố cục mẫu Excel của biểu", { detail: d });
+  if (typeof body !== "string") return invalid("Giả lập chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx");
+  const rows = body.replace(/^﻿/, "").split(/\r?\n/).map((l) => l.split(",").map((x) => x.trim()));
+  const letter = (n: number) => { let s = ""; for (let k = n; k > 0; k = Math.floor((k - 1) / 26)) s = String.fromCharCode(65 + ((k - 1) % 26)) + s; return s; };
+  const at = rows.findIndex((r) => r.length >= 3 && r.slice(0, 3).every((x, j) => x === letter(j + 1)));
+  if (at < 0) return invalid("Không thấy hàng chữ cái cột (A, B, C…) — dùng tệp \"Tải mẫu Excel\" của biểu");
+  const cols = rows[at]!.filter((x, j) => x === letter(j + 1));
+  const kinds = new Set(["cố định", "tỉnh giao", "nhập", "kỳ", "ƒx", "fx", "công thức"]);
+  const out: { line: number; cells: Record<string, string>; numeric: string[] }[] = [];
+  for (let i = at + 1; i < rows.length; i++) {
+    const r = rows[i]!;
+    const first = r.find((x) => x) ?? "";
+    if (!first) continue;
+    if (first.replace(/^\*/, "").startsWith("Yêu cầu biểu mẫu")) break;
+    if (i === at + 1 && r.filter(Boolean).every((x) => kinds.has(x.toLowerCase()))) continue;
+    const cells: Record<string, string> = {};
+    cols.forEach((l, j) => r[j] && (cells[l] = r[j]!));
+    if (Object.keys(cells).length) out.push({ line: i + 1, cells, numeric: [] }); // CSV: mọi ô là chữ
+  }
+  return json({ sheet: "", rows: out });
 }

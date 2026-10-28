@@ -13,6 +13,7 @@ package app
 // Đọc (cổng): ReadFeed theo cursor (seq), SnapshotURL cấp URL ký ≤ 15 phút lúc yêu cầu.
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -126,12 +127,64 @@ func validateRecords(c *integration.Contract, recs []domain.KeyedRecord) ([]doma
 	return out, nil
 }
 
+// snapshotAttempts: số lần dựng tối đa khi dữ liệu nguồn đổi giữa lúc ghi ảnh chụp và lúc ghi phiên bản.
+const snapshotAttempts = 3
+
+// errSnapshotPending: lần dựng cần ảnh chụp chưa ghi — hủy giao dịch, ghi ảnh chụp NGOÀI giao dịch rồi dựng lại.
+var errSnapshotPending = errors.New("feed: cần ghi ảnh chụp trước")
+
+// preparedSnapshot là ảnh chụp đã ghi vào kho đối tượng (ngoài giao dịch) cho phiên bản version, băm sum.
+type preparedSnapshot struct {
+	version int64
+	sum     string
+	key     string
+	size    int64
+}
+
+// pendingSnapshot là ảnh chụp lần dựng cần mà chưa có (giao dịch đã hủy).
+type pendingSnapshot struct {
+	version int64
+	sum     string
+	body    []byte
+}
+
 // publish ghi một lần dựng vào kho feed (một giao dịch, tenant đơn vị vận hành).
+//
+// P0-POOL-SHARED (#126): KHÔNG ghi kho đối tượng khi đang giữ giao dịch (và khóa đầu feed). Lần dựng cần ảnh chụp
+// mà chưa có → hủy giao dịch, ghi ảnh chụp ngoài giao dịch (khóa đối tượng có mã lần dựng — ghi một lần), rồi dựng
+// lại: phiên bản chỉ trỏ tới ảnh chụp khi số phiên bản và băm SHA-256 khớp (dữ liệu nguồn không đổi giữa hai lần).
+// Lệch → dựng lại, tối đa snapshotAttempts lần; ảnh chụp bỏ dở là đối tượng mồ côi vô hại (như lần dựng lỗi).
 func (s *Service) publish(ctx context.Context, in publishInput) (BuildResult, error) {
+	c := in.contract
+	var prep *preparedSnapshot
+	for attempt := 1; ; attempt++ {
+		res, pending, err := s.publishOnce(ctx, in, prep)
+		if err != nil {
+			return BuildResult{}, err
+		}
+		if pending == nil {
+			s.log().InfoContext(ctx, "feed: dựng tập dữ liệu", "event", "integration.dataset_built", "dataset", c.Name, "version", res.Version,
+				"changed", res.Changed, "upserts", res.Upserts, "retracts", res.Retracts, "records", res.RecordCount, "suppressed", res.Suppressed, "outcome", "ok")
+			return res, nil
+		}
+		if attempt >= snapshotAttempts {
+			return BuildResult{}, fmt.Errorf("feed: dữ liệu nguồn %s đổi liên tục trong lúc ghi ảnh chụp (%d lần)", c.Name, attempt)
+		}
+		key := SnapshotKey(s.OperatorTenant, c, pending.version, ids.New())
+		if _, err := s.Store.Put(ctx, key, bytes.NewReader(pending.body), int64(len(pending.body)), pending.sum, "application/x-ndjson"); err != nil {
+			return BuildResult{}, fmt.Errorf("feed: ghi ảnh chụp %s: %w", key, err)
+		}
+		prep = &preparedSnapshot{version: pending.version, sum: pending.sum, key: key, size: int64(len(pending.body))}
+	}
+}
+
+// publishOnce là một lần dựng trong MỘT giao dịch. Cần ảnh chụp chưa có trong prep → trả pendingSnapshot (giao dịch hủy).
+func (s *Service) publishOnce(ctx context.Context, in publishInput, prep *preparedSnapshot) (BuildResult, *pendingSnapshot, error) {
 	c := in.contract
 	res := BuildResult{Dataset: c.Name}
 	versioned := c.Delivery != nil && c.Delivery.DatasetVersioned
 	now := s.Clock.Now().UTC()
+	var pending *pendingSnapshot
 	err := s.operatorTx(ctx, func(tx pgx.Tx) error {
 		head, err := store.LockFeedHead(ctx, tx, s.OperatorTenant, c.Name, in.partition)
 		if err != nil {
@@ -257,23 +310,24 @@ func (s *Service) publish(ctx context.Context, in publishInput) (BuildResult, er
 			if s.Store == nil {
 				s.log().WarnContext(ctx, "feed: chưa có kho đối tượng — phiên bản không có ảnh chụp", "event", "integration.snapshot_skipped",
 					"dataset", c.Name, "version", *version, "outcome", "degraded")
+			} else if prep == nil || prep.version != *version || prep.sum != sum {
+				// Chưa có ảnh chụp khớp: hủy giao dịch, ghi kho đối tượng ngoài giao dịch (publish) rồi dựng lại.
+				pending = &pendingSnapshot{version: *version, sum: sum, body: []byte(body)}
+				return errSnapshotPending
 			} else {
-				key := SnapshotKey(s.OperatorTenant, c, *version, ids.New())
-				if _, err := s.Store.Put(ctx, key, strings.NewReader(string(body)), int64(len(body)), sum, "application/x-ndjson"); err != nil {
-					return fmt.Errorf("feed: ghi ảnh chụp %s: %w", key, err)
-				}
-				size := int64(len(body))
+				key, size := prep.key, prep.size
 				v.SnapshotKey, v.SnapshotSize, res.SnapshotKey = &key, &size, key
 			}
 		}
 		return store.InsertDatasetVersion(ctx, tx, s.OperatorTenant, v)
 	})
-	if err != nil {
-		return BuildResult{}, err
+	if errors.Is(err, errSnapshotPending) {
+		return BuildResult{}, pending, nil
 	}
-	s.log().InfoContext(ctx, "feed: dựng tập dữ liệu", "event", "integration.dataset_built", "dataset", c.Name, "version", res.Version,
-		"changed", res.Changed, "upserts", res.Upserts, "retracts", res.Retracts, "records", res.RecordCount, "suppressed", res.Suppressed, "outcome", "ok")
-	return res, nil
+	if err != nil {
+		return BuildResult{}, nil, err
+	}
+	return res, nil, nil
 }
 
 // SnapshotKey là khóa đối tượng của ảnh chụp: mã lần dựng (UUIDv7) trong khóa để lần dựng lỗi giữa chừng không

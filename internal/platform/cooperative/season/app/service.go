@@ -120,11 +120,15 @@ func businessDay(t time.Time) time.Time {
 
 // fromCtx mở giao dịch với tenant lấy từ context (cổng cho module khác).
 func (s *Service) fromCtx(ctx context.Context, fn func(pgx.Tx) error) error {
-	return tenant.FromCtxTx(ctx, s.DB, fn)
+	tid, err := tenant.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	return s.nativeScopeTx(ctx, tid, fn)
 }
 
 func (s *Service) inTx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) error {
-	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
+	return s.nativeScopeTx(ctx, tid, fn)
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +181,11 @@ func (s *Service) accessFor(ctx context.Context, p authz.Principal, roles []stri
 	}
 	for _, r := range knRoles {
 		if has(r) {
+			// A native caller inside a joined transaction must not acquire a
+			// second pool connection through ScopeResolver before inTx runs.
+			if err := s.nativeScopePreflight(ctx); err != nil {
+				return access{}, err
+			}
 			if s.Scope == nil {
 				return access{}, ErrDependency.WithDetail("chưa nối bộ tính phạm vi (pf/party)")
 			}

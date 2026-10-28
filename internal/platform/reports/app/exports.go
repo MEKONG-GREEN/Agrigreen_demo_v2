@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"slices"
@@ -63,6 +64,7 @@ type ExportInput struct {
 	Format      string
 	Params      domain.Params
 	IdemKey     string
+	SourceArgs  json.RawMessage
 }
 
 // normalizeParams kiểm và chuẩn hóa bộ lọc theo nguồn của mẫu (FN-10 BR-01: tệp
@@ -154,20 +156,18 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 	if in.IdemKey == "" {
 		return domain.Job{}, false, problem.IdempotencyRequired
 	}
-	sc, err := s.reach(ctx, p)
-	if err != nil {
-		return domain.Job{}, false, err
-	}
-	if sc.Empty() && !s.coopOnly(p) {
-		return domain.Job{}, false, ErrOutOfScope.WithDetail("tài khoản chưa gắn đơn vị công tác")
-	}
-	now := s.now()
 	var job domain.Job
 	replayed := false
 	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.JobByIdemKey(ctx, tx, in.IdemKey); err != nil {
 			return err
 		} else if prev != nil {
+			if err := s.checkReplayTemplate(ctx, tx, in, *prev); err != nil {
+				return err
+			}
+			if err := s.checkSourceReplay(ctx, p, in, *prev); err != nil {
+				return err
+			}
 			job, replayed = *prev, true
 			return nil
 		}
@@ -184,19 +184,9 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 		if !slices.Contains(t.Def.Formats, in.Format) {
 			return ErrFormat.WithField("format", "mẫu hỗ trợ "+strings.Join(t.Def.Formats, ", "))
 		}
-		raw := in.Params
-		jsc, err := s.jobScope(p, sc, t.Def, &raw)
+		job, err = s.sourceRequestJob(ctx, p, t, in, nil)
 		if err != nil {
 			return err
-		}
-		params, err := s.normalizeParams(ctx, t.Def, raw, jsc, now)
-		if err != nil {
-			return err
-		}
-		job = domain.Job{
-			ID: ids.New(), TenantID: p.TenantID, TemplateKey: t.Key, TemplateVersion: t.Version, Def: t.Def, Format: in.Format,
-			Params: params, ScopeAll: jsc.All, ScopeUnits: jsc.Units, RequestedBy: p.ActorRef, RequestedAt: now,
-			Trigger: domain.TriggerAPI, IdemKey: in.IdemKey, Status: domain.JobQueued,
 		}
 		if err := s.egress(ctx, tx, Egress{Kind: EgressExport, TenantID: p.TenantID, ActorRef: p.ActorRef, TemplateKey: t.Key,
 			Format: in.Format, JobID: job.ID}); err != nil {
@@ -210,8 +200,14 @@ func (s *Service) RequestExport(ctx context.Context, in ExportInput) (domain.Job
 		if rerr := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 			var e error
 			prev, e = store.JobByIdemKey(ctx, tx, in.IdemKey)
-			return e
+			if e != nil || prev == nil {
+				return e
+			}
+			return s.checkReplayTemplate(ctx, tx, in, *prev)
 		}); rerr == nil && prev != nil {
+			if e := s.checkSourceReplay(ctx, p, in, *prev); e != nil {
+				return domain.Job{}, false, e
+			}
 			return *prev, true, nil
 		}
 	}
@@ -265,10 +261,6 @@ func (s *Service) GetExport(ctx context.Context, id uuid.UUID) (domain.Job, erro
 	if err != nil {
 		return domain.Job{}, err
 	}
-	sc, err := s.reach(ctx, p)
-	if err != nil {
-		return domain.Job{}, err
-	}
 	var j *domain.Job
 	if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
 		var e error
@@ -277,8 +269,21 @@ func (s *Service) GetExport(ctx context.Context, id uuid.UUID) (domain.Job, erro
 	}); err != nil {
 		return domain.Job{}, err
 	}
-	if j == nil || !s.jobVisible(p, sc, *j) {
+	if j == nil {
 		return domain.Job{}, ErrExportNotFound
+	}
+	if enabled, _ := s.Builders.jobPolicy(j.Def.Source); j.SourceArgs != nil || enabled.Version > 0 {
+		if err := s.readSourceJob(ctx, p, *j, port.SourceJobDetail); err != nil {
+			return domain.Job{}, err
+		}
+	} else {
+		sc, err := s.reach(ctx, p)
+		if err != nil {
+			return domain.Job{}, err
+		}
+		if !s.jobVisible(p, sc, *j) {
+			return domain.Job{}, ErrExportNotFound
+		}
 	}
 	return *j, nil
 }
@@ -299,13 +304,42 @@ func (s *Service) MyExports(ctx context.Context, before uuid.UUID, limit int) (E
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	var jobs []domain.Job
-	if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
-		var e error
-		jobs, e = store.JobsOf(ctx, tx, p.ActorRef, before, limit+1)
-		return e
-	}); err != nil {
-		return ExportPage{}, err
+	// Page on the visible set. Revoked/private legacy jobs cannot suppress
+	// unrelated history, while an unavailable owner still fails the whole read.
+	jobs := []domain.Job{}
+	cursor := before
+	const scanSize = 200
+	for len(jobs) <= limit {
+		var batch []domain.Job
+		if err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+			var e error
+			batch, e = store.JobsOf(ctx, tx, p.ActorRef, cursor, scanSize)
+			return e
+		}); err != nil {
+			return ExportPage{}, err
+		}
+		for _, job := range batch {
+			if _, _, stateErr := s.sourceJobPolicyState(job); stateErr != nil {
+				// An immutable legacy/mismatched envelope has no readable owner
+				// snapshot. Hide it; a live owner's 5xx still fails below.
+				continue
+			}
+			if err := s.readSourceJob(ctx, p, job, port.SourceJobList); err != nil {
+				var denied *problem.Problem
+				if errors.As(err, &denied) && denied.Status >= 400 && denied.Status < 500 {
+					continue
+				}
+				return ExportPage{}, err
+			}
+			jobs = append(jobs, job)
+			if len(jobs) > limit {
+				break
+			}
+		}
+		if len(batch) < scanSize || len(jobs) > limit {
+			break
+		}
+		cursor = batch[len(batch)-1].ID
 	}
 	var pg ExportPage
 	if len(jobs) > limit {
@@ -337,6 +371,9 @@ func (s *Service) Download(ctx context.Context, id uuid.UUID) (DownloadLink, err
 	}
 	j, err := s.GetExport(ctx, id)
 	if err != nil {
+		return DownloadLink{}, err
+	}
+	if err := s.readSourceJob(ctx, p, j, port.SourceJobDownload); err != nil {
 		return DownloadLink{}, err
 	}
 	if j.Status != domain.JobCompleted || j.ObjectKey == nil {

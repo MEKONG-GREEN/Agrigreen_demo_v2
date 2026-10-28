@@ -23,6 +23,11 @@ type NotificationDraft struct {
 	SubjectRef                            *uuid.UUID
 	CreatedAt                             time.Time
 	Email                                 bool
+	// Channels nil preserves legacy inbox + push and Email. An explicit choice
+	// replaces that default; at least one channel must be enabled. Push implies
+	// InApp. Email requires a concrete RecipientRef and queue dependencies; a
+	// disabled transport is audited as dropped rather than promised delivery.
+	Channels *DeliveryChannels
 }
 
 // EventRenderer is a pure content builder. No database, transaction or tenant capability is supplied.

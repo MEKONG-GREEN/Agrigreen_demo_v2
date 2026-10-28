@@ -64,8 +64,8 @@ type attrsDTO struct {
 	HouseholdRefs      []string `json:"household_refs"`
 }
 
-func toAttrsDTO(a port.AssignmentAttrs) attrsDTO {
-	return attrsDTO{ProvinceGroup: strPtr(a.ProvinceGroup), ProvinceGroupLabel: strPtr(port.CatalogLabel(port.ProvinceGroups, a.ProvinceGroup)),
+func toAttrsDTO(a port.AssignmentAttrs, groupLabel string) attrsDTO {
+	return attrsDTO{ProvinceGroup: strPtr(a.ProvinceGroup), ProvinceGroupLabel: strPtr(groupLabel),
 		Duties: nonNilStr(a.Duties), InternalUnitCode: strPtr(a.InternalUnit), FacilityRefs: refsDTO(a.Facilities),
 		HouseholdRefs: refsDTO(a.Households)}
 }
@@ -119,7 +119,7 @@ func (h Handler) setAttrs(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"assignment_id": aid.String(), "attributes": toAttrsDTO(res.Attrs), "seq": res.Attrs.Seq})
+	c.JSON(http.StatusOK, gin.H{"assignment_id": aid.String(), "attributes": toAttrsDTO(res.Attrs, h.Svc.AttributeCatalog().GroupLabel(res.Attrs.ProvinceGroup)), "seq": res.Attrs.Seq})
 }
 
 type delegationDTO struct {

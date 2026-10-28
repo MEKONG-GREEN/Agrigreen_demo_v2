@@ -124,6 +124,9 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 	if err := k.resolveAudience(ctx, p, &q); err != nil {
 		return MenuView{}, err
 	}
+	if err := k.checkMenuUnit(ctx, p, q.UnitRef); err != nil {
+		return MenuView{}, err
+	}
 	var depts []port.Department
 	err = tenant.WithTenantTx(ctx, k.DB, p.TenantID, func(tx pgx.Tx) error {
 		if q.UnitRef == uuid.Nil {
@@ -151,11 +154,20 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 		return MenuView{}, err
 	}
 	if q.Audience == port.AudienceAdmin {
+		if k.Menus != nil {
+			request := menuRequest(ctx, q.Audience, q.UnitRef, port.Department{})
+			request.Mode = port.MenuAdmin
+			request.Departments = depts
+			return k.registeredMenu(ctx, p.TenantID, request)
+		}
 		return k.withModules(ctx, p.TenantID, AdminMenu(q.UnitRef, depts))
 	}
 	d, err := pickDepartment(depts, q.Department)
 	if err != nil {
 		return MenuView{}, err
+	}
+	if k.Menus != nil {
+		return k.registeredMenu(ctx, p.TenantID, menuRequest(ctx, q.Audience, q.UnitRef, d))
 	}
 	view, err := DepartmentMenu(ctx, k.Forms, d, q.Audience)
 	view.UnitRef = q.UnitRef
@@ -167,15 +179,14 @@ func (k *KN) Menu(ctx context.Context, q MenuQuery) (MenuView, error) {
 
 // withModules bỏ mục menu của module đã tắt cho tenant (W1.4, R-MOD-08: menu không hiện).
 func (k *KN) withModules(ctx context.Context, tid uuid.UUID, view MenuView) (MenuView, error) {
-	if k.Modules == nil {
-		return view, nil
+	if k.Modules != nil {
+		disabled, err := k.Modules.DisabledModules(ctx, tid)
+		if err != nil {
+			return MenuView{}, err
+		}
+		view.Groups = FilterMenuGroups(view.Groups, disabled)
 	}
-	disabled, err := k.Modules.DisabledModules(ctx, tid)
-	if err != nil {
-		return MenuView{}, err
-	}
-	view.Groups = FilterMenuGroups(view.Groups, disabled)
-	return view, nil
+	return ApplyNavigation(view, k.NavigationPolicy)
 }
 
 // FilterMenuGroups bỏ mục lá có màn thuộc module đã tắt (domain.MenuModule), mục cha không còn mục con
@@ -237,6 +248,9 @@ func (k *KN) DepartmentModules(ctx context.Context, code string, q MenuQuery) (M
 	if q.Audience != port.AudienceAdmin {
 		return k.Menu(ctx, q)
 	}
+	if err := k.checkMenuUnit(ctx, p, q.UnitRef); err != nil {
+		return MenuView{}, err
+	}
 	var d *port.Department
 	err = tenant.WithTenantTx(ctx, k.DB, p.TenantID, func(tx pgx.Tx) error {
 		if q.UnitRef == uuid.Nil {
@@ -255,6 +269,12 @@ func (k *KN) DepartmentModules(ctx context.Context, code string, q MenuQuery) (M
 	}
 	if d == nil {
 		return MenuView{}, ErrDepartmentNotFound
+	}
+	if k.Menus != nil {
+		request := menuRequest(ctx, q.Audience, q.UnitRef, *d)
+		request.Mode = port.MenuDepartmentModules
+		request.Departments = []port.Department{*d}
+		return k.registeredMenu(ctx, p.TenantID, request)
 	}
 	item := adminDeptItem(*d)
 	return k.withModules(ctx, p.TenantID, MenuView{Version: domain.MenuVersion, Audience: q.Audience, UnitRef: q.UnitRef, Department: d,
@@ -304,6 +324,11 @@ func findDepartment(depts []port.Department, code string) (port.Department, bool
 
 // departmentGroups giải điều kiện mục (FormAvailability) và bỏ mục cha không còn mục con.
 func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.Department, audience string) ([]MenuGroupView, error) {
+	traits, filter := menuTraits(ctx)
+	return departmentGroupsWithTraits(ctx, forms, d, audience, traits, filter)
+}
+
+func departmentGroupsWithTraits(ctx context.Context, forms port.FormAvailability, d port.Department, audience string, traits domain.MenuTraits, filter bool) ([]MenuGroupView, error) {
 	level := domain.LevelProvince
 	if audience == port.AudienceXa {
 		level = domain.LevelCommune
@@ -352,8 +377,8 @@ func departmentGroups(ctx context.Context, forms port.FormAvailability, d port.D
 	}
 	var out []MenuGroupView
 	groups := domain.DepartmentMenu(d.MenuProfile, audience, d.Code)
-	if t, ok := menuTraits(ctx); ok {
-		groups = domain.FilterNeeds(groups, t)
+	if filter {
+		groups = domain.FilterNeeds(groups, traits)
 	}
 	for _, g := range groups {
 		items, err := conv(g.Items)

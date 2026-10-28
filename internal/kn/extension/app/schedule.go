@@ -3,8 +3,7 @@ package app
 // KN v7.7 gói P5 — lịch công tác tuần: FN-XA-03.08 (Cán bộ xã đăng ký lịch tuần, gửi duyệt) và FN-TI-02.07
 // (Cấp Tỉnh xem, duyệt / yêu cầu chỉnh sửa lịch Cán bộ xã cùng phòng ban, cùng tỉnh; đăng ký "Lịch của tôi").
 //
-// Ngữ cảnh KN (vai trò, phòng ban, tỉnh, xã phụ trách, cấp quản lý) lấy qua port.KNContextResolver của P1;
-// chưa có P1 thì suy từ vai realm + phạm vi đơn vị (knActor). Sổ chỉ ghi thêm: mỗi lần lưu là một phiên bản
+// Phiên đã chọn dùng payload do KN sở hữu; resolver/realm cũ chỉ phục vụ request chưa chọn phiên. Sổ chỉ ghi thêm: mỗi lần lưu là một phiên bản
 // (work_schedule_item), mỗi thao tác là một sự việc (work_schedule_event) — RB-1.
 
 import (
@@ -63,6 +62,7 @@ var defaultApproverLevels = []string{port.MgmtLevelHead}
 type knActor struct {
 	authz.Principal
 	accountsport.KNContext
+	ownedSession *port.SessionContext
 }
 
 // knActor dựng ngữ cảnh KN: P1 (X-AG-Context) nếu có; ngược lại suy từ vai realm + phạm vi đơn vị:
@@ -74,6 +74,25 @@ func (s *Service) knActor(ctx context.Context) (knActor, error) {
 		return knActor{}, problem.Unauthenticated
 	}
 	a := knActor{Principal: p}
+	// A selected session is authoritative, including when its legacy marker is absent.
+	// Never let a resolver or broad raw role replace an invalid owner binding.
+	if p.SelectedSession != nil || p.KN != nil {
+		_, k, err := port.RequireSession(ctx)
+		if err != nil {
+			return knActor{}, err
+		}
+		a.ownedSession = &k
+		a.KNContext = accountsport.KNContext{Role: k.Role, Department: k.Department,
+			Communes: slices.Clone(k.Communes), MgmtLevel: strings.ToLower(strings.TrimSpace(k.MgmtLevel)),
+			InternalUnit: k.InternalUnit, ReadOnly: k.ReadOnly()}
+		if k.Role != port.SessionRoleAdmin && k.Role != port.SessionRoleNational {
+			a.ProvinceCode, err = s.scheduleOwnerProvince(ctx, k)
+			if err != nil {
+				return knActor{}, err
+			}
+		}
+		return a, nil
+	}
 	if s.KNContext != nil {
 		c, ok, err := s.KNContext.KNContext(ctx)
 		if err != nil {
@@ -286,7 +305,7 @@ func (s *Service) GetScheduleSettings(ctx context.Context, province string) (Sch
 // canReview: Cấp Tỉnh cùng phòng ban, cùng tỉnh, cấp quản lý được duyệt (Q-05), không phải người đăng ký (R-56).
 // Lịch của cán bộ Cấp Tỉnh chỉ duyệt được khi cấu hình "peer" (Q-16).
 func (a knActor) canReview(sc domain.Schedule, st ScheduleSettings) error {
-	if a.Role != port.KNRoleTinh || sc.Department != a.Department || sc.ProvinceCode != a.ProvinceCode {
+	if a.ReadOnly || a.Role != port.KNRoleTinh || sc.Department != a.Department || sc.ProvinceCode != a.ProvinceCode {
 		return ErrNotScheduleApprover
 	}
 	if sc.OwnerRef == a.ActorRef {
@@ -417,6 +436,9 @@ func (s *Service) SaveSchedule(ctx context.Context, in ScheduleSaveInput) (Sched
 	if err != nil {
 		return ScheduleDetail{}, err
 	}
+	if a.ReadOnly {
+		return ScheduleDetail{}, problem.Forbidden.WithDetail("ngữ cảnh chỉ xem")
+	}
 	if err := a.registrant(); err != nil {
 		return ScheduleDetail{}, err
 	}
@@ -436,18 +458,19 @@ func (s *Service) SaveSchedule(ctx context.Context, in ScheduleSaveInput) (Sched
 	if domain.WeekLocked(in.WeekStart, now, zone) {
 		return ScheduleDetail{}, ErrWeekLocked
 	}
-	var allowed []string
-	if a.Role == port.KNRoleXa {
-		allowed = a.Communes
+	// Xã chọn được: cán bộ xã → xã phụ trách; cán bộ tỉnh → mọi xã thuộc tỉnh (quyết định PO 25/10/2026).
+	allowed, err := s.scheduleCommunes(ctx, a, false)
+	if err != nil {
+		return ScheduleDetail{}, err
 	}
-	items, err := domain.NormalizeItems(in.WeekStart, in.Items, allowed, ids.New)
+	items, err := domain.NormalizeItems(in.WeekStart, in.Items, communeCodes(allowed), ids.New)
 	if err != nil {
 		return ScheduleDetail{}, fieldProblem(err)
 	}
 	if in.Action == domain.SaveSubmit && len(items) == 0 {
 		return ScheduleDetail{}, problem.Validation.WithField("items", domain.ErrSubmitEmpty.Error())
 	}
-	if err := s.checkScheduleItems(ctx, a, items); err != nil {
+	if err := s.checkScheduleItems(ctx, items); err != nil {
 		return ScheduleDetail{}, err
 	}
 	st, err := s.scheduleSettings(ctx, a.Department, a.ProvinceCode, now)
@@ -564,18 +587,10 @@ func (s *Service) SaveSchedule(ctx context.Context, in ScheduleSaveInput) (Sched
 	return s.scheduleDetail(ctx, a, sched.ID, 0)
 }
 
-// checkScheduleItems kiểm địa điểm: xã của Cấp Tỉnh thuộc tỉnh mình; HTX đang hoạt động và thuộc xã đã chọn.
-func (s *Service) checkScheduleItems(ctx context.Context, a knActor, items []domain.ScheduleItem) error {
+// checkScheduleItems kiểm HTX đang hoạt động và thuộc xã đã chọn (xã thuộc phạm vi đã kiểm ở NormalizeItems:
+// xã phụ trách của cán bộ xã, xã thuộc tỉnh của cán bộ tỉnh).
+func (s *Service) checkScheduleItems(ctx context.Context, items []domain.ScheduleItem) error {
 	for _, it := range items {
-		if it.CommuneCode != "" && a.Role == port.KNRoleTinh {
-			prov, level, err := s.provinceOf(ctx, it.CommuneCode, "items.commune_code")
-			if err != nil {
-				return err
-			}
-			if level != partyport.LevelCommune || prov != a.ProvinceCode {
-				return ErrOutOfScope.WithField("items.commune_code", "xã không thuộc tỉnh của bạn")
-			}
-		}
 		if it.CooperativeRef != uuid.Nil {
 			if it.CommuneCode == "" {
 				return problem.Validation.WithField("items.commune_code", "chọn xã của HTX")
@@ -689,6 +704,9 @@ func (s *Service) ReviewSchedule(ctx context.Context, in ReviewInput) (ScheduleD
 	if err != nil {
 		return ScheduleDetail{}, err
 	}
+	if a.ReadOnly {
+		return ScheduleDetail{}, problem.Forbidden.WithDetail("ngữ cảnh chỉ xem")
+	}
 	if a.Role != port.KNRoleTinh {
 		return ScheduleDetail{}, problem.Forbidden.WithDetail("chỉ Cấp Tỉnh duyệt lịch công tác")
 	}
@@ -774,6 +792,9 @@ func (s *Service) BulkApprove(ctx context.Context, idsIn []uuid.UUID, key string
 	a, err := s.knActor(ctx)
 	if err != nil {
 		return BulkResult{}, err
+	}
+	if a.ReadOnly {
+		return BulkResult{}, problem.Forbidden.WithDetail("ngữ cảnh chỉ xem")
 	}
 	if a.Role != port.KNRoleTinh {
 		return BulkResult{}, problem.Forbidden.WithDetail("chỉ Cấp Tỉnh duyệt lịch công tác")
@@ -1071,6 +1092,85 @@ type MySchedule struct {
 	PreviousAvailable bool
 	// CheckinEnabled: phòng ban của người gọi dùng check-in GPS (W11.46) — Mobile hiện nút "Check-in".
 	CheckinEnabled bool
+	// OwnerLevel, Communes: cấp và xã chọn được khi đăng ký lịch, không phụ thuộc lịch tuần đã có (tuần mới
+	// chưa đăng ký vẫn biết xã để chọn — BF-SCHED R-B1). Cán bộ xã: xã phụ trách theo phiên KN; cán bộ tỉnh:
+	// mọi xã hiện hành thuộc tỉnh (quyết định PO 25/10/2026). CommuneOptions: cùng danh sách, kèm tên xã.
+	OwnerLevel     string
+	Communes       []string
+	CommuneOptions []CommuneRef
+}
+
+// CommuneRef là một xã chọn được khi đăng ký lịch (mã, tên đơn vị hành chính).
+type CommuneRef struct {
+	Code string
+	Name string
+}
+
+// scheduleCommunes trả xã người gọi chọn được khi đăng ký lịch (BF-SCHED R-B1, quyết định PO 25/10/2026: cán bộ
+// tỉnh cũng bắt buộc Xã/phường): cán bộ xã → xã phụ trách theo phiên KN; cán bộ tỉnh → mọi xã hiện hành thuộc
+// tỉnh (cây đơn vị hành chính). withNames: tra tên xã (chỉ `mine` cần; lưu lịch chỉ cần mã).
+func (s *Service) scheduleCommunes(ctx context.Context, a knActor, withNames bool) ([]CommuneRef, error) {
+	now := s.now()
+	var codes []string
+	switch a.Role {
+	case port.KNRoleXa:
+		codes = slices.Clone(a.Communes)
+	case port.KNRoleTinh:
+		if s.Units == nil {
+			return nil, ErrDependency.WithDetail("chưa nối danh mục đơn vị hành chính")
+		}
+		if a.ProvinceCode == "" {
+			return []CommuneRef{}, nil
+		}
+		if tree, ok := s.Units.(partyport.AdminUnitTree); ok {
+			us, err := tree.Children(ctx, a.ProvinceCode, now)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]CommuneRef, 0, len(us))
+			for _, u := range us {
+				if u.Level == partyport.LevelCommune {
+					out = append(out, CommuneRef{Code: u.Code, Name: u.Name})
+				}
+			}
+			slices.SortFunc(out, func(x, y CommuneRef) int { return strings.Compare(x.Code, y.Code) })
+			return out, nil
+		}
+		ds, err := s.Units.Descendants(ctx, a.ProvinceCode, now)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range ds {
+			if c != a.ProvinceCode {
+				codes = append(codes, c)
+			}
+		}
+		slices.Sort(codes)
+		withNames = true // cần Get để biết cấp (Descendants không trả cấp)
+	}
+	out := make([]CommuneRef, 0, len(codes))
+	for _, c := range codes {
+		r := CommuneRef{Code: c, Name: c}
+		if withNames && s.Units != nil {
+			u, err := s.Units.Get(ctx, c, now)
+			if err == nil && a.Role == port.KNRoleTinh && u.Level != partyport.LevelCommune {
+				continue
+			}
+			if err == nil && u.Name != "" {
+				r.Name = u.Name
+			}
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+func communeCodes(rs []CommuneRef) []string {
+	out := make([]string, len(rs))
+	for i, r := range rs {
+		out[i] = r.Code
+	}
+	return out
 }
 
 // GetMySchedule trả lịch tuần của người gọi (mặc định tuần kế tiếp) kèm hạn đăng ký (FN-XA-03.08 thiết kế:
@@ -1093,7 +1193,12 @@ func (s *Service) GetMySchedule(ctx context.Context, weekRaw string) (MySchedule
 		return MySchedule{}, err
 	}
 	m := MySchedule{Week: week, SubmitDue: st.SubmitDue(week), ReviewDue: st.ReviewDue(week),
-		Locked: domain.WeekLocked(week, now, clock.Zone()), PreviousWeek: week.AddDate(0, 0, -7), CheckinEnabled: st.Checkin}
+		Locked: domain.WeekLocked(week, now, clock.Zone()), PreviousWeek: week.AddDate(0, 0, -7), CheckinEnabled: st.Checkin,
+		OwnerLevel: a.level()}
+	if m.CommuneOptions, err = s.scheduleCommunes(ctx, a, true); err != nil {
+		return MySchedule{}, err
+	}
+	m.Communes = communeCodes(m.CommuneOptions)
 	var cur, prev *domain.Schedule
 	err = tenant.WithTenantTx(ctx, s.DB, a.TenantID, func(tx pgx.Tx) error {
 		var e error
@@ -1123,6 +1228,9 @@ func (s *Service) CopyPreviousWeek(ctx context.Context, weekRaw, key string) (Sc
 	a, err := s.knActor(ctx)
 	if err != nil {
 		return ScheduleDetail{}, err
+	}
+	if a.ReadOnly {
+		return ScheduleDetail{}, problem.Forbidden.WithDetail("ngữ cảnh chỉ xem")
 	}
 	if err := a.registrant(); err != nil {
 		return ScheduleDetail{}, err

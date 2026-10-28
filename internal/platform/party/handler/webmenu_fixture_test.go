@@ -48,6 +48,18 @@ type webMenuDept struct {
 
 // UR-KT-02 / KN-fix: bản giả lập menu của web-ops = bảng menu Go (một hợp đồng).
 func TestWebMenuFixture(t *testing.T) {
+	navigation, err := domain.RegisteredNavigation()
+	if err != nil {
+		t.Fatal(err)
+	}
+	navigate := func(view app.MenuView) app.MenuView {
+		out, err := app.ApplyNavigation(view, navigation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
 	var seed struct {
 		Departments []webMenuDept `json:"departments"`
 	}
@@ -73,7 +85,7 @@ func TestWebMenuFixture(t *testing.T) {
 			if adHoc {
 				name += "+dot_xuat"
 			}
-			cases = append(cases, webMenuCase{Name: name, Audience: aud, Department: depts[0].Code, AdHoc: adHoc, Menu: menuBody(v)})
+			cases = append(cases, webMenuCase{Name: name, Audience: aud, Department: depts[0].Code, AdHoc: adHoc, Menu: menuBody(navigate(v))})
 		}
 	}
 	// kn.menu/v3 (W11.06): khuôn riêng của từng phòng ban còn lại (bảng menu không phụ thuộc trạng thái —
@@ -84,20 +96,13 @@ func TestWebMenuFixture(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cases = append(cases, webMenuCase{Name: aud + "/" + d.Code, Audience: aud, Department: d.Code, Menu: menuBody(v)})
+			cases = append(cases, webMenuCase{Name: aud + "/" + d.Code, Audience: aud, Department: d.Code, Menu: menuBody(navigate(v))})
 		}
 	}
-	cases = append(cases, webMenuCase{Name: "admin", Audience: port.AudienceAdmin, Menu: menuBody(app.AdminMenu(uuid.Nil, depts))})
+	cases = append(cases, webMenuCase{Name: "admin", Audience: port.AudienceAdmin, Menu: menuBody(navigate(app.AdminMenu(uuid.Nil, depts)))})
 	defaults := map[string]string{}
 	for _, aud := range port.Audiences {
-		v := app.AdminMenu(uuid.Nil, nil)
-		if aud != port.AudienceAdmin {
-			var err error
-			if v, err = app.DepartmentMenu(ctx, nil, depts[0], aud); err != nil {
-				t.Fatal(err)
-			}
-		}
-		defaults[aud] = v.DefaultRoute
+		defaults[aud] = domain.DefaultRoute(aud)
 	}
 	want, err := json.MarshalIndent(map[string]any{
 		"_note":          "SINH TỪ GO (internal/platform/party/handler/webmenu_fixture_test.go) — không sửa tay. AG_UPDATE_WEB_FIXTURES=1 go test ./internal/platform/party/handler -run TestWebMenuFixture",

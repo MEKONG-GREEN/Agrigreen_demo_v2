@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -163,10 +165,11 @@ func OpenDeliveries(ctx context.Context, tx pgx.Tx, batch uuid.UUID) ([]domain.D
 	return out, rows.Err()
 }
 
-// FinishDelivery ghi kết quả một lần thử. lastErr chỉ là mã lỗi ngắn, không token.
+// FinishDelivery ghi kết quả một lần thử (finished_at = now, cùng UPDATE với status — mốc của delivery-health).
+// lastErr chỉ là mã lỗi ngắn, không token.
 func FinishDelivery(ctx context.Context, tx pgx.Tx, id uuid.UUID, status string, lastErr *string, now time.Time) error {
 	_, err := tx.Exec(ctx, `UPDATE pf_notify.push_delivery SET status = $2, attempts = attempts + 1, last_error = $3,
-	    sent_at = CASE WHEN $2 = 'sent' THEN $4::timestamptz ELSE sent_at END
+	    finished_at = $4::timestamptz, sent_at = CASE WHEN $2 = 'sent' THEN $4::timestamptz ELSE sent_at END
 	  WHERE id = $1`, id, status, lastErr, now.UTC())
 	return err
 }
@@ -237,10 +240,18 @@ func InsertDigestItem(ctx context.Context, tx pgx.Tx, tid uuid.UUID, it domain.D
 	return err
 }
 
-// PendingDigest trả mục chưa gửi (khóa dòng để hai worker không gửi trùng).
-func PendingDigest(ctx context.Context, tx pgx.Tx, limit int) ([]domain.DigestItem, error) {
-	rows, err := tx.Query(ctx, `SELECT directive_id, audience_units, issued_at FROM pf_notify.email_digest_item
-	  WHERE sent_at IS NULL ORDER BY issued_at, directive_id LIMIT $1 FOR UPDATE SKIP LOCKED`, limit)
+// ClaimDigest NHẬN tối đa limit mục chưa gửi và chưa có người nhận còn hạn (P0-POOL-SHARED, #126): khóa dòng (hai
+// worker không nhận trùng), ghi claim_id + claimed_until rồi trả mục. Gửi email chạy SAU khi giao dịch này commit;
+// kết quả ghi bằng MarkDigestSent / ReleaseDigestClaim trong giao dịch ngắn khác. Hết claimed_until mà chưa kết
+// (tiến trình chết) → mục được nhận lại.
+func ClaimDigest(ctx context.Context, tx pgx.Tx, claim uuid.UUID, now, until time.Time, limit int) ([]domain.DigestItem, error) {
+	rows, err := tx.Query(ctx, `WITH picked AS (
+	    SELECT tenant_id, directive_id FROM pf_notify.email_digest_item
+	     WHERE sent_at IS NULL AND (claimed_until IS NULL OR claimed_until <= $2::timestamptz)
+	     ORDER BY issued_at, directive_id LIMIT $4 FOR UPDATE SKIP LOCKED)
+	  UPDATE pf_notify.email_digest_item d SET claim_id = $1::uuid, claimed_until = $3::timestamptz
+	    FROM picked p WHERE d.tenant_id = p.tenant_id AND d.directive_id = p.directive_id
+	  RETURNING d.directive_id, d.audience_units, d.issued_at`, claim, now.UTC(), until.UTC(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -253,13 +264,30 @@ func PendingDigest(ctx context.Context, tx pgx.Tx, limit int) ([]domain.DigestIt
 		}
 		out = append(out, it)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	slices.SortFunc(out, func(a, b domain.DigestItem) int {
+		if c := a.IssuedAt.Compare(b.IssuedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Reference.String(), b.Reference.String())
+	})
+	return out, nil
 }
 
-// MarkDigestSent đánh dấu các mục đã vào email digestID.
-func MarkDigestSent(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, digestID uuid.UUID, now time.Time) error {
-	_, err := tx.Exec(ctx, `UPDATE pf_notify.email_digest_item SET digest_id = $2, sent_at = $3
-	  WHERE directive_id = ANY($1::uuid[]) AND sent_at IS NULL`, uuidStrings(ids), digestID, now.UTC())
+// MarkDigestSent kết lần nhận claim: các mục còn giữ claim và chưa gửi → digest_id = claim, sent_at. Trả số mục.
+func MarkDigestSent(ctx context.Context, tx pgx.Tx, claim uuid.UUID, now time.Time) (int64, error) {
+	tag, err := tx.Exec(ctx, `UPDATE pf_notify.email_digest_item SET digest_id = $1::uuid, sent_at = $2::timestamptz,
+	    claim_id = NULL, claimed_until = NULL
+	  WHERE claim_id = $1::uuid AND sent_at IS NULL`, claim, now.UTC())
+	return tag.RowsAffected(), err
+}
+
+// ReleaseDigestClaim trả các mục của lần nhận claim về hàng chờ (gửi lỗi) — lần chạy sau gửi lại.
+func ReleaseDigestClaim(ctx context.Context, tx pgx.Tx, claim uuid.UUID) error {
+	_, err := tx.Exec(ctx, `UPDATE pf_notify.email_digest_item SET claim_id = NULL, claimed_until = NULL
+	  WHERE claim_id = $1::uuid AND sent_at IS NULL`, claim)
 	return err
 }
 

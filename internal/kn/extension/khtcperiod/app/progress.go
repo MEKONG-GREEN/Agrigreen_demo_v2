@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -325,6 +326,17 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) 
 	case err != nil:
 		return Detail{}, ErrNotClosable.WithDetail("kỳ đang " + domain.PeriodLabels[d.State] + ": " + err.Error())
 	}
+	if s.CancelGuard != nil {
+		// Đang hủy kỳ (ý định còn hạn): không chốt kỳ native ở cap/forms — trigger cũng chặn sự kiện 'closed', kiểm trước để
+		// không để lại kỳ native đã chốt mà sổ KHTC chưa đóng (review #143 N6).
+		pending, err := s.CancelGuard.CancelPending(ctx, id)
+		if err != nil {
+			return Detail{}, ErrDependency.WithDetail("trạng thái hủy kỳ lỗi").WithCause(err)
+		}
+		if pending {
+			return Detail{}, ErrCancelling
+		}
+	}
 	if err := s.Control.ClosePeriod(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, eventIdem(idem, "forms-close", id)); err != nil &&
 		!errors.Is(err, formsport.ErrPeriodClosed) {
 		return Detail{}, err
@@ -344,18 +356,12 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) 
 // Cancel "Hủy kỳ" (BR-DL-18): kỳ Đã mở/Đang thu thập/Trễ hạn/Đủ dữ liệu, báo cáo chưa có Bản cuối, lý do bắt buộc. Hủy kỳ
 // native (phiếu gỡ khỏi module các phòng, số liệu không vào ảnh chụp) rồi ghi sự kiện hủy. Kỳ đã hủy không tính khi
 // kiểm mở trùng — mở lại đúng kỳ đó được.
+//
+// P0-POOL-SHARED-2 (#143, bàn giao từ #139): KHÔNG giữ giao dịch quanh lời gọi module khác. Đọc kỳ, Bản cuối và kiểm điều
+// kiện ngoài giao dịch; CancelGuard (khtcreport) ghi Ý ĐỊNH HỦY bền trong giao dịch ngắn giữ khóa khtc_snapshot (trigger chặn
+// Bản cuối/đóng kỳ trong lúc còn hạn), hủy kỳ native ở cap/forms NGOÀI giao dịch, rồi ghi sự kiện hủy + bỏ ý định trong
+// giao dịch ngắn thứ hai. cap/forms lỗi → bỏ ý định, không ghi gì ở sổ KHTC.
 func (s *Service) Cancel(ctx context.Context, id uuid.UUID, reason, idem string) (Detail, error) {
-	if s.GuardCancel != nil {
-		err := s.GuardCancel(ctx, id, func(tx pgx.Tx) error { _, e := s.cancel(ctx, id, reason, idem, tx); return e })
-		if err != nil {
-			return Detail{}, err
-		}
-		return s.Get(ctx, id)
-	}
-	return s.cancel(ctx, id, reason, idem, nil)
-}
-
-func (s *Service) cancel(ctx context.Context, id uuid.UUID, reason, idem string, protected pgx.Tx) (Detail, error) {
 	c, err := s.writer(ctx)
 	if err != nil {
 		return Detail{}, err
@@ -379,21 +385,94 @@ func (s *Service) cancel(ctx context.Context, id uuid.UUID, reason, idem string,
 	case err != nil:
 		return Detail{}, ErrNotCancellable.WithDetail(err.Error())
 	}
-	if err := s.Control.CancelPeriod(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, why, eventIdem(idem, "forms-cancel", id)); err != nil &&
+	var token uuid.UUID
+	cctx := ctx // lời gọi cap/forms: có hạn trước khi ý định hủy hết hạn (review #143 C1)
+	if s.CancelGuard != nil {
+		var deadline time.Time
+		token, deadline, err = s.CancelGuard.BeginCancel(ctx, id)
+		if err == nil {
+			var cancel context.CancelFunc
+			cctx, cancel = context.WithDeadline(ctx, deadline)
+			defer cancel()
+		}
+		switch {
+		case errors.Is(err, domain.ErrHasFinal):
+			return Detail{}, ErrNotCancellable.WithDetail(err.Error())
+		case errors.Is(err, domain.ErrCancelling):
+			return Detail{}, ErrCancelling
+		case err != nil:
+			return Detail{}, err
+		}
+	}
+	abort := func(cause error) error {
+		if s.CancelGuard == nil {
+			return cause
+		}
+		actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if aerr := s.CancelGuard.AbortCancel(actx, id, token); aerr != nil {
+			return errors.Join(cause, aerr)
+		}
+		return cause
+	}
+	if err := s.Control.CancelPeriod(cctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, why, eventIdem(idem, "forms-cancel", id)); err != nil &&
 		!errors.Is(err, formsport.ErrPeriodCancelled) {
-		return Detail{}, err
+		if ctx.Err() == nil && cctx.Err() != nil {
+			err = ErrDependency.WithDetail("hủy kỳ ở cap/forms chậm quá hạn giữ kỳ — thử lại").WithCause(err)
+		}
+		return Detail{}, abort(err)
 	}
 	st := d.State
 	event := store.Event{PeriodID: id, Action: store.ActionCancelled, Reason: &why, State: &st}
-	if protected != nil {
+	if s.CancelGuard != nil {
 		event.ID, event.ActorRef, event.EventTime = ids.New(), c.p.ActorRef, s.now()
-		err := store.InsertEvent(ctx, protected, c.p.TenantID, &event, eventIdem(idem, "cancel", id))
-		return Detail{}, classify(err)
+		write := func(tx pgx.Tx) error {
+			return store.InsertEvent(ctx, tx, c.p.TenantID, &event, eventIdem(idem, "cancel", id))
+		}
+		err := s.CancelGuard.FinishCancel(ctx, id, token, write)
+		if errors.Is(err, domain.ErrCancelLost) {
+			return s.recoverLostCancel(ctx, id, d.Period.FormsPeriodRef, write)
+		}
+		if err != nil {
+			return Detail{}, abort(classify(err))
+		}
+		return s.Get(ctx, id)
 	}
 	if err := s.appendEvent(ctx, c, event, eventIdem(idem, "cancel", id)); err != nil {
 		return Detail{}, err
 	}
 	return s.Get(ctx, id)
+}
+
+// recoverLostCancel (review #143 C1): cap/forms ĐÃ hủy kỳ native nhưng ý định hủy đã hết hạn trước khi ghi sự kiện hủy
+// (lời gọi/giao dịch chậm quá hạn). Bù: nhận ý định MỚI (BeginCancel kiểm Bản cuối dưới khóa khtc_snapshot) rồi ghi sự
+// kiện hủy — nhất quán khi trong lúc đó chưa ai đánh dấu Bản cuối. Đã có Bản cuối (cap/forms hủy, KHTC có Bản cuối — không
+// tự hoàn tác được vì hủy ở cap/forms là trạng thái cuối) → log lỗi extension.khtc.cancel_intent_lost để đối soát, trả
+// 409 extension.khtc_period_cancel_interrupted. Lần hủy khác đang giữ ý định → 409 cancelling (lần đó sẽ ghi sự kiện).
+func (s *Service) recoverLostCancel(ctx context.Context, id, formsRef uuid.UUID, write func(pgx.Tx) error) (Detail, error) {
+	lg := slog.Default().With("event", "extension.khtc.cancel_intent_lost", "period_id", id, "forms_period_ref", formsRef)
+	token, _, err := s.CancelGuard.BeginCancel(ctx, id)
+	if err == nil {
+		if err = s.CancelGuard.FinishCancel(ctx, id, token, write); err != nil {
+			actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
+			err = errors.Join(err, s.CancelGuard.AbortCancel(actx, id, token))
+		}
+	}
+	switch {
+	case err == nil:
+		lg.WarnContext(ctx, "hủy kỳ KHTC: ý định hủy hết hạn sau khi cap/forms đã hủy — đã nhận lại ý định và ghi sự kiện hủy", "outcome", "recovered")
+		return s.Get(ctx, id)
+	case errors.Is(err, domain.ErrCancelling):
+		lg.WarnContext(ctx, "hủy kỳ KHTC: ý định hủy hết hạn, lần hủy khác đang giữ ý định", "outcome", "deferred")
+		return Detail{}, ErrCancelling
+	case errors.Is(err, domain.ErrHasFinal):
+		lg.ErrorContext(ctx, "hủy kỳ KHTC: cap/forms đã hủy kỳ native nhưng báo cáo đã có Bản cuối — cần đối soát", "outcome", "alert")
+		return Detail{}, ErrCancelInterrupted.WithCause(err)
+	default:
+		lg.ErrorContext(ctx, "hủy kỳ KHTC: cap/forms đã hủy kỳ native nhưng chưa ghi được sự kiện hủy — thử Hủy kỳ lại", "outcome", "alert", "error", err.Error())
+		return Detail{}, classify(err)
+	}
 }
 
 // ---------------------------------------------------------------------------

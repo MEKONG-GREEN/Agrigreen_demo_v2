@@ -88,6 +88,10 @@ func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 // Control là cổng điều khiển kỳ native (tiến độ, chốt, hủy) cho module nghiệp vụ (W11.62 — KN Kỳ KHTC).
 func (m *Module) Control() port.PeriodControl { return app.Control{Svc: m.svc} }
 
+// SystemProgress provides a read-only server-side reader for trusted tenant jobs.
+// User requests continue to use Control and its existing authorization checks.
+func (m *Module) SystemProgress() port.SystemProgressReader { return app.SystemReader{Svc: m.svc} }
+
 // Figures là cổng đọc số liệu kỳ native theo lô (bài nộp cuối + ảnh chụp mới nhất) cho tổng hợp của module nghiệp vụ
 // (W11.44 — KN CNTS BM-02, BM-18).
 func (m *Module) Figures() port.FiguresReader { return app.Figures{Svc: m.svc} }

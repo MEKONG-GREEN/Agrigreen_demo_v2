@@ -11,6 +11,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
 
 // OrgRuleVersion ghim vào mọi bản ghi sổ biến động tổ chức.
@@ -177,7 +178,8 @@ func (c CooperativeProfile) Validate(now time.Time) error {
 	if c.AreaHa != nil && !ValidArea(*c.AreaHa) {
 		return FieldError{"cooperative.area_ha", ErrArea}
 	}
-	if c.EstablishedOn != nil && c.EstablishedOn.After(now) {
+	// established_on là ngày lịch VN (00:00 UTC): so với ngày VN của now (KN-VN-DATE #149).
+	if c.EstablishedOn != nil && c.EstablishedOn.After(clock.BusinessDay(now)) {
 		return FieldError{"cooperative.established_on", ErrDate}
 	}
 	if c.Location != nil && !c.Location.Valid() {

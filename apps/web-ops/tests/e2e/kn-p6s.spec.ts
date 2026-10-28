@@ -7,6 +7,8 @@ import { accountMenu, sidebar } from "./helpers";
 // trò trong menu tài khoản; Menu các cấp: dải vàng hỗ trợ + nhật ký.
 const PASSWORD = "KhuyenNong@2026";
 const menuNav = (page: Page) => sidebar(page).getByRole("navigation", { name: "Menu chức năng" });
+// BF-MENU (#98): Cấp Tỉnh Trồng trọt — "Báo cáo tổng hợp các xã" là nhóm: Báo cáo tuần › T01 · Tiến độ XG (/kn/bao-cao/tong-hop).
+const TONG_HOP_TUAN = [/^Báo cáo tổng hợp các xã/, /^Báo cáo tuần/] as const;
 
 async function login(page: Page, identifier: string): Promise<void> {
   await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
@@ -33,10 +35,11 @@ async function logout(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
 }
 
-async function go(page: Page, label: string | RegExp, parent?: RegExp): Promise<void> {
+async function go(page: Page, label: string | RegExp, parent?: RegExp | readonly RegExp[]): Promise<void> {
   const nav = menuNav(page);
-  if (parent) {
-    const btn = nav.getByRole("button", { name: parent });
+  const parents: readonly RegExp[] = parent === undefined ? [] : parent instanceof RegExp ? [parent] : parent;
+  for (const p of parents) {
+    const btn = nav.getByRole("button", { name: p });
     if ((await btn.getAttribute("aria-expanded")) === "false") await btn.click();
   }
   await nav.getByRole("link", { name: label }).click();
@@ -58,14 +61,22 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await enter(page, "binh.tt@angiang.gov.vn", /^Cấp Tỉnh/);
     await go(page, "Phát hành biểu mẫu", /Nhiệm vụ/);
     await expect(page.getByRole("heading", { level: 1, name: "Phát hành biểu mẫu báo cáo" })).toBeVisible();
+    // BF-TT-PUBLISH (#106): wizard 5 bước — B1 biểu, B2 chọn xã từ danh sách, B3 kỳ, B4 Tỉnh giao, B5 xem trước.
+    const nextStep = () => page.getByRole("button", { name: "Tiếp →" }).click();
     await page.getByLabel("Chọn T01").check();
+    await nextStep();
     await page.getByRole("radio", { name: "Chọn từng xã" }).click();
-    await page.getByLabel("Mã xã (cách nhau dấu phẩy)").fill("91301,91302");
-    await page.getByLabel("Tên vụ / đợt*").fill("Đợt E2E");
-    await page.getByRole("button", { name: /Xem trước/ }).click();
-    await expect(page.getByTestId("task-count")).toHaveText("8");
+    await page.getByRole("checkbox", { name: /91301/ }).check();
+    await page.getByRole("checkbox", { name: /91302/ }).check();
+    await nextStep();
+    // BF-UI-KIT (#97) TextField: dấu * bắt buộc chỉ hiển thị (aria-hidden), trường đánh dấu aria-required.
+    await expect(page.getByLabel("Vụ / đợt")).toHaveAttribute("aria-required", "true");
+    await page.getByLabel("Vụ / đợt").fill("Đợt E2E");
+    await nextStep();
     await page.getByLabel("T01 D 91301").fill("126");
     await page.getByLabel("T01 D 91302").fill("290");
+    await nextStep();
+    await expect(page.getByTestId("task-count")).toHaveText("8");
     await page.getByRole("button", { name: "Phát hành", exact: true }).click();
     await expect(page.getByText(/Đã phát hành 8 công việc cho 2 xã, 4 kỳ/)).toBeVisible();
     await logout(page);
@@ -84,7 +95,7 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
 
     // 3. Cấp Tỉnh: Cập nhật lần 1 → yêu cầu Bình Đức điều chỉnh (lý do bắt buộc).
     await enter(page, "binh.tt@angiang.gov.vn", /^Cấp Tỉnh/);
-    await go(page, "Báo cáo tổng hợp các xã");
+    await go(page, "T01 · Tiến độ XG", TONG_HOP_TUAN);
     await page.getByLabel("Vụ/đợt").selectOption({ label: "Đợt E2E" });
     await page.getByRole("button", { name: "Cập nhật" }).click();
     await expect(page.getByText(/Đã cập nhật T01: 2 xã/)).toBeVisible();
@@ -92,8 +103,12 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await page.getByRole("link", { name: "Rà soát T01 Bình Đức Tuần 1" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Bình Đức · T01 · Tuần 1" })).toBeVisible();
     await page.getByRole("button", { name: "Yêu cầu điều chỉnh" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "Dữ liệu chưa hợp lệ" })).toBeVisible();
-    await page.getByLabel("Lý do yêu cầu điều chỉnh*").fill("Kiểm tra lại diện tích tuần 1");
+    // BF-SWEEP-TT (#100): lý do bắt buộc được kiểm ngay trên trường (không gọi API), lỗi gắn với ô.
+    const adjReason = page.getByLabel("Lý do yêu cầu điều chỉnh");
+    await expect(adjReason).toHaveAttribute("aria-required", "true");
+    await expect(adjReason).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByRole("alert").filter({ hasText: "Bắt buộc nhập." })).toBeVisible();
+    await page.getByLabel("Lý do yêu cầu điều chỉnh").fill("Kiểm tra lại diện tích tuần 1");
     await page.getByRole("button", { name: "Yêu cầu điều chỉnh" }).click();
     await expect(page.getByText("Đã gửi yêu cầu điều chỉnh tới Cán bộ xã.")).toBeVisible();
     await logout(page);
@@ -110,7 +125,7 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
 
     // 5. Cấp Tỉnh: "Có 1 thay đổi mới" → Cập nhật → nhật ký ô (Điều chỉnh theo yêu cầu, Tự tính), ô viền vàng → chốt kỳ.
     await enter(page, "binh.tt@angiang.gov.vn", /^Cấp Tỉnh/);
-    await go(page, "Báo cáo tổng hợp các xã");
+    await go(page, "T01 · Tiến độ XG", TONG_HOP_TUAN);
     await page.getByLabel("Vụ/đợt").selectOption({ label: "Đợt E2E" });
     await expect(page.getByRole("status", { name: "Thay đổi chờ cập nhật" })).toContainText("Có 1 thay đổi mới từ 1 xã");
     await page.getByRole("button", { name: "Cập nhật" }).click();
@@ -157,14 +172,20 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await expect(page.getByText("Phòng ban đang áp dụng")).toBeVisible();
     await go(page, "Người dùng");
     await expect(page.getByRole("heading", { level: 1, name: "Người dùng" })).toBeVisible();
-    await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-    const dlg = page.getByRole("dialog");
-    await dlg.getByLabel("Họ tên*").fill("Võ Thị Hạnh");
-    await dlg.getByLabel("Email*").fill("hanh.vt@angiang.gov.vn");
-    await dlg.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912345699");
-    await dlg.getByLabel("Xã Châu Phong").check();
-    await dlg.getByRole("button", { name: "+ Thêm vai trò" }).click();
-    await dlg.getByRole("button", { name: "Tạo tài khoản" }).click();
+    // BF-SWEEP-TT (#100): Tạo tài khoản mở trang riêng (thay pop-up), "Lưu" là nút chính.
+    await page.getByRole("link", { name: "Tạo tài khoản" }).click();
+    await expect(page).toHaveURL(/\/kn\/quan-tri\/nguoi-dung\/them-moi$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Tạo tài khoản" })).toBeVisible();
+    const main = page.getByRole("main");
+    await expect(main.getByLabel("Họ tên")).toHaveAttribute("aria-required", "true");
+    await expect(main.getByLabel("Email")).toHaveAttribute("aria-required", "true");
+    await main.getByLabel("Họ tên").fill("Võ Thị Hạnh");
+    await main.getByLabel("Email").fill("hanh.vt@angiang.gov.vn");
+    await main.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912345699");
+    await main.getByLabel("Xã Châu Phong").check();
+    await main.getByRole("button", { name: "+ Thêm vai trò" }).click();
+    await expect(main.getByRole("group", { name: "Vai trò và phạm vi" })).toHaveCount(2);
+    await main.getByRole("button", { name: "Lưu", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Võ Thị Hạnh" })).toBeVisible();
     const roles = page.getByRole("table", { name: "Vai trò và phạm vi" });
     await expect(roles).toContainText("Cấp Xã");
@@ -175,7 +196,7 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     // Menu các cấp: vào vai Cấp Xã thay Nguyễn Văn An, lưu nháp có lý do → nhật ký hỗ trợ.
     await go(page, "Menu các cấp");
     await page.getByLabel("Tài khoản / xã*").selectOption({ label: "Nguyễn Văn An · Mỹ Hòa Hưng, Bình Đức" });
-    await page.getByLabel("Lý do hỗ trợ*").fill("Cán bộ xã mất mạng, nhập thay T04");
+    await page.getByLabel("Lý do hỗ trợ").fill("Cán bộ xã mất mạng, nhập thay T04");
     await page.getByRole("button", { name: /Vào menu Cấp Xã/ }).click();
     await expect(page.getByRole("status", { name: "Chế độ hỗ trợ" })).toContainText("Đang hỗ trợ thay Nguyễn Văn An");
     await expect(page.getByRole("heading", { level: 1, name: "Công việc cần làm" })).toBeVisible();
@@ -196,7 +217,8 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await expect(page).toHaveURL(/\/kn\/nhiem-vu\/cong-viec$/);
     await accountMenu(page).click();
     await page.getByRole("menuitem", { name: "Cấp Tỉnh · Phòng Trồng trọt" }).click();
-    await expect(page).toHaveURL(/\/kn\/dashboard$/);
+    // Trang vào Cấp Tỉnh phòng chuyên môn = "Báo cáo cho KHTC" (#44, internal/kn/extension/menus/navigation.json).
+    await expect(page).toHaveURL(/\/kn\/bao-cao-khtc$/);
     await expect(accountMenu(page)).toContainText("Cấp Tỉnh · Trồng trọt");
   });
 });

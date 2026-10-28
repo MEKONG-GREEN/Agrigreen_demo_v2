@@ -1,0 +1,76 @@
+# Ánh xạ mặc định của cmd/hrmimport (W11.30, D3 H10). Sao chép ra tệp riêng (go run ./cmd/hrmimport -dump-mapping m.yaml),
+# sửa theo tiêu đề cột thật của tệp HCTH gửi (Q-069), rồi chạy với -mapping m.yaml.
+#
+# columns: trường chuẩn → các tiêu đề cột nguồn. So khớp không phân biệt hoa thường, dấu, khoảng trắng, dấu câu
+#          ("Họ và tên" = "HO VA TEN" = "họ_và_tên"). Tiêu đề của tệp mẫu (-template) luôn được nhận.
+# values:  trường → {chữ trong tệp: mã}. Bổ sung khi tên trong tệp khác tên danh mục trên hệ thống; tên/mã trùng
+#          danh mục (Admin → Danh mục nhân sự) và tên/mã đơn vị nội bộ tự khớp, không cần khai báo.
+# defaults: giá trị khi ô trống. as_of = ngày chốt dữ liệu (ngày hiệu lực của đơn vị/chức vụ/trình độ khi tệp không có ngày).
+version: 1
+defaults:
+  type: ""          # vd hop_dong khi nạp riêng sheet HĐLĐ-ĐVSN (không có cột Loại nhân sự)
+  position: ""      # vd vien_chuc khi tệp để trống chức vụ của người không giữ chức vụ
+  as_of: ""         # vd 2026-08-31 (danh sách có mặt tháng 8/2026)
+columns:
+  source_key: ["STT", "TT", "Số TT", "Mã NV", "Mã nhân viên", "Mã hồ sơ cũ"]
+  type: ["Loại", "Loại NS", "Loại hình", "Đối tượng"]
+  full_name: ["Họ tên", "Họ và tên", "Họ, tên"]
+  gender: ["Giới tính", "Phái", "GT"]
+  birth_date: ["Ngày sinh", "Ngày, tháng, năm sinh", "Năm sinh", "Ngày tháng năm sinh"]
+  birth_date_male: ["Nam", "Năm sinh Nam", "Ngày sinh Nam"]
+  birth_date_female: ["Nữ", "Năm sinh Nữ", "Ngày sinh Nữ"]
+  phone: ["SĐT", "Điện thoại", "Số điện thoại (Zalo)", "Di động", "ĐT"]
+  email: ["Email", "E-mail", "Thư điện tử"]
+  address: ["Địa chỉ", "Nơi ở", "Nơi ở hiện nay", "Chỗ ở hiện nay"]
+  unit: ["Đơn vị", "Phòng", "Phòng ban", "Phòng, ban, bộ phận", "Đơn vị công tác", "Bộ phận"]
+  commune: ["Mã xã", "Mã ĐVHC", "Xã phường mã"]
+  mgmt_unit: ["Đơn vị quản lý", "ĐV quản lý"]
+  unit_since: ["Ngày về đơn vị", "Ngày điều động"]
+  position: ["Chức vụ", "Chức vụ, chức danh", "Chức danh"]
+  position_title: ["Tên chức vụ", "Chức vụ ghi rõ"]
+  allowance: ["Hệ số PCCV", "PCCV", "Hệ số phụ cấp chức vụ"]
+  appointed_on: ["Ngày bổ nhiệm", "Ngày QĐ bổ nhiệm"]
+  work_start: ["Ngày vào làm", "Ngày tuyển dụng", "Ngày vào cơ quan", "Ngày TGCM", "Ngày tham gia công tác"]
+  work_end: ["Ngày nghỉ", "Ngày nghỉ việc", "Nghỉ từ ngày"]
+  leave_reason: ["Lý do nghỉ", "Lý do"]
+  grade: ["Ngạch", "Ngạch/CDNN", "Ngạch, CDNN", "Ngạch hiện giữ", "Mã ngạch", "CDNN"]
+  step: ["Bậc", "Bậc lương", "Bậc hiện hưởng"]
+  coefficient: ["Hệ số", "Hệ số lương", "Hệ số bậc", "HS lương"]
+  step_since: ["Ngày xếp bậc", "Thời điểm được xếp", "Mốc nâng bậc", "Thời điểm xếp bậc"]
+  reserved_coeff: ["HS bảo lưu", "Hệ số bảo lưu", "Bảo lưu"]
+  education_level: ["Trình độ", "Trình độ chuyên môn", "TĐCM", "Học vị"]
+  major: ["Chuyên ngành", "Ngành"]
+  degree_form: ["Hình thức đào tạo", "Hệ đào tạo", "Loại hình đào tạo"]
+  institution: ["Trường", "Cơ sở đào tạo", "Nơi đào tạo"]
+  grad_year: ["Năm tốt nghiệp", "Năm TN"]
+  political_theory: ["LLCT", "Lý luận chính trị", "Chính trị"]
+  state_mgmt: ["QLNN", "Quản lý nhà nước"]
+  it_level: ["Tin học", "Trình độ tin học"]
+  ethnicity: ["Dân tộc"]
+  religion: ["Tôn giáo"]
+  party_date: ["Ngày vào Đảng", "Đảng viên", "Ngày kết nạp Đảng"]
+  hometown: ["Quê quán"]
+  birthplace: ["Nơi sinh"]
+  note: ["Ghi chú"]
+values:
+  # Bổ sung theo tệp thật, ví dụ:
+  # unit:
+  #   "HC-TH": hcth
+  #   "Phòng HCTH": hcth
+  # position:
+  #   "PGĐ": pho_giam_doc
+  #   "TP": truong_phong
+  # grade:
+  #   "Chuyên viên": "01.003"
+  position:
+    "PGĐ": pho_giam_doc
+    "GĐ": giam_doc
+    "TP": truong_phong
+    "PTP": pho_truong_phong
+    "Nhân viên": vien_chuc
+  education_level:
+    "ĐH": dai_hoc
+    "CĐ": cao_dang
+    "TC": trung_cap
+    "ThS": thac_si
+    "TS": tien_si

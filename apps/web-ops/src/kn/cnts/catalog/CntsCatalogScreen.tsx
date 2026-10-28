@@ -1,26 +1,35 @@
 "use client";
 
-// FN-06 — Danh mục Chăn nuôi – Thủy sản (BRD CNTS v3.7, UR-ADM-04; W11.41, pf/masterdata). Admin thêm/sửa/ngừng dùng
-// trong popup, nạp Excel; Cấp Tỉnh chỉ xem (Application API). Thuộc tính ảnh hưởng tổng hợp có hiệu lực TỪ NGÀY (BR-03):
-// mỗi lần sửa chọn ngày áp dụng, "Xem tại ngày" đọc giá trị có hiệu lực ngày đó, "Hiệu lực" liệt kê các giá trị.
+// FN-06 — Danh mục Chăn nuôi – Thủy sản (BRD CNTS v3.7, UR-ADM-04; W11.41, pf/masterdata). Admin thêm/sửa trên trang riêng
+// (R-A2, BF-SWEEP-CNTS #101): một route chung cho mọi loại danh mục — `…/[loại]/them-moi`, `…/[loại]/[mã]` (chi tiết + các
+// giá trị theo ngày hiệu lực), `…/[loại]/[mã]/sua`. Ngừng dùng qua pop-up lý do ngắn; nạp Excel; Cấp Tỉnh chỉ xem
+// (Application API). Thuộc tính ảnh hưởng tổng hợp có hiệu lực TỪ NGÀY (BR-03): mỗi lần sửa chọn ngày áp dụng, "Xem tại ngày"
+// đọc giá trị có hiệu lực ngày đó.
+import Link from "next/link";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ChangeEvent } from "react";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { fieldErrorMap } from "@/api/problem";
 import type { CatalogItem, CatalogName } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
-import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
-import { DataTable, PageHeader, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
+import { NumberField, SelectField, TextField, parseNumberInput, type NumberRule } from "@/components/form";
+import { DetailPage, LabelValueBlock } from "@/components/patterns/detail";
+import { DataTable, PageHeader, RowActions, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
 import { toCsv } from "@/htx/rules";
 import { LoadState, ReadOnlyNotice, useAction, useLoad } from "@/kn/cycle/common";
 import { readUpload, saveBlob } from "@/lib/files";
+import { ReasonDialog } from "../ReasonDialog";
 import {
   CNTS_TABS,
   CNTS_THRESHOLDS,
+  INT_RULE,
   cleanAttrs,
   codes,
   formatDoses,
+  normalizeAttrs,
   parseDoses,
   tabOf,
   templateRows,
@@ -45,6 +54,30 @@ function dmy(d?: string | null): string {
   return `${dd}/${m}/${y}`;
 }
 
+/** Gốc route danh mục: `/kn/cnts/danh-muc` hoặc `/kn/phong-ban/[dept]/danh-muc-cnts` (Admin › Phòng ban › Phòng CNTS). */
+export function catalogBase(pathname: string | null | undefined): string {
+  const m = /^(.*\/danh-muc(?:-cnts)?)(?:\/|$)/.exec(pathname ?? "");
+  return m ? m[1]! : "/kn/cnts/danh-muc";
+}
+
+function isCntsCatalog(v: string | null | undefined): v is CntsCatalog {
+  return !!v && CNTS_TABS.some((t) => t.id === v);
+}
+
+const itemHref = (base: string, catalog: string, code: string) => `${base}/${catalog}/${encodeURIComponent(code)}`;
+
+/** Ngày tham chiếu từ `?at=YYYY-MM-DD` (ngày "Xem tại ngày" của danh sách); thiếu hoặc sai → hôm nay. */
+export function parseAt(v: string | null | undefined): string {
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return vnToday();
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : vnToday();
+}
+
+/** Giữ ngày tham chiếu khi chuyển trang (Codex review #101); hôm nay là mặc định nên không cần ghi vào URL. */
+function withAt(href: string, at: string): string {
+  return at === vnToday() ? href : `${href}${href.includes("?") ? "&" : "?"}at=${at}`;
+}
+
 /** Truy cập danh mục: Admin (masterdata_admin) qua Admin API, người khác chỉ đọc qua Application API. */
 function useCatalogApi() {
   const { api, adminApi, principal } = useAuth();
@@ -57,6 +90,18 @@ function useCatalogApi() {
     return page.items as Item[];
   };
   return { api, adminApi, canEdit, list };
+}
+
+/** Tên mục được tham chiếu (loài, bệnh, mô hình, giống, vaccine) để hiển thị thay mã. */
+function useRefNames(at: string, nonce = 0) {
+  const ca = useCatalogApi();
+  return useLoad(
+    () =>
+      Promise.all((["cnts_species", "cnts_disease", "cnts_model_type", "cnts_breed", "cnts_vaccine"] as CntsCatalog[]).map((c) => ca.list(c, at))).then((ls) =>
+        Object.fromEntries(ls.flat().map((i) => [i.code, i.name])) as Record<string, string>,
+      ),
+    [at, nonce],
+  );
 }
 
 /** Tóm tắt thuộc tính một dòng (cột "Thuộc tính"). */
@@ -95,45 +140,65 @@ function summary(tab: CatalogTab, it: Item, names: Record<string, string>): stri
   }
 }
 
+/** Giá trị hiển thị của một thuộc tính ở trang chi tiết. */
+function fieldText(f: Field, value: string | undefined, names: Record<string, string>): string {
+  if (!value) return "";
+  switch (f.kind) {
+    case "select":
+      return f.options.find(([v]) => v === value)?.[1] ?? value;
+    case "bool":
+      return value === "true" ? "Có" : "Không";
+    case "ref":
+      return codes(value)
+        .map((c) => names[c] ?? c)
+        .join(", ");
+    case "doses":
+      return parseDoses(value)
+        .map((d) => `${names[d.vaccine] ?? d.vaccine} lần ${d.shot} @ ${d.age_days} ngày tuổi`)
+        .join("; ");
+    default:
+      return value;
+  }
+}
+
 export function CntsCatalogScreen() {
   const ca = useCatalogApi();
-  const [tab, setTab] = useState<TabId>("cnts_species");
-  const [at, setAt] = useState(vnToday());
+  const base = catalogBase(usePathname());
+  const sp = useSearchParams();
+  const [tab, setTab] = useState<TabId>(() => {
+    const t = sp?.get("tab");
+    return t === "thresholds" || isCntsCatalog(t) ? t : "cnts_species";
+  });
+  const [at, setAt] = useState(() => parseAt(sp?.get("at")));
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [nonce, setNonce] = useState(0);
-  const [editing, setEditing] = useState<Item | "new" | null>(null);
   const [retiring, setRetiring] = useState<Item | null>(null);
-  const [versionsOf, setVersionsOf] = useState<Item | null>(null);
   const [showImport, setShowImport] = useState(false);
   const act = useAction();
   const catalog = tab === "thresholds" ? null : tab;
   const rows = useLoad(catalog ? () => ca.list(catalog, at) : null, [catalog, at, nonce]);
-  // Tên mục được tham chiếu (loài, bệnh, mô hình, giống) để hiển thị thay mã.
-  const refNames = useLoad(
-    () =>
-      Promise.all((["cnts_species", "cnts_disease", "cnts_model_type", "cnts_breed", "cnts_vaccine"] as CntsCatalog[]).map((c) => ca.list(c, at))).then((ls) =>
-        Object.fromEntries(ls.flat().map((i) => [i.code, i.name])),
-      ),
-    [at, nonce],
-  );
+  const refNames = useRefNames(at, nonce);
   const names = refNames.data ?? {};
   const reload = () => setNonce((n) => n + 1);
   const current = catalog ? tabOf(catalog) : null;
 
-  const reactivate = (it: Item) =>
-    void act
+  const setActive = (it: Item, active: boolean, reason?: string) =>
+    act
       .run(
         () =>
           unwrap(
-            ca.adminApi.POST("/v1/masterdata/catalogs/{catalog}/items/{code}/reactivate", {
+            ca.adminApi.POST(active ? "/v1/masterdata/catalogs/{catalog}/items/{code}/reactivate" : "/v1/masterdata/catalogs/{catalog}/items/{code}/deactivate", {
               params: { path: { catalog: it.catalog as CatalogName, code: it.code }, header: { "Idempotency-Key": newIdempotencyKey() } },
-              body: {},
+              body: active ? {} : { reason: reason ?? "" },
             }),
           ),
-        `Đã dùng lại ${it.name}`,
+        active ? `Đã dùng lại ${it.name}` : `Đã ngừng dùng ${it.name}`,
       )
-      .then(reload);
+      .then((r) => {
+        if (r) reload();
+        return r;
+      });
 
   const columns: Column<Item>[] = current
     ? [
@@ -147,26 +212,21 @@ export function CntsCatalogScreen() {
           header: "",
           cell: (i) => (
             <span className="row">
-              {ca.canEdit ? (
-                <button type="button" className="btn btn-o btn-sm" aria-label={`Sửa ${i.name}`} onClick={() => setEditing(i)}>
-                  <Icon name="edit" size={15} />
-                </button>
-              ) : null}
+              <RowActions
+                label={i.name}
+                viewHref={withAt(itemHref(base, i.catalog, i.code), at)}
+                editHref={ca.canEdit ? withAt(`${itemHref(base, i.catalog, i.code)}/sua`, at) : undefined}
+              />
               {ca.canEdit ? (
                 i.active ? (
                   <button type="button" className="btn btn-o btn-sm" onClick={() => setRetiring(i)}>
                     Ngừng dùng
                   </button>
                 ) : (
-                  <button type="button" className="btn btn-o btn-sm" disabled={act.busy} onClick={() => reactivate(i)}>
+                  <button type="button" className="btn btn-o btn-sm" disabled={act.busy} onClick={() => void setActive(i, true)}>
                     Dùng lại
                   </button>
                 )
-              ) : null}
-              {ca.canEdit ? (
-                <button type="button" className="btn btn-o btn-sm" onClick={() => setVersionsOf(i)}>
-                  Hiệu lực
-                </button>
               ) : null}
             </span>
           ),
@@ -185,9 +245,9 @@ export function CntsCatalogScreen() {
                 <Icon name="upload" size={15} />
                 Nạp Excel
               </button>
-              <button type="button" className="btn btn-p btn-sm" onClick={() => setEditing("new")}>
+              <Link className="btn btn-p btn-sm" href={withAt(`${base}/${current.id}/them-moi`, at)}>
                 Thêm {current.label.toLowerCase()}
-              </button>
+              </Link>
             </span>
           ) : null
         }
@@ -235,19 +295,253 @@ export function CntsCatalogScreen() {
       ) : (
         <Thresholds at={at} />
       )}
-      {editing && current ? (
-        <ItemDialog
-          tab={current}
-          item={editing === "new" ? null : editing}
-          at={at}
-          names={names}
-          onClose={() => setEditing(null)}
-          onSaved={() => (setEditing(null), reload())}
-        />
+      {retiring ? (
+        <ReasonDialog
+          title={`Ngừng dùng ${retiring.name}`}
+          confirmLabel="Ngừng dùng"
+          busy={act.busy}
+          onClose={() => setRetiring(null)}
+          onConfirm={(reason) => void setActive(retiring, false, reason).then((r) => r && setRetiring(null))}
+        >
+          <p className="small">Mục đang dùng trong biểu chỉ được ngừng dùng, không xóa; số liệu cũ giữ nguyên.</p>
+        </ReasonDialog>
       ) : null}
-      {retiring ? <RetireDialog item={retiring} onClose={() => setRetiring(null)} onDone={() => (setRetiring(null), reload())} /> : null}
-      {versionsOf ? <VersionsDialog item={versionsOf} names={names} onClose={() => setVersionsOf(null)} /> : null}
     </>
+  );
+}
+
+/** Đọc loại danh mục + mã mục từ route; mục được tìm trong danh sách tại ngày tham chiếu `?at=` (mặc định hôm nay; Admin: gồm
+ * cả mục ngừng dùng) — đúng ngày danh sách đang xem, kể cả mục chỉ có hiệu lực từ ngày tương lai. */
+function useRouteItem() {
+  const params = useParams<{ type?: string; code?: string }>();
+  const type = params?.type;
+  const code = params?.code ? decodeURIComponent(params.code) : undefined;
+  const base = catalogBase(usePathname());
+  const at = parseAt(useSearchParams()?.get("at"));
+  const ca = useCatalogApi();
+  const tab = isCntsCatalog(type) ? tabOf(type) : null;
+  const item = useLoad(tab && code ? () => ca.list(tab.id, at).then((ls) => ({ item: ls.find((i) => i.code === code) ?? null })) : null, [tab?.id, code, at]);
+  return { tab, code, base, at, ca, item };
+}
+
+function NotFound({ base, what }: { base: string; what: string }) {
+  return (
+    <DetailPage back={{ href: base, label: "Danh mục CNTS" }} title={what}>
+      <p className="mute">Không tìm thấy. Có thể mục đã bị xóa khỏi danh mục hoặc đường dẫn sai.</p>
+    </DetailPage>
+  );
+}
+
+/** Trang Thêm / Sửa mục danh mục CNTS (dùng chung mọi loại danh mục). */
+export function CntsCatalogItemFormScreen() {
+  const { tab, code, base, at, ca, item } = useRouteItem();
+  if (!tab) return <NotFound base={base} what="Danh mục không tồn tại" />;
+  const listHref = withAt(`${base}?tab=${tab.id}`, at);
+  if (!ca.canEdit) {
+    return (
+      <DetailPage back={{ href: listHref, label: tab.label }} title={tab.label}>
+        <ReadOnlyNotice>Chỉ xem — Admin quản trị danh mục CNTS (FN-06).</ReadOnlyNotice>
+      </DetailPage>
+    );
+  }
+  if (!code) return <ItemForm tab={tab} item={null} base={base} at={at} />;
+  return (
+    <LoadState s={item}>
+      {(d) => (d.item ? <ItemForm key={`${d.item.code}@${at}`} tab={tab} item={d.item} base={base} at={at} /> : <NotFound base={listHref} what={`Không có mục ${code}`} />)}
+    </LoadState>
+  );
+}
+
+/** `at`: ngày tham chiếu đã chọn ở danh sách — mục được nạp tại ngày này. Ngày áp dụng mặc định như pop-up cũ (Sửa: hôm nay,
+ * Thêm: ngày đang xem), người dùng vẫn chọn được và gửi nguyên `valid_from` cho API. */
+function ItemForm({ tab, item, base, at }: { tab: CatalogTab; item: Item | null; base: string; at: string }) {
+  const ca = useCatalogApi();
+  const router = useRouter();
+  const [code, setCode] = useState(item?.code ?? "");
+  const [name, setName] = useState(item?.name ?? "");
+  const [attrs, setAttrs] = useState<Record<string, string>>({ ...(item?.attrs ?? {}) });
+  const [validFrom, setValidFrom] = useState(item ? vnToday() : at);
+  const [errs, setErrs] = useState<Record<string, string | undefined>>({});
+  const [dosesInput, setDosesInput] = useState<string | undefined>();
+  const [key] = useState(newIdempotencyKey);
+  const act = useAction();
+  const server = act.problem ? fieldErrorMap(act.problem) : {};
+  const listHref = withAt(`${base}?tab=${tab.id}`, at);
+  const back = item ? withAt(itemHref(base, tab.id, item.code), at) : listHref;
+  const refCatalogs = [...new Set(tab.fields.flatMap((f) => (f.kind === "ref" ? [f.catalog] : f.kind === "doses" ? ["cnts_vaccine" as CntsCatalog] : [])))];
+  const opts = useLoad(
+    () => Promise.all(refCatalogs.map((c) => ca.list(c, validFrom))).then((ls) => Object.fromEntries(refCatalogs.map((c, i) => [c, ls[i]!])) as Record<CntsCatalog, Item[]>),
+    [validFrom],
+  );
+  const save = async () => {
+    const e: Record<string, string> = validateAttrs(tab, attrs);
+    if (!name.trim()) e.name = "Bắt buộc nhập.";
+    if (!item && !code.trim()) e.code = "Bắt buộc nhập.";
+    if (!validFrom) e.valid_from = "Bắt buộc nhập.";
+    if (dosesInput) e.doses = dosesInput;
+    setErrs(e);
+    if (Object.keys(e).length > 0) return;
+    const body = { name: name.trim(), attrs: cleanAttrs(normalizeAttrs(tab, attrs)), valid_from: validFrom };
+    const c = tab.id as CatalogName;
+    const r = await act.run(() =>
+      item
+        ? unwrap(ca.adminApi.PUT("/v1/masterdata/catalogs/{catalog}/items/{code}", { params: { path: { catalog: c, code: item.code } }, body }))
+        : unwrap(
+            ca.adminApi.POST("/v1/masterdata/catalogs/{catalog}/items", {
+              params: { path: { catalog: c }, header: { "Idempotency-Key": key } },
+              body: { ...body, code: code.trim() },
+            }),
+          ),
+    );
+    if (r) router.push(item ? back : listHref);
+  };
+  const err = (k: string) => errs[k] ?? server[k] ?? server[`attrs.${k}`];
+  return (
+    <DetailPage
+      back={{ href: back, label: item ? item.name : tab.label }}
+      title={item ? `Sửa ${tab.label.toLowerCase()} ${item.code}` : `Thêm ${tab.label.toLowerCase()}`}
+      actions={
+        <>
+          <Link className="btn btn-o" href={back}>
+            Hủy
+          </Link>
+          <button type="button" className="btn btn-p" disabled={act.busy} onClick={() => void save()}>
+            {act.busy ? "Đang lưu…" : "Lưu"}
+          </button>
+        </>
+      }
+    >
+      {act.view}
+      <div className="grid2">
+        <TextField label="Mã" required value={code} disabled={!!item} onChange={setCode} error={err("code")} maxLength={40} hint="1–40 ký tự A–Z, 0–9, _ . -" />
+        <TextField label="Tên" required value={name} onChange={setName} error={err("name")} maxLength={200} />
+      </div>
+      <LoadState s={opts}>
+        {(o) => (
+          <div className="grid2">
+            {tab.fields.map((f) => (
+              <FieldInput
+                key={f.key}
+                f={f}
+                value={attrs[f.key] ?? ""}
+                options={o}
+                error={err(f.key)}
+                onChange={(v) => setAttrs((a) => ({ ...a, [f.key]: v }))}
+                onBlurError={(m) => setErrs((x) => ({ ...x, [f.key]: m }))}
+                onDosesInput={setDosesInput}
+              />
+            ))}
+          </div>
+        )}
+      </LoadState>
+      {item?.attrs.facility_ref ? <p className="mute small">Mã định danh cơ sở (cố định): {item.attrs.facility_ref}</p> : null}
+      <div className="field">
+        <label htmlFor="cnts-valid-from">
+          Ngày áp dụng<span className="req" aria-hidden="true"> *</span>
+        </label>
+        <input
+          id="cnts-valid-from"
+          className="input"
+          type="date"
+          aria-required
+          aria-invalid={err("valid_from") ? true : undefined}
+          value={validFrom}
+          onChange={(e) => setValidFrom(e.target.value)}
+        />
+        {err("valid_from") ? (
+          <span className="err" role="alert">
+            {err("valid_from")}
+          </span>
+        ) : (
+          <span className="mute hint">Giá trị mới có hiệu lực từ ngày này; kỳ trước giữ giá trị cũ (FN-06 BR-03).</span>
+        )}
+      </div>
+    </DetailPage>
+  );
+}
+
+/** Trang chi tiết mục danh mục: thuộc tính tại ngày tham chiếu `?at=` (mặc định hôm nay) + các giá trị theo ngày hiệu lực (Admin). */
+export function CntsCatalogItemScreen() {
+  const { tab, code, base, at, ca, item } = useRouteItem();
+  const names = useRefNames(at);
+  if (!tab || !code) return <NotFound base={base} what="Danh mục không tồn tại" />;
+  return (
+    <LoadState s={item}>
+      {(d) =>
+        d.item ? (
+          <ItemDetail tab={tab} item={d.item} base={base} at={at} canEdit={ca.canEdit} names={names.data ?? {}} />
+        ) : (
+          <NotFound base={withAt(`${base}?tab=${tab.id}`, at)} what={`Không có mục ${code}`} />
+        )
+      }
+    </LoadState>
+  );
+}
+
+function ItemDetail({ tab, item, base, at, canEdit, names }: { tab: CatalogTab; item: Item; base: string; at: string; canEdit: boolean; names: Record<string, string> }) {
+  const ca = useCatalogApi();
+  const versions = useLoad(
+    canEdit
+      ? () =>
+          unwrap(
+            ca.adminApi.GET("/v1/masterdata/catalogs/{catalog}/items/{code}/versions", {
+              params: { path: { catalog: item.catalog as CatalogName, code: item.code } },
+            }),
+          )
+      : null,
+    [item.code, canEdit],
+  );
+  const href = itemHref(base, tab.id, item.code);
+  return (
+    <DetailPage
+      back={{ href: withAt(`${base}?tab=${tab.id}`, at), label: tab.label }}
+      title={item.name}
+      badge={item.active ? <StatusPill tone="ok">Đang dùng</StatusPill> : <StatusPill>Ngừng dùng</StatusPill>}
+      actions={
+        canEdit ? (
+          <Link className="btn btn-p" href={withAt(`${href}/sua`, at)}>
+            Sửa
+          </Link>
+        ) : null
+      }
+    >
+      <LabelValueBlock
+        title={tab.label}
+        items={[
+          { label: "Mã", value: <code>{item.code}</code> },
+          { label: "Tên", value: item.name },
+          ...tab.fields.map((f) => ({ label: f.label, value: fieldText(f, item.attrs[f.key], names) })),
+          ...(item.attrs.facility_ref ? [{ label: "Mã định danh cơ sở", value: item.attrs.facility_ref }] : []),
+          { label: "Hiệu lực từ", value: dmy(item.valid_from) },
+          ...(item.deactivation_reason ? [{ label: "Lý do ngừng dùng", value: item.deactivation_reason }] : []),
+        ]}
+      />
+      {canEdit ? (
+        <section>
+          <h2>Các giá trị theo ngày hiệu lực</h2>
+          <LoadState s={versions}>
+            {(v) =>
+              v.items.length === 0 ? (
+                <p className="small mute">Mục nạp sẵn chưa sửa lần nào — giá trị hiện tại áp cho mọi kỳ.</p>
+              ) : (
+                <DataTable
+                  caption="Các giá trị có hiệu lực từ ngày"
+                  rows={v.items}
+                  rowKey={(x) => x.id}
+                  columns={[
+                    { key: "from", header: "Từ ngày", cell: (x) => dmy(x.valid_from) },
+                    { key: "to", header: "Đến trước ngày", cell: (x) => dmy(x.valid_to) },
+                    { key: "name", header: "Tên", cell: (x) => x.after.name },
+                    { key: "attrs", header: "Thuộc tính", cell: (x) => <span className="small">{summary(tab, { ...item, attrs: x.after.attrs ?? {} }, names)}</span> },
+                    { key: "st", header: "Trạng thái", cell: (x) => (x.after.active ? "Đang dùng" : "Ngừng dùng") },
+                  ]}
+                />
+              )
+            }
+          </LoadState>
+        </section>
+      ) : null}
+    </DetailPage>
   );
 }
 
@@ -255,33 +549,23 @@ function FieldInput({
   f,
   value,
   onChange,
+  onBlurError,
+  onDosesInput,
   options,
   error,
 }: {
   f: Field;
   value: string;
   onChange: (v: string) => void;
+  onBlurError: (error: string | undefined) => void;
+  onDosesInput: (error: string | undefined) => void;
   options: Record<CntsCatalog, Item[]>;
   error?: string;
 }) {
-  const label = `${f.label}${"required" in f && f.required ? " *" : ""}`;
-  const err = error ? <span className="err small">{error}</span> : null;
+  const required = "required" in f && !!f.required;
   switch (f.kind) {
     case "select":
-      return (
-        <label className="stack small">
-          {label}
-          <select aria-label={f.label} value={value} onChange={(e) => onChange(e.target.value)}>
-            <option value="">—</option>
-            {f.options.map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </select>
-          {err}
-        </label>
-      );
+      return <SelectField label={f.label} required={required} value={value} onChange={onChange} error={error} placeholder="—" options={f.options.map(([v, l]) => ({ value: v, label: l }))} />;
     case "bool":
       return (
         <label className="row small">
@@ -289,27 +573,33 @@ function FieldInput({
           {f.label}
         </label>
       );
+    case "int":
+      return <NumberField label={f.label} value={value} onChange={onChange} onBlurError={onBlurError} error={error} rule={INT_RULE} />;
     case "ref": {
       const opts = (options[f.catalog] ?? []).filter((o) => o.active);
       if (!f.multi)
         return (
-          <label className="stack small">
-            {label}
-            <select aria-label={f.label} value={value} onChange={(e) => onChange(e.target.value)}>
-              <option value="">—</option>
-              {opts.map((o) => (
-                <option key={o.code} value={o.code}>
-                  {o.name} ({o.code})
-                </option>
-              ))}
-            </select>
-            {err}
-          </label>
+          <SelectField
+            label={f.label}
+            required={required}
+            value={value}
+            onChange={onChange}
+            error={error}
+            placeholder="—"
+            options={opts.map((o) => ({ value: o.code, label: `${o.name} (${o.code})` }))}
+          />
         );
       const picked = codes(value);
       return (
-        <fieldset className="stack small" style={{ border: 0, padding: 0 }}>
-          <legend>{label}</legend>
+        <fieldset className="field" style={{ border: 0, padding: 0 }}>
+          <legend>
+            {f.label}
+            {required ? (
+              <span className="req" aria-hidden="true">
+                {" "}*
+              </span>
+            ) : null}
+          </legend>
           <span className="row" style={{ flexWrap: "wrap", gap: 8 }}>
             {opts.map((o) => (
               <label key={o.code} className="row">
@@ -323,81 +613,121 @@ function FieldInput({
               </label>
             ))}
           </span>
-          {err}
+          {error ? (
+            <span className="err" role="alert">
+              {error}
+            </span>
+          ) : null}
         </fieldset>
       );
     }
     case "doses":
-      return <DosesEditor value={value} onChange={onChange} vaccines={(options.cnts_vaccine ?? []).filter((v) => v.active)} error={error} />;
+      return <DosesEditor value={value} onChange={onChange} onInputError={onDosesInput} vaccines={(options.cnts_vaccine ?? []).filter((v) => v.active)} error={error} />;
+    case "codes":
+      return <TextField label={f.label} value={value} onChange={onChange} error={error} hint={f.hint} />;
     default:
-      return (
-        <label className="stack small">
-          {label}
-          <input aria-label={f.label} value={value} inputMode={f.kind === "int" ? "numeric" : undefined} onChange={(e) => onChange(e.target.value)} />
-          {f.kind === "codes" ? <span className="mute">{f.hint}</span> : null}
-          {err}
-        </label>
-      );
+      return <TextField label={f.label} required={required} value={value} onChange={onChange} error={error} maxLength={f.max} />;
   }
 }
 
+/** Lần tiêm: số nguyên 1–20; ngày tuổi: số nguyên 0–3650 (như máy chủ). */
+const SHOT_RULE: NumberRule = { required: true, integer: true, positive: true, max: 20 };
+const AGE_RULE: NumberRule = { required: true, integer: true, max: 3650 };
+
 /** Danh sách mũi của quy trình tiêm: vaccine, lần, ngày tuổi (FN-06; ví dụ gà thương phẩm UR-TINH-10). */
-function DosesEditor({ value, onChange, vaccines, error }: { value: string; onChange: (v: string) => void; vaccines: Item[]; error?: string }) {
+function DosesEditor({
+  value,
+  onChange,
+  onInputError,
+  vaccines,
+  error,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onInputError: (error: string | undefined) => void;
+  vaccines: Item[];
+  error?: string;
+}) {
   const ds = parseDoses(value);
+  // Chuỗi người đang gõ ở ô Lần / Ngày tuổi (khóa "dòng.trường") và lỗi của ô đó; ô hợp lệ mới ghi vào danh sách mũi.
+  const [raw, setRaw] = useState<Record<string, string>>({});
+  const [bad, setBad] = useState<Record<string, string>>({});
   const set = (next: Dose[]) => onChange(formatDoses(next));
+  const reset = () => {
+    setRaw({});
+    setBad({});
+    onInputError(undefined);
+  };
+  const numCell = (i: number, k: "shot" | "age_days", label: string, rule: NumberRule) => {
+    const id = `${i}.${k}`;
+    return (
+      <>
+        <input
+          className="input"
+          aria-label={`${label} mũi ${i + 1}`}
+          inputMode="numeric"
+          aria-invalid={bad[id] ? true : undefined}
+          value={raw[id] ?? String(ds[i]![k])}
+          onChange={(e) => {
+            const t = e.target.value;
+            const p = parseNumberInput(t, rule);
+            const nextBad = { ...bad };
+            if (p.ok) delete nextBad[id];
+            else nextBad[id] = p.error;
+            setRaw((r) => ({ ...r, [id]: t }));
+            setBad(nextBad);
+            onInputError(Object.keys(nextBad).length ? "Sửa các ô Lần / Ngày tuổi đang lỗi." : undefined);
+            if (p.ok) set(ds.map((x, j) => (j === i ? { ...x, [k]: Number(p.value) } : x)));
+          }}
+        />
+        {bad[id] ? (
+          <span className="err" role="alert">
+            {bad[id]}
+          </span>
+        ) : null}
+      </>
+    );
+  };
   return (
-    <fieldset className="stack small" style={{ border: 0, padding: 0 }}>
-      <legend>Danh sách mũi (vaccine, lần, ngày tuổi) *</legend>
-      <table className="tbl">
-        <thead>
-          <tr>
-            <th scope="col">Vaccine</th>
-            <th scope="col">Lần</th>
-            <th scope="col">Ngày tuổi</th>
-            <th scope="col" />
-          </tr>
-        </thead>
-        <tbody>
-          {ds.map((d, i) => (
-            <tr key={i}>
-              <td>
-                <select aria-label={`Vaccine mũi ${i + 1}`} value={d.vaccine} onChange={(e) => set(ds.map((x, j) => (j === i ? { ...x, vaccine: e.target.value } : x)))}>
-                  {vaccines.map((v) => (
-                    <option key={v.code} value={v.code}>
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <input
-                  aria-label={`Lần mũi ${i + 1}`}
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={d.shot}
-                  onChange={(e) => set(ds.map((x, j) => (j === i ? { ...x, shot: Math.max(1, Number(e.target.value) || 1) } : x)))}
-                />
-              </td>
-              <td>
-                <input
-                  aria-label={`Ngày tuổi mũi ${i + 1}`}
-                  type="number"
-                  min={0}
-                  max={3650}
-                  value={d.age_days}
-                  onChange={(e) => set(ds.map((x, j) => (j === i ? { ...x, age_days: Math.max(0, Number(e.target.value) || 0) } : x)))}
-                />
-              </td>
-              <td>
-                <button type="button" className="btn btn-o btn-sm" aria-label={`Bỏ mũi ${i + 1}`} onClick={() => set(ds.filter((_, j) => j !== i))}>
-                  <Icon name="trash" size={14} />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <fieldset className="field" style={{ border: 0, padding: 0, gridColumn: "1 / -1" }}>
+      <legend>
+        Danh sách mũi (vaccine, lần, ngày tuổi)
+        <span className="req" aria-hidden="true">
+          {" "}*
+        </span>
+      </legend>
+      <DataTable
+        caption="Danh sách mũi"
+        rows={ds.map((d, i) => ({ d, i }))}
+        rowKey={(r) => String(r.i)}
+        empty="Chưa có mũi nào."
+        columns={[
+          {
+            key: "vaccine",
+            header: "Vaccine",
+            cell: ({ d, i }) => (
+              <select className="select" aria-label={`Vaccine mũi ${i + 1}`} value={d.vaccine} onChange={(e) => set(ds.map((x, j) => (j === i ? { ...x, vaccine: e.target.value } : x)))}>
+                {vaccines.map((v) => (
+                  <option key={v.code} value={v.code}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            ),
+          },
+          { key: "shot", header: "Lần", cell: ({ i }) => numCell(i, "shot", "Lần", SHOT_RULE) },
+          { key: "age", header: "Ngày tuổi", cell: ({ i }) => numCell(i, "age_days", "Ngày tuổi", AGE_RULE) },
+          {
+            key: "del",
+            header: "",
+            cell: ({ i }) => (
+              <button type="button" className="btn btn-o btn-sm" aria-label={`Bỏ mũi ${i + 1}`} onClick={() => (reset(), set(ds.filter((_, j) => j !== i)))}>
+                <Icon name="trash" size={14} />
+              </button>
+            ),
+          },
+        ]}
+      />
       <button
         type="button"
         className="btn btn-o btn-sm"
@@ -406,183 +736,12 @@ function DosesEditor({ value, onChange, vaccines, error }: { value: string; onCh
       >
         Thêm mũi
       </button>
-      {error ? <span className="err small">{error}</span> : null}
+      {error ? (
+        <span className="err" role="alert">
+          {error}
+        </span>
+      ) : null}
     </fieldset>
-  );
-}
-
-function ItemDialog({
-  tab,
-  item,
-  at,
-  onClose,
-  onSaved,
-}: {
-  tab: CatalogTab;
-  item: Item | null;
-  at: string;
-  names: Record<string, string>;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const ca = useCatalogApi();
-  const [code, setCode] = useState(item?.code ?? "");
-  const [name, setName] = useState(item?.name ?? "");
-  const [attrs, setAttrs] = useState<Record<string, string>>({ ...(item?.attrs ?? {}) });
-  const [validFrom, setValidFrom] = useState(item ? vnToday() : at);
-  const [errs, setErrs] = useState<Record<string, string>>({});
-  const [key] = useState(newIdempotencyKey);
-  const act = useAction();
-  const refCatalogs = [...new Set(tab.fields.flatMap((f) => (f.kind === "ref" ? [f.catalog] : f.kind === "doses" ? ["cnts_vaccine" as CntsCatalog] : [])))];
-  const opts = useLoad(
-    () => Promise.all(refCatalogs.map((c) => ca.list(c, validFrom))).then((ls) => Object.fromEntries(refCatalogs.map((c, i) => [c, ls[i]!])) as Record<CntsCatalog, Item[]>),
-    [validFrom],
-  );
-  const save = async () => {
-    const e = validateAttrs(tab, attrs);
-    if (!name.trim()) e.name = "Bắt buộc";
-    if (!item && !code.trim()) e.code = "Bắt buộc";
-    setErrs(e);
-    if (Object.keys(e).length > 0) return;
-    const body = { name: name.trim(), attrs: cleanAttrs(attrs), valid_from: validFrom };
-    const c = tab.id as CatalogName;
-    const r = await act.run(() =>
-      item
-        ? unwrap(ca.adminApi.PUT("/v1/masterdata/catalogs/{catalog}/items/{code}", { params: { path: { catalog: c, code: item.code } }, body }))
-        : unwrap(
-            ca.adminApi.POST("/v1/masterdata/catalogs/{catalog}/items", {
-              params: { path: { catalog: c }, header: { "Idempotency-Key": key } },
-              body: { ...body, code: code.trim() },
-            }),
-          ),
-    );
-    if (r) onSaved();
-  };
-  return (
-    <Dialog
-      title={item ? `Sửa ${tab.label.toLowerCase()} ${item.code}` : `Thêm ${tab.label.toLowerCase()}`}
-      onClose={onClose}
-      actions={
-        <button type="button" className="btn btn-p btn-sm" disabled={act.busy} onClick={() => void save()}>
-          {act.busy ? "Đang lưu…" : "Lưu"}
-        </button>
-      }
-    >
-      <div className="stack" style={{ gap: 10, minWidth: 420 }}>
-        {act.view}
-        <label className="stack small">
-          Mã *
-          <input aria-label="Mã" value={code} disabled={!!item} onChange={(e) => setCode(e.target.value)} />
-          {errs.code ? <span className="err small">{errs.code}</span> : null}
-        </label>
-        <label className="stack small">
-          Tên *
-          <input aria-label="Tên" value={name} onChange={(e) => setName(e.target.value)} />
-          {errs.name ? <span className="err small">{errs.name}</span> : null}
-        </label>
-        <LoadState s={opts}>
-          {(o) => (
-            <>
-              {tab.fields.map((f) => (
-                <FieldInput key={f.key} f={f} value={attrs[f.key] ?? ""} options={o} error={errs[f.key]} onChange={(v) => setAttrs((a) => ({ ...a, [f.key]: v }))} />
-              ))}
-            </>
-          )}
-        </LoadState>
-        {item?.attrs.facility_ref ? <span className="mute small">Mã định danh cơ sở (cố định): {item.attrs.facility_ref}</span> : null}
-        <label className="stack small">
-          Ngày áp dụng *
-          <input type="date" aria-label="Ngày áp dụng" value={validFrom} onChange={(e) => setValidFrom(e.target.value || vnToday())} />
-          <span className="mute">Giá trị mới có hiệu lực từ ngày này; kỳ trước giữ giá trị cũ (FN-06 BR-03).</span>
-        </label>
-      </div>
-    </Dialog>
-  );
-}
-
-function RetireDialog({ item, onClose, onDone }: { item: Item; onClose: () => void; onDone: () => void }) {
-  const ca = useCatalogApi();
-  const [reason, setReason] = useState("");
-  const [key] = useState(newIdempotencyKey);
-  const act = useAction();
-  const ok = reason.trim().length >= 10;
-  const submit = async () => {
-    const r = await act.run(() =>
-      unwrap(
-        ca.adminApi.POST("/v1/masterdata/catalogs/{catalog}/items/{code}/deactivate", {
-          params: { path: { catalog: item.catalog as CatalogName, code: item.code }, header: { "Idempotency-Key": key } },
-          body: { reason: reason.trim() },
-        }),
-      ),
-    );
-    if (r) onDone();
-  };
-  return (
-    <Dialog
-      title={`Ngừng dùng ${item.name}`}
-      onClose={onClose}
-      actions={
-        <button type="button" className="btn btn-p btn-sm" disabled={!ok || act.busy} onClick={() => void submit()}>
-          Ngừng dùng
-        </button>
-      }
-    >
-      {act.view}
-      <p className="small">Mục đang dùng trong biểu chỉ được ngừng dùng, không xóa; số liệu cũ giữ nguyên.</p>
-      <label className="stack small">
-        Lý do (tối thiểu 10 ký tự)
-        <textarea aria-label="Lý do ngừng dùng" value={reason} onChange={(e) => setReason(e.target.value)} />
-      </label>
-    </Dialog>
-  );
-}
-
-function VersionsDialog({ item, names, onClose }: { item: Item; names: Record<string, string>; onClose: () => void }) {
-  const ca = useCatalogApi();
-  const tab = tabOf(item.catalog as CntsCatalog);
-  const s = useLoad(
-    () =>
-      unwrap(
-        ca.adminApi.GET("/v1/masterdata/catalogs/{catalog}/items/{code}/versions", {
-          params: { path: { catalog: item.catalog as CatalogName, code: item.code } },
-        }),
-      ),
-    [item.code],
-  );
-  return (
-    <Dialog title={`Hiệu lực của ${item.name}`} onClose={onClose}>
-      <LoadState s={s}>
-        {(d) =>
-          d.items.length === 0 ? (
-            <p className="small mute">Mục nạp sẵn chưa sửa lần nào — giá trị hiện tại áp cho mọi kỳ.</p>
-          ) : (
-            <table className="tbl">
-              <caption className="sr-only">Các giá trị có hiệu lực từ ngày</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Từ ngày</th>
-                  <th scope="col">Đến trước ngày</th>
-                  <th scope="col">Tên</th>
-                  <th scope="col">Thuộc tính</th>
-                  <th scope="col">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.items.map((v) => (
-                  <tr key={v.id}>
-                    <td>{dmy(v.valid_from)}</td>
-                    <td>{dmy(v.valid_to)}</td>
-                    <td>{v.after.name}</td>
-                    <td className="small">{summary(tab, { ...item, attrs: v.after.attrs ?? {} }, names)}</td>
-                    <td>{v.after.active ? "Đang dùng" : "Ngừng dùng"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )
-        }
-      </LoadState>
-    </Dialog>
   );
 }
 
@@ -669,7 +828,7 @@ function ImportPanel({ tab, onDone }: { tab: CatalogTab; onDone: () => void }) {
   };
   return (
     <div className="panel stack" style={{ gap: 8, marginBottom: 12 }} aria-label="Nạp danh mục từ tệp">
-      <b>Nạp {tab.label.toLowerCase()} từ Excel/CSV (tối đa 500 dòng)</b>
+      <h3>Nạp {tab.label.toLowerCase()} từ Excel/CSV (tối đa 500 dòng)</h3>
       <span className="small mute">
         Cột catalog ({tab.id}), code, name, valid_from (YYYY-MM-DD, trống = hôm nay) và các cột thuộc tính. Mục đã có cùng nội dung được bỏ qua.
       </span>

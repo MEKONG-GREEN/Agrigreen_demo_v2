@@ -120,6 +120,9 @@ function latest(ctx: Ctx, w: Who, ref: string, base: number | undefined): Outbre
 const invalid = (code: string, errors: { field: string; reason: string }[]) =>
   problem(422, code, code.includes("suspect") ? "Tin báo nghi dịch không hợp lệ" : "Báo cáo dịch bệnh không hợp lệ", { errors });
 
+const WORD_NUMBERS = new Map<string, string>();
+const WORD_RUNS = new Map<string, S["CNTSOutbreakWordRun"][]>();
+
 export const cntsOutbreakRoutes: Route[] = [
   {
     method: "GET",
@@ -130,7 +133,7 @@ export const cntsOutbreakRoutes: Route[] = [
       if (deny) return deny;
       const all = filtered(ctx, w);
       const byStatus = (["reported", "monitoring", "closed"] as const).map((k) => ({
-        key: k, label: { reported: "Đã gửi", monitoring: "Đang theo dõi", closed: "Đã kết thúc" }[k], count: all.filter((x) => x.o.status === k).length,
+        key: k, label: { reported: "Chờ xác nhận", monitoring: "Đang theo dõi", closed: "Đã kết thúc" }[k], count: all.filter((x) => x.o.status === k).length,
       }));
       const diseases = [...new Set(all.map((x) => x.o.disease_code))].sort();
       const byDisease = diseases.map((d) => ({ key: d, label: name("cnts_disease", d), count: all.filter((x) => x.o.disease_code === d).length }));
@@ -226,6 +229,46 @@ export const cntsOutbreakRoutes: Route[] = [
       },
     }),
   ),
+  // BF-CN-OUTBREAK (UP-08): Word BM-10 (giả lập pf/export — số {n}/BC-TTKN một số mỗi ổ dịch, tệp .docx giả).
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/outbreaks\/([^/]+)\/word$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      const deny = reader(w);
+      if (deny) return deny;
+      const ref = ctx.params[0]!;
+      const cur = OUTBREAKS.get(ref)?.at(-1);
+      if (!cur || !sees(w, cur.commune_code)) return problem(404, "extension.cnts_outbreak_not_found", "Không có ổ dịch");
+      let no = WORD_NUMBERS.get(ref);
+      if (!no) {
+        no = `${WORD_NUMBERS.size + 1}/BC-TTKN`;
+        WORD_NUMBERS.set(ref, no);
+      }
+      const runs = WORD_RUNS.get(ref) ?? [];
+      const run = { id: uuidv7(), seq: runs.length + 1, template: "cnts.bm10", template_version: 1, doc_number: no, doc_number_auto: true,
+        file_name: `bao-cao-dich-benh-${ref}-v${cur.version}.docx`, body_hash: "0".repeat(64), size: 4, actor_ref: w.actor, at: new Date().toISOString() };
+      WORD_RUNS.set(ref, [run, ...runs]);
+      return json(run, 201);
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/outbreaks\/([^/]+)\/words$/,
+    handler: (ctx) => json({ items: WORD_RUNS.get(ctx.params[0]!) ?? [] }),
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/outbreaks\/([^/]+)\/words\/([^/]+)\/download$/,
+    handler: (ctx) => {
+      const run = (WORD_RUNS.get(ctx.params[0]!) ?? []).find((r) => r.id === ctx.params[1]);
+      if (!run) return problem(404, "export.run_not_found", "Không có lần xuất này");
+      return new Response(new Blob(["PK\u0003\u0004"]), {
+        status: 200,
+        headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Content-Disposition": `attachment; filename="${run.file_name}"` },
+      });
+    },
+  },
   {
     method: "GET",
     pattern: /^\/v1\/extension\/cnts\/suspects$/,

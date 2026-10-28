@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
 import { BackLink } from "@/components/patterns/detail";
+import { AlertList } from "@/components/patterns/dashboard";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
@@ -25,6 +26,9 @@ import {
   type ReportsApi,
 } from "./reports-api";
 import { STAFF_TYPE_LABEL, vnDate } from "./staff-api";
+import { hrmDashboardAlerts } from "./dashboard-alerts";
+import { createPromotionApi } from "./promotion-api";
+import { KpiGrid, KpiTile } from "./ui";
 
 const BASE = "/kn/nhan-su/bao-cao-so";
 
@@ -466,16 +470,20 @@ export function HrmDashboardScreen() {
     null,
   );
   const d = useLoad(() => ra.dashboard(at), [at]);
+  // W11.29: khối "Cảnh báo" như prototype — nâng bậc khung 3 tháng (chỉ phạm vi toàn Trung tâm: HCTH/Admin).
+  const { api } = useAuth();
+  const pa = useMemo(() => createPromotionApi(api), [api]);
+  const promo = useLoad(
+    d.data?.scope === "all" ? () => pa.list(3, at) : null,
+    [d.data?.scope, at],
+  );
   const Tile = ({ k, label, n }: { k: string; label: string; n: number }) => (
-    <button
-      type="button"
-      className="card stat-tile"
+    <KpiTile
+      label={label}
+      value={n}
       onClick={() => setMetric({ key: k, label })}
-      aria-label={`${label}: ${n} — xem danh sách`}
-    >
-      <span className="mute small">{label}</span>
-      <strong className="h2">{n}</strong>
-    </button>
+      ariaLabel={`${label}: ${n} — xem danh sách`}
+    />
   );
   const Bars = ({
     title,
@@ -564,7 +572,7 @@ export function HrmDashboardScreen() {
             {x.staff === 0 && x.total === 0 ? (
               <p className="mute">Chưa có dữ liệu tại ngày chốt.</p>
             ) : null}
-            <div className="grid-4">
+            <KpiGrid label="Chỉ số nhân sự">
               <Tile k="total" label="Viên chức có mặt (NS01)" n={x.total} />
               <Tile k="staff" label="Viên chức + HĐLĐ" n={x.staff} />
               <Tile
@@ -584,7 +592,7 @@ export function HrmDashboardScreen() {
                 label="Trên tuổi nghỉ hưu"
                 n={x.over_retire}
               />
-            </div>
+            </KpiGrid>
             <div className="grid-2">
               <Bars title="Theo đơn vị" items={x.by_unit} prefix="unit:" />
               <Bars
@@ -618,6 +626,15 @@ export function HrmDashboardScreen() {
                   count: n,
                 }))}
                 prefix="grade:"
+              />
+            </div>
+            <div style={{ marginTop: 24 }}>
+              <AlertList
+                alerts={hrmDashboardAlerts(
+                  promo.data ?? null,
+                  { joined: x.joined, left: x.left },
+                  `${x.as_of}T00:00:00+07:00`,
+                )}
               />
             </div>
           </>
