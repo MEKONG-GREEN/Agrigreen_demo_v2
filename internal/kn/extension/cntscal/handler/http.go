@@ -6,6 +6,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -34,6 +35,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/vaccination-batches/:ref", h.getBatch)
 	g.POST("/vaccination-batches/:ref/doses", h.updateDoses)
 	g.POST("/vaccination-batches/:ref/cancel", h.cancelBatch)
+	g.GET("/vaccination-matrix", h.matrix)          // BF-CN-VACC: bảng BM-07
+	g.GET("/vaccination-matrix/xlsx", h.matrixXLSX) // BF-CN-VACC: xuất Excel đúng mẫu BM-07
 }
 
 func idem(c *gin.Context) string { return idempotency.KeyFromContext(c.Request.Context()) }
@@ -254,7 +257,94 @@ func batchOut(v app.BatchView, today time.Time, labels map[string]string) gin.H 
 	if v.Next != nil {
 		m["next_dose"] = doseOut(*v.Next, today, labels)
 	}
+	m["model"] = modelOut(v.Model, v.Names)
 	return m
+}
+
+// modelOut là hộ mô hình của lứa (BF-CN-VACC): điểm, dự án, CB theo dõi MH, nhãn chủ hộ đã che bớt.
+func modelOut(x *app.ModelInfo, names map[uuid.UUID]string) any {
+	if x == nil {
+		return nil
+	}
+	var officer any
+	if x.OfficerRef != nil {
+		officer = nameOf(names, *x.OfficerRef)
+	}
+	return gin.H{"household_ref": x.HouseholdRef, "owner_label": optStr(x.OwnerLabel), "site_ref": x.SiteRef, "site_name": x.SiteName,
+		"project_ref": x.ProjectRef, "project_code": x.ProjectCode, "project_name": x.ProjectName, "officer_ref": optRef(x.OfficerRef),
+		"officer_display": officer, "active": x.Open}
+}
+
+func optUUID(v *problem.Problem, bad *bool, field, s string) *uuid.UUID {
+	if s == "" {
+		return nil
+	}
+	r, err := uuid.Parse(s)
+	if err != nil {
+		*v, *bad = *v.WithField(field, "phải là UUID"), true
+		return nil
+	}
+	return &r
+}
+
+func (h Handler) matrixQuery(c *gin.Context) (app.MatrixQuery, bool) {
+	v, bad := *problem.Validation, false
+	q := app.MatrixQuery{ModelType: c.Query("model_type_code"), Commune: c.Query("commune_code"),
+		Project: optUUID(&v, &bad, "project_ref", c.Query("project_ref")), Site: optUUID(&v, &bad, "site_ref", c.Query("site_ref")),
+		From: parseDay(&v, &bad, "received_from", c.Query("received_from")), To: parseDay(&v, &bad, "received_to", c.Query("received_to"))}
+	if bad {
+		httpx.Fail(c, &v)
+		return q, false
+	}
+	return q, true
+}
+
+func (h Handler) matrix(c *gin.Context) {
+	q, ok := h.matrixQuery(c)
+	if !ok {
+		return
+	}
+	m, err := h.Svc.VaccinationMatrix(c.Request.Context(), q)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	cols := make([]gin.H, 0, len(m.Columns))
+	for _, x := range m.Columns {
+		cols = append(cols, gin.H{"vaccine_code": x.Vaccine, "vaccine_name": optStr(m.Labels["cnts_vaccine:"+x.Vaccine]), "shot": x.Shot, "age_days": x.AgeDays})
+	}
+	rows := make([]gin.H, 0, len(m.Rows))
+	for _, r := range m.Rows {
+		cells := make([]any, 0, len(r.Cells))
+		for _, d := range r.Cells {
+			if d == nil {
+				cells = append(cells, nil)
+				continue
+			}
+			cells = append(cells, doseOut(*d, m.Today, m.Labels))
+		}
+		v := r.BatchView
+		v.Names = m.Names
+		x := batchOut(v, m.Today, m.Labels)
+		x["cells"], x["household_text"], x["commune_name"] = cells, optStr(r.HouseholdText()), optStr(m.CommuneNames[r.CommuneCode])
+		rows = append(rows, x)
+	}
+	c.JSON(http.StatusOK, gin.H{"model_type_code": m.ModelType, "model_type_name": optStr(m.Labels["cnts_model_type:"+m.ModelType]),
+		"columns": cols, "rows": rows, "truncated": m.Truncated, "max_rows": domain.MaxMatrixRows})
+}
+
+func (h Handler) matrixXLSX(c *gin.Context) {
+	q, ok := h.matrixQuery(c)
+	if !ok {
+		return
+	}
+	b, name, err := h.Svc.VaccinationMatrixXLSX(c.Request.Context(), q)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename=\""+name+"\"; filename*=UTF-8''"+url.PathEscape(name))
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b)
 }
 
 func parseDay(v *problem.Problem, bad *bool, field, s string) *time.Time {
@@ -271,7 +361,8 @@ func parseDay(v *problem.Problem, bad *bool, field, s string) *time.Time {
 
 func (h Handler) listBatches(c *gin.Context) {
 	v, bad := *problem.Validation, false
-	q := app.BatchQuery{Commune: c.Query("commune_code"), Status: c.Query("status"),
+	q := app.BatchQuery{Commune: c.Query("commune_code"), Status: c.Query("status"), ModelType: c.Query("model_type_code"),
+		Project: optUUID(&v, &bad, "project_ref", c.Query("project_ref")), Site: optUUID(&v, &bad, "site_ref", c.Query("site_ref")),
 		From: parseDay(&v, &bad, "received_from", c.Query("received_from")), To: parseDay(&v, &bad, "received_to", c.Query("received_to"))}
 	if s := c.Query("household_ref"); s != "" {
 		r, err := uuid.Parse(s)

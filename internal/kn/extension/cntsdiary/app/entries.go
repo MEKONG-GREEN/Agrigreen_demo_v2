@@ -379,6 +379,7 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 	if err != nil {
 		return EntryView{}, err
 	}
+	vnames := s.vaccineNames(ctx) // BF-CN-VACC: tên vaccine cho NC-11 → lịch tiêm, đọc NGOÀI giao dịch
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
 			if prev != nil {
@@ -464,7 +465,10 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 			}
 		}
 		if status == domain.StatusSubmitted {
-			return s.alerts(ctx, tx, c, hc, out)
+			if err := s.alerts(ctx, tx, c, hc, out); err != nil {
+				return err
+			}
+			return s.syncVaccinations(ctx, tx, c, *cy, out, vnames)
 		}
 		return nil
 	})
@@ -517,6 +521,10 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 		if cat, err = s.indicatorRanges(ctx); err != nil {
 			return EntryView{}, err
 		}
+	}
+	var vnames map[string]string
+	if act == domain.ActSubmit || act == domain.ActUpdate || act == domain.ActCorrect {
+		vnames = s.vaccineNames(ctx) // BF-CN-VACC: đọc NGOÀI giao dịch
 	}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
@@ -607,7 +615,12 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 			return err
 		}
 		if next == domain.StatusSubmitted && act != domain.ActVerify {
-			return s.alerts(ctx, tx, c, hc, n)
+			if err := s.alerts(ctx, tx, c, hc, n); err != nil {
+				return err
+			}
+		}
+		if (next == domain.StatusSubmitted && act != domain.ActVerify) || act == domain.ActCorrect {
+			return s.syncVaccinations(ctx, tx, c, *cy, n, vnames)
 		}
 		return nil
 	})

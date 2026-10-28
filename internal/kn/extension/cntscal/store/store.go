@@ -274,6 +274,7 @@ type BatchFilter struct {
 	Communes  []string
 	Commune   string
 	Household *uuid.UUID
+	ModelType string     // rỗng = mọi loại mô hình
 	From, To  *time.Time // ngày nhận giống
 	Limit     int
 }
@@ -299,7 +300,8 @@ func ListBatches(ctx context.Context, tx pgx.Tx, f BatchFilter) ([]Batch, error)
 	      AND ($4::uuid IS NULL OR household_ref = $4) AND ($5::date IS NULL OR received_date >= $5::date)
 	      AND ($6::date IS NULL OR received_date <= $6::date)
 	    ORDER BY batch_ref, seq DESC) b
-	  ORDER BY received_date DESC, batch_ref LIMIT $7`, f.All, communes, f.Commune, f.Household, from, to, f.Limit)
+	  WHERE ($8 = '' OR b.model_type_code = $8)
+	  ORDER BY received_date DESC, batch_ref LIMIT $7`, f.All, communes, f.Commune, f.Household, from, to, f.Limit, f.ModelType)
 	if err != nil {
 		return nil, err
 	}

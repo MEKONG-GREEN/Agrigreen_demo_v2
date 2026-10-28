@@ -37,6 +37,7 @@ type BatchView struct {
 	Names        map[uuid.UUID]string
 	Labels       map[string]string // "<danh mục>:<mã>" → tên
 	Replayed     bool
+	Model        *ModelInfo // hộ mô hình của lứa (BF-CN-VACC); nil = lứa theo địa bàn hoặc hộ không còn trong sổ W11.47
 }
 
 func (c caller) canPlanVaccination() bool {
@@ -83,7 +84,10 @@ func (s *Service) labels(ctx context.Context) map[string]string {
 type BatchQuery struct {
 	Commune   string
 	Household *uuid.UUID
-	Status    string // open | overdue | done | cancelled | "" (mọi)
+	ModelType string     // BF-CN-VACC: loại mô hình (bảng BM-07)
+	Project   *uuid.UUID // BF-CN-VACC: dự án của hộ mô hình
+	Site      *uuid.UUID // BF-CN-VACC: điểm trình diễn của hộ mô hình
+	Status    string     // open | overdue | done | cancelled | "" (mọi)
 	From, To  *time.Time
 	Limit     int
 }
@@ -94,27 +98,46 @@ func (s *Service) ListBatches(ctx context.Context, q BatchQuery) ([]BatchView, m
 	if err != nil {
 		return nil, nil, err
 	}
+	out, _, err := s.listBatches(ctx, c, q)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, s.labels(ctx), nil
+}
+
+// listBatches đọc lứa trong phạm vi người gọi kèm hộ mô hình; truncated = chạm giới hạn số lứa.
+func (s *Service) listBatches(ctx context.Context, c caller, q BatchQuery) ([]BatchView, bool, error) {
 	switch q.Status {
 	case "", domain.StatusOpen, domain.StatusOverdue, domain.StatusDone, domain.StatusCancelled:
 	default:
-		return nil, nil, problem.Validation.WithField("status", "open, overdue, done hoặc cancelled")
+		return nil, false, problem.Validation.WithField("status", "open, overdue, done hoặc cancelled")
 	}
-	if q.Limit <= 0 || q.Limit > 500 {
+	if q.Limit <= 0 || q.Limit > domain.MaxMatrixRows {
 		q.Limit = 200
 	}
 	f := store.BatchFilter{All: c.admin() || c.k.Scope.All, Communes: c.k.Scope.Units, Commune: strings.TrimSpace(q.Commune),
-		Household: q.Household, From: q.From, To: q.To, Limit: q.Limit}
+		Household: q.Household, ModelType: strings.TrimSpace(q.ModelType), From: q.From, To: q.To, Limit: q.Limit}
 	if c.k.Role == knport.SessionRoleProvince && !c.k.Scope.All {
 		// Cấp Tỉnh: Scope là Nút tỉnh — mọi xã của tỉnh; lọc theo phạm vi ở tầng ứng dụng.
 		f.All = true
 	}
 	var list []store.Batch
+	var models map[uuid.UUID]*ModelInfo
 	if err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		list, e = store.ListBatches(ctx, tx, f)
+		if list, e = store.ListBatches(ctx, tx, f); e != nil {
+			return e
+		}
+		var refs []uuid.UUID
+		for _, b := range list {
+			if b.HouseholdRef != nil && c.seesBatch(b) {
+				refs = append(refs, *b.HouseholdRef)
+			}
+		}
+		models, e = loadModel(ctx, tx, refs)
 		return e
 	}); err != nil {
-		return nil, nil, err
+		return nil, false, err
 	}
 	out := []BatchView{}
 	for _, b := range list {
@@ -125,9 +148,16 @@ func (s *Service) ListBatches(ctx context.Context, q BatchQuery) ([]BatchView, m
 		if q.Status != "" && v.Status != q.Status {
 			continue
 		}
+		if b.HouseholdRef != nil {
+			v.Model = models[*b.HouseholdRef]
+		}
+		if (q.Project != nil && (v.Model == nil || v.Model.ProjectRef != *q.Project)) || (q.Site != nil && (v.Model == nil || v.Model.SiteRef != *q.Site)) {
+			continue
+		}
 		out = append(out, v)
 	}
-	return out, s.labels(ctx), nil
+	s.ownerLabels(ctx, models)
+	return out, len(list) >= q.Limit, nil
 }
 
 // GetBatch đọc chi tiết lứa kèm các phiên bản.
@@ -137,9 +167,15 @@ func (s *Service) GetBatch(ctx context.Context, ref uuid.UUID) (BatchView, error
 		return BatchView{}, err
 	}
 	var vs []store.Batch
+	var models map[uuid.UUID]*ModelInfo
 	if err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		vs, e = store.BatchVersions(ctx, tx, ref)
+		if vs, e = store.BatchVersions(ctx, tx, ref); e != nil || len(vs) == 0 {
+			return e
+		}
+		if h := vs[len(vs)-1].HouseholdRef; h != nil && c.seesBatch(vs[len(vs)-1]) {
+			models, e = loadModel(ctx, tx, []uuid.UUID{*h})
+		}
 		return e
 	}); err != nil {
 		return BatchView{}, err
@@ -149,9 +185,16 @@ func (s *Service) GetBatch(ctx context.Context, ref uuid.UUID) (BatchView, error
 	}
 	v := s.view(c, vs[len(vs)-1])
 	v.Versions = vs
+	if h := v.HouseholdRef; h != nil {
+		v.Model = models[*h]
+		s.ownerLabels(ctx, models)
+	}
 	refs := []uuid.UUID{}
 	for _, b := range vs {
 		refs = append(refs, b.ActorRef)
+	}
+	if v.Model != nil && v.Model.OfficerRef != nil {
+		refs = append(refs, *v.Model.OfficerRef)
 	}
 	v.Names, v.Labels = s.names(ctx, uniq(refs)), s.labels(ctx)
 	return v, nil
@@ -255,6 +298,25 @@ func (s *Service) CreateBatch(ctx context.Context, in CreateBatchInput) (BatchVi
 	}
 	in.CommuneCode, in.ModelType, in.Breed = strings.TrimSpace(in.CommuneCode), strings.TrimSpace(in.ModelType), strings.TrimSpace(in.Breed)
 	in.Locality, in.Note = strings.TrimSpace(in.Locality), strings.TrimSpace(in.Note)
+	var model *ModelInfo
+	if in.HouseholdRef != nil {
+		// BF-CN-VACC: hộ là hộ mô hình của KN (FN-10) — xã, loại mô hình lấy theo hộ/điểm nếu bỏ trống; khác thì báo lỗi.
+		if model, err = s.modelHousehold(ctx, c, *in.HouseholdRef); err != nil {
+			return BatchView{}, err
+		}
+		switch {
+		case in.CommuneCode == "":
+			in.CommuneCode = model.CommuneCode
+		case in.CommuneCode != model.CommuneCode:
+			return BatchView{}, ErrBatchInvalid.WithField("commune_code", "khác xã của hộ mô hình")
+		}
+		switch {
+		case in.ModelType == "":
+			in.ModelType = model.ModelType
+		case in.ModelType != model.ModelType:
+			return BatchView{}, ErrBatchInvalid.WithField("model_type_code", "khác loại mô hình của điểm trình diễn")
+		}
+	}
 	today := s.today()
 	switch {
 	case in.HouseholdRef == nil && in.Locality == "":
@@ -332,7 +394,12 @@ func (s *Service) CreateBatch(ctx context.Context, in CreateBatchInput) (BatchVi
 		return BatchView{}, err
 	}
 	v := s.view(c, b)
-	v.Replayed, v.Versions, v.Labels, v.Names = replayed, []store.Batch{b}, s.labels(ctx), s.names(ctx, []uuid.UUID{b.ActorRef})
+	v.Replayed, v.Versions, v.Labels, v.Model = replayed, []store.Batch{b}, s.labels(ctx), model
+	names := []uuid.UUID{b.ActorRef}
+	if model != nil && model.OfficerRef != nil {
+		names = append(names, *model.OfficerRef)
+	}
+	v.Names = s.names(ctx, names)
 	return v, nil
 }
 

@@ -129,7 +129,8 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.model = &modelapp.Service{DB: db, Clock: clk, Units: d.Units, Programs: khtcapp.Ports{Svc: m.khtc},
 		Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
-		Names: func() partyport.ActorNames { return m.rc.Names }}
+		Vaccinations: m.cal, // BF-CN-VACC: NC-11 → ngày tiêm thực tế của lịch BM-07 (quy tắc liên biểu số 7)
+		Names:        func() partyport.ActorNames { return m.rc.Names }}
 	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.rc.BM11Programs = m.bm11Programs // W11.45: kết quả CT/DA cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()
