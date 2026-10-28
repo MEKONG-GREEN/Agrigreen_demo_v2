@@ -24,7 +24,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
 	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/channel"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -85,7 +84,9 @@ func (f *fixture) sized(n int32, pusher interface {
 func (f *fixture) sizedMail(n int32, pusher interface {
 	Name() string
 	Send(context.Context, notify.PushMessage) error
-}, mailer channel.Mailer) sizedPool {
+}, mailer interface {
+	Send(ctx context.Context, to []string, subject, body string) error
+}) sizedPool {
 	f.t.Helper()
 	pool := pgtest.Get(f.t).SizedPool(f.t, migrations.PF, dbadmin.AppPlatform, n)
 	mod := notify.New(pool, f.clk, notify.Deps{Kinds: []port.KindRegistration{extension.NotificationKinds(), price.NotificationKinds()},
