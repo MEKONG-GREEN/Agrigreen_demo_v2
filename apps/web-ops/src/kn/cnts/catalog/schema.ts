@@ -25,7 +25,20 @@ export type Field =
   | { key: string; label: string; kind: "codes"; hint: string }
   | { key: string; label: string; kind: "doses"; required: true }
   /** Mã xã/phường/đặc khu chọn từ danh mục ĐVHC (FN-01 AC-02): lưu mã, hiện "Tên (mã)". */
-  | { key: string; label: string; kind: "commune"; required?: boolean };
+  | { key: string; label: string; kind: "commune"; required?: boolean }
+  /** Số thập phân không âm (ngưỡng chỉ tiêu, BF-CN-CATALOG #170) — như máy chủ: ≤ 7 chữ số nguyên, ≤ 4 chữ số thập phân. */
+  | { key: string; label: string; kind: "decimal"; hint?: string };
+
+/** Ô ngưỡng: không âm, tối đa 9 999 999,9999 và 4 chữ số thập phân (khớp `catalogThreshold` của máy chủ). */
+export const THRESHOLD_RULE: NumberRule = { max: "9999999.9999", maxDecimals: 4 };
+
+/** Chỉ số nhật ký BM-19 (môi trường nước) gắn được với chỉ tiêu theo dõi — khớp `knport.DiaryWaterMetrics`. */
+export const DIARY_METRICS: [string, string][] = [
+  ["ph", "pH (NT-08)"],
+  ["do_mgl", "Oxy hòa tan (NT-09)"],
+  ["temp_c", "Nhiệt độ (NT-10)"],
+  ["salinity", "Độ mặn (NT-10)"],
+];
 
 const desc: Field = { key: "description", label: "Mô tả", kind: "text", max: 500 };
 const order: Field = { key: "order", label: "Thứ tự cột", kind: "int" };
@@ -183,6 +196,13 @@ export const CNTS_TABS: CatalogTab[] = [
     id: "cnts_indicator",
     label: "Chỉ tiêu theo dõi",
     summary: "ĐVT · Kiểu",
+    columns: [
+      { key: "unit", header: "ĐVT" },
+      { key: "value_type", header: "Kiểu" },
+      { key: "threshold_min", header: "Ngưỡng tối thiểu" },
+      { key: "threshold_max", header: "Ngưỡng tối đa" },
+      { key: "diary_metric", header: "Chỉ số nhật ký" },
+    ],
     fields: [
       { key: "unit", label: "Đơn vị tính", kind: "text", max: 20 },
       {
@@ -196,6 +216,9 @@ export const CNTS_TABS: CatalogTab[] = [
           ["percent", "Phần trăm"],
         ],
       },
+      { key: "threshold_min", label: "Ngưỡng tối thiểu", kind: "decimal", hint: "Trống = không cảnh báo dưới ngưỡng" },
+      { key: "threshold_max", label: "Ngưỡng tối đa", kind: "decimal", hint: "Trống = không cảnh báo trên ngưỡng" },
+      { key: "diary_metric", label: "Áp vào chỉ số nhật ký BM-19", kind: "select", options: DIARY_METRICS },
       desc,
     ],
   },
@@ -270,10 +293,15 @@ export function validateAttrs(tab: CatalogTab, attrs: Record<string, string>): R
   for (const f of tab.fields) {
     const v = (attrs[f.key] ?? "").trim();
     if ("required" in f && f.required && !v) errs[f.key] = "Bắt buộc nhập.";
-    if (f.kind === "int" && v) {
-      const p = parseNumberInput(v, INT_RULE);
+    if ((f.kind === "int" || f.kind === "decimal") && v) {
+      const p = parseNumberInput(v, f.kind === "int" ? INT_RULE : THRESHOLD_RULE);
       if (!p.ok) errs[f.key] = p.error;
     }
+  }
+  if (tab.id === "cnts_indicator" && !errs.threshold_min && !errs.threshold_max) {
+    const lo = parseNumberInput(attrs.threshold_min ?? "", THRESHOLD_RULE);
+    const hi = parseNumberInput(attrs.threshold_max ?? "", THRESHOLD_RULE);
+    if (lo.ok && hi.ok && lo.value && hi.value && Number(lo.value) > Number(hi.value)) errs.threshold_max = "Ngưỡng tối đa phải lớn hơn hoặc bằng ngưỡng tối thiểu.";
   }
   if (tab.id === "cnts_vaccination_schedule" && !attrs.model_type && !attrs.breed) errs.model_type = "Gắn loại mô hình hoặc giống.";
   if (tab.id === "cnts_vaccination_schedule" && parseDoses(attrs.doses).length === 0) errs.doses = "Cần ít nhất một mũi";
@@ -292,8 +320,8 @@ export const INT_RULE: NumberRule = { integer: true, max: 999 };
 export function normalizeAttrs(tab: CatalogTab, attrs: Record<string, string>): Record<string, string> {
   const out = { ...attrs };
   for (const f of tab.fields) {
-    if (f.kind !== "int" || !out[f.key]?.trim()) continue;
-    const p = parseNumberInput(out[f.key]!, INT_RULE);
+    if ((f.kind !== "int" && f.kind !== "decimal") || !out[f.key]?.trim()) continue;
+    const p = parseNumberInput(out[f.key]!, f.kind === "int" ? INT_RULE : THRESHOLD_RULE);
     if (p.ok) out[f.key] = p.value;
   }
   return out;
@@ -309,11 +337,19 @@ export function cleanAttrs(attrs: Record<string, string>): Record<string, string
   return out;
 }
 
-/** Ngưỡng mặc định CNTS — tham số có phiên bản pf/masterdata (BRD Mục III.5, UR-TINH-13). */
+/** Khóa tham số ngưỡng của một chỉ tiêu (Cấp Tỉnh đặt, người khác duyệt) — ghi đè ngưỡng mặc định của danh mục. */
+export const indicatorParamKey = (bound: "min" | "max", code: string) => `cnts.indicator_${bound}:${code}`;
+
+/** Ngưỡng hiệu lực của một chỉ tiêu: tham số đã duyệt (nếu có) được ưu tiên, không có thì ngưỡng mặc định của danh mục. */
+export function effectiveThreshold(param: string | null | undefined, catalog: string | undefined): { value: string; source: "param" | "catalog" | "none" } {
+  if (param) return { value: param, source: "param" };
+  if (catalog) return { value: catalog, source: "catalog" };
+  return { value: "", source: "none" };
+}
+
+/** Tham số cảnh báo CNTS khác (không gắn chỉ tiêu) — tham số có phiên bản pf/masterdata (BRD Mục III.5, UR-TINH-13). Ngưỡng
+ * theo chỉ tiêu sinh từ danh mục chỉ tiêu theo dõi (BF-CN-CATALOG #170), không nằm trong danh sách này. */
 export const CNTS_THRESHOLDS: { key: string; label: string; unit: string }[] = [
-  { key: "cnts.indicator_min:PH", label: "pH tối thiểu", unit: "" },
-  { key: "cnts.indicator_max:PH", label: "pH tối đa", unit: "" },
-  { key: "cnts.indicator_min:DO", label: "Oxy hòa tan tối thiểu", unit: "mg/l" },
   { key: "cnts.herd_change_pct", label: "Biến động tổng đàn BM-04", unit: "%" },
   { key: "cnts.fishing_change_pct", label: "Biến động khai thác BM-17", unit: "%" },
   { key: "cnts.slaughter_spike_factor", label: "KSGM bất thường (lần trung bình 4 tuần)", unit: "lần" },
@@ -332,4 +368,12 @@ export function templateRows(tab: CatalogTab): string[][] {
   };
   const row = (sample[tab.id] ?? `MA_MAU|Tên mục mẫu|`).split("|");
   return [head, [tab.id, ...row, ...Array(Math.max(0, head.length - 1 - row.length)).fill("")].slice(0, head.length)];
+}
+
+/** "Xuất danh mục" (FN-06 luồng phụ, #170): cùng cột với tệp mẫu (nạp lại được qua "Nạp Excel") + cột trang_thai chỉ để đọc
+ * (máy chủ bỏ qua khi nạp). Giá trị là giá trị có hiệu lực tại ngày đang xem; valid_from là ngày bắt đầu của giá trị đó. */
+export function exportRows(tab: CatalogTab, items: readonly { code: string; name: string; attrs: Record<string, string>; active: boolean; valid_from?: string | null }[]): string[][] {
+  const keys = tab.fields.map((f) => f.key);
+  const head = ["catalog", "code", "name", "valid_from", ...keys, "trang_thai"];
+  return [head, ...items.map((i) => [tab.id, i.code, i.name, i.valid_from?.slice(0, 10) ?? "", ...keys.map((k) => i.attrs[k] ?? ""), i.active ? "Đang dùng" : "Ngừng dùng"])];
 }

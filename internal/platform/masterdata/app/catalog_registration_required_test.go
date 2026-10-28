@@ -23,7 +23,7 @@ func TestCatalogsRequireRegistration(t *testing.T) {
 	if err := json.Unmarshal(raw, &frozen); err != nil {
 		t.Fatal(err)
 	}
-	if len(frozen.Metadata) != 12 || len(frozen.Seeds) != 64 { // +4 CSGM mẫu (BF-CN-SLAUGHTER #169)
+	if len(frozen.Metadata) != 12 || len(frozen.Seeds) != 80 { // +4 CSGM mẫu (BF-CN-SLAUGHTER #169), +16 mục BM-07/chỉ tiêu (BF-CN-CATALOG #170)
 		t.Fatal("frozen inventory changed")
 	}
 	for _, tc := range []struct {

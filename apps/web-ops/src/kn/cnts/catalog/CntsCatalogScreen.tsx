@@ -27,8 +27,12 @@ import {
   CNTS_TABS,
   CNTS_THRESHOLDS,
   INT_RULE,
+  THRESHOLD_RULE,
   cleanAttrs,
   codes,
+  effectiveThreshold,
+  exportRows,
+  indicatorParamKey,
   formatDoses,
   normalizeAttrs,
   parseDoses,
@@ -261,15 +265,31 @@ export function CntsCatalogScreen() {
       <PageHeader
         title="Danh mục Chăn nuôi – Thủy sản"
         actions={
-          ca.canEdit && current ? (
+          current ? (
             <span className="row">
-              <button type="button" className="btn btn-o btn-sm" aria-expanded={showImport} onClick={() => setShowImport((v) => !v)}>
-                <Icon name="upload" size={15} />
-                Nạp Excel
+              <button
+                type="button"
+                className="btn btn-o btn-sm"
+                disabled={!rows.data}
+                onClick={() =>
+                  rows.data &&
+                  saveBlob(new Blob([toCsv(exportRows(current, rows.data))], { type: "text/csv;charset=utf-8" }), `danh-muc-${current.id}-${at}.csv`)
+                }
+              >
+                <Icon name="download" size={15} />
+                Xuất danh mục
               </button>
-              <Link className="btn btn-p btn-sm" href={withAt(`${base}/${current.id}/them-moi`, at)}>
-                Thêm {current.label.toLowerCase()}
-              </Link>
+              {ca.canEdit ? (
+                <>
+                  <button type="button" className="btn btn-o btn-sm" aria-expanded={showImport} onClick={() => setShowImport((v) => !v)}>
+                    <Icon name="upload" size={15} />
+                    Nạp Excel
+                  </button>
+                  <Link className="btn btn-p btn-sm" href={withAt(`${base}/${current.id}/them-moi`, at)}>
+                    Thêm {current.label.toLowerCase()}
+                  </Link>
+                </>
+              ) : null}
             </span>
           ) : null
         }
@@ -672,6 +692,8 @@ function FieldInput({
       return <TextField label={f.label} value={value} onChange={onChange} error={error} hint={f.hint} />;
     case "commune":
       return <CommuneField label={f.label} required={required} value={value} at={at || vnToday()} onChange={onChange} error={error} />;
+    case "decimal":
+      return <NumberField label={f.label} value={value} onChange={onChange} onBlurError={onBlurError} error={error} rule={THRESHOLD_RULE} hint={f.hint} />;
     default:
       return <TextField label={f.label} required={required} value={value} onChange={onChange} error={error} maxLength={f.max} />;
   }
@@ -792,9 +814,52 @@ function DosesEditor({
   );
 }
 
-/** Ngưỡng mặc định (tham số có phiên bản, sửa qua quy trình đặt → duyệt ở "Tham số"). */
+interface IndicatorThresholdRow {
+  key: string;
+  code: string;
+  name: string;
+  bound: "min" | "max";
+  unit: string;
+  value: string;
+  source: "param" | "catalog" | "none";
+  from: string;
+  doc: string;
+}
+
+/** Ngưỡng theo chỉ tiêu (BF-CN-CATALOG #170): SINH TỪ danh mục chỉ tiêu theo dõi tại ngày đang xem — mỗi chỉ tiêu một dòng tối
+ * thiểu, một dòng tối đa. Giá trị hiệu lực: tham số đã duyệt cnts.indicator_min/max:<mã> nếu có, không thì ngưỡng mặc định của
+ * danh mục (Admin sửa ở form chỉ tiêu). Chỉ tiêu mới có ngưỡng hiện ngay. */
+function useIndicatorThresholds(at: string) {
+  const { api } = useAuth();
+  const ca = useCatalogApi();
+  return useLoad(async () => {
+    const indicators = (await ca.list("cnts_indicator", at)).filter((i) => i.active);
+    const param = (key: string) =>
+      unwrap(api.GET("/v1/masterdata/params/value", { params: { query: { key, at } } }))
+        .then((v) => ({ value: v.value ?? v.text ?? "", from: v.effective_from ?? "", doc: v.source_doc ?? "" }))
+        .catch(() => null);
+    const rows = await Promise.all(
+      indicators.flatMap((i) =>
+        (["min", "max"] as const).map(async (bound): Promise<IndicatorThresholdRow> => {
+          const key = indicatorParamKey(bound, i.code);
+          const p = await param(key);
+          const eff = effectiveThreshold(p?.value, i.attrs[bound === "min" ? "threshold_min" : "threshold_max"]);
+          return {
+            key, code: i.code, name: i.name, bound, unit: i.attrs.unit ?? "", value: eff.value, source: eff.source,
+            from: eff.source === "param" ? (p?.from ?? "") : eff.source === "catalog" ? (i.valid_from ?? "") : "",
+            doc: eff.source === "param" ? (p?.doc ?? "") : eff.source === "catalog" ? "Danh mục chỉ tiêu theo dõi" : "Chưa đặt",
+          };
+        }),
+      ),
+    );
+    return rows;
+  }, [at]);
+}
+
+/** Ngưỡng mặc định: theo chỉ tiêu (sinh từ danh mục) + tham số cảnh báo khác (tham số có phiên bản, đặt → duyệt ở "Tham số"). */
 function Thresholds({ at }: { at: string }) {
   const { api, principal } = useAuth();
+  const ind = useIndicatorThresholds(at);
   const s = useLoad(
     () =>
       Promise.all(
@@ -807,12 +872,15 @@ function Thresholds({ at }: { at: string }) {
     [at],
   );
   const setter = hasRole(principal, ROLES.paramSetter);
+  const SOURCE = { param: "Tham số đã duyệt", catalog: "Ngưỡng mặc định của danh mục", none: "—" } as const;
   return (
     <>
       <div className="alert alert-info" style={{ marginBottom: 12 }}>
         <Icon name="info" />
         <span>
-          Ngưỡng là tham số có phiên bản (người đặt ≠ người duyệt); ngưỡng mới áp dụng cho số liệu có ngày từ ngày hiệu lực.
+          Ngưỡng theo chỉ tiêu lấy từ danh mục &quot;Chỉ tiêu theo dõi&quot; (Admin đặt ngưỡng tối thiểu/tối đa ở form chỉ tiêu, có hiệu lực từ
+          ngày áp dụng). Cấp Tỉnh có thể ghi đè bằng tham số có phiên bản cnts.indicator_min/max:&lt;mã&gt; (người đặt ≠ người duyệt) — tham số
+          đã duyệt được ưu tiên.
           {setter ? (
             <>
               {" "}
@@ -821,10 +889,34 @@ function Thresholds({ at }: { at: string }) {
           ) : null}
         </span>
       </div>
+      <LoadState s={ind}>
+        {(rows) => (
+          <DataTable
+            caption="Ngưỡng theo chỉ tiêu theo dõi"
+            columns={[
+              { key: "name", header: "Chỉ tiêu", cell: (r) => `${r.name} (${r.code})` },
+              { key: "bound", header: "Ngưỡng", cell: (r) => (r.bound === "min" ? "Tối thiểu" : "Tối đa") },
+              { key: "value", header: "Giá trị", cell: (r) => (r.value ? <b>{`${r.value} ${r.unit}`.trim()}</b> : <span className="mute">Chưa đặt</span>) },
+              { key: "source", header: "Nguồn", cell: (r) => <span className="small">{SOURCE[r.source]}</span> },
+              { key: "key", header: "Khóa tham số", cell: (r) => <code className="small">{r.key}</code> },
+              { key: "from", header: "Hiệu lực từ", cell: (r) => dmy(r.from) },
+              { key: "doc", header: "Căn cứ", cell: (r) => <span className="small">{r.doc}</span> },
+            ]}
+            rows={rows}
+            rowKey={(r) => r.key}
+            page={1}
+            pageSize={rows.length || 1}
+            total={rows.length}
+            onPage={() => undefined}
+            empty="Danh mục chưa có chỉ tiêu theo dõi đang dùng."
+          />
+        )}
+      </LoadState>
+      <h3 style={{ marginTop: 16 }}>Tham số cảnh báo khác</h3>
       <LoadState s={s}>
         {(rows) => (
           <DataTable
-            caption="Ngưỡng mặc định CNTS"
+            caption="Tham số cảnh báo CNTS khác"
             columns={[
               { key: "label", header: "Ngưỡng", cell: (r) => r.label },
               { key: "value", header: "Giá trị", cell: (r) => <b>{`${r.value} ${r.unit}`.trim()}</b> },

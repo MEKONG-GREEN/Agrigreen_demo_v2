@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -106,6 +107,8 @@ type Service struct {
 	Files evport.Files
 	// Names (tùy chọn): tên cán bộ.
 	Names func() partyport.ActorNames
+	// Catalogs (tùy chọn, BF-CN-CATALOG #170): ngưỡng mặc định của danh mục chỉ tiêu theo dõi. nil → chỉ tham số + mặc định.
+	Catalogs knport.CNTSCatalogs
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
@@ -135,9 +138,105 @@ func (s *Service) optParam(ctx context.Context, key string) *decimal.Decimal {
 	return &d
 }
 
-func (s *Service) thresholds(ctx context.Context, modelType string) domain.Thresholds {
-	phMin, phMax, doMin := s.param(ctx, ParamPHMin, "7.5"), s.param(ctx, ParamPHMax, "8.5"), s.param(ctx, ParamDOMin, "4")
-	return domain.Thresholds{PHMin: &phMin, PHMax: &phMax, DOMin: &doMin, MortalityMaxPct: s.optParam(ctx, ParamMortality+":"+modelType)}
+// indicatorRange là ngưỡng mặc định của danh mục chỉ tiêu theo dõi gắn với một chỉ số nhật ký (BF-CN-CATALOG #170).
+type indicatorRange struct {
+	code   string
+	lo, hi *decimal.Decimal
+}
+
+// legacyIndicator: chỉ tiêu PH, DO nạp sẵn trước #170 chưa có diary_metric vẫn áp vào ph, do_mgl như cũ.
+var legacyIndicator = map[string]string{"ph": "PH", "do_mgl": "DO"}
+
+// indicatorRanges đọc danh mục chỉ tiêu (đang dùng hôm nay) NGOÀI giao dịch ghi: chỉ số nhật ký → chỉ tiêu + ngưỡng mặc định.
+// Nhiều chỉ tiêu cùng gắn một chỉ số → lấy mã nhỏ nhất. Chưa nối danh mục → rỗng (chỉ dùng tham số và mặc định trong mã).
+func (s *Service) indicatorRanges(ctx context.Context) (map[string]indicatorRange, error) {
+	out := map[string]indicatorRange{}
+	if s.Catalogs == nil {
+		return out, nil
+	}
+	items, err := s.Catalogs.ListAt(ctx, knport.CatalogCNTSIndicator, s.today())
+	if err != nil {
+		return nil, ErrDependency.WithDetail("không đọc được danh mục chỉ tiêu theo dõi")
+	}
+	order := make([]int, len(items))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortFunc(order, func(a, b int) int { return strings.Compare(items[a].Code, items[b].Code) })
+	for _, i := range order {
+		it := items[i]
+		metric := it.Attrs[knport.AttrDiaryMetric]
+		if metric == "" {
+			for m, code := range legacyIndicator {
+				if code == it.Code {
+					metric = m
+				}
+			}
+		}
+		if _, taken := out[metric]; metric == "" || taken || !slices.Contains(knport.DiaryWaterMetrics, metric) {
+			continue
+		}
+		out[metric] = indicatorRange{code: it.Code, lo: knport.ParseThreshold(it.Attrs[knport.AttrThresholdMin]),
+			hi: knport.ParseThreshold(it.Attrs[knport.AttrThresholdMax])}
+	}
+	return out, nil
+}
+
+// indicatorParam: tham số đã duyệt theo loại mô hình, rồi theo chỉ tiêu (ghi đè ngưỡng mặc định của danh mục).
+func (s *Service) indicatorParam(ctx context.Context, prefix, code, modelType string) *decimal.Decimal {
+	if modelType != "" {
+		if v := s.optParam(ctx, knport.IndicatorKey(prefix, code, modelType)); v != nil {
+			return v
+		}
+	}
+	return s.optParam(ctx, knport.IndicatorKey(prefix, code, ""))
+}
+
+// thresholds: ngưỡng của lần ghi. Mỗi chỉ số môi trường nước: tham số đã duyệt (loại mô hình → chỉ tiêu) > ngưỡng mặc định
+// của danh mục chỉ tiêu (cat, đọc trước giao dịch) > mặc định trong mã (chỉ pH 7,5–8,5, oxy ≥ 4 như trước #170).
+func (s *Service) thresholds(ctx context.Context, modelType string, cat map[string]indicatorRange) domain.Thresholds {
+	resolve := func(metric string) (lo, hi *decimal.Decimal) {
+		r, ok := cat[metric]
+		if !ok {
+			r = indicatorRange{code: legacyIndicator[metric]}
+		}
+		if r.code == "" {
+			return nil, nil
+		}
+		lo = s.indicatorParam(ctx, knport.ParamCNTSIndicatorMinPrefix, r.code, modelType)
+		hi = s.indicatorParam(ctx, knport.ParamCNTSIndicatorMaxPrefix, r.code, modelType)
+		if lo == nil {
+			lo = r.lo
+		}
+		if hi == nil {
+			hi = r.hi
+		}
+		return lo, hi
+	}
+	def := func(d *decimal.Decimal, v string) *decimal.Decimal {
+		if d != nil {
+			return d
+		}
+		x := decimal.RequireFromString(v)
+		return &x
+	}
+	t := domain.Thresholds{MortalityMaxPct: s.optParam(ctx, ParamMortality+":"+modelType)}
+	t.PHMin, t.PHMax = resolve("ph")
+	t.PHMin, t.PHMax = def(t.PHMin, "7.5"), def(t.PHMax, "8.5")
+	t.DOMin, t.DOMax = resolve("do_mgl")
+	t.DOMin = def(t.DOMin, "4")
+	for _, m := range knport.DiaryWaterMetrics {
+		if _, legacy := legacyIndicator[m]; legacy {
+			continue
+		}
+		if lo, hi := resolve(m); lo != nil || hi != nil {
+			if t.Others == nil {
+				t.Others = map[string]domain.Range{}
+			}
+			t.Others[m] = domain.Range{Min: lo, Max: hi}
+		}
+	}
+	return t
 }
 
 // caller là người gọi đã giải ngữ cảnh phiên KN.

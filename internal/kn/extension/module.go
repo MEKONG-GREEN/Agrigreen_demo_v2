@@ -171,6 +171,7 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 // vật nuôi). Chưa nối → lập/cập nhật ổ dịch, báo nghi dịch trả 503 extension.dependency_unavailable.
 func (m *Module) UseCNTSCatalogs(c port.CNTSCatalogs) {
 	m.ob.Catalogs, m.cal.Catalogs, m.model.Catalogs, m.zmap.Catalogs = c, c, c, c
+	m.diary.Catalogs = c // BF-CN-CATALOG #170: ngưỡng mặc định theo danh mục chỉ tiêu theo dõi
 }
 
 // UseXaScopes (W11.46) nối danh sách cán bộ Cấp Xã CNTS kèm phạm vi (pf/accounts) cho lưới lịch trực KSGM BM-03.

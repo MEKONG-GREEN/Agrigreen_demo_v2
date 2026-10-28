@@ -565,21 +565,40 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
     ["GA", "Gà", { group: "gia_cam", unit: "con", herd_column: "true", order: "6" }],
     ["CHO_MEO", "Chó, mèo", { group: "thu_cung", unit: "con", herd_column: "true", order: "7" }],
   ]),
-  cnts_breed: cat("cnts_breed", []),
+  // BF-CN-CATALOG #170: giống, bệnh, vaccine, loại mô hình, quy trình cho mẫu BM-07 (gà chuyên trứng, vịt xiêm) như dữ liệu nền.
+  cnts_breed: cat("cnts_breed", [
+    ["GA_LAI_THA_VUON", "Gà lai thả vườn", { species: "GA" }],
+    ["GA_TRUNG_ISA_BROWN", "Gà đẻ trứng ISA Brown", { species: "GA" }],
+    ["VIT_XIEM_PHAP", "Vịt xiêm Pháp", { species: "VIT" }],
+  ]),
   cnts_disease: cat("cnts_disease", [
     ["ASF", "Dịch tả heo Châu Phi", { species: "HEO", notifiable: "true" }],
     ["VDNC", "Viêm da nổi cục", { species: "BO,TRAU", notifiable: "true" }],
     ["CUM_GIA_CAM", "Cúm gia cầm", { species: "GA,VIT", notifiable: "true" }],
     ["NEWCASTLE", "Newcastle", { species: "GA" }],
+    ["THT_GIA_CAM", "Tụ huyết trùng gia cầm", { species: "GA,VIT" }],
+    ["VIEM_GAN_VIT", "Viêm gan vịt", { species: "VIT" }],
+    ["DICH_TA_VIT", "Dịch tả vịt", { species: "VIT" }],
+    ["IB", "Viêm phế quản truyền nhiễm (IB)", { species: "GA" }],
   ]),
   cnts_vaccine: cat("cnts_vaccine", [
     ["VX_ASF", "Tả heo Châu Phi", { diseases: "ASF", species: "HEO", report_group: "heo", order: "1" }],
     ["VX_VDNC_BO", "Viêm da nổi cục bò", { diseases: "VDNC", species: "BO,TRAU", report_group: "bo", order: "5" }],
     ["VX_CUM_GIA_CAM", "Cúm gia cầm (H5N1)", { diseases: "CUM_GIA_CAM", species: "GA,VIT", report_group: "cum_gia_cam", order: "8" }],
     ["VX_ND_F", "Newcastle chủng F", { diseases: "NEWCASTLE", species: "GA", report_group: "khac", order: "20" }],
+    ["VX_IB", "Viêm phế quản truyền nhiễm (IB)", { diseases: "IB", species: "GA", report_group: "khac", order: "26" }],
+    ["VX_VIEM_GAN_VIT", "Viêm gan vịt", { diseases: "VIEM_GAN_VIT", species: "VIT", report_group: "khac", order: "27" }],
+    ["VX_DICH_TA_VIT", "Dịch tả vịt", { diseases: "DICH_TA_VIT", species: "VIT", report_group: "khac", order: "28" }],
+    ["VX_THT_VIT", "Tụ huyết trùng vịt", { diseases: "THT_GIA_CAM", species: "VIT", report_group: "khac", order: "29" }],
   ]),
   cnts_vaccination_schedule: cat("cnts_vaccination_schedule", [
     ["QT_GA_THUONG_PHAM", "Quy trình tiêm gà thương phẩm", { model_type: "GA_THUONG_PHAM", doses: "VX_ND_F/1@3,VX_CUM_GIA_CAM/1@17,VX_CUM_GIA_CAM/2@40" }],
+    ["QT_GA_CHUYEN_TRUNG", "Quy trình tiêm gà chuyên trứng", { model_type: "GA_CHUYEN_TRUNG", doses: "VX_ND_F/1@3,VX_IB/1@5,VX_CUM_GIA_CAM/1@21,VX_IB/2@35,VX_CUM_GIA_CAM/2@45" }],
+    [
+      "QT_VIT_XIEM",
+      "Quy trình tiêm vịt xiêm",
+      { model_type: "VIT_XIEM", doses: "VX_VIEM_GAN_VIT/1@3,VX_CUM_GIA_CAM/1@14,VX_DICH_TA_VIT/1@21,VX_CUM_GIA_CAM/2@35,VX_THT_VIT/1@45,VX_DICH_TA_VIT/2@60" },
+    ],
   ]),
   cnts_chemical: cat("cnts_chemical", [["HC_GIA_SUC", "Hóa chất khử trùng – gia súc", { unit: "lít", target: "gia_suc" }]]),
   cnts_slaughter_facility: cat("cnts_slaughter_facility", [
@@ -613,10 +632,15 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
     ["KHAC", "Khác", { unit: "tấn", order: "4" }],
   ]),
   cnts_indicator: cat("cnts_indicator", [
-    ["PH", "pH", { value_type: "decimal" }],
-    ["DO", "Oxy hòa tan", { unit: "mg/l", value_type: "decimal" }],
+    ["PH", "pH", { value_type: "decimal", threshold_min: "7.5", threshold_max: "8.5", diary_metric: "ph" }],
+    ["DO", "Oxy hòa tan", { unit: "mg/l", value_type: "decimal", threshold_min: "4", diary_metric: "do_mgl" }],
+    ["NHIET_DO", "Nhiệt độ nước", { unit: "°C", value_type: "decimal", diary_metric: "temp_c" }],
   ]),
-  cnts_model_type: cat("cnts_model_type", [["GA_THUONG_PHAM", "Gà thương phẩm", { sector: "chan_nuoi", species: "GA" }]]),
+  cnts_model_type: cat("cnts_model_type", [
+    ["GA_THUONG_PHAM", "Gà thương phẩm", { sector: "chan_nuoi", species: "GA" }],
+    ["GA_CHUYEN_TRUNG", "Gà chuyên trứng", { sector: "chan_nuoi", species: "GA" }],
+    ["VIT_XIEM", "Vịt xiêm", { sector: "chan_nuoi", species: "VIT" }],
+  ]),
   cnts_document_type: cat("cnts_document_type", [["QUY_TRINH", "Quy trình kỹ thuật", {}]]),
 };
 

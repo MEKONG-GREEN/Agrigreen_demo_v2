@@ -3,6 +3,7 @@ package masterdata_test
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -172,6 +173,73 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 		"code": "VT_X", "name": "Vật tư X", "attrs": map[string]string{"unit": "kg"}, "valid_from": "2026-10-01",
 	}); st != http.StatusUnprocessableEntity {
 		t.Fatalf("valid_from ở danh mục không theo hiệu lực: %d", st)
+	}
+}
+
+// BF-CN-CATALOG #170 (CN-11): ngưỡng mặc định gắn từng chỉ tiêu theo dõi (theo ngày hiệu lực), tệp "Xuất danh mục" nạp lại
+// được (cột trang_thai bỏ qua), dữ liệu nền có giống, loại mô hình gà chuyên trứng / vịt xiêm, vaccine và quy trình BM-07.
+func TestBFCNCatalog_IndicatorThresholdsSeedsExport(t *testing.T) {
+	f := newFixture(t)
+	tid := f.seeded()
+	admin := f.caller(tid, port.RoleMasterdataAdmin)
+	reader := knOfficer(t, f, tid)
+	cnts := extension.NewCNTSCatalogs(f.mod.EffectiveCatalogs(), clock.System{})
+	ctx := admin.ctx()
+
+	// Dữ liệu nền BM-07.
+	on := day("2026-10-28")
+	for _, s := range []struct{ code, model, first string }{{"QT_GA_CHUYEN_TRUNG", "GA_CHUYEN_TRUNG", "VX_ND_F"}, {"QT_VIT_XIEM", "VIT_XIEM", "VX_VIEM_GAN_VIT"}} {
+		sch, err := cnts.ScheduleAt(ctx, s.code, on)
+		if err != nil || sch.ModelType != s.model || len(sch.Doses) < 5 || sch.Doses[0].Vaccine != s.first {
+			t.Fatalf("quy trình %s: %+v %v", s.code, sch, err)
+		}
+	}
+	for _, it := range []struct{ catalog, code string }{{knport.CatalogCNTSBreed, "VIT_XIEM_PHAP"}, {knport.CatalogCNTSBreed, "GA_TRUNG_ISA_BROWN"},
+		{knport.CatalogCNTSVaccine, "VX_IB"}, {knport.CatalogCNTSVaccine, "VX_DICH_TA_VIT"}, {knport.CatalogCNTSVaccine, "VX_THT_VIT"},
+		{knport.CatalogCNTSIndicator, "DO_MAN"}} {
+		if _, err := cnts.ItemAt(ctx, it.catalog, it.code, on); err != nil {
+			t.Fatalf("dữ liệu nền %s/%s: %v", it.catalog, it.code, err)
+		}
+	}
+	ph, err := cnts.ItemAt(ctx, knport.CatalogCNTSIndicator, "PH", on)
+	if err != nil || ph.Attrs[knport.AttrThresholdMin] != "7.5" || ph.Attrs[knport.AttrThresholdMax] != "8.5" || ph.Attrs[knport.AttrDiaryMetric] != "ph" {
+		t.Fatalf("ngưỡng mặc định pH: %+v %v", ph, err)
+	}
+
+	// Chỉ tiêu mới kèm ngưỡng, sửa ngưỡng theo ngày hiệu lực (BR-03); số mũ, số âm, chuỗi dài, tối thiểu > tối đa bị từ chối.
+	create := func(code, lo, hi, from string) (int, map[string]any) {
+		return admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_indicator/items", map[string]any{"code": code, "name": "Nhiệt độ ao " + code,
+			"valid_from": from, "attrs": map[string]string{"value_type": "decimal", "unit": "°C", "diary_metric": "temp_c", "threshold_min": lo, "threshold_max": hi}})
+	}
+	for _, bad := range [][2]string{{"1e100000", "32"}, {"-1", "32"}, {"25", strings.Repeat("9", 5000)}, {"33", "32"}, {"25", "1.23456"}} {
+		if st, body := create("NHIET_DO_SAI", bad[0], bad[1], "2026-10-01"); st != http.StatusUnprocessableEntity {
+			t.Fatalf("ngưỡng %v phải bị từ chối: %d %v", bad, st, body)
+		}
+	}
+	if st, body := create("NHIET_DO_AO", "25,0", "32", "2026-10-01"); st != http.StatusCreated || body["attrs"].(map[string]any)["threshold_min"] != "25" {
+		t.Fatalf("chỉ tiêu mới có ngưỡng: %d %v", st, body)
+	}
+	if st, body := admin.adm(http.MethodPut, "/v1/masterdata/catalogs/cnts_indicator/items/NHIET_DO_AO", map[string]any{"name": "Nhiệt độ ao NHIET_DO_AO",
+		"valid_from": "2026-11-01", "attrs": map[string]string{"value_type": "decimal", "unit": "°C", "diary_metric": "temp_c", "threshold_min": "26", "threshold_max": "31"}}); st != http.StatusOK {
+		t.Fatalf("sửa ngưỡng từ 01/11: %d %v", st, body)
+	}
+	for at, want := range map[string]string{"2026-10-15": "32", "2026-11-02": "31"} {
+		it, err := cnts.ItemAt(ctx, knport.CatalogCNTSIndicator, "NHIET_DO_AO", day(at))
+		if err != nil || it.Attrs[knport.AttrThresholdMax] != want {
+			t.Fatalf("ngưỡng theo ngày %s: %+v %v", at, it, err)
+		}
+	}
+
+	// Tệp xuất (cùng cột tệp mẫu + trang_thai) nạp lại: mục đã có cùng nội dung → bỏ qua; dòng mới → tạo.
+	csv := "catalog,code,name,valid_from,unit,value_type,threshold_min,threshold_max,diary_metric,description,trang_thai\n" +
+		"cnts_indicator,PH,pH,2000-01-01,,decimal,7.5,8.5,ph,\"Ngưỡng mặc định 7,5–8,5 (tham số cnts.indicator_min/max:PH)\",Đang dùng\n" +
+		"cnts_indicator,DO_TRONG,Độ trong,2026-10-01,cm,decimal,30,60,,,Ngừng dùng\n"
+	st, body := admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte(csv))
+	if st != http.StatusOK || body["skipped"] != 1.0 || body["created"] != 1.0 || body["rejected"] != 0.0 {
+		t.Fatalf("nạp lại tệp xuất: %d %v", st, body)
+	}
+	if st, body := reader.get("/v1/masterdata/catalogs/cnts_indicator/DO_TRONG"); st != http.StatusOK || body["attrs"].(map[string]any)["trang_thai"] != nil {
+		t.Fatalf("cột trạng thái không thành thuộc tính: %d %v", st, body)
 	}
 }
 

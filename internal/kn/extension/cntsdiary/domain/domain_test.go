@@ -69,6 +69,37 @@ func TestEvaluatePoultry(t *testing.T) {
 	}
 }
 
+// BF-CN-CATALOG #170: ngưỡng theo chỉ tiêu (không chỉ pH, DO) — nhiệt độ, độ mặn vượt ngưỡng sinh cảnh báo môi trường nước.
+func TestEvaluateIndicatorThresholds(t *testing.T) {
+	th := Thresholds{PHMin: dp("7.5"), PHMax: dp("8.5"), DOMin: dp("4"), DOMax: dp("9"),
+		Others: map[string]Range{"temp_c": {Min: dp("25"), Max: dp("32")}, "salinity": {Max: dp("5")}}}
+	in := EvalInput{Form: FormBM19, Thresholds: th, MaxDistM: decimal.NewFromInt(200), MaxAccM: decimal.NewFromInt(50),
+		Entry: Entry{Kind: KindEnv, EntryDate: d0, Metrics: map[string]string{"ph": "7.8", "do_mgl": "9.5", "temp_c": "33.5", "salinity": "4"}}}
+	cs := Evaluate(in)
+	got := codes(cs)
+	for _, c := range []string{"do_high", "temp_c_out_of_range", "action_note_missing"} {
+		if !slices.Contains(got, c) {
+			t.Fatalf("thiếu %s: %v", c, got)
+		}
+	}
+	if slices.Contains(got, "salinity_out_of_range") || slices.Contains(got, "ph_out_of_range") {
+		t.Fatalf("trong ngưỡng không cảnh báo: %v", got)
+	}
+	for _, c := range cs {
+		if c.Code == "temp_c_out_of_range" && (c.Alert != AlertWater || c.Message != "Nhiệt độ 33.5 °C ngoài ngưỡng 25–32 °C") {
+			t.Fatalf("cảnh báo nhiệt độ: %+v", c)
+		}
+	}
+	in.Entry.Metrics = map[string]string{"ph": "7.8", "do_mgl": "5", "temp_c": "30", "salinity": "6", "action_note": "Thay nước"}
+	if got := codes(Evaluate(in)); !slices.Contains(got, "salinity_out_of_range") || slices.Contains(got, "temp_c_out_of_range") || slices.Contains(got, "action_note_missing") {
+		t.Fatalf("độ mặn vượt ngưỡng trên: %v", got)
+	}
+	in.Thresholds.Others = nil // chưa đặt ngưỡng → không cảnh báo
+	if got := codes(Evaluate(in)); slices.Contains(got, "salinity_out_of_range") {
+		t.Fatalf("không ngưỡng: %v", got)
+	}
+}
+
 func TestEvaluateAquaticAndLocation(t *testing.T) {
 	ph := Thresholds{PHMin: dp("7.5"), PHMax: dp("8.5"), DOMin: dp("4")}
 	in := EvalInput{Form: FormBM19, Thresholds: ph, MaxDistM: decimal.NewFromInt(200), MaxAccM: decimal.NewFromInt(50),

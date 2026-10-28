@@ -82,6 +82,15 @@ function check(c: string, code: string, body: Record<string, unknown>): Response
     }
   }
   if (c === "cnts_vaccine" && !(attrs.species ?? "").trim()) return validation([{ field: "attrs.species", reason: "bắt buộc ít nhất một mã" }]);
+  if (c === "cnts_indicator") {
+    // BF-CN-CATALOG #170: như catalogThreshold của máy chủ — số thập phân thường không âm, ≤ 7 chữ số nguyên, ≤ 4 chữ số thập phân.
+    for (const k of ["threshold_min", "threshold_max"]) {
+      const v = (attrs[k] ?? "").trim();
+      if (v && !/^\d{1,7}(\.\d{1,4})?$/.test(v)) return validation([{ field: `attrs.${k}`, reason: "số thập phân không âm, tối đa 7 chữ số phần nguyên và 4 chữ số thập phân" }]);
+    }
+    if (attrs.threshold_min && attrs.threshold_max && Number(attrs.threshold_min) > Number(attrs.threshold_max))
+      return validation([{ field: "attrs.threshold_max", reason: "ngưỡng tối đa phải lớn hơn hoặc bằng ngưỡng tối thiểu" }]);
+  }
   return null;
 }
 

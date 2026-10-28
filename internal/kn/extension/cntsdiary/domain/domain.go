@@ -824,11 +824,16 @@ type Previous struct {
 	Metrics   map[string]string
 }
 
-// Thresholds là ngưỡng (tham số cnts.*).
+// Range là ngưỡng dưới/trên của một chỉ số (nil = không đặt).
+type Range struct{ Min, Max *decimal.Decimal }
+
+// Thresholds là ngưỡng (tham số cnts.* và ngưỡng mặc định của danh mục chỉ tiêu theo dõi, BF-CN-CATALOG #170).
 type Thresholds struct {
-	PHMin, PHMax, DOMin *decimal.Decimal
-	MortalityMaxPct     *decimal.Decimal // nil = chưa cấu hình → không cảnh báo
-	WeightStandardG     *decimal.Decimal // chuẩn kỹ thuật (UR-TINH-07) — chưa có → so lần cân trước
+	PHMin, PHMax, DOMin, DOMax *decimal.Decimal
+	// Others: ngưỡng của chỉ số môi trường nước khác (temp_c, salinity…) theo mã chỉ số BM-19.
+	Others          map[string]Range
+	MortalityMaxPct *decimal.Decimal // nil = chưa cấu hình → không cảnh báo
+	WeightStandardG *decimal.Decimal // chuẩn kỹ thuật (UR-TINH-07) — chưa có → so lần cân trước
 }
 
 // EvalInput là đầu vào kiểm tra một lần ghi.
@@ -917,6 +922,27 @@ func Evaluate(in EvalInput) []Check {
 			add(Check{Code: "do_low", Level: LevelWarn, Field: "metrics.do_mgl", Alert: AlertWater,
 				Message: "Oxy hòa tan " + dstr(*do) + " mg/l dưới ngưỡng " + dstr(*in.Thresholds.DOMin) + " mg/l", Value: dstr(*do),
 				Compare: dstr(*in.Thresholds.DOMin)})
+		} else if do != nil && in.Thresholds.DOMax != nil && do.GreaterThan(*in.Thresholds.DOMax) {
+			water = true
+			add(Check{Code: "do_high", Level: LevelWarn, Field: "metrics.do_mgl", Alert: AlertWater,
+				Message: "Oxy hòa tan " + dstr(*do) + " mg/l trên ngưỡng " + dstr(*in.Thresholds.DOMax) + " mg/l", Value: dstr(*do),
+				Compare: dstr(*in.Thresholds.DOMax)})
+		}
+		// Chỉ số môi trường nước khác có ngưỡng theo danh mục chỉ tiêu (#170), theo thứ tự cột của sổ.
+		for _, d := range aquatic {
+			r, ok := in.Thresholds.Others[d.Code]
+			v := Dec(m, d.Code)
+			if !ok || v == nil || !((r.Min != nil && v.LessThan(*r.Min)) || (r.Max != nil && v.GreaterThan(*r.Max))) {
+				continue
+			}
+			water = true
+			unit := ""
+			if d.Unit != "" {
+				unit = " " + d.Unit
+			}
+			add(Check{Code: d.Code + "_out_of_range", Level: LevelWarn, Field: "metrics." + d.Code, Alert: AlertWater,
+				Message: d.Label + " " + dstr(*v) + unit + " ngoài ngưỡng " + rangeText(r.Min, r.Max) + unit, Value: dstr(*v),
+				Compare: rangeText(r.Min, r.Max)})
 		}
 		if water && strings.TrimSpace(m["action_note"]) == "" {
 			add(Check{Code: "action_note_missing", Level: LevelBlock, Field: "metrics.action_note",

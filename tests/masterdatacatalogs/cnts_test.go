@@ -1,6 +1,7 @@
 package masterdatacatalogs_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -77,6 +78,43 @@ func TestCNTS_ScheduleNeedsTarget(t *testing.T) {
 	it.Attrs["breed"] = "GA_TA"
 	if _, err := normalizeOwnedCatalogItem(it); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// BF-CN-CATALOG #170: ngưỡng mặc định của chỉ tiêu theo dõi — số thập phân thường có giới hạn, tối thiểu ≤ tối đa.
+func TestCNTS_IndicatorThresholds(t *testing.T) {
+	item := func(lo, hi, metric string) port.CatalogItem {
+		attrs := map[string]string{"value_type": "decimal"}
+		for k, v := range map[string]string{knport.AttrThresholdMin: lo, knport.AttrThresholdMax: hi, knport.AttrDiaryMetric: metric} {
+			if v != "" {
+				attrs[k] = v
+			}
+		}
+		return port.CatalogItem{Catalog: knport.CatalogCNTSIndicator, Code: "NHIET_DO_AO", Name: "Nhiệt độ ao", Attrs: attrs}
+	}
+	it, err := normalizeOwnedCatalogItem(item(" 25,50 ", "32.0000", "temp_c"))
+	if err != nil || it.Attrs[knport.AttrThresholdMin] != "25.5" || it.Attrs[knport.AttrThresholdMax] != "32" || it.Attrs[knport.AttrDiaryMetric] != "temp_c" {
+		t.Fatalf("chuẩn hóa ngưỡng: %v %v", it.Attrs, err)
+	}
+	if _, err := normalizeOwnedCatalogItem(item("", "", "")); err != nil {
+		t.Fatalf("ngưỡng không bắt buộc: %v", err)
+	}
+	for _, bad := range []string{"1e100000", "1e-100000", "-1", "abc", "1.23456", "12345678", "0x10", "NaN", "Infinity", "1.", ".5", strings.Repeat("9", 5000)} {
+		if _, err := normalizeOwnedCatalogItem(item(bad, "", "")); err == nil {
+			t.Fatalf("ngưỡng %q phải bị từ chối", bad)
+		}
+		if _, err := normalizeOwnedCatalogItem(item("", bad, "")); err == nil {
+			t.Fatalf("ngưỡng %q phải bị từ chối", bad)
+		}
+	}
+	if _, err := normalizeOwnedCatalogItem(item("33", "32", "")); err == nil {
+		t.Fatal("tối thiểu > tối đa phải bị từ chối")
+	}
+	if _, err := normalizeOwnedCatalogItem(item("", "", "weight_avg_g")); err == nil {
+		t.Fatal("chỉ số nhật ký ngoài danh sách môi trường nước")
+	}
+	if knport.ParseThreshold("1e100000") != nil || knport.ParseThreshold("9999999.9999") == nil {
+		t.Fatal("ParseThreshold")
 	}
 }
 

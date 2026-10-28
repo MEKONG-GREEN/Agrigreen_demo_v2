@@ -5,7 +5,7 @@ import { createAdminApiClient, createApiClient, unwrap } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsVersions } from "@/api/mock/kn-cnts-catalogs";
 import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase } from "./CntsCatalogScreen";
-import { CNTS_TABS, cleanAttrs, expectedDate, formatDoses, parseDoses, tabOf, templateRows, validateAttrs } from "./schema";
+import { CNTS_TABS, cleanAttrs, effectiveThreshold, expectedDate, exportRows, formatDoses, normalizeAttrs, parseDoses, tabOf, templateRows, validateAttrs } from "./schema";
 
 const nav = { path: "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts", params: {} as Record<string, string>, search: "" };
 const push = vi.fn();
@@ -43,6 +43,30 @@ describe("danh mục CNTS — trường thuộc tính (W11.41)", () => {
     expect(formatDoses(ds)).toBe("VX_ND_F/1@3,VX_GUMBORO/1@7");
     expect(expectedDate("2026-10-01", 1, { vaccine: "X", shot: 1, age_days: 17 })).toBe("2026-10-17");
     expect(validateAttrs(tabOf("cnts_vaccination_schedule"), { doses: "" })).toMatchObject({ model_type: expect.any(String), doses: expect.any(String) });
+  });
+
+  it("chỉ tiêu theo dõi (#170): ngưỡng tối thiểu/tối đa là số thập phân không âm có giới hạn, tối thiểu ≤ tối đa", () => {
+    const tab = tabOf("cnts_indicator");
+    expect(tab.fields.map((f) => f.key)).toEqual(expect.arrayContaining(["threshold_min", "threshold_max", "diary_metric"]));
+    for (const bad of ["1e100000", "-1", "1.23456", "12345678", "abc", "9".repeat(5000)]) {
+      expect(validateAttrs(tab, { value_type: "decimal", threshold_min: bad }).threshold_min, bad).toBeTruthy();
+    }
+    expect(validateAttrs(tab, { value_type: "decimal", threshold_min: "33", threshold_max: "32" }).threshold_max).toMatch(/lớn hơn hoặc bằng/);
+    expect(validateAttrs(tab, { value_type: "decimal", threshold_min: "25,5", threshold_max: "32" })).toEqual({});
+    expect(normalizeAttrs(tab, { threshold_min: "25,5" }).threshold_min).toBe("25.5");
+  });
+
+  it("Xuất danh mục (#170): cùng cột với tệp mẫu (nạp lại được) + trạng thái", () => {
+    const tab = tabOf("cnts_indicator");
+    const rows = exportRows(tab, [
+      { code: "PH", name: "pH", attrs: { value_type: "decimal", threshold_min: "7.5", threshold_max: "8.5" }, active: true, valid_from: "2026-10-01" },
+      { code: "CU", name: "Chỉ tiêu cũ", attrs: { value_type: "integer" }, active: false },
+    ]);
+    expect(rows[0]).toEqual([...templateRows(tab)[0]!, "trang_thai"]);
+    expect(rows[1]).toEqual(["cnts_indicator", "PH", "pH", "2026-10-01", "", "decimal", "7.5", "8.5", "", "", "Đang dùng"]);
+    expect(rows[2]!.at(-1)).toBe("Ngừng dùng");
+    expect(effectiveThreshold("7", "7.5")).toEqual({ value: "7", source: "param" });
+    expect(effectiveThreshold(null, "7.5")).toEqual({ value: "7.5", source: "catalog" });
   });
 
   it("cơ sở giết mổ: bắt buộc xã + loại, mã không trùng GS/GC, không gửi facility_ref", () => {
@@ -248,6 +272,32 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     const h = await screen.findByRole("heading", { level: 1, name: new RegExp(cur.name) });
     expect(h).not.toHaveTextContent("2099");
     expect(screen.getByRole("link", { name: "Sửa" })).toHaveAttribute("href", "/kn/cnts/danh-muc/cnts_species/TRAU/sua");
+  });
+
+  it("#170: tab Ngưỡng mặc định sinh từ danh mục chỉ tiêu — chỉ tiêu mới có ngưỡng hiện ngay; nút Xuất danh mục", async () => {
+    await unwrap(
+      admin().POST("/v1/masterdata/catalogs/{catalog}/items", {
+        params: { path: { catalog: "cnts_indicator" }, header: { "Idempotency-Key": "ind-170" } },
+        body: { code: "NHIET_DO_AO", name: "Nhiệt độ nước ao", attrs: { value_type: "decimal", unit: "°C", threshold_min: "25", threshold_max: "32", diary_metric: "temp_c" } },
+      }),
+    );
+    const bad = await admin().POST("/v1/masterdata/catalogs/{catalog}/items", {
+      params: { path: { catalog: "cnts_indicator" }, header: { "Idempotency-Key": "ind-170-bad" } },
+      body: { code: "XAU", name: "Ngưỡng hỏng", attrs: { value_type: "decimal", threshold_min: "1e100000" } },
+    });
+    expect(bad.response.status).toBe(422);
+    const user = userEvent.setup();
+    nav.search = "tab=cnts_indicator";
+    render(<CntsCatalogScreen />);
+    expect(await screen.findByText("Nhiệt độ nước ao")).toBeTruthy();
+    for (const h of ["Ngưỡng tối thiểu", "Ngưỡng tối đa", "Chỉ số nhật ký"]) expect(screen.getByRole("columnheader", { name: h })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Xuất danh mục/ })).toBeEnabled();
+    await user.click(screen.getByRole("tab", { name: "Ngưỡng mặc định" }));
+    const table = await screen.findByRole("table", { name: "Ngưỡng theo chỉ tiêu theo dõi" });
+    expect(await within(table).findAllByText("Nhiệt độ nước ao (NHIET_DO_AO)")).toHaveLength(2);
+    expect(within(table).getByText("32 °C")).toBeTruthy();
+    expect(within(table).getByText("cnts.indicator_max:NHIET_DO_AO")).toBeTruthy();
+    expect(within(table).getAllByText("Ngưỡng mặc định của danh mục").length).toBeGreaterThanOrEqual(2);
   });
 
   it("gốc route danh mục cho cả Phòng CNTS và Admin › Phòng ban", () => {

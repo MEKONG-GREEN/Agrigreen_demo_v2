@@ -68,6 +68,9 @@ var catalogImportAliases = map[string]string{
 	"name": "name", "ten": "name", "ten_muc": "name",
 	// W11.41: ngày áp dụng của danh mục CNTS (YYYY-MM-DD; trống = hôm nay).
 	"valid_from": "valid_from", "hieu_luc_tu": "valid_from", "ngay_hieu_luc": "valid_from",
+	// BF-CN-CATALOG #170: cột trạng thái của tệp "Xuất danh mục" chỉ để đọc — nạp lại tệp xuất thì bỏ qua cột này (không
+	// coi là thuộc tính, không đổi trạng thái; ngừng/dùng lại qua thao tác riêng có lý do).
+	"trang_thai": "status", "status": "status",
 }
 
 // ImportCatalogs nạp nhiều mục danh mục từ CSV/XLSX (HTX US-CAT-02). Tệp sai mẫu →

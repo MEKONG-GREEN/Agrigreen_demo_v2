@@ -121,6 +121,9 @@
       "Name": "Chỉ tiêu theo dõi",
       "Attributes": [
         "description",
+        "diary_metric",
+        "threshold_max",
+        "threshold_min",
         "unit",
         "value_type"
       ],
@@ -242,6 +245,42 @@
       }
     },
     {
+      "catalog": "cnts_breed",
+      "code": "GA_LAI_THA_VUON",
+      "name": "Gà lai thả vườn",
+      "attrs": {
+        "description": "Giống mẫu (BF-CN-CATALOG), dùng cho mô hình gà thương phẩm",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_breed",
+      "code": "GA_TRUNG_ISA_BROWN",
+      "name": "Gà đẻ trứng ISA Brown",
+      "attrs": {
+        "description": "Giống mẫu (BF-CN-CATALOG), dùng cho mô hình gà chuyên trứng",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_breed",
+      "code": "VIT_XIEM_PHAP",
+      "name": "Vịt xiêm Pháp",
+      "attrs": {
+        "description": "Giống của mô hình vịt xiêm trong mẫu BM-07 2026",
+        "species": "VIT"
+      }
+    },
+    {
+      "catalog": "cnts_breed",
+      "code": "BO_LAI_SIND",
+      "name": "Bò lai Sind",
+      "attrs": {
+        "description": "Giống mẫu (BF-CN-CATALOG)",
+        "species": "BO"
+      }
+    },
+    {
       "catalog": "cnts_disease",
       "code": "ASF",
       "name": "Dịch tả heo Châu Phi",
@@ -350,6 +389,30 @@
       "name": "Tụ huyết trùng gia cầm",
       "attrs": {
         "species": "GA,VIT"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "VIEM_GAN_VIT",
+      "name": "Viêm gan vịt",
+      "attrs": {
+        "species": "VIT"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "DICH_TA_VIT",
+      "name": "Dịch tả vịt",
+      "attrs": {
+        "species": "VIT"
+      }
+    },
+    {
+      "catalog": "cnts_disease",
+      "code": "IB",
+      "name": "Viêm phế quản truyền nhiễm (IB)",
+      "attrs": {
+        "species": "GA"
       }
     },
     {
@@ -519,6 +582,50 @@
       }
     },
     {
+      "catalog": "cnts_vaccine",
+      "code": "VX_IB",
+      "name": "Viêm phế quản truyền nhiễm (IB)",
+      "attrs": {
+        "diseases": "IB",
+        "order": "26",
+        "report_group": "khac",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_VIEM_GAN_VIT",
+      "name": "Viêm gan vịt",
+      "attrs": {
+        "diseases": "VIEM_GAN_VIT",
+        "order": "27",
+        "report_group": "khac",
+        "species": "VIT"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_DICH_TA_VIT",
+      "name": "Dịch tả vịt",
+      "attrs": {
+        "diseases": "DICH_TA_VIT",
+        "order": "28",
+        "report_group": "khac",
+        "species": "VIT"
+      }
+    },
+    {
+      "catalog": "cnts_vaccine",
+      "code": "VX_THT_VIT",
+      "name": "Tụ huyết trùng vịt",
+      "attrs": {
+        "diseases": "THT_GIA_CAM",
+        "order": "29",
+        "report_group": "khac",
+        "species": "VIT"
+      }
+    },
+    {
       "catalog": "cnts_model_type",
       "code": "GA_THUONG_PHAM",
       "name": "Gà thương phẩm",
@@ -554,6 +661,24 @@
       }
     },
     {
+      "catalog": "cnts_model_type",
+      "code": "GA_CHUYEN_TRUNG",
+      "name": "Gà chuyên trứng",
+      "attrs": {
+        "sector": "chan_nuoi",
+        "species": "GA"
+      }
+    },
+    {
+      "catalog": "cnts_model_type",
+      "code": "VIT_XIEM",
+      "name": "Vịt xiêm",
+      "attrs": {
+        "sector": "chan_nuoi",
+        "species": "VIT"
+      }
+    },
+    {
       "catalog": "cnts_vaccination_schedule",
       "code": "QT_GA_THUONG_PHAM",
       "name": "Quy trình tiêm gà thương phẩm",
@@ -561,6 +686,26 @@
         "description": "Ví dụ BRD CNTS v3.7 UR-TINH-10",
         "doses": "VX_ND_F/1@3,VX_GUMBORO/1@7,VX_DAU_GA/1@12,VX_CUM_GIA_CAM/1@17,VX_ND_LASOTA/1@21,VX_GUMBORO/2@28,VX_CUM_GIA_CAM/2@40,VX_THT_GA/1@47,VX_ND_M/1@60",
         "model_type": "GA_THUONG_PHAM"
+      }
+    },
+    {
+      "catalog": "cnts_vaccination_schedule",
+      "code": "QT_GA_CHUYEN_TRUNG",
+      "name": "Quy trình tiêm gà chuyên trứng",
+      "attrs": {
+        "description": "Theo BM-07 2026 (dịch tả gà – Newcastle, Gumboro, cúm gia cầm, IB); ngày tuổi là giả định, chờ đối chiếu tệp gốc",
+        "doses": "VX_ND_F/1@3,VX_IB/1@5,VX_GUMBORO/1@10,VX_CUM_GIA_CAM/1@21,VX_GUMBORO/2@24,VX_ND_LASOTA/1@28,VX_IB/2@35,VX_CUM_GIA_CAM/2@45,VX_ND_M/1@60,VX_IB/3@120",
+        "model_type": "GA_CHUYEN_TRUNG"
+      }
+    },
+    {
+      "catalog": "cnts_vaccination_schedule",
+      "code": "QT_VIT_XIEM",
+      "name": "Quy trình tiêm vịt xiêm",
+      "attrs": {
+        "description": "Theo BM-07 2026 (viêm gan, dịch tả vịt, cúm gia cầm, tụ huyết trùng); ngày tuổi là giả định, chờ đối chiếu tệp gốc",
+        "doses": "VX_VIEM_GAN_VIT/1@3,VX_CUM_GIA_CAM/1@14,VX_DICH_TA_VIT/1@21,VX_CUM_GIA_CAM/2@35,VX_THT_VIT/1@45,VX_DICH_TA_VIT/2@60",
+        "model_type": "VIT_XIEM"
       }
     },
     {
@@ -655,6 +800,9 @@
       "name": "pH",
       "attrs": {
         "description": "Ngưỡng mặc định 7,5–8,5 (tham số cnts.indicator_min/max:PH)",
+        "diary_metric": "ph",
+        "threshold_max": "8.5",
+        "threshold_min": "7.5",
         "value_type": "decimal"
       }
     },
@@ -664,6 +812,8 @@
       "name": "Oxy hòa tan",
       "attrs": {
         "description": "Ngưỡng mặc định ≥ 4 mg/l",
+        "diary_metric": "do_mgl",
+        "threshold_min": "4",
         "unit": "mg/l",
         "value_type": "decimal"
       }
@@ -673,7 +823,18 @@
       "code": "NHIET_DO",
       "name": "Nhiệt độ nước",
       "attrs": {
+        "diary_metric": "temp_c",
         "unit": "°C",
+        "value_type": "decimal"
+      }
+    },
+    {
+      "catalog": "cnts_indicator",
+      "code": "DO_MAN",
+      "name": "Độ mặn",
+      "attrs": {
+        "diary_metric": "salinity",
+        "unit": "‰",
         "value_type": "decimal"
       }
     },

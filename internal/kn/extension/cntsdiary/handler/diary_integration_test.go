@@ -607,11 +607,19 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	want(t, chu.post(base+"diary-cycles/"+cref+"/reopen", map[string]any{"base_version": json.Number(num(cl, "version")),
 		"reason": "Bổ sung lần ghi"}), 200, "", "chủ nhiệm mở lại lứa")
 
+	// ----- BF-CN-CATALOG #170: Admin thêm chỉ tiêu nhiệt độ có ngưỡng vào danh mục → lần ghi vượt ngưỡng có cảnh báo -----
+	items["cnts_indicator:NHIET_DO_AO"] = mdport.CatalogItem{Catalog: "cnts_indicator", Code: "NHIET_DO_AO", Name: "Nhiệt độ nước ao", Active: true,
+		Attrs: map[string]string{"value_type": "decimal", "unit": "°C", "diary_metric": "temp_c", "threshold_min": "25", "threshold_max": "32"}}
+	t.Cleanup(func() { delete(items, "cnts_indicator:NHIET_DO_AO") })
+
 	// ----- Hạn sửa 7 ngày, dọn tọa độ, xóa định danh chủ hộ -----
 	draft := want(t, officer.post(base+"diary-entries", map[string]any{"cycle_ref": ccref, "entry_kind": "env",
-		"metrics": map[string]any{"loss": "0", "ph": "7.8", "do_mgl": "5", "feed_kg": "35"}}), 201, "", "nháp")
+		"metrics": map[string]any{"loss": "0", "ph": "7.8", "do_mgl": "5", "temp_c": "34.5", "feed_kg": "35"}}), 201, "", "nháp")
 	if str(draft, "status") != "draft" {
 		t.Fatalf("nháp: %s", draft)
+	}
+	if got := checkCodes(draft); !slices.Contains(got, "temp_c_out_of_range") || slices.Contains(got, "ph_out_of_range") {
+		t.Fatalf("nhiệt độ 34,5 vượt ngưỡng 25–32 của chỉ tiêu mới: %v", got)
 	}
 	if l := list(want(t, chu.get(base+"diary-entries?cycle_ref="+ccref), 200, "", "chủ nhiệm"), "items"); len(l) != 1 {
 		t.Fatalf("bản nháp chỉ người ghi thấy: %v", l)

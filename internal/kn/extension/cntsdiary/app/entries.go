@@ -223,14 +223,15 @@ func photosOf(ctx context.Context, tx pgx.Tx, household uuid.UUID, refs []uuid.U
 func itoa(i int) string { return decimal.NewFromInt(int64(i)).String() }
 
 // evaluate dựng kết quả kiểm tra tự động của bản en (mã ref) so với các lần ghi khác của lứa.
+// cat: ngưỡng mặc định của danh mục chỉ tiêu, đọc trước giao dịch (indicatorRanges).
 func (s *Service) evaluate(ctx context.Context, tx pgx.Tx, cy store.Cycle, modelType string, ref uuid.UUID, en domain.Entry, captured time.Time,
-	weighing int, loc domain.Location) ([]domain.Check, error) {
+	weighing int, loc domain.Location, cat map[string]indicatorRange) ([]domain.Check, error) {
 	others, err := store.ListEntries(ctx, tx, store.EntryFilter{Cycle: &cy.Ref})
 	if err != nil {
 		return nil, err
 	}
 	in := domain.EvalInput{Form: cy.Form, Entry: en, InitialCount: cy.InitialCount, WeighingPhotos: weighing, Location: loc,
-		Thresholds: s.thresholds(ctx, modelType), MaxDistM: s.param(ctx, ParamDistance, "200"), MaxAccM: s.param(ctx, ParamAccuracy, "50")}
+		Thresholds: s.thresholds(ctx, modelType, cat), MaxDistM: s.param(ctx, ParamDistance, "200"), MaxAccM: s.param(ctx, ParamAccuracy, "50")}
 	var prev, prevW *store.Entry
 	for i := range others {
 		o := others[i]
@@ -374,6 +375,10 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 	if _, err := s.editDays(ctx, day); err != nil {
 		return EntryView{}, err
 	}
+	cat, err := s.indicatorRanges(ctx) // ngưỡng mặc định của danh mục chỉ tiêu: đọc NGOÀI giao dịch (#170)
+	if err != nil {
+		return EntryView{}, err
+	}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
 			if prev != nil {
@@ -434,7 +439,7 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 			}
 		}
 		loc := domain.EvaluateLocation(in.Fix, tp, s.param(ctx, ParamDistance, "200"), s.param(ctx, ParamAccuracy, "50"), others)
-		checks, err := s.evaluate(ctx, tx, *cy, hc.x.ModelType, ref, en, captured, weighing, loc)
+		checks, err := s.evaluate(ctx, tx, *cy, hc.x.ModelType, ref, en, captured, weighing, loc, cat)
 		if err != nil {
 			return err
 		}
@@ -505,6 +510,12 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 			if editDays, err = s.editDays(ctx, editDate); err != nil {
 				return EntryView{}, err
 			}
+		}
+	}
+	var cat map[string]indicatorRange
+	if act != domain.ActReturn && act != domain.ActVerify { // chỉ các hành động chạy kiểm tra tự động (#170)
+		if cat, err = s.indicatorRanges(ctx); err != nil {
+			return EntryView{}, err
 		}
 	}
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
@@ -583,7 +594,7 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 			if err != nil {
 				return err
 			}
-			if n.Checks, err = s.evaluate(ctx, tx, *cy, hc.x.ModelType, ref, n.Entry, n.CapturedAt, weighing, n.Location); err != nil {
+			if n.Checks, err = s.evaluate(ctx, tx, *cy, hc.x.ModelType, ref, n.Entry, n.CapturedAt, weighing, n.Location, cat); err != nil {
 				return err
 			}
 			if next == domain.StatusSubmitted {
