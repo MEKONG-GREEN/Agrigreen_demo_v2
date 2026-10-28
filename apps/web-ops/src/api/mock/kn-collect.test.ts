@@ -52,7 +52,19 @@ describe("thu thập dữ liệu Cấp Xã giả lập (P7)", () => {
     expect((await xa.records({ kind: "coop_group" })).items.length).toBeGreaterThan(0);
     expect((await xa.records({ kind: "household", parent_ref: c.ref })).items.map((x) => x.ref)).toEqual([h.ref]);
     const tinh = await clientFor("kn-binh", "asg-binh-tinh");
-    expect((await tinh.records({ kind: "cooperative", status: "all" })).items.length).toBeGreaterThan(list.length);
+    const all = (await tinh.records({ kind: "cooperative", status: "all" })).items;
+    expect(all.length).toBeGreaterThan(list.length);
+    // Phân trang theo con trỏ như máy chủ: limit nhỏ → next_cursor; đi hết các trang = đúng danh sách đầy đủ.
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const pg = await tinh.records({ kind: "cooperative", status: "all", limit: 1, ...(cursor ? { cursor } : {}) });
+      seen.push(...pg.items.map((x) => x.ref));
+      if (!pg.next_cursor) break;
+      cursor = pg.next_cursor;
+    }
+    expect(seen).toEqual(all.map((x) => x.ref));
+    expect(await code(tinh.records({ kind: "cooperative", limit: 201 }))).toBe("422 validation_failed");
     expect(await code(tinh.createRecord({ kind: "cooperative", commune_code: "91301", name: "X", representative: { full_name: "A B", phone: "0912000777" } }))).toBe("403 forbidden");
   });
 

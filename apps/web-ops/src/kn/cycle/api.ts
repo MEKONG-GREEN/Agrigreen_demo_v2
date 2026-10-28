@@ -431,6 +431,9 @@ export type KnProducer = A["KNProducerRecord"];
 export type KnProducerDetail = A["KNProducerRecordDetail"];
 export type KnProducerWrite = A["KNProducerRecordWrite"];
 export type KnProducerQuery = { kind: KnProducerKind; commune?: string; status?: "active" | "inactive" | "all"; q?: string; parent_ref?: string; htx_ref?: string };
+/** Một trang danh sách hồ sơ: `cursor` = next_cursor của trang trước (không gửi = trang đầu), `limit` ≤ 200. */
+export type KnProducerPageQuery = KnProducerQuery & { cursor?: string; limit?: number };
+export type KnProducerPage = { items: KnProducer[]; next_cursor: string | null };
 export type KnHTXCandidate = { htx_ref: string; name: string; commune_code: string; linked_ref: string | null };
 
 export type CollectApi = ReturnType<typeof createCollectApi>;
@@ -439,7 +442,8 @@ export function createCollectApi(opts: KnHttpOptions) {
   const call = knHttp(opts);
   return {
     // Hồ sơ KN riêng (#67) — mọi thao tác ghi HTX / Nông hộ / Tổ hợp tác của màn KN đi qua đây.
-    records: (q: KnProducerQuery) => call<{ items: KnProducer[]; next_cursor: string | null }>("GET", "/v1/kn/producer-records", undefined, { ...q, limit: 200 }),
+    // Một trang theo con trỏ (máy chủ: limit 1–200, mặc định 50; next_cursor null = hết). Đọc hết → loadAllRecords.
+    records: (q: KnProducerPageQuery) => call<KnProducerPage>("GET", "/v1/kn/producer-records", undefined, q),
     record: (ref: string) => call<KnProducerDetail>("GET", `/v1/kn/producer-records/${ref}`),
     createRecord: (b: KnProducerWrite, idem?: string) => call<KnProducerDetail>("POST", "/v1/kn/producer-records", b, undefined, idem),
     updateRecord: (ref: string, b: KnProducerWrite & { base_version: number }, idem?: string) => call<KnProducerDetail>("POST", `/v1/kn/producer-records/${ref}`, b, undefined, idem),

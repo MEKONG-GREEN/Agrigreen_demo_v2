@@ -40,7 +40,7 @@ beforeEach(() => {
   auth.role = "kn_xa";
   auth.collectApi = {
     record: vi.fn().mockResolvedValue(rec),
-    records: vi.fn().mockResolvedValue({ items: [hh] }),
+    records: vi.fn().mockResolvedValue({ items: [hh], next_cursor: null }),
     htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
     setRecordStatus: vi.fn().mockResolvedValue({ ...rec, status: "inactive", version: 4 }),
     updateRecord: vi.fn().mockResolvedValue({ ...rec, version: 4 }),
@@ -57,7 +57,7 @@ describe("Hồ sơ KN riêng — chi tiết, vô hiệu hóa, sửa (#67)", () =
     expect(screen.getByText("Sửa hồ sơ")).toBeInTheDocument();
     expect(screen.getByText("Tạo hồ sơ")).toBeInTheDocument();
     expect(screen.getByText(/Trần T\. B\./)).toBeInTheDocument();
-    expect(auth.collectApi.records).toHaveBeenCalledWith({ kind: "household", parent_ref: "rec-1", status: "all" });
+    expect(auth.collectApi.records).toHaveBeenCalledWith({ kind: "household", parent_ref: "rec-1", status: "all", limit: 200 });
     expect(screen.getByRole("link", { name: "Sửa" })).toHaveAttribute("href", "/kn/du-lieu/htx/rec-1/sua");
     await u.click(screen.getByRole("button", { name: "Vô hiệu hóa" }));
     await u.type(screen.getByLabelText(/Lý do/), "ngắn");
