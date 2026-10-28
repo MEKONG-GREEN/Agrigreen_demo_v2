@@ -168,8 +168,8 @@ describe("IdempotentOperation", () => {
   });
 });
 
-describe("Tạo HTX (FN-XA-03.03) — bấm Lưu lại sau lỗi", () => {
-  const body = { name: "HTX Thử Lại", commune_code: "91302", area_ha: "10", representative: { full_name: "Trần Văn Lại", phone: "0912000333" } };
+describe("Tạo HTX (FN-XA-03.03, hồ sơ KN riêng #67) — bấm Lưu lại sau lỗi", () => {
+  const body = { kind: "cooperative" as const, name: "HTX Thử Lại", commune_code: "91302", area_ha: "10", representative: { full_name: "Trần Văn Lại", phone: "0912000333" } };
 
   async function setup(plan: Mode[]) {
     const ctx = await contextFor("kn-an", "asg-an-xa");
@@ -177,13 +177,13 @@ describe("Tạo HTX (FN-XA-03.03) — bấm Lưu lại sau lỗi", () => {
     const xa = createCollectApi({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-an", getContextId: () => ctx, fetch: net.fetch });
     return { xa, net };
   }
-  const count = async (xa: ReturnType<typeof createCollectApi>) => (await xa.cooperatives({ status: "all", q: "Thử Lại" })).items.filter((c) => c.name === body.name).length;
+  const count = async (xa: ReturnType<typeof createCollectApi>) => (await xa.records({ kind: "cooperative", status: "all", q: "Thử Lại" })).items.filter((c) => c.name === body.name).length;
 
   it("mất phản hồi (máy chủ đã tạo) → bấm lại cùng khóa → phát lại kết quả, không 409, chỉ một HTX", async () => {
     const { xa, net } = await setup(["lost", "pass"]);
     const op = new IdempotentOperation();
-    expect(await code(withIdempotentOperation(op, () => xa.createCooperative(body)))).toBe("0 network_error");
-    const again = await withIdempotentOperation(op, () => xa.createCooperative(body));
+    expect(await code(withIdempotentOperation(op, () => xa.createRecord(body)))).toBe("0 network_error");
+    const again = await withIdempotentOperation(op, () => xa.createRecord(body));
     expect(again.name).toBe(body.name);
     expect(net.keys[0]).toBe(net.keys[1]);
     expect(net.replayed).toEqual([false, true]);
@@ -192,21 +192,21 @@ describe("Tạo HTX (FN-XA-03.03) — bấm Lưu lại sau lỗi", () => {
 
   it("đối chứng — không có phiên thao tác (khóa mới mỗi lần) thì bấm lại ra 409 (lỗi cũ của #129)", async () => {
     const { xa, net } = await setup(["lost", "pass"]);
-    await code(xa.createCooperative(body));
-    expect(await code(xa.createCooperative(body))).toBe("409 party.cooperative_name_taken");
+    await code(xa.createRecord(body));
+    expect(await code(xa.createRecord(body))).toBe("409 extension.kn_record_name_taken");
     expect(net.keys[0]).not.toBe(net.keys[1]);
   });
 
   it("503 trước khi tới máy chủ → thử lại cùng khóa, tạo một lần; thành công → thao tác sau khóa mới", async () => {
     const { xa, net } = await setup(["503", "pass", "pass"]);
     const op = new IdempotentOperation();
-    expect(await code(withIdempotentOperation(op, () => xa.createCooperative(body)))).toBe("503 unavailable");
-    await withIdempotentOperation(op, () => xa.createCooperative(body));
+    expect(await code(withIdempotentOperation(op, () => xa.createRecord(body)))).toBe("503 unavailable");
+    await withIdempotentOperation(op, () => xa.createRecord(body));
     expect(net.keys[0]).toBe(net.keys[1]);
     expect(net.replayed).toEqual([false]);
     expect(op.size).toBe(0);
     // Thành công rồi: lần gửi sau (cùng dữ liệu) là thao tác mới → khóa mới → máy chủ báo trùng tên đúng nghiệp vụ.
-    expect(await code(withIdempotentOperation(op, () => xa.createCooperative(body)))).toBe("409 party.cooperative_name_taken");
+    expect(await code(withIdempotentOperation(op, () => xa.createRecord(body)))).toBe("409 extension.kn_record_name_taken");
     expect(net.keys[2]).not.toBe(net.keys[1]);
     expect(await count(xa)).toBe(1);
   });
@@ -214,8 +214,8 @@ describe("Tạo HTX (FN-XA-03.03) — bấm Lưu lại sau lỗi", () => {
   it("đổi dữ liệu sau lỗi → khóa mới (không 422 idempotency_key_reused)", async () => {
     const { xa, net } = await setup(["lost", "pass"]);
     const op = new IdempotentOperation();
-    await code(withIdempotentOperation(op, () => xa.createCooperative(body)));
-    const other = await withIdempotentOperation(op, () => xa.createCooperative({ ...body, name: "HTX Thử Lại Hai" }));
+    await code(withIdempotentOperation(op, () => xa.createRecord(body)));
+    const other = await withIdempotentOperation(op, () => xa.createRecord({ ...body, name: "HTX Thử Lại Hai" }));
     expect(other.name).toBe("HTX Thử Lại Hai");
     expect(net.keys[1]).not.toBe(net.keys[0]);
   });
@@ -223,7 +223,7 @@ describe("Tạo HTX (FN-XA-03.03) — bấm Lưu lại sau lỗi", () => {
   it("bấm hai lần liên tiếp (lần đầu chưa xong) → cùng khóa → một HTX; lần hai 409 đang xử lý hoặc phát lại", async () => {
     const { xa, net } = await setup(["pass", "pass"]);
     const op = new IdempotentOperation();
-    const [a, b] = await Promise.all([code(withIdempotentOperation(op, () => xa.createCooperative(body))), code(withIdempotentOperation(op, () => xa.createCooperative(body)))]);
+    const [a, b] = await Promise.all([code(withIdempotentOperation(op, () => xa.createRecord(body))), code(withIdempotentOperation(op, () => xa.createRecord(body)))]);
     expect(a).toBe("ok");
     expect(["ok", "409 idempotency_in_progress"]).toContain(b);
     expect(net.keys[0]).toBe(net.keys[1]);
@@ -232,7 +232,7 @@ describe("Tạo HTX (FN-XA-03.03) — bấm Lưu lại sau lỗi", () => {
 
   it("khóa tường minh của nơi gọi được giữ nguyên", async () => {
     const { xa, net } = await setup(["pass"]);
-    await xa.createCooperative(body, "explicit-key-0001");
+    await xa.createRecord(body, "explicit-key-0001");
     expect(net.keys[0]).toBe("explicit-key-0001");
   });
 
@@ -241,12 +241,12 @@ describe("Tạo HTX (FN-XA-03.03) — bấm Lưu lại sau lỗi", () => {
     const { result } = renderHook(() => useAction());
     let r: unknown;
     await act(async () => {
-      r = await result.current.run(() => xa.createCooperative(body));
+      r = await result.current.run(() => xa.createRecord(body));
     });
     expect(r).toBeNull();
     expect(result.current.problem?.code).toBe("network_error");
     await act(async () => {
-      r = await result.current.run(() => xa.createCooperative(body));
+      r = await result.current.run(() => xa.createRecord(body));
     });
     expect((r as { name: string }).name).toBe(body.name);
     expect(net.keys[0]).toBe(net.keys[1]);

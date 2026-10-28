@@ -13861,6 +13861,41 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/indicators:
+    get:
+      summary: "Danh mục chỉ tiêu nguồn ngoài (FN-TI-02.11)"
+      operationId: extensionKhtcExternalIndicators
+      tags: [extension]
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalIndicatorList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm chỉ tiêu nguồn ngoài ngay trên màn (tên, ĐVT, nhóm; mã tự sinh nếu bỏ trống)"
+      operationId: extensionKhtcExternalIndicatorCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/KHTCExternalIndicatorInput"}
+      responses:
+        "201":
+          description: Đã thêm
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalIndicator"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_ext_indicator_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: extension.khtc_ext_invalid, $ref: "#/components/responses/Problem"}
   /v1/exports/runs:
     get:
       summary: "Lịch sử lần xuất văn bản của đơn vị (không kèm tệp), mới nhất trước"
@@ -13905,6 +13940,47 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/figures:
+    get:
+      summary: "Số liệu nguồn ngoài hiệu lực theo năm, kỳ, cơ quan cung cấp, tìm chỉ tiêu"
+      operationId: extensionKhtcExternalFigures
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: period_id, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: agency, in: query, required: false, schema: {type: string}}
+        - {name: q, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalFigureList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm số liệu / Sửa (nguồn bắt buộc; đã có giá trị → xác nhận ghi đè hoặc base_version, lý do ≥ 10 ký tự)"
+      operationId: extensionKhtcExternalFigureSave
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/KHTCExternalFigureInput"}
+      responses:
+        "201":
+          description: Đã ghi phiên bản mới
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalFigure"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_ext_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_ext_duplicate | extension.khtc_ext_conflict | extension.khtc_ext_period_closed | extension.khtc_report_final", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.khtc_ext_invalid, $ref: "#/components/responses/Problem"}
   /v1/exports/runs/{id}/download:
     get:
       summary: "Tải lại tệp .docx đã lưu của một lần xuất (kiểm băm SHA-256)"
@@ -13942,6 +14018,25 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/figures/withdraw:
+    post:
+      summary: "Rút số liệu nhập nhầm (bản ghi bù, lý do bắt buộc)"
+      operationId: extensionKhtcExternalFigureWithdraw
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/KHTCExternalWithdraw"}
+      responses:
+        "204": {description: Đã rút}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/extension/dept-docs/folders:
     get:
       summary: "Thư mục kho văn bản phòng"
@@ -13988,6 +14083,22 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/history:
+    get:
+      summary: "Lịch sử nhập/sửa: giá trị cũ → mới, lý do, người, thời điểm"
+      operationId: extensionKhtcExternalHistory
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: period_id, in: query, required: false, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalHistoryList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/extension/dept-docs/folders/{ref}/rename:
     post:
       summary: "Đổi tên thư mục"
@@ -14015,6 +14126,20 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/template:
+    get:
+      summary: "Tải mẫu Excel: trang nhập, danh mục chỉ tiêu, kỳ còn mở"
+      operationId: extensionKhtcExternalTemplate
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
   /v1/extension/dept-docs/folders/{ref}/hide:
     post:
       summary: "Ẩn thư mục rỗng (Lãnh đạo phòng, có lý do)"
@@ -14042,6 +14167,30 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/imports:
+    post:
+      summary: "Nạp Excel tổng hợp — bước 1: kiểm từng dòng, chưa ghi số liệu"
+      operationId: extensionKhtcExternalImportStage
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: file_name, in: query, required: false, schema: {type: string, maxLength: 200}}
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+          text/csv: {schema: {type: string, format: binary}}
+      responses:
+        "201":
+          description: Kết quả kiểm
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalImport"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: extension.khtc_ext_import_invalid, $ref: "#/components/responses/Problem"}
   /v1/extension/dept-docs/folders/{ref}/restore:
     post:
       summary: "Hiện lại thư mục (Lãnh đạo phòng)"
@@ -14069,6 +14218,21 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/imports/{importID}:
+    get:
+      summary: "Đọc kết quả một lần nạp"
+      operationId: extensionKhtcExternalImportGet
+      tags: [extension]
+      parameters:
+        - {name: importID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalImport"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
   /v1/extension/dept-docs:
     get:
       summary: "Văn bản của phòng (FN-20: lọc, tìm; hết hiệu lực vẫn có, nhãn validity)"
@@ -14125,6 +14289,30 @@ paths:
         "413": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/imports/{importID}/commit:
+    post:
+      summary: "Nạp Excel tổng hợp — bước 2 Hoàn tất: kiểm lại, ghi dòng hợp lệ; dòng trùng chỉ ghi khi xác nhận ghi đè"
+      operationId: extensionKhtcExternalImportCommit
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: importID, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/KHTCExternalCommit"}
+      responses:
+        "201":
+          description: Đã hoàn tất
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalImport"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_ext_import_committed | extension.khtc_ext_period_closed", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/extension/dept-docs/{ref}:
     get:
       summary: "Chi tiết văn bản và mọi phiên bản"
@@ -14145,6 +14333,33 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/evidence:
+    post:
+      summary: "Tải tệp minh chứng (PDF, ảnh, Word, Excel, email; tối đa 15 MB) vào kho đối tượng"
+      operationId: extensionKhtcExternalEvidenceUpload
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: file_name, in: query, required: true, schema: {type: string, maxLength: 200}}
+      requestBody:
+        required: true
+        content:
+          application/octet-stream: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Gọi lặp cùng khóa — bản đã có
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalEvidence"}
+        "201":
+          description: Đã lưu
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalEvidence"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: extension.khtc_ext_evidence_invalid, $ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/dept-docs/{ref}/update:
     post:
@@ -14172,6 +14387,21 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/external/evidence/{evidenceID}:
+    get:
+      summary: "Tải tệp minh chứng (Nguồn dữ liệu)"
+      operationId: extensionKhtcExternalEvidenceDownload
+      tags: [extension]
+      parameters:
+        - {name: evidenceID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung tệp
+          content:
+            application/octet-stream: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/dept-docs/{ref}/file:
     post:
@@ -14417,6 +14647,196 @@ paths:
         "404": {description: extension.kn_attrs_plot_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: extension.kn_attrs_plot_retired, $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | extension.kn_attrs_crop_unknown", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-records:
+    get:
+      summary: "KNSPLIT-2-KN-RECORDS (#67) / TT-09: danh sách hồ sơ KN riêng theo loại — HTX, Nông hộ, Tổ hợp tác (mọi vai KN trong phạm vi)"
+      description: |
+        Hồ sơ thuộc KN (pf_extension.kn_producer), KHÔNG phải HTX nền tảng; thay đường legacy /v1/kn/cooperatives cho màn KN.
+        Phạm vi xã của ngữ cảnh phiên lọc trong SQL trước khi trả dữ liệu; xã ngoài phạm vi → 403 extension.out_of_scope.
+        Mỗi loại có bộ lọc riêng: HTX (xã, trạng thái, tên, htx_ref), Tổ hợp tác (xã, trạng thái, tên), Nông hộ (xã, trạng thái,
+        parent_ref = HTX/THT). Nông hộ không tìm theo tên (họ tên chủ hộ ở kho định danh).
+      operationId: knListProducerRecords
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: kind, in: query, required: true, schema: {$ref: "#/components/schemas/KNProducerKind"}}
+        - {name: commune, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive, all], default: active}}
+        - {name: q, in: query, schema: {type: string, maxLength: 100}, description: "HTX, THT: tìm theo tên (không phân biệt hoa thường)"}
+        - {name: parent_ref, in: query, schema: {type: string, format: uuid}, description: "Nông hộ: thuộc HTX/THT (hồ sơ KN)"}
+        - {name: htx_ref, in: query, schema: {type: string, format: uuid}, description: "HTX: liên kết HTX đã công bố"}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Một trang, theo ref tăng dần (thứ tự tạo)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/KNProducerRecord"}}
+                  next_cursor: {type: [string, "null"], format: uuid}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "TT-08: thêm hồ sơ HTX / Nông hộ / Tổ hợp tác (Cấp Xã, Admin) — bắt buộc Xã/phường, Loại, Tên, Người đại diện, Điện thoại"
+      description: |
+        HTX, THT: name, representative {full_name, phone} bắt buộc. Nông hộ: holder {full_name, phone} bắt buộc (tên hộ = chủ hộ,
+        lưu kho định danh), không nhận name/tax_code/address; parent_ref tùy chọn (HTX/THT đang hoạt động trong phạm vi).
+        area_ha: số thập phân thường ≥ 0, ≤ 1.000.000, tối đa 4 chữ số lẻ (không số mũ). Trùng tên cùng loại, cùng xã (đang hoạt
+        động) → 409; trùng chủ hộ → 409. htx_ref (chỉ HTX): HTX đã công bố, đang hoạt động, cùng xã — chỉ đối chiếu, KN không ghi
+        gì về HTX đó. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
+      operationId: knCreateProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNProducerRecordWrite"}
+      responses:
+        "201":
+          description: Hồ sơ đã tạo
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "200":
+          description: Phát lại cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "403": {description: "extension.read_only | forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.kn_record_name_taken | extension.kn_record_household_exists", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-records/{ref}:
+    get:
+      summary: "Chi tiết hồ sơ KN riêng kèm nhật ký phiên bản (mới nhất trước)"
+      operationId: knGetProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Hồ sơ hiện hành
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "TT-08 (có sửa): sửa hồ sơ — thay toàn bộ trường nhập được, khóa lạc quan base_version; không đổi loại"
+      description: |
+        Trường tùy chọn vắng = xóa giá trị. representative/holder vắng = giữ người đại diện/chủ hộ hiện tại; có = ghi chủ thể
+        mới ở kho định danh. Hồ sơ ngừng hoạt động phải kích hoạt lại trước (409). Không đổi gì → không ghi sổ.
+      operationId: knUpdateProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: "#/components/schemas/KNProducerRecordWrite"}
+                - type: object
+                  required: [base_version]
+                  properties:
+                    base_version: {type: integer}
+      responses:
+        "200":
+          description: Hồ sơ sau khi sửa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "403": {description: "extension.read_only | forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.kn_record_version_conflict | extension.kn_record_state_conflict | extension.kn_record_name_taken | extension.kn_record_household_exists", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-records/{ref}/deactivate:
+    post:
+      summary: "Vô hiệu hóa hồ sơ (thay xóa) — lý do 10–1000 ký tự, không chứa SĐT/CCCD"
+      operationId: knDeactivateProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNProducerStatusChange"}
+      responses:
+        "200":
+          description: Hồ sơ sau khi vô hiệu hóa
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.kn_record_version_conflict | extension.kn_record_state_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-records/{ref}/reactivate:
+    post:
+      summary: "Kích hoạt lại hồ sơ — lý do bắt buộc; trùng tên/chủ hộ với hồ sơ đang hoạt động → 409"
+      operationId: knReactivateProducerRecord
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KNProducerStatusChange"}
+      responses:
+        "200":
+          description: Hồ sơ sau khi kích hoạt lại
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KNProducerRecordDetail"}
+        "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.kn_record_version_conflict | extension.kn_record_state_conflict | extension.kn_record_name_taken | extension.kn_record_household_exists", $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+  /v1/kn/producer-htx-candidates:
+    get:
+      summary: "HTX đã công bố (pf_party_pub.v1_org_tree), đang hoạt động, trong phạm vi — chỉ đọc, để liên kết đối chiếu htx_ref"
+      operationId: knListProducerHTXCandidates
+      tags: [extension]
+      parameters:
+        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
+        - {name: commune, in: query, schema: {type: string}, description: "Bắt buộc với phạm vi toàn quốc"}
+      responses:
+        "200":
+          description: Tối đa 200 HTX
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [htx_ref, name, commune_code, linked_ref]
+                      properties:
+                        htx_ref: {type: string, format: uuid}
+                        name: {type: string}
+                        commune_code: {type: string}
+                        linked_ref: {type: [string, "null"], format: uuid, description: "Hồ sơ KN đang liên kết (nếu có)"}
+        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/campaigns:
     get:
@@ -15602,6 +16022,231 @@ paths:
               schema: {type: string, format: binary}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {description: "extension.cnts_outbreak_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-specs:
+    get:
+      summary: "W11.53 FN-19: đặc tả 5 mẫu biểu dự án KNQG (Mẫu 01/TĐ-DA, 03, 04/DA-NTTH, 05/DA-NTMH, 07/NTKQ-DA) — mục, ô, bảng của mẫu Word gốc; màn soạn biểu dựng theo đặc tả"
+      operationId: extensionCntsKnqgSpecs
+      tags: [extension]
+      responses:
+        "200":
+          description: Đặc tả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGSpec"}}
+        "403": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs:
+    get:
+      summary: "W11.53: biên bản/báo cáo dự án KNQG trong phạm vi (Cấp Tỉnh trong tỉnh; TW chỉ dự án KNQG, không thấy Mẫu 07 chưa gửi; Cấp Xã chỉ Mẫu 05 điểm xã mình)"
+      operationId: extensionCntsKnqgList
+      tags: [extension]
+      parameters:
+        - {name: project_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: form, in: query, required: false, schema: {type: string, enum: ["01", "03", "04", "05", "07"]}}
+        - {name: status, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách (bản hiện hành, không nội dung)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGDoc"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.53 FN-19 B2: lập biểu từ chi tiết dự án KNQG, số liệu điền sẵn (Mẫu 05: thực tế từ nhật ký đã xác thực). Mẫu 01 mỗi dự án × tháng, Mẫu 07 mỗi dự án × năm, Mẫu 05 mỗi điểm một bản hiệu lực"
+      operationId: extensionCntsKnqgCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSKNQGCreate"}
+      responses:
+        "200":
+          description: Phát lại cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "201":
+          description: Đã lập
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {description: "forbidden (FN-19 BR-01 — chỉ chủ nhiệm dự án, lãnh đạo phòng, Admin) | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_knqg_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_exists | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_knqg_invalid | extension.cnts_knqg_project_kind", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}:
+    get:
+      summary: "W11.53: chi tiết biểu — nội dung, thao tác được phép, cảnh báo (quy tắc 11), nội dung còn thiếu, điều kiện gửi Mẫu 07 (quy tắc 10), lịch sử phiên bản"
+      operationId: extensionCntsKnqgGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_knqg_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.53: sửa nội dung (Đang lập / Trả lại) — khóa lạc quan base_version; ô, cột tự điền do máy chủ đặt lại; số điện thoại trong văn bản bị chặn"
+      operationId: extensionCntsKnqgUpdate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSKNQGUpdate"}
+      responses:
+        "200":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_version_conflict | extension.cnts_knqg_locked | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_knqg_invalid, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}/actions/{action}:
+    post:
+      summary: "W11.53 Mục III.5: chuyển trạng thái — submit/approve/return (Mẫu 01; trả lại bắt buộc ý kiến), request_sign/unrequest (03, 04, 05), send (07 — mọi điểm có Mẫu 05 đã ký), confirm/return (Cấp TW, Mẫu 07), adjust (bản điều chỉnh, lý do bắt buộc)"
+      operationId: extensionCntsKnqgAction
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: action, in: path, required: true, schema: {type: string, enum: [submit, approve, return, request_sign, unrequest, send, confirm, adjust]}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSKNQGAction"}
+      responses:
+        "200":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_state | extension.cnts_knqg_version_conflict | extension.cnts_knqg_needs_signed_05", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation (reason) | extension.cnts_knqg_incomplete", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}/signed:
+    get:
+      summary: "W11.53: tải bản scan đã ký (version = phiên bản cụ thể; bỏ trống = bản ký mới nhất)"
+      operationId: extensionCntsKnqgScan
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: version, in: query, required: false, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Tệp scan
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+            image/jpeg:
+              schema: {type: string, format: binary}
+            image/png:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_knqg_not_found | extension.cnts_knqg_scan_not_found", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.53 FN-19 B4: ký — tải bản scan đã ký (PDF/JPG/PNG ≤ 10 MB, kiểm chữ ký tệp) cho Mẫu 03, 04, 05 đang Chờ ký → Đã ký"
+      operationId: extensionCntsKnqgSign
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [meta, file]
+              properties:
+                meta: {type: string, description: "JSON {\"base_version\": n}"}
+                file: {type: string, format: binary}
+      responses:
+        "200":
+          description: Đã ký
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_state | extension.cnts_knqg_version_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_knqg_scan_invalid | extension.cnts_knqg_incomplete", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}/word:
+    post:
+      summary: "W11.53 FN-19 AC-01: xuất Word đúng mẫu TTKN Quốc gia qua pf/export (Mẫu 03 tự cấp số {n}/BC-TTKN và dòng địa danh, ngày)"
+      operationId: extensionCntsKnqgWord
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Lần xuất đã ghi sổ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGWordRun"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_knqg_not_found | export.template_not_found", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}/words:
+    get:
+      summary: Lịch sử các lần xuất Word của biểu (mới nhất trước)
+      operationId: extensionCntsKnqgWords
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGWordRun"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}/words/{run}/download:
+    get:
+      summary: Tải lại tệp Word đã xuất (pf/export kiểm băm SHA-256)
+      operationId: extensionCntsKnqgWordDownload
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: run, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .docx
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_knqg_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/bm11/reports:
     get:
       summary: "Báo cáo phòng CNTS BM-11 (W11.45, UR-TINH-16, FN-16): danh sách báo cáo tuần/tháng/quý/năm của phòng (Admin, Cấp Tỉnh/Cấp Quốc gia CNTS; Admin/TW truyền province)"
@@ -25284,7 +25929,7 @@ components:
     KHTCReportSourceValue: {"type":"object","properties":{"Cumulative":{"type":["string","null"]},"Base":{"type":["string","null"]},"Increment":{"type":["string","null"]},"YearToDate":{"type":["string","null"]},"Sum":{"type":["string","null"]},"Min":{"type":["string","null"]},"Max":{"type":["string","null"]},"Unconfirmed":{"type":["string","null"]},"Closed":{"type":"boolean"},"NoSource":{"type":"boolean"},"Frozen":{"type":"boolean"},"SourceChanged":{"type":"boolean"},"Fallback":{"type":"boolean"},"Unavailable":{"type":"boolean"},"SourceKey":{"type":"string"},"Mode":{"type":"string"},"BaseRef":{"type":"string"},"PriceDay":{"type":"string"},"PriceDays":{"type":["array","null"],"items":{"type":"object","properties":{"Day":{"type":"string"},"Min":{"type":"string"},"Max":{"type":"string"}},"required":["Day","Min","Max"],"additionalProperties":false}},"SourceKeys":{"type":["array","null"],"items":{"type":"string"}},"Weeks":{"type":["array","null"],"items":{"type":"object","additionalProperties":true}}},"required":["Cumulative","Base","Increment","YearToDate","Sum","Min","Max","Unconfirmed","Closed","NoSource","Frozen","SourceChanged","Fallback","Unavailable","SourceKey","Mode","BaseRef","PriceDay","PriceDays","SourceKeys","Weeks"],"additionalProperties":false}
     KHTCReportSubmission: {"type":"object","properties":{"period_id":{"type":"string","format":"uuid"},"department":{"type":"string"},"type":{"type":"string"},"year":{"type":"integer"},"from":{"type":"string","format":"date-time"},"to":{"type":"string","format":"date-time"},"submission_id":{"type":"string","format":"uuid"},"attempt":{"type":"integer"},"sheet_id":{"type":"string","format":"uuid"},"hash":{"type":"string"},"decision":{"type":"string"}},"required":["period_id","department","type","year","from","to","submission_id","attempt","sheet_id","hash","decision"],"additionalProperties":false}
     KHTCReportRow: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"parent_ref":{"type":["string","null"],"format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"kind":{"type":"string"},"tab":{"type":"string"},"roman":{"type":"string"},"name":{"type":"string"},"unit":{"type":"string"},"department":{"type":"string"},"planned":{"type":["string","null"]},"scale":{"type":"string"},"in_period":{"type":"string"},"adjustment":{"type":"string"},"year_to_date":{"type":"string"},"percent":{"type":["string","null"]},"level":{"type":"string"},"status":{"type":"string"},"content":{"type":"string"},"people":{"type":"string"},"budget":{"type":"string"},"missing":{"type":"boolean"},"source_key":{"type":"string"},"communes":{"type":"array","items":{"type":"string"}}},"required":["ref","parent_ref","program_ref","kind","tab","roman","name","unit","department","planned","scale","in_period","adjustment","year_to_date","percent","level","status","content","people","budget","missing","source_key","communes"],"additionalProperties":false}
-    KHTCReportData: {"type":"object","properties":{"period":{"$ref":"#/components/schemas/KHTCReportPeriod"},"template":{"type":"string","enum":["mau_1","mau_2","mau_3","mau_4","mau_5"]},"plan":{"$ref":"#/components/schemas/KHTCReportPlan"},"sources":{"anyOf":[{"$ref":"#/components/schemas/KHTCReportSourceRef"},{"type":"null"}]},"metrics":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportSourceMetric"}},"submissions":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportSubmission"}},"rows":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportRow"}},"form_texts":{"type":"object","additionalProperties":{"type":"object","additionalProperties":{"type":"string"}}},"provisional":{"type":"array","items":{"type":"string"}},"input_hash":{"type":"string"},"captured_at":{"type":"string","format":"date-time"}},"required":["period","template","plan","sources","metrics","submissions","rows","form_texts","provisional","input_hash","captured_at"],"additionalProperties":false}
+    KHTCReportData: {"type":"object","properties":{"period":{"$ref":"#/components/schemas/KHTCReportPeriod"},"template":{"type":"string","enum":["mau_1","mau_2","mau_3","mau_4","mau_5"]},"plan":{"$ref":"#/components/schemas/KHTCReportPlan"},"sources":{"anyOf":[{"$ref":"#/components/schemas/KHTCReportSourceRef"},{"type":"null"}]},"metrics":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportSourceMetric"}},"submissions":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportSubmission"}},"rows":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportRow"}},"form_texts":{"type":"object","additionalProperties":{"type":"object","additionalProperties":{"type":"string"}}},"provisional":{"type":"array","items":{"type":"string"}},"external":{"type":"array","description":"Ô Nhập ngoài (W11.67); không có thì bỏ trường","items":{"$ref":"#/components/schemas/KHTCReportExternalFigure"}},"input_hash":{"type":"string"},"captured_at":{"type":"string","format":"date-time"}},"required":["period","template","plan","sources","metrics","submissions","rows","form_texts","provisional","input_hash","captured_at"],"additionalProperties":false}
     KHTCReportAdminField: {"type":"object","properties":{"system":{"type":"string"},"override":{"type":["string","null"]},"actor":{"type":["string","null"],"format":"uuid"},"at":{"type":["string","null"],"format":"date-time"},"system_changed":{"type":"boolean"}},"required":["system","override","actor","at","system_changed"],"additionalProperties":false}
     KHTCReportContent: {"type":"object","properties":{"data":{"$ref":"#/components/schemas/KHTCReportData"},"admin":{"type":"object","additionalProperties":{"$ref":"#/components/schemas/KHTCReportAdminField"}},"texts":{"type":"object","additionalProperties":{"type":"string"}}},"required":["data","admin","texts"],"additionalProperties":false}
     KHTCReportSection: {"type":"object","properties":{"key":{"type":"string"},"title":{"type":"string"},"editable":{"type":"boolean"}},"required":["key","title","editable"],"additionalProperties":false}
@@ -25300,24 +25945,39 @@ components:
     KHTCReportWordList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportWord"}}},"required":["items"],"additionalProperties":false}
     ExportTemplateVersion: {"type":"object","properties":{"version":{"type":"integer"},"hash":{"type":"string"},"registered":{"type":"boolean"},"recorded_at":{"type":["string","null"],"format":"date-time"},"drift":{"type":"boolean"}},"required":["version","hash","registered","recorded_at","drift"],"additionalProperties":false}
     DeptActor: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "display": {"type": ["string", "null"]}}, "required": ["ref", "display"], "additionalProperties": false}
+    KHTCExternalIndicator: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"unit":{"type":"string"},"group":{"type":"string"},"created_at":{"type":"string","format":"date-time"}},"required":["id","code","name","unit","group","created_at"],"additionalProperties":false}
     ExportTemplate: {"type":"object","properties":{"key":{"type":"string"},"title":{"type":"string"},"owner":{"type":"string"},"latest":{"type":"integer"},"vars":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"label":{"type":"string"},"required":{"type":"boolean"}},"required":["key","label"],"additionalProperties":false}},"lists":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"label":{"type":"string"},"fields":{"type":"array","items":{"type":"string"}}},"required":["key","label","fields"],"additionalProperties":false}},"sections":{"type":"array","items":{"type":"string"}},"versions":{"type":"array","items":{"$ref":"#/components/schemas/ExportTemplateVersion"}}},"required":["key","title","owner","latest","vars","lists","sections","versions"],"additionalProperties":false}
     DeptProfile: {"type": "object", "properties": {"department_code": {"type": "string"}, "intro": {"type": "string"}, "duties": {"type": "string"}, "version": {"type": "integer"}, "recorded_at": {"type": "string", "format": "date-time"}, "actor": {"$ref": "#/components/schemas/DeptActor"}}, "required": ["department_code", "intro", "duties", "version", "recorded_at", "actor"], "additionalProperties": false}
+    KHTCExternalIndicatorList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalIndicator"}}},"required":["items"],"additionalProperties":false}
     ExportTemplateList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/ExportTemplate"}}},"required":["items"],"additionalProperties":false}
     DeptProfileInput: {"type": "object", "properties": {"intro": {"type": "string"}, "duties": {"type": "string"}, "base_version": {"type": "integer", "description": "0 khi chưa có bản nào"}}, "required": ["base_version"], "additionalProperties": false}
+    KHTCExternalIndicatorInput: {"type":"object","properties":{"code":{"type":"string","maxLength":40},"name":{"type":"string","minLength":1,"maxLength":300},"unit":{"type":"string","maxLength":50},"group":{"type":"string","maxLength":200}},"required":["name"],"additionalProperties":false}
     ExportRun: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"seq":{"type":"integer"},"subject":{"type":"string"},"template":{"type":"string"},"template_version":{"type":"integer"},"template_hash":{"type":"string"},"input_hash":{"type":"string"},"doc_number":{"type":"string"},"doc_number_auto":{"type":"boolean"},"file_name":{"type":"string"},"body_hash":{"type":"string"},"size":{"type":"integer"},"actor_ref":{"type":"string","format":"uuid"},"at":{"type":"string","format":"date-time"}},"required":["id","seq","subject","template","template_version","template_hash","input_hash","doc_number","doc_number_auto","file_name","body_hash","size","actor_ref","at"],"additionalProperties":false}
     DeptProfileList: {"type": "object", "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/DeptProfile"}}}, "required": ["items"], "additionalProperties": false}
+    KHTCExternalEvidenceRef: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"file_name":{"type":"string"},"content_type":{"type":"string"},"size":{"type":"integer"}},"required":["id","file_name","content_type","size"],"additionalProperties":false}
     ExportRunList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/ExportRun"}}},"required":["items"],"additionalProperties":false}
     DeptKPI: {"type": "object", "properties": {"key": {"type": "string"}, "label": {"type": "string"}, "value": {"type": "integer"}, "tone": {"type": "string", "enum": ["neutral", "ok", "warn", "bad", "info"]}}, "required": ["key", "label", "value", "tone"], "additionalProperties": false}
+    KHTCExternalFigure: {"type":"object","properties":{"entry_id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"period_id":{"type":"string","format":"uuid"},"period_name":{"type":"string"},"period_type":{"type":"string"},"year":{"type":"integer"},"closed":{"type":"boolean"},"indicator_id":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"group":{"type":"string"},"value":{"type":"string","description":"Số thập phân dạng chuỗi"},"unit":{"type":"string"},"agency":{"type":"string"},"document":{"type":"string"},"source_date":{"type":"string","format":"date"},"evidence":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalEvidenceRef"}},"used_in":{"type":"string"},"actor_ref":{"type":"string","format":"uuid"},"actor_name":{"type":"string"},"at":{"type":"string","format":"date-time"},"editable":{"type":"boolean"}},"required":["entry_id","version","period_id","period_name","period_type","year","closed","indicator_id","code","name","group","value","unit","agency","document","source_date","evidence","used_in","actor_ref","actor_name","at","editable"],"additionalProperties":false}
     DeptClosedPeriod: {"type": "object", "properties": {"form_code": {"type": "string"}, "period_type": {"type": "string"}, "period_key": {"type": "string"}, "period_label": {"type": "string"}, "period_to": {"type": ["string", "null"], "format": "date"}, "units_total": {"type": ["integer", "null"]}, "units_with_data": {"type": ["integer", "null"]}, "closed": {"type": "boolean"}, "closed_at": {"type": ["string", "null"], "format": "date-time"}}, "required": ["form_code", "period_type", "period_key", "period_label", "period_to", "units_total", "units_with_data", "closed", "closed_at"], "additionalProperties": false}
+    KHTCExternalFigureList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalFigure"}}},"required":["items"],"additionalProperties":false}
     DeptOfficer: {"type": "object", "properties": {"actor": {"$ref": "#/components/schemas/DeptActor"}, "mgmt_level": {"type": ["string", "null"]}, "leader": {"type": "boolean"}}, "required": ["actor", "mgmt_level", "leader"], "additionalProperties": false}
+    KHTCExternalFigureInput: {"type":"object","properties":{"period_id":{"type":"string","format":"uuid"},"indicator_id":{"type":"string","format":"uuid"},"value":{"type":"string","description":"Số thập phân, dấu chấm thập phân; tối đa 4 chữ số lẻ"},"unit":{"type":"string","maxLength":50},"agency":{"type":"string","maxLength":300},"document":{"type":"string","maxLength":300},"source_date":{"type":"string","description":"YYYY-MM-DD hoặc DD/MM/YYYY"},"evidence_ids":{"type":"array","maxItems":10,"items":{"type":"string","format":"uuid"}},"reason":{"type":"string","maxLength":1000},"overwrite":{"type":"boolean"},"base_version":{"type":["integer","null"],"minimum":0}},"required":["period_id","indicator_id","value"],"additionalProperties":false}
     DeptPrice: {"type": "object", "properties": {"board_date": {"type": ["string", "null"], "format": "date"}, "items": {"type": "integer"}, "week_key": {"type": ["string", "null"]}, "tickets": {"type": "integer"}, "week_days_approved": {"type": "integer"}}, "required": ["board_date", "items", "week_key", "tickets", "week_days_approved"], "additionalProperties": false}
+    KHTCExternalWithdraw: {"type":"object","properties":{"period_id":{"type":"string","format":"uuid"},"indicator_id":{"type":"string","format":"uuid"},"base_version":{"type":"integer","minimum":1},"reason":{"type":"string","minLength":10,"maxLength":1000}},"required":["period_id","indicator_id","base_version","reason"],"additionalProperties":false}
     DeptLibraryStats: {"type": "object", "properties": {"total": {"type": "integer"}, "expired": {"type": "integer"}, "new_30d": {"type": "integer"}}, "required": ["total", "expired", "new_30d"], "additionalProperties": false}
+    KHTCExternalHistoryItem: {"type":"object","properties":{"entry_id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"action":{"type":"string","enum":["set","withdraw"]},"period_id":{"type":"string","format":"uuid"},"period_name":{"type":"string"},"indicator_id":{"type":"string","format":"uuid"},"indicator_name":{"type":"string"},"old_value":{"type":["string","null"]},"new_value":{"type":["string","null"]},"unit":{"type":"string"},"reason":{"type":"string"},"import_id":{"type":["string","null"],"format":"uuid"},"actor_ref":{"type":"string","format":"uuid"},"actor_name":{"type":"string"},"at":{"type":"string","format":"date-time"}},"required":["entry_id","version","action","period_id","period_name","indicator_id","indicator_name","old_value","new_value","unit","reason","import_id","actor_ref","actor_name","at"],"additionalProperties":false}
     DeptHome: {"type": "object", "properties": {"department_code": {"type": "string"}, "as_of": {"type": "string", "format": "date-time"}, "manager": {"type": "boolean"}, "read_only": {"type": "boolean"}, "can_edit_profile": {"type": "boolean"}, "profile": {"anyOf": [{"$ref": "#/components/schemas/DeptProfile"}, {"type": "null"}]}, "kpis": {"type": "array", "items": {"$ref": "#/components/schemas/DeptKPI"}}, "closed_periods": {"type": "array", "items": {"$ref": "#/components/schemas/DeptClosedPeriod"}}, "price": {"anyOf": [{"$ref": "#/components/schemas/DeptPrice"}, {"type": "null"}]}, "officers": {"type": "array", "items": {"$ref": "#/components/schemas/DeptOfficer"}}, "library": {"$ref": "#/components/schemas/DeptLibraryStats"}, "latest_docs": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDoc"}}}, "required": ["department_code", "as_of", "manager", "read_only", "can_edit_profile", "profile", "kpis", "closed_periods", "price", "officers", "library", "latest_docs"], "additionalProperties": false}
+    KHTCExternalHistoryList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalHistoryItem"}}},"required":["items"],"additionalProperties":false}
     DeptDocFolder: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "department_code": {"type": "string"}, "parent_ref": {"type": ["string", "null"], "format": "uuid"}, "name": {"type": "string"}, "path": {"type": "array", "items": {"type": "string"}}, "hidden": {"type": "boolean"}, "status_reason": {"type": ["string", "null"]}, "docs": {"type": "integer"}, "version": {"type": "integer"}, "event": {"type": "string", "enum": ["created", "renamed", "hidden", "restored"]}, "recorded_at": {"type": "string", "format": "date-time"}}, "required": ["ref", "department_code", "parent_ref", "name", "path", "hidden", "status_reason", "docs", "version", "event", "recorded_at"], "additionalProperties": false}
+    KHTCExternalImportRow: {"type":"object","properties":{"line":{"type":"integer"},"indicator":{"type":"string"},"period":{"type":"string"},"value":{"type":"string"},"unit":{"type":"string"},"agency":{"type":"string"},"document":{"type":"string"},"source_date":{"type":"string"},"status":{"type":"string","enum":["ok","overwrite","error"]},"errors":{"type":"array","items":{"type":"string"}},"indicator_id":{"type":["string","null"],"format":"uuid"},"indicator_name":{"type":"string"},"period_id":{"type":["string","null"],"format":"uuid"},"period_name":{"type":"string"},"normalized_value":{"type":"string"},"current_value":{"type":["string","null"]}},"required":["line","indicator","period","value","unit","agency","document","source_date","status","errors","indicator_id","indicator_name","period_id","period_name","normalized_value","current_value"],"additionalProperties":false}
     DeptDocFolderList: {"type": "object", "properties": {"department_code": {"type": "string"}, "can_write": {"type": "boolean"}, "can_manage": {"type": "boolean"}, "items": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDocFolder"}}}, "required": ["department_code", "can_write", "can_manage", "items"], "additionalProperties": false}
+    KHTCExternalImport: {"type":"object","properties":{"import_id":{"type":"string","format":"uuid"},"year":{"type":"integer"},"file_name":{"type":"string"},"status":{"type":"string","enum":["staged","committed"]},"result":{"type":"object","properties":{"rows":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalImportRow"}},"valid":{"type":"integer"},"overwrites":{"type":"integer"},"errors":{"type":"integer"}},"required":["rows","valid","overwrites","errors"],"additionalProperties":false},"recorded":{"type":"integer"},"skipped":{"type":"integer"},"overwrite":{"type":"boolean"}},"required":["import_id","year","file_name","status","result","recorded","skipped","overwrite"],"additionalProperties":false}
     DeptDocFolderInput: {"type": "object", "properties": {"parent_ref": {"type": ["string", "null"], "format": "uuid"}, "name": {"type": "string"}}, "required": ["name"], "additionalProperties": false}
+    KHTCExternalCommit: {"type":"object","properties":{"overwrite":{"type":"boolean"},"reason":{"type":"string","maxLength":1000}},"required":[],"additionalProperties":false}
     DeptDocFolderChange: {"type": "object", "properties": {"name": {"type": "string"}, "reason": {"type": "string"}, "base_version": {"type": "integer"}}, "required": ["base_version"], "additionalProperties": false}
+    KHTCExternalEvidence: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"file_name":{"type":"string"},"content_type":{"type":"string"},"size":{"type":"integer"},"sha256":{"type":"string"},"created_at":{"type":"string","format":"date-time"}},"required":["id","file_name","content_type","size","sha256","created_at"],"additionalProperties":false}
     DeptDocFile: {"type": "object", "properties": {"version": {"type": "integer"}, "name": {"type": "string"}, "content_type": {"type": "string"}, "size_bytes": {"type": "integer"}, "sha256": {"type": "string"}}, "required": ["version", "name", "content_type", "size_bytes", "sha256"], "additionalProperties": false}
+    KHTCReportExternalFigure: {"type":"object","properties":{"entry_id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"indicator_id":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"group":{"type":"string"},"value":{"type":"string"},"unit":{"type":"string"},"agency":{"type":"string"},"document":{"type":"string"},"source_date":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string","format":"uuid"},"file_name":{"type":"string"}},"required":["id","file_name"],"additionalProperties":false}},"at":{"type":"string","format":"date-time"}},"required":["entry_id","version","indicator_id","code","name","group","value","unit","agency","document","source_date","evidence","at"],"additionalProperties":false}
     DeptDocVersion: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "version": {"type": "integer"}, "event": {"type": "string", "enum": ["created", "updated", "file_replaced", "hidden", "restored"]}, "department_code": {"type": "string"}, "folder_ref": {"type": ["string", "null"], "format": "uuid"}, "title": {"type": "string"}, "kind": {"type": "string", "enum": ["quy_trinh_ky_thuat", "van_ban_phap_quy", "van_ban_chi_dao", "ke_hoach", "mau_bieu", "tai_lieu_tap_huan", "khac"]}, "field": {"type": ["string", "null"]}, "number": {"type": ["string", "null"]}, "issuer": {"type": ["string", "null"]}, "summary": {"type": ["string", "null"]}, "issued_on": {"type": ["string", "null"], "format": "date"}, "effective_from": {"type": ["string", "null"], "format": "date"}, "effective_to": {"type": ["string", "null"], "format": "date"}, "audience": {"type": "array", "items": {"type": "string", "enum": ["xa", "nong_ho"]}}, "file": {"$ref": "#/components/schemas/DeptDocFile"}, "hidden": {"type": "boolean"}, "status_reason": {"type": ["string", "null"]}, "recorded_at": {"type": "string", "format": "date-time"}, "actor": {"$ref": "#/components/schemas/DeptActor"}}, "required": ["ref", "version", "event", "department_code", "folder_ref", "title", "kind", "field", "number", "issuer", "summary", "issued_on", "effective_from", "effective_to", "audience", "file", "hidden", "status_reason", "recorded_at", "actor"], "additionalProperties": false}
     DeptDoc: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "version": {"type": "integer"}, "event": {"type": "string", "enum": ["created", "updated", "file_replaced", "hidden", "restored"]}, "department_code": {"type": "string"}, "folder_ref": {"type": ["string", "null"], "format": "uuid"}, "title": {"type": "string"}, "kind": {"type": "string", "enum": ["quy_trinh_ky_thuat", "van_ban_phap_quy", "van_ban_chi_dao", "ke_hoach", "mau_bieu", "tai_lieu_tap_huan", "khac"]}, "field": {"type": ["string", "null"]}, "number": {"type": ["string", "null"]}, "issuer": {"type": ["string", "null"]}, "summary": {"type": ["string", "null"]}, "issued_on": {"type": ["string", "null"], "format": "date"}, "effective_from": {"type": ["string", "null"], "format": "date"}, "effective_to": {"type": ["string", "null"], "format": "date"}, "audience": {"type": "array", "items": {"type": "string", "enum": ["xa", "nong_ho"]}}, "file": {"$ref": "#/components/schemas/DeptDocFile"}, "hidden": {"type": "boolean"}, "status_reason": {"type": ["string", "null"]}, "recorded_at": {"type": "string", "format": "date-time"}, "actor": {"$ref": "#/components/schemas/DeptActor"}, "validity": {"type": "string", "enum": ["active", "pending", "expired"]}, "folder_path": {"type": "array", "items": {"type": "string"}}, "can_edit": {"type": "boolean"}, "can_manage": {"type": "boolean"}, "versions": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDocVersion"}}}, "required": ["ref", "version", "event", "department_code", "folder_ref", "title", "kind", "field", "number", "issuer", "summary", "issued_on", "effective_from", "effective_to", "audience", "file", "hidden", "status_reason", "recorded_at", "actor", "validity", "folder_path", "can_edit", "can_manage"], "additionalProperties": false}
     DeptDocList: {"type": "object", "properties": {"department_code": {"type": "string"}, "can_write": {"type": "boolean"}, "can_manage": {"type": "boolean"}, "total": {"type": "integer"}, "kinds": {"type": "array", "items": {"type": "string"}}, "extensions": {"type": "array", "items": {"type": "string"}}, "max_bytes": {"type": "integer"}, "items": {"type": "array", "items": {"$ref": "#/components/schemas/DeptDoc"}}}, "required": ["department_code", "can_write", "can_manage", "total", "kinds", "extensions", "max_bytes", "items"], "additionalProperties": false}
@@ -25364,6 +26024,91 @@ components:
         crop_name: {type: [string, "null"]}
         updated_at: {type: [string, "null"], format: date-time}
         actor_ref: {type: [string, "null"], format: uuid}
+    KNProducerKind:
+      type: string
+      enum: [cooperative, household, coop_group]
+      description: "cooperative = HTX, household = Nông hộ, coop_group = Tổ hợp tác"
+    KNProducerPerson:
+      type: object
+      required: [label, masked_phone]
+      properties:
+        label: {type: string, description: "Nhãn che (vd Nguyễn V. A.)"}
+        masked_phone: {type: [string, "null"]}
+    KNProducerRecord:
+      type: object
+      required: [ref, kind, kind_label, commune_code, name, display_name, representative, holder, parent_ref, parent_name, parent_kind,
+        htx_ref, htx_name, area_ha, tax_code, address, member_count, status, status_reason, version, can_edit, updated_at]
+      properties:
+        ref: {type: string, format: uuid}
+        kind: {$ref: "#/components/schemas/KNProducerKind"}
+        kind_label: {type: string}
+        commune_code: {type: string}
+        name: {type: [string, "null"], description: "HTX, THT; null với Nông hộ"}
+        display_name: {type: string, description: "Tên HTX/THT, hoặc nhãn che của chủ hộ"}
+        representative: {oneOf: [{$ref: "#/components/schemas/KNProducerPerson"}, {type: "null"}]}
+        holder: {oneOf: [{$ref: "#/components/schemas/KNProducerPerson"}, {type: "null"}]}
+        parent_ref: {type: [string, "null"], format: uuid}
+        parent_name: {type: [string, "null"]}
+        parent_kind: {oneOf: [{$ref: "#/components/schemas/KNProducerKind"}, {type: "null"}]}
+        htx_ref: {type: [string, "null"], format: uuid}
+        htx_name: {type: [string, "null"]}
+        area_ha: {type: [string, "null"]}
+        tax_code: {type: [string, "null"]}
+        address: {type: [string, "null"]}
+        member_count: {type: integer, description: "Nông hộ đang hoạt động (HTX, THT)"}
+        status: {type: string, enum: [active, inactive]}
+        status_reason: {type: [string, "null"]}
+        version: {type: integer, description: "base_version cho lần sửa kế tiếp"}
+        can_edit: {type: boolean}
+        updated_at: {type: string, format: date-time}
+    KNProducerRecordDetail:
+      allOf:
+        - {$ref: "#/components/schemas/KNProducerRecord"}
+        - type: object
+          required: [log]
+          properties:
+            log:
+              type: array
+              items:
+                type: object
+                required: [version, event, at, actor_ref, actor_display, status_reason]
+                properties:
+                  version: {type: integer}
+                  event: {type: string, enum: [created, updated, deactivated, reactivated]}
+                  at: {type: string, format: date-time}
+                  actor_ref: {type: string, format: uuid}
+                  actor_display: {type: [string, "null"]}
+                  status_reason: {type: [string, "null"]}
+    KNProducerRecordWrite:
+      type: object
+      required: [kind, commune_code]
+      properties:
+        kind: {$ref: "#/components/schemas/KNProducerKind"}
+        commune_code: {type: string, maxLength: 20}
+        name: {type: [string, "null"], maxLength: 200}
+        area_ha: {type: [string, "null"], description: "Số thập phân thường, ≥ 0, ≤ 1000000, tối đa 4 chữ số lẻ"}
+        tax_code: {type: [string, "null"], description: "Chỉ HTX: 10 chữ số hoặc 10-3"}
+        address: {type: [string, "null"], maxLength: 300}
+        representative:
+          type: object
+          required: [full_name, phone]
+          properties:
+            full_name: {type: string, maxLength: 120}
+            phone: {type: string, maxLength: 20}
+        holder:
+          type: object
+          required: [full_name, phone]
+          properties:
+            full_name: {type: string, maxLength: 120}
+            phone: {type: string, maxLength: 20}
+        parent_ref: {type: [string, "null"], format: uuid}
+        htx_ref: {type: [string, "null"], format: uuid}
+    KNProducerStatusChange:
+      type: object
+      required: [reason, base_version]
+      properties:
+        reason: {type: string, minLength: 10, maxLength: 1000}
+        base_version: {type: integer}
     CNTSCampaignInput: {"type":"object","required":["name","field","template_code","scope_mode","from_date","to_date","due_at"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"goal":{"type":"string","maxLength":2000},"field":{"type":"string","enum":["chan_nuoi","thu_y","thuy_san","khac"]},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"owner_ref":{"type":"string","format":"uuid"},"remind_before_hours":{"type":"integer","minimum":0,"maximum":168}},"additionalProperties":false}
     CNTSPoint: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"source":{"type":"string","enum":["gps","map"]}},"required":["lat","lng","source"],"additionalProperties":false}
     CNTSCampaignDueInput: {"type":"object","required":["due_at","reason"],"properties":{"due_at":{"type":"string","format":"date-time"},"reason":{"type":"string","minLength":10,"maxLength":500}},"additionalProperties":false}
@@ -25439,6 +26184,184 @@ components:
     CNTSDiaryEntrySave: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"cycle_ref":{"type":"string","format":"uuid"},"base_version":{"type":"integer"},"submit":{"type":"boolean"},"captured_at":{"type":"string","format":"date-time"},"entry_date":{"type":"string","format":"date"},"entry_kind":{"type":"string","enum":["daily","growth_env","env","harvest"]},"metrics":{"type":"object","additionalProperties":{"type":"string"},"description":"Chỉ số theo mẫu (NC-05…NC-12, NT-04…NT-12) — giá trị dạng chuỗi"},"tables":{"$ref":"#/components/schemas/CNTSDiaryTables"},"photo_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"location":{"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"accuracy_m":{"type":["string","null"]},"mock_location":{"type":"boolean"}},"required":["lat","lng"],"additionalProperties":false},"reason":{"type":"string"}},"required":["entry_kind","metrics"],"additionalProperties":false}
     CNTSDiaryBase: {"type":"object","properties":{"base_version":{"type":"integer"}},"required":["base_version"],"additionalProperties":false}
     CNTSOutbreakWordRun:
+      type: object
+      required: [id, seq, template, template_version, doc_number, doc_number_auto, file_name, body_hash, size, actor_ref, at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        template: {type: string}
+        template_version: {type: integer}
+        doc_number: {type: string}
+        doc_number_auto: {type: boolean}
+        file_name: {type: string}
+        body_hash: {type: string}
+        size: {type: integer}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+    CNTSKNQGOption:
+      type: object
+      required: [value, label]
+      properties:
+        value: {type: string}
+        label: {type: string}
+    CNTSKNQGField:
+      type: object
+      required: [key, label, kind]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        kind: {type: string, enum: [text, long, date, number, int, choice]}
+        options: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGOption"}}
+        required: {type: boolean}
+        auto: {type: boolean, description: "máy chủ điền — giá trị gửi lên bị bỏ"}
+        hint: {type: string}
+    CNTSKNQGColumn:
+      type: object
+      required: [key, label, kind]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        kind: {type: string, enum: [text, long, date, number, int, choice]}
+        options: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGOption"}}
+        auto: {type: boolean}
+    CNTSKNQGTable:
+      type: object
+      required: [key, label, columns, max_rows]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        columns: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGColumn"}}
+        max_rows: {type: integer}
+        auto: {type: boolean, description: "cả bảng do máy chủ dựng (Mẫu 07 — tổng hợp Mẫu 05 đã ký)"}
+        hint: {type: string}
+    CNTSKNQGSection:
+      type: object
+      required: [title]
+      properties:
+        title: {type: string}
+        fields: {type: array, items: {type: string}}
+        tables: {type: array, items: {type: string}}
+    CNTSKNQGSpec:
+      type: object
+      required: [form, code, bm, title, lifecycle, per_site, unique, fields, tables, sections]
+      properties:
+        form: {type: string, enum: ["01", "03", "04", "05", "07"]}
+        code: {type: string}
+        bm: {type: string}
+        title: {type: string}
+        lifecycle: {type: string, enum: [approve, sign, national]}
+        per_site: {type: boolean}
+        period: {type: string, enum: [month, year]}
+        unique: {type: boolean}
+        numbered: {type: boolean}
+        fields: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGField"}}
+        tables: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGTable"}}
+        sections: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGSection"}}
+    CNTSKNQGContent:
+      type: object
+      required: [fields, tables]
+      properties:
+        fields: {type: object, additionalProperties: {type: string}}
+        tables:
+          type: object
+          additionalProperties:
+            type: array
+            items: {type: object, additionalProperties: {type: string}}
+    CNTSKNQGScanInfo:
+      type: object
+      required: [name, content_type, size, sha256]
+      properties:
+        name: {type: string}
+        content_type: {type: string}
+        size: {type: integer}
+        sha256: {type: string}
+    CNTSKNQGDoc:
+      type: object
+      required: [ref, form, project_ref, project_code, project_name, site_ref, site_name, commune_code, period, revision, event, status,
+        status_reason, signed, version, updated_at, updated_by, actor_display, can_edit, actions, warnings]
+      properties:
+        ref: {type: string, format: uuid}
+        form: {type: string, enum: ["01", "03", "04", "05", "07"]}
+        project_ref: {type: string, format: uuid}
+        project_code: {type: string}
+        project_name: {type: string}
+        site_ref: {type: ["string", "null"], format: uuid}
+        site_name: {type: ["string", "null"]}
+        commune_code: {type: ["string", "null"]}
+        period: {type: ["string", "null"], description: "YYYY-MM (Mẫu 01) | YYYY (Mẫu 07)"}
+        revision: {type: integer, description: "bản điều chỉnh thứ n (1 = bản đầu)"}
+        event: {type: string, enum: [created, updated, submitted, approved, returned, sign_requested, unrequested, signed, adjusted, sent, confirmed]}
+        status: {type: string, enum: [draft, submitted, approved, returned, awaiting_sign, signed, sent, confirmed]}
+        status_reason: {type: ["string", "null"]}
+        signed:
+          anyOf:
+            - {$ref: "#/components/schemas/CNTSKNQGScanInfo"}
+            - {type: "null"}
+        version: {type: integer}
+        updated_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+        actor_display: {type: ["string", "null"]}
+        can_edit: {type: boolean}
+        actions: {type: array, items: {type: string, enum: [submit, approve, return, request_sign, unrequest, sign, send, confirm, adjust]}}
+        warnings: {type: array, items: {type: string}}
+    CNTSKNQGVersion:
+      type: object
+      required: [version, revision, event, status, status_reason, signed, at, actor_ref, actor_display]
+      properties:
+        version: {type: integer}
+        revision: {type: integer}
+        event: {type: string}
+        status: {type: string}
+        status_reason: {type: ["string", "null"]}
+        signed:
+          anyOf:
+            - {$ref: "#/components/schemas/CNTSKNQGScanInfo"}
+            - {type: "null"}
+        at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: ["string", "null"]}
+    CNTSKNQGIssue:
+      type: object
+      required: [field, reason]
+      properties:
+        field: {type: string}
+        reason: {type: string}
+    CNTSKNQGDocDetail:
+      allOf:
+        - {$ref: "#/components/schemas/CNTSKNQGDoc"}
+        - type: object
+          required: [content, issues, blockers, versions]
+          properties:
+            content: {$ref: "#/components/schemas/CNTSKNQGContent"}
+            issues: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGIssue"}}
+            blockers: {type: array, items: {type: string}, description: "Mẫu 07: điểm chưa có Mẫu 05 đã ký"}
+            versions: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGVersion"}}
+            replayed: {type: boolean}
+    CNTSKNQGCreate:
+      type: object
+      required: [form, project_ref]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 do máy khách sinh (tùy chọn)"}
+        form: {type: string, enum: ["01", "03", "04", "05", "07"]}
+        project_ref: {type: string, format: uuid}
+        site_ref: {type: ["string", "null"], format: uuid, description: "bắt buộc với Mẫu 05"}
+        period: {type: ["string", "null"], description: "YYYY-MM (Mẫu 01) | YYYY (Mẫu 07)"}
+    CNTSKNQGUpdate:
+      type: object
+      required: [base_version, content]
+      additionalProperties: false
+      properties:
+        base_version: {type: integer}
+        content: {$ref: "#/components/schemas/CNTSKNQGContent"}
+    CNTSKNQGAction:
+      type: object
+      required: [base_version]
+      additionalProperties: false
+      properties:
+        base_version: {type: integer}
+        reason: {type: string, maxLength: 1000}
+    CNTSKNQGWordRun:
       type: object
       required: [id, seq, template, template_version, doc_number, doc_number_auto, file_name, body_hash, size, actor_ref, at]
       properties:

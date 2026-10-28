@@ -159,6 +159,20 @@ export function modelHouseholdInfo(ref: string): (S["CNTSVaccinationModel"] & { 
   };
 }
 
+/** Dự án (bản hiện hành), điểm và số hộ đang tham gia — cho giả lập mẫu biểu KNQG (W11.53). null = không có dự án. */
+export function cntsMockProjectInfo(ref: string) {
+  seed();
+  const p = last(PROJECTS, ref);
+  if (!p) return null;
+  const sites = [...SITES.values()].map((v) => v.at(-1)!).filter((s) => s.project_ref === ref).map((s) => ({
+    ref: s.ref, name: s.name, commune_code: s.commune_code, closed: s.event === "closed",
+    scale: s.scale ? `${s.scale} ${s.scale_unit}` : "",
+    households: [...HOUSEHOLDS.values()].map((v) => v.at(-1)!).filter((h) => h.site_ref === s.ref && h.event !== "withdrawn")
+      .map((h) => ({ label: OWNERS.get(h.person_ref)?.label ?? "", scale: h.scale ? `${h.scale} ${h.scale_unit}` : "" })),
+  }));
+  return { project: p, manager: NAMES[p.manager_ref] ?? "", sites };
+}
+
 function parsePoint(b: { location?: S["CNTSPoint"] | null }) {
   const l = b.location;
   if (!l) return null;

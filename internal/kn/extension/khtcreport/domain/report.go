@@ -121,6 +121,30 @@ type Section struct {
 	Editable bool   `json:"editable"`
 }
 
+// ExternalEvidence là tệp minh chứng của một số liệu nguồn ngoài (chỉ siêu dữ liệu).
+type ExternalEvidence struct {
+	ID       uuid.UUID `json:"id"`
+	FileName string    `json:"file_name"`
+}
+
+// ExternalFigure là một ô "Nhập ngoài" (W11.67, BR-DL-19): giá trị hiệu lực của chỉ tiêu nguồn ngoài trong kỳ, khóa như ô
+// số trên bản soạn; "Nguồn dữ liệu" hiện cơ quan, văn bản/kênh, ngày, tệp minh chứng. Chỉ sửa tại Số liệu nguồn ngoài.
+type ExternalFigure struct {
+	EntryID     uuid.UUID          `json:"entry_id"`
+	Version     int64              `json:"version"`
+	IndicatorID uuid.UUID          `json:"indicator_id"`
+	Code        string             `json:"code"`
+	Name        string             `json:"name"`
+	Group       string             `json:"group"`
+	Value       string             `json:"value"`
+	Unit        string             `json:"unit"`
+	Agency      string             `json:"agency"`
+	Document    string             `json:"document"`
+	SourceDate  string             `json:"source_date"`
+	Evidence    []ExternalEvidence `json:"evidence"`
+	At          time.Time          `json:"at"`
+}
+
 type Data struct {
 	Period      Period                       `json:"period"`
 	Template    string                       `json:"template"`
@@ -133,6 +157,31 @@ type Data struct {
 	Provisional []string                     `json:"provisional"`
 	InputHash   string                       `json:"input_hash"`
 	CapturedAt  time.Time                    `json:"captured_at"`
+	// External: ô Nhập ngoài của kỳ (W11.67). Rỗng thì bỏ khỏi JSON và khỏi băm — bản soạn cũ không đổi băm.
+	External []ExternalFigure `json:"external,omitempty"`
+}
+
+// WithExternal gắn số liệu nguồn ngoài của kỳ vào dữ liệu đã dựng và đưa chúng vào băm đầu vào: đổi giá trị, nguồn hay
+// minh chứng sau khi xuất → "Nguồn đã thay đổi" (BR-DL-04). Không có số liệu → giữ nguyên băm của Compose.
+func WithExternal(data Data, figures []ExternalFigure) (Data, error) {
+	if len(figures) == 0 {
+		data.External = nil
+		return data, nil
+	}
+	data.External = append([]ExternalFigure{}, figures...)
+	sort.SliceStable(data.External, func(i, j int) bool {
+		a, b := data.External[i], data.External[j]
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return a.Code < b.Code
+	})
+	var err error
+	data.InputHash, err = Hash(struct {
+		Base     string
+		External []ExternalFigure
+	}{data.InputHash, data.External})
+	return data, err
 }
 
 func Template(kind string) string {

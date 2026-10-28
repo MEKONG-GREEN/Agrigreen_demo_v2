@@ -31,6 +31,7 @@ import (
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
 	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
+	krapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knrecords/app"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/handler"
 	obapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/app"
@@ -48,6 +49,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -74,6 +76,8 @@ type Deps struct {
 	// Plots, Coops (tùy chọn): cổng thống kê hẹp do KN sở hữu; gốc lắp ráp nối bộ đọc publication v1.
 	Plots port.PlotStatistics
 	Coops port.CooperativeStatistics
+	// Store (tùy chọn): kho đối tượng cho tệp minh chứng số liệu nguồn ngoài KHTC (W11.67); thiếu → tải tệp trả 503.
+	Store objstore.Store
 }
 
 // Module là pf/extension đã nối.
@@ -94,6 +98,8 @@ type Module struct {
 	// W11.63: phiếu Báo cáo cho KHTC (extension/khtcform, module_khtc.go).
 	khtcForms   *khtcFormService
 	khtcReports *khtcReportService
+	khtcExt     *khtcExternalService // W11.67: số liệu nguồn ngoài (extension/khtcext, module_khtcext.go)
+	objects     objstore.Store
 	// W11.43 (D4 CN3): quy tắc liên biểu + 12 cảnh báo CNTS, vòng đời cảnh báo, nhắc nộp theo biểu (module_cntsalert.go).
 	alert *alertapp.Service
 	// W11.46 (D4 CN6): lịch trực KSGM BM-03, lịch tiêm phòng BM-07 (extension/cntscal).
@@ -110,6 +116,10 @@ type Module struct {
 	campaigns *campaignService
 	// BF-SRV-KN-ATTRS (#119): hồ sơ KN riêng — năm sản xuất máy (TT-10), cây trồng thửa (TT-11) (module_knattrs.go).
 	attrs *kaapp.Service
+	// W11.53 (D4 CN13): mẫu biểu dự án KNQG Mẫu 01–07 (extension/cntsknqg, module_cntsknqg.go).
+	knqg *knqgService
+	// KNSPLIT-2-KN-RECORDS (#67): hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (module_knrecords.go).
+	records *krapp.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -119,7 +129,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Plots: d.Plots, Coops: d.Coops,
-	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}}
+	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}, objects: d.Store}
 	// Tên người thao tác của sổ vật tư dùng chung danh bạ của vòng đời báo cáo (UseReportCycle nối sau).
 	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.khtc = &khtcapp.Service{DB: db, Clock: clk, Names: func() partyport.ActorNames { return m.rc.Names }}
@@ -135,6 +145,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.rc.BM11Programs = m.bm11Programs // W11.45: kết quả CT/DA cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()
 	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs)
+	m.records = m.newKNRecords(pool, db, clk, d.Units)
 	return m
 }
 
@@ -203,6 +214,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
 	m.registerKHTCReports(rg)                          // W11.66
 	m.registerKHTCSources(rg)                          // W11.64
+	m.registerKHTCExternal(rg)                         // W11.67
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
 	modelhandler.Handler{Svc: m.model}.RegisterApp(rg) // W11.47
@@ -211,6 +223,8 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerDeptHome(rg)                             // W11.54
 	m.registerCNTSCampaigns(rg)                        // W11.50
 	m.registerKNAttrs(rg)                              // BF-SRV-KN-ATTRS
+	m.registerCNTSKNQG(rg)                             // W11.53
+	m.registerKNRecords(rg)                            // KNSPLIT-2-KN-RECORDS
 }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham

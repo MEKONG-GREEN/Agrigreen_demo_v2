@@ -13,6 +13,7 @@ import { callerOf, isErr, type Caller } from "./kn-reports/store";
 import { vnDate } from "@/kn/schedule/week";
 import { parseCsvText } from "@/lib/csv";
 import { knPlotRoutes, resetKnPlots } from "./kn-collect-plots";
+import { knRecordRoutes, resetKnRecords } from "./kn-collect-records";
 
 interface Coop {
   ref: string;
@@ -122,6 +123,7 @@ function seed(): void {
 export function resetKnCollect(): void {
   seeded = false;
   resetKnPlots();
+  resetKnRecords();
   seed();
 }
 
@@ -425,6 +427,8 @@ export const knCollectRoutes: Route[] = [
   },
   // Thửa (pf/cooperative) + cây trồng (hồ sơ KN #119) — TT-11 #104.
   ...knPlotRoutes(() => COOPS, wrap),
+  // Hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác — KNSPLIT-2-KN-RECORDS #67 (HTX giả lập ở trên = HTX đã công bố, chỉ đọc).
+  ...knRecordRoutes(() => COOPS.map((x) => ({ ref: x.ref, name: x.name, commune_code: x.commune_code, active: x.active })), wrap),
 ];
 
 /** Giả lập POST /v1/kn/materials/import (BF-TT-MAT #105): chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx. */
