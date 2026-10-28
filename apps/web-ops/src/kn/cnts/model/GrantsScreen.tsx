@@ -4,7 +4,8 @@
 // quyền (tài khoản Cấp Xã có sẵn, vai trong module, địa bàn xã/cơ sở/điểm/hộ, biểu mẫu, hiệu lực), sửa, thu hồi kèm người
 // nhận việc chưa nộp, nhật ký thay đổi. Cấp Xã xem quyền của mình.
 // BF-SWEEP-CNTS (#101): bảng có STT; trường bắt buộc báo lỗi theo trường khi bấm Lưu; thu hồi nhập lý do trong pop-up ngắn.
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { SelectField } from "@/components/form";
 import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
@@ -36,8 +37,18 @@ export function GrantsScreen() {
   const list = useLoad(mapi ? () => mapi.grants({ ...(mine ? { mine: true } : {}), ...(status ? { status } : {}) }) : null, [mapi, mine, status]);
   const candidates = useLoad(mapi && !mine ? () => mapi.candidates() : null, [mapi, mine]);
   const communeName = useCommuneNames([...(list.data?.items ?? []).flatMap((g) => g.commune_codes), ...(candidates.data ?? []).flatMap((c) => c.commune_codes)]);
-  const [mode, setMode] = useState<{ kind: "new" } | { kind: "edit"; g: Grant } | { kind: "revoke"; g: Grant } | null>(null);
+  const [mode, setMode] = useState<{ kind: "new"; preset?: GrantPreset } | { kind: "edit"; g: Grant } | { kind: "revoke"; g: Grant } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  // BF-CN-DUTY (#171): từ cảnh báo "chưa cấp quyền" của lịch trực KSGM — mở sẵn biểu cấp quyền vai KSGM cho viên chức, xã, cơ sở.
+  const sp = useSearchParams();
+  const presetUsed = useRef(false);
+  const canGrant = !!list.data?.can_grant;
+  useEffect(() => {
+    const officer = sp?.get("vien_chuc");
+    if (!canGrant || presetUsed.current || !officer) return;
+    presetUsed.current = true;
+    setMode({ kind: "new", preset: { officer, facility: sp?.get("co_so") ?? "", commune: sp?.get("xa") ?? "" } });
+  }, [canGrant, sp]);
   if (!mapi) return null;
   const done = () => (setMode(null), list.reload());
   return (
@@ -55,7 +66,16 @@ export function GrantsScreen() {
         <p className="mute">Chỉ cấp vai Cấp Xã, Nông hộ trong module CNTS; địa bàn ngoài tỉnh bị chặn; mọi thay đổi quyền được ghi nhật ký. Tài khoản do Admin tạo.</p>
       </PageHeader>
       {mode?.kind === "new" || mode?.kind === "edit" ? (
-        <GrantForm key={mode.kind === "edit" ? mode.g.ref : "new"} mapi={mapi} grant={mode.kind === "edit" ? mode.g : undefined} candidates={candidates.data ?? []} communeName={communeName} onDone={done} onCancel={() => setMode(null)} />
+        <GrantForm
+          key={mode.kind === "edit" ? mode.g.ref : "new"}
+          mapi={mapi}
+          grant={mode.kind === "edit" ? mode.g : undefined}
+          preset={mode.kind === "new" ? mode.preset : undefined}
+          candidates={candidates.data ?? []}
+          communeName={communeName}
+          onDone={done}
+          onCancel={() => setMode(null)}
+        />
       ) : null}
       {mode?.kind === "revoke" ? <RevokeForm mapi={mapi} g={mode.g} candidates={candidates.data ?? []} onDone={done} onCancel={() => setMode(null)} /> : null}
       <div className="row">
@@ -122,9 +142,13 @@ export function GrantsScreen() {
   );
 }
 
+/** Biểu cấp quyền mở từ cảnh báo lịch trực KSGM: viên chức, cơ sở giết mổ, xã của cơ sở. */
+type GrantPreset = { officer: string; facility: string; commune: string };
+
 function GrantForm({
   mapi,
   grant,
+  preset,
   candidates,
   communeName,
   onDone,
@@ -132,6 +156,7 @@ function GrantForm({
 }: {
   mapi: CntsModelApi;
   grant?: Grant;
+  preset?: GrantPreset;
   candidates: Candidate[];
   communeName: (c: string) => string;
   onDone: () => void;
@@ -140,10 +165,10 @@ function GrantForm({
   const sites = useLoad(() => mapi.sites({ status: "active" }), [mapi]);
   const households = useLoad(() => mapi.households({ status: "active" }), [mapi]);
   const [g, setG] = useState<GrantSave>({
-    grantee_ref: grant?.grantee_ref ?? "",
-    role: grant?.role ?? "theo_doi_mo_hinh",
-    commune_codes: grant?.commune_codes ?? [],
-    facility_refs: grant?.facility_refs ?? [],
+    grantee_ref: grant?.grantee_ref ?? preset?.officer ?? "",
+    role: grant?.role ?? (preset ? "ksgm" : "theo_doi_mo_hinh"),
+    commune_codes: grant?.commune_codes ?? (preset?.commune ? [preset.commune] : []),
+    facility_refs: grant?.facility_refs ?? (preset?.facility ? [preset.facility] : []),
     site_refs: grant?.site_refs ?? [],
     household_refs: grant?.household_refs ?? [],
     forms: grant?.forms ?? [],
@@ -221,6 +246,15 @@ function GrantForm({
         )}
         {errOf("commune_codes")}
       </fieldset>
+      {preset?.facility && (role === "ksgm" || role === "tang_cuong") ? (
+        <fieldset>
+          <legend>Cơ sở giết mổ</legend>
+          <label className="check">
+            <input type="checkbox" checked={(g.facility_refs ?? []).includes(preset.facility)} onChange={() => setG({ ...g, facility_refs: toggle(g.facility_refs ?? [], preset.facility) })} /> Chỉ cơ sở chọn
+            từ cảnh báo lịch trực KSGM (bỏ chọn để cấp cả xã)
+          </label>
+        </fieldset>
+      ) : null}
       {role === "theo_doi_mo_hinh" ? (
         <fieldset>
           <legend>Điểm trình diễn được theo dõi</legend>
