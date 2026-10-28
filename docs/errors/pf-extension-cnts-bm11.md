@@ -7,5 +7,5 @@
 | 409 | `extension.cnts_bm11_not_ready` | Quy tắc 13 / BR-06: chưa tới hạn nộp của tuần cuối của kỳ, hoặc tỷ lệ xã đã nộp của biểu nguồn (BM-04, BM-17) dưới mức `extension.cnts_bm11_min_submit_pct` và kỳ chưa chốt, hoặc kỳ chưa có kỳ nguồn nào; `detail` liệt kê lý do |
 | 409 | `extension.cnts_bm11_state` | Sửa, làm mới, trình khi báo cáo không Đang soạn/Trả lại; duyệt, trả lại khi không Chờ duyệt; xác nhận Đã nhận khi chưa gửi hoặc nơi nhận không thuộc báo cáo (DB: `cnts_bm11_state`, `cnts_bm11_received`) |
 | 409 | `extension.cnts_bm11_version_conflict` | `expected_seq` khác bước hiện hành của báo cáo (khóa lạc quan — người khác vừa cập nhật) |
-| 403 | `forbidden` | Không phải Phòng CNTS/Admin/phòng nhận; cán bộ (không phải Lãnh đạo phòng hoặc người được ủy quyền `duyet_bao_cao`) duyệt/trả lại; sửa đoạn chương trình không phải của mình |
-| 422 | `validation_failed` | Loại/kỳ sai dạng, nơi nhận lạ, mục phần viết không có trong mẫu, đoạn viết quá 8.000 ký tự, trả lại thiếu ý kiến (AC-04), thiếu `expected_seq` |
+
+Ngoài ra dùng mã chung: `forbidden` (không phải Phòng CNTS/Admin/phòng nhận; cán bộ duyệt/trả lại; sửa đoạn chương trình không phải của mình) và `validation_failed` (loại/kỳ sai dạng, nơi nhận lạ, mục không có trong mẫu, đoạn viết quá 8.000 ký tự, trả lại thiếu ý kiến — AC-04, thiếu `expected_seq`).
