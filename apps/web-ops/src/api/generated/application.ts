@@ -5634,6 +5634,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/vaccination-matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bảng lịch tiêm BM-07 của một loại mô hình (BF-CN-VACC #168): hàng = hộ/lứa (xã, chủ hộ che bớt, CB theo dõi MH, ngày nhận giống), cột = vaccine × lần (ngày dự kiến, ngày thực tế, quá hạn) */
+        get: operations["extensionCntsVaccinationMatrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/vaccination-matrix/xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel bảng BM-07 đúng bố cục sheet của tệp mẫu (FN-15 luồng phụ) — chủ hộ chỉ hiện nhãn che bớt */
+        get: operations["extensionCntsVaccinationMatrixXlsx"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/outbreaks": {
         parameters: {
             query?: never;
@@ -13717,6 +13751,8 @@ export interface components {
             actor_display?: string | null;
         };
         CNTSVaccinationBatch: components["schemas"]["CNTSVaccinationBatchCore"] & {
+            /** @description Hộ mô hình của lứa (BF-CN-VACC); null = lứa theo địa bàn */
+            model: components["schemas"]["CNTSVaccinationModel"] | null;
             /** @enum {string} */
             status: "open" | "overdue" | "done" | "cancelled";
             overdue_count: number;
@@ -13728,20 +13764,21 @@ export interface components {
             /** @description Mới nhất trước */
             versions: components["schemas"]["CNTSVaccinationBatchCore"][];
         };
+        /** @description commune_code, model_type_code bắt buộc khi không chọn hộ mô hình */
         CNTSVaccinationBatchCreate: {
             /**
              * Format: uuid
              * @description UUIDv7 máy khách sinh (tùy chọn)
              */
             id?: string | null;
-            commune_code: string;
-            model_type_code: string;
+            commune_code?: string;
+            model_type_code?: string;
             breed_code?: string | null;
             /** @description Rỗng → chọn quy trình theo giống/loại mô hình tại ngày nhận giống */
             schedule_code?: string | null;
             /**
              * Format: uuid
-             * @description Hộ mô hình — hoặc ghi địa bàn (không lưu họ tên tự do)
+             * @description Hộ mô hình (FN-10) — xã, loại mô hình bỏ trống thì lấy theo hộ/điểm; hoặc ghi địa bàn (không lưu họ tên tự do)
              */
             household_ref?: string | null;
             locality?: string | null;
@@ -13765,6 +13802,47 @@ export interface components {
                 clear_actual?: boolean;
                 note?: string | null;
             }[];
+        };
+        CNTSVaccinationMatrix: {
+            model_type_code: string;
+            model_type_name: string | null;
+            columns: components["schemas"]["CNTSVaccinationMatrixColumn"][];
+            rows: components["schemas"]["CNTSVaccinationMatrixRow"][];
+            /** @description Quá max_rows lứa — thu hẹp bộ lọc */
+            truncated: boolean;
+            max_rows: number;
+        };
+        CNTSVaccinationMatrixColumn: {
+            vaccine_code: string;
+            vaccine_name: string | null;
+            shot: number;
+            age_days: number;
+        };
+        CNTSVaccinationMatrixRow: components["schemas"]["CNTSVaccinationBatch"] & {
+            /** @description Theo thứ tự cột; null = lứa không có mũi này */
+            cells: (components["schemas"]["CNTSVaccinationDose"] | null)[];
+            /** @description Nhãn chủ hộ che bớt, hoặc địa bàn khi lứa không gắn hộ */
+            household_text: string | null;
+            commune_name: string | null;
+        };
+        /** @description Hộ mô hình (FN-10, W11.47) của lứa: điểm, dự án, cán bộ theo dõi điểm (CB theo dõi MH) */
+        CNTSVaccinationModel: {
+            /** Format: uuid */
+            household_ref: string;
+            /** @description Nhãn chủ hộ đã che bớt (kho định danh) */
+            owner_label: string | null;
+            /** Format: uuid */
+            site_ref: string;
+            site_name: string;
+            /** Format: uuid */
+            project_ref: string;
+            project_code: string;
+            project_name: string;
+            /** Format: uuid */
+            officer_ref: string | null;
+            officer_display: string | null;
+            /** @description Hộ còn tham gia, điểm và dự án chưa kết thúc */
+            active: boolean;
         };
         ExtWorkScheduleItemInput: {
             /**
@@ -35049,6 +35127,9 @@ export interface operations {
             query?: {
                 commune_code?: string;
                 household_ref?: string;
+                model_type_code?: string;
+                project_ref?: string;
+                site_ref?: string;
                 status?: "open" | "overdue" | "done" | "cancelled";
                 received_from?: string;
                 received_to?: string;
@@ -35207,6 +35288,65 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsVaccinationMatrix: {
+        parameters: {
+            query: {
+                model_type_code: string;
+                project_ref?: string;
+                site_ref?: string;
+                commune_code?: string;
+                received_from?: string;
+                received_to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bảng */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSVaccinationMatrix"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_vaccination_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsVaccinationMatrixXlsx: {
+        parameters: {
+            query: {
+                model_type_code: string;
+                project_ref?: string;
+                site_ref?: string;
+                commune_code?: string;
+                received_from?: string;
+                received_to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp Excel */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

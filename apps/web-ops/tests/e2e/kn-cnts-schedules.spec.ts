@@ -42,3 +42,49 @@ test("W11.46 Admin lập lịch trực riêng theo tỉnh và xem lịch cũ", a
   await expect(page.getByRole("button",{name:"Lưu",exact:true})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Thêm hàng"})).toHaveCount(0);
 });
+
+// BF-CN-VACC (#168, CN-09): lập lịch tiêm cho hộ của mô hình (dự án → điểm → hộ), bảng BM-07 (hàng = hộ, cột = vaccine ×
+// lần), ghi ngày tiêm thực tế ngay trên bảng, xuất Excel.
+test("BF-CN-VACC lập lịch tiêm theo hộ mô hình và bảng BM-07", async ({ page }) => {
+  const login = async () => {
+    await page.getByLabel("Email hoặc số điện thoại").fill("admin.mekong@mekonggreen.vn");
+    await page.getByLabel("Mật khẩu", { exact: true }).fill("KhuyenNong@2026");
+    await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
+    await expect(sidebar(page)).toBeVisible();
+  };
+  await page.goto("/login");
+  await login();
+  await sidebar(page).getByRole("link", { name: "Phòng ban", exact: true }).click();
+  await page.getByLabel("Trạng thái Phòng Chăn nuôi - Thủy sản", { exact: true }).selectOption("active");
+  await expect(page.getByRole("status").filter({ hasText: "Đã đổi" })).toContainText("Đang áp dụng");
+  await logout(page);
+  await login();
+  await sidebar(page).getByRole("button", { name: "Phòng Chăn nuôi - Thủy sản", exact: true }).click();
+  await sidebar(page).getByRole("link", { name: "Lịch tiêm phòng", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Lịch tiêm phòng", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Tạo lịch theo quy trình" }).click();
+  const form = page.getByRole("region", { name: "Tạo lịch tiêm" });
+  await form.getByRole("combobox", { name: "Chương trình, dự án" }).selectOption({ index: 1 });
+  await form.getByRole("combobox", { name: "Điểm trình diễn (mô hình)" }).selectOption({ index: 1 });
+  await expect(form).toContainText("CB theo dõi MH");
+  await form.getByRole("checkbox", { name: /Nguyễn V\. B\./ }).check();
+  await form.getByLabel("Ngày nhận giống").fill("2026-09-19");
+  await form.getByRole("button", { name: "Tạo lịch", exact: true }).click();
+  const detail = page.getByRole("region", { name: "Chi tiết lịch tiêm" });
+  await expect(detail).toContainText("Điểm ấp Bình Hòa");
+  await expect(detail).toContainText("Nguyễn V. B.");
+
+  await page.getByRole("tab", { name: "Bảng BM-07" }).click();
+  await page.getByRole("combobox", { name: "Loại mô hình (bảng)" }).selectOption("GA_THUONG_PHAM");
+  const table = page.getByRole("table", { name: /Lịch tiêm phòng Gà thương phẩm/ });
+  await expect(table).toContainText("Nguyễn V. B.");
+  await expect(table).toContainText("Quá hạn");
+  const actual = table.getByLabel("Ngày tiêm thực tế VX_ND_F/1 hộ 1");
+  await actual.fill("2026-09-21");
+  await table.getByRole("button", { name: "Lưu hộ 1" }).click();
+  await expect(table.getByLabel("Ngày tiêm thực tế VX_ND_F/1 hộ 1")).toHaveValue("2026-09-21");
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Xuất Excel BM-07" }).click();
+  expect((await downloaded).suggestedFilename()).toBe("lich-tiem-phong-bm07-ga_thuong_pham.xlsx");
+});

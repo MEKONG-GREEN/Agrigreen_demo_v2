@@ -9,7 +9,10 @@ import {
   createCntsCalApi,
   expectedDate,
   fromGrid,
+  householdText,
   nextShift,
+  rowChanges,
+  vaccineGroups,
   rosterCsv,
   rowsOf,
   shiftMonth,
@@ -108,5 +111,41 @@ describe("giả lập lịch trực, lịch tiêm", () => {
     const u = await capi.updateDoses(b.ref, { base_version: 1, doses: [{ vaccine_code: "VX_ND_F", shot: 1, actual_date: "2027-10-03" }] });
     expect(u.event).toBe("dose_recorded");
     expect(u.versions).toHaveLength(2);
+  });
+
+  it("BF-CN-VACC: lập lịch theo hộ mô hình (xã, loại mô hình theo điểm) và bảng BM-07", async () => {
+    const hh = "0190f1c4-7d3e-7000-8000-0000000c7301"; // hộ mẫu của giả lập W11.47
+    await expect(capi.createBatch({ household_ref: "0190f1c4-7d3e-7000-8000-00000000ffff", received_date: "2027-10-01", age_at_receipt: 1 })).rejects.toThrow();
+    await expect(capi.createBatch({ household_ref: hh, commune_code: "99999", received_date: "2027-10-01", age_at_receipt: 1 })).rejects.toThrow();
+    const b = await capi.createBatch({ household_ref: hh, received_date: "2027-10-01", age_at_receipt: 1 });
+    expect(b.model?.site_name).toBe("Điểm ấp Bình Hòa");
+    expect(householdText(b)).toBe("Nguyễn V. B.");
+    const m = await capi.matrix({ model_type_code: b.model_type_code, site_ref: b.model!.site_ref });
+    expect(m.rows).toHaveLength(1);
+    expect(m.rows[0]!.cells).toHaveLength(m.columns.length);
+    expect(m.rows[0]!.household_text).toBe("Nguyễn V. B.");
+    expect(vaccineGroups(m.columns).reduce((n, g) => n + g.span, 0)).toBe(m.columns.length);
+    expect((await capi.matrix({ model_type_code: b.model_type_code, site_ref: "0190f1c4-7d3e-7000-8000-00000000eeee" })).rows).toHaveLength(0);
+  });
+});
+
+describe("bảng BM-07 (BF-CN-VACC)", () => {
+  it("kiểm biểu: chọn hộ mô hình thì không bắt xã, loại mô hình", () => {
+    expect(batchErrors({ household_ref: "h", received_date: "2026-10-01", age_at_receipt: 1 })).toEqual({});
+    expect(Object.keys(batchErrors({ received_date: "2026-10-01", age_at_receipt: 1 })).sort()).toEqual(["commune_code", "locality", "model_type_code"]);
+  });
+
+  it("gom cột theo vaccine; thay đổi của hàng (Cấp Xã không gửi ngày dự kiến)", () => {
+    const cols = [
+      { vaccine_code: "A", vaccine_name: "Vaccine A", shot: 1, age_days: 3 },
+      { vaccine_code: "B", vaccine_name: null, shot: 1, age_days: 7 },
+      { vaccine_code: "B", vaccine_name: null, shot: 2, age_days: 28 },
+    ];
+    expect(vaccineGroups(cols)).toEqual([{ code: "A", name: "Vaccine A", span: 1 }, { code: "B", name: "B", span: 2 }]);
+    const dose = { vaccine_code: "B", vaccine_name: null, shot: 1, age_days: 7, expected_date: "2027-10-07", actual_date: null, note: null, overdue: true };
+    const edit = { "B/1": { expected: "2027-10-09", actual: "2027-10-08" } };
+    expect(rowChanges({ cells: [null, dose], can_plan: false }, edit)).toEqual([{ vaccine_code: "B", shot: 1, actual_date: "2027-10-08" }]);
+    expect(rowChanges({ cells: [null, dose], can_plan: true }, edit)).toEqual([{ vaccine_code: "B", shot: 1, expected_date: "2027-10-09", actual_date: "2027-10-08" }]);
+    expect(rowChanges({ cells: [dose], can_plan: true }, {})).toEqual([]);
   });
 });

@@ -3,6 +3,7 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { parseProblemResponse } from "@/api/problem";
 import { parseNumberInput, type NumberRule } from "@/components/form";
 
 type S = components["schemas"];
@@ -16,6 +17,11 @@ export type VaccinationDose = S["CNTSVaccinationDose"];
 export type BatchCreate = S["CNTSVaccinationBatchCreate"];
 export type BatchStatus = VaccinationBatch["status"];
 export type DosesUpdate = S["CNTSVaccinationDosesUpdate"];
+export type VaccinationModel = S["CNTSVaccinationModel"];
+export type VaccinationMatrix = S["CNTSVaccinationMatrix"];
+export type MatrixRow = S["CNTSVaccinationMatrixRow"];
+export type MatrixColumn = S["CNTSVaccinationMatrixColumn"];
+export type MatrixQuery = { model_type_code: string; project_ref?: string; site_ref?: string; commune_code?: string; received_from?: string; received_to?: string };
 
 /** Nhãn ca (UR-TINH-10): N ngày, Đ đêm, NĐ cả ngày đêm; trống = nghỉ. */
 export const SHIFT_LABEL: Record<Shift, string> = { N: "N", D: "Đ", ND: "NĐ" };
@@ -108,8 +114,9 @@ export function intValue(raw: string, rule: NumberRule): { ok: true; value: numb
 
 export function batchErrors(b: Partial<BatchCreate>): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!b.commune_code) e.commune_code = "Bắt buộc nhập.";
-  if (!b.model_type_code) e.model_type_code = "Bắt buộc nhập.";
+  // Chọn hộ mô hình: xã, loại mô hình lấy theo hộ/điểm ở máy chủ (BF-CN-VACC).
+  if (!b.household_ref && !b.commune_code) e.commune_code = "Bắt buộc nhập.";
+  if (!b.household_ref && !b.model_type_code) e.model_type_code = "Bắt buộc nhập.";
   if (!b.household_ref && !b.locality?.trim()) e.locality = "Chọn hộ mô hình hoặc ghi địa bàn (không ghi họ tên, số điện thoại).";
   if (!b.received_date) e.received_date = "Bắt buộc nhập.";
   if (b.age_at_receipt === undefined || !Number.isInteger(b.age_at_receipt) || b.age_at_receipt < 0 || b.age_at_receipt > 3650) e.age_at_receipt = "0–3650 ngày";
@@ -126,18 +133,55 @@ export function expectedDate(received: string, ageDays: number, ageAtReceipt: nu
 
 const idem = () => ({ header: { "Idempotency-Key": newIdempotencyKey() } });
 
+/** Nhãn hộ của một lứa: chủ hộ che bớt (hộ mô hình) hoặc địa bàn. */
+export function householdText(b: Pick<VaccinationBatch, "model" | "locality" | "household_ref">): string {
+  return b.model?.owner_label ?? b.locality ?? (b.household_ref ? `Hộ ${b.household_ref.slice(0, 8)}` : "—");
+}
+
+/** Cột của bảng BM-07 gom theo vaccine: [vaccine, số lần] theo thứ tự cột. */
+export function vaccineGroups(cols: readonly MatrixColumn[]): { code: string; name: string; span: number }[] {
+  const out: { code: string; name: string; span: number }[] = [];
+  for (const c of cols) {
+    const last = out.at(-1);
+    if (last && last.code === c.vaccine_code) last.span++;
+    else out.push({ code: c.vaccine_code, name: c.vaccine_name ?? c.vaccine_code, span: 1 });
+  }
+  return out;
+}
+
+/** Thay đổi của một hàng bảng BM-07 (ô đang sửa khác bản hiện hành); Cấp Xã/nông hộ không gửi ngày dự kiến. */
+export function rowChanges(row: Pick<MatrixRow, "cells" | "can_plan">, edit: Readonly<Record<string, { expected?: string; actual?: string }>>): DosesUpdate["doses"] {
+  const out: DosesUpdate["doses"] = [];
+  for (const d of row.cells) {
+    if (!d) continue;
+    const e = edit[`${d.vaccine_code}/${d.shot}`];
+    if (!e) continue;
+    const u: DosesUpdate["doses"][number] = { vaccine_code: d.vaccine_code, shot: d.shot };
+    if (row.can_plan && e.expected && e.expected !== d.expected_date) u.expected_date = e.expected;
+    if (e.actual && e.actual !== d.actual_date) u.actual_date = e.actual;
+    if (u.expected_date || u.actual_date) out.push(u);
+  }
+  return out;
+}
+
 export function createCntsCalApi(api: ApiClient) {
   return {
     roster: (month: string, province_code?: string): Promise<DutyRoster> => unwrap(api.GET("/v1/extension/cnts/duty-rosters/{month}", { params: { path: { month }, query: { province_code } } })),
     saveRoster: (month: string, body: S["CNTSDutyRosterSave"]): Promise<DutyRoster> =>
       unwrap(api.POST("/v1/extension/cnts/duty-rosters/{month}", { params: { path: { month }, ...idem() }, body })),
     myDuties: (month: string, province_code?: string): Promise<MyDuties> => unwrap(api.GET("/v1/extension/cnts/my-duties", { params: { query: { month, province_code } } })),
-    batches: async (q: { status?: BatchStatus; commune_code?: string } = {}): Promise<VaccinationBatch[]> =>
+    batches: async (q: { status?: BatchStatus; commune_code?: string; model_type_code?: string; project_ref?: string; site_ref?: string } = {}): Promise<VaccinationBatch[]> =>
       (await unwrap(api.GET("/v1/extension/cnts/vaccination-batches", { params: { query: q } }))).items,
     batch: (ref: string): Promise<VaccinationBatchDetail> =>
       unwrap(api.GET("/v1/extension/cnts/vaccination-batches/{ref}", { params: { path: { ref } } })),
     createBatch: (body: BatchCreate): Promise<VaccinationBatchDetail> =>
       unwrap(api.POST("/v1/extension/cnts/vaccination-batches", { params: idem(), body })),
+    matrix: (q: MatrixQuery): Promise<VaccinationMatrix> => unwrap(api.GET("/v1/extension/cnts/vaccination-matrix", { params: { query: q } })),
+    matrixXlsx: async (q: MatrixQuery): Promise<Blob> => {
+      const res = await api.GET("/v1/extension/cnts/vaccination-matrix/xlsx", { params: { query: q }, parseAs: "blob" });
+      if (!res.response.ok || !res.data) throw await parseProblemResponse(res.response);
+      return res.data as Blob;
+    },
     updateDoses: (ref: string, body: DosesUpdate): Promise<VaccinationBatchDetail> =>
       unwrap(api.POST("/v1/extension/cnts/vaccination-batches/{ref}/doses", { params: { path: { ref }, ...idem() }, body })),
     cancelBatch: (ref: string, base_version: number, reason: string): Promise<VaccinationBatchDetail> =>

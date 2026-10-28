@@ -8,6 +8,7 @@ import { ADMIN_UNITS, CATALOGS } from "./data";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext, personaForContext } from "./kn";
 import { AG_COMMUNES } from "./kn-reports/store";
+import { modelHouseholdInfo } from "./kn-cnts-model";
 
 type S = components["schemas"];
 type Roster = S["CNTSDutyRoster"];
@@ -85,12 +86,47 @@ function warnings(r: Roster): Roster["warnings"] {
 
 const latestRoster = (month: string, province: string) => ROSTERS.get(rosterKey(month,province))?.at(-1) ?? emptyRoster(month,province);
 
-function batchView(b: Batch): S["CNTSVaccinationBatch"] {
+/** Hộ mô hình của lứa (BF-CN-VACC) từ giả lập W11.47. */
+function modelOf(b: Batch): S["CNTSVaccinationModel"] | null {
+  const m = b.household_ref ? modelHouseholdInfo(b.household_ref) : null;
+  if (!m) return null;
+  return { household_ref: m.household_ref, owner_label: m.owner_label, site_ref: m.site_ref, site_name: m.site_name, project_ref: m.project_ref,
+    project_code: m.project_code, project_name: m.project_name, officer_ref: m.officer_ref, officer_display: m.officer_display, active: m.active };
+}
+function batchView(b: Batch, w?: ReturnType<typeof who>): S["CNTSVaccinationBatch"] {
   const t = today();
   const doses = b.doses.map((d) => ({ ...d, overdue: !d.actual_date && d.expected_date < t }));
   const overdue = doses.filter((d) => d.overdue).length;
   const status = b.event === "cancelled" ? "cancelled" : overdue ? "overdue" : doses.every((d) => d.actual_date) ? "done" : "open";
-  return { ...b, doses, status, overdue_count: overdue, can_plan: b.event !== "cancelled", can_record: b.event !== "cancelled", next_dose: doses.find((d) => !d.actual_date) ?? null };
+  const plan = !w || ((w.role === "admin" || w.role === "kn_tinh") && !w.readOnly);
+  const record = !w || ((w.role === "admin" || w.role === "kn_tinh" || w.role === "kn_xa") && !w.readOnly);
+  return { ...b, doses, status, overdue_count: overdue, can_plan: plan && b.event !== "cancelled", can_record: record && b.event !== "cancelled",
+    next_dose: doses.find((d) => !d.actual_date) ?? null, model: modelOf(b) };
+}
+/** Lứa (bản hiện hành) trong phạm vi người gọi theo bộ lọc của danh sách/bảng BM-07. */
+function scopedBatches(ctx: Ctx) {
+  const w = who(ctx);
+  const q = ctx.url.searchParams;
+  return [...BATCHES.values()]
+    .map((vs) => batchView(vs.at(-1)!, w))
+    .filter((b) => (w.communes === null || w.communes.includes(b.commune_code)) && (!q.get("model_type_code") || b.model_type_code === q.get("model_type_code")) &&
+      (!q.get("project_ref") || b.model?.project_ref === q.get("project_ref")) && (!q.get("site_ref") || b.model?.site_ref === q.get("site_ref")));
+}
+/** Bảng BM-07 giả lập: cột = vaccine × lần (theo ngày tuổi), hàng = lứa chưa hủy. */
+function matrix(ctx: Ctx): S["CNTSVaccinationMatrix"] | Response {
+  const mt = ctx.url.searchParams.get("model_type_code");
+  if (!mt) return problem(422, "extension.cnts_vaccination_invalid", "Lịch tiêm phòng không hợp lệ");
+  const rows = scopedBatches(ctx).filter((b) => b.status !== "cancelled").sort((a, b) => a.commune_code.localeCompare(b.commune_code) || a.received_date.localeCompare(b.received_date));
+  const cols = new Map<string, S["CNTSVaccinationMatrixColumn"]>();
+  for (const b of rows) for (const d of b.doses) if (!cols.has(`${d.vaccine_code}/${d.shot}`)) cols.set(`${d.vaccine_code}/${d.shot}`, { vaccine_code: d.vaccine_code, vaccine_name: d.vaccine_name, shot: d.shot, age_days: d.age_days });
+  const first = new Map<string, number>();
+  for (const c of cols.values()) first.set(c.vaccine_code, Math.min(first.get(c.vaccine_code) ?? c.age_days, c.age_days));
+  const columns = [...cols.values()].sort((a, b) => (first.get(a.vaccine_code)! - first.get(b.vaccine_code)!) || a.vaccine_code.localeCompare(b.vaccine_code) || a.shot - b.shot);
+  return {
+    model_type_code: mt, model_type_name: CATALOGS.cnts_model_type.find((m) => m.code === mt)?.name ?? null, columns, truncated: false, max_rows: 500,
+    rows: rows.map((b) => ({ ...b, cells: columns.map((c) => b.doses.find((d) => d.vaccine_code === c.vaccine_code && d.shot === c.shot) ?? null),
+      household_text: b.model?.owner_label ?? b.locality, commune_name: AG_COMMUNES.find((c) => c.code === b.commune_code)?.name ?? ADMIN_UNITS.find((u) => u.code === b.commune_code)?.name ?? null })),
+  };
 }
 const detail = (ref: string) => {
   const vs = BATCHES.get(ref)!;
@@ -154,12 +190,31 @@ export const cntsCalRoutes: Route[] = [
     method: "GET",
     pattern: /^\/v1\/extension\/cnts\/vaccination-batches$/,
     handler: (ctx) => {
-      const w = who(ctx);
       const st = ctx.url.searchParams.get("status");
-      const items = [...BATCHES.values()]
-        .map((vs) => batchView(vs.at(-1)!))
-        .filter((b) => (w.communes === null || w.communes.includes(b.commune_code)) && (!st || b.status === st));
-      return json({ items });
+      return json({ items: scopedBatches(ctx).filter((b) => !st || b.status === st) });
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/vaccination-matrix$/,
+    handler: (ctx) => {
+      const m = matrix(ctx);
+      return m instanceof Response ? m : json(m);
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/vaccination-matrix\/xlsx$/,
+    handler: (ctx) => {
+      const m = matrix(ctx);
+      if (m instanceof Response) return m;
+      // Giả lập: CSV UTF-8 (BOM) cùng cột với tệp .xlsx thật (STT, xã, hộ, CB theo dõi MH, ngày nhận, dự kiến/thực tế từng mũi).
+      const head = ["STT", "Địa chỉ (xã)", "Họ tên nông dân", "CB theo dõi MH", "Ngày nhận giống", ...m.columns.flatMap((c) => [`${c.vaccine_name ?? c.vaccine_code} L${c.shot} dự kiến`, `L${c.shot} thực tế`])];
+      const lines = m.rows.map((r, i) => [String(i + 1), r.commune_name ?? r.commune_code, r.household_text ?? "", r.model?.officer_display ?? "", r.received_date,
+        ...r.cells.flatMap((d) => [d?.expected_date ?? "", d?.actual_date ?? ""])].map((v) => `"${v.replace(/"/g, '""')}"`).join(","));
+      return new Response(`﻿${head.join(",")}\r\n${lines.join("\r\n")}\r\n`, {
+        status: 200, headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="lich-tiem-phong-bm07-gia-lap.csv"' },
+      });
     },
   },
   {
@@ -175,6 +230,16 @@ export const cntsCalRoutes: Route[] = [
         b.head_count !== undefined && b.head_count !== null && !(Number.isInteger(b.head_count) && b.head_count >= 1) && { field: "head_count", reason: "số con ≥ 1" },
       ].filter(Boolean) as { field: string; reason: string }[];
       if (numErrs.length) return validation(numErrs);
+      if (b.household_ref) {
+        // Như máy chủ (BF-CN-VACC): hộ mô hình của KN; xã, loại mô hình theo hộ/điểm.
+        const m = modelHouseholdInfo(b.household_ref);
+        if (!m || !m.active) return validation([{ field: "household_ref", reason: "không có hộ mô hình (FN-10) này trong phạm vi" }]);
+        if (b.commune_code && b.commune_code !== m.commune_code) return validation([{ field: "commune_code", reason: "khác xã của hộ mô hình" }]);
+        if (b.model_type_code && b.model_type_code !== m.model_type_code) return validation([{ field: "model_type_code", reason: "khác loại mô hình của điểm trình diễn" }]);
+        b.commune_code = m.commune_code;
+        b.model_type_code = m.model_type_code;
+      }
+      if (!b.commune_code || !b.model_type_code) return validation([{ field: !b.commune_code ? "commune_code" : "model_type_code", reason: "bắt buộc khi không chọn hộ mô hình" }]);
       const sc = CATALOGS.cnts_vaccination_schedule.find((x) => x.attrs.model_type === b.model_type_code);
       if (!sc) return problem(422, "extension.cnts_vaccination_no_procedure", "Không có quy trình tiêm cho loại mô hình/giống tại ngày nhận giống");
       const doses = (sc.attrs.doses ?? "")

@@ -145,6 +145,20 @@ function seed() {
     status_reason: null, ...sys }]);
 }
 
+/** Hộ mô hình cho lịch tiêm BM-07 (BF-CN-VACC): điểm, dự án, cán bộ theo dõi điểm, nhãn chủ hộ che bớt. */
+export function modelHouseholdInfo(ref: string): (S["CNTSVaccinationModel"] & { commune_code: string; model_type_code: string }) | null {
+  seed();
+  const h = last(HOUSEHOLDS, ref);
+  const s = h ? last(SITES, h.site_ref) : undefined;
+  const p = s ? last(PROJECTS, s.project_ref) : undefined;
+  if (!h || !s || !p) return null;
+  return {
+    household_ref: h.ref, owner_label: OWNERS.get(h.person_ref)?.label ?? null, site_ref: s.ref, site_name: s.name, project_ref: p.ref, project_code: p.code,
+    project_name: p.name, officer_ref: s.officer_ref, officer_display: s.officer_ref ? NAMES[s.officer_ref] ?? null : null,
+    active: h.event !== "withdrawn" && s.event !== "closed" && p.event !== "closed", commune_code: h.commune_code, model_type_code: s.model_type_code,
+  };
+}
+
 function parsePoint(b: { location?: S["CNTSPoint"] | null }) {
   const l = b.location;
   if (!l) return null;

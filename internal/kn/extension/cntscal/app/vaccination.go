@@ -321,6 +321,10 @@ func (s *Service) CreateBatch(ctx context.Context, in CreateBatchInput) (BatchVi
 	switch {
 	case in.HouseholdRef == nil && in.Locality == "":
 		return BatchView{}, ErrBatchInvalid.WithField("household_ref", "chọn hộ mô hình hoặc ghi địa bàn")
+	case in.CommuneCode == "":
+		return BatchView{}, ErrBatchInvalid.WithField("commune_code", "bắt buộc khi không chọn hộ mô hình")
+	case in.ModelType == "":
+		return BatchView{}, ErrBatchInvalid.WithField("model_type_code", "bắt buộc khi không chọn hộ mô hình")
 	case in.AgeAtReceipt < 0 || in.AgeAtReceipt > domain.MaxAgeDays:
 		return BatchView{}, ErrBatchInvalid.WithField("age_at_receipt", "0–3650 ngày")
 	case in.HeadCount != nil && (*in.HeadCount < 1 || *in.HeadCount > domain.MaxHeadCount):

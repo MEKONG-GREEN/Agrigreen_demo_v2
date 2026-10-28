@@ -845,6 +845,9 @@ paths:
       parameters:
         - {name: commune_code, in: query, required: false, schema: {type: string}}
         - {name: household_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: model_type_code, in: query, required: false, schema: {type: string}}
+        - {name: project_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: site_ref, in: query, required: false, schema: {type: string, format: uuid}}
         - {name: status, in: query, required: false, schema: {type: string, enum: [open, overdue, done, cancelled]}}
         - {name: received_from, in: query, required: false, schema: {type: string, format: date}}
         - {name: received_to, in: query, required: false, schema: {type: string, format: date}}
@@ -2290,8 +2293,9 @@ components:
       allOf:
         - $ref: "#/components/schemas/CNTSVaccinationBatchCore"
         - type: object
-          required: [status, overdue_count, can_plan, can_record, next_dose]
+          required: [status, overdue_count, can_plan, can_record, next_dose, model]
           properties:
+            model: {oneOf: [{$ref: "#/components/schemas/CNTSVaccinationModel"}, {type: "null"}], description: "Hộ mô hình của lứa (BF-CN-VACC); null = lứa theo địa bàn"}
             status: {type: string, enum: [open, overdue, done, cancelled]}
             overdue_count: {type: integer}
             can_plan: {type: boolean}
@@ -2308,14 +2312,15 @@ components:
 # @ag-order: 661
     CNTSVaccinationBatchCreate:
       type: object
-      required: [commune_code, model_type_code, received_date, age_at_receipt]
+      required: [received_date, age_at_receipt]
+      description: "commune_code, model_type_code bắt buộc khi không chọn hộ mô hình"
       properties:
         id: {type: [string, "null"], format: uuid, description: UUIDv7 máy khách sinh (tùy chọn)}
         commune_code: {type: string}
         model_type_code: {type: string}
         breed_code: {type: [string, "null"]}
         schedule_code: {type: [string, "null"], description: "Rỗng → chọn quy trình theo giống/loại mô hình tại ngày nhận giống"}
-        household_ref: {type: [string, "null"], format: uuid, description: "Hộ mô hình — hoặc ghi địa bàn (không lưu họ tên tự do)"}
+        household_ref: {type: [string, "null"], format: uuid, description: "Hộ mô hình (FN-10) — xã, loại mô hình bỏ trống thì lấy theo hộ/điểm; hoặc ghi địa bàn (không lưu họ tên tự do)"}
         locality: {type: [string, "null"], maxLength: 300}
         received_date: {type: string, format: date}
         age_at_receipt: {type: integer, minimum: 0, maximum: 3650}
