@@ -101,8 +101,9 @@ func renderCNTSNotifications(eventType string, payload json.RawMessage, occurred
 			DeepLink: cntsNotificationPeriodsLink, SubjectRef: sourceNotificationRef(p.PeriodRef), CreatedAt: sourceNotificationTime(p.EventTime, occurred)}
 		email := slices.Contains(p.Channels, "email")
 		// BF-CN-PUBLISH (CN-07): kênh Cấp Tỉnh chọn ở cấu hình nhắc của biểu là lựa chọn kênh tường minh (BF-NOTIFY-CNTS):
-		// bỏ "Đẩy thông báo Mobile" thì không push. Sự kiện cũ không có kênh → hành vi mặc định (hộp thư + push).
-		ch := reminderChannels(p.Channels)
+		// bỏ "Đẩy thông báo Mobile" thì không push. BF-NOTIFY-KN-ADAPTER (#121): chỉ khi sự kiện đánh dấu channels_explicit
+		// (job nhắc theo cấu hình biểu); sự kiện cũ/không đánh dấu → hành vi cũ (hộp thư + push, email theo cờ) — giữ golden.
+		ch := reminderChannels(p.Channels, p.ChannelsExplicit)
 		out := make([]notifyport.NotificationDraft, 0, len(p.RecipientRefs))
 		for _, r := range sourceNotificationRecipients(p.RecipientRefs) {
 			n := tpl.For(r)
@@ -127,10 +128,10 @@ func renderCNTSNotifications(eventType string, payload json.RawMessage, occurred
 	return nil, nil
 }
 
-// reminderChannels chuyển kênh của cấu hình nhắc (in_app, push, email) sang lựa chọn kênh của pf/notify; rỗng → nil
-// (hành vi cũ). Hộp thư luôn có (KN chuẩn hóa in_app; push của notify cũng kéo theo hộp thư).
-func reminderChannels(chs []string) *notifyport.DeliveryChannels {
-	if len(chs) == 0 {
+// reminderChannels chuyển kênh của cấu hình nhắc (in_app, push, email) sang lựa chọn kênh của pf/notify; không tường minh
+// hoặc rỗng → nil (hành vi cũ). Hộp thư luôn có (KN chuẩn hóa in_app; push của notify cũng kéo theo hộp thư).
+func reminderChannels(chs []string, explicit bool) *notifyport.DeliveryChannels {
+	if !explicit || len(chs) == 0 {
 		return nil
 	}
 	return &notifyport.DeliveryChannels{InApp: true, Push: slices.Contains(chs, "push"), Email: slices.Contains(chs, "email")}
