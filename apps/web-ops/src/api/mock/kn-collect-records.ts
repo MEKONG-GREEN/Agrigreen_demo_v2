@@ -285,7 +285,15 @@ export function knRecordRoutes(getCoops: () => PublishedCoop[], wrap: Wrap): Rou
             (!p("parent_ref") || x.parent_ref === p("parent_ref")) &&
             (!p("htx_ref") || x.htx_ref === p("htx_ref")),
         );
-        return json({ items: items.map((x) => wire(x, c, coops)), next_cursor: null });
+        // Phân trang theo con trỏ như máy chủ: limit 1–200 (mặc định 50), cursor = ref cuối của trang trước.
+        const lim = p("limit") ? Number(p("limit")) : 50;
+        if (!Number.isInteger(lim) || lim < 1 || lim > 200) return field([{ field: "limit", reason: "số nguyên 1–200" }]);
+        const cur = p("cursor");
+        const start = cur ? items.findIndex((x) => x.ref === cur) + 1 : 0;
+        if (cur && start === 0) return field([{ field: "cursor", reason: "con trỏ không hợp lệ" }]);
+        const pageItems = items.slice(start, start + lim);
+        const more = start + lim < items.length;
+        return json({ items: pageItems.map((x) => wire(x, c, coops)), next_cursor: more ? pageItems.at(-1)!.ref : null });
       }),
     },
     {

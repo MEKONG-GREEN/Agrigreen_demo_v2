@@ -15,7 +15,7 @@ import { ActionBar, BackLink, DetailLayout, DetailPage, LabelValueBlock, LogPane
 import { DataTable, FilterBar, FilterChip, PageHeader, RowActions, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import { PiiHint } from "@/kn/pii";
-import type { KnProducer, KnProducerDetail, KnProducerKind, KnProducerWrite } from "../api";
+import type { CollectApi, KnProducer, KnProducerDetail, KnProducerKind, KnProducerQuery, KnProducerWrite } from "../api";
 import { LoadState, num, useAction, useCommuneNames, useLoad } from "../common";
 import { useCommuneFilter } from "./DataScreens";
 
@@ -62,6 +62,38 @@ export function ProducerTabs({ current }: { current: KnProducerKind }) {
   );
 }
 
+/** Số dòng mỗi trang danh sách — cũng là `limit` gửi máy chủ (phân trang theo con trỏ của máy chủ, không cắt ở client). */
+export const PRODUCER_PAGE_SIZE = 10;
+/** Mỗi lượt đọc hết danh mục dùng đúng trần máy chủ (200); trần số lượt chặn vòng lặp vô hạn nếu con trỏ hỏng. */
+const ALL_PAGE_LIMIT = 200;
+const ALL_MAX_PAGES = 100;
+
+/**
+ * Đọc HẾT hồ sơ khớp bộ lọc theo next_cursor (mỗi lượt ≤ 200 — giữ giới hạn máy chủ). Dùng cho danh mục HTX/THT cha và
+ * danh sách nông hộ của một HTX/THT: không được mất hồ sơ sau trang đầu. Con trỏ lặp lại hoặc quá trần → báo lỗi
+ * thay vì trả danh sách thiếu.
+ */
+export async function loadAllRecords(api: Pick<CollectApi, "records">, q: KnProducerQuery): Promise<KnProducer[]> {
+  const out: KnProducer[] = [];
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  for (let i = 0; i < ALL_MAX_PAGES; i++) {
+    const r = await api.records(cursor ? { ...q, cursor, limit: ALL_PAGE_LIMIT } : { ...q, limit: ALL_PAGE_LIMIT });
+    out.push(...r.items);
+    if (!r.next_cursor) return out;
+    if (seen.has(r.next_cursor)) throw new Error("Con trỏ phân trang lặp lại — dừng đọc danh sách hồ sơ.");
+    seen.add(r.next_cursor);
+    cursor = r.next_cursor;
+  }
+  throw new Error("Danh sách hồ sơ vượt số trang tối đa — thu hẹp bộ lọc.");
+}
+
+/** Danh mục HTX + Tổ hợp tác (đủ mọi trang) cho ô chọn "Thuộc HTX/THT". */
+async function loadParents(api: Pick<CollectApi, "records">, status?: KnProducerQuery["status"]): Promise<KnProducer[]> {
+  const [a, b] = await Promise.all([loadAllRecords(api, { kind: "cooperative", status }), loadAllRecords(api, { kind: "coop_group", status })]);
+  return [...a, ...b];
+}
+
 /** Danh sách một loại hồ sơ, bộ lọc riêng của loại (TT-09). */
 export function ProducerListScreen({ kind, title, actions }: { kind: KnProducerKind; title?: string; actions?: ReactNode }) {
   const { collectApi } = useAuth();
@@ -71,20 +103,27 @@ export function ProducerListScreen({ kind, title, actions }: { kind: KnProducerK
   const [status, setStatus] = useState<"active" | "inactive" | "all">("active");
   const [q, setQ] = useState("");
   const [parent, setParent] = useState("");
-  const [page, setPage] = useState(1);
+  // Phân trang máy chủ theo con trỏ: `cursors` = con trỏ của trang 2..n đã đi qua (trang n đọc bằng cursors[n-2]).
+  // Gắn với khóa bộ lọc: đổi bất kỳ bộ lọc nào (kể cả Xã/phường, loại) → về trang 1, bỏ con trỏ cũ.
+  const filterKey = JSON.stringify([kind, f.commune, status, q, parent]);
+  const [pg, setPg] = useState<{ key: string; cursors: string[] }>({ key: filterKey, cursors: [] });
+  const cursors = pg.key === filterKey ? pg.cursors : [];
+  const cursor = cursors.at(-1);
+  const page = cursors.length + 1;
   const s = useLoad(
-    () => collectApi.records({ kind, commune: f.commune || undefined, status, q: kind === "household" ? undefined : q || undefined, parent_ref: kind === "household" ? parent || undefined : undefined }),
-    [kind, f.commune, status, q, parent],
+    () =>
+      collectApi.records({
+        kind,
+        commune: f.commune || undefined,
+        status,
+        q: kind === "household" ? undefined : q || undefined,
+        parent_ref: kind === "household" ? parent || undefined : undefined,
+        ...(cursor ? { cursor } : {}),
+        limit: PRODUCER_PAGE_SIZE,
+      }),
+    [kind, f.commune, status, q, parent, cursor],
   );
-  const parents = useLoad(
-    kind === "household"
-      ? async () => {
-          const [a, b] = await Promise.all([collectApi.records({ kind: "cooperative", status: "all" }), collectApi.records({ kind: "coop_group", status: "all" })]);
-          return [...a.items, ...b.items];
-        }
-      : null,
-    [kind],
-  );
+  const parents = useLoad(kind === "household" ? () => loadParents(collectApi, "all") : null, [kind]);
   const name = useCommuneNames(s.data?.items.map((c) => c.commune_code) ?? []);
   const columns: Column<KnProducer>[] = [
     { key: "name", header: cfg.nameLabel, cell: (c) => c.display_name },
@@ -111,13 +150,13 @@ export function ProducerListScreen({ kind, title, actions }: { kind: KnProducerK
           )
         }
       />
-      <FilterBar onReset={() => (setStatus("active"), setQ(""), setParent(""), setPage(1))}>
+      <FilterBar onReset={() => (setStatus("active"), setQ(""), setParent(""))}>
         {f.chip}
         <FilterChip
           label="Trạng thái"
           value={status}
           defaultValue="active"
-          onChange={(v) => (setStatus(v as typeof status), setPage(1))}
+          onChange={(v) => setStatus(v as typeof status)}
           options={[
             { value: "active", label: "Hoạt động" },
             { value: "inactive", label: "Ngừng hoạt động" },
@@ -125,15 +164,58 @@ export function ProducerListScreen({ kind, title, actions }: { kind: KnProducerK
           ]}
         />
         {kind === "household" ? (
-          <FilterChip label="Thuộc HTX/THT" value={parent} onChange={(v) => (setParent(v), setPage(1))} options={[{ value: "", label: "Tất cả" }, ...(parents.data ?? []).map((p) => ({ value: p.ref, label: `${p.kind_label}: ${p.display_name}` }))]} />
+          <FilterChip label="Thuộc HTX/THT" value={parent} onChange={setParent} options={[{ value: "", label: "Tất cả" }, ...(parents.data ?? []).map((p) => ({ value: p.ref, label: `${p.kind_label}: ${p.display_name}` }))]} />
         ) : (
-          <SearchBox value={q} onChange={(v) => (setQ(v), setPage(1))} placeholder={`Tìm theo tên ${cfg.label}`} />
+          <SearchBox value={q} onChange={setQ} placeholder={`Tìm theo tên ${cfg.label}`} />
         )}
       </FilterBar>
       <LoadState s={s}>
-        {(d) => <DataTable caption={cfg.list} columns={columns} rows={d.items.slice((page - 1) * 10, page * 10)} rowKey={(c) => c.ref} page={page} pageSize={10} total={d.items.length} onPage={setPage} empty={cfg.empty} />}
+        {(d) => (
+          <>
+            <DataTable caption={cfg.list} columns={columns} rows={d.items} rowKey={(c) => c.ref} page={page} pageSize={PRODUCER_PAGE_SIZE} empty={cfg.empty} />
+            <CursorPager
+              page={page}
+              rows={d.items.length}
+              busy={s.loading}
+              hasNext={!!d.next_cursor}
+              onPrev={() => setPg({ key: filterKey, cursors: cursors.slice(0, -1) })}
+              onNext={() => {
+                if (d.next_cursor) setPg({ key: filterKey, cursors: [...cursors, d.next_cursor] });
+              }}
+            />
+          </>
+        )}
       </LoadState>
     </>
+  );
+}
+
+/** Thanh phân trang theo con trỏ (máy chủ không trả tổng số): Trang trước / số trang hiện tại / Trang sau. */
+function CursorPager({ page, rows, busy, hasNext, onPrev, onNext }: { page: number; rows: number; busy: boolean; hasNext: boolean; onPrev: () => void; onNext: () => void }) {
+  const from = (page - 1) * PRODUCER_PAGE_SIZE + 1;
+  return (
+    <div className="pager">
+      <span aria-live="polite">{rows ? `Hiển thị ${from}–${from + rows - 1}${hasNext ? " · còn trang sau" : ""}` : page > 1 ? "Không còn dòng nào" : "Không có dòng nào"}</span>
+      <nav aria-label="Phân trang">
+        <ol>
+          <li>
+            <button type="button" aria-label="Trang trước" disabled={busy || page <= 1} onClick={onPrev}>
+              ‹
+            </button>
+          </li>
+          <li>
+            <button type="button" aria-current="page" aria-label={`Trang ${page}`}>
+              {page}
+            </button>
+          </li>
+          <li>
+            <button type="button" aria-label="Trang sau" disabled={busy || !hasNext} onClick={onNext}>
+              ›
+            </button>
+          </li>
+        </ol>
+      </nav>
+    </div>
   );
 }
 
@@ -147,11 +229,11 @@ export function ProducerDetailScreen({ kind }: { kind: KnProducerKind }) {
   const s = useLoad(async () => {
     const c = await collectApi.record(id);
     const [hh, mm, pl] = await Promise.all([
-      c.kind === "household" ? Promise.resolve({ items: [] as KnProducer[] }) : collectApi.records({ kind: "household", parent_ref: id, status: "all" }),
+      c.kind === "household" ? Promise.resolve([] as KnProducer[]) : loadAllRecords(collectApi, { kind: "household", parent_ref: id, status: "all" }),
       c.htx_ref ? collectApi.coopMachines(c.htx_ref).catch(() => null) : Promise.resolve(null),
       c.htx_ref ? collectApi.plots({ cooperative_ref: c.htx_ref }).catch(() => null) : Promise.resolve(null),
     ]);
-    return { c, hh: hh.items, mm, pl: pl?.items ?? [] };
+    return { c, hh, mm, pl: pl?.items ?? [] };
   }, [id, act.note]);
   const [dlg, setDlg] = useState<null | "off" | "on">(null);
   const [reason, setReason] = useState("");
@@ -316,15 +398,7 @@ export function ProducerFormScreen({ kind: fixedKind, kinds, parentRef, editRef,
   }
   const kind = (cur.data?.kind ?? form.kind) as KnProducerKind | "";
   const candidates = useLoad(kind === "cooperative" && form.commune_code ? () => collectApi.htxCandidates(form.commune_code) : null, [kind, form.commune_code]);
-  const parents = useLoad(
-    kind === "household" && !parentRef
-      ? async () => {
-          const [a, b] = await Promise.all([collectApi.records({ kind: "cooperative" }), collectApi.records({ kind: "coop_group" })]);
-          return [...a.items, ...b.items];
-        }
-      : null,
-    [kind, parentRef],
-  );
+  const parents = useLoad(kind === "household" && !parentRef ? () => loadParents(collectApi) : null, [kind, parentRef]);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const server = act.problem ? fieldErrorMap(act.problem) : {};
   const set = (k: keyof Form) => (v: string) => setForm((x) => ({ ...x, [k]: v }));

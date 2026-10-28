@@ -56,7 +56,7 @@ describe("TT-09: ba danh sách riêng, bộ lọc riêng", () => {
     expect(screen.getByRole("link", { name: "Sửa Nông hộ Trần T. B." })).toHaveAttribute("href", "/kn/du-lieu/htx/nong-ho/h-1/sua");
     await waitFor(() => expect(screen.getByRole("option", { name: "HTX: HTX Mỹ Hòa" })).toBeInTheDocument());
     await u.selectOptions(screen.getByLabelText("Thuộc HTX/THT"), "c-1");
-    await waitFor(() => expect(auth.collectApi.records).toHaveBeenLastCalledWith({ kind: "household", commune: undefined, status: "active", q: undefined, parent_ref: "c-1" }));
+    await waitFor(() => expect(auth.collectApi.records).toHaveBeenLastCalledWith({ kind: "household", commune: undefined, status: "active", q: undefined, parent_ref: "c-1", limit: 10 }));
   });
 
   it("Tổ hợp tác: tìm theo tên, cột Người đại diện + Nông hộ; Cấp Tỉnh không có nút Thêm/Sửa", async () => {
@@ -69,7 +69,58 @@ describe("TT-09: ba danh sách riêng, bộ lọc riêng", () => {
     expect(screen.queryByRole("link", { name: "Thêm Tổ hợp tác" })).toBeNull();
     expect(screen.queryByRole("link", { name: /^Sửa / })).toBeNull();
     await u.type(screen.getByPlaceholderText("Tìm theo tên Tổ hợp tác"), "rau");
-    await waitFor(() => expect(auth.collectApi.records).toHaveBeenLastCalledWith({ kind: "coop_group", commune: undefined, status: "active", q: "rau", parent_ref: undefined }));
+    await waitFor(() => expect(auth.collectApi.records).toHaveBeenLastCalledWith({ kind: "coop_group", commune: undefined, status: "active", q: "rau", parent_ref: undefined, limit: 10 }));
+  });
+});
+
+describe("TT-09: ba danh sách phân trang theo con trỏ của máy chủ (Codex P2 #102)", () => {
+  const many = (kind: "household" | "coop_group", n: number) =>
+    Array.from({ length: n }, (_, i) => {
+      const id = String(i + 1).padStart(3, "0");
+      return kind === "household" ? { ...hh, ref: `h-${id}`, display_name: `Hộ số ${id}` } : { ...tht, ref: `g-${id}`, name: `THT số ${id}`, display_name: `THT số ${id}` };
+    });
+  /** Máy chủ giả: limit mặc định 50 (> 200 lỗi), cursor = ref cuối trang trước, lọc parent_ref. */
+  const paged = (rows: Record<string, { ref: string; parent_ref?: string | null }[]>) =>
+    vi.fn(async (q: { kind: string; parent_ref?: string; cursor?: string; limit?: number }) => {
+      const limit = q.limit ?? 50;
+      if (limit > 200) throw new Error("limit vượt giới hạn máy chủ");
+      const all = (rows[q.kind] ?? []).filter((r) => !q.parent_ref || r.parent_ref === q.parent_ref);
+      const start = q.cursor ? all.findIndex((r) => r.ref === q.cursor) + 1 : 0;
+      const items = all.slice(start, start + limit);
+      return { items, next_cursor: start + limit < all.length ? items.at(-1)!.ref : null };
+    });
+
+  it.each([
+    ["household", "Danh sách Nông hộ", "Hộ số"],
+    ["coop_group", "Danh sách Tổ hợp tác", "THT số"],
+  ] as const)("%s: 51 hồ sơ — Trang sau tới trang 6 thấy hồ sơ thứ 51 (gửi cursor)", async (kind, caption, label) => {
+    const u = userEvent.setup();
+    auth.collectApi.records = paged({ cooperative: [htx], coop_group: kind === "coop_group" ? many("coop_group", 51) : [tht], household: kind === "household" ? many("household", 51) : [] });
+    render(<ProducerListScreen kind={kind} />);
+    await screen.findByRole("table", { name: caption });
+    for (let p = 2; p <= 6; p++) {
+      await u.click(screen.getByRole("button", { name: "Trang sau" }));
+      expect(await screen.findByText(`${label} ${String((p - 1) * 10 + 1).padStart(3, "0")}`)).toBeInTheDocument();
+    }
+    expect(screen.getByText(`${label} 051`)).toBeInTheDocument();
+    expect(auth.collectApi.records).toHaveBeenLastCalledWith(expect.objectContaining({ kind, cursor: kind === "household" ? "h-050" : "g-050", limit: 10 }));
+    expect(screen.getByRole("button", { name: "Trang sau" })).toBeDisabled();
+  });
+
+  it("Nông hộ: đổi HTX/THT ở bộ lọc → về trang 1, bỏ cursor; ô lọc có THT sau trang 200 đầu", async () => {
+    const u = userEvent.setup();
+    const groups = many("coop_group", 205);
+    auth.collectApi.records = paged({ cooperative: [htx], coop_group: groups, household: many("household", 30) });
+    render(<ProducerListScreen kind="household" />);
+    await screen.findByText("Hộ số 001");
+    await u.click(screen.getByRole("button", { name: "Trang sau" }));
+    expect(await screen.findByText("Hộ số 011")).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Tổ hợp tác: THT số 205" })).toBeInTheDocument();
+    await u.selectOptions(screen.getByLabelText("Thuộc HTX/THT"), "c-1");
+    await waitFor(() => expect(auth.collectApi.records).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "household", parent_ref: "c-1", limit: 10 })));
+    expect(auth.collectApi.records.mock.lastCall![0]).not.toHaveProperty("cursor");
+    expect(await screen.findByText("Hộ số 001")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trang 1" })).toHaveAttribute("aria-current", "page");
   });
 });
 

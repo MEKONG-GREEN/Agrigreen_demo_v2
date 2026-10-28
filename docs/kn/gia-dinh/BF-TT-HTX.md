@@ -10,5 +10,6 @@
 - **TT-08 — có sửa:** trang Sửa cho cả ba loại (`…/{id}/sua`), điền sẵn; người đại diện/chủ hộ để trống = giữ người hiện tại (họ tên, SĐT không hiện rõ); gửi `base_version` — người khác vừa sửa → 409, tải lại. Loại không đổi sau khi tạo. Hồ sơ ngừng hoạt động phải kích hoạt lại trước khi sửa. Vô hiệu hóa/kích hoạt lại có lý do (≥ 10 ký tự, pop-up ngắn theo ui-kit).
 - **Quyền web:** chỉ Cấp Xã thấy nút Thêm/Sửa/Vô hiệu hóa; Cấp Tỉnh, Quốc gia, Admin chỉ xem (máy chủ: Cấp Tỉnh 403, Quốc gia 403 read_only).
 - **Mock:** `apps/web-ops/src/api/mock/kn-collect-records.ts` (#67) có sẵn HTX demo (liên kết HTX giả lập), 2 Tổ hợp tác, nông hộ thuộc HTX/THT.
+- **Phân trang (Codex P2, 28/10):** ba danh sách dùng phân trang theo con trỏ của máy chủ từ #67 (`limit` 10/trang, `cursor` = `next_cursor`); hồ sơ thứ 51 trở đi xem được ở cả ba tab; đổi bộ lọc (xã, trạng thái, tên, HTX/THT) → về trang 1. Ô lọc/ô chọn "Thuộc HTX/THT" đọc đủ mọi trang (mỗi lượt ≤ 200).
 - **Không đổi:** menu (mục "Danh sách HTX" vẫn trỏ `/kn/du-lieu/htx`), route API (#67).
 - **Câu hỏi PO:** (1) Nhãn menu giữ "Danh sách HTX" hay đổi thành "HTX, Nông hộ, Tổ hợp tác"? (2) Nông hộ có cần tìm theo SĐT (tra kho định danh) không?
