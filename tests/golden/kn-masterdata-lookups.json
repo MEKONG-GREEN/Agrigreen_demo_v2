@@ -619,10 +619,16 @@
       "VX_DAU_GA": [
         "GA"
       ],
+      "VX_DICH_TA_VIT": [
+        "VIT"
+      ],
       "VX_DT_THT_HEO": [
         "HEO"
       ],
       "VX_GUMBORO": [
+        "GA"
+      ],
+      "VX_IB": [
         "GA"
       ],
       "VX_LMLM_BO": [
@@ -651,9 +657,15 @@
       "VX_THT_GA": [
         "GA"
       ],
+      "VX_THT_VIT": [
+        "VIT"
+      ],
       "VX_VDNC_BO": [
         "BO",
         "TRAU"
+      ],
+      "VX_VIEM_GAN_VIT": [
+        "VIT"
       ]
     },
     "Error": "",
