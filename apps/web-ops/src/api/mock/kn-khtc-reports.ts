@@ -17,6 +17,7 @@ const STORE = new Map<string, {
     exports: {
         meta: Export;
         body: string;
+        documentNo: string;
     }[];
 }>();
 const ADMIN = ["document_no", "place", "report_date", "recipient", "basis", "recipients", "authority", "signer_title", "signer"];
@@ -96,7 +97,7 @@ function load(ctx: Ctx, s: Stored) {
     value.detail.source_changed = current.data.input_hash !== value.detail.content.data.input_hash || (khtcReportSource(ctx, s.p.id)).source_changed;
     return value;
 }
-export const khtcReportRoutes: Route[] = [{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
+export const khtcReportRoutes: Route[] = [{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
 function handle(ctx: Ctx): Response {
     const [id, op, exportID, action] = ctx.params;
     const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
@@ -147,7 +148,7 @@ function handle(ctx: Ctx): Response {
         const rows = filterRows(d.content.data.rows ?? [], filter), esc = (s: string) => `"${s.replaceAll('"', '""')}"`;
         const bytes = "\uFEFF" + [["GIẢ LẬP KHTC", d.content.data.period.name], ["Hạng mục", "Trong kỳ", "Điều chỉnh", "Lũy kế năm"], ...rows.map(r => [r.name, r.in_period, r.adjustment, r.year_to_date])].map(r => r.map(esc).join(",")).join("\r\n");
         const x: Export = { id: uuidv7(), period_id: s.p.id, version: value.exports.length + 1, draft_id: d.draft_id!, file_name: `gia-lap-khtc-v${value.exports.length + 1}.csv`, body_hash: "0".repeat(64), input_hash: d.content.data.input_hash, provisional: !!d.content.data.provisional.length, filter, actor_ref: ctx.persona.me.actor_ref, at: new Date().toISOString() };
-        value.exports.push({ meta: x, body: bytes });
+        value.exports.push({ meta: x, body: bytes, documentNo: d.content.admin.document_no?.override ?? d.content.admin.document_no?.system ?? "" });
         return json(x, 201);
     }
     if (op === "refresh") {
@@ -183,4 +184,21 @@ function handle(ctx: Ctx): Response {
 export function khtcReportExport(periodId: string, exportId: string) {
     const value = STORE.get(periodId), x = value?.exports.find(e => e.meta.id === exportId);
     return value && x ? { detail: value.detail, meta: x.meta } : undefined;
+}
+
+function archive(ctx: Ctx): Response {
+ const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
+ if (!kc || kc.role !== "admin" && !(kc.department_code === KHTC && (kc.role === "kn_tinh" || kc.role === "kn_tw"))) return problem(403,"forbidden","Không có quyền");
+ const u = new URL(ctx.request.url), y=u.searchParams.get("year")??"", rawOffset=u.searchParams.get("offset")??"0", rawLimit=u.searchParams.get("limit")??"20";
+ const kind=u.searchParams.get("kind")??"", q=u.searchParams.get("q")??"", versions=u.searchParams.get("versions")??"false";
+ if (!/^\d{4}$/.test(y) || +y<2000 || +y>2100 || !/^\d{1,6}$/.test(rawOffset) || +rawOffset>100000 || !/^\d{1,2}$/.test(rawLimit) || +rawLimit<1 || +rawLimit>50 || q.length>800 || [...q].length>200 || !["","week","month","quarter","year","program","adhoc"].includes(kind) || !["true","false"].includes(versions)) return code("invalid","Bộ lọc không hợp lệ",422);
+ const rows:S["KHTCArchiveRow"][]=[];
+ for(const p of khtcMockStore()) {
+  if(p.p.year!==+y || p.terminal==="cancelled" || kind && p.p.report_type!==kind) continue;
+  const stored=STORE.get(p.p.id); if(!stored)continue;
+  const chosen=versions==="true" ? stored.exports : [stored.exports.find(x=>x.meta.id===stored.detail.final?.export_id)??stored.exports.at(-1)].filter(x=>x!==undefined);
+  for(const x of chosen)if((p.p.name+" "+x.documentNo).toLocaleLowerCase().includes(q.trim().toLocaleLowerCase()))rows.push({id:x.meta.id,period_id:p.p.id,period_name:p.p.name,report_type:p.p.report_type as S["KHTCArchiveRow"]["report_type"],document_no:x.documentNo,version:x.meta.version,final:stored.detail.final?.export_id===x.meta.id,provisional:x.meta.provisional,actor_ref:x.meta.actor_ref,at:x.meta.at});
+ }
+ rows.sort((a,b)=>b.at.localeCompare(a.at)||b.id.localeCompare(a.id));const offset=+rawOffset,limit=+rawLimit;
+ return json({items:rows.slice(offset,offset+limit),has_more:rows.length>offset+limit,offset},200,{"Cache-Control":"no-store"});
 }
