@@ -199,7 +199,7 @@ func InsertBM11Event(ctx context.Context, tx pgx.Tx, tid uuid.UUID, province str
 	}
 	return tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_bm11_event (id, tenant_id, stream_key, report_id, province_code, event, status,
 	    content, content_hash, comment, recipient, event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'cnts_bm11:' || $3::text, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14) RETURNING seq`,
-		e.ID, tid, e.ReportID, province, e.Event, e.Status, content, hash, comment, recipient, e.At.UTC(), e.ActorRef, e.IdemKey,
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15) RETURNING seq`,
+		e.ID, tid, "cnts_bm11:"+e.ReportID.String(), e.ReportID, province, e.Event, e.Status, content, hash, comment, recipient, e.At.UTC(), e.ActorRef, e.IdemKey,
 		domain.BM11RuleVersion).Scan(&e.Seq)
 }
