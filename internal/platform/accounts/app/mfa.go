@@ -56,7 +56,7 @@ func (s *Service) ResetTOTP(ctx context.Context, in TOTPResetInput) (Result, err
 	if err := domain.CheckReason(in.Reason); err != nil {
 		return Result{}, fieldProblem(err)
 	}
-	if prev, err := s.replay(ctx, a.p.TenantID, in.IdemKey); err != nil || prev != nil {
+	if prev, err := s.replayFor(ctx, a, in.IdemKey, domain.ActionTOTPReset, in.UserID); err != nil || prev != nil {
 		return Result{Account: derefAcc(prev), Event: derefEv(prev), Replayed: prev != nil}, err
 	}
 	if in.UserID == a.p.ActorRef {
