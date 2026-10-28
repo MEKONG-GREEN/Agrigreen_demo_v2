@@ -100,8 +100,8 @@ type KindInfo struct {
 	LevelConfigurable bool
 	Recipients        []string
 	// Source: nơi sinh cảnh báo — "forms" (bài nộp biểu kỳ, W11.43 chạy), "outbreak" (ổ dịch, W11.43 chạy), "job" (trễ
-	// liên tiếp, W11.43 chạy), "log"/"schedule" (nhật ký BM-08/09/19, lịch tiêm BM-07 — hàm đánh giá có, nguồn chờ
-	// W11.48/CN6).
+	// liên tiếp, W11.43 chạy), "log" (nhật ký BM-08/09/19, W11.48 chạy dòng 6–9), "schedule" (lịch tiêm BM-07 — job
+	// extension_cnts_alert chạy dòng 11 từ BF-CN-VACC #168).
 	Source string
 }
 

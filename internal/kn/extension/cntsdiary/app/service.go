@@ -102,8 +102,8 @@ type Vaccinations interface {
 type Service struct {
 	// Vaccinations (tùy chọn): NC-11 → lịch tiêm của lứa có vaccination_batch_ref. nil → không đồng bộ.
 	Vaccinations Vaccinations
-	DB    tenant.Beginner // pool vai extension_app (db.ForModule)
-	Clock clock.Clock
+	DB           tenant.Beginner // pool vai extension_app (db.ForModule)
+	Clock        clock.Clock
 	// Units: tỉnh của xã (cảnh báo). nil → ghi trả 503.
 	Units partyport.AdminUnits
 	// Params (tùy chọn): ngưỡng; thiếu → mặc định trong mã.

@@ -232,6 +232,16 @@ func OpenBySubject(ctx context.Context, tx pgx.Tx, subject string, kinds []strin
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Alert, error) { return scanAlert(r) })
 }
 
+// OpenByKind trả tối đa limit cảnh báo chưa đóng của loại kind (cũ trước) — tự đóng khi nguồn hết vi phạm (BF-CN-VACC).
+func OpenByKind(ctx context.Context, tx pgx.Tx, kind string, limit int) ([]Alert, error) {
+	rows, err := tx.Query(ctx, `SELECT `+alertCols+` FROM pf_extension.cnts_alert_current
+	   WHERE kind = $1 AND status <> 'closed' ORDER BY raised_at, alert_ref LIMIT $2`, kind, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Alert, error) { return scanAlert(r) })
+}
+
 // Overdue trả cảnh báo chưa đóng quá hạn xử lý chưa báo Quá hạn.
 func Overdue(ctx context.Context, tx pgx.Tx, now time.Time, limit int) ([]Alert, error) {
 	rows, err := tx.Query(ctx, `SELECT `+alertCols+` FROM pf_extension.cnts_alert_current

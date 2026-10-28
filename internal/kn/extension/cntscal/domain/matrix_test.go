@@ -55,12 +55,12 @@ func TestMatchDiaryDoses(t *testing.T) {
 	}
 	names := map[string]string{"VX_GUMBORO": "Gumboro", "VX_ND_F": "Newcastle F", "VX_IB": "Viêm phế quản truyền nhiễm (IB)"}
 	ups := MatchDiaryDoses(cur, []DiaryDose{
-		{Vaccine: "  gumboro ", Date: d("2027-10-08")},                // tên danh mục, không ghi lần → mũi chưa tiêm sớm nhất
-		{Vaccine: "Gumboro", Date: d("2027-10-09")},                   // lần 0 lần nữa → L2 (L1 đã dùng)
-		{Vaccine: "Newcastle F", Shot: 1, Date: d("2027-10-04")},      // đã có ngày thực tế → không ghi đè
-		{Vaccine: "vx_ib", Shot: 1, Date: d("2027-10-20")},            // ngày ở tương lai → bỏ
-		{Vaccine: "Vaccine lạ", Date: d("2027-10-05")},                // không khớp → bỏ
-		{Vaccine: "VX_IB", Shot: 1, Date: d("2027-09-30")},            // trước ngày nhận giống → bỏ
+		{Vaccine: "  gumboro ", Date: d("2027-10-08")},                  // tên danh mục, không ghi lần → mũi chưa tiêm sớm nhất
+		{Vaccine: "Gumboro", Date: d("2027-10-09")},                     // lần 0 lần nữa → L2 (L1 đã dùng)
+		{Vaccine: "Newcastle F", Shot: 1, Date: d("2027-10-04")},        // đã có ngày thực tế → không ghi đè
+		{Vaccine: "vx_ib", Shot: 1, Date: d("2027-10-20")},              // ngày ở tương lai → bỏ
+		{Vaccine: "Vaccine lạ", Date: d("2027-10-05")},                  // không khớp → bỏ
+		{Vaccine: "VX_IB", Shot: 1, Date: d("2027-09-30")},              // trước ngày nhận giống → bỏ
 		{Vaccine: "Viêm phế quản truyền nhiễm (IB)", Date: time.Time{}}, // thiếu ngày → bỏ
 	}, names, recv, today)
 	if len(ups) != 2 || ups[0].Vaccine != "VX_GUMBORO" || ups[0].Shot != 1 || !ups[0].Actual.Equal(d("2027-10-08")) ||
