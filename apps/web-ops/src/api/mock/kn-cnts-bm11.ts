@@ -74,12 +74,23 @@ function label(t: Type, k: string): string {
   if (t === "quarter") return `Quý ${["I", "II", "III", "IV"][Number(k.slice(6)) - 1]}/${k.slice(0, 4)}`;
   return `Năm ${k}`;
 }
-function defaultKey(t: Type): string {
-  const d = new Date(Date.now() - 7 * 86_400_000);
-  if (t === "week") return `${d.getFullYear()}-W${String(Math.max(1, Math.ceil((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 604_800_000))).padStart(2, "0")}`;
-  if (t === "month") return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  if (t === "quarter") return `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`;
-  return String(d.getFullYear() - 1);
+// Kỳ vừa kết thúc theo ngày nghiệp vụ VN (UTC+7), neo ngày 1 trước khi lùi tháng/quý — như bm11PrevKey phía máy chủ.
+export function bm11DefaultKey(t: Type, nowMs: number = Date.now()): string {
+  const vn = new Date(nowMs + 7 * 3_600_000);
+  const y = vn.getUTCFullYear(), m = vn.getUTCMonth();
+  if (t === "week") {
+    const d = new Date(vn.getTime() - 7 * 86_400_000), dy = d.getUTCFullYear();
+    return `${dy}-W${String(Math.max(1, Math.ceil((d.getTime() - Date.UTC(dy, 0, 1)) / 604_800_000))).padStart(2, "0")}`;
+  }
+  if (t === "month") {
+    const p = new Date(Date.UTC(y, m - 1, 1));
+    return `${p.getUTCFullYear()}-${String(p.getUTCMonth() + 1).padStart(2, "0")}`;
+  }
+  if (t === "quarter") {
+    const p = new Date(Date.UTC(y, Math.floor(m / 3) * 3 - 3, 1));
+    return `${p.getUTCFullYear()}-Q${Math.floor(p.getUTCMonth() / 3) + 1}`;
+  }
+  return String(y - 1);
 }
 
 function summary(r: Report): S["CNTSBM11Summary"] {
@@ -144,7 +155,7 @@ export const cntsBm11Routes: Route[] = [
       const w = who(ctx);
       if (!cnts(w)) return problem(403, "forbidden", "Báo cáo phòng BM-11 dành cho Phòng Chăn nuôi – Thủy sản");
       const t = (ctx.url.searchParams.get("type") ?? "week") as Type;
-      const k = ctx.url.searchParams.get("key") || defaultKey(t);
+      const k = ctx.url.searchParams.get("key") || bm11DefaultKey(t);
       if (!KEY[t]?.test(k)) return validation([{ field: "key", reason: "khóa kỳ không đúng dạng" }]);
       const existing = [...REPORTS.values()].find((r) => r.type === t && r.period_key === k);
       return json({ type: t, period_key: k, label: label(t, k), from: "2026-09-22", to: "2026-09-28", weeks: [k], due_at: new Date().toISOString(),
