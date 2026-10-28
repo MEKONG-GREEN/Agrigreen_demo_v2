@@ -1,0 +1,430 @@
+paths:
+# @ag-order: 31300
+  /v1/extension/cnts/knqg-specs:
+    get:
+      summary: "W11.53 FN-19: đặc tả 5 mẫu biểu dự án KNQG (Mẫu 01/TĐ-DA, 03, 04/DA-NTTH, 05/DA-NTMH, 07/NTKQ-DA) — mục, ô, bảng của mẫu Word gốc; màn soạn biểu dựng theo đặc tả"
+      operationId: extensionCntsKnqgSpecs
+      tags: [extension]
+      responses:
+        "200":
+          description: Đặc tả
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGSpec"}}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 31301
+  /v1/extension/cnts/knqg-docs:
+    get:
+      summary: "W11.53: biên bản/báo cáo dự án KNQG trong phạm vi (Cấp Tỉnh trong tỉnh; TW chỉ dự án KNQG, không thấy Mẫu 07 chưa gửi; Cấp Xã chỉ Mẫu 05 điểm xã mình)"
+      operationId: extensionCntsKnqgList
+      tags: [extension]
+      parameters:
+        - {name: project_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: form, in: query, required: false, schema: {type: string, enum: ["01", "03", "04", "05", "07"]}}
+        - {name: status, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Danh sách (bản hiện hành, không nội dung)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGDoc"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.53 FN-19 B2: lập biểu từ chi tiết dự án KNQG, số liệu điền sẵn (Mẫu 05: thực tế từ nhật ký đã xác thực). Mẫu 01 mỗi dự án × tháng, Mẫu 07 mỗi dự án × năm, Mẫu 05 mỗi điểm một bản hiệu lực"
+      operationId: extensionCntsKnqgCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSKNQGCreate"}
+      responses:
+        "200":
+          description: Phát lại cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "201":
+          description: Đã lập
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {description: "forbidden (FN-19 BR-01 — chỉ chủ nhiệm dự án, lãnh đạo phòng, Admin) | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_knqg_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_exists | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_knqg_invalid | extension.cnts_knqg_project_kind", $ref: "#/components/responses/Problem"}
+# @ag-order: 31302
+  /v1/extension/cnts/knqg-docs/{ref}:
+    get:
+      summary: "W11.53: chi tiết biểu — nội dung, thao tác được phép, cảnh báo (quy tắc 11), nội dung còn thiếu, điều kiện gửi Mẫu 07 (quy tắc 10), lịch sử phiên bản"
+      operationId: extensionCntsKnqgGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_knqg_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.53: sửa nội dung (Đang lập / Trả lại) — khóa lạc quan base_version; ô, cột tự điền do máy chủ đặt lại; số điện thoại trong văn bản bị chặn"
+      operationId: extensionCntsKnqgUpdate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSKNQGUpdate"}
+      responses:
+        "200":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_version_conflict | extension.cnts_knqg_locked | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_knqg_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 31303
+  /v1/extension/cnts/knqg-docs/{ref}/actions/{action}:
+    post:
+      summary: "W11.53 Mục III.5: chuyển trạng thái — submit/approve/return (Mẫu 01; trả lại bắt buộc ý kiến), request_sign/unrequest (03, 04, 05), send (07 — mọi điểm có Mẫu 05 đã ký), confirm/return (Cấp TW, Mẫu 07), adjust (bản điều chỉnh, lý do bắt buộc)"
+      operationId: extensionCntsKnqgAction
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: action, in: path, required: true, schema: {type: string, enum: [submit, approve, return, request_sign, unrequest, send, confirm, adjust]}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSKNQGAction"}
+      responses:
+        "200":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_state | extension.cnts_knqg_version_conflict | extension.cnts_knqg_needs_signed_05", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation (reason) | extension.cnts_knqg_incomplete", $ref: "#/components/responses/Problem"}
+# @ag-order: 31304
+  /v1/extension/cnts/knqg-docs/{ref}/signed:
+    get:
+      summary: "W11.53: tải bản scan đã ký (version = phiên bản cụ thể; bỏ trống = bản ký mới nhất)"
+      operationId: extensionCntsKnqgScan
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: version, in: query, required: false, schema: {type: integer, minimum: 1}}
+      responses:
+        "200":
+          description: Tệp scan
+          content:
+            application/pdf:
+              schema: {type: string, format: binary}
+            image/jpeg:
+              schema: {type: string, format: binary}
+            image/png:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_knqg_not_found | extension.cnts_knqg_scan_not_found", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.53 FN-19 B4: ký — tải bản scan đã ký (PDF/JPG/PNG ≤ 10 MB, kiểm chữ ký tệp) cho Mẫu 03, 04, 05 đang Chờ ký → Đã ký"
+      operationId: extensionCntsKnqgSign
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [meta, file]
+              properties:
+                meta: {type: string, description: "JSON {\"base_version\": n}"}
+                file: {type: string, format: binary}
+      responses:
+        "200":
+          description: Đã ký
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGDocDetail"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_state | extension.cnts_knqg_version_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_knqg_scan_invalid | extension.cnts_knqg_incomplete", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 31305
+  /v1/extension/cnts/knqg-docs/{ref}/word:
+    post:
+      summary: "W11.53 FN-19 AC-01: xuất Word đúng mẫu TTKN Quốc gia qua pf/export (Mẫu 03 tự cấp số {n}/BC-TTKN và dòng địa danh, ngày)"
+      operationId: extensionCntsKnqgWord
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "201":
+          description: Lần xuất đã ghi sổ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGWordRun"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_knqg_not_found | export.template_not_found", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 31306
+  /v1/extension/cnts/knqg-docs/{ref}/words:
+    get:
+      summary: Lịch sử các lần xuất Word của biểu (mới nhất trước)
+      operationId: extensionCntsKnqgWords
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGWordRun"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 31307
+  /v1/extension/cnts/knqg-docs/{ref}/words/{run}/download:
+    get:
+      summary: Tải lại tệp Word đã xuất (pf/export kiểm băm SHA-256)
+      operationId: extensionCntsKnqgWordDownload
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: run, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .docx
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_knqg_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 31310
+    CNTSKNQGOption:
+      type: object
+      required: [value, label]
+      properties:
+        value: {type: string}
+        label: {type: string}
+# @ag-order: 31311
+    CNTSKNQGField:
+      type: object
+      required: [key, label, kind]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        kind: {type: string, enum: [text, long, date, number, int, choice]}
+        options: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGOption"}}
+        required: {type: boolean}
+        auto: {type: boolean, description: "máy chủ điền — giá trị gửi lên bị bỏ"}
+        hint: {type: string}
+# @ag-order: 31312
+    CNTSKNQGColumn:
+      type: object
+      required: [key, label, kind]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        kind: {type: string, enum: [text, long, date, number, int, choice]}
+        options: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGOption"}}
+        auto: {type: boolean}
+# @ag-order: 31313
+    CNTSKNQGTable:
+      type: object
+      required: [key, label, columns, max_rows]
+      properties:
+        key: {type: string}
+        label: {type: string}
+        columns: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGColumn"}}
+        max_rows: {type: integer}
+        auto: {type: boolean, description: "cả bảng do máy chủ dựng (Mẫu 07 — tổng hợp Mẫu 05 đã ký)"}
+        hint: {type: string}
+# @ag-order: 31314
+    CNTSKNQGSection:
+      type: object
+      required: [title]
+      properties:
+        title: {type: string}
+        fields: {type: array, items: {type: string}}
+        tables: {type: array, items: {type: string}}
+# @ag-order: 31315
+    CNTSKNQGSpec:
+      type: object
+      required: [form, code, bm, title, lifecycle, per_site, unique, fields, tables, sections]
+      properties:
+        form: {type: string, enum: ["01", "03", "04", "05", "07"]}
+        code: {type: string}
+        bm: {type: string}
+        title: {type: string}
+        lifecycle: {type: string, enum: [approve, sign, national]}
+        per_site: {type: boolean}
+        period: {type: string, enum: [month, year]}
+        unique: {type: boolean}
+        numbered: {type: boolean}
+        fields: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGField"}}
+        tables: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGTable"}}
+        sections: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGSection"}}
+# @ag-order: 31316
+    CNTSKNQGContent:
+      type: object
+      required: [fields, tables]
+      properties:
+        fields: {type: object, additionalProperties: {type: string}}
+        tables:
+          type: object
+          additionalProperties:
+            type: array
+            items: {type: object, additionalProperties: {type: string}}
+# @ag-order: 31317
+    CNTSKNQGScanInfo:
+      type: object
+      required: [name, content_type, size, sha256]
+      properties:
+        name: {type: string}
+        content_type: {type: string}
+        size: {type: integer}
+        sha256: {type: string}
+# @ag-order: 31318
+    CNTSKNQGDoc:
+      type: object
+      required: [ref, form, project_ref, project_code, project_name, site_ref, site_name, commune_code, period, revision, event, status,
+        status_reason, signed, version, updated_at, updated_by, actor_display, can_edit, actions, warnings]
+      properties:
+        ref: {type: string, format: uuid}
+        form: {type: string, enum: ["01", "03", "04", "05", "07"]}
+        project_ref: {type: string, format: uuid}
+        project_code: {type: string}
+        project_name: {type: string}
+        site_ref: {type: ["string", "null"], format: uuid}
+        site_name: {type: ["string", "null"]}
+        commune_code: {type: ["string", "null"]}
+        period: {type: ["string", "null"], description: "YYYY-MM (Mẫu 01) | YYYY (Mẫu 07)"}
+        revision: {type: integer, description: "bản điều chỉnh thứ n (1 = bản đầu)"}
+        event: {type: string, enum: [created, updated, submitted, approved, returned, sign_requested, unrequested, signed, adjusted, sent, confirmed]}
+        status: {type: string, enum: [draft, submitted, approved, returned, awaiting_sign, signed, sent, confirmed]}
+        status_reason: {type: ["string", "null"]}
+        signed:
+          anyOf:
+            - {$ref: "#/components/schemas/CNTSKNQGScanInfo"}
+            - {type: "null"}
+        version: {type: integer}
+        updated_at: {type: string, format: date-time}
+        updated_by: {type: string, format: uuid}
+        actor_display: {type: ["string", "null"]}
+        can_edit: {type: boolean}
+        actions: {type: array, items: {type: string, enum: [submit, approve, return, request_sign, unrequest, sign, send, confirm, adjust]}}
+        warnings: {type: array, items: {type: string}}
+# @ag-order: 31319
+    CNTSKNQGVersion:
+      type: object
+      required: [version, revision, event, status, status_reason, signed, at, actor_ref, actor_display]
+      properties:
+        version: {type: integer}
+        revision: {type: integer}
+        event: {type: string}
+        status: {type: string}
+        status_reason: {type: ["string", "null"]}
+        signed:
+          anyOf:
+            - {$ref: "#/components/schemas/CNTSKNQGScanInfo"}
+            - {type: "null"}
+        at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+        actor_display: {type: ["string", "null"]}
+# @ag-order: 31320
+    CNTSKNQGIssue:
+      type: object
+      required: [field, reason]
+      properties:
+        field: {type: string}
+        reason: {type: string}
+# @ag-order: 31321
+    CNTSKNQGDocDetail:
+      allOf:
+        - {$ref: "#/components/schemas/CNTSKNQGDoc"}
+        - type: object
+          required: [content, issues, blockers, versions]
+          properties:
+            content: {$ref: "#/components/schemas/CNTSKNQGContent"}
+            issues: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGIssue"}}
+            blockers: {type: array, items: {type: string}, description: "Mẫu 07: điểm chưa có Mẫu 05 đã ký"}
+            versions: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGVersion"}}
+            replayed: {type: boolean}
+# @ag-order: 31322
+    CNTSKNQGCreate:
+      type: object
+      required: [form, project_ref]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid, description: "UUIDv7 do máy khách sinh (tùy chọn)"}
+        form: {type: string, enum: ["01", "03", "04", "05", "07"]}
+        project_ref: {type: string, format: uuid}
+        site_ref: {type: ["string", "null"], format: uuid, description: "bắt buộc với Mẫu 05"}
+        period: {type: ["string", "null"], description: "YYYY-MM (Mẫu 01) | YYYY (Mẫu 07)"}
+# @ag-order: 31323
+    CNTSKNQGUpdate:
+      type: object
+      required: [base_version, content]
+      additionalProperties: false
+      properties:
+        base_version: {type: integer}
+        content: {$ref: "#/components/schemas/CNTSKNQGContent"}
+# @ag-order: 31324
+    CNTSKNQGAction:
+      type: object
+      required: [base_version]
+      additionalProperties: false
+      properties:
+        base_version: {type: integer}
+        reason: {type: string, maxLength: 1000}
+# @ag-order: 31325
+    CNTSKNQGWordRun:
+      type: object
+      required: [id, seq, template, template_version, doc_number, doc_number_auto, file_name, body_hash, size, actor_ref, at]
+      properties:
+        id: {type: string, format: uuid}
+        seq: {type: integer}
+        template: {type: string}
+        template_version: {type: integer}
+        doc_number: {type: string}
+        doc_number_auto: {type: boolean}
+        file_name: {type: string}
+        body_hash: {type: string}
+        size: {type: integer}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}

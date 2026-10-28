@@ -11004,6 +11004,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/knqg-specs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.53 FN-19: đặc tả 5 mẫu biểu dự án KNQG (Mẫu 01/TĐ-DA, 03, 04/DA-NTTH, 05/DA-NTMH, 07/NTKQ-DA) — mục, ô, bảng của mẫu Word gốc; màn soạn biểu dựng theo đặc tả */
+        get: operations["extensionCntsKnqgSpecs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.53: biên bản/báo cáo dự án KNQG trong phạm vi (Cấp Tỉnh trong tỉnh; TW chỉ dự án KNQG, không thấy Mẫu 07 chưa gửi; Cấp Xã chỉ Mẫu 05 điểm xã mình) */
+        get: operations["extensionCntsKnqgList"];
+        put?: never;
+        /** W11.53 FN-19 B2: lập biểu từ chi tiết dự án KNQG, số liệu điền sẵn (Mẫu 05: thực tế từ nhật ký đã xác thực). Mẫu 01 mỗi dự án × tháng, Mẫu 07 mỗi dự án × năm, Mẫu 05 mỗi điểm một bản hiệu lực */
+        post: operations["extensionCntsKnqgCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.53: chi tiết biểu — nội dung, thao tác được phép, cảnh báo (quy tắc 11), nội dung còn thiếu, điều kiện gửi Mẫu 07 (quy tắc 10), lịch sử phiên bản */
+        get: operations["extensionCntsKnqgGet"];
+        put?: never;
+        /** W11.53: sửa nội dung (Đang lập / Trả lại) — khóa lạc quan base_version; ô, cột tự điền do máy chủ đặt lại; số điện thoại trong văn bản bị chặn */
+        post: operations["extensionCntsKnqgUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}/actions/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.53 Mục III.5: chuyển trạng thái — submit/approve/return (Mẫu 01; trả lại bắt buộc ý kiến), request_sign/unrequest (03, 04, 05), send (07 — mọi điểm có Mẫu 05 đã ký), confirm/return (Cấp TW, Mẫu 07), adjust (bản điều chỉnh, lý do bắt buộc) */
+        post: operations["extensionCntsKnqgAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}/signed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.53: tải bản scan đã ký (version = phiên bản cụ thể; bỏ trống = bản ký mới nhất) */
+        get: operations["extensionCntsKnqgScan"];
+        put?: never;
+        /** W11.53 FN-19 B4: ký — tải bản scan đã ký (PDF/JPG/PNG ≤ 10 MB, kiểm chữ ký tệp) cho Mẫu 03, 04, 05 đang Chờ ký → Đã ký */
+        post: operations["extensionCntsKnqgSign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}/word": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.53 FN-19 AC-01: xuất Word đúng mẫu TTKN Quốc gia qua pf/export (Mẫu 03 tự cấp số {n}/BC-TTKN và dòng địa danh, ngày) */
+        post: operations["extensionCntsKnqgWord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}/words": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử các lần xuất Word của biểu (mới nhất trước) */
+        get: operations["extensionCntsKnqgWords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}/words/{run}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải lại tệp Word đã xuất (pf/export kiểm băm SHA-256) */
+        get: operations["extensionCntsKnqgWordDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -23344,6 +23483,176 @@ export interface components {
             base_version: number;
         };
         CNTSOutbreakWordRun: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            template: string;
+            template_version: number;
+            doc_number: string;
+            doc_number_auto: boolean;
+            file_name: string;
+            body_hash: string;
+            size: number;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        CNTSKNQGOption: {
+            value: string;
+            label: string;
+        };
+        CNTSKNQGField: {
+            key: string;
+            label: string;
+            /** @enum {string} */
+            kind: "text" | "long" | "date" | "number" | "int" | "choice";
+            options?: components["schemas"]["CNTSKNQGOption"][];
+            required?: boolean;
+            /** @description máy chủ điền — giá trị gửi lên bị bỏ */
+            auto?: boolean;
+            hint?: string;
+        };
+        CNTSKNQGColumn: {
+            key: string;
+            label: string;
+            /** @enum {string} */
+            kind: "text" | "long" | "date" | "number" | "int" | "choice";
+            options?: components["schemas"]["CNTSKNQGOption"][];
+            auto?: boolean;
+        };
+        CNTSKNQGTable: {
+            key: string;
+            label: string;
+            columns: components["schemas"]["CNTSKNQGColumn"][];
+            max_rows: number;
+            /** @description cả bảng do máy chủ dựng (Mẫu 07 — tổng hợp Mẫu 05 đã ký) */
+            auto?: boolean;
+            hint?: string;
+        };
+        CNTSKNQGSection: {
+            title: string;
+            fields?: string[];
+            tables?: string[];
+        };
+        CNTSKNQGSpec: {
+            /** @enum {string} */
+            form: "01" | "03" | "04" | "05" | "07";
+            code: string;
+            bm: string;
+            title: string;
+            /** @enum {string} */
+            lifecycle: "approve" | "sign" | "national";
+            per_site: boolean;
+            /** @enum {string} */
+            period?: "month" | "year";
+            unique: boolean;
+            numbered?: boolean;
+            fields: components["schemas"]["CNTSKNQGField"][];
+            tables: components["schemas"]["CNTSKNQGTable"][];
+            sections: components["schemas"]["CNTSKNQGSection"][];
+        };
+        CNTSKNQGContent: {
+            fields: {
+                [key: string]: string;
+            };
+            tables: {
+                [key: string]: {
+                    [key: string]: string;
+                }[];
+            };
+        };
+        CNTSKNQGScanInfo: {
+            name: string;
+            content_type: string;
+            size: number;
+            sha256: string;
+        };
+        CNTSKNQGDoc: {
+            /** Format: uuid */
+            ref: string;
+            /** @enum {string} */
+            form: "01" | "03" | "04" | "05" | "07";
+            /** Format: uuid */
+            project_ref: string;
+            project_code: string;
+            project_name: string;
+            /** Format: uuid */
+            site_ref: string | null;
+            site_name: string | null;
+            commune_code: string | null;
+            /** @description YYYY-MM (Mẫu 01) | YYYY (Mẫu 07) */
+            period: string | null;
+            /** @description bản điều chỉnh thứ n (1 = bản đầu) */
+            revision: number;
+            /** @enum {string} */
+            event: "created" | "updated" | "submitted" | "approved" | "returned" | "sign_requested" | "unrequested" | "signed" | "adjusted" | "sent" | "confirmed";
+            /** @enum {string} */
+            status: "draft" | "submitted" | "approved" | "returned" | "awaiting_sign" | "signed" | "sent" | "confirmed";
+            status_reason: string | null;
+            signed: components["schemas"]["CNTSKNQGScanInfo"] | null;
+            version: number;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: uuid */
+            updated_by: string;
+            actor_display: string | null;
+            can_edit: boolean;
+            actions: ("submit" | "approve" | "return" | "request_sign" | "unrequest" | "sign" | "send" | "confirm" | "adjust")[];
+            warnings: string[];
+        };
+        CNTSKNQGVersion: {
+            version: number;
+            revision: number;
+            event: string;
+            status: string;
+            status_reason: string | null;
+            signed: components["schemas"]["CNTSKNQGScanInfo"] | null;
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            actor_ref: string;
+            actor_display: string | null;
+        };
+        CNTSKNQGIssue: {
+            field: string;
+            reason: string;
+        };
+        CNTSKNQGDocDetail: components["schemas"]["CNTSKNQGDoc"] & {
+            content: components["schemas"]["CNTSKNQGContent"];
+            issues: components["schemas"]["CNTSKNQGIssue"][];
+            /** @description Mẫu 07: điểm chưa có Mẫu 05 đã ký */
+            blockers: string[];
+            versions: components["schemas"]["CNTSKNQGVersion"][];
+            replayed?: boolean;
+        };
+        CNTSKNQGCreate: {
+            /**
+             * Format: uuid
+             * @description UUIDv7 do máy khách sinh (tùy chọn)
+             */
+            id?: string;
+            /** @enum {string} */
+            form: "01" | "03" | "04" | "05" | "07";
+            /** Format: uuid */
+            project_ref: string;
+            /**
+             * Format: uuid
+             * @description bắt buộc với Mẫu 05
+             */
+            site_ref?: string | null;
+            /** @description YYYY-MM (Mẫu 01) | YYYY (Mẫu 07) */
+            period?: string | null;
+        };
+        CNTSKNQGUpdate: {
+            base_version: number;
+            content: components["schemas"]["CNTSKNQGContent"];
+        };
+        CNTSKNQGAction: {
+            base_version: number;
+            reason?: string;
+        };
+        CNTSKNQGWordRun: {
             /** Format: uuid */
             id: string;
             seq: number;
@@ -47009,6 +47318,348 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             /** @description extension.cnts_outbreak_not_found | export.run_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgSpecs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Đặc tả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSKNQGSpec"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgList: {
+        parameters: {
+            query?: {
+                project_ref?: string;
+                form?: "01" | "03" | "04" | "05" | "07";
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách (bản hiện hành, không nội dung) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSKNQGDoc"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSKNQGCreate"];
+            };
+        };
+        responses: {
+            /** @description Phát lại cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGDocDetail"];
+                };
+            };
+            /** @description Đã lập */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGDocDetail"];
+                };
+            };
+            /** @description forbidden (FN-19 BR-01 — chỉ chủ nhiệm dự án, lãnh đạo phòng, Admin) | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_exists | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_invalid | extension.cnts_knqg_project_kind */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGDocDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSKNQGUpdate"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản mới */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGDocDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_version_conflict | extension.cnts_knqg_locked | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_invalid */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgAction: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+                action: "submit" | "approve" | "return" | "request_sign" | "unrequest" | "send" | "confirm" | "adjust";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSKNQGAction"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản mới */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGDocDetail"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_state | extension.cnts_knqg_version_conflict | extension.cnts_knqg_needs_signed_05 */
+            409: components["responses"]["Problem"];
+            /** @description validation (reason) | extension.cnts_knqg_incomplete */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgScan: {
+        parameters: {
+            query?: {
+                version?: number;
+            };
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp scan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_not_found | extension.cnts_knqg_scan_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgSign: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** @description JSON {"base_version": n} */
+                    meta: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ký */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGDocDetail"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_state | extension.cnts_knqg_version_conflict */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_scan_invalid | extension.cnts_knqg_incomplete */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgWord: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lần xuất đã ghi sổ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGWordRun"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_not_found | export.template_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgWords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSKNQGWordRun"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgWordDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+                run: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .docx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_not_found | export.run_not_found */
             404: components["responses"]["Problem"];
         };
     };
