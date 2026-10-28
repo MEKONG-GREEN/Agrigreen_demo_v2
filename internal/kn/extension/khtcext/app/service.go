@@ -197,19 +197,42 @@ func periodOne(ctx context.Context, tx pgx.Tx, id uuid.UUID) (periodInfo, error)
 	return all[id], nil
 }
 
+// names tra tên hiển thị người thao tác qua port ActorNames (module tài khoản — có thể gọi Keycloak). CHỈ gọi SAU khi giao
+// dịch KN đã đóng (AGENTS §9.1, P0-POOL-KN #125/#139): giao dịch chỉ đọc/ghi dòng và trả actor_ref. Port lỗi hoặc chưa nối
+// → bản đồ rỗng: actor_name để trống, web hiện nhãn dự phòng "Cán bộ KHTC"; số liệu đã ghi không phụ thuộc việc tra tên.
 func (s *Service) names(ctx context.Context, refs []uuid.UUID) map[uuid.UUID]string {
-	if s.Names == nil || len(refs) == 0 {
+	uniq := make([]uuid.UUID, 0, len(refs))
+	seen := map[uuid.UUID]bool{}
+	for _, r := range refs {
+		if r != uuid.Nil && !seen[r] {
+			seen[r] = true
+			uniq = append(uniq, r)
+		}
+	}
+	if s.Names == nil || len(uniq) == 0 {
 		return map[uuid.UUID]string{}
 	}
 	n := s.Names()
 	if n == nil {
 		return map[uuid.UUID]string{}
 	}
-	m, err := n.DisplayNames(ctx, refs)
+	m, err := n.DisplayNames(ctx, uniq)
 	if err != nil || m == nil {
 		return map[uuid.UUID]string{}
 	}
 	return m
+}
+
+// nameFigures gắn tên người thao tác vào các dòng số liệu — gọi ngoài giao dịch.
+func (s *Service) nameFigures(ctx context.Context, vs []FigureView) {
+	refs := make([]uuid.UUID, 0, len(vs))
+	for _, v := range vs {
+		refs = append(refs, v.ActorRef)
+	}
+	names := s.names(ctx, refs)
+	for i := range vs {
+		vs[i].ActorName = names[vs[i].ActorRef]
+	}
 }
 
 // ---------- Danh mục chỉ tiêu ----------
@@ -435,8 +458,9 @@ func dateText(t *time.Time) string {
 	return t.Format(time.DateOnly)
 }
 
-// views dựng dòng hiển thị từ bản mới nhất (bỏ bản đã rút).
-func (s *Service) views(ctx context.Context, tx pgx.Tx, c caller, latest []store.Entry, periods map[uuid.UUID]periodInfo) ([]FigureView, error) {
+// views dựng dòng hiển thị từ bản mới nhất (bỏ bản đã rút). Chỉ đọc CSDL trong giao dịch của bên gọi; ActorName để
+// trống — bên gọi gắn tên bằng nameFigures SAU khi giao dịch đóng.
+func views(ctx context.Context, tx pgx.Tx, c caller, latest []store.Entry, periods map[uuid.UUID]periodInfo) ([]FigureView, error) {
 	inds, err := store.Indicators(ctx, tx)
 	if err != nil {
 		return nil, err
@@ -445,16 +469,14 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, c caller, latest []store
 	for _, i := range inds {
 		byID[i.ID] = i
 	}
-	var evIDs, actors []uuid.UUID
+	var evIDs []uuid.UUID
 	for _, e := range latest {
 		evIDs = append(evIDs, e.Evidence...)
-		actors = append(actors, e.ActorRef)
 	}
 	evs, err := store.EvidenceByIDs(ctx, tx, evIDs)
 	if err != nil {
 		return nil, err
 	}
-	names := s.names(ctx, actors)
 	out := []FigureView{}
 	for _, e := range latest {
 		p, ok := periods[e.PeriodID]
@@ -465,7 +487,7 @@ func (s *Service) views(ctx context.Context, tx pgx.Tx, c caller, latest []store
 		v := FigureView{EntryID: e.ID, Version: e.Seq, PeriodID: e.PeriodID, PeriodName: domain.ShortName(p.Name), PeriodType: p.Type, Year: p.Year,
 			Closed: p.Closed, IndicatorID: e.IndicatorID, Code: ind.Code, Name: ind.Name, Group: ind.Group, Value: e.Value.String(), Unit: e.Unit,
 			Agency: e.Agency, Document: e.Document, SourceDate: dateText(e.SourceDate), Evidence: []EvidenceView{}, UsedIn: domain.Template(p.Type),
-			ActorRef: e.ActorRef, ActorName: names[e.ActorRef], At: e.At, Editable: canWrite(c) && !p.Closed}
+			ActorRef: e.ActorRef, At: e.At, Editable: canWrite(c) && !p.Closed}
 		for _, id := range e.Evidence {
 			if f, ok := evs[id]; ok {
 				v.Evidence = append(v.Evidence, EvidenceView{ID: f.ID, FileName: f.FileName, ContentType: f.ContentType, Size: f.Size})
@@ -508,7 +530,7 @@ func (s *Service) List(ctx context.Context, q Query) ([]FigureView, error) {
 		if e != nil {
 			return e
 		}
-		out, e = s.views(ctx, tx, c, latest, periods)
+		out, e = views(ctx, tx, c, latest, periods)
 		return e
 	})
 	if err != nil {
@@ -519,6 +541,7 @@ func (s *Service) List(ctx context.Context, q Query) ([]FigureView, error) {
 		return (agency != "" && !strings.Contains(strings.ToLower(v.Agency), agency)) ||
 			(search != "" && !strings.Contains(domain.NameKey(v.Name), search) && !strings.Contains(strings.ToLower(v.Code), search))
 	})
+	s.nameFigures(ctx, out) // giao dịch đã đóng
 	return out, nil
 }
 
@@ -549,7 +572,7 @@ func (s *Service) Save(ctx context.Context, in SaveInput, idem string) (FigureVi
 			if e != nil {
 				return e
 			}
-			return s.viewOne(ctx, tx, c, *old, &out)
+			return viewOne(ctx, tx, c, *old, &out)
 		}
 		p, e := periodOne(ctx, tx, f.PeriodID)
 		if e != nil {
@@ -592,9 +615,15 @@ func (s *Service) Save(ctx context.Context, in SaveInput, idem string) (FigureVi
 		if e := store.InsertEntry(ctx, tx, c.p.TenantID, &entry, idem); e != nil {
 			return e
 		}
-		return s.viewOne(ctx, tx, c, entry, &out)
+		return viewOne(ctx, tx, c, entry, &out)
 	})
-	return out, classify(err)
+	if err != nil {
+		return FigureView{}, classify(err)
+	}
+	// Đã commit (hoặc phát lại bản đã ghi): tra tên ngoài giao dịch; tra tên lỗi không làm hỏng thao tác lưu.
+	vs := []FigureView{out}
+	s.nameFigures(ctx, vs)
+	return vs[0], nil
 }
 
 // WithdrawInput là "Rút số liệu" (ghi bù không có giá trị, lý do bắt buộc).
@@ -661,12 +690,13 @@ func currentOf(ctx context.Context, tx pgx.Tx, period, indicator uuid.UUID) (*st
 	return nil, nil
 }
 
-func (s *Service) viewOne(ctx context.Context, tx pgx.Tx, c caller, e store.Entry, out *FigureView) error {
+// viewOne dựng dòng hiển thị của một bản ghi (chỉ đọc CSDL; tên người thao tác gắn sau giao dịch).
+func viewOne(ctx context.Context, tx pgx.Tx, c caller, e store.Entry, out *FigureView) error {
 	p, err := periodOne(ctx, tx, e.PeriodID)
 	if err != nil {
 		return err
 	}
-	vs, err := s.views(ctx, tx, c, []store.Entry{e}, map[uuid.UUID]periodInfo{p.ID: p})
+	vs, err := views(ctx, tx, c, []store.Entry{e}, map[uuid.UUID]periodInfo{p.ID: p})
 	if err != nil {
 		return err
 	}
@@ -720,12 +750,11 @@ func (s *Service) History(ctx context.Context, year int, period *uuid.UUID, limi
 		if e != nil {
 			return e
 		}
-		var prevIDs, actors []uuid.UUID
+		var prevIDs []uuid.UUID
 		for _, h := range hist {
 			if h.Supersedes != nil {
 				prevIDs = append(prevIDs, *h.Supersedes)
 			}
-			actors = append(actors, h.ActorRef)
 		}
 		prev, e := store.EntriesByIDs(ctx, tx, prevIDs)
 		if e != nil {
@@ -739,11 +768,10 @@ func (s *Service) History(ctx context.Context, year int, period *uuid.UUID, limi
 		for _, i := range inds {
 			indName[i.ID] = i.Name
 		}
-		names := s.names(ctx, actors)
 		for _, h := range hist {
 			v := HistoryView{EntryID: h.ID, Version: h.Seq, Action: h.Action, PeriodID: h.PeriodID, PeriodName: domain.ShortName(periods[h.PeriodID].Name),
 				IndicatorID: h.IndicatorID, IndicatorName: indName[h.IndicatorID], Unit: h.Unit, Reason: h.Reason, ImportID: h.ImportID,
-				ActorRef: h.ActorRef, ActorName: names[h.ActorRef], At: h.At}
+				ActorRef: h.ActorRef, At: h.At}
 			if h.Value != nil {
 				n := h.Value.String()
 				v.New = &n
@@ -758,5 +786,17 @@ func (s *Service) History(ctx context.Context, year int, period *uuid.UUID, limi
 		}
 		return nil
 	})
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	// Giao dịch đã đóng: tra tên người thao tác (port module tài khoản) theo lô.
+	refs := make([]uuid.UUID, 0, len(out))
+	for _, v := range out {
+		refs = append(refs, v.ActorRef)
+	}
+	names := s.names(ctx, refs)
+	for i := range out {
+		out[i].ActorName = names[out[i].ActorRef]
+	}
+	return out, nil
 }
