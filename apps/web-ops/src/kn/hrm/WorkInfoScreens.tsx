@@ -1,16 +1,16 @@
 "use client";
 
 // FN-08 Thông tin làm việc (BRD HCTH v3.0; màn `tl` và `tl.d` của prototype HCTH — W11.29). Danh sách nhân sự với ngày
-// vào làm/nghỉ việc, ba thẻ số liệu bấm để lọc nhanh, lọc theo đơn vị/trạng thái/tháng biến động, hộp thoại "Cập nhật
+// vào làm/nghỉ việc, ba thẻ số liệu bấm để lọc nhanh, lọc theo đơn vị/trạng thái/tháng biến động, trang "Cập nhật
 // thông tin làm việc" và trang chi tiết có khối "Ảnh hưởng đến báo cáo" (NS01/NS02). Chỉ dùng API có sẵn của W11.22:
 // danh sách /v1/hrm/staff (tải đủ các trang, tối đa 100/lần), sự kiện work_start/work_end qua /events, /replace, /void
 // (sổ chỉ ghi thêm). Dữ liệu cá nhân chỉ trong bộ nhớ của màn.
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Dialog } from "@/components/Dialog";
+import { SelectField, TextField } from "@/components/form";
 import { Icon } from "@/components/Icon";
-import { BackLink, LabelValueBlock, LogPanel, type LogEntry } from "@/components/patterns/detail";
+import { BackLink, DetailPage, LabelValueBlock, LogPanel, type LogEntry } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, SearchBox, StatusPill, type Column } from "@/components/patterns/list";
 import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
@@ -93,10 +93,8 @@ export function HrmWorkInfoScreen() {
   const [q, setQ] = useState("");
   const [f, setF] = useState<WorkFilter>({ status: "", month: "", move: "" });
   const [page, setPage] = useState(1);
-  const [nonce, setNonce] = useState(0);
-  const [editing, setEditing] = useState<string | null>(null);
   const act = useAction();
-  const all = useLoad(enabled ? () => loadAll(sa, unit || undefined, q || undefined) : null, [enabled, unit, q, nonce]);
+  const all = useLoad(enabled ? () => loadAll(sa, unit || undefined, q || undefined) : null, [enabled, unit, q]);
   const km = f.month || vnMonth();
   const months = useMemo(() => recentMonths(vnMonth(), 12), []);
   const set = (patch: Partial<WorkFilter>) => {
@@ -124,9 +122,9 @@ export function HrmWorkInfoScreen() {
             <Icon name="eye" size={17} />
           </Link>
           {canEdit ? (
-            <button type="button" aria-label={`Cập nhật ${r.code}`} title="Cập nhật" onClick={() => setEditing(r.id)}>
+            <Link href={`${WORK_ROUTE}/${r.id}/sua`} aria-label={`Cập nhật ${r.code}`} title="Cập nhật">
               <Icon name="edit" size={16} />
-            </button>
+            </Link>
           ) : null}
         </span>
       ),
@@ -261,48 +259,12 @@ export function HrmWorkInfoScreen() {
           )
         }
       </LoadState>
-      {editing ? (
-        <WorkDialogLoader
-          sa={sa}
-          id={editing}
-          reasons={names.reasons}
-          onClose={() => setEditing(null)}
-          onDone={(msg) => {
-            setEditing(null);
-            act.setNote(msg);
-            setNonce((n) => n + 1);
-          }}
-        />
-      ) : null}
     </>
   );
 }
 
-function WorkDialogLoader({
-  sa,
-  id,
-  reasons,
-  onClose,
-  onDone,
-}: {
-  sa: StaffApi;
-  id: string;
-  reasons: { code: string; name: string }[];
-  onClose: () => void;
-  onDone: (msg: string) => void;
-}) {
-  const d = useLoad(() => sa.get(id), [id]);
-  if (!d.data)
-    return (
-      <Dialog title="Cập nhật thông tin làm việc" onClose={onClose}>
-        <LoadState s={d}>{() => null}</LoadState>
-      </Dialog>
-    );
-  return <WorkDialog sa={sa} d={d.data} reasons={reasons} onClose={onClose} onDone={onDone} />;
-}
-
-/** Hộp thoại "Cập nhật thông tin làm việc · <họ tên>" (prototype `tlModal`). */
-export function WorkDialog({
+/** R-A2: cập nhật ở route riêng; giữ nguyên kế hoạch ghi sổ và khóa idempotency. */
+export function WorkEditor({
   sa,
   d,
   reasons,
@@ -349,70 +311,51 @@ export function WorkDialog({
   };
   const invalid = (k: string) => (err?.fields.includes(k) ? true : undefined);
   return (
-    <Dialog
+    <DetailPage
+      back={{ href: WORK_ROUTE, label: "Danh sách" }}
       title={`Cập nhật thông tin làm việc · ${d.profile.full_name || d.code}`}
-      onClose={onClose}
+      log={<LogPanel title="Lịch sử" entries={workHistory(d)} empty="Chưa có dòng vào làm/nghỉ việc." />}
       actions={
         <>
-          <button type="button" className="btn btn-o btn-sm" onClick={onClose}>
-            Hủy
-          </button>
-          <button type="button" className="btn btn-p btn-sm" disabled={act.busy} onClick={() => void save()}>
-            Lưu
-          </button>
+          <button type="button" className="btn btn-o btn-sm" disabled={act.busy} onClick={onClose}>Hủy</button>
+          <button type="submit" form="work-info-editor" className="btn btn-p btn-sm" disabled={act.busy}>Lưu</button>
         </>
       }
     >
       {act.view}
-      {err ? (
-        <div className="alert alert-bad" role="alert">
-          <span>{err.message}</span>
-        </div>
-      ) : null}
-      <div className="grid2">
-        <label className="field">
-          <span>Ngày vào làm *</span>
-          <input type="date" aria-invalid={invalid("start")} value={v.start} onChange={(e) => setV({ ...v, start: e.target.value })} />
-        </label>
-        <div>
+      {err ? <div className="alert alert-bad" role="alert"><span>{err.message}</span></div> : null}
+      <form id="work-info-editor" noValidate onSubmit={(e) => { e.preventDefault(); if (!act.busy) void save(); }}>
+        <div className="grid2">
           <label className="field">
-            <span>Ngày nghỉ việc</span>
-            <input type="date" aria-invalid={invalid("end")} value={v.end} onChange={(e) => setV({ ...v, end: e.target.value })} />
+            <span>Ngày vào làm <span className="req" aria-hidden="true">*</span></span>
+            <input type="date" aria-required="true" aria-invalid={invalid("start")} aria-describedby={invalid("start") ? "work-start-error" : undefined} value={v.start} onChange={(e) => setV({ ...v, start: e.target.value })} />
+            {invalid("start") ? <span id="work-start-error" className="err">{err?.message}</span> : null}
           </label>
-          <small className="mute">Để trống nếu đang làm việc.</small>
-        </div>
-        <label className="field">
-          <span>Lý do nghỉ</span>
-          <select
-            aria-invalid={invalid("leaveReason")}
-            value={v.leaveReason}
-            disabled={!v.end}
-            onChange={(e) => setV({ ...v, leaveReason: e.target.value })}
-          >
-            <option value="">— Chọn —</option>
-            {reasons.map((r) => (
-              <option key={r.code} value={r.code}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Số quyết định (nếu có)</span>
-          <input value={v.decisionNo} disabled={!v.end} onChange={(e) => setV({ ...v, decisionNo: e.target.value })} />
-        </label>
-        {needNote ? (
-          <div style={{ gridColumn: "1 / -1" }}>
+          <div>
             <label className="field">
-              <span>Lý do sửa (10–500 ký tự) *</span>
-              <textarea rows={2} aria-invalid={invalid("note")} value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} />
+              <span>Ngày nghỉ việc</span>
+              <input type="date" aria-invalid={invalid("end")} aria-describedby={invalid("end") ? "work-end-error" : undefined} value={v.end} onChange={(e) => setV({ ...v, end: e.target.value })} />
+              {invalid("end") ? <span id="work-end-error" className="err">{err?.message}</span> : null}
             </label>
-            <small className="mute">Dòng cũ được giữ trong lịch sử (sổ chỉ ghi thêm).</small>
+            <small className="mute">Để trống nếu đang làm việc.</small>
           </div>
-        ) : null}
-      </div>
+          <SelectField label="Lý do nghỉ" required={!!v.end} disabled={!v.end} value={v.leaveReason}
+            onChange={(leaveReason) => setV({ ...v, leaveReason })}
+            options={reasons.map((r) => ({ value: r.code, label: r.name }))}
+            error={invalid("leaveReason") ? err?.message : undefined} />
+          <TextField label="Số quyết định (nếu có)" value={v.decisionNo} disabled={!v.end}
+            onChange={(decisionNo) => setV({ ...v, decisionNo })} />
+          {needNote ? (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <TextField label="Lý do sửa (10–500 ký tự)" multiline required maxLength={500} value={v.note}
+                onChange={(note) => setV({ ...v, note })} error={invalid("note") ? err?.message : undefined}
+                hint="Dòng cũ được giữ trong lịch sử (sổ chỉ ghi thêm)." />
+            </div>
+          ) : null}
+        </div>
+      </form>
       <p className="mute small">Tệp quyết định nghỉ việc tải lên ở Hồ sơ dữ liệu (thư mục của nhân viên).</p>
-    </Dialog>
+    </DetailPage>
   );
 }
 
@@ -443,8 +386,7 @@ export function HrmWorkInfoDetailScreen() {
   const names = useNames();
   const access = useLoad(() => sa.access(), []);
   const s = useLoad(() => sa.get(id), [id]);
-  const [editing, setEditing] = useState(false);
-  const act = useAction();
+
   useBreadcrumbTail(s.data ? [{ label: s.data.profile.full_name || s.data.code }] : []);
   const canEdit = access.data?.enabled === true && access.data.perms["profile.edit"] !== "none" && s.data?.can["profile.edit"] !== false;
   return (
@@ -463,9 +405,7 @@ export function HrmWorkInfoDetailScreen() {
                 actions={
                   <>
                     {canEdit ? (
-                      <button type="button" className="btn btn-p btn-sm" onClick={() => setEditing(true)}>
-                        Sửa
-                      </button>
+                      <Link className="btn btn-p btn-sm" href={`${WORK_ROUTE}/${d.id}/sua`}>Sửa</Link>
                     ) : null}
                     <Link className="btn btn-o btn-sm" href={`${PROFILE_ROUTE}/${d.id}`}>
                       Mở hồ sơ nhân viên
@@ -473,7 +413,6 @@ export function HrmWorkInfoDetailScreen() {
                   </>
                 }
               />
-              {act.view}
               <div className="detail-grid">
                 <div className="card detail-main">
                   <LabelValueBlock
@@ -497,23 +436,29 @@ export function HrmWorkInfoDetailScreen() {
                 </div>
                 <LogPanel title="Lịch sử" entries={workHistory(d)} empty="Chưa có dòng vào làm/nghỉ việc." />
               </div>
-              {editing ? (
-                <WorkDialog
-                  sa={sa}
-                  d={d}
-                  reasons={names.reasons}
-                  onClose={() => setEditing(false)}
-                  onDone={(msg) => {
-                    setEditing(false);
-                    act.setNote(msg);
-                    s.reload();
-                  }}
-                />
-              ) : null}
+
             </>
           );
         }}
       </LoadState>
     </>
   );
+}
+
+/** Kiểm quyền màn và hồ sơ trước khi mở form; máy chủ tiếp tục kiểm quyền mỗi lần ghi. */
+export function HrmWorkInfoEditScreen() {
+  const { id } = useParams<{ id: string }>();
+  const sa = useStaffApi();
+  const access = useLoad(() => sa.access(), []);
+  const scope = access.data?.perms["profile.edit"];
+  const allowed = access.data?.enabled === true && (scope === "self" || scope === "unit" || scope === "all");
+  const detail = useLoad(allowed ? () => sa.get(id) : null, [allowed, id]);
+  const names = useNames();
+  const router = useRouter();
+  return <LoadState s={access}>{() => !allowed ? (
+    <><BackLink href={WORK_ROUTE}>Danh sách</BackLink><p role="alert">Bạn không có quyền cập nhật thông tin làm việc.</p></>
+  ) : <LoadState s={detail}>{(d) => d.can["profile.edit"] !== true ? (
+    <><BackLink href={WORK_ROUTE}>Danh sách</BackLink><p role="alert">Bạn không có quyền cập nhật hồ sơ này.</p></>
+  ) : <WorkEditor key={d.id} sa={sa} d={d} reasons={names.reasons}
+    onClose={() => router.push(WORK_ROUTE)} onDone={() => router.push(`${WORK_ROUTE}/${d.id}`)} />}</LoadState>}</LoadState>;
 }
