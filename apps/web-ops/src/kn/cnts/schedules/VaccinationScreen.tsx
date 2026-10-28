@@ -390,34 +390,30 @@ function MatrixView({ capi, mapi }: { capi: CntsCalApi; mapi: CntsModelApi }) {
                   <table className="table" aria-label={`Lịch tiêm phòng ${mx.model_type_name ?? mx.model_type_code}`}>
                     <thead>
                       <tr>
-                        {["STT", "Địa chỉ (xã)", "Hộ (chủ hộ)", "CB theo dõi MH", "Ngày nhận giống"].map((h) => (
-                          <th key={h} rowSpan={3} scope="col">
+                        {["Stt", "Địa chỉ", "Họ tên nông dân", "CB theo dõi MH", "Ngày nhận giống"].map((h) => (
+                          <th key={h} rowSpan={2} scope="col">
                             {h}
                           </th>
                         ))}
                         {vaccineGroups(mx.columns).map((g) => (
                           <th key={g.code} colSpan={2 * g.span} scope="colgroup">
-                            {g.name}
+                            Vaccin {g.name}
                           </th>
                         ))}
-                        <th rowSpan={3} />
+                        <th rowSpan={2} />
                       </tr>
                       <tr>
-                        {mx.columns.map((c) => (
-                          <th key={`${c.vaccine_code}/${c.shot}`} colSpan={2} scope="colgroup">
-                            Lần {c.shot}
-                          </th>
-                        ))}
-                      </tr>
-                      <tr>
-                        {mx.columns.flatMap((c) => [
-                          <th key={`${c.vaccine_code}/${c.shot}/e`} scope="col">
-                            Dự kiến
-                          </th>,
-                          <th key={`${c.vaccine_code}/${c.shot}/a`} scope="col">
-                            Thực tế
-                          </th>,
-                        ])}
+                        {mx.columns.flatMap((c) => {
+                          const shot = mx.columns.filter((x) => x.vaccine_code === c.vaccine_code).length > 1 ? ` (Lần ${c.shot})` : "";
+                          return [
+                            <th key={`${c.vaccine_code}/${c.shot}/e`} scope="col">
+                              Ngày tiêm dự kiến{shot}
+                            </th>,
+                            <th key={`${c.vaccine_code}/${c.shot}/a`} scope="col">
+                              Ngày tiêm thực tế{shot}
+                            </th>,
+                          ];
+                        })}
                       </tr>
                     </thead>
                     <tbody>

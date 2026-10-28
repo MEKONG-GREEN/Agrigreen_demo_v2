@@ -114,8 +114,9 @@ func (r MatrixRow) HouseholdText() string {
 	return ""
 }
 
-// VaccinationMatrixXLSX xuất bảng BM-07 ra Excel đúng bố cục sheet của tệp mẫu: tiêu đề, hàng tiêu đề 3 tầng (vaccine →
-// lần → ngày dự kiến/thực tế), một hàng mỗi hộ. Không ghi họ tên/SĐT đầy đủ — chỉ nhãn che bớt.
+// VaccinationMatrixXLSX xuất bảng BM-07 ra Excel đúng bố cục sheet của tệp mẫu "LỊCH TIÊM PHÒNG VACCIN CT GIA CẦM 2026":
+// tiêu đề, hai hàng tiêu đề (vaccine → ngày dự kiến/thực tế theo lần), một hàng mỗi hộ. Không ghi họ tên/SĐT đầy đủ — chỉ
+// nhãn che bớt.
 func (s *Service) VaccinationMatrixXLSX(ctx context.Context, q MatrixQuery) ([]byte, string, error) {
 	m, err := s.VaccinationMatrix(ctx, q)
 	if err != nil {
@@ -132,23 +133,24 @@ func (s *Service) VaccinationMatrixXLSX(ctx context.Context, q MatrixQuery) ([]b
 		return nil, "", err
 	}
 	w := xw{f: x, sh: sh}
-	fixed := []string{"STT", "Địa chỉ (xã)", "Họ tên nông dân", "CB theo dõi MH", "Ngày nhận giống"}
+	// Bố cục sheet mẫu: hàng 1 tiêu đề (gộp hết bảng); hàng 2 "Stt, Địa chỉ, Họ tên nông dân, CB theo dõi MH, Ngày nhận giống"
+	// (gộp 2 hàng) và "Vaccin <tên>" gộp qua các lần; hàng 3 "Ngày tiêm dự kiến (Lần n)", "Ngày tiêm thực tế (Lần n)" (vaccine
+	// một lần thì không ghi lần); dữ liệu từ hàng 4. Mẫu ghi kèm SĐT nông dân, cán bộ — tệp xuất KHÔNG có SĐT (dữ liệu cá nhân).
+	fixed := []string{"Stt", "Địa chỉ", "Họ tên nông dân", "CB theo dõi MH", "Ngày nhận giống"}
 	last := len(fixed) + 2*len(m.Columns)
 	if last < len(fixed)+1 {
 		last = len(fixed) + 1
 	}
-	title := "LỊCH TIÊM PHÒNG VACCIN " + strings.ToUpper(model)
+	title := "LỊCH TIÊM PHÒNG VACCIN MÔ HÌNH NUÔI " + strings.ToUpper(model)
 	if q.From != nil {
 		title += " NĂM " + fmt.Sprint(q.From.Year())
 	}
 	w.set(1, 1, title)
 	w.merge(1, 1, last, 1)
-	w.set(1, 2, fmt.Sprintf("Xuất ngày %s · %d hộ", m.Today.Format("02/01/2006"), len(m.Rows)))
-	w.merge(1, 2, last, 2)
-	const h1, h2, h3 = 4, 5, 6
+	const h1, h2 = 2, 3
 	for i, t := range fixed {
 		w.set(i+1, h1, t)
-		w.merge(i+1, h1, i+1, h3)
+		w.merge(i+1, h1, i+1, h2)
 	}
 	col := len(fixed) + 1
 	for i := 0; i < len(m.Columns); {
@@ -160,14 +162,15 @@ func (s *Service) VaccinationMatrixXLSX(ctx context.Context, q MatrixQuery) ([]b
 		if name == "" {
 			name = m.Columns[i].Vaccine
 		}
-		w.set(col, h1, name)
+		w.set(col, h1, "Vaccin "+name)
 		w.merge(col, h1, col+2*(j-i)-1, h1)
 		for k := i; k < j; k++ {
-			c := col + 2*(k-i)
-			w.set(c, h2, fmt.Sprintf("Lần %d", m.Columns[k].Shot))
-			w.merge(c, h2, c+1, h2)
-			w.set(c, h3, "Ngày tiêm dự kiến")
-			w.set(c+1, h3, "Ngày tiêm thực tế")
+			c, shot := col+2*(k-i), ""
+			if j-i > 1 {
+				shot = fmt.Sprintf(" (Lần %d)", m.Columns[k].Shot)
+			}
+			w.set(c, h2, "Ngày tiêm dự kiến"+shot)
+			w.set(c+1, h2, "Ngày tiêm thực tế"+shot)
 		}
 		col += 2 * (j - i)
 		i = j
@@ -181,10 +184,10 @@ func (s *Service) VaccinationMatrixXLSX(ctx context.Context, q MatrixQuery) ([]b
 	if err != nil {
 		return nil, "", err
 	}
-	if err := w.style(1, 1, last, h3, head); err != nil {
+	if err := w.style(1, 1, last, h2, head); err != nil {
 		return nil, "", err
 	}
-	row := h3 + 1
+	row := h2 + 1
 	for i, r := range m.Rows {
 		officer := ""
 		if r.Model != nil && r.Model.OfficerRef != nil {
@@ -216,8 +219,9 @@ func (s *Service) VaccinationMatrixXLSX(ctx context.Context, q MatrixQuery) ([]b
 		}
 		row++
 	}
+	w.set(1, row+1, fmt.Sprintf("Xuất ngày %s · %d hộ · chủ hộ hiện nhãn che bớt, không kèm số điện thoại.", m.Today.Format("02/01/2006"), len(m.Rows)))
 	if m.Truncated {
-		w.set(1, row+1, fmt.Sprintf("Chỉ xuất %d lứa đầu — thu hẹp bộ lọc (dự án, điểm, xã, ngày nhận giống) để xuất đủ.", domain.MaxMatrixRows))
+		w.set(1, row+2, fmt.Sprintf("Chỉ xuất %d lứa đầu — thu hẹp bộ lọc (dự án, điểm, xã, ngày nhận giống) để xuất đủ.", domain.MaxMatrixRows))
 	}
 	if w.err != nil {
 		return nil, "", w.err

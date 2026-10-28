@@ -113,11 +113,16 @@ func TestVaccinationBM07(t *testing.T) {
 		}
 		return v
 	}
-	if !strings.Contains(cell("A1"), "LỊCH TIÊM PHÒNG VACCIN GÀ THƯƠNG PHẨM NĂM 2027") || cell("A4") != "STT" || cell("C4") != "Họ tên nông dân" ||
-		cell("D4") != "CB theo dõi MH" || cell("F5") != "Lần 1" || cell("F6") != "Ngày tiêm dự kiến" || cell("G6") != "Ngày tiêm thực tế" ||
-		cell("A7") != "1" || cell("B7") != "Xã 30001" || cell("E7") != "01/10/2027" || cell("H7") != "07/10/2027" || cell("I7") != "Quá hạn" {
-		t.Fatalf("bố cục BM-07: A1=%q A4=%q F5=%q F6=%q A7=%q B7=%q E7=%q H7=%q I7=%q", cell("A1"), cell("A4"), cell("F5"), cell("F6"),
-			cell("A7"), cell("B7"), cell("E7"), cell("H7"), cell("I7"))
+	// Như sheet mẫu: tiêu đề hàng 1, tiêu đề cột hàng 2–3 (vaccine một lần không ghi lần), dữ liệu từ hàng 4.
+	if cell("A1") != "LỊCH TIÊM PHÒNG VACCIN MÔ HÌNH NUÔI GÀ THƯƠNG PHẨM NĂM 2027" || cell("A2") != "Stt" || cell("C2") != "Họ tên nông dân" ||
+		cell("D2") != "CB theo dõi MH" || cell("F2") != "Vaccin VX_ND_F" || cell("F3") != "Ngày tiêm dự kiến" || cell("H2") != "Vaccin Gumboro" ||
+		cell("H3") != "Ngày tiêm dự kiến (Lần 1)" || cell("I3") != "Ngày tiêm thực tế (Lần 1)" || cell("A4") != "1" || cell("B4") != "Xã 30001" ||
+		cell("E4") != "01/10/2027" || cell("H4") != "07/10/2027" || cell("I4") != "Quá hạn" {
+		t.Fatalf("bố cục BM-07: A1=%q A2=%q F2=%q F3=%q H2=%q H3=%q A4=%q B4=%q E4=%q H4=%q I4=%q", cell("A1"), cell("A2"), cell("F2"), cell("F3"),
+			cell("H2"), cell("H3"), cell("A4"), cell("B4"), cell("E4"), cell("H4"), cell("I4"))
+	}
+	if mc, err := xf.GetMergeCells(sh); err != nil || len(mc) < 7 {
+		t.Fatalf("ô gộp tiêu đề: %d %v", len(mc), err)
 	}
 	if strings.Contains(string(x.raw), "0900000001") {
 		t.Fatal("tệp Excel lộ SĐT")
