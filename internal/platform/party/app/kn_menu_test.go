@@ -19,7 +19,7 @@ func TestW1106_MenuViewComingSoonAndAlias(t *testing.T) {
 		t.Fatal(err)
 	}
 	// BF-MENU (#98, kn.menu/v6): mục nghiệp vụ HCTH nằm trong nhóm Điều hành (Đánh giá), không còn nhóm "Nghiệp vụ".
-	if v.Version != "kn.menu/v8" || len(v.Groups) < 2 || v.Groups[0].Key != "dieu_hanh" || v.Groups[1].Key != domain.GroupBaoCao {
+	if v.Version != "kn.menu/v9" || len(v.Groups) < 2 || v.Groups[0].Key != "dieu_hanh" || v.Groups[1].Key != domain.GroupBaoCao {
 		t.Fatalf("menu HCTH: %+v", v.Groups)
 	}
 	var it MenuItemView

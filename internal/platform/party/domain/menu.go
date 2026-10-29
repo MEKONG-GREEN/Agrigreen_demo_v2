@@ -37,7 +37,7 @@ import (
 )
 
 // MenuVersion là phiên bản của bảng menu tĩnh.
-const MenuVersion = "kn.menu/v8"
+const MenuVersion = "kn.menu/v9"
 
 // Mã loại báo cáo của danh mục report_type (pf/masterdata) mà menu tham chiếu.
 const ReportTypeAdHoc = "dot_xuat"

@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v8";
+export const MENU_VERSION = "kn.menu/v9";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -2242,6 +2242,12 @@ const ADMIN_SYSTEM: Group = {
       "label": "Mẫu văn bản & lịch sử xuất",
       "route": "/kn/quan-tri/mau-van-ban",
       "icon": "report"
+    },
+    {
+      "key": "admin.qt.nhat_ky_he_thong",
+      "label": "Nhật ký hệ thống",
+      "route": "/kn/quan-tri/nhat-ky-he-thong",
+      "icon": "shield"
     }
   ]
 };
