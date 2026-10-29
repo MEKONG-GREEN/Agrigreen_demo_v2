@@ -6,6 +6,7 @@ import { filterRows } from "@/kn/khtc/reports/api";
 import { validAdhocSelection, selectedAdhocContent } from "@/kn/khtc/adhoc/selection";
 import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
+import { TENANT } from "./personas";
 import { khtcMockStore, type Stored } from "./kn-khtc-periods";
 import {ADHOC_REQUESTS} from "./kn-khtc-adhoc-state";
 import { khtcAdhocSubmitted, khtcReportInputs } from "./kn-khtc-forms";
@@ -24,6 +25,26 @@ const STORE = new Map<string, {
         documentNo: string;
     }[];
 }>();
+export interface KhtcTemplateNarrativeUsage {
+ draftID: string | null; version: number; hasSavedNarrative: boolean;
+ revisions: {draftID: string; version: number; sections: string[]}[];
+}
+const NARRATIVE_REVISIONS = new Map<string,KhtcTemplateNarrativeUsage["revisions"]>();
+// Fixed mock periods are fixtures of TENANT; adhoc periods carry their real mock tenant.
+function templatePeriod(ctx: Ctx, periodID: string): Stored | undefined {
+ return khtcMockStore().find(p=>p.p.id===periodID && (p.adhocTenant??TENANT)===ctx.persona.me.tenant_id);
+}
+/** Ledger metadata only: never load/capture or synthesize a draft for this read. */
+export function khtcTemplateNarrativeUsage(ctx: Ctx, periodID: string): KhtcTemplateNarrativeUsage | null {
+ if(!templatePeriod(ctx,periodID))return null;
+ const detail=STORE.get(periodID)?.detail, revisions=NARRATIVE_REVISIONS.get(ctx.persona.me.tenant_id+":"+periodID)??[];
+ return structuredClone({draftID:detail?.draft_id??null,version:detail?.version??0,hasSavedNarrative:revisions.some(r=>r.sections.length>0),revisions});
+}
+function recordNarrativeRevision(ctx:Ctx, d:Detail):void {
+ const key=ctx.persona.me.tenant_id+":"+d.period_id, history=NARRATIVE_REVISIONS.get(key)??[];
+ const sections=Object.entries(d.content.texts).filter(([,v])=>v.trim()).map(([k])=>k);
+ history.push({draftID:d.draft_id!,version:d.version,sections});NARRATIVE_REVISIONS.set(key,history);
+}
 const ADMIN = ["document_no", "place", "report_date", "recipient", "basis", "recipients", "authority", "signer_title", "signer"];
 const KHTC = "ke_hoach_tai_chinh";
 const code = (name: string, title: string, status = 409) => problem(status, `extension.khtc_report_${name}`, title);
@@ -118,7 +139,7 @@ function load(ctx: Ctx, s: Stored) {
 }
 /** Read-only preview seam: the template editor shares the composer's projection. */
 export function khtcTemplatePreviewContent(ctx: Ctx, periodId: string): Content | null {
- const period=khtcMockStore().find(x=>x.p.id===periodId);
+ const period=templatePeriod(ctx,periodId);
  return period ? structuredClone(load(ctx,period).detail.content) : null;
 }
 export const khtcReportRoutes: Route[] = [{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
@@ -212,6 +233,7 @@ function handle(ctx: Ctx): Response {
     if(s.p.report_type==="adhoc")d.content.data.provisional=selectedAdhocContent(d.content).data.provisional;
     d.version++;
     d.draft_id = uuidv7();
+    recordNarrativeRevision(ctx,d);
     return json((load(ctx, s)).detail, 201);
 }
 /** W10.17: bản xuất Excel đã lưu cùng bản soạn hiện tại — nguồn của Word giả lập (kn-khtc-words). */

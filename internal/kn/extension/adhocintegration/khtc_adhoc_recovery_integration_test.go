@@ -1,4 +1,4 @@
-package kn77_test
+package adhocintegration_test
 
 import (
 	"bytes"

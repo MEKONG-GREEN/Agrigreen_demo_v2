@@ -1,0 +1,43 @@
+import {expect,it} from "vitest";
+import {createApiClient} from "@/api/client";
+import {mockFetchNoDelay} from "./handler";
+import {findPersona} from "./personas";
+import type {Ctx} from "./http";
+import {khtcTemplateNarrativeUsage,khtcTemplatePreviewContent} from "./kn-khtc-reports";
+import {createKhtcPeriodApi} from "@/kn/khtc/periods/api";
+import {createReportApi} from "@/kn/khtc/reports/api";
+
+it("W11.68 usage is tenant-bound saved revision evidence, not auto-load/default prose",async()=>{
+ const url=new URL("http://mock"),persona=findPersona("tinh")!;
+ const ctx:Ctx={url,persona,params:[],body:null,request:new Request(url)};
+ // Existing fixed-report fixture caller; native session/role gates are PG-tested.
+ const client=createApiClient({baseUrl:"http://mock",getAccessToken:()=>"mock.tinh",getContextId:()=>null,fetch:mockFetchNoDelay});
+ const p=await createKhtcPeriodApi(client).open({report_type:"week",year:2039,no:1});
+ const reports=createReportApi(client);
+ expect(khtcTemplateNarrativeUsage(ctx,crypto.randomUUID())).toBeNull();
+ expect(khtcTemplateNarrativeUsage(ctx,p.id)).toEqual({draftID:null,version:0,hasSavedNarrative:false,revisions:[]});
+ let d=await reports.get(p.id);
+ expect(d.content.texts.D).toBe("Không có.");
+ expect(khtcTemplateNarrativeUsage(ctx,p.id)?.hasSavedNarrative).toBe(false);
+ d=await reports.refresh(p.id,d.version);
+ expect(khtcTemplateNarrativeUsage(ctx,p.id)?.hasSavedNarrative).toBe(true);
+ expect(khtcTemplateNarrativeUsage(ctx,p.id)?.revisions.at(-1)?.sections).toContain("D");
+ d=await reports.save(p.id,{base_version:d.version,texts:{B:"Nội dung đã được lưu thật"}});
+ const saved=khtcTemplateNarrativeUsage(ctx,p.id)!;
+ expect(saved.version).toBe(d.version);expect(saved.draftID).toBe(d.draft_id);
+ expect(saved.hasSavedNarrative).toBe(true);expect(saved.revisions.at(-1)?.sections).toContain("B");
+ saved.revisions.at(-1)!.sections.push("tampered");
+ expect(khtcTemplateNarrativeUsage(ctx,p.id)?.revisions.at(-1)?.sections).not.toContain("tampered");
+ d=await reports.save(p.id,{base_version:d.version,texts:{B:"",D:""}});
+ d=await reports.refresh(p.id,d.version);
+ const cleared=khtcTemplateNarrativeUsage(ctx,p.id)!;
+ expect(cleared.hasSavedNarrative).toBe(true);expect(cleared.revisions).toHaveLength(4);
+ expect(cleared.revisions.at(-1)?.sections).toEqual([]);
+ d=await reports.save(p.id,{base_version:d.version,texts:{D:"Không có."}});
+ expect(khtcTemplateNarrativeUsage(ctx,p.id)?.revisions.at(-1)?.sections).toContain("D");
+ await reports.refresh(p.id,d.version);
+ expect(khtcTemplateNarrativeUsage(ctx,p.id)?.revisions.at(-1)?.sections).toContain("D");
+ const foreign={...ctx,persona:{...persona,me:{...persona.me,tenant_id:crypto.randomUUID()}}};
+ expect(khtcTemplateNarrativeUsage(foreign,p.id)).toBeNull();
+ expect(khtcTemplatePreviewContent(foreign,p.id)).toBeNull();
+});

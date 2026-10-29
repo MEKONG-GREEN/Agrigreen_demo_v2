@@ -39,7 +39,7 @@ func projectAdhocRequest(row *FormRow, r *store.AdhocRequest, u forms.UnitProgre
 	row.RequestDueAt = &due
 	row.RequestState = r.State
 	row.ReviewNote = r.Instruction
-	if r.NativeSubmissionRef != nil && u.LastSubmissionID != nil && *r.NativeSubmissionRef == *u.LastSubmissionID && u.LastSubmittedAt != nil {
+	if r.State == "fulfilled" && r.NativeSubmissionRef != nil && u.LastSubmissionID != nil && *r.NativeSubmissionRef == *u.LastSubmissionID && u.LastSubmittedAt != nil {
 		native := u.Late
 		row.NativeLate = &native
 		row.Late = u.LastSubmittedAt.After(r.DueAt)

@@ -2,28 +2,6 @@
   "id": "extension-khtc-adhoc",
   "order": 113,
   "tables": {
-    "deptMenus": {
-      "ke_hoach_tai_chinh": {
-        "kn_tinh": [
-          {
-            "Key": "bao_cao_phat_sinh", "Label":"Báo cáo phát sinh",
-            "Items": [
-              {
-                "Key": "tinh.khtc.phat_sinh",
-                "Label": "Báo cáo phát sinh",
-                "Route": "/kn/khtc/bao-cao-phat-sinh",
-                "Icon": "report",
-                "BadgeSource": "",
-                "Requires": null,
-                "ComingSoon": false,
-                "Needs": "",
-                "Children": null
-              }
-            ]
-          }
-        ]
-      }
-    },
     "adminDeptBusiness": {
       "ke_hoach_tai_chinh": [
         {
@@ -42,5 +20,191 @@
     "menuModules": {
       "/kn/khtc/bao-cao-phat-sinh": "pf/extension"
     }
-  }
+  },
+  "replacements": [
+    {
+      "path": [
+        "deptMenus",
+        "ke_hoach_tai_chinh",
+        "kn_tinh",
+        1,
+        "Items"
+      ],
+      "before": [
+        {
+          "Key": "tinh.bao_cao.tong_hop",
+          "Label": "Báo cáo tổng hợp các xã",
+          "Route": "/kn/bao-cao/tong-hop",
+          "Icon": "layers",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.bao_cao.dot_xuat",
+          "Label": "Báo cáo đột xuất",
+          "Route": "/kn/bao-cao/dot-xuat",
+          "Icon": "zap",
+          "BadgeSource": "extension.report_status.ad_hoc_pending",
+          "Requires": {
+            "ReportType": "dot_xuat",
+            "Level": "province"
+          },
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.bao_cao",
+          "Label": "Soạn báo cáo (Mẫu 1–5)",
+          "Route": "/kn/khtc/bao-cao",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.tien_do",
+          "Label": "Tiến độ các chương trình",
+          "Route": "/kn/khtc/tien-do",
+          "Icon": "chart",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.da_xuat",
+          "Label": "Báo cáo đã xuất",
+          "Route": "/kn/khtc/bao-cao-da-xuat",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.bao_cao_den",
+          "Label": "Báo cáo đến",
+          "Route": "/kn/bao-cao-den",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.mau_bao_cao",
+          "Label": "Mẫu báo cáo KHTC",
+          "Route": "/kn/khtc/mau-bao-cao",
+          "Icon": "table",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": true,
+          "Needs": "",
+          "Children": null
+        }
+      ],
+      "after": [
+        {
+          "Key": "tinh.bao_cao.tong_hop",
+          "Label": "Báo cáo tổng hợp các xã",
+          "Route": "/kn/bao-cao/tong-hop",
+          "Icon": "layers",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.bao_cao.dot_xuat",
+          "Label": "Báo cáo đột xuất",
+          "Route": "/kn/bao-cao/dot-xuat",
+          "Icon": "zap",
+          "BadgeSource": "extension.report_status.ad_hoc_pending",
+          "Requires": {
+            "ReportType": "dot_xuat",
+            "Level": "province"
+          },
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.bao_cao",
+          "Label": "Soạn báo cáo (Mẫu 1–5)",
+          "Route": "/kn/khtc/bao-cao",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.tien_do",
+          "Label": "Tiến độ các chương trình",
+          "Route": "/kn/khtc/tien-do",
+          "Icon": "chart",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.da_xuat",
+          "Label": "Báo cáo đã xuất",
+          "Route": "/kn/khtc/bao-cao-da-xuat",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.bao_cao_den",
+          "Label": "Báo cáo đến",
+          "Route": "/kn/bao-cao-den",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.mau_bao_cao",
+          "Label": "Mẫu báo cáo KHTC",
+          "Route": "/kn/khtc/mau-bao-cao",
+          "Icon": "table",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": true,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.khtc.phat_sinh",
+          "Label": "Báo cáo phát sinh",
+          "Route": "/kn/khtc/bao-cao-phat-sinh",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ]
+    }
+  ]
 }

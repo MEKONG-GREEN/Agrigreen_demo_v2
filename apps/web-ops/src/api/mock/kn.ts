@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v7";
+export const MENU_VERSION = "kn.menu/v8";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -1269,6 +1269,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/khtc/mau-bao-cao",
             "icon": "table",
             "soon": true
+          },
+          {
+            "key": "tinh.khtc.phat_sinh",
+            "label": "Báo cáo phát sinh",
+            "route": "/kn/khtc/bao-cao-phat-sinh",
+            "icon": "report"
           }
         ]
       },
@@ -1287,18 +1293,6 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "label": "Quy trình, văn bản",
             "route": "/kn/van-ban",
             "icon": "library"
-          }
-        ]
-      },
-      {
-        "key": "bao_cao_phat_sinh",
-        "label": "Báo cáo phát sinh",
-        "items": [
-          {
-            "key": "tinh.khtc.phat_sinh",
-            "label": "Báo cáo phát sinh",
-            "route": "/kn/khtc/bao-cao-phat-sinh",
-            "icon": "report"
           }
         ]
       }

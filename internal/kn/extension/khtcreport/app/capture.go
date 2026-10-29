@@ -35,7 +35,11 @@ func (s *Service) submitted(ctx context.Context, c caller, p ps.Period) ([]domai
 		var e error
 		for year := p.From.Year(); year <= p.Year; year++ {
 			var rows []ps.Period
-			rows, e = ps.Periods(ctx, tx, year, 10000)
+			if p.Type == pd.TypeAdhoc {
+				rows, e = ps.AdhocReportPeriods(ctx, tx, year, p.ID, pd.QuantityEnd(p.Type, p.To, p.Cutoff))
+			} else {
+				rows, e = ps.Periods(ctx, tx, year, 10000)
+			}
 			if e != nil {
 				return e
 			}

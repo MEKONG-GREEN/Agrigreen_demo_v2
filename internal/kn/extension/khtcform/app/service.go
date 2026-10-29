@@ -704,7 +704,7 @@ func (s *Service) Review(ctx context.Context, id uuid.UUID, dept, decision, note
 	if err != nil {
 		return Form{}, err
 	}
-	if !c.review && !(c.k.Role == extport.SessionRoleAdmin && !c.k.ReadOnly() && f.Period.Type == pdomain.TypeAdhoc) {
+	if !c.review && (c.k.Role != extport.SessionRoleAdmin || c.k.ReadOnly() || f.Period.Type != pdomain.TypeAdhoc) {
 		return Form{}, errNotKHTC
 	}
 	switch decision {

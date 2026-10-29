@@ -3,11 +3,11 @@ package kn77_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/docx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
 	"net/http"
 	"strings"
@@ -87,7 +87,17 @@ func TestW1168SupplementNativeTokenAndFrozenExports(t *testing.T) {
 	c, b = f.call(http.MethodGet, p.ID, "", nil)
 	f.ok(c, b, nil)
 	var content struct {
-		Content domain.Draft `json:"content"`
+		Content struct {
+			Data struct {
+				Metrics []struct {
+					Key   string                         `json:"key"`
+					Value struct{ Sum *decimal.Decimal } `json:"value"`
+					Trace []struct {
+						FiguresHash *string `json:"figures_hash"`
+					} `json:"trace"`
+				} `json:"metrics"`
+			} `json:"data"`
+		} `json:"content"`
 	}
 	if err := json.Unmarshal(b, &content); err != nil {
 		t.Fatal(err)
@@ -110,7 +120,11 @@ func TestW1168SupplementNativeTokenAndFrozenExports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer book.Close()
+	defer func() {
+		if e := book.Close(); e != nil {
+			t.Errorf("close workbook: %v", e)
+		}
+	}()
 	rows, err := book.GetRows("Báo cáo")
 	if err != nil {
 		t.Fatal(err)
@@ -175,11 +189,12 @@ func TestW1168ConcurrentRequestsAndNativeLimit(t *testing.T) {
 	close(codes)
 	success, conflict := 0, 0
 	for c := range codes {
-		if c == 201 {
+		switch c {
+		case 201:
 			success++
-		} else if c == 409 {
+		case 409:
 			conflict++
-		} else {
+		default:
 			t.Fatalf("request race %d", c)
 		}
 	}

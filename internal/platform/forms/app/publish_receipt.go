@@ -14,7 +14,7 @@ import (
 )
 
 func sameDate(a, b *time.Time) bool {
-	return a == nil && b == nil || a != nil && b != nil && a.Equal(*b)
+	return a == nil && b == nil || a != nil && b != nil && a.UTC().Format(time.DateOnly) == b.UTC().Format(time.DateOnly)
 }
 func sameReceiptSpec(a, b domain.Spec) bool {
 	return a.UnitKind == b.UnitKind && slices.Equal(a.UnitParents, b.UnitParents) && a.MaxSubmissions == b.MaxSubmissions && a.ReviewFlow == b.ReviewFlow && a.PeriodKind == b.PeriodKind && a.PeriodKey == b.PeriodKey && sameDate(a.From, b.From) && sameDate(a.To, b.To) && a.PeriodRule == b.PeriodRule

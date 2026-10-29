@@ -5,14 +5,14 @@ import {LoadState,dt,useAction,useLoad} from "@/kn/cycle/common";
 import {TextField} from "@/components/form";
 import {ApiProblem} from "@/api/problem";
 import {createAdhocApi} from "./api";
-export function AdhocOpenRecovery(){
+export function AdhocOpenRecovery({onRecovered}:{onRecovered?:()=>void}={}){
  const{api}=useAuth();const requests=useMemo(()=>createAdhocApi(api),[api]);const list=useLoad(()=>requests.opens(),[requests]);
  const act=useAction();const[reasons,setReasons]=useState<Record<string,string>>({});
  const pending=useRef(new Map<string,string>());const[uncertain,setUncertain]=useState<Record<string,boolean>>({});
  const recover=(id:string,generation:number)=>act.run(async()=>{
   const key=id+":"+generation,reason=pending.current.get(key)??reasons[id]??"";
   pending.current.set(key,reason);setUncertain(xs=>({...xs,[key]:true}));
-  try{await requests.recover(id,generation,reason);pending.current.delete(key);setUncertain(xs=>({...xs,[key]:false}));list.reload()}
+  try{await requests.recover(id,generation,reason);pending.current.delete(key);setUncertain(xs=>({...xs,[key]:false}));list.reload();onRecovered?.()}
   catch(e){if(e instanceof ApiProblem&&e.problem.status>=400 && e.problem.status<500){pending.current.delete(key);setUncertain(xs=>({...xs,[key]:false}))}throw e}
  },"Đã đối chiếu phát hành. Tải lại danh sách kỳ để tiếp tục soạn.");
  return <section aria-label="Khôi phục phát hành kỳ"><h2>Khôi phục phát hành kỳ</h2>

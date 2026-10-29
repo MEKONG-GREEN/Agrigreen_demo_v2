@@ -38,7 +38,7 @@ function fromLocal(v: string): string | undefined {
   return v ? new Date(`${v}:00+07:00`).toISOString() : undefined;
 }
 
-export function KhtcPeriodsScreen({adhocOnly=false}:{adhocOnly?:boolean}={}) {
+export function KhtcPeriodsScreen({adhocOnly=false,onOpened}:{adhocOnly?:boolean;onOpened?:()=>void}={}) {
   const { api, kn } = useAuth();
   const ctx = kn.context;
   const role = ctx?.role ?? null;
@@ -463,6 +463,7 @@ export function KhtcPeriodsScreen({adhocOnly=false}:{adhocOnly?:boolean}={}) {
                     setOpening(false);
                     reset();
                     setSelected(p.id);
+                    onOpened?.();
                     periods.reload();
                   }
                 }}

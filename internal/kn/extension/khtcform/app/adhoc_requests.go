@@ -327,7 +327,7 @@ func (s *Service) AdhocRequests(ctx context.Context, id uuid.UUID, dept string) 
 			return nil, err
 		}
 	}
-	if dept == "" && !(c.k.Role == ext.SessionRoleAdmin || c.review) {
+	if dept == "" && c.k.Role != ext.SessionRoleAdmin && !c.review {
 		return nil, problem.Forbidden
 	}
 	if !c.khtc && (!c.member || dept != c.k.Department) {
