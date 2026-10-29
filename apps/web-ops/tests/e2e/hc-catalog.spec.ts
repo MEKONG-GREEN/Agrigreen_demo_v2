@@ -1,13 +1,19 @@
 import { expect, test } from "@playwright/test";
-import { loginViaUi, sidebar } from "./helpers";
+import { loginAs, sidebar } from "./helpers";
 
 test("hc-catalog: FN-19 thêm/sửa/chi tiết trên route, Log và lỗi số ngay tại ô", async ({ page }) => {
-  await page.goto("/login");
-  await loginViaUi(page, "admin.mekong");
+  await loginAs(page, "kn-admin", "/kn/tong-quan");
   await expect(sidebar(page)).toBeVisible();
   await sidebar(page).getByRole("link", { name: "Phòng ban", exact: true }).click();
   await page.getByLabel("Trạng thái Phòng Hành chính - Tổng hợp", { exact: true }).selectOption("active");
   await expect(page.getByRole("status").filter({ hasText: "Đã đổi" })).toContainText("Đang áp dụng");
+  // Trạng thái phòng áp dụng khi chọn lại ngữ cảnh. Vào/thoát hỗ trợ để tải lại menu Admin,
+  // giữ nguyên dữ liệu mock trong tab (reload toàn trang sẽ cài lại dữ liệu mẫu).
+  await sidebar(page).getByRole("link", { name: "Menu các cấp", exact: true }).click();
+  await page.getByLabel("Xem như vai trò*").selectOption("kn_tinh");
+  await page.getByLabel(/^Lý do hỗ trợ/).fill("Kiểm tra danh mục nhân sự FN-19");
+  await page.getByRole("button", { name: "Vào menu Cấp Tỉnh", exact: true }).click();
+  await page.getByRole("button", { name: "Thoát chế độ hỗ trợ", exact: true }).click();
   await sidebar(page).getByRole("button", { name: "Phòng Hành chính - Tổng hợp", exact: true }).click();
   await sidebar(page).getByRole("link", { name: "Danh mục nhân sự", exact: true }).click();
   await page.getByRole("button", { name: /^Chức vụ/ }).click();
@@ -18,6 +24,7 @@ test("hc-catalog: FN-19 thêm/sửa/chi tiết trên route, Log và lỗi số n
   await expect(page.getByRole("complementary", { name: "Log", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByLabel(/^Mã/)).toHaveAttribute("aria-invalid", "true");
+  await page.screenshot({ path: test.info().outputPath("fn19-them-moi.png"), fullPage: true });
   await page.getByLabel(/^Mã/).fill("truong_tram_e2e");
   await page.getByLabel(/^Tên/).fill("Trạm trưởng E2E");
   await page.getByLabel(/^Thứ tự/).fill("1e100000");
@@ -28,16 +35,17 @@ test("hc-catalog: FN-19 thêm/sửa/chi tiết trên route, Log và lỗi số n
   await page.getByLabel(/^Thứ tự/).fill("80");
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page).toHaveURL(/\/position\/truong_tram_e2e$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Trạm trưởng E2E · truong_tram_e2e");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Trạm trưởng E2E · truong_tram_e2e Đang dùng");
   await page.getByRole("link", { name: "Sửa", exact: true }).click();
   await expect(page).toHaveURL(/\/truong_tram_e2e\/sua$/);
   await expect(page.getByLabel(/^Mã/)).toBeDisabled();
   await page.getByLabel(/^Tên/).fill("Trạm trưởng đã sửa E2E");
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Trạm trưởng đã sửa E2E · truong_tram_e2e");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Trạm trưởng đã sửa E2E · truong_tram_e2e Đang dùng");
   const log = page.getByRole("complementary", { name: "Log", exact: true });
   await expect(log.getByText("Phiên bản 2", { exact: true })).toBeVisible();
   await expect(log.getByText("Phiên bản 1", { exact: true })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("fn19-chi-tiet.png"), fullPage: true });
   await page.getByRole("link", { name: "Danh sách", exact: true }).click();
   await expect(page).toHaveURL(/\/position$/);
   await expect(page.getByRole("link", { name: "truong_tram_e2e", exact: true })).toBeVisible();

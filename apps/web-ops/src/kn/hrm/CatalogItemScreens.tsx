@@ -26,17 +26,22 @@ function namesFor(levels: HrmItem[], groups: HrmItem[]) {
 
 /** API chỉ trả thời điểm và phiên bản, không trả tên người thực hiện; không suy đoán từ vai đăng nhập. */
 export function catalogHistory(kind: HrmKind, versions: HrmItem[], names: Map<string, string>): LogEntry[] {
-  return [...versions].sort((a, b) => b.version - a.version).map((item) => ({
-    event: `Phiên bản ${item.version}${item.placeholder ? " · Mẫu" : ""}`,
-    actor_display: "Chưa có thông tin người thực hiện",
-    at: item.recorded_at,
-    changes: [
-      { field: "Tên", old: null, new: item.name },
-      { field: "Thứ tự", old: null, new: String(item.sort_order) },
-      { field: "Thuộc tính", old: null, new: attrsText(kind, item.attrs, names) || "—" },
-      { field: "Trạng thái", old: null, new: item.active ? "Đang dùng" : "Ngừng sử dụng" },
-    ],
-  }));
+  const sorted = [...versions].sort((a, b) => b.version - a.version);
+  return sorted.map((item, index) => {
+    const previous = sorted[index + 1];
+    return {
+      event: `Phiên bản ${item.version}${item.placeholder ? " · Mẫu" : ""}`,
+      actor_display: "Chưa có thông tin người thực hiện",
+      at: item.recorded_at,
+      changes: [
+        { field: "Tên", old: previous?.name ?? null, new: item.name },
+        { field: "Thứ tự", old: previous ? String(previous.sort_order) : null, new: String(item.sort_order) },
+        { field: "Thuộc tính", old: previous ? attrsText(kind, previous.attrs, names) || null : null, new: attrsText(kind, item.attrs, names) || null },
+        { field: "Trạng thái", old: previous ? previous.active ? "Đang dùng" : "Ngừng sử dụng" : null, new: item.active ? "Đang dùng" : "Ngừng sử dụng" },
+        { field: "Dữ liệu mẫu", old: previous ? previous.placeholder ? "Mẫu" : "Không" : null, new: item.placeholder ? "Mẫu" : "Không" },
+      ].filter((change) => change.old !== change.new),
+    };
+  });
 }
 
 function Missing({ base }: { base: string }) {

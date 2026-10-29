@@ -93,7 +93,10 @@ describe("FN-19: route thêm/sửa/chi tiết và quyền từ server", () => {
     expect((await ha.history("position", "vien_chuc")).versions.at(-1)).toMatchObject({ code: "vien_chuc", name: "Viên chức đổi tên", active: false });
     const versions = (await ha.history("position", "vien_chuc")).versions;
     const before = JSON.stringify(versions);
-    expect(catalogHistory("position", versions, new Map()).map((entry) => entry.event)).toEqual(["Phiên bản 3", "Phiên bản 2", "Phiên bản 1 · Mẫu"]);
+    const entries = catalogHistory("position", versions, new Map());
+    expect(entries.map((entry) => entry.event)).toEqual(["Phiên bản 3", "Phiên bản 2", "Phiên bản 1 · Mẫu"]);
+    expect(entries[0]?.changes).toEqual([{ field: "Tên", old: "Viên chức", new: "Viên chức đổi tên" }]);
+    expect(entries[1]?.changes).toContainEqual({ field: "Trạng thái", old: "Đang dùng", new: "Ngừng sử dụng" });
     expect(JSON.stringify(versions)).toBe(before);
     form.unmount();
     render(<HrmCatalogItemScreen />);
