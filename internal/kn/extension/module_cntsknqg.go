@@ -27,8 +27,8 @@ type knqgService = knqgapp.Service
 func (m *Module) knqgSvc() *knqgapp.Service {
 	if m.knqg == nil {
 		m.knqg = &knqgapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Units: m.model.Units,
-			Names: func() partyport.ActorNames { return m.rc.Names },
-			Vault: func() client.Client { return m.model.Vault },
+			Names:      func() partyport.ActorNames { return m.rc.Names },
+			Vault:      func() client.Client { return m.model.Vault },
 			Store:      func() objstore.Store { return m.home.Store },
 			Recipients: knqgRecipients{m: m}}
 	}
