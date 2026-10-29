@@ -20,10 +20,13 @@ func TestW1168DurableNativeReceiptStrictPayloadAndTerminal(t *testing.T) {
 	other, e := f.svc.DefineTemplate(admin, TemplateInput{Profile: "prod", Code: "REAL-01", Title: "Native receipt other profile", Fields: refs[0].Fields}, "other-template")
 	f.must(e, "other template")
 	from, to := f.clk.Now(), f.clk.Now().Add(6*24*time.Hour)
-	in := port.BatchInput{Profile: "fx", TemplateID: refs[0].ID, Units: []string{"U1"}, Periods: []port.PeriodDef{{Kind: "adhoc", From: from, To: to, DueAt: to.Add(time.Hour), Label: "Durable receipt"}}}
+	in := port.BatchInput{Profile: "fx", TemplateID: refs[0].ID, Units: []string{"U1"}, Periods: []port.PeriodDef{{Kind: "adhoc", From: from, To: to, DueAt: to.Add(time.Hour).Add(123456789 * time.Nanosecond), Label: "Durable receipt"}}}
 	publisher := Publisher{Svc: f.svc}
 	old, e := publisher.PublishBatchOnce(ctx, in, "durable-strict")
 	f.must(e, "first")
+	if in.Periods[0].DueAt.Nanosecond() != 123456789 {
+		t.Fatal("native publisher mutated the caller timestamp")
+	}
 	clone := func() port.BatchInput {
 		raw, _ := json.Marshal(in)
 		var v port.BatchInput
@@ -32,7 +35,7 @@ func TestW1168DurableNativeReceiptStrictPayloadAndTerminal(t *testing.T) {
 		}
 		return v
 	}
-	for _, mode := range []string{"label", "due", "units", "from", "to", "key", "template", "profile", "actor", "owner", "add-part"} {
+	for _, mode := range []string{"label", "due", "due-microsecond", "units", "from", "to", "key", "template", "profile", "actor", "owner", "add-part"} {
 		t.Run(mode, func(t *testing.T) {
 			candidate, current := clone(), ctx
 			switch mode {
@@ -40,6 +43,8 @@ func TestW1168DurableNativeReceiptStrictPayloadAndTerminal(t *testing.T) {
 				candidate.Periods[0].Label = "Changed"
 			case "due":
 				candidate.Periods[0].DueAt = candidate.Periods[0].DueAt.Add(time.Hour)
+			case "due-microsecond":
+				candidate.Periods[0].DueAt = candidate.Periods[0].DueAt.Add(time.Microsecond)
 			case "units":
 				candidate.Units = []string{"U2"}
 			case "from":

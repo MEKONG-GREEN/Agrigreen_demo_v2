@@ -54,7 +54,7 @@ func assertAdhocStatus(t *testing.T, err error, status int) {
 func adhocOpenInput() periodapp.OpenInput {
 	from := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 0, 12)
-	due := to.AddDate(0, 0, 7)
+	due := to.AddDate(0, 0, 7).Add(123456789 * time.Nanosecond)
 	return periodapp.OpenInput{Request: pd.Request{Type: pd.TypeAdhoc, Year: 2026, Name: "Phát sinh biên nhận", From: &from, To: &to}, Overrides: pd.Overrides{DueAt: &due, ExportDueAt: &due}, Departments: []string{dTT}}
 }
 

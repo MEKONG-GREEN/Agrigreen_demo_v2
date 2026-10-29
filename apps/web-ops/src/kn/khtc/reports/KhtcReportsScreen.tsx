@@ -87,7 +87,7 @@ function ReportEditor({ d, api, mode, reload }: {
     {data.template === "adhoc" && <AdhocSelector data={data} value={adhocSelection ?? d.content.adhoc} onChange={setAdhocSelection} disabled={!writable}/>}
     <h3>Nội dung lời văn</h3>
     {data.template === "mau_5" && <p>Mục II được khởi tạo từ báo cáo tiến độ kỳ trước, nếu có. Nội dung đã lưu của kỳ này được giữ khi cập nhật số liệu.</p>}
-    {d.sections.filter(s => s.editable).map(s => <div key={s.key}><label>{s.key} {s.title}<textarea rows={4} maxLength={12000} disabled={!writable} value={texts[s.key] ?? d.content.texts[s.key] ?? ""} onChange={e => setTexts({ ...texts, [s.key]: e.target.value })}/></label></div>)}
+    {d.sections.filter(s => s.editable).map(s => <div key={s.key}><label>{data.template === "adhoc" ? s.title : s.key+" "+s.title}<textarea rows={4} maxLength={12000} disabled={!writable} value={texts[s.key] ?? d.content.texts[s.key] ?? ""} onChange={e => setTexts({ ...texts, [s.key]: e.target.value })}/></label></div>)}
     <button className="btn btn-primary" disabled={!writable} onClick={() => act.run(async () => { await api.save(id, { base_version: d.version, admin, texts, ...(adhocSelection ? { adhoc: adhocSelection } : {}) }); reload(); }, "Đã lưu bản soạn")}>Lưu bản soạn</button>{" "}
     <button className="btn" disabled={!d.can_refresh || act.busy || dirty} onClick={() => act.run(async () => { await api.refresh(id, d.version); reload(); }, "Đã cập nhật số liệu")}>Cập nhật số liệu</button>
     {dirty && <p role="status">Có thay đổi chưa lưu. Lưu bản soạn trước khi cập nhật hoặc xuất Excel.</p>}

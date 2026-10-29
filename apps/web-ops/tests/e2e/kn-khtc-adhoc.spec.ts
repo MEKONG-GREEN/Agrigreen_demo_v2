@@ -75,7 +75,7 @@ test("W11.68 Admin giao số liệu mới, phòng trả lời, bốn mắt rà s
  await expect(page.getByText(/^Phiên bản soạn 2 ·/)).toBeVisible();
  await expect(page.getByText("Nguồn đã thay đổi. Cập nhật số liệu trước khi đánh dấu Bản cuối. Các tệp đã xuất được giữ nguyên.",{exact:true})).not.toBeVisible();
  await page.getByLabel("Chọn Số lớp mới browser",{exact:true}).check();
- await page.getByLabel(/^noi_dung /).fill("Nội dung báo cáo browser đã soạn.");
+ await page.getByLabel("Nội dung báo cáo",{exact:true}).fill("Nội dung báo cáo browser đã soạn.");
  await page.getByRole("button",{name:"Lưu bản soạn",exact:true}).click();
  await expect(page.getByRole("status").filter({hasText:"Đã lưu bản soạn"})).toBeVisible();
  const provisional=page.getByLabel("Tôi xác nhận xuất bản Tạm tính",{exact:true});
@@ -86,5 +86,6 @@ test("W11.68 Admin giao số liệu mới, phòng trả lời, bốn mắt rà s
  expect(csv).toContain("Số lớp mới browser");expect(csv).toContain("12.5");expect(csv).toContain("Nội dung báo cáo browser đã soạn");
  const wordWait=page.waitForEvent("download");await page.getByRole("button",{name:"Xuất Word v1",exact:true}).click();
  const word=await wordWait;expect(await word.path()).toBeTruthy();
+ await expect(page.getByText(/^Lần 1 ·/)).toBeVisible();
  await page.screenshot({path:test.info().outputPath("w1168-exported.png"),fullPage:true});
 });

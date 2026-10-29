@@ -165,6 +165,13 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			}
 			continue
 		}
+		if code == port.DeptKeHoachTaiChinh { // W11.68: actual adhoc screen has its dedicated KHTC route.
+			last := admin[len(admin)-1]
+			if last.Key != "admin.pb.khtc_phat_sinh" || last.Route != "/kn/khtc/bao-cao-phat-sinh" || last.ComingSoon || !implementedMenu[last.Key] {
+				t.Fatalf("KHTC Admin phát sinh: %+v", last)
+			}
+			continue
+		}
 		if last := admin[len(admin)-1]; (!last.ComingSoon && !implementedMenu[last.Key]) || !strings.HasPrefix(last.Route, "/kn/phong-ban/"+code+"/") {
 			t.Fatalf("%s: mục Admin Sắp có: %+v", code, last)
 		}
