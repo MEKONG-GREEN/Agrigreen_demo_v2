@@ -3,8 +3,12 @@
 // Cơ sở giết mổ: facility_ref do máy chủ cấp, mã mộc dấu không trùng giữa cơ sở. Dữ liệu tổng hợp, không phải thật.
 import { uuidv7 } from "../idempotency";
 import type { CatalogItem, CatalogName } from "../types";
-import { CATALOGS, PARAM_VERSIONS } from "./data";
+import { ADMIN_UNITS, CATALOGS, PARAM_VERSIONS } from "./data";
 import { hasRole, json, nowIso, problem, reasonOf, validation, type Ctx, type Route } from "./http";
+
+/** Mã xã của mục mẫu cũ CS_BINH_DUC (mã ĐVHC thật, không có trong danh sách xã giả lập) vẫn hợp lệ. */
+const LEGACY_COMMUNES = new Set(["30292"]);
+const COMMUNE_OK = (code: string) => LEGACY_COMMUNES.has(code) || ADMIN_UNITS.some((u) => u.code === code && u.level === "commune");
 
 interface MockVersion {
   id: string;
@@ -64,6 +68,11 @@ function check(c: string, code: string, body: Record<string, unknown>): Response
   if (typeof body.name !== "string" || !body.name.trim()) return validation([{ field: "name", reason: "bắt buộc" }]);
   if (c === "cnts_slaughter_facility") {
     if (!attrs.commune_code) return validation([{ field: "attrs.commune_code", reason: "bắt buộc" }]);
+    // FN-01 AC-02 (BF-CN-SLAUGHTER #169): xã phải có trong danh mục ĐVHC như máy chủ (pf/masterdata AdminUnit constraint).
+    if (!COMMUNE_OK(attrs.commune_code))
+      return problem(422, "masterdata.cnts_commune_invalid", "Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng", {
+        errors: [{ field: "attrs.commune_code", reason: "Không có xã/phường/đặc khu này trong danh mục ĐVHC." }],
+      });
     const mine = [...(attrs.stamp_codes_gs ?? "").split(","), ...(attrs.stamp_codes_gc ?? "").split(",")].map((s) => s.trim()).filter(Boolean);
     for (const o of items(c)) {
       if (o.code === code) continue;
