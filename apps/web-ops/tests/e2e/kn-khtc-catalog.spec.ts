@@ -54,7 +54,9 @@ test("BF-SWEEP-KHTC: Danh mục có route riêng, lỗi từng trường, Log v�
   await expect(log).toContainText("Ngừng dùng · v3");
   await page.getByRole("link", { name: "Danh sách danh mục", exact: true }).click();
   await expect(table.getByText("Đơn vị kiểm thử 164 đã sửa", { exact: true })).toHaveCount(0);
-  await page.getByLabel("Hiện cả mục đã ngừng dùng", { exact: true }).check();
+  // Bộ lọc lấy trạng thái từ URL; chờ route hoàn tất trước khi đọc checkbox.
+  await page.getByLabel("Hiện cả mục đã ngừng dùng", { exact: true }).click();
+  await expect(page.getByLabel("Hiện cả mục đã ngừng dùng", { exact: true })).toBeChecked();
   const row = table.getByRole("row").filter({ hasText: "Đơn vị kiểm thử 164 đã sửa" });
   await expect(row).toContainText("Ngừng dùng");
   await row.getByRole("link", { name: "Xem Đơn vị kiểm thử 164 đã sửa", exact: true }).click();

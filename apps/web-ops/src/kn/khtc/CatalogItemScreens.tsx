@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { fieldErrorMap } from "@/api/problem";
 import { NumberField, TextField } from "@/components/form";
 import { DetailPage, LabelValueBlock, LogPanel } from "@/components/patterns/detail";
@@ -82,6 +82,11 @@ function CatalogEditor({ kind, item, retired, history }: { kind: KhtcCatalogKind
   const rights = useKhtcRights();
   const router = useRouter();
   const formId = useId();
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const [values, setValues] = useState(() => catalogValues(kind, item));
   const [defaults, setDefaults] = useState(item?.default_for ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -101,14 +106,14 @@ function CatalogEditor({ kind, item, retired, history }: { kind: KhtcCatalogKind
     if (!checked.body || rejectedSort) return;
     const body = checked.body;
     const saved = await act.run(() => item ? api.reviseCatalog(kind, item.code, body) : api.createCatalog(kind, body));
-    if (saved) router.push(catalogItemHref(kind, saved.code, retired));
+    if (saved && mounted.current) router.push(catalogItemHref(kind, saved.code, retired));
   };
   return <DetailPage back={{ href: catalogListHref(kind, retired), label: "Danh sách danh mục" }} title={`${item ? "Sửa" : "Thêm"} ${KIND_LABEL[kind].toLowerCase()}`}
     actions={<><Link className="btn btn-o" href={catalogListHref(kind, retired)}>Hủy</Link><button type="submit" form={formId} className="btn btn-p" disabled={act.busy}>Lưu</button></>}
     log={<LogPanel entries={catalogLog(history)} empty="Chưa lưu mục danh mục." />}>
     {act.view}
     <form id={formId} noValidate onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <TextField label="Mã" required maxLength={40} value={values.code ?? ""} onChange={set("code")} disabled={!!item || act.busy} error={errors.code || server.code} hint="Chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang; mã không đổi sau khi tạo." />
+      <TextField label="Mã" required maxLength={40} value={values.code ?? ""} onChange={set("code")} disabled={!!item || act.busy} error={errors.code || server.code} hint="Bắt đầu bằng chữ không dấu hoặc số; mã không đổi sau khi tạo." />
       <TextField label={kind === "signer" ? "Họ tên" : "Tên"} required maxLength={500} value={values.name ?? ""} onChange={set("name")} disabled={act.busy} error={errors.name || server.name} />
       {(KIND_ATTRS[kind] ?? []).map((field) => <TextField key={field.key} label={field.label} required={field.required} maxLength={300} value={values[`attrs.${field.key}`] ?? ""} onChange={set(`attrs.${field.key}`)} disabled={act.busy} error={errors[`attrs.${field.key}`] || server[`attrs.${field.key}`]} />)}
       <NumberField label="Thứ tự" value={values.sort_order ?? ""} rule={CATALOG_SORT_RULE} hint="Số nguyên từ 0 đến 100000; để trống dùng 0." disabled={act.busy} error={rejectedSort || errors.sort_order || server.sort_order}

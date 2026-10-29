@@ -37,7 +37,7 @@ export function validateCatalogValues(kind: KhtcCatalogKind, values: CatalogValu
   const errors: Record<string, string> = {};
   for (const [field, error] of Object.entries(checked.errors)) if (error) errors[field] = error;
   const code = (checked.values.code ?? "").trim().toLowerCase();
-  if (!errors.code && !/^[a-z0-9._-]{1,40}$/.test(code)) errors.code = "Mã chỉ gồm chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.";
+  if (!errors.code && !/^[a-z0-9][a-z0-9._-]{0,39}$/.test(code)) errors.code = "Mã bắt đầu bằng chữ không dấu hoặc số; chỉ dùng chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.";
   if (numericError) errors.sort_order = numericError;
   if (Object.keys(errors).length) return { errors, body: null };
   return { errors, body: {

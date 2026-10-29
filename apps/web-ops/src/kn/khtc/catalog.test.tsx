@@ -17,9 +17,16 @@ vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: auth.api, kn: { c
 
 const writes: { request: Request; body: Record<string, unknown> }[] = [];
 let failOnce = false;
+let writeGate: Promise<void> | null = null;
+let releaseWrite: (() => void) | undefined;
 const trackedFetch: typeof mockFetchNoDelay = async (request) => {
   if (request.method === "POST" && new URL(request.url).pathname.startsWith("/v1/kn/khtc/catalogs/")) {
     writes.push({ request: request.clone(), body: await request.clone().json() });
+    if (writeGate) {
+      const gate = writeGate;
+      writeGate = null;
+      await gate;
+    }
     if (failOnce) {
       failOnce = false;
       return new Response(JSON.stringify({ code: "internal_error", title: "Thử lại", status: 503 }), { status: 503, headers: { "Content-Type": "application/problem+json" } });
@@ -31,14 +38,14 @@ const trackedFetch: typeof mockFetchNoDelay = async (request) => {
 beforeEach(async () => {
   vi.restoreAllMocks();
   nav.params = { kind: "unit", code: "ha" }; nav.query = ""; nav.push.mockReset(); nav.replace.mockReset();
-  auth.role = "admin"; auth.readOnly = false; writes.length = 0; failOnce = false;
+  auth.role = "admin"; auth.readOnly = false; writes.length = 0; failOnce = false; writeGate = null; releaseWrite = undefined;
   resetKhtcMock();
   const response = await mockFetchNoDelay(new Request("http://mock/v1/me/context", { method: "POST", headers: { Authorization: "Bearer mock.kn-admin", "Content-Type": "application/json", "Idempotency-Key": `ctx-${Math.random()}` }, body: JSON.stringify({ assignment_id: "asg-admin", department_code: null }) }));
   expect(response.status).toBe(201);
   const context = await response.json() as { context_id: string };
   auth.api = createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-admin", getContextId: () => context.context_id, fetch: trackedFetch });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); releaseWrite?.(); });
 
 async function fillNew(code = "ui-test", name = "Đơn vị kiểm thử") {
   await userEvent.setup().type(screen.getByRole("textbox", { name: "Mã" }), code);
@@ -82,6 +89,14 @@ describe("Danh mục KHTC — route, kiểm nhập và quyền", () => {
     expect(writes).toHaveLength(1);
     expect(writes[0]!.body).toMatchObject({ code: "them-moi", name: "Đơn vị kiểm thử", sort_order: 12, attrs: { symbol: "đv" }, active: true });
     expect(catalogItemHref("unit", "them-moi")).toContain("/unit/muc/them-moi");
+  });
+
+  it.each([".", "..", "_a", "-a"])("mã %s không đúng quy tắc máy chủ bị chặn trước ghi", async (code) => {
+    render(<KhtcCatalogCreateScreen />);
+    await fillNew(code);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Lưu" }));
+    expect(screen.getByRole("textbox", { name: "Mã" })).toHaveAttribute("aria-invalid", "true");
+    expect(writes).toHaveLength(0);
   });
 
   it("mã đã tồn tại: lỗi máy chủ gắn lại vào ô Mã", async () => {
@@ -129,6 +144,16 @@ describe("Danh mục KHTC — route, kiểm nhập và quyền", () => {
     expect(writes[0]!.request.headers.get("Idempotency-Key")).toBeTruthy();
     expect(writes[0]!.request.headers.get("Idempotency-Key")).toBe(writes[1]!.request.headers.get("Idempotency-Key"));
     expect((await createKhtcApi(auth.api!).catalogHistory("unit", "ui-test")).items).toHaveLength(1);
+  });
+
+  it("đã rời trang thì phản hồi Lưu đến muộn không kéo người dùng trở lại", async () => {
+    writeGate = new Promise<void>((resolve) => { releaseWrite = resolve; });
+    render(<KhtcCatalogCreateScreen />); await fillNew();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(writes).toHaveLength(1));
+    cleanup(); releaseWrite!();
+    await waitFor(async () => expect((await createKhtcApi(auth.api!).catalogHistory("unit", "ui-test")).items).toHaveLength(1));
+    expect(nav.push).not.toHaveBeenCalled();
   });
 
   it("sửa trên trang riêng; chi tiết và Log đọc lịch sử thật, giữ cũ → mới/người/thời điểm", async () => {
