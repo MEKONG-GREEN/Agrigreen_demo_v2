@@ -24219,6 +24219,8 @@ export interface components {
         };
         CNTSDiaryEntryList: {
             items: components["schemas"]["CNTSDiaryEntry"][];
+            /** @description Còn trang sau (BF-CN-XA-DATA); trang lọc phạm vi sau khi đọc nên có thể ít hơn limit dòng */
+            next_cursor: string | null;
         };
         CNTSDiaryEntrySave: {
             /** Format: uuid */
@@ -48276,6 +48278,17 @@ export interface operations {
                 status?: "draft" | "submitted" | "returned" | "verified";
                 review?: boolean;
                 flagged?: boolean;
+                /** @description BF-CN-XA-DATA: mã xã (ngoài phạm vi → rỗng) */
+                commune?: string;
+                form?: "BM-08" | "BM-09" | "BM-19";
+                /** @description Ngày ghi từ (bản hiện hành) */
+                from?: string;
+                /** @description Ngày ghi đến */
+                to?: string;
+                /** @description Số dòng đọc một trang (bỏ trống: tối đa 2000) */
+                limit?: number;
+                /** @description next_cursor của trang trước */
+                cursor?: string;
             };
             header?: never;
             path?: never;

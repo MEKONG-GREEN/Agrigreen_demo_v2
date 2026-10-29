@@ -72,7 +72,9 @@ const FORMS: Omit<Form, "template_id" | "template_version" | "template_up_to_dat
 ];
 
 interface Tpl { id: string; version: number }
-interface Sub { id: string; version: number; values: Record<string, string>; nil_report: boolean; note: string; explanation: string; late: boolean; at: string; by: string }
+interface Sub { id: string; version: number; values: Record<string, string>; nil_report: boolean; note: string; explanation: string; late: boolean; at: string; by: string;
+  /** BF-CN-XA-DATA: rà soát của Cấp Tỉnh (xác thực / yêu cầu điều chỉnh). */
+  review?: { id: string; decision: "accepted" | "returned"; note: string | null; at: string; by: string } }
 interface Period {
   id: string; code: string; title: string; label: string; kind: string; key: string; from: string; to: string; due_at: string; rule: string;
   template_id: string; template_version: number; unit_kind: "commune" | "facility"; units: string[]; parents: string[];
@@ -178,8 +180,8 @@ function split(f: Form, from: string, to: string, deadline?: { offset_days: numb
 function unitStatus(p: Period, unit: string, now = Date.now()): S["FormsTask"]["status"] {
   const last = p.subs.get(unit)?.at(-1);
   const closedFor = p.status === "closed" || (p.status === "reopened" && p.reopen_units.length > 0 && !p.reopen_units.includes(unit));
-  if (closedFor) return last ? "submitted" : "missed";
-  if (last) return "submitted";
+  if (closedFor) return last ? (last.review?.decision ?? "submitted") : "missed";
+  if (last) return last.review?.decision ?? "submitted";
   return now > Date.parse(p.due_at) ? "overdue" : "not_submitted";
 }
 
@@ -193,7 +195,8 @@ function task(p: Period, unit: string): S["FormsTask"] {
     period_key: p.key, period_from: p.from, period_to: p.to, due_at: p.due_at, period_status: p.status,
     open: p.status === "open" || (p.status === "reopened" && (p.reopen_units.length === 0 || p.reopen_units.includes(unit))), status: unitStatus(p, unit),
     version: last?.version ?? 0, submission_id: last?.id ?? null, values: last?.values ?? {}, nil_report: last?.nil_report ?? false, note: last?.note ?? "",
-    explanation: last?.explanation ?? "", late: last?.late ?? false, submitted_at: last?.at ?? null, return_note: null, held_at: null,
+    explanation: last?.explanation ?? "", late: last?.late ?? false, submitted_at: last?.at ?? null,
+    return_note: last?.review?.decision === "returned" ? last.review.note : null, held_at: null,
   };
 }
 
@@ -212,6 +215,7 @@ function periodView(p: Period, w: Who): S["FormsPeriodView"] {
 }
 
 const body = <T>(ctx: Ctx) => (ctx.body ?? {}) as T;
+const reviewOut = (s: Sub) => (s.review ? { id: s.review.id, decision: s.review.decision, reviewer_ref: s.review.by, note: s.review.note, event_time: s.review.at } : null);
 const tinhOnly = (w: Who) => (w.role === "kn_tinh" || w.role === "admin" ? null : problem(403, "forbidden", "phát hành, chốt kỳ cần Cấp Tỉnh"));
 
 export const cntsPeriodRoutes: Route[] = [
@@ -281,7 +285,9 @@ export const cntsPeriodRoutes: Route[] = [
     handler: (ctx) => {
       const w = who(ctx);
       const code = ctx.url.searchParams.get("code");
-      const items = PERIODS.filter((p) => p.status !== "cancelled" && (!code || p.code === code)).flatMap((p) => p.units.filter((u) => sees(w, p, u)).map((u) => task(p, u)));
+      const from = ctx.url.searchParams.get("from");
+      const to = ctx.url.searchParams.get("to");
+      const items = PERIODS.filter((p) => p.status !== "cancelled" && (!code || p.code === code) && (!from || p.to >= from) && (!to || p.from <= to)).flatMap((p) => p.units.filter((u) => sees(w, p, u)).map((u) => task(p, u)));
       return json({ items });
     },
   },
@@ -318,7 +324,7 @@ export const cntsPeriodRoutes: Route[] = [
       if (!p) return problem(404, "forms.period_not_found", "Không tìm thấy kỳ");
       if (!sees(who(ctx), p, unit)) return problem(403, "forbidden", `đơn vị ${unit} ngoài phạm vi`);
       const items = [...(p.subs.get(unit) ?? [])].reverse().map((s) => ({ id: s.id, period_id: p.id, unit, version: s.version, values: s.values, submitter_ref: s.by,
-        event_time: s.at, status: "submitted", review: null, nil_report: s.nil_report, note: s.note || null, explanation: s.explanation || null, late: s.late, captured_at: null }));
+        event_time: s.at, status: s.review?.decision ?? "submitted", review: reviewOut(s), nil_report: s.nil_report, note: s.note || null, explanation: s.explanation || null, late: s.late, captured_at: null }));
       return json({ items });
     },
   },
@@ -372,6 +378,7 @@ export const cntsPeriodRoutes: Route[] = [
       if (!task(p, b.unit).open) return problem(409, "forms.period_closed", "Kỳ đã chốt — mở lại kỳ trước khi nộp hoặc chốt lại");
       const list = p.subs.get(b.unit) ?? [];
       const cur = list.at(-1);
+      if (cur?.review?.decision === "accepted" && p.status !== "reopened") return problem(409, "forms.submission_accepted", "Bài nộp đã được chấp nhận — mở lại kỳ để nộp lại");
       if (b.base_version !== undefined && b.base_version !== (cur?.version ?? 0)) {
         return problem(409, "forms.submission_conflict", "Đã có người cập nhật báo cáo — tải bản mới rồi sửa lại (không ghi đè)", {
           detail: `Đã có người cập nhật lúc ${cur ? new Date(cur.at).toLocaleString("vi-VN") : "—"} (phiên bản ${cur?.version ?? 0})`,
@@ -393,6 +400,35 @@ export const cntsPeriodRoutes: Route[] = [
       p.subs.set(b.unit, list);
       return json({ id: s.id, period_id: p.id, unit: b.unit, version: s.version, values, submitter_ref: s.by, event_time: s.at, status: "submitted", review: null,
         nil_report: s.nil_report, note: s.note || null, explanation: s.explanation || null, late, captured_at: null }, 201);
+    },
+  },
+  {
+    // BF-CN-XA-DATA (FN-09): Cấp Tỉnh xác thực / yêu cầu điều chỉnh phiên bản bài nộp cuối (người rà soát ≠ người nộp).
+    method: "POST",
+    pattern: /^\/v1\/forms\/submissions\/([^/]+)\/review$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      const deny = tinhOnly(w);
+      if (deny) return deny;
+      const b = body<{ decision?: string; note?: string }>(ctx);
+      const note = (b.note ?? "").trim();
+      if (b.decision !== "accepted" && b.decision !== "returned") return validation([{ field: "decision", reason: "accepted | returned" }]);
+      if (b.decision === "returned" && !note) return validation([{ field: "note", reason: "bắt buộc khi trả lại" }]);
+      for (const p of PERIODS) {
+        for (const [unit, list] of p.subs) {
+          const s = list.find((x) => x.id === ctx.params[0]);
+          if (!s) continue;
+          if (p.status === "cancelled") return problem(409, "forms.period_cancelled", "Kỳ đã hủy");
+          if (p.status === "closed") return problem(409, "forms.period_closed", "Kỳ đã chốt");
+          if (list.at(-1) !== s) return problem(409, "forms.submission_superseded", "Đã có phiên bản mới hơn");
+          if (s.review) return problem(409, "forms.already_reviewed", "Phiên bản đã được rà soát");
+          if (s.by === w.actor) return problem(403, "self_approval_forbidden", "người rà soát trùng người nộp");
+          s.review = { id: uuidv7(), decision: b.decision, note: note || null, at: new Date().toISOString(), by: w.actor };
+          return json({ id: s.id, period_id: p.id, unit, version: s.version, values: s.values, submitter_ref: s.by, event_time: s.at, status: b.decision,
+            review: reviewOut(s), nil_report: s.nil_report, note: s.note || null, explanation: s.explanation || null, late: s.late, captured_at: null });
+        }
+      }
+      return problem(404, "forms.submission_not_found", "Không tìm thấy bài nộp");
     },
   },
   ...(["close", "reopen", "cancel"] as const).map(

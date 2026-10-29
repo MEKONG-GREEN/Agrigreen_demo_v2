@@ -403,6 +403,23 @@ const base = (ref: string, base_version: number) => ({
   body: { base_version },
 });
 
+/** Bộ lọc màn Tỉnh "Số liệu cấp xã › Nhật ký sản xuất" (BF-CN-XA-DATA). */
+export interface EntryPageQuery {
+  commune?: string;
+  project_ref?: string;
+  household_ref?: string;
+  form?: Form;
+  status?: EntryStatus;
+  from?: string;
+  to?: string;
+  flagged?: boolean;
+  limit?: number;
+  cursor?: string;
+}
+
+/** Số dòng một trang của màn Tỉnh. */
+export const ENTRY_PAGE = 50;
+
 export function createCntsDiaryApi(api: ApiClient) {
   return {
     cycles: (
@@ -451,6 +468,9 @@ export function createCntsDiaryApi(api: ApiClient) {
         flagged?: boolean;
       } = {},
     ) => (await unwrap(api.GET("/v1/extension/cnts/diary-entries", { params: { query: q } }))).items,
+    /** BF-CN-XA-DATA (#175): một trang lần ghi theo bộ lọc của màn Tỉnh (máy chủ lọc phạm vi, con trỏ `next_cursor`). */
+    entryPage: (q: EntryPageQuery): Promise<{ items: Entry[]; next_cursor: string | null }> =>
+      unwrap(api.GET("/v1/extension/cnts/diary-entries", { params: { query: q } })),
     entry: (ref: string): Promise<EntryDetail> =>
       unwrap(
         api.GET("/v1/extension/cnts/diary-entries/{ref}", {

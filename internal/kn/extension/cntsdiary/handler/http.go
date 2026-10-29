@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -547,7 +548,20 @@ func (h Handler) writeEntry(c *gin.Context, v app.EntryView, err error, code int
 func (h Handler) listEntries(c *gin.Context) {
 	f := newForm()
 	q := app.EntryQuery{Cycle: queryRef(c, f, "cycle_ref"), Household: queryRef(c, f, "household_ref"), Project: queryRef(c, f, "project_ref"),
-		Status: c.Query("status"), Review: c.Query("review") == "true", Flagged: c.Query("flagged") == "true"}
+		Status: c.Query("status"), Review: c.Query("review") == "true", Flagged: c.Query("flagged") == "true",
+		Commune: c.Query("commune"), Form: c.Query("form"), Cursor: c.Query("cursor")}
+	from, to := c.Query("from"), c.Query("to")
+	q.From, q.To = f.date("from", &from), f.date("to", &to)
+	if s := c.Query("limit"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > app.MaxEntryPage {
+			f.fail("limit", "số nguyên 1–200")
+		}
+		q.Limit = n
+	}
+	if len(q.Commune) > 20 {
+		f.fail("commune", "mã xã tối đa 20 ký tự")
+	}
 	if !f.done(c) {
 		return
 	}
@@ -560,7 +574,7 @@ func (h Handler) listEntries(c *gin.Context) {
 	for _, v := range l.Items {
 		items = append(items, entryOut(v, l.Names))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": optStr(l.NextCursor)})
 }
 
 func (h Handler) createEntry(c *gin.Context) {

@@ -136,6 +136,17 @@ export function createCntsPeriodApi(api: ApiClient) {
     publish: (body: CntsSeriesInput): Promise<CntsSeries> => unwrap(api.POST("/v1/extension/cnts/period-series", { params: idem(), body })),
     tasks: async (code?: string): Promise<FormsTask[]> =>
       (await unwrap(api.GET("/v1/forms/tasks", { params: { query: { ...query, ...(code ? { code } : {}) } } }))).items,
+    /** Công việc của một biểu trong khoảng ngày (kỳ có ngày cuối ≥ from, ngày đầu ≤ to; tối đa `limit` kỳ, ≤ 200). */
+    tasksIn: async (code: string, from: string, to: string, limit = 200): Promise<FormsTask[]> =>
+      (await unwrap(api.GET("/v1/forms/tasks", { params: { query: { ...query, code, from, to, limit } } }))).items,
+    /** BF-CN-XA-DATA (FN-09): Cấp Tỉnh xác thực / yêu cầu điều chỉnh (bắt buộc lý do) phiên bản bài nộp cuối. */
+    review: (submissionId: string, decision: "accepted" | "returned", note?: string): Promise<FormsSubmission> =>
+      unwrap(
+        api.POST("/v1/forms/submissions/{id}/review", {
+          params: { path: { id: submissionId }, query, ...idem() },
+          body: { decision, ...(note ? { note } : {}) },
+        }),
+      ),
     period: (id: string): Promise<FormsPeriodView> => unwrap(api.GET("/v1/forms/periods/{id}", { params: { path: { id }, query } })),
     previous: async (periodId: string, unit: string): Promise<FormsPrevious | null> =>
       (await unwrap(api.GET("/v1/forms/periods/{id}/previous", { params: { path: { id: periodId }, query: { ...query, unit } } }))).previous,

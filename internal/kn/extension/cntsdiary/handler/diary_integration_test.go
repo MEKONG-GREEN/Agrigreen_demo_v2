@@ -473,6 +473,7 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	if l := list(want(t, chu.get(base+"diary-entries?flagged=true&cycle_ref="+cref), 200, "", "lọc có cảnh báo"), "items"); len(l) != 1 {
 		t.Fatalf("lọc lần ghi có cảnh báo: %v", l)
 	}
+	diaryProvinceList(t, viewer, other, offlineID, e2ref)
 	want(t, viewer.post(base+"diary-entries/"+e2ref+"/verify", map[string]any{"base_version": 1}), 403, "", "viên chức không xác thực")
 	want(t, officer.post(base+"diary-entries/"+e2ref+"/verify", map[string]any{"base_version": 1}), 403, "", "người ghi không xác thực")
 	want(t, chu.post(base+"diary-entries/"+e2ref+"/return", map[string]any{"base_version": 1, "reason": ""}), 422, "", "thiếu lý do")
@@ -707,5 +708,44 @@ func TestCNTSDiary_BFCNDiaryPaperFields(t *testing.T) {
 	d = want(t, officer.get(base+"diary-cycles/"+cref), 200, "", "gợi ý hạch toán")
 	if fc := str(obj(d, "suggest"), "feed_cost"); fc != "384000" { // 25×12.000 + 10,5×8.000
 		t.Fatalf("NC-09 mục 3 + mục 4 cộng vào gợi ý chi thức ăn: %s", fc)
+	}
+}
+
+// diaryProvinceList: BF-CN-XA-DATA (#175) — màn Tỉnh "Số liệu cấp xã › Nhật ký sản xuất": lọc xã, mẫu, khoảng ngày ở máy
+// chủ; trang theo con trỏ (khóa entry_date, captured_at, entry_ref giảm dần); xã ngoài phạm vi → rỗng; tham số sai → 422.
+func diaryProvinceList(t *testing.T, viewer, outsider user, e1, e2 string) {
+	t.Helper()
+	p1 := want(t, viewer.get(base+"diary-entries?limit=1"), 200, "", "trang 1")
+	l1 := list(p1, "items")
+	if len(l1) != 1 || str(l1[0].(map[string]any), "ref") != e2 || str(p1, "next_cursor") == "" {
+		t.Fatalf("trang 1 (mới trước, còn trang sau): %v", p1)
+	}
+	p2 := want(t, viewer.get(base+"diary-entries?limit=1&cursor="+str(p1, "next_cursor")), 200, "", "trang 2")
+	l2 := list(p2, "items")
+	if len(l2) != 1 || str(l2[0].(map[string]any), "ref") != e1 || p2["next_cursor"] != nil {
+		t.Fatalf("trang 2 (hết): %v", p2)
+	}
+	if all := want(t, viewer.get(base+"diary-entries"), 200, "", "không limit"); len(list(all, "items")) != 2 || all["next_cursor"] != nil {
+		t.Fatalf("không limit: %v", all)
+	}
+	for q, n := range map[string]int{
+		"commune=30001":                             2,
+		"commune=30002":                             0,
+		"commune=30001&form=BM-19":                  0,
+		"form=BM-08&from=2027-10-12&to=2027-10-12":  1,
+		"from=2027-10-13":                           0,
+		"to=2027-10-11":                             1,
+		"commune=30001&status=submitted&form=BM-08": 2,
+		"commune=30001&status=verified":             0,
+	} {
+		if l := list(want(t, viewer.get(base+"diary-entries?"+q), 200, "", q), "items"); len(l) != n {
+			t.Fatalf("%s: %d lần ghi, muốn %d", q, len(l), n)
+		}
+	}
+	if l := list(want(t, outsider.get(base+"diary-entries?commune=30001"), 200, "", "xã ngoài phạm vi"), "items"); len(l) != 0 {
+		t.Fatalf("xã ngoài phạm vi phải rỗng: %v", l)
+	}
+	for _, q := range []string{"form=BM-99", "limit=0", "limit=201", "limit=x", "cursor=YWJj", "cursor=!!!", "from=2027-10-12&to=2027-10-11", "from=12/10/2027"} {
+		want(t, viewer.get(base+"diary-entries?"+q), 422, "", "tham số sai: "+q)
 	}
 }

@@ -336,25 +336,60 @@ type EntryFilter struct {
 	Household *uuid.UUID
 	Project   *uuid.UUID
 	Statuses  []string
-	Limit     int
+	// BF-CN-XA-DATA (#175): màn Tỉnh "Số liệu cấp xã › Nhật ký sản xuất" — lọc xã, mẫu, khoảng ngày ghi (bản hiện hành),
+	// trang theo con trỏ khóa (entry_date, captured_at, entry_ref) giảm dần.
+	Commune  string
+	Form     string
+	From, To *time.Time
+	After    *EntryCursor
+	Limit    int
 }
 
-// ListEntries trả bản hiện hành của các lần ghi (mới trước).
+// EntryCursor là khóa thứ tự của dòng cuối trang trước (ORDER BY entry_date DESC, captured_at DESC, entry_ref DESC).
+type EntryCursor struct {
+	EntryDate  time.Time
+	CapturedAt time.Time
+	Ref        uuid.UUID
+}
+
+// MaxEntryList là số dòng tối đa một lần đọc danh sách lần ghi.
+const MaxEntryList = 2000
+
+// ListEntries trả bản hiện hành của các lần ghi (mới trước), tối đa f.Limit dòng (≤ MaxEntryList).
 func ListEntries(ctx context.Context, tx pgx.Tx, f EntryFilter) ([]Entry, error) {
 	var st []string
 	if len(f.Statuses) > 0 {
 		st = f.Statuses
 	}
 	limit := f.Limit
-	if limit <= 0 || limit > 2000 {
-		limit = 2000
+	if limit <= 0 || limit > MaxEntryList+1 {
+		limit = MaxEntryList + 1 // +1: người gọi biết còn trang sau
+	}
+	var from, to, afterDate *string
+	if f.From != nil {
+		s := f.From.Format(time.DateOnly)
+		from = &s
+	}
+	if f.To != nil {
+		s := f.To.Format(time.DateOnly)
+		to = &s
+	}
+	var afterAt *time.Time
+	var afterRef *uuid.UUID
+	if f.After != nil {
+		s := f.After.EntryDate.Format(time.DateOnly)
+		afterDate, afterAt, afterRef = &s, &f.After.CapturedAt, &f.After.Ref
 	}
 	rows, err := tx.Query(ctx, "SELECT "+entryCols+` FROM (
 	    SELECT DISTINCT ON (entry_ref) * FROM pf_extension.cnts_diary_entry
 	    WHERE ($1::uuid IS NULL OR cycle_ref = $1) AND ($2::uuid IS NULL OR household_ref = $2) AND ($3::uuid IS NULL OR project_ref = $3)
 	    ORDER BY entry_ref, seq DESC) e
 	  WHERE ($4::text[] IS NULL OR status = ANY ($4::text[]))
-	  ORDER BY entry_date DESC, captured_at DESC LIMIT $5`, f.Cycle, f.Household, f.Project, st, limit)
+	    AND ($6::text = '' OR commune_code = $6) AND ($7::text = '' OR form = $7)
+	    AND ($8::date IS NULL OR entry_date >= $8::date) AND ($9::date IS NULL OR entry_date <= $9::date)
+	    AND ($10::date IS NULL OR (entry_date, captured_at, entry_ref) < ($10::date, $11::timestamptz, $12::uuid))
+	  ORDER BY entry_date DESC, captured_at DESC, entry_ref DESC LIMIT $5`, f.Cycle, f.Household, f.Project, st, limit,
+		f.Commune, f.Form, from, to, afterDate, afterAt, afterRef)
 	return collect(rows, err, scanEntry)
 }
 

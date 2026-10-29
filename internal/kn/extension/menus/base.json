@@ -810,7 +810,7 @@
                     "Icon": "table",
                     "BadgeSource": "",
                     "Requires": null,
-                    "ComingSoon": true,
+                    "ComingSoon": false,
                     "Needs": "",
                     "Children": null
                   },
@@ -832,7 +832,7 @@
                     "Icon": "journal",
                     "BadgeSource": "",
                     "Requires": null,
-                    "ComingSoon": true,
+                    "ComingSoon": false,
                     "Needs": "",
                     "Children": null
                   },

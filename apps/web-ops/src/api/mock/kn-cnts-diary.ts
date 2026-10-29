@@ -703,15 +703,35 @@ export const cntsDiaryRoutes: Route[] = [
         st = q.get("status"),
         review = q.get("review") === "true",
         fl = q.get("flagged") === "true";
-      const items = [...ENTRIES.values()]
+      // BF-CN-XA-DATA (#175): lọc xã, chương trình, mẫu, khoảng ngày; trang theo con trỏ (giả lập: vị trí trong danh sách).
+      const project = q.get("project_ref"),
+        commune = q.get("commune"),
+        form = q.get("form"),
+        from = q.get("from"),
+        to = q.get("to");
+      const limit = Number(q.get("limit") ?? 0);
+      if (q.get("limit") !== null && !(Number.isInteger(limit) && limit >= 1 && limit <= 200)) return validation([{ field: "limit", reason: "số nguyên 1–200" }]);
+      if (from && to && to < from) return validation([{ field: "to", reason: "không trước from" }]);
+      const all = [...ENTRIES.values()]
         .map((v) => v.at(-1)!)
         .filter((e) => (!cycle || e.cycle_ref === cycle) && (!hh || e.household_ref === hh))
         .map((e) => entryView(ctx, e))
         .filter(
-          (e): e is S["CNTSDiaryEntry"] => !!e && (!st || e.status === st) && (!review || e.can_review) && (!fl || e.checks.some((c) => c.level === "warn")),
+          (e): e is S["CNTSDiaryEntry"] =>
+            !!e &&
+            (!st || e.status === st) &&
+            (!review || e.can_review) &&
+            (!fl || e.checks.some((c) => c.level === "warn")) &&
+            (!project || e.project_ref === project) &&
+            (!commune || e.commune_code === commune) &&
+            (!form || e.form === form) &&
+            (!from || e.entry_date >= from) &&
+            (!to || e.entry_date <= to),
         )
-        .sort((x, y) => y.entry_date.localeCompare(x.entry_date));
-      return json({ items });
+        .sort((x, y) => y.entry_date.localeCompare(x.entry_date) || y.captured_at.localeCompare(x.captured_at) || y.ref.localeCompare(x.ref));
+      const start = Number(q.get("cursor") ?? 0) || 0;
+      const items = limit ? all.slice(start, start + limit) : all;
+      return json({ items, next_cursor: limit && start + limit < all.length ? String(start + limit) : null });
     },
   },
   {
