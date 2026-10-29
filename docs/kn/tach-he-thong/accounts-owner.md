@@ -22,3 +22,25 @@ Bằng chứng parity:
 
 - `internal/kn/extension/module_role_catalog_test.go`: snapshot chính sách (managed, MFA, LoginTOTP, OrgKinds, grantable theo người gọi) của legacy bằng snapshot của native + KN, và bằng golden `testdata/role_catalog.golden.json`. Kèm truy vấn từng vai, fail closed và các kiểm sao chép.
 - `tests/knaccounts/role_catalog_pg_test.go`: trên PostgreSQL thật, cùng kịch bản HTTP (catalog `/v1/accounts/grants` theo người gọi; tạo tài khoản theo vai × loại tổ chức × người cấp; sửa lần gán; nhập CSV) cho kết quả giống hệt giữa module legacy và module có catalog KN. Kiểm thêm cách ly instance.
+
+## Luật lần gán vai trò KN (#72)
+
+Factory: `extension.AssignmentRules() accport.AssignmentRules`. Adapter không có trạng thái và không nhận actor hay tenant.
+
+- `ValidateAssignment` kiểm theo đúng thứ tự cũ:
+  1. vai thuộc `kn_tw | kn_tinh | kn_xa | admin`;
+  2. cấp quản lý thuộc danh mục KN (bản tạm Q-05/Q-059, 7 mã);
+  3. Admin không có phòng ban và không có xã;
+  4. vai khác Admin phải có Nút và ít nhất một phòng ban;
+  5. chỉ Cấp Xã có xã phụ trách.
+
+  Lỗi trả về là `accport.AssignmentRuleError{Field, Msg}`, giữ nguyên câu chữ hiện hành.
+- `ValidateNodeKind`: `kn_tw` gắn `ttkn_national`; `kn_tinh` và `kn_xa` gắn `ttkn_province`; Admin không hạn loại Nút.
+- Accounts vẫn tự kiểm: tenant, Nút đang hoạt động, phòng ban chưa xóa, xã thuộc Nút, phạm vi người gọi, Admin chỉ do `platform_admin` cấp, MFA, sổ chỉ ghi thêm.
+- Cách gọi ở gốc lắp ráp: `accounts.Deps{AssignmentRules: extension.AssignmentRules()}`. Phần nối này do Codex làm (shared); gói này không sửa assembly.
+- Thứ tự lỗi khi một đầu vào sai nhiều chỗ: khi đã cấu hình provider, accounts (#68) kiểm cú pháp chung trước (định dạng mã vai/phòng ban/xã, thời hạn), rồi mới gọi adapter. Với đầu vào sai cả cú pháp lẫn danh mục, lỗi báo ra có thể khác bridge. Ví dụ: vai rỗng báo "mã vai trò không hợp lệ" thay cho câu liệt kê vai. Mã HTTP vẫn là 422. Đây là thiết kế của #68, adapter không đổi được.
+
+Bằng chứng parity:
+
+- `internal/kn/extension/module_assignment_rules_test.go`: bảng lỗi (trường, câu chữ, thứ tự), loại Nút, danh mục khớp bridge, adapter không sửa đầu vào.
+- `tests/knaccounts/assignment_rules_pg_test.go`: trên PostgreSQL thật, chạy ma trận tạo tài khoản KN (vai × Nút × phòng ban × xã × cấp quản lý, kèm `account_admin`), rồi thêm/sửa lần gán và đọc danh sách lần gán. Phản hồi đã chuẩn hóa (status, mã, trường, câu chữ, lần gán) giống hệt giữa module legacy (`AssignmentRules` nil) và module có adapter KN. Ma trận phủ đủ 7 luật của adapter.

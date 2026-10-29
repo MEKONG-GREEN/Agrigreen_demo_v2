@@ -34,7 +34,8 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 
 // fixtureDeps: cấu hình owner được inject vào accounts.Deps (nil = bridge legacy, như gốc lắp ráp hiện hành).
 type fixtureDeps struct {
-	Roles *accport.RoleCatalog
+	Roles           *accport.RoleCatalog
+	AssignmentRules accport.AssignmentRules
 }
 
 type fixture struct {
@@ -43,6 +44,7 @@ type fixture struct {
 	srv    *httptest.Server
 	dir    *accounts.MemoryDirectory
 	tenant uuid.UUID
+	depts  *fakeDepartments
 
 	national, p91, team30292, coop30292, team31120 uuid.UUID
 }
@@ -59,8 +61,9 @@ func newFixture(t *testing.T, d fixtureDeps) *fixture {
 	f.team30292 = pty.add(f.tenant, partyport.OrgExtensionTeam, "30292")
 	f.coop30292 = pty.add(f.tenant, partyport.OrgCooperative, "30292")
 	f.team31120 = pty.add(f.tenant, partyport.OrgExtensionTeam, "31120")
+	f.depts = newFakeDepartments(f)
 	mod := accounts.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{
-		Directory: f.dir, Scope: pty, Orgs: pty, Roles: d.Roles,
+		Directory: f.dir, Scope: pty, Orgs: pty, Roles: d.Roles, AssignmentRules: d.AssignmentRules, Departments: f.depts,
 	})
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
 	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(),
@@ -267,7 +270,48 @@ func (p *fakeParty) Scope(ctx context.Context) (authz.Scope, error) {
 	return authz.Scope{Units: []string{o.AdminUnitCode}}, nil
 }
 
+// fakeDepartments thực hiện party/port.Departments: đơn vị = Nút cấp 1/2 (khai trực tiếp), phòng ban theo đơn vị.
+type fakeDepartments struct {
+	unit  map[uuid.UUID]uuid.UUID
+	depts map[uuid.UUID][]partyport.Department
+}
+
+func newFakeDepartments(f *fixture) *fakeDepartments {
+	mk := func(unit uuid.UUID, code, status string) partyport.Department {
+		return partyport.Department{ID: ids.New(), OrgRef: unit, Code: code, Name: "Phòng " + code, Status: status}
+	}
+	d := &fakeDepartments{unit: map[uuid.UUID]uuid.UUID{f.national: f.national, f.p91: f.p91, f.team30292: f.p91},
+		depts: map[uuid.UUID][]partyport.Department{
+			f.p91: {mk(f.p91, "trong_trot", partyport.DeptActive), mk(f.p91, "chan_nuoi", partyport.DeptNotOpen),
+				mk(f.p91, "bao_ve_thuc_vat", partyport.DeptActive)},
+			f.national: {mk(f.national, "trong_trot", partyport.DeptActive)},
+		}}
+	return d
+}
+
+func (d *fakeDepartments) DepartmentUnit(_ context.Context, org uuid.UUID) (uuid.UUID, error) {
+	u, ok := d.unit[org]
+	if !ok {
+		return uuid.Nil, partyport.ErrOrgNotFound
+	}
+	return u, nil
+}
+
+func (d *fakeDepartments) UnitDepartments(_ context.Context, unit uuid.UUID) ([]partyport.Department, error) {
+	return slices.Clone(d.depts[unit]), nil
+}
+
+func (d *fakeDepartments) DepartmentByCode(_ context.Context, unit uuid.UUID, code string) (partyport.Department, error) {
+	for _, x := range d.depts[unit] {
+		if x.Code == code && !x.Retired {
+			return x, nil
+		}
+	}
+	return partyport.Department{}, partyport.ErrDepartmentNotFound
+}
+
 var (
+	_ partyport.Departments   = (*fakeDepartments)(nil)
 	_ partyport.Orgs          = (*fakeParty)(nil)
 	_ partyport.OrgCodes      = (*fakeParty)(nil)
 	_ partyport.ScopeResolver = (*fakeParty)(nil)
