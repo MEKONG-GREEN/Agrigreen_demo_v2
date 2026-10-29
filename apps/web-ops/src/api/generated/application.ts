@@ -5548,6 +5548,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/duty-rosters/{month}/export.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * BF-CN-DUTY: Xuất bản đã lưu của tháng thành .xlsx đúng mẫu BM-03 (tiêu đề tháng, dòng căn cứ, ghi chú ca, gộp ô theo cơ sở)
+         * @description Cột ĐT viên chức chỉ có số với người lập lịch (cán bộ tổng hợp Cấp Tỉnh, Admin). Tệp nạp lại được, ra cùng lịch.
+         */
+        get: operations["extensionCntsExportDutyRoster"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/duty-rosters/{month}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * BF-CN-DUTY: Nạp Excel đúng mẫu "Lịch trực ksgm" (BM-03) — đọc tệp, ghép cơ sở/viên chức, trả ô + lỗi theo dòng + cảnh báo; KHÔNG ghi
+         * @description Thân request là tệp .xlsx (không multipart), tối đa 4 MB, 2000 dòng viên chức. Lấy sheet hiển thị có tiêu đề "THÁNG M/YYYY"
+         *     đúng tháng (không sheet nào ghi tháng thì nhận sheet BM-03 duy nhất); dòng tiêu đề cột STT | TÊN CƠ SỞ GIẾT MỔ | ĐỊA CHỈ |
+         *     VIÊN CHỨC TRỰC KSGM | ĐT viên chức | ngày 1…31; tên/địa chỉ của dòng đầu khối áp cho các dòng sau (ô gộp); dừng ở dòng "TC".
+         *     Cơ sở khớp theo mã, tên hoặc "tên (mã)" trong các cơ sở hoạt động của tỉnh; viên chức theo SĐT rồi tên (bỏ ghi chú
+         *     trong ngoặc cuối tên). Ô N, Đ/D, NĐ/ND; ký hiệu khác hoặc ngày ngoài tháng → lỗi ô. Web xem trước rồi lưu bằng POST
+         *     /duty-rosters/{month} với source=excel. Cán bộ tổng hợp Cấp Tỉnh, Admin.
+         */
+        post: operations["extensionCntsImportDutyRoster"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/my-duties": {
         parameters: {
             query?: never;
@@ -14059,6 +14104,8 @@ export interface components {
             name: string;
             commune_code: string;
             kind: string | null;
+            /** @description Địa chỉ ở danh mục (cột Địa chỉ BM-03); null → web hiện tên xã */
+            address: string | null;
         };
         CNTSDutyOfficer: {
             /** Format: uuid */
@@ -14067,6 +14114,8 @@ export interface components {
             commune_codes: string[];
             /** @description Giới hạn cơ sở (rỗng = cả xã phụ trách) */
             facility_refs: string[];
+            /** @description SĐT đã che (4 số đầu · 3 số cuối), chỉ khi can_view_phone và viên chức có ô trong lưới */
+            phone_masked: string | null;
         };
         CNTSDutyWarning: {
             /** @enum {string} */
@@ -14112,6 +14161,30 @@ export interface components {
             can_edit: boolean;
             /** @description Viên chức có ca thay đổi ở lần lưu này */
             notified_officer_refs: string[];
+            /** @description Người gọi xem được cột ĐT viên chức (người lập lịch) */
+            can_view_phone: boolean;
+        };
+        CNTSDutyRosterImport: {
+            month: string;
+            province_code: string | null;
+            /** @description Tên sheet đã đọc */
+            sheet: string;
+            /** @description Dòng căn cứ đọc được ở tiêu đề */
+            basis: string | null;
+            /** @description Số dòng viên chức đã đọc */
+            row_count: number;
+            /** @description Ô ghép được (đã chuẩn hóa, sắp) */
+            cells: components["schemas"]["CNTSDutyCell"][];
+            /** @description Lỗi theo dòng/ô (dòng lỗi cơ sở/viên chức bị bỏ cả dòng; ô ký hiệu lạ bị bỏ ô). Không lặp lại SĐT */
+            issues: {
+                /** @description Số dòng trong tệp */
+                line: number | null;
+                /** @description facility | officer | row | day:<n> */
+                field: string;
+                message: string;
+            }[];
+            /** @description Cảnh báo như khi lưu lưới */
+            warnings: components["schemas"]["CNTSDutyWarning"][];
         };
         CNTSMyDuty: {
             /** Format: date */
@@ -35945,6 +36018,72 @@ export interface operations {
             409: components["responses"]["Problem"];
             /** @description validation_failed | extension.cnts_roster_invalid */
             422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsExportDutyRoster: {
+        parameters: {
+            query?: {
+                province_code?: string;
+                /** @description Dòng căn cứ (vd "theo thông báo số …"); rỗng → mẫu chờ điền; không chứa SĐT/CCCD */
+                basis?: string;
+            };
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsImportDutyRoster: {
+        parameters: {
+            query?: {
+                /** @description Tỉnh suy từ phạm vi phiên; Admin chọn tỉnh */
+                province_code?: string;
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+            };
+        };
+        responses: {
+            /** @description Kết quả đọc tệp (chưa lưu) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDutyRosterImport"];
+                };
+            };
+            /** @description forbidden | extension.read_only | extension.out_of_scope */
+            403: components["responses"]["Problem"];
+            /** @description validation_failed | extension.cnts_roster_import_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
         };
     };
     extensionCntsMyDuties: {
