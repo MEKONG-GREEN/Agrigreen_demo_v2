@@ -565,5 +565,62 @@
     "code": "KE_HOACH",
     "name": "Kế hoạch",
     "attrs": {}
+  },
+  {
+    "catalog": "cnts_slaughter_facility",
+    "code": "CSGM_MAU_01",
+    "name": "Cơ sở giết mổ tập trung mẫu 01 (dữ liệu mẫu)",
+    "attrs": {
+      "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5901",
+      "commune_code": "30316",
+      "facility_kind": "tap_trung",
+      "stamp_codes_gs": "91.900.01",
+      "stamp_codes_gc": "91.900.02",
+      "species": "BO,GA,HEO,TRAU,VIT",
+      "address": "Khu vực mẫu 1, Phường Châu Đốc",
+      "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật"
+    }
+  },
+  {
+    "catalog": "cnts_slaughter_facility",
+    "code": "CSGM_MAU_02",
+    "name": "Cơ sở giết mổ tập trung mẫu 02 (dữ liệu mẫu)",
+    "attrs": {
+      "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5902",
+      "commune_code": "30742",
+      "facility_kind": "tap_trung",
+      "stamp_codes_gs": "91.900.11,91.900.12",
+      "species": "BO,HEO,TRAU",
+      "address": "Khu vực mẫu 2, Phường Rạch Giá",
+      "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật"
+    }
+  },
+  {
+    "catalog": "cnts_slaughter_facility",
+    "code": "CSGM_MAU_03",
+    "name": "Cơ sở giết mổ nhỏ lẻ mẫu 03 (dữ liệu mẫu)",
+    "attrs": {
+      "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5903",
+      "commune_code": "30628",
+      "facility_kind": "nho_le",
+      "stamp_codes_gs": "91.900.21",
+      "species": "HEO",
+      "address": "Khu vực mẫu 3, Xã Chợ Mới",
+      "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật"
+    }
+  },
+  {
+    "catalog": "cnts_slaughter_facility",
+    "code": "CSGM_MAU_04",
+    "name": "Cơ sở giết mổ gia cầm nhỏ lẻ mẫu 04 (dữ liệu mẫu)",
+    "attrs": {
+      "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5904",
+      "commune_code": "30463",
+      "facility_kind": "nho_le",
+      "stamp_codes_gc": "91.900.31",
+      "species": "GA,VIT",
+      "address": "Khu vực mẫu 4, Xã Châu Phú",
+      "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật"
+    }
   }
 ]

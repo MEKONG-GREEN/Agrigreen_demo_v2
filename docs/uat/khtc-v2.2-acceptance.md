@@ -216,3 +216,11 @@ Bổ sung KH-FN-TI-02.09 (Mẫu5 cutoff sớm,16/10): `TestKH_M5_ProgramUsesCuto
 - PostgreSQL thật: `TestExportRun_W10_17`, `TestDocNumberGapSafe_W10_17` (12 lần xuất đồng thời → số 1…13 không trùng, không hở; giao dịch hỏng sau khi cấp số không để lỗ; năm mới theo giờ Việt Nam đánh lại từ 1), `TestTemplateVersionsImmutable_W10_17`, `TestAdminAPI_W10_17`, `TestKH_W10_17_WordFromFrozenExcel` (HTTP: chỉ cán bộ phụ trách, bản Tạm tính không cấp số, số dùng lại cho cùng báo cáo, xuất lại cùng byte, tải qua điểm kiểm soát xuất, Word sau Bản cuối, số tay "77" → "77/BC-TTKN").
 - Web: nút "Xuất Word vN" cạnh từng bản Excel, "Lịch sử Word"; màn Admin "Mẫu văn bản & lịch sử xuất" (`/kn/quan-tri/mau-van-ban`); `word.test.ts` trên giả lập. Giả lập trả tệp văn bản có nhãn GIẢ LẬP — không dùng làm bằng chứng .docx.
 - Còn mở: Q-062 (mẫu .docx gốc của Sở làm khung hay bộ ghi tự dựng; PDF cho biểu NS). Thể thức hiện là bộ ghi tự dựng theo NĐ 30/2020; chưa đối chiếu với mẫu gốc của khách.
+
+## W11.69 phần đầu #34 — kho Excel đã xuất (chờ review/gộp)
+
+- FN-TW-01.01 **một phần**, không thay các hàng “chưa làm” của toàn gói bằng “đạt”: danh sách metadata đã xuất theo tenant KHTC/TW; năm/loại/tìm tên kỳ, số văn bản; Bản cuối hoặc bản mới nhất, chọn mọi phiên bản; phân trang 20 dòng; tải lại Excel.
+- UAT: lưu bản soạn chưa xuất → không có dòng trong kho; xuất v1 số 12 rồi sửa bản soạn và xuất v2 số 13 → kho mọi phiên bản giữ đúng hai số, v1 tải byte cũ; Bản cuối có nhãn; cấp Xã/phòng khác bị từ chối, tenant khác không có metadata/tệp; không có nút ghi ở màn kho.
+- `TestW1169_ExportArchiveImmutableReadOnly` kiểm HTTP/DB thật; `src/kn/khtc/reports/archive.test.tsx` kiểm UI không đọc bản soạn, tải file, lọc/phân trang và 403. Chỉ ghi kết quả đạt trong issue sau khi chạy.
+- Dashboard và phần archive còn lại nằm ở #166/#167: xem trước/Word/zip, lọc kỳ/lĩnh vực, cấp quyền phòng có số liệu và tên hiển thị người xuất; giữ Q-027/Q-055 theo PO. Chưa nghiệm thu toàn bộ W11.69.
+- W11.69 phần đầu: TW/KHTC vào kho đã xuất từ menu có thể bấm và trang mặc định; Playwright 	ests/e2e/kn-khtc-archive.spec.ts chuẩn bị tài khoản đúng phòng qua UI mock, kiểm bộ lọc có accessible name rõ và không có nút soạn/xuất mới.
