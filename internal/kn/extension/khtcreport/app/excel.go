@@ -312,6 +312,14 @@ func writeExternal(w *workbook, figures []domain.ExternalFigure) {
 }
 
 func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, error) {
+	if d.Data.Template == "adhoc" {
+		if d.Adhoc == nil {
+			return nil, ErrInvalid.WithDetail("Chọn ít nhất một chỉ tiêu trước khi xuất")
+		}
+		if err := d.Adhoc.ValidateData(d.Data); err != nil {
+			return nil, ErrInvalid.WithCause(err)
+		}
+	}
 	file := excelize.NewFile()
 	defer func() { _ = file.Close() }()
 	heading, err := file.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Family: "Times New Roman"}, Fill: excelize.Fill{Type: "pattern", Color: []string{"E7EFEC"}, Pattern: 1}, Alignment: &excelize.Alignment{WrapText: true}})
@@ -332,12 +340,19 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 	w.check(tabular.SetColumnWidth(file, w.sheet, "A", "N", 18))
 	w.check(tabular.SetColumnWidth(file, w.sheet, "B", "B", 42))
 	data := d.Data
+	if data.Template == "adhoc" {
+		data = domain.AdhocData(d)
+		d.Data = data
+	}
 	rows := domain.SelectRows(data.Rows, filter)
 	w.title("TRUNG TÂM KHUYẾN NÔNG")
 	w.title("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM — Độc lập - Tự do - Hạnh phúc")
 	w.line("Số: "+admin(d, "document_no")+"/BC-TTKN", admin(d, "place")+", ngày "+admin(d, "report_date"))
 	w.title("BÁO CÁO")
 	title := "Kết quả thực hiện nhiệm vụ công tác khuyến nông"
+	if data.Template == "adhoc" {
+		title = "Báo cáo phát sinh"
+	}
 	if data.Template == "mau_5" {
 		title = fmt.Sprintf("Kết quả tiến độ thực hiện Chương trình khuyến nông địa phương năm %d", data.Period.Year)
 	}
@@ -369,6 +384,8 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 			writeExternal(w, data.External)
 		}
 		switch section.Key {
+		case "chi_tieu":
+			writeAdhocFigures(w, data)
 		case "A.I.1", "A.I.2", "A.I.3", "A.III":
 			writeMetrics(w, data.Metrics, section.Key)
 		case "A.II.1", "I.1":

@@ -22102,7 +22102,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "week" | "month" | "quarter" | "year" | "program";
+            type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
             year: number;
             name: string;
             /** Format: date-time */
@@ -22238,7 +22238,7 @@ export interface components {
         KHTCReportData: {
             period: components["schemas"]["KHTCReportPeriod"];
             /** @enum {string} */
-            template: "mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5";
+            template: "mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5" | "adhoc";
             plan: components["schemas"]["KHTCReportPlan"];
             sources: components["schemas"]["KHTCReportSourceRef"] | null;
             metrics: components["schemas"]["KHTCReportSourceMetric"][];
@@ -22273,6 +22273,7 @@ export interface components {
             texts: {
                 [key: string]: string;
             };
+            adhoc?: components["schemas"]["KHTCReportAdhocSelection"];
         };
         KHTCReportSection: {
             key: string;
@@ -22310,6 +22311,7 @@ export interface components {
             texts?: {
                 [key: string]: string;
             };
+            adhoc?: components["schemas"]["KHTCReportAdhocSelection"];
         };
         KHTCReportRefresh: {
             base_version: number;
@@ -22346,6 +22348,10 @@ export interface components {
         };
         KHTCReportExportList: {
             items: components["schemas"]["KHTCReportExport"][];
+        };
+        KHTCReportAdhocSelection: {
+            rows: string[];
+            metrics: string[];
         };
         KHTCReportWord: {
             /** Format: uuid */

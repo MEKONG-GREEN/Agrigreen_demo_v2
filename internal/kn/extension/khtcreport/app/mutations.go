@@ -20,9 +20,10 @@ import (
 )
 
 type SaveInput struct {
-	BaseVersion int64              `json:"base_version"`
-	Admin       map[string]*string `json:"admin"`
-	Texts       map[string]string  `json:"texts"`
+	Adhoc       *domain.AdhocSelection `json:"adhoc,omitempty"`
+	BaseVersion int64                  `json:"base_version"`
+	Admin       map[string]*string     `json:"admin"`
+	Texts       map[string]string      `json:"texts"`
 }
 type ExportInput struct {
 	BaseVersion            int64         `json:"base_version"`
@@ -75,7 +76,7 @@ func (s *Service) Save(ctx context.Context, id uuid.UUID, in SaveInput, idem str
 	if err != nil {
 		return Detail{}, err
 	}
-	edits := domain.Edits{Admin: in.Admin, Texts: in.Texts}
+	edits := domain.Edits{Admin: in.Admin, Texts: in.Texts, Adhoc: in.Adhoc}
 	if err = edits.Validate(domain.Template(p.Type)); err != nil {
 		return Detail{}, ErrInvalid.WithCause(err)
 	}
