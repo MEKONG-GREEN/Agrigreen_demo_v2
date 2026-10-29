@@ -16,6 +16,7 @@ import {
   compressImage,
   cost6Label,
   createCntsDiaryApi,
+  createPhotoDrafts,
   currentFix,
   dmy,
   expectedAlive,
@@ -554,6 +555,7 @@ function EntryForm({
   const [tables, setTables] = useState<Record<string, Row[]>>((entry?.tables as Record<string, Row[]> | undefined) ?? {});
   const [photos, setPhotos] = useState<Photo[]>(entry?.photos ?? []);
   const [photoKind, setPhotoKind] = useState<Photo["kind"]>(c.form === "BM-19" ? "weighing" : "flock");
+  const [photoDrafts] = useState(() => createPhotoDrafts());
   const [fix, setFix] = useState<EntrySave["location"] | null>(null);
   const [locating, setLocating] = useState(false);
   const [reason, setReason] = useState("");
@@ -659,8 +661,17 @@ function EntryForm({
               const file = e.target.files?.[0];
               e.target.value = "";
               if (!file) return;
-              const p = await act.run(async () => dapi.uploadPhoto(c.household_ref, photoKind, await compressImage(file)), "Đã tải ảnh");
-              if (p) setPhotos([...photos, p]);
+              // #172: chọn lại đúng ảnh sau mất phản hồi → cùng id/captured_at + thân tất định → cùng khóa, máy chủ phát lại.
+              // Lời gọi tải đứng sau await nén ảnh nên phải bọc bằng `idem` của lượt này.
+              const draft = photoDrafts.draft(c.household_ref, photoKind, file);
+              const p = await act.run(async (idem) => {
+                const blob = await compressImage(file);
+                return idem(() => dapi.uploadPhoto(c.household_ref, photoKind, blob, draft));
+              }, "Đã tải ảnh");
+              if (p) {
+                photoDrafts.done(draft);
+                setPhotos([...photos, p]);
+              }
             }}
           />
         </div>
