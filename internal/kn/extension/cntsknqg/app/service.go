@@ -83,6 +83,9 @@ type Service struct {
 	Store func() objstore.Store
 	// Exporter: pf/export (Word đúng mẫu). nil → xuất Word trả 503.
 	Exporter exportport.Exporter
+	// Recipients (tùy chọn, W11.53b): người nhận thông báo (Cấp TW khi gửi Mẫu 07, lãnh đạo phòng khi trình Mẫu 01).
+	// nil → chỉ thông báo chủ nhiệm khi TW xác nhận/trả lại Mẫu 07.
+	Recipients Recipients
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

@@ -16272,6 +16272,86 @@ paths:
               schema: {type: string, format: binary}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {description: "extension.cnts_knqg_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}/photos:
+    get:
+      summary: "W11.53b UR-TINH-21: ảnh thực địa hiện hành của báo cáo kiểm tra Mẫu 03 (người xem được biểu)"
+      operationId: extensionCntsKnqgPhotos
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách ảnh
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGPhotoList"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: extension.cnts_knqg_not_found, $ref: "#/components/responses/Problem"}
+    post:
+      summary: "W11.53b UR-TINH-21: tải ảnh thực địa (JPG/PNG ≤ 5 MB, kiểm chữ ký tệp; tối đa 20 ảnh) lên báo cáo Mẫu 03 đang lập — chủ nhiệm, lãnh đạo phòng, Admin"
+      operationId: extensionCntsKnqgAddPhoto
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+                caption: {type: string, maxLength: 300, description: "Chú thích (không số điện thoại/CCCD)"}
+      responses:
+        "200":
+          description: Danh sách ảnh sau khi thêm
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGPhotoList"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_locked | extension.cnts_project_closed | extension.cnts_knqg_version_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.cnts_knqg_photo_invalid, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}/photos/{photo}:
+    get:
+      summary: "W11.53b: tải một ảnh thực địa hiện hành của báo cáo"
+      operationId: extensionCntsKnqgPhoto
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: photo, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Ảnh
+          content:
+            image/jpeg:
+              schema: {type: string, format: binary}
+            image/png:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_knqg_not_found | extension.cnts_knqg_photo_not_found", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/knqg-docs/{ref}/photos/{photo}/remove:
+    post:
+      summary: "W11.53b: gỡ ảnh thực địa khỏi báo cáo Mẫu 03 đang lập (sổ ghi thêm dòng gỡ; tệp vẫn lưu)"
+      operationId: extensionCntsKnqgRemovePhoto
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: photo, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Danh sách ảnh sau khi gỡ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSKNQGPhotoList"}
+        "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_knqg_not_found | extension.cnts_knqg_photo_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_knqg_locked | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/bm11/reports:
     get:
       summary: "Báo cáo phòng CNTS BM-11 (W11.45, UR-TINH-16, FN-16): danh sách báo cáo tuần/tháng/quý/năm của phòng (Admin, Cấp Tỉnh/Cấp Quốc gia CNTS; Admin/TW truyền province)"
@@ -19272,11 +19352,11 @@ components:
       description: Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic).
       properties:
         id: {type: string, format: uuid}
-        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale, price_reminder, price_alert, price_verify_request, price_verify_reply, price_verify_decision, price_lock_summary, price_board_approved, price_board_reopened, price_proxy_entry]}
+        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale, price_reminder, price_alert, price_verify_request, price_verify_reply, price_verify_decision, price_lock_summary, price_board_approved, price_board_reopened, price_proxy_entry, cnts_knqg_sent, cnts_knqg_reviewed, cnts_knqg_submitted]}
         severity: {type: string, enum: [urgent, normal]}
         title: {type: string, maxLength: 300}
         body: {type: string, maxLength: 2000}
-        deep_link: {type: string, description: "Đường dẫn trong app: /extension/directives/{id}, /documents/{ref}, /extension/tasks/{id}, /sync/conflicts/{id}, /orgs/{ref}"}
+        deep_link: {type: string, description: "Đường dẫn trong app: /extension/directives/{id}, /documents/{ref}, /extension/tasks/{id}, /sync/conflicts/{id}, /orgs/{ref}, /kn/cnts/du-an-mau-bieu?doc={ref} (W11.53b: biểu dự án KNQG)"}
         subject_ref: {type: [string, "null"], format: uuid}
         created_at: {type: string, format: date-time}
         read_at: {type: [string, "null"], format: date-time}
@@ -26399,6 +26479,27 @@ components:
         size: {type: integer}
         actor_ref: {type: string, format: uuid}
         at: {type: string, format: date-time}
+    CNTSKNQGPhoto:
+      type: object
+      required: [ref, name, content_type, size, sha256, caption, uploaded_at, uploaded_by, uploaded_by_name]
+      properties:
+        ref: {type: string, format: uuid}
+        name: {type: string}
+        content_type: {type: string, enum: [image/jpeg, image/png]}
+        size: {type: integer}
+        sha256: {type: string}
+        caption: {type: [string, "null"]}
+        uploaded_at: {type: string, format: date-time}
+        uploaded_by: {type: string, format: uuid}
+        uploaded_by_name: {type: [string, "null"]}
+    CNTSKNQGPhotoList:
+      type: object
+      required: [items, can_edit, max_photos, replayed]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/CNTSKNQGPhoto"}}
+        can_edit: {type: boolean, description: "Người gọi thêm/gỡ được ảnh (Mẫu 03 đang lập, người sửa được biểu)"}
+        max_photos: {type: integer}
+        replayed: {type: boolean}
     CNTSBM11CreateInput:
       type: object
       required: [type, period_key]
