@@ -25098,6 +25098,28 @@ export interface components {
             definition_hash: string;
             scenario: string;
         };
+        /** @description Nguồn mẫu đã ghim trong revision; không chọn lại phiên bản mới khi đọc hoặc xuất lịch sử. */
+        KHTCFixedTemplateSnapshot: {
+            /** @enum {string} */
+            mode: "legacy" | "published";
+            rule: string;
+            /** Format: uuid */
+            id: string;
+            key: components["schemas"]["KHTCTemplateKey"];
+            version: number;
+            hash: string;
+            readonly definition: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            applicable_from: string;
+            /** Format: date-time */
+            legacy_until?: string;
+            word_key: string;
+            word_version: number;
+            word_hash: string;
+            excel_rule: string;
+        };
     };
     responses: {
         /** @description Đã ghi dòng quá trình */

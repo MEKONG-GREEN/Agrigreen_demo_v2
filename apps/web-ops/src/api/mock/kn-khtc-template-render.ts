@@ -151,8 +151,9 @@ export function renderTemplate(d: Definition, c: Context, scenario = "actual"): 
     if (!["actual", "normal", "no_send", "unclosed", "no_activity", "provisional"].includes(scenario))
         throw Error("Tình huống không hợp lệ");
     for (const value of [...Object.values(c.values), ...Object.values(c.lists).flatMap(rows => rows.flatMap(row => Object.values(row.values)))])
-        if (length(value) > 12000)
+        if (length(value) > 20000)
             throw Error("Giá trị nguồn quá dài");
+    for (const text of Object.values(c.texts)) if (length(text) > 12000) throw Error("Lời văn quá dài");
     const out: S["KHTCTemplateRendered"] = { key: d.key, nodes: [], input_hash: c.input_hash, provisional: [...c.provisional] };
     let budget = 0, count = 0;
     if (scenario === "provisional")
@@ -216,7 +217,8 @@ export function renderTemplate(d: Definition, c: Context, scenario = "actual"): 
                 if (message || n.body)
                     item.rows.push(row);
             }
-            if (n.text_slot && n.repeat !== "none" && c.texts[n.id]) {
+            if (n.text_slot && !item.rows.some(row => [...row.tokens, ...(row.preamble_tokens ?? [])].some(token => token.source === "text")) && c.texts[n.id]) {
+                if (++count > 20000) throw Error("Tổng số dòng sau lặp vượt giới hạn");
                 const text = c.texts[n.id]!;
                 budget += length(text);
                 if (budget > 1048576)

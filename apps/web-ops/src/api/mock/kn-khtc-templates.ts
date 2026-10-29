@@ -5,7 +5,7 @@ import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
 import { TENANT } from "./personas";
 import { khtcMockStore } from "./kn-khtc-periods";
-import { khtcTemplatePreviewContent } from "./kn-khtc-reports";
+import { khtcTemplateNarrativeUsage, khtcTemplatePreviewContent } from "./kn-khtc-reports";
 import { templateContext } from "./kn-khtc-template-context";
 import { canonical, invalidDefinition, isFixedKey, mockDigest, renderTemplate, seedTemplate, type Definition } from "./kn-khtc-template-render";
 type S = components["schemas"];
@@ -24,8 +24,14 @@ const REPLAYS = new Map<string, {
 const RULE = "khtc-template/v2.3-1";
 const TYPES: Record<Key, string> = { mau_1: "week", mau_2: "month", mau_3: "quarter", mau_4: "year", mau_5: "program" };
 // Bound by a coordinated report-history seam; never infer saved history from preview's default narrative.
-let narrativeUsage: ((ctx: Ctx, key: Key, slots: string[]) => boolean) | null = null;
-export function useTemplateMockNarrativeUsage(read: typeof narrativeUsage) { narrativeUsage = read; }
+function savedNarrativeUsage(ctx: Ctx, key: Key, slots: string[]): boolean {
+ return khtcMockStore().filter(period => period.p.report_type === TYPES[key]).some(period => {
+  const usage = khtcTemplateNarrativeUsage(ctx, period.p.id);
+  return usage?.revisions.some(revision => revision.sections.some(section => slots.includes(section))) ?? false;
+ });
+}
+let narrativeUsage: ((ctx: Ctx, key: Key, slots: string[]) => boolean) | null = savedNarrativeUsage;
+export function useTemplateMockNarrativeUsage(read: typeof narrativeUsage | undefined) { narrativeUsage = read === undefined ? savedNarrativeUsage : read; }
 export function resetKhtcTemplates() { STORE.clear(); REPLAYS.clear(); }
 const code = (name: string, title: string, status = 409) => problem(status, `extension.khtc_template_${name}`, title);
 const state = (tenant: string, key: Key) => { const id = `${tenant}:${key}`; let s = STORE.get(id); if (!s) {
@@ -57,6 +63,8 @@ function preview(ctx: Ctx, key: Key, s: State): Response {
     const b = bodyObject(ctx, ["definition", "version_id", "period_id", "scenario"]);
     if (b instanceof Response)
         return b;
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (b.definition != null && b.version_id != null || b.version_id != null && (typeof b.version_id !== "string" || !uuid.test(b.version_id)) || b.period_id != null && (typeof b.period_id !== "string" || !uuid.test(b.period_id)) || b.scenario != null && typeof b.scenario !== "string") return code("invalid", "Dữ liệu xem trước không hợp lệ", 422);
     let d: Definition | undefined;
     if (b.definition != null)
         d = b.definition as Definition;
@@ -77,6 +85,7 @@ function preview(ctx: Ctx, key: Key, s: State): Response {
     const period = id ? khtcMockStore().find(p => p.p.id === id) : periods.sort((a, b) => b.p.from_date.localeCompare(a.p.from_date) || b.p.id.localeCompare(a.p.id))[0];
     if (!period)
         return code("not_found", "Chưa có kỳ phù hợp để xem trước", 404);
+    if (period.p.report_type !== TYPES[key]) return code("invalid", "Kỳ không thuộc mẫu đã chọn", 422);
     const content = khtcTemplatePreviewContent(ctx, period.p.id);
     if (!content || content.data.template !== key)
         return code("invalid", "Kỳ không thuộc mẫu đã chọn", 422);

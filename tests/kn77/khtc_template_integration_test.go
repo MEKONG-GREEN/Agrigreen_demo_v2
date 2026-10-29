@@ -325,3 +325,33 @@ func TestW1165_DatabaseRejectsMismatchedPublishedVersion(t *testing.T) {
 		t.Fatalf("publication version mismatch accepted: %v", err)
 	}
 }
+
+func TestW1165_PreviewBypassesPublishedSelectionWithoutPersisting(t *testing.T) {
+	f := newReportFx(t)
+	period := f.open(41, dTT)
+	context := templateCtx(t, f.tid, f.khtcUser, authz.KNAdmin, false)
+	pool := pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform)
+	countDrafts := func() int {
+		var n int
+		err := tenant.WithTenantTx(context, db.ForModule(pool, extension.DBModule), f.tid, func(tx pgx.Tx) error {
+			return tx.QueryRow(context, `SELECT count(*) FROM pf_extension.khtc_report_draft WHERE payload->'data'->'period'->>'id'=$1`, period.ID).Scan(&n)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	// A structurally valid definition can refer to an unavailable source. The
+	// editor must still preview a repaired explicit definition using native inputs.
+	broken := templatedomain.Seed("mau_1")
+	broken.Nodes = append(broken.Nodes, templatedomain.Node{ID: "unavailable", Parent: "B", Order: 100, Title: "Nguồn chưa có", Repeat: "none", Body: "{value}", Bindings: []templatedomain.Binding{{Variable: "value", Source: "form", Field: "value", Ref: "missing-source"}}})
+	version := templateSave(t, f, "mau_1", 0, broken)
+	templatePublish(t, f, "mau_1", version, "2026-10-07")
+	preview := templatePreview(t, f, period.ID)
+	if preview.Context.PeriodID.String() != period.ID || preview.Context.InputHash == "" {
+		t.Fatal("native capture missing")
+	}
+	if got := countDrafts(); got != 0 {
+		t.Fatalf("preview persisted %d drafts", got)
+	}
+}

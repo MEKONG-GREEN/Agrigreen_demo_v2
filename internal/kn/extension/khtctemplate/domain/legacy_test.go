@@ -21,6 +21,11 @@ func TestLegacySourceFingerprintAndVersion(t *testing.T) {
 		t.Fatal("legacy layout and renderer were not independently identified")
 	}
 	bad := pinned
+	bad.ExcelRule = "other-layout"
+	if ValidateLegacy(bad) == nil {
+		t.Fatal("Excel renderer drift accepted")
+	}
+	bad = pinned
 	bad.Hash = strings.Repeat("0", 64)
 	if ValidateLegacy(bad) == nil {
 		t.Fatal("corrupt source hash accepted")

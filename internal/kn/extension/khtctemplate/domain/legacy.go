@@ -34,11 +34,11 @@ func LegacySnapshot(key, rule string, sections json.RawMessage, word doctpl.Temp
 		return port.KHTCTemplateSnapshot{}, err
 	}
 	sum := sha256.Sum256(raw)
-	return port.KHTCTemplateSnapshot{Mode: "legacy", Rule: rule, Key: key, Version: 1, Hash: hex.EncodeToString(sum[:]), Definition: raw, ApplicableFrom: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), WordKey: word.Key, WordVersion: word.Version, WordHash: word.Hash()}, nil
+	return port.KHTCTemplateSnapshot{Mode: "legacy", Rule: rule, Key: key, Version: 1, Hash: hex.EncodeToString(sum[:]), Definition: raw, ApplicableFrom: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), WordKey: word.Key, WordVersion: word.Version, WordHash: word.Hash(), ExcelRule: rule}, nil
 }
 
 func ValidateLegacy(pinned port.KHTCTemplateSnapshot) error {
-	if pinned.Mode != "legacy" || !Fixed(pinned.Key) || pinned.Version != 1 || pinned.Rule == "" || pinned.WordVersion != 1 || pinned.WordKey != "khtc."+pinned.Key || len(pinned.Definition) > MaxDefinitionBytes {
+	if pinned.Mode != "legacy" || !Fixed(pinned.Key) || pinned.Version != 1 || pinned.Rule == "" || pinned.ExcelRule != pinned.Rule || pinned.WordVersion != 1 || pinned.WordKey != "khtc."+pinned.Key || len(pinned.Definition) > MaxDefinitionBytes {
 		return invalid("template", "Nguồn mẫu nền không hợp lệ")
 	}
 	var definition LegacyDefinition

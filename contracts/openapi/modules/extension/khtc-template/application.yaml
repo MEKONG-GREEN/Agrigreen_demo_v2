@@ -90,3 +90,24 @@ components:
     KHTCTemplateRendered: {"type":"object","properties":{"key":{"$ref":"#/components/schemas/KHTCTemplateKey"},"nodes":{"type":"array","items":{"$ref":"#/components/schemas/KHTCTemplateRenderedNode"}},"input_hash":{"type":"string"},"provisional":{"type":"array","items":{"type":"string"}}},"required":["key","nodes","input_hash","provisional"],"additionalProperties":false}
 # @ag-order: 34049
     KHTCTemplatePreview: {"type":"object","properties":{"context":{"$ref":"#/components/schemas/KHTCTemplateContext"},"document":{"$ref":"#/components/schemas/KHTCTemplateRendered"},"definition_hash":{"type":"string"},"scenario":{"type":"string"}},"required":["context","document","definition_hash","scenario"],"additionalProperties":false}
+# @ag-order: 34050
+    KHTCFixedTemplateSnapshot:
+      type: object
+      readOnly: true
+      description: "Nguồn mẫu đã ghim trong revision; không chọn lại phiên bản mới khi đọc hoặc xuất lịch sử."
+      properties:
+        mode: {type: string, enum: [legacy, published]}
+        rule: {type: string}
+        id: {type: string, format: uuid}
+        key: {$ref: '#/components/schemas/KHTCTemplateKey'}
+        version: {type: integer, minimum: 1, maximum: 1000000000}
+        hash: {type: string, pattern: '^[a-f0-9]{64}$'}
+        definition: {type: object, additionalProperties: true, readOnly: true}
+        applicable_from: {type: string, format: date-time}
+        legacy_until: {type: string, format: date-time}
+        word_key: {type: string}
+        word_version: {type: integer, minimum: 1}
+        word_hash: {type: string, pattern: '^[a-f0-9]{64}$'}
+        excel_rule: {type: string}
+      required: [mode, rule, id, key, version, hash, definition, applicable_from, word_key, word_version, word_hash, excel_rule]
+      additionalProperties: false

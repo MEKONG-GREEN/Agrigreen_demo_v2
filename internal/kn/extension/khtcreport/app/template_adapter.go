@@ -82,6 +82,9 @@ func fixedTemplateSections(pinned *port.KHTCTemplateSnapshot, content domain.Dra
 		return nil, ErrInvalid.WithCause(err)
 	}
 	if pinned.Mode == "legacy" {
+		if pinned.Rule != domain.RuleVersion || pinned.ExcelRule != domain.RuleVersion {
+			return nil, ErrInvalid.WithDetail("Quy tắc mẫu nền chưa được hỗ trợ")
+		}
 		var source templatedomain.LegacyDefinition
 		if err := json.Unmarshal(pinned.Definition, &source); err != nil {
 			return nil, ErrInvalid.WithCause(err)
@@ -164,5 +167,10 @@ func selectFixedTemplate(ctx context.Context, provider port.KHTCFixedTemplates, 
 		return nil, ErrInvalid.WithCause(fmt.Errorf("selected template: %w", err))
 	}
 	cloned := cloneFixedTemplate(pinned)
+	if cloned.Mode == "published" {
+		renderer := FixedWordTemplate()
+		cloned.WordKey, cloned.WordVersion, cloned.WordHash = renderer.Key, renderer.Version, renderer.Hash()
+		cloned.ExcelRule = fixedWorkbookRule
+	}
 	return &cloned, nil
 }

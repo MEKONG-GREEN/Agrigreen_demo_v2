@@ -4201,6 +4201,15 @@
           "badge_source": null,
           "enabled": false,
           "children": []
+         },
+         {
+          "key": "admin.pb.khtc_muc_luc_mau",
+          "label": "Mục lục mẫu báo cáo",
+          "route": "/kn/phong-ban/ke_hoach_tai_chinh/muc-luc-mau",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
          }
         ]
        },

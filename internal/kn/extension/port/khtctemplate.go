@@ -24,6 +24,7 @@ type KHTCTemplateSnapshot struct {
 	WordKey        string          `json:"word_key,omitempty"`
 	WordVersion    int             `json:"word_version,omitempty"`
 	WordHash       string          `json:"word_hash,omitempty"`
+	ExcelRule      string          `json:"excel_rule,omitempty"`
 }
 
 // KHTCFixedTemplates resolves only mau_1..mau_5. Tenant and actor come from ctx.

@@ -55,6 +55,11 @@ func Render(d Definition, context port.KHTCTemplateContext, scenario string) (Re
 	if !slices.Contains([]string{"", "actual", "normal", "no_send", "unclosed", "no_activity", "provisional"}, scenario) {
 		return Rendered{}, invalid("scenario", "Tình huống xem trước không hợp lệ")
 	}
+	for key, text := range context.Texts {
+		if utf8.RuneCountInString(text) > MaxBodyRunes {
+			return Rendered{}, invalid("texts."+key, "Lời văn vượt giới hạn")
+		}
+	}
 	count := 0
 	for _, rows := range context.Lists {
 		count += len(rows)
@@ -149,7 +154,19 @@ func Render(d Definition, context port.KHTCTemplateContext, scenario string) (Re
 					return invalid("period_id", "Nội dung xem trước vượt giới hạn")
 				}
 			}
-			if n.TextSlot && n.Repeat != "none" && context.Texts[n.ID] != "" {
+			narrativeRendered := false
+			for _, row := range item.Rows {
+				for _, token := range append(append([]Token{}, row.Tokens...), row.PreambleTokens...) {
+					if token.Source == "text" {
+						narrativeRendered = true
+					}
+				}
+			}
+			if n.TextSlot && !narrativeRendered && context.Texts[n.ID] != "" {
+				if renderedRows >= MaxRows {
+					return invalid("period_id", "Tổng số dòng sau khi lặp vượt giới hạn")
+				}
+				renderedRows++
 				text := context.Texts[n.ID]
 				if utf8.RuneCountInString(text) > MaxBodyRunes {
 					return invalid("texts."+n.ID, "Lời văn vượt giới hạn")
