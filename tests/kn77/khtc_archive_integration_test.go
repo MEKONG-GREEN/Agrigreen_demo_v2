@@ -128,3 +128,34 @@ func TestW1169_ExportArchiveImmutableReadOnly(t *testing.T) {
 		t.Fatal("archive contains draft/content")
 	}
 }
+
+// Kỳ đã hủy vẫn giữ tệp lịch sử, nhưng không được xuất hiện trong kho kể cả khi xem mọi phiên bản.
+func TestW1169_ExportArchiveExcludesCancelledPeriod(t *testing.T) {
+	f := newReportFx(t)
+	p := f.open(41, dTT, dTTTT)
+	d := f.refresh(p.ID, 0)
+	x := f.export(p.ID, d.Version, true)
+	if !x.Provisional {
+		t.Fatal("expected provisional export before submissions")
+	}
+	read := func() archiveResult {
+		t.Helper()
+		var out archiveResult
+		c, b := f.do(http.MethodGet, "/v1/extension/khtc/exported-reports?year=2026&versions=true",
+			authz.KNTW, khtcDept, f.khtcUser, "", nil)
+		f.ok(c, b, &out)
+		return out
+	}
+	if got := read(); len(got.Items) != 1 || got.Items[0].ID.String() != x.ID || got.Items[0].Final {
+		t.Fatalf("export missing before cancellation: %+v", got)
+	}
+	c, b := f.khtc(http.MethodPost, "/periods/"+p.ID+"/cancel", f.khtcUser, "",
+		map[string]any{"reason": "Hủy kỳ báo cáo mở nhầm"})
+	f.ok(c, b, nil)
+	if state := f.get(p.ID); state.State != "cancelled" {
+		t.Fatalf("period not cancelled: %+v", state)
+	}
+	if got := read(); len(got.Items) != 0 || got.HasMore {
+		t.Fatalf("cancelled period leaked into archive: %+v", got)
+	}
+}
