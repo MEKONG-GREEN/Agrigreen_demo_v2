@@ -53,7 +53,7 @@ Bản build production thật: `next build` **dừng** nếu thiếu `NEXT_PUBLI
 | `NEXT_PUBLIC_API_MOCK` | `0` | `1` = backend giả lập trong trình duyệt, bỏ qua đăng nhập (dữ liệu tổng hợp). Chỉ hiệu lực khi `next dev` hoặc `NEXT_PUBLIC_DEPLOY_ENV=demo`/`dev` |
 | `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8080` (chỉ dev) | Application API |
 | `NEXT_PUBLIC_ADMIN_API_BASE` | `http://localhost:8082` (chỉ dev) | Admin API: host riêng (admin.<domain>), bắt buộc MFA. Dùng cho danh mục, tham số, cây tổ chức, nhập tệp, tài khoản, mẫu/lịch báo cáo, xung đột đồng bộ, thiết bị, chạy dự báo CGH |
-| `NEXT_PUBLIC_OIDC_ISSUER` | `http://localhost:8081/realms/agrigreen` (chỉ dev) | Issuer Keycloak |
+| `NEXT_PUBLIC_OIDC_ISSUER` | `http://localhost:8180/realms/agrigreen` (chỉ dev) | Issuer Keycloak (Compose mở Keycloak ở 8180; 8081 là API nội bộ MKG) |
 | `NEXT_PUBLIC_OIDC_CLIENT_ID` | `agrigreen-web-ops` | Client công khai, PKCE S256 |
 | `NEXT_PUBLIC_MAP_STYLE_URL` | rỗng | Style MapLibre của nhà cung cấp tile trong lãnh thổ (ADR-0007). Rỗng = nền trơn, không gọi tile ngoài |
 | `NEXT_PUBLIC_SURFACE` | `auto` | `auto`: tài khoản có vai trò KN v7.7 (`GET /v1/me/contexts` trả lần gán) dùng menu theo cấu hình; còn lại menu cũ `src/nav/nav.ts`. `legacy`: luôn menu cũ |
