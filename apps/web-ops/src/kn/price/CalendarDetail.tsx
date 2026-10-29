@@ -174,7 +174,7 @@ function SchedulePage({
           <>
             <Cancel base={base} />
             <button
-              className="btn btn-primary"
+              className="btn btn-p"
               type="submit"
               form="price-schedule-form"
               disabled={act.busy}
@@ -183,7 +183,7 @@ function SchedulePage({
             </button>
           </>
         ) : c.can_manage ? (
-          <Link className="btn btn-primary" href={`${path}/sua`}>
+          <Link className="btn btn-p" href={`${path}/sua`}>
             Sửa cấu hình
           </Link>
         ) : undefined
@@ -444,7 +444,7 @@ function ExceptionPage({
           <>
             <Cancel base={base} />
             <button
-              className="btn btn-primary"
+              className="btn btn-p"
               type="submit"
               form="price-exception-form"
               disabled={act.busy}
@@ -623,7 +623,7 @@ function ThresholdPage({
           <>
             <Cancel base={base} />
             <button
-              className="btn btn-primary"
+              className="btn btn-p"
               type="submit"
               form="price-threshold-form"
               disabled={act.busy}
@@ -633,7 +633,7 @@ function ThresholdPage({
           </>
         ) : current && t.can_manage ? (
           <Link
-            className="btn btn-primary"
+            className="btn btn-p"
             href={`${base}/${thresholdPath(current.scope, current.code)}/sua`}
           >
             Sửa ngưỡng

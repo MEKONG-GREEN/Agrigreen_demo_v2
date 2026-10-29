@@ -94,7 +94,7 @@ function CalendarList({ api, base }: { api: ApiClient; base: string }) {
                       </p>
                       {c.can_manage ? (
                         <Link
-                          className="btn btn-primary"
+                          className="btn btn-p"
                           href={`${base}/ngoai-le/them-moi`}
                         >
                           Thêm ngoại lệ
@@ -172,7 +172,7 @@ function CalendarList({ api, base }: { api: ApiClient; base: string }) {
                         </Link>
                         {c.can_manage ? (
                           <Link
-                            className="btn btn-primary"
+                            className="btn btn-p"
                             href={`${base}/nhac/sua`}
                           >
                             Sửa cấu hình nhắc
@@ -275,7 +275,7 @@ function CalendarList({ api, base }: { api: ApiClient; base: string }) {
                               </Link>
                               {t.can_manage ? (
                                 <Link
-                                  className="btn btn-primary"
+                                  className="btn btn-p"
                                   href={`${base}/nguong/mac-dinh/sua`}
                                 >
                                   Sửa tham số chung
@@ -287,7 +287,7 @@ function CalendarList({ api, base }: { api: ApiClient; base: string }) {
                           {t.can_manage ? (
                             <p>
                               <Link
-                                className="btn btn-primary"
+                                className="btn btn-p"
                                 href={`${base}/nguong/them-moi`}
                               >
                                 Thêm ngưỡng
@@ -378,7 +378,7 @@ function CalendarList({ api, base }: { api: ApiClient; base: string }) {
           actions={
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-p"
               disabled={act.busy || !canRetire}
               onClick={() => void confirm()}
             >
@@ -437,7 +437,7 @@ function ScheduleTab({ c, base }: { c: PriceCalendar; base: string }) {
             Xem kỳ báo giá & giờ khóa
           </Link>
           {c.can_manage ? (
-            <Link className="btn btn-primary" href={`${base}/lich/sua`}>
+            <Link className="btn btn-p" href={`${base}/lich/sua`}>
               Sửa kỳ báo giá
             </Link>
           ) : null}

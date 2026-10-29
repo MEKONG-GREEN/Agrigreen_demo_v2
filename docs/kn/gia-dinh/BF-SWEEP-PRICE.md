@@ -1,6 +1,6 @@
-# BF-SWEEP-PRICE — Lát cấu hình Báo giá (#165)
+## BF-SWEEP-PRICE — Lát cấu hình Báo giá (#165)
 
-## Phạm vi và nguồn
+### Phạm vi và nguồn
 
 Lát đầu của #165 chuẩn hóa **toàn luồng nhập/xem trong CalendarConfig**, gồm FN-AD-04.04 (kỳ/giờ khóa, ngoại lệ),
 FN-AD-04.05 (nhắc nhập giá), FN-AD-04.06 (ngưỡng). Phần items/points/tickets/reports/surveys còn lại ở
@@ -14,7 +14,7 @@ khác nhau, không khẳng định chênh hash chỉ do metadata ZIP. Đã đố
 BR/AC về thứ tự giờ, biến mẫu, miền ngưỡng, hiệu lực/lịch sử với `kn-handoff/analysis/src/brd_baogia.txt`: khớp,
 không thấy khác biệt nghiệp vụ trong lát này. Không dùng BRD KHTC thay nguồn Báo giá.
 
-## Quyết định triển khai
+### Quyết định triển khai
 
 | Mục | Hành vi | Bằng chứng |
 |---|---|---|
@@ -28,7 +28,7 @@ không thấy khác biệt nghiệp vụ trong lát này. Không dùng BRD KHTC 
 | Giới hạn Log ngoại lệ | API hiện chỉ trả day/kind/reason/version, không có actor/time/history. Cột Log nói rõ thiếu metadata; không lấy giờ tải trang hay log lịch làm sự kiện ngoại lệ. Giữ API theo phạm vi gói | Detail ngoại lệ; câu hỏi PO dưới đây |
 | STT/typography | DataTable đánh STT cho lịch30 ngày, ngoại lệ, ngưỡng, job và lịch sử; DetailPage/h2 dùng typography chung. Không thay FormGrid, mẫu giấy, M1–M7 hoặc API nghiệp vụ khác | UI/E2E |
 
-## Ranh giới và kiểm
+### Ranh giới và kiểm
 
 Không sửa `components/form.tsx` đang thuộc #163; guard nằm trong feature Price. Không sửa navigation test #181,
 TT/CNTS, KHTC/HCTH, registry, OpenAPI, role/scope/tenant, PII hoặc dữ liệu HTX. Không thêm migration.

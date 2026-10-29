@@ -146,6 +146,21 @@ describe("BF-SWEEP-PRICE cấu hình trên trang riêng", () => {
     ).toHaveAttribute("href", `${nav.path}/lich/sua`);
   });
 
+  it("ngưỡng mới phải chọn phạm vi trước khi lưu", async () => {
+    render(<PriceConfigDetailScreen route={{ kind: "threshold-new" }} />);
+    const scope = await screen.findByLabelText(/Phạm vi áp dụng/);
+    fireEvent.change(scope, { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText(/Mã mặt hàng/), {
+      target: { value: "MH00001" },
+    });
+    fireEvent.change(screen.getByLabelText(/Ngưỡng ±%/), {
+      target: { value: "40" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Lưu ngưỡng" }));
+    expect(scope).toHaveAttribute("aria-invalid", "true");
+    expect(writes).toHaveLength(0);
+  });
+
   it("kỳ báo giá kiểm tại ô, giữ lịch nhắc và ngày áp dụng trước khi lưu", async () => {
     render(
       <PriceConfigDetailScreen route={{ kind: "schedule", edit: true }} />,
@@ -290,6 +305,38 @@ describe("BF-SWEEP-PRICE cấu hình trên trang riêng", () => {
     });
   });
 
+  it.each(["group", "item"] as const)(
+    "ngưỡng riêng %s cũng chặn hostile trước parse",
+    async (scope) => {
+      const code = scope === "group" ? "rau_mau" : "MH00001";
+      store.saveThreshold(true, { scope, code, pct: "40" });
+      render(
+        <PriceConfigDetailScreen
+          route={{ kind: "threshold", scope, code, edit: true }}
+        />,
+      );
+      const input = await screen.findByLabelText(/Ngưỡng ±%/);
+      const parse = vi.spyOn(Decimal, "parse");
+      try {
+        for (const raw of [
+          "1e100000",
+          "1e-100000",
+          "9".repeat(100000),
+          "100.01",
+        ]) {
+          parse.mockClear();
+          fireEvent.change(input, { target: { value: raw } });
+          fireEvent.blur(input);
+          fireEvent.click(screen.getByRole("button", { name: "Lưu ngưỡng" }));
+          expect(parse).not.toHaveBeenCalled();
+          expect(writes).toHaveLength(0);
+        }
+      } finally {
+        parse.mockRestore();
+      }
+    },
+  );
+
   it("lỗi tại trường từ máy chủ nằm dưới ô tương ứng", async () => {
     fieldFailure = "flat_pct";
     render(
@@ -411,9 +458,7 @@ describe("BF-SWEEP-PRICE cấu hình trên trang riêng", () => {
     const table = await screen.findByRole("table", {
       name: "Ngưỡng theo nhóm hàng / mặt hàng",
     });
-    fireEvent.click(
-      within(table).getByRole("button", { name: "Xóa", exact: true }),
-    );
+    fireEvent.click(within(table).getByRole("button", { name: "Xóa" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(writes).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận xóa" }));
@@ -421,7 +466,7 @@ describe("BF-SWEEP-PRICE cấu hình trên trang riêng", () => {
     expect(writes[0]?.path).toBe("/v1/price/thresholds/group/rau_mau/retire");
     await waitFor(() =>
       expect(
-        screen.queryByRole("button", { name: "Xóa", exact: true }),
+        screen.queryByRole("button", { name: "Xóa" }),
       ).not.toBeInTheDocument(),
     );
   });

@@ -146,6 +146,9 @@ export function validateThreshold(form: ThresholdForm) {
       ? (["pct", "lookback", "flat", "survey"] as const)
       : (["pct"] as const);
   const errors: Errors = {};
+  if (!["default", "group", "item"].includes(form.scope)) {
+    errors.scope = "Chọn phạm vi áp dụng.";
+  }
   for (const key of keys) {
     const issue = numberTextError(
       form[key],

@@ -1,14 +1,45 @@
 import { expect, test, type Page } from "@playwright/test";
+import { sidebar } from "./helpers";
 
-const BASE = "/kn/bao-gia/cau-hinh";
+const BASE = "/kn/phong-ban/thong_tin_truyen_thong/bao-gia-lich";
 
-async function admin(page: Page, path = BASE) {
+async function admin(page: Page) {
   // Persona chỉ có trong build mock; không dùng thông tin đăng nhập hay sửa helper chung đang thuộc #163.
   await page.goto("/login");
   await page.evaluate(() =>
     sessionStorage.setItem("ag.mock.persona", "kn-admin"),
   );
-  await page.goto(path);
+  await page.goto("/kn/tong-quan");
+  await expect(sidebar(page)).toBeVisible();
+  await sidebar(page)
+    .getByRole("link", { name: "Phòng ban", exact: true })
+    .click();
+  await page
+    .getByLabel("Trạng thái Phòng Thông tin Tuyên truyền", { exact: true })
+    .selectOption("active");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Đã đổi" }),
+  ).toContainText("Đang áp dụng");
+  // Lấy lại menu theo ngữ cảnh, giữ dữ liệu mock trong SPA (reload trang sẽ cài lại seed).
+  await sidebar(page)
+    .getByRole("link", { name: "Menu các cấp", exact: true })
+    .click();
+  await page.getByLabel("Xem như vai trò*").selectOption("kn_tinh");
+  await page
+    .getByLabel(/^Lý do hỗ trợ/)
+    .fill("Kiểm tra cấu hình Báo giá FN-AD-04.04–06");
+  await page
+    .getByRole("button", { name: "Vào menu Cấp Tỉnh", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Thoát chế độ hỗ trợ", exact: true })
+    .click();
+  await sidebar(page)
+    .getByRole("button", { name: "Phòng Thông tin Tuyên truyền", exact: true })
+    .click();
+  await sidebar(page)
+    .getByRole("link", { name: "Kỳ báo giá & giờ khóa", exact: true })
+    .click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Lịch báo giá",
   );
@@ -18,21 +49,17 @@ test("price-config: route, lỗi từng ô, log, số an toàn và xóa có xác
   page,
 }) => {
   test.setTimeout(180_000);
-  const thresholdWrites: string[] = [];
-  page.on("request", (request) => {
-    if (
-      request.method() === "POST" &&
-      new URL(request.url()).pathname === "/v1/price/thresholds"
-    )
-      thresholdWrites.push(request.postData() ?? "");
-  });
   await admin(page);
   await page.getByRole("link", { name: "Xem kỳ báo giá & giờ khóa" }).click();
-  await expect(page).toHaveURL(/\/cau-hinh\/lich$/);
+  await expect(page).toHaveURL(/\/bao-gia-lich\/lich$/);
   await expect(
     page.getByRole("complementary", { name: "Log", exact: true }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Sửa cấu hình", exact: true }).click();
+  await page.mouse.move(260, 80);
+  await expect(page.getByRole("button", { name: "Lưu cấu hình", exact: true })).toHaveCSS("background-color", "rgb(0, 168, 45)");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCSS("font-family", /Noto Serif/);
+  await expect(page.getByLabel(/Hạn phản hồi xác minh/)).toHaveCSS("font-family", /Roboto/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByLabel(/Hạn phản hồi xác minh/).fill("11:30");
   await page.getByRole("button", { name: "Lưu cấu hình", exact: true }).click();
@@ -42,7 +69,7 @@ test("price-config: route, lỗi từng ô, log, số an toàn và xóa có xác
   );
   await page.getByLabel(/Hạn phản hồi xác minh/).fill("14:00");
   await page.getByRole("button", { name: "Lưu cấu hình", exact: true }).click();
-  await expect(page).toHaveURL(/\/cau-hinh\/lich$/);
+  await expect(page).toHaveURL(/\/bao-gia-lich\/lich$/);
   await expect(
     page.getByRole("complementary", { name: "Log", exact: true }),
   ).toContainText("14:00");
@@ -64,7 +91,7 @@ test("price-config: route, lỗi từng ô, log, số an toàn và xóa có xác
     .getByLabel(/Nội dung mẫu/)
     .fill("Nhập giá {ngày} cho {xã} trước {giờ khóa}");
   await page.getByRole("button", { name: "Lưu cấu hình", exact: true }).click();
-  await expect(page).toHaveURL(/\/cau-hinh\/nhac$/);
+  await expect(page).toHaveURL(/\/bao-gia-lich\/nhac$/);
   await page
     .getByRole("link", { name: "Cấu hình báo giá", exact: true })
     .click();
@@ -121,10 +148,10 @@ test("price-config: route, lỗi từng ô, log, số an toàn và xóa có xác
         .click();
       await expect(input).toHaveAttribute("aria-invalid", "true");
       await expect(page).toHaveURL(/\/nguong\/mac-dinh\/sua$/);
+      if (i === 0 && bad === "1e100000") await page.screenshot({ path: test.info().outputPath("price-config-number-error.png"), fullPage: true });
     }
     await input.fill(["30", "7", "1", "40"][i]!);
   }
-  expect(thresholdWrites).toHaveLength(0);
   await page.screenshot({
     path: test.info().outputPath("price-config-number-guards.png"),
     fullPage: true,
@@ -165,16 +192,18 @@ test("price-config: route, lỗi từng ô, log, số an toàn và xóa có xác
   await expect(table).toContainText("Chưa có ngưỡng riêng");
 });
 
-test("price-config: alias phòng ban mở đủ route DetailPage", async ({
+test("price-config: hủy trang alias bỏ nháp và giữ cấu hình đã lưu", async ({
   page,
 }) => {
-  const alias = "/kn/phong-ban/thong_tin_tuyen_truyen/bao-gia-lich";
-  await admin(page, alias);
+  await admin(page);
   await page.getByRole("link", { name: "Sửa kỳ báo giá", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`${alias}/lich/sua$`));
+  await expect(page).toHaveURL(new RegExp(`${BASE}/lich/sua$`));
   await expect(
     page.getByRole("complementary", { name: "Log", exact: true }),
   ).toBeVisible();
+  await page.getByLabel(/Hạn phản hồi xác minh/).fill("14:00");
   await page.getByRole("link", { name: "Hủy", exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`${alias}$`));
+  await expect(page).toHaveURL(new RegExp(`${BASE}$`));
+  await page.getByRole("link", { name: "Sửa kỳ báo giá", exact: true }).click();
+  await expect(page.getByLabel(/Hạn phản hồi xác minh/)).toHaveValue("13:30");
 });
