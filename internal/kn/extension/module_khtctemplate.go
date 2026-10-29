@@ -68,12 +68,5 @@ func (a khtcTemplateContexts) TemplateContext(ctx context.Context, key string, i
 			return port.KHTCTemplateContext{}, err
 		}
 	}
-	detail, err := a.m.khtcReportSvc().Get(ctx, id)
-	if err != nil {
-		return port.KHTCTemplateContext{}, err
-	}
-	if detail.Content.Data.Template != key {
-		return port.KHTCTemplateContext{}, templateapp.ErrInvalid.WithField("period_id", "Kỳ không thuộc mẫu đã chọn")
-	}
-	return templateapp.ContextFromDraft(detail.Content, detail.Terminal), nil
+	return a.m.khtcReportSvc().TemplateContext(ctx, key, id)
 }

@@ -99,6 +99,11 @@ function load(ctx: Ctx, s: Stored) {
     value.detail.source_changed = current.data.input_hash !== value.detail.content.data.input_hash || (khtcReportSource(ctx, s.p.id)).source_changed;
     return value;
 }
+/** Read-only preview seam: the template editor shares the composer's projection. */
+export function khtcTemplatePreviewContent(ctx: Ctx, periodId: string): Content | null {
+ const period=khtcMockStore().find(x=>x.p.id===periodId);
+ return period ? structuredClone(load(ctx,period).detail.content) : null;
+}
 export const khtcReportRoutes: Route[] = [{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
 function handle(ctx: Ctx): Response {
     const [id, op, exportID, action] = ctx.params;

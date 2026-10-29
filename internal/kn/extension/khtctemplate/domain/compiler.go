@@ -199,9 +199,27 @@ func boundValues(n Node, row port.KHTCTemplateRow, c port.KHTCTemplateContext) (
 	values := map[string]string{}
 	bindings := map[string]Binding{}
 	for _, b := range n.Bindings {
+		selected := row.Values
+		if b.Source != "admin" && b.Source != "text" && b.Ref != "" && !strings.HasPrefix(b.Ref, "section:") {
+			selected = nil
+			for _, list := range c.Lists {
+				for _, candidate := range list {
+					if candidate.Ref == b.Ref {
+						selected = candidate.Values
+						break
+					}
+				}
+				if selected != nil {
+					break
+				}
+			}
+			if selected == nil {
+				return nil, nil, invalid("nodes."+n.ID+".bindings", "Không tìm thấy tham chiếu nguồn trong kỳ đã chọn")
+			}
+		}
 		source := b.Source
 		if source == "auto" {
-			source = row.Values["data_source"]
+			source = selected["data_source"]
 			if source != "module" {
 				source = "form"
 			}
@@ -215,24 +233,6 @@ func boundValues(n Node, row port.KHTCTemplateRow, c port.KHTCTemplateContext) (
 		case "admin":
 			values[b.Variable] = c.Values["admin."+b.Field]
 		default:
-			selected := row.Values
-			if b.Ref != "" && !strings.HasPrefix(b.Ref, "section:") {
-				selected = nil
-				for _, list := range c.Lists {
-					for _, candidate := range list {
-						if candidate.Ref == b.Ref {
-							selected = candidate.Values
-							break
-						}
-					}
-					if selected != nil {
-						break
-					}
-				}
-				if selected == nil {
-					return nil, nil, invalid("nodes."+n.ID+".bindings", "Không tìm thấy tham chiếu nguồn trong kỳ đã chọn")
-				}
-			}
 			value, ok := selected[source+"."+b.Field]
 			if !ok {
 				value, ok = c.Values[source+"."+b.Field]

@@ -24967,6 +24967,7 @@ export interface components {
             /** Format: date-time */
             at: string;
             actor_display: string;
+            rule: string;
         };
         KHTCTemplatePublication: {
             /** Format: uuid */
