@@ -7,7 +7,14 @@ import { uuidv7 } from "../idempotency";
 import fixture from "./fixtures/knqg-specs.json";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext, personaForContext } from "./kn";
+import { KN_ACCOUNTS } from "./kn-accounts";
 import { cntsMockProjectInfo } from "./kn-cnts-model";
+
+/** Cấp quản lý có quyền lãnh đạo (như máy chủ: accport.IsManager) — ngữ cảnh giả lập chưa mang cờ manager. */
+const MANAGER_LEVELS = ["Phụ trách", "Phó trưởng phòng", "Trưởng phòng", "Lãnh đạo đơn vị", "Phó Giám đốc", "Giám đốc"];
+const managerByLevel = (assignmentId: string | null | undefined) =>
+  !!assignmentId &&
+  KN_ACCOUNTS.some((a) => a.assignments.some((x) => x.assignment_id === assignmentId && MANAGER_LEVELS.includes(x.mgmt_level ?? "")));
 
 type S = components["schemas"];
 type Spec = S["CNTSKNQGSpec"];
@@ -38,7 +45,7 @@ function who(ctx: Ctx) {
   const p = personaForContext(ctx.persona, id);
   const role = kc?.role ?? (p.me.roles.includes("platform_admin") ? "admin" : p.me.roles.includes("kn_national_admin") ? "kn_tw" : p.me.scope.level === "commune" ? "kn_xa" : "kn_tinh");
   const communes = role === "kn_xa" ? (kc?.communes.map((c) => c.code) ?? p.me.scope.units) : null;
-  return { role, communes, actor: p.me.actor_ref, readOnly: !!kc?.read_only, manager: !!kc?.manager || kc?.province_group === "lanh_dao_phong" };
+  return { role, communes, actor: p.me.actor_ref, readOnly: !!kc?.read_only, manager: !!kc?.manager || kc?.province_group === "lanh_dao_phong" || managerByLevel(kc?.assignment_id) };
 }
 type Who = ReturnType<typeof who>;
 type Info = NonNullable<ReturnType<typeof cntsMockProjectInfo>>;

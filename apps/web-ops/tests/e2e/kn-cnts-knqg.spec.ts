@@ -22,18 +22,33 @@ async function enterCnts(page: Page, level: RegExp) {
 
 const CNTS = "cnts.thu@demo.agrigreen.test";
 
+/** Mở mục menu (nhóm thu gọn → bấm mở nếu link chưa hiện). */
+async function openMenu(page: Page, link: string) {
+  const l = sidebar(page).getByRole("link", { name: link, exact: true });
+  if (!(await l.isVisible().catch(() => false))) {
+    const group = sidebar(page).getByRole("button", { name: /Dự án KNQG|Mẫu biểu|Nghiệm thu/ }).first();
+    if ((await group.getAttribute("aria-expanded")) !== "true") await group.click();
+  }
+  await l.click();
+}
+
 async function createDoc(page: Page, form: RegExp, opts: { site?: boolean; year?: string } = {}) {
   await page.getByRole("button", { name: "Lập biểu", exact: true }).click();
   const box = page.getByRole("region", { name: "Lập biểu" });
-  const label = (await box.getByLabel("Mẫu").locator("option").allTextContents()).find((t) => form.test(t))!;
-  await box.getByLabel("Mẫu").selectOption({ label });
+  await expect(box.getByLabel("Dự án KNQG").locator("option")).toHaveCount(2);
   await box.getByLabel("Dự án KNQG").selectOption({ index: 1 });
+  const form_ = box.getByLabel("Mẫu");
+  const label = (await form_.locator("option").allTextContents()).find((t) => form.test(t))!;
+  const value = await form_.locator("option", { hasText: label }).getAttribute("value");
+  await form_.selectOption(value!);
+  await expect(form_).toHaveValue(value!);
+  await expect(box.getByLabel("Dự án KNQG")).not.toHaveValue("");
   if (opts.site) {
     const site = box.getByLabel("Điểm trình diễn");
     await expect(site.locator("option")).toHaveCount(2);
     await site.selectOption({ index: 1 });
   }
-  if (opts.year) await box.getByLabel("Năm").fill(opts.year);
+  if (opts.year) await box.getByRole("textbox", { name: "Năm", exact: true }).fill(opts.year);
   await box.getByRole("button", { name: "Lập biểu", exact: true }).click();
 }
 
@@ -47,7 +62,7 @@ test("W11.53b luồng chính Mẫu 05 → ký → Mẫu 07 gửi → TW xác nh�
   await logout(page);
   await login(page, CNTS);
   await enterCnts(page, /^Cấp Tỉnh/);
-  await sidebar(page).getByRole("link", { name: "Mẫu biểu dự án", exact: true }).click();
+  await openMenu(page, "Mẫu biểu dự án");
   await expect(page.getByRole("heading", { level: 1, name: "Mẫu biểu dự án KNQG" })).toBeVisible();
 
   // Mẫu 05: lập (điền sẵn từ dự án) → điền ô bắt buộc → trình ký → tải bản scan đã ký.
@@ -92,7 +107,7 @@ test("W11.53b luồng chính Mẫu 05 → ký → Mẫu 07 gửi → TW xác nh�
   await logout(page);
   await login(page, CNTS);
   await enterCnts(page, /^Cấp Quốc gia/);
-  await sidebar(page).getByRole("link", { name: "Mẫu biểu, nghiệm thu năm (07)", exact: true }).click();
+  await openMenu(page, "Mẫu biểu, nghiệm thu năm (07)");
   await expect(page.getByRole("heading", { level: 1, name: "Mẫu biểu dự án KNQG" })).toBeVisible();
   await page.getByRole("button", { name: /^Mẫu 07/ }).first().click();
   const tw07 = page.getByRole("region", { name: /^Mẫu 07/ });
