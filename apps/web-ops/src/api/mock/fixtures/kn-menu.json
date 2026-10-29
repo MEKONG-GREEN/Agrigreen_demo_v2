@@ -2297,7 +2297,7 @@
    "ad_hoc": false,
    "menu": {
     "audience": "kn_tw",
-    "default_route": "/kn/dashboard",
+    "default_route": "/kn/khtc/bao-cao-da-xuat",
     "department": {
      "code": "ke_hoach_tai_chinh",
      "name": "Phòng Kế hoạch - Tài chính",
@@ -2366,9 +2366,7 @@
         "route": "/kn/khtc/bao-cao-da-xuat",
         "icon": "report",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
