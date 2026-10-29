@@ -6,7 +6,7 @@
 // next_cursor). Chi tiết CHỈ ĐỌC dùng lại khối của màn Rà soát (số liệu, bảng phụ, kiểm tra tự động, vị trí, ảnh, lịch sử);
 // lần ghi chờ xác thực có liên kết sang Rà soát nhật ký. Tỉnh không sửa số liệu xã — màn không có nút ghi.
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader } from "@/components/patterns/list";
 import { LoadState, useCommuneNames, useLoad } from "@/kn/cycle/common";
@@ -144,32 +144,42 @@ export function ProvinceDiaryScreen() {
 }
 
 function EntryList({ dapi, filter, open, setOpen }: { dapi: CntsDiaryApi; filter: Filter; open: string | null; setOpen: (r: string | null) => void }) {
-  const [items, setItems] = useState<Entry[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Trang đầu theo bộ lọc (thành phần được khóa theo bộ lọc — đổi lọc là dựng lại); trang sau nối thêm khi bấm "Tải thêm".
+  const first = useLoad(() => dapi.entryPage(pageQuery(filter)), [dapi]);
+  const [more, setMore] = useState<{ items: Entry[]; cursor: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<ApiProblem | null>(null);
-  const [nonce, setNonce] = useState(0);
+  const items = [...(first.data?.items ?? []), ...(more?.items ?? [])];
+  const cursor = more ? more.cursor : (first.data?.next_cursor ?? null);
+  const loading = first.loading || busy;
   const communeName = useCommuneNames(items.map((e) => e.commune_code));
-  const load = async (after: string | null) => {
-    setLoading(true);
+  const loadMore = async () => {
+    if (!cursor) return;
+    setBusy(true);
     setProblem(null);
     try {
-      const p = await dapi.entryPage(pageQuery(filter, after ?? undefined));
-      setItems((xs) => (after ? [...xs, ...p.items] : p.items));
-      setCursor(p.next_cursor);
+      const p = await dapi.entryPage(pageQuery(filter, cursor));
+      setMore((m) => ({ items: [...(m?.items ?? []), ...p.items], cursor: p.next_cursor }));
     } catch (e) {
       setProblem(e instanceof ApiProblem ? e : null);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
-  useEffect(() => {
-    void load(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- bộ lọc đổi → khóa thành phần đổi, dựng lại
-  }, [nonce]);
+  const err = first.problem ?? problem;
   return (
     <section className="card sec">
-      {problem ? <ProblemAlert problem={problem} onRetry={() => setNonce((n) => n + 1)} /> : null}
+      {err ? (
+        <ProblemAlert
+          problem={err}
+          onRetry={() => {
+            if (first.problem) {
+              setMore(null);
+              first.reload();
+            } else void loadMore();
+          }}
+        />
+      ) : null}
       <div className="table-scroll">
         <table className="dt" aria-label="Lần ghi nhật ký">
           <thead>
@@ -224,7 +234,7 @@ function EntryList({ dapi, filter, open, setOpen }: { dapi: CntsDiaryApi; filter
         </table>
       </div>
       {cursor ? (
-        <button className="btn" disabled={loading} onClick={() => void load(cursor)}>
+        <button className="btn" disabled={loading} onClick={() => void loadMore()}>
           {loading ? "Đang tải…" : "Tải thêm"}
         </button>
       ) : items.length ? (

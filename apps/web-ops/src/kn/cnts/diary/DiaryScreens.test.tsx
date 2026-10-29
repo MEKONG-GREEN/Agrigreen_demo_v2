@@ -8,8 +8,9 @@ import { resetCntsModel } from "@/api/mock/kn-cnts-model";
 import type * as Common from "@/kn/cycle/common";
 import { DiaryScreen } from "./DiaryScreen";
 import { ReviewScreen } from "./ReviewScreen";
+import { pageQuery, ProvinceDiaryScreen } from "./ProvinceDiaryScreen";
 import { GrowthSection } from "./parts";
-import type { Cycle } from "./api";
+import { createCntsDiaryApi, type Cycle } from "./api";
 
 const auth: { api: ApiClient | null } = { api: null };
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: auth.api, kn: { context: { role: "admin" } } }) }));
@@ -88,4 +89,35 @@ it("BF-CN-DIARY #109 (Codex P2): tuần tuổi bất thường không sinh dòng
   expect(within(growth).getAllByText(/^Tuần \d+$/)).toHaveLength(8);
   expect(screen.getByRole("note")).toHaveTextContent("Dữ liệu tuần tuổi bất thường: 1 lần ghi");
   expect(screen.getByRole("note")).toHaveTextContent("ngày 03/01/2027 — tuần 100000000");
+});
+
+it("BF-CN-XA-DATA #175 Số liệu cấp xã › Nhật ký sản xuất: danh sách mọi xã có STT, lọc ở máy chủ, chi tiết chỉ đọc, trang theo con trỏ", async () => {
+  const user = userEvent.setup();
+  render(<ProvinceDiaryScreen />);
+  const table = await screen.findByRole("table", { name: "Lần ghi nhật ký" });
+  const rows = await within(table).findAllByRole("button", { name: /^Xem lần ghi/ });
+  expect(rows.length).toBeGreaterThanOrEqual(2);
+  expect(within(table).getByRole("columnheader", { name: "STT" })).toBeInTheDocument();
+  await user.selectOptions(screen.getByRole("combobox", { name: "Mẫu nhật ký" }), "BM-19");
+  expect(await within(await screen.findByRole("table", { name: "Lần ghi nhật ký" })).findByText("Không có lần ghi khớp bộ lọc.")).toBeInTheDocument();
+  await user.selectOptions(screen.getByRole("combobox", { name: "Mẫu nhật ký" }), "");
+  const again = await within(await screen.findByRole("table", { name: "Lần ghi nhật ký" })).findAllByRole("button", { name: /^Xem lần ghi/ });
+  await user.click(again[0]!);
+  const detail = await screen.findByRole("region", { name: "Chi tiết lần ghi" });
+  expect(await within(detail).findByText("Số liệu")).toBeInTheDocument();
+  // Tỉnh không sửa số liệu xã: không có nút ghi, có liên kết sang Rà soát nhật ký.
+  expect(within(detail).queryByRole("button", { name: /Xác thực|Yêu cầu bổ sung|Sửa|Gửi/ })).not.toBeInTheDocument();
+  expect(within(detail).getByRole("link", { name: /Rà soát nhật ký/ })).toHaveAttribute("href", "/kn/cnts/ra-soat-nhat-ky");
+  await user.type(screen.getByLabelText("Từ ngày"), "2030-01-02");
+  await user.type(screen.getByLabelText("Đến ngày"), "2030-01-01");
+  expect(await screen.findByRole("alert")).toHaveTextContent("Đến ngày phải không trước Từ ngày.");
+  // Trang theo con trỏ.
+  const dapi = createCntsDiaryApi(auth.api!);
+  const p1 = await dapi.entryPage(pageQuery({ commune: "", project: "", household: "", form: "", status: "", from: "", to: "", flagged: false }));
+  expect(p1.items.length).toBeGreaterThanOrEqual(2);
+  const one = await dapi.entryPage({ limit: 1 });
+  expect(one.items).toHaveLength(1);
+  expect(one.next_cursor).toBeTruthy();
+  const two = await dapi.entryPage({ limit: 1, cursor: one.next_cursor! });
+  expect(two.items[0]!.ref).not.toBe(one.items[0]!.ref);
 });

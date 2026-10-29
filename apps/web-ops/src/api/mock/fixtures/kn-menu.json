@@ -1956,9 +1956,7 @@
           "route": "/kn/cnts/so-lieu-xa/nhap-lieu-tuan",
           "icon": "table",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
@@ -1976,9 +1974,7 @@
           "route": "/kn/cnts/so-lieu-xa/nhat-ky",
           "icon": "journal",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
