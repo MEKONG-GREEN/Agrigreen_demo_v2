@@ -3,8 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminApiClient, createApiClient, unwrap } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
+import { CATALOGS } from "@/api/mock/data";
 import { resetCntsVersions } from "@/api/mock/kn-cnts-catalogs";
-import { toCsv } from "@/htx/rules";
+import { toCsvText } from "@/lib/csv";
 import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase } from "./CntsCatalogScreen";
 import { CNTS_TABS, cleanAttrs, effectiveThreshold, expectedDate, exportRows, formatDoses, normalizeAttrs, parseDoses, tabOf, templateRows, validateAttrs } from "./schema";
 
@@ -101,13 +102,17 @@ describe("Xuất danh mục → Nạp lại (#170, review Codex #168)", () => {
     const res = await unwrap(
       admin.POST("/v1/masterdata/catalog-imports", {
         params: { header: { "Idempotency-Key": "rt-170" } },
-        body: toCsv(rows),
+        body: String.fromCharCode(0xfeff) + toCsvText(rows), // như nút Xuất danh mục (toCsv: BOM + CRLF)
         bodySerializer: (b: unknown) => b as BodyInit,
         headers: { "Content-Type": "text/csv" },
       } as never),
     );
     expect(items.length).toBeGreaterThanOrEqual(4);
     expect(res).toMatchObject({ total: items.length, skipped: items.length, created: 0, rejected: 0 });
+    // Dọn mục vừa tạo khỏi dữ liệu giả lập dùng chung để không ảnh hưởng các test màn hình bên dưới.
+    const list = CATALOGS.cnts_indicator;
+    list.splice(list.findIndex((i) => i.code === "NHIET_DO_RT"), 1);
+    resetCntsVersions();
   });
 });
 
