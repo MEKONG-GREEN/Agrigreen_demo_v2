@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuditItem, AuditPage } from "../cycle/api";
 import { AuditDetailScreen } from "./AuditDetailScreen";
-import { AUDIT_MAX_DAYS, AuditLogScreen, auditFilterError, auditQuery, defaultAuditFilters } from "./AuditLogScreen";
+import { AUDIT_ENTER, AUDIT_MAX_DAYS, AuditLogScreen, auditFilterError, auditQuery, defaultAuditFilters } from "./AuditLogScreen";
 import { resetAuditSelection } from "./selection";
 
 const params: { id: string } = { id: "" };
@@ -127,6 +127,50 @@ describe("AUDIT-LOG-KN — màn Nhật ký hệ thống", () => {
     expect(screen.getAllByText("Nguyễn Văn An").length).toBeGreaterThan(0);
     expect(auth.knAdminApi.audit).toHaveBeenCalledTimes(1);
   }, 30_000);
+
+  // Review Codex [P2] (11cf8956): Admin KN hợp lệ không có vai quản trị nền tảng → /v1/accounts/users và /v1/departments
+  // trả 403; bộ lọc Người thao tác/Phòng ban vẫn phải chọn được (mã đã thấy trong trang đã tải) hoặc nhập mã hợp lệ.
+  it("Admin KN không có vai native (users/departments 403): vẫn lọc được người thao tác/phòng ban", async () => {
+    const forbidden = Object.assign(new Error("forbidden"), { status: 403 });
+    auth.knAdminApi.users = vi.fn().mockRejectedValue(forbidden);
+    auth.knAdminApi.departments = vi.fn().mockRejectedValue(forbidden);
+    const u = userEvent.setup();
+    render(<AuditLogScreen />);
+    await screen.findByRole("table", { name: "Nhật ký hệ thống" });
+    const actorSel = screen.getByLabelText("Người thao tác");
+    const deptSel = screen.getByLabelText("Phòng ban");
+    await waitFor(() => expect(within(actorSel).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)).toContain(AN));
+    expect(within(deptSel).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)).toContain("trong_trot");
+
+    await u.selectOptions(actorSel, AN);
+    await u.selectOptions(deptSel, "trong_trot");
+    await u.click(screen.getByRole("button", { name: "Xem" }));
+    await waitFor(() => expect(auth.knAdminApi.audit).toHaveBeenCalledTimes(2));
+    expect(auditMock().mock.calls[1]![0]).toMatchObject({ actor_ref: AN, department: "trong_trot", cursor: undefined });
+
+    // Nhập mã: sai định dạng → báo lỗi, không gọi; đúng → gửi mã đã nhập.
+    await u.selectOptions(actorSel, AUDIT_ENTER);
+    await u.type(screen.getByLabelText("Mã người thao tác"), "khong-phai-uuid");
+    await u.click(screen.getByRole("button", { name: "Xem" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("UUID");
+    expect(auth.knAdminApi.audit).toHaveBeenCalledTimes(2);
+    const other = "0192A000-0000-7000-8000-0000000000B2";
+    await u.clear(screen.getByLabelText("Mã người thao tác"));
+    await u.type(screen.getByLabelText("Mã người thao tác"), other);
+    await u.selectOptions(deptSel, AUDIT_ENTER);
+    await u.type(screen.getByLabelText("Mã phòng ban"), "chan_nuoi");
+    await u.click(screen.getByRole("button", { name: "Xem" }));
+    await waitFor(() => expect(auth.knAdminApi.audit).toHaveBeenCalledTimes(3));
+    expect(auditMock().mock.calls[2]![0]).toMatchObject({ actor_ref: other.toLowerCase(), department: "chan_nuoi" });
+  }, 30_000);
+
+  it("mã người thao tác/phòng ban nhập tay được kiểm trước khi gọi máy chủ", () => {
+    const f = defaultAuditFilters("2026-10-29");
+    expect(auditFilterError({ ...f, actor: AN, department: "trong_trot" })).toBeNull();
+    expect(auditFilterError({ ...f, actor: "1e100000" })).toMatch(/UUID/);
+    expect(auditFilterError({ ...f, department: "Trong Trot" })).toMatch(/phòng ban/);
+    expect(auditFilterError({ ...f, department: "a".repeat(81) })).toMatch(/phòng ban/);
+  });
 
   it("Chi tiết khi không có dữ liệu trong bộ nhớ", () => {
     params.id = "0192a000-0000-7000-8000-0000000000ff";
