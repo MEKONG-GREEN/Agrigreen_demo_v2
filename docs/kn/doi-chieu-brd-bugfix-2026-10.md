@@ -64,6 +64,8 @@ A1–A5 phải kiểm ở danh sách + tạo/sửa + chi tiết của mọi hàn
 | FN-19 · Mục V · P2059 | Danh mục nhân sự | `/kn/phong-ban/hanh_chinh_tong_hop/danh-muc-nhan-su` | `apps/web-ops/src/kn/hrm/CatalogScreen.tsx:78` | Lệch | Catalog có phiên bản/thang/ngạch; nhiều ItemDialog/ScaleDialog/RuleDialog còn sửa dữ liệu bằng popup, trái A2. #117. | Chưa có UAT. | Không thêm chặn riêng — luồng chuyên biệt đã có; lệch còn lại đưa khách chọn, cổng A/#97/#117 và quyền/UAT vẫn bắt buộc. |
 | FN-20 · Mục V · P2099 | Phân quyền hồ sơ | `/kn/phong-ban/hanh_chinh_tong_hop/phan-quyen-ho-so` | `apps/web-ops/src/kn/hrm/StaffScreens.tsx:42` | Lệch | Ma trận quyền hồ sơ có; cần E2E đúng nhân sự/phòng/địa bàn, dữ liệu nhạy cảm và chuẩn A2/A4. #23/#117. | Chưa có UAT. | Có — Phân quyền hồ sơ quyết định đọc dữ liệu nhân sự theo đơn vị; #23/#117, không mở gate PII. |
 
+Bổ sung 29/10/2026 — #163 phần đầu: luồng 16 loại mục FN-19 chuyển Thêm/Sửa/Chi tiết và lịch sử sang route riêng, dùng DetailPage/LogPanel, lỗi theo trường và số có giới hạn trước tính toán. [Phạm vi và giới hạn](gia-dinh/BF-SWEEP-HCTH-REST.md). Bảng hệ số/quy tắc FN-19 cùng sáu màn HCTH còn lại nằm ở [#179](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/179); chưa đổi trạng thái toàn FN-19 hoặc toàn HCTH thành Đạt, chưa có UAT khách.
+
 ## 4. KHTC — 18 chức năng v2.3
 
 | BRD / mục / đoạn gốc | Yêu cầu | Màn | Bằng chứng mã | Trạng thái | Khác biệt / ticket | Khách chấp nhận / UAT | Chặn UAT riêng (đề xuất, chờ PO) |

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { fieldErrorMap } from "@/api/problem";
+import { useAuth } from "@/auth/AuthProvider";
 import { NumberField, SelectField, TextField } from "@/components/form";
 import { BackLink, DetailPage, LabelValueBlock, LogPanel, type LogEntry } from "@/components/patterns/detail";
 import { DataTable, StatusPill } from "@/components/patterns/list";
@@ -27,7 +28,7 @@ function namesFor(levels: HrmItem[], groups: HrmItem[]) {
 export function catalogHistory(kind: HrmKind, versions: HrmItem[], names: Map<string, string>): LogEntry[] {
   return [...versions].sort((a, b) => b.version - a.version).map((item) => ({
     event: `Phiên bản ${item.version}${item.placeholder ? " · Mẫu" : ""}`,
-    actor_display: "API chưa cung cấp người thực hiện",
+    actor_display: "Chưa có thông tin người thực hiện",
     at: item.recorded_at,
     changes: [
       { field: "Tên", old: null, new: item.name },
@@ -49,9 +50,10 @@ export function HrmCatalogKindScreen() {
 }
 
 export function HrmCatalogItemScreen() {
+  const context = useAuth().kn?.context?.context_id ?? "unknown";
   const { kind, code } = useParams<{ kind: string; code: string }>();
   const base = catalogBase(usePathname());
-  return isHrmKind(kind) ? <CatalogItem key={`${kind}/${code}`} kind={kind} code={code} base={base} /> : <Missing base={base} />;
+  return isHrmKind(kind) ? <CatalogItem key={`${context}/${kind}/${code}`} kind={kind} code={code} base={base} /> : <Missing base={base} />;
 }
 
 function CatalogItem({ kind, code, base }: { kind: HrmKind; code: string; base: string }) {
@@ -90,9 +92,11 @@ function CatalogItem({ kind, code, base }: { kind: HrmKind; code: string; base: 
 }
 
 export function HrmCatalogItemFormScreen({ edit = false }: { edit?: boolean }) {
+  const context = useAuth().kn?.context?.context_id ?? "unknown";
   const { kind, code } = useParams<{ kind: string; code?: string }>();
   const base = catalogBase(usePathname());
-  return isHrmKind(kind) ? <CatalogFormAccess key={`${kind}/${code ?? "new"}/${edit}`} kind={kind} code={code} edit={edit} base={base} /> : <Missing base={base} />;
+  // Đổi phiên/vai/phòng phải hủy dữ liệu và quyền form cũ ngay, trước khi status mới trả về.
+  return isHrmKind(kind) ? <CatalogFormAccess key={`${context}/${kind}/${code ?? "new"}/${edit}`} kind={kind} code={code} edit={edit} base={base} /> : <Missing base={base} />;
 }
 
 function CatalogFormAccess({ kind, code, edit, base }: { kind: HrmKind; code?: string; edit: boolean; base: string }) {

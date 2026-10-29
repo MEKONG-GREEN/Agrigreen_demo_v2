@@ -65,7 +65,12 @@ function PlaceholderPill({ on }: { on: boolean }) {
   ) : null;
 }
 
-export function HrmCatalogScreen({ initialKind = "grade" }: { initialKind?: HrmKind }) {
+export function HrmCatalogScreen(props: { initialKind?: HrmKind }) {
+  const { kn } = useAuth();
+  return <CatalogList key={kn?.context?.context_id ?? "unknown"} {...props} />;
+}
+
+function CatalogList({ initialKind = "grade" }: { initialKind?: HrmKind }) {
   const ha = useHrmApi();
   const base = catalogBase(usePathname());
   const [view, setView] = useState<View>({ t: "kind", kind: initialKind });

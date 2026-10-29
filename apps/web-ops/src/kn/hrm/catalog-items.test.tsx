@@ -10,8 +10,8 @@ import { catalogBase, validateCatalogItem, type CatalogValues } from "./catalog-
 
 const route = vi.hoisted(() => ({ params: { kind: "position", code: "vien_chuc" }, path: "/kn/nhan-su/danh-muc", push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useParams: () => route.params, usePathname: () => route.path, useRouter: () => ({ push: route.push }) }));
-const auth: { api: ApiClient | null } = { api: null };
-vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: auth.api }) }));
+const auth: { api: ApiClient | null; context: string } = { api: null, context: "admin" };
+vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: auth.api, kn: { context: { context_id: auth.context } } }) }));
 
 async function setup(fetcher: (request: Request) => Promise<Response> = mockFetchNoDelay) {
   const context = await mockFetchNoDelay(new Request("http://mock/v1/me/context", { method: "POST", headers: { Authorization: "Bearer mock.kn-admin", "Content-Type": "application/json", "Idempotency-Key": "catalog-test-context" }, body: JSON.stringify({ assignment_id: "asg-admin", department_code: "trong_trot" }) }));
@@ -54,7 +54,7 @@ describe("FN-19: kiểm đầu vào trước khi tính", () => {
 });
 
 describe("FN-19: route thêm/sửa/chi tiết và quyền từ server", () => {
-  beforeEach(() => { resetHrm(); route.params = { kind: "position", code: "vien_chuc" }; route.path = "/kn/nhan-su/danh-muc"; route.push.mockReset(); });
+  beforeEach(() => { resetHrm(); auth.context = "admin"; route.params = { kind: "position", code: "vien_chuc" }; route.path = "/kn/nhan-su/danh-muc"; route.push.mockReset(); });
 
   it("Thêm: trường bắt buộc, lỗi tại ô; lưu hợp lệ về chi tiết, không có dialog", async () => {
     const ha = await setup();
@@ -186,5 +186,22 @@ describe("FN-19: route thêm/sửa/chi tiết và quyền từ server", () => {
     await setup();
     render(<HrmCatalogKindScreen />);
     expect(await screen.findByRole("link", { name: "Thêm" })).toHaveAttribute("href", `${catalogBase(route.path)}/position/them-moi`);
+  });
+
+  it("đổi ngữ cảnh hủy form và quyền Admin cũ ngay khi status mới còn chờ", async () => {
+    let manage = true;
+    await setup(async (req) => {
+      const res = await mockFetchNoDelay(req);
+      if (req.url.endsWith("/hrm/status")) return Response.json({ ...await res.json(), can_manage: manage });
+      return res;
+    });
+    const view = render(<HrmCatalogItemFormScreen edit />);
+    expect(await screen.findByLabelText(/^Mã/)).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeVisible();
+    manage = false;
+    auth.context = "hcth-readonly";
+    view.rerender(<HrmCatalogItemFormScreen edit />);
+    expect(screen.queryByRole("button", { name: "Lưu" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("không có quyền");
   });
 });
