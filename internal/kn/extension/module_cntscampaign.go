@@ -5,6 +5,8 @@ package extension
 // cap/forms → 503 extension.dependency_unavailable. Gốc lắp ráp gọi UseCNTSCampaigns sau khi dựng pf/forms.
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 
 	campapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscampaign/app"
@@ -51,3 +53,6 @@ func (m *Module) UseCNTSCampaigns(d CNTSCampaignDeps) {
 		s.Figures = d.Figures
 	}
 }
+
+// UseCNTSCampaignLease đặt hạn ý định thao tác của đợt (BF-CNTS-CAMPAIGN-POOL, #156; 0 → mặc định 2 phút) — cho kiểm thử.
+func (m *Module) UseCNTSCampaignLease(d time.Duration) { m.campaignSvc().Lease = d }
