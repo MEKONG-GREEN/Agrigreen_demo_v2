@@ -1,0 +1,273 @@
+paths:
+# @ag-order: 20100
+  /v1/extension/khtc/external/indicators:
+    get:
+      summary: "Danh mục chỉ tiêu nguồn ngoài (FN-TI-02.11)"
+      operationId: extensionKhtcExternalIndicators
+      tags: [extension]
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalIndicatorList"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm chỉ tiêu nguồn ngoài ngay trên màn (tên, ĐVT, nhóm; mã tự sinh nếu bỏ trống)"
+      operationId: extensionKhtcExternalIndicatorCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/KHTCExternalIndicatorInput"}
+      responses:
+        "201":
+          description: Đã thêm
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalIndicator"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {description: extension.khtc_ext_indicator_duplicate, $ref: "#/components/responses/Problem"}
+        "422": {description: extension.khtc_ext_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 20101
+  /v1/extension/khtc/external/figures:
+    get:
+      summary: "Số liệu nguồn ngoài hiệu lực theo năm, kỳ, cơ quan cung cấp, tìm chỉ tiêu"
+      operationId: extensionKhtcExternalFigures
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: period_id, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: agency, in: query, required: false, schema: {type: string}}
+        - {name: q, in: query, required: false, schema: {type: string}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalFigureList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm số liệu / Sửa (nguồn bắt buộc; đã có giá trị → xác nhận ghi đè hoặc base_version, lý do ≥ 10 ký tự)"
+      operationId: extensionKhtcExternalFigureSave
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/KHTCExternalFigureInput"}
+      responses:
+        "201":
+          description: Đã ghi phiên bản mới
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalFigure"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_ext_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_ext_duplicate | extension.khtc_ext_conflict | extension.khtc_ext_period_closed | extension.khtc_report_final", $ref: "#/components/responses/Problem"}
+        "422": {description: extension.khtc_ext_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 20102
+  /v1/extension/khtc/external/figures/withdraw:
+    post:
+      summary: "Rút số liệu nhập nhầm (bản ghi bù, lý do bắt buộc)"
+      operationId: extensionKhtcExternalFigureWithdraw
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/KHTCExternalWithdraw"}
+      responses:
+        "204": {description: Đã rút}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20103
+  /v1/extension/khtc/external/history:
+    get:
+      summary: "Lịch sử nhập/sửa: giá trị cũ → mới, lý do, người, thời điểm"
+      operationId: extensionKhtcExternalHistory
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: period_id, in: query, required: false, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalHistoryList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20104
+  /v1/extension/khtc/external/template:
+    get:
+      summary: "Tải mẫu Excel: trang nhập, danh mục chỉ tiêu, kỳ còn mở"
+      operationId: extensionKhtcExternalTemplate
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20105
+  /v1/extension/khtc/external/imports:
+    post:
+      summary: "Nạp Excel tổng hợp — bước 1: kiểm từng dòng, chưa ghi số liệu"
+      operationId: extensionKhtcExternalImportStage
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: file_name, in: query, required: false, schema: {type: string, maxLength: 200}}
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+          text/csv: {schema: {type: string, format: binary}}
+      responses:
+        "201":
+          description: Kết quả kiểm
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalImport"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: extension.khtc_ext_import_invalid, $ref: "#/components/responses/Problem"}
+# @ag-order: 20106
+  /v1/extension/khtc/external/imports/{importID}:
+    get:
+      summary: "Đọc kết quả một lần nạp"
+      operationId: extensionKhtcExternalImportGet
+      tags: [extension]
+      parameters:
+        - {name: importID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalImport"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20107
+  /v1/extension/khtc/external/imports/{importID}/commit:
+    post:
+      summary: "Nạp Excel tổng hợp — bước 2 Hoàn tất: kiểm lại, ghi dòng hợp lệ; dòng trùng chỉ ghi khi xác nhận ghi đè"
+      operationId: extensionKhtcExternalImportCommit
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: importID, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/KHTCExternalCommit"}
+      responses:
+        "201":
+          description: Đã hoàn tất
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalImport"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_ext_import_committed | extension.khtc_ext_period_closed", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20108
+  /v1/extension/khtc/external/evidence:
+    post:
+      summary: "Tải tệp minh chứng (PDF, ảnh, Word, Excel, email; tối đa 15 MB) vào kho đối tượng"
+      operationId: extensionKhtcExternalEvidenceUpload
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - {name: file_name, in: query, required: true, schema: {type: string, maxLength: 200}}
+      requestBody:
+        required: true
+        content:
+          application/octet-stream: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Gọi lặp cùng khóa — bản đã có
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalEvidence"}
+        "201":
+          description: Đã lưu
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCExternalEvidence"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: extension.khtc_ext_evidence_invalid, $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 20109
+  /v1/extension/khtc/external/evidence/{evidenceID}:
+    get:
+      summary: "Tải tệp minh chứng (Nguồn dữ liệu)"
+      operationId: extensionKhtcExternalEvidenceDownload
+      tags: [extension]
+      parameters:
+        - {name: evidenceID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung tệp
+          content:
+            application/octet-stream: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 30100
+    KHTCExternalIndicator: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"unit":{"type":"string"},"group":{"type":"string"},"created_at":{"type":"string","format":"date-time"}},"required":["id","code","name","unit","group","created_at"],"additionalProperties":false}
+# @ag-order: 30101
+    KHTCExternalIndicatorList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalIndicator"}}},"required":["items"],"additionalProperties":false}
+# @ag-order: 30102
+    KHTCExternalIndicatorInput: {"type":"object","properties":{"code":{"type":"string","maxLength":40},"name":{"type":"string","minLength":1,"maxLength":300},"unit":{"type":"string","maxLength":50},"group":{"type":"string","maxLength":200}},"required":["name"],"additionalProperties":false}
+# @ag-order: 30103
+    KHTCExternalEvidenceRef: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"file_name":{"type":"string"},"content_type":{"type":"string"},"size":{"type":"integer"}},"required":["id","file_name","content_type","size"],"additionalProperties":false}
+# @ag-order: 30104
+    KHTCExternalFigure: {"type":"object","properties":{"entry_id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"period_id":{"type":"string","format":"uuid"},"period_name":{"type":"string"},"period_type":{"type":"string"},"year":{"type":"integer"},"closed":{"type":"boolean"},"indicator_id":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"group":{"type":"string"},"value":{"type":"string","description":"Số thập phân dạng chuỗi"},"unit":{"type":"string"},"agency":{"type":"string"},"document":{"type":"string"},"source_date":{"type":"string","format":"date"},"evidence":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalEvidenceRef"}},"used_in":{"type":"string"},"actor_ref":{"type":"string","format":"uuid"},"actor_name":{"type":"string"},"at":{"type":"string","format":"date-time"},"editable":{"type":"boolean"}},"required":["entry_id","version","period_id","period_name","period_type","year","closed","indicator_id","code","name","group","value","unit","agency","document","source_date","evidence","used_in","actor_ref","actor_name","at","editable"],"additionalProperties":false}
+# @ag-order: 30105
+    KHTCExternalFigureList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalFigure"}}},"required":["items"],"additionalProperties":false}
+# @ag-order: 30106
+    KHTCExternalFigureInput: {"type":"object","properties":{"period_id":{"type":"string","format":"uuid"},"indicator_id":{"type":"string","format":"uuid"},"value":{"type":"string","description":"Số thập phân, dấu chấm thập phân; tối đa 4 chữ số lẻ"},"unit":{"type":"string","maxLength":50},"agency":{"type":"string","maxLength":300},"document":{"type":"string","maxLength":300},"source_date":{"type":"string","description":"YYYY-MM-DD hoặc DD/MM/YYYY"},"evidence_ids":{"type":"array","maxItems":10,"items":{"type":"string","format":"uuid"}},"reason":{"type":"string","maxLength":1000},"overwrite":{"type":"boolean"},"base_version":{"type":["integer","null"],"minimum":0}},"required":["period_id","indicator_id","value"],"additionalProperties":false}
+# @ag-order: 30107
+    KHTCExternalWithdraw: {"type":"object","properties":{"period_id":{"type":"string","format":"uuid"},"indicator_id":{"type":"string","format":"uuid"},"base_version":{"type":"integer","minimum":1},"reason":{"type":"string","minLength":10,"maxLength":1000}},"required":["period_id","indicator_id","base_version","reason"],"additionalProperties":false}
+# @ag-order: 30108
+    KHTCExternalHistoryItem: {"type":"object","properties":{"entry_id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"action":{"type":"string","enum":["set","withdraw"]},"period_id":{"type":"string","format":"uuid"},"period_name":{"type":"string"},"indicator_id":{"type":"string","format":"uuid"},"indicator_name":{"type":"string"},"old_value":{"type":["string","null"]},"new_value":{"type":["string","null"]},"unit":{"type":"string"},"reason":{"type":"string"},"import_id":{"type":["string","null"],"format":"uuid"},"actor_ref":{"type":"string","format":"uuid"},"actor_name":{"type":"string"},"at":{"type":"string","format":"date-time"}},"required":["entry_id","version","action","period_id","period_name","indicator_id","indicator_name","old_value","new_value","unit","reason","import_id","actor_ref","actor_name","at"],"additionalProperties":false}
+# @ag-order: 30109
+    KHTCExternalHistoryList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalHistoryItem"}}},"required":["items"],"additionalProperties":false}
+# @ag-order: 30110
+    KHTCExternalImportRow: {"type":"object","properties":{"line":{"type":"integer"},"indicator":{"type":"string"},"period":{"type":"string"},"value":{"type":"string"},"unit":{"type":"string"},"agency":{"type":"string"},"document":{"type":"string"},"source_date":{"type":"string"},"status":{"type":"string","enum":["ok","overwrite","error"]},"errors":{"type":"array","items":{"type":"string"}},"indicator_id":{"type":["string","null"],"format":"uuid"},"indicator_name":{"type":"string"},"period_id":{"type":["string","null"],"format":"uuid"},"period_name":{"type":"string"},"normalized_value":{"type":"string"},"current_value":{"type":["string","null"]}},"required":["line","indicator","period","value","unit","agency","document","source_date","status","errors","indicator_id","indicator_name","period_id","period_name","normalized_value","current_value"],"additionalProperties":false}
+# @ag-order: 30111
+    KHTCExternalImport: {"type":"object","properties":{"import_id":{"type":"string","format":"uuid"},"year":{"type":"integer"},"file_name":{"type":"string"},"status":{"type":"string","enum":["staged","committed"]},"result":{"type":"object","properties":{"rows":{"type":"array","items":{"$ref":"#/components/schemas/KHTCExternalImportRow"}},"valid":{"type":"integer"},"overwrites":{"type":"integer"},"errors":{"type":"integer"}},"required":["rows","valid","overwrites","errors"],"additionalProperties":false},"recorded":{"type":"integer"},"skipped":{"type":"integer"},"overwrite":{"type":"boolean"}},"required":["import_id","year","file_name","status","result","recorded","skipped","overwrite"],"additionalProperties":false}
+# @ag-order: 30112
+    KHTCExternalCommit: {"type":"object","properties":{"overwrite":{"type":"boolean"},"reason":{"type":"string","maxLength":1000}},"required":[],"additionalProperties":false}
+# @ag-order: 30113
+    KHTCExternalEvidence: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"file_name":{"type":"string"},"content_type":{"type":"string"},"size":{"type":"integer"},"sha256":{"type":"string"},"created_at":{"type":"string","format":"date-time"}},"required":["id","file_name","content_type","size","sha256","created_at"],"additionalProperties":false}
+# @ag-order: 30114
+    KHTCReportExternalFigure: {"type":"object","properties":{"entry_id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"indicator_id":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"group":{"type":"string"},"value":{"type":"string"},"unit":{"type":"string"},"agency":{"type":"string"},"document":{"type":"string"},"source_date":{"type":"string"},"evidence":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string","format":"uuid"},"file_name":{"type":"string"}},"required":["id","file_name"],"additionalProperties":false}},"at":{"type":"string","format":"date-time"}},"required":["entry_id","version","indicator_id","code","name","group","value","unit","agency","document","source_date","evidence","at"],"additionalProperties":false}
