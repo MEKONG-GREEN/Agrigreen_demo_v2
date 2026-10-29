@@ -342,7 +342,8 @@ paths:
         - {name: code, in: query, schema: {type: string}, description: "Mã biểu (vd CNTS-BM04)"}
         - {name: from, in: query, schema: {type: string, format: date}, description: "Kỳ có ngày cuối ≥ from"}
         - {name: to, in: query, schema: {type: string, format: date}, description: "Kỳ có ngày đầu ≤ to"}
-        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 60}, description: Số kỳ tối đa}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 60}, description: "Số kỳ tối đa một trang (đếm sau khi lọc phạm vi người gọi)"}
+        - {name: cursor, in: query, schema: {type: string, maxLength: 100}, description: "next_cursor của trang trước"}
       responses:
         "200":
           description: Danh sách (kỳ mới trước; kỳ đã hủy bỏ qua)
@@ -353,6 +354,7 @@ paths:
                 required: [items]
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/FormsTask"}}
+                  next_cursor: {type: [string, "null"], description: "BF-CN-XA-DATA (#175): còn kỳ trong phạm vi sau trang này (null = hết)"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
 # @ag-order: 334

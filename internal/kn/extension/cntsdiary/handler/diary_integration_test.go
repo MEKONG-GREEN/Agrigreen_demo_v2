@@ -9,6 +9,7 @@ package handler_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -744,6 +745,18 @@ func diaryProvinceList(t *testing.T, viewer, outsider user, e1, e2 string) {
 	}
 	if l := list(want(t, outsider.get(base+"diary-entries?commune=30001"), 200, "", "xã ngoài phạm vi"), "items"); len(l) != 0 {
 		t.Fatalf("xã ngoài phạm vi phải rỗng: %v", l)
+	}
+	// #175 review [P2]: phân trang SAU khi lọc phạm vi — tài khoản xã 30002 không thấy lần ghi nào của xã 30001 thì không
+	// được nhận con trỏ (con trỏ cũ mang ngày ghi, captured_at, UUID của lần ghi ngoài phạm vi).
+	for _, q := range []string{"limit=1", "limit=2", ""} {
+		p := want(t, outsider.get(base+"diary-entries?"+q), 200, "", "ngoài phạm vi "+q)
+		if len(list(p, "items")) != 0 || p["next_cursor"] != nil {
+			t.Fatalf("ngoài phạm vi (%q) phải rỗng và không con trỏ: %v", q, p)
+		}
+	}
+	// Con trỏ chỉ mang khóa của dòng cuối ĐÃ TRẢ cho người gọi.
+	if raw, err := base64.RawURLEncoding.DecodeString(str(p1, "next_cursor")); err != nil || !strings.HasSuffix(string(raw), "|"+e2) {
+		t.Fatalf("con trỏ trang 1 phải là khóa của %s: %q %v", e2, raw, err)
 	}
 	for _, q := range []string{"form=BM-99", "limit=0", "limit=201", "limit=x", "cursor=YWJj", "cursor=!!!", "from=2027-10-12&to=2027-10-11", "from=12/10/2027"} {
 		want(t, viewer.get(base+"diary-entries?"+q), 422, "", "tham số sai: "+q)

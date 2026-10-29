@@ -48,6 +48,8 @@ type Deps struct {
 	// theo profile (vd kn_cnts: số liều tiêm ≤ tổng đàn).
 	Facilities port.FacilityDirectory
 	Validators map[string]port.Validator
+	// ReviewGuards: kiểm quyền rà soát thêm theo profile (BF-CN-XA-DATA #175 — kn_cnts: chỉ người phụ trách biểu).
+	ReviewGuards map[string]port.ReviewGuard
 }
 
 // Module là pf/forms đã nối.
@@ -64,8 +66,16 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc.Facilities, svc.Validators = d.Facilities, d.Validators
+	svc.Facilities, svc.Validators, svc.ReviewGuards = d.Facilities, d.Validators, d.ReviewGuards
 	return &Module{svc: svc}, nil
+}
+
+// UseReviewGuard nối kiểm quyền rà soát của bên dùng cho profile (gốc lắp ráp).
+func (m *Module) UseReviewGuard(profile string, g port.ReviewGuard) {
+	if m.svc.ReviewGuards == nil {
+		m.svc.ReviewGuards = map[string]port.ReviewGuard{}
+	}
+	m.svc.ReviewGuards[profile] = g
 }
 
 // UseValidator nối quy tắc nghiệp vụ của bên dùng cho profile (gốc lắp ráp — bên cài quy tắc có thể dựng sau module).

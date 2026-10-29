@@ -619,7 +619,7 @@ func (h Handler) snapshot(c *gin.Context) {
 }
 
 func (h Handler) tasks(c *gin.Context) {
-	f := app.TaskFilter{Code: c.Query("code")}
+	f := app.TaskFilter{Code: c.Query("code"), Cursor: c.Query("cursor")}
 	f.Limit, _ = strconv.Atoi(c.Query("limit"))
 	for _, x := range []struct {
 		field string
@@ -636,16 +636,20 @@ func (h Handler) tasks(c *gin.Context) {
 		}
 		*x.dst = &d
 	}
-	ts, err := h.Svc.Tasks(c.Request.Context(), c.Query("profile"), f)
+	pg, err := h.Svc.TasksPage(c.Request.Context(), c.Query("profile"), f)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	out := make([]app.TaskData, 0, len(ts))
-	for _, t := range ts {
+	out := make([]app.TaskData, 0, len(pg.Items))
+	for _, t := range pg.Items {
 		out = append(out, app.TaskDataOf(t, t.Template))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": out})
+	var next *string
+	if pg.NextCursor != "" {
+		next = &pg.NextCursor
+	}
+	c.JSON(http.StatusOK, gin.H{"items": out, "next_cursor": next})
 }
 
 type previousDTO struct {

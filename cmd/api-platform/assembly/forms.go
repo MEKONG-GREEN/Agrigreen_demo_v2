@@ -35,7 +35,8 @@ var (
 func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extension.Module, facilities formsport.FacilityDirectory) (*forms.Module, error) {
 	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: append(append([]formsport.Profile{}, KNProfiles...), KNHRMProfiles...),
 		Facilities: facilities, Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator(),
-			KNKHTCProfile.Name: kn.KHTCFormValidator(), hrmport.PlanProfile: hrm.PlanValidator()}})
+			KNKHTCProfile.Name: kn.KHTCFormValidator(), hrmport.PlanProfile: hrm.PlanValidator()},
+		ReviewGuards: map[string]formsport.ReviewGuard{KNCNTSProfile.Name: kn.CNTSReviewGuard()}})
 	if err != nil {
 		return nil, err
 	}

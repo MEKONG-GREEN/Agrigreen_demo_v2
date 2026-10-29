@@ -17,6 +17,7 @@ provides:
     - Freezer
     - PeriodControl
     - Publisher
+    - ReviewGuard
     - SubmissionFeed
     - SystemProgressReader
     - Validator

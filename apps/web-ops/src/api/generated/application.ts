@@ -24332,7 +24332,7 @@ export interface components {
         };
         CNTSDiaryEntryList: {
             items: components["schemas"]["CNTSDiaryEntry"][];
-            /** @description Còn trang sau (BF-CN-XA-DATA); trang lọc phạm vi sau khi đọc nên có thể ít hơn limit dòng */
+            /** @description Còn dòng trong phạm vi người gọi sau trang này (BF-CN-XA-DATA); khóa của dòng cuối đã trả */
             next_cursor: string | null;
         };
         CNTSDiaryEntrySave: {
@@ -37541,8 +37541,10 @@ export interface operations {
                 from?: string;
                 /** @description Kỳ có ngày đầu ≤ to */
                 to?: string;
-                /** @description Số kỳ tối đa */
+                /** @description Số kỳ tối đa một trang (đếm sau khi lọc phạm vi người gọi) */
                 limit?: number;
+                /** @description next_cursor của trang trước */
+                cursor?: string;
             };
             header?: never;
             path?: never;
@@ -37558,6 +37560,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["FormsTask"][];
+                        /** @description BF-CN-XA-DATA (#175): còn kỳ trong phạm vi sau trang này (null = hết) */
+                        next_cursor?: string | null;
                     };
                 };
             };

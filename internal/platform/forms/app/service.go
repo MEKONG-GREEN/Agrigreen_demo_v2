@@ -39,8 +39,10 @@ type Service struct {
 	// W11.42: danh mục cơ sở (đơn vị lá UnitFacility — kiểm cơ sở thuộc xã) và quy tắc nghiệp vụ theo profile.
 	Facilities port.FacilityDirectory
 	Validators map[string]port.Validator
-	profiles   map[string]port.Profile
-	order      []string
+	// ReviewGuards: kiểm quyền rà soát thêm của bên dùng theo profile (gọi ngoài giao dịch, trước khi ghi).
+	ReviewGuards map[string]port.ReviewGuard
+	profiles     map[string]port.Profile
+	order        []string
 }
 
 var _ port.Freezer = (*Service)(nil)

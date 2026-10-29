@@ -5,7 +5,8 @@
 // chế độ Lũy kế từ đầu năm/quý (BR-01: kỳ thiếu tính 0, hiện "Thiếu kỳ" — AC-03). Chi tiết một xã: số kỳ này, lịch sử
 // phiên bản gửi (cũ → mới, giá trị cũ → mới, lý do sửa sau hạn — AC-05), cờ "Đã sửa sau xác thực" (AC-06); người phụ trách
 // biểu Xác thực / Yêu cầu điều chỉnh có lý do (POST /v1/forms/submissions/{id}/review). Chỉ đọc số liệu xã — Tỉnh không sửa.
-// Dữ liệu: GET /v1/forms/tasks (máy chủ lọc theo phạm vi người gọi, tối đa 200 kỳ một năm), period-tracking (người phụ trách).
+// Dữ liệu: GET /v1/forms/tasks (máy chủ lọc theo phạm vi người gọi rồi mới giới hạn; đọc hết các trang next_cursor),
+// period-tracking (người phụ trách; máy chủ cũng chặn người không phụ trách xác thực — ReviewGuard kn_cnts).
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";

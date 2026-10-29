@@ -288,7 +288,7 @@ export const cntsPeriodRoutes: Route[] = [
       const from = ctx.url.searchParams.get("from");
       const to = ctx.url.searchParams.get("to");
       const items = PERIODS.filter((p) => p.status !== "cancelled" && (!code || p.code === code) && (!from || p.to >= from) && (!to || p.from <= to)).flatMap((p) => p.units.filter((u) => sees(w, p, u)).map((u) => task(p, u)));
-      return json({ items });
+      return json({ items, next_cursor: null });
     },
   },
   {
@@ -423,6 +423,9 @@ export const cntsPeriodRoutes: Route[] = [
           if (list.at(-1) !== s) return problem(409, "forms.submission_superseded", "Đã có phiên bản mới hơn");
           if (s.review) return problem(409, "forms.already_reviewed", "Phiên bản đã được rà soát");
           if (s.by === w.actor) return problem(403, "self_approval_forbidden", "người rà soát trùng người nộp");
+          // #175 review: kỳ có người phụ trách biểu thì chỉ người đó rà soát (máy chủ: ReviewGuard của kn_cnts).
+          const owner = PUBLICATIONS.get(p.id)?.owner_ref;
+          if (owner && owner !== w.actor) return problem(403, "forbidden", "chỉ người phụ trách biểu của kỳ được xác thực hoặc yêu cầu điều chỉnh");
           s.review = { id: uuidv7(), decision: b.decision, note: note || null, at: new Date().toISOString(), by: w.actor };
           return json({ id: s.id, period_id: p.id, unit, version: s.version, values: s.values, submitter_ref: s.by, event_time: s.at, status: b.decision,
             review: reviewOut(s), nil_report: s.nil_report, note: s.note || null, explanation: s.explanation || null, late: s.late, captured_at: null });

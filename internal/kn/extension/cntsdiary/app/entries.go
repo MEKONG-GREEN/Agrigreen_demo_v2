@@ -660,11 +660,14 @@ type EntryQuery struct {
 // MaxEntryPage là số dòng tối đa một trang khi người gọi truyền limit.
 const MaxEntryPage = 200
 
+// entryScanBatch là số dòng đọc mỗi lô khi lọc phạm vi trước khi phân trang.
+const entryScanBatch = 200
+
 // EntryList là danh sách lần ghi.
 type EntryList struct {
 	Items []EntryView
 	Names map[uuid.UUID]string
-	// NextCursor: còn dòng sau trang này (rỗng = hết). Trang lọc phạm vi sau khi đọc nên có thể ít hơn limit dòng.
+	// NextCursor: còn dòng người gọi thấy được sau trang này (rỗng = hết); khóa của dòng cuối đã trả.
 	NextCursor string
 }
 
@@ -738,51 +741,59 @@ func (s *Service) ListEntries(ctx context.Context, q EntryQuery) (EntryList, err
 	if page == 0 {
 		page = store.MaxEntryList
 	}
-	f.Limit = page + 1
 	out := EntryList{Items: []EntryView{}}
 	if f.Commune != "" && !c.sees(f.Commune) {
 		return out, nil
 	}
 	refs := []uuid.UUID{}
+	// #175 review: phân trang SAU khi áp phạm vi/quyền — đọc theo lô cho tới khi có page+1 dòng người gọi được thấy (hoặc
+	// hết dòng); con trỏ là khóa của dòng cuối ĐÃ TRẢ, không bao giờ của lần ghi bị loại (không lộ ngày/UUID ngoài phạm vi).
+	f.Limit = max(page+1, entryScanBatch)
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
-		es, err := store.ListEntries(ctx, tx, f)
-		if err != nil {
-			return err
-		}
-		if len(es) > page {
-			es = es[:page]
-			last := es[page-1]
-			out.NextCursor = EncodeEntryCursor(store.EntryCursor{EntryDate: last.EntryDate, CapturedAt: last.CapturedAt, Ref: last.Ref})
-		}
 		hcs, cys := map[uuid.UUID]*hctx{}, map[uuid.UUID]*store.Cycle{}
-		for _, e := range es {
-			hc, ok := hcs[e.HouseholdRef]
-			if !ok {
-				if hc, err = s.loadHousehold(ctx, tx, c, e.HouseholdRef); err != nil {
-					return err
+		var last store.Entry
+		for {
+			es, err := store.ListEntries(ctx, tx, f)
+			if err != nil {
+				return err
+			}
+			for _, e := range es {
+				f.After = &store.EntryCursor{EntryDate: e.EntryDate, CapturedAt: e.CapturedAt, Ref: e.Ref}
+				hc, ok := hcs[e.HouseholdRef]
+				if !ok {
+					if hc, err = s.loadHousehold(ctx, tx, c, e.HouseholdRef); err != nil {
+						return err
+					}
+					hcs[e.HouseholdRef] = hc
 				}
-				hcs[e.HouseholdRef] = hc
-			}
-			if hc == nil || !c.visibleEntry(hc, e) {
-				continue
-			}
-			if q.Review && !c.reviewer(hc.p) {
-				continue
-			}
-			if q.Flagged && !slices.ContainsFunc(e.Checks, func(x domain.Check) bool { return x.Level == domain.LevelWarn }) {
-				continue
-			}
-			cy, ok := cys[e.CycleRef]
-			if !ok {
-				if cy, err = store.LatestCycle(ctx, tx, e.CycleRef); err != nil {
-					return err
+				if hc == nil || !c.visibleEntry(hc, e) {
+					continue
 				}
-				cys[e.CycleRef] = cy
+				if q.Review && !c.reviewer(hc.p) {
+					continue
+				}
+				if q.Flagged && !slices.ContainsFunc(e.Checks, func(x domain.Check) bool { return x.Level == domain.LevelWarn }) {
+					continue
+				}
+				if len(out.Items) == page { // còn dòng thấy được sau trang này
+					out.NextCursor = EncodeEntryCursor(store.EntryCursor{EntryDate: last.EntryDate, CapturedAt: last.CapturedAt, Ref: last.Ref})
+					return nil
+				}
+				cy, ok := cys[e.CycleRef]
+				if !ok {
+					if cy, err = store.LatestCycle(ctx, tx, e.CycleRef); err != nil {
+						return err
+					}
+					cys[e.CycleRef] = cy
+				}
+				out.Items = append(out.Items, s.entryView(c, hc, cy, e))
+				refs = append(refs, e.AuthorRef)
+				last = e
 			}
-			out.Items = append(out.Items, s.entryView(c, hc, cy, e))
-			refs = append(refs, e.AuthorRef)
+			if len(es) < f.Limit {
+				return nil
+			}
 		}
-		return nil
 	})
 	if err != nil {
 		return EntryList{}, err

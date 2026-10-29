@@ -199,4 +199,33 @@ describe("màn Nhập liệu tuần — Cấp Tỉnh", () => {
     await waitFor(() => expect(within(detail).getByText(/bạn chỉ xem/)).toBeInTheDocument());
     expect(within(detail).queryByRole("button", { name: "Xác thực" })).not.toBeInTheDocument();
   });
+
+  it("#175 review: máy chủ (giả lập) chặn người không phụ trách gọi thẳng API rà soát", async () => {
+    await setup("00000000-0000-7000-8000-0000000000aa");
+    const tinh = createCntsPeriodApi(apiOf("kn-binh", null));
+    const t = (await tinh.tasksIn(BM04_CODE, `${y}-01-01`, `${y}-12-31`)).find((x) => x.unit === "91301" && x.submission_id)!;
+    await expect(tinh.review(t.submission_id!, "accepted")).rejects.toMatchObject({ status: 403 });
+    await expect(tinh.review(t.submission_id!, "returned", "Sai số")).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("tasksIn — đọc hết các trang next_cursor (#175 review)", () => {
+  it("nối các trang tới khi next_cursor null; quá số trang thì báo lỗi, không trả thiếu", async () => {
+    const page = (n: number, next: string | null) => ({ items: [{ period_id: `p${n}`, unit: "91301" }], next_cursor: next });
+    const seen: (string | null)[] = [];
+    const fetchPages = async (req: Request) => {
+      const cur = new URL(req.url).searchParams.get("cursor");
+      seen.push(cur);
+      const body = cur === null ? page(1, "c1") : cur === "c1" ? page(2, "c2") : page(3, null);
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    const api = createCntsPeriodApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => "x", getContextId: () => null, fetch: fetchPages }));
+    const all = await api.tasksIn(BM04_CODE, "2026-01-01", "2026-12-31");
+    expect(all.map((t) => t.period_id)).toEqual(["p1", "p2", "p3"]);
+    expect(seen).toEqual([null, "c1", "c2"]);
+    const endless = async () =>
+      new Response(JSON.stringify(page(9, "again")), { status: 200, headers: { "Content-Type": "application/json" } });
+    const api2 = createCntsPeriodApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => "x", getContextId: () => null, fetch: endless }));
+    await expect(api2.tasksIn(BM04_CODE, "2026-01-01", "2026-12-31", 200, 3)).rejects.toThrow(/Quá nhiều kỳ/);
+  });
 });

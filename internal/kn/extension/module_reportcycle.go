@@ -55,6 +55,10 @@ func (m *Module) UseCNTSFacilities(c rcapp.CNTSFacilityCatalog) { m.rc.CNTSFacil
 // CNTSValidator (W11.42) là quy tắc chặn của biểu kỳ CNTS cho profile kn_cnts của cap/forms.
 func (m *Module) CNTSValidator() formsport.Validator { return rcapp.CNTSValidator{} }
 
+// CNTSReviewGuard (BF-CN-XA-DATA #175, FN-09) cho profile kn_cnts của cap/forms: kỳ có người phụ trách biểu thì chỉ người
+// đó xác thực / yêu cầu điều chỉnh bài nộp.
+func (m *Module) CNTSReviewGuard() formsport.ReviewGuard { return rcapp.CNTSReviewGuard{Svc: m.rc} }
+
 // ReportSyncSource cho pf/sync (KN v7.7 P7): chiều xuống report_task, form_layout, report_submission của các xã phụ
 // trách trong ngữ cảnh Cấp Xã — field-app nhập báo cáo ngoại tuyến (N-07).
 func (m *Module) ReportSyncSource() syncport.Source { return rcapp.ReportSync{Svc: m.rc} }
