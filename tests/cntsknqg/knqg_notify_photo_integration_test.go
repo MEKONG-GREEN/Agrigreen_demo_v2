@@ -105,8 +105,12 @@ func (u user) addPhoto(ref, name string, data []byte, caption string) resp {
 	return u.send(base_+ref+"/photos", key(), ct, body)
 }
 
-func png(i int) []byte  { return append([]byte("\x89PNG\r\n\x1a\n"), []byte(fmt.Sprintf("anh-thuc-dia-%d", i))...) }
-func jpeg(i int) []byte { return append([]byte{0xFF, 0xD8, 0xFF, 0xE0}, []byte(fmt.Sprintf("jpeg-%d", i))...) }
+func png(i int) []byte {
+	return append([]byte("\x89PNG\r\n\x1a\n"), []byte(fmt.Sprintf("anh-thuc-dia-%d", i))...)
+}
+func jpeg(i int) []byte {
+	return append([]byte{0xFF, 0xD8, 0xFF, 0xE0}, []byte(fmt.Sprintf("jpeg-%d", i))...)
+}
 
 func TestCNTSKNQGNotifyPhotos_W1153b(t *testing.T) {
 	f := newFix(t)
