@@ -1,0 +1,1 @@
+- [ ] BF-SWEEP-KHTC (#164): lát Danh mục KHTC 7 loại theo BRD v2.3 FN-AD-04.01, route Thêm/Sửa/Chi tiết với DetailPage + Log, STT và kiểm nhập UI-KIT; giữ API/quyền/M1–M7. Phần PlanScreen/periods/inbox/reports/forms theo #180, không trùng #163 HCTH. Chờ Claude review và UAT.

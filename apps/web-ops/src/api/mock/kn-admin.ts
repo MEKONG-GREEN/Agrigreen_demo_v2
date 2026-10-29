@@ -509,6 +509,85 @@ function orgTree() {
 // Định tuyến (Admin API)
 // ---------------------------------------------------------------------------
 const UUID = "([0-9a-f-]{36})";
+// --- AUDIT-LOG-KN (#73): nhật ký hệ thống GET /v1/accounts/audit (cổng #70) ---
+// Bản giả: chỉ Admin KN; bộ lọc from/to bắt buộc (≤ 93 ngày), limit 1–200; mỗi trang (kể cả rỗng) ghi một lượt xem vào
+// sổ lượt xem giả (AUDIT_VIEWS) TRƯỚC khi trả — lượt xem hiện lại như dòng audit.viewed. Cursor = vị trí trong danh sách.
+interface MockAuditItem {
+  source: string;
+  module: string;
+  event_ref: string;
+  entity_ref: string;
+  actor_ref: string;
+  occurred_at: string;
+  recorded_at: string;
+  department?: string;
+  action: string;
+  outcome: "unknown" | "succeeded" | "denied" | "failed";
+  changes: { field: string; after?: { kind: "boolean" | "ref" | "codes"; boolean?: boolean; ref?: string; codes?: string[] } }[];
+}
+const AUDIT_VIEWS: MockAuditItem[] = [];
+function auditSeed(): MockAuditItem[] {
+  const an = KN_ACCOUNTS[0] ? userId(KN_ACCOUNTS[0]) : stableUuid("audit-actor-1");
+  const binh = KN_ACCOUNTS[1] ? userId(KN_ACCOUNTS[1]) : stableUuid("audit-actor-2");
+  const now = Date.now();
+  const at = (h: number) => new Date(now - h * 3_600_000).toISOString();
+  const row = (i: number, x: Omit<MockAuditItem, "event_ref" | "entity_ref" | "occurred_at" | "recorded_at">, h: number): MockAuditItem => ({
+    ...x,
+    event_ref: stableUuid(`audit-ev-${i}`),
+    entity_ref: stableUuid(`audit-en-${i}`),
+    occurred_at: at(h),
+    recorded_at: at(h),
+  });
+  return [
+    row(1, { source: "accounts.account_event", module: "accounts", actor_ref: an, action: "account.locked", outcome: "unknown", changes: [{ field: "enabled", after: { kind: "boolean", boolean: false } }] }, 2),
+    row(2, { source: "kn.period_event", module: "kn.report", actor_ref: binh, department: "trong_trot", action: "period.reopened", outcome: "succeeded", changes: [{ field: "batch_ref", after: { kind: "ref", ref: stableUuid("audit-batch") } }] }, 5),
+    row(3, { source: "kn.producer", module: "kn.records", actor_ref: binh, action: "producer.created", outcome: "succeeded", changes: [{ field: "kind", after: { kind: "codes", codes: ["cooperative"] } }] }, 26),
+    row(4, { source: "kn.cnts_grant", module: "kn.cnts", actor_ref: an, action: "cnts_grant.granted", outcome: "succeeded", changes: [{ field: "role", after: { kind: "codes", codes: ["ksgm"] } }] }, 50),
+  ];
+}
+let AUDIT_SEED: MockAuditItem[] | null = null;
+const AUDIT_CODE = /^[a-z][a-z0-9_.-]{0,79}$/;
+function auditPage(ctx: Ctx): Response {
+  if (!isKnAdmin(ctx)) return deny();
+  const q = ctx.url.searchParams;
+  const from = Date.parse(q.get("from") ?? ""), to = Date.parse(q.get("to") ?? "");
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || to - from > 93 * 86_400_000) return errField("from", "bộ lọc nhật ký không hợp lệ");
+  const limit = Number(q.get("limit") ?? 50);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 200) return errField("limit", "bộ lọc nhật ký không hợp lệ");
+  for (const k of ["module", "action", "department"]) {
+    const v = q.get(k);
+    if (v && !AUDIT_CODE.test(v)) return errField(k, "bộ lọc nhật ký không hợp lệ");
+  }
+  const offset = q.get("cursor") ? Number(q.get("cursor")) : 0;
+  if (!Number.isInteger(offset) || offset < 0) return errField("cursor", "bộ lọc nhật ký không hợp lệ");
+  AUDIT_SEED ??= auditSeed();
+  const actor = q.get("actor_ref"), mod = q.get("module"), action = q.get("action"), dept = q.get("department");
+  const all = [...AUDIT_SEED, ...AUDIT_VIEWS]
+    .filter((r) => {
+      const t = Date.parse(r.recorded_at);
+      return t >= from && t < to && (!actor || r.actor_ref === actor) && (!mod || r.module === mod) && (!action || r.action === action) && (!dept || r.department === dept);
+    })
+    .sort((a, b) => b.recorded_at.localeCompare(a.recorded_at));
+  const items = all.slice(offset, offset + limit);
+  const registered: [string, string][] = [["accounts.account_event", "accounts"], ["kn.audit_view", "kn.audit"], ["kn.cnts_grant", "kn.cnts"], ["kn.khtc_period_event", "kn.khtc"], ["kn.period_event", "kn.report"], ["kn.producer", "kn.records"], ["kn.review_event", "kn.report"]];
+  const sources = registered.filter(([, m]) => !mod || m === mod).map(([s]) => s);
+  if (!sources.length) return errField("module", "bộ lọc nhật ký không hợp lệ");
+  const now = new Date().toISOString();
+  AUDIT_VIEWS.push({
+    source: "kn.audit_view",
+    module: "kn.audit",
+    event_ref: uuidv7(),
+    entity_ref: uuidv7(),
+    actor_ref: KN_ACCOUNTS[0] ? userId(KN_ACCOUNTS[0]) : stableUuid("audit-actor-1"),
+    occurred_at: now,
+    recorded_at: now,
+    action: "audit.viewed",
+    outcome: "succeeded",
+    changes: [{ field: "sources", after: { kind: "codes", codes: sources } }],
+  });
+  return json({ items, sources, as_of: now, next_cursor: offset + limit < all.length ? String(offset + limit) : null });
+}
+
 const re = (s: string) => new RegExp(`^${s.replaceAll("{id}", UUID)}$`);
 
 function withAccount(ctx: Ctx, h: (a: MockKnAccount) => Response): Response {
@@ -864,6 +943,7 @@ export const knAdminRoutes: Route[] = [
       return json({ support_session_id: ctx.params[0], ended_at: s.ended });
     },
   },
+  { method: "GET", pattern: re("/v1/accounts/audit"), handler: auditPage },
   {
     method: "GET",
     pattern: re("/v1/accounts/support-log"),

@@ -31,6 +31,7 @@ import (
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
 	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knaudit"
 	krapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knrecords/app"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/handler"
@@ -120,6 +121,8 @@ type Module struct {
 	knqg *knqgService
 	// KNSPLIT-2-KN-RECORDS (#67): hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (module_knrecords.go).
 	records *krapp.Service
+	// AUDIT-LOG-KN (#73): nguồn nhật ký KN, quyền xem, sổ lượt xem bền (module_knaudit.go).
+	audit *knaudit.Service
 }
 
 // New tạo module với pool của vai extension_app.
@@ -145,11 +148,13 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.home = m.newDeptHome()
 	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs)
 	m.records = m.newKNRecords(pool, db, clk, d.Units)
+	m.audit = newKNAudit(db, clk)
 	return m
 }
 
-// UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng.
-func (m *Module) UseContacts(c accport.StaffContacts) { m.svc.Contacts = c }
+// UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng: danh bạ trực (US-DIR-02) và cột
+// "ĐT viên chức" của lịch trực KSGM BM-03 (BF-CN-DUTY).
+func (m *Module) UseContacts(c accport.StaffContacts) { m.svc.Contacts, m.cal.Contacts = c, c }
 
 // UseFarmers nối cổng liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) — yêu cầu
 // hỗ trợ từ App HTX (HTX US-SUPPORT-01 → KN US-TASK-01). Gốc lắp ráp gọi sau khi dựng pf/accounts.
