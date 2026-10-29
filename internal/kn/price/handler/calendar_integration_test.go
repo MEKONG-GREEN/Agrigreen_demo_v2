@@ -198,6 +198,22 @@ func TestPriceCalendarHTTP_W1174(t *testing.T) {
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":40}`, http.StatusUnprocessableEntity) // số phải là chuỗi
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"0"}`, http.StatusUnprocessableEntity)
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"100.5"}`, http.StatusUnprocessableEntity)
+	// BF-SWEEP-PRICE: API gọi thẳng cũng chặn cú pháp/độ dài/biên TRƯỚC Decimal; lỗi gắn đúng ô.
+	for _, field := range []string{"pct", "flat_pct", "survey_pct"} {
+		for _, bad := range []string{"1e100000", "1e-100000", strings.Repeat("9", 100000), "-1", "0", "100.01", "1.001"} {
+			payload := map[string]any{"scope": "default", "code": "", "pct": "30", "lookback_days": 7, "flat_pct": "1", "survey_pct": "40"}
+			payload[field] = bad
+			body, err := json.Marshal(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p := call("admin", http.MethodPost, "/v1/price/thresholds", string(body), http.StatusUnprocessableEntity)
+			fields, _ := p["errors"].([]any)
+			if code(p) != "validation_failed" || len(fields) != 1 || fields[0].(map[string]any)["field"] != field {
+				t.Fatalf("lỗi phải gắn vào %s, không ghi ngưỡng: %v", field, p)
+			}
+		}
+	}
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"group","code":"rau_mau","pct":"40"}`, http.StatusCreated)
 	call("admin", http.MethodPost, "/v1/price/thresholds", `{"scope":"item","code":"MH00001","pct":"25.5"}`, http.StatusCreated)
 	call("admin", http.MethodPost, "/v1/price/thresholds",

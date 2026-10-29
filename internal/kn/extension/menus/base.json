@@ -1511,7 +1511,7 @@
                 "Icon": "report",
                 "BadgeSource": "",
                 "Requires": null,
-                "ComingSoon": true,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               }

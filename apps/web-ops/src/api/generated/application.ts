@@ -9862,6 +9862,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/exported-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kho metadata báo cáo KHTC đã xuất, chỉ đọc trong tenant phiên hiện tại */
+        get: operations["extensionKhtcExportedReports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/external/indicators": {
         parameters: {
             query?: never;
@@ -11458,6 +11475,58 @@ export interface paths {
         get: operations["extensionCntsKnqgWordDownload"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.53b UR-TINH-21: ảnh thực địa hiện hành của báo cáo kiểm tra Mẫu 03 (người xem được biểu) */
+        get: operations["extensionCntsKnqgPhotos"];
+        put?: never;
+        /** W11.53b UR-TINH-21: tải ảnh thực địa (JPG/PNG ≤ 5 MB, kiểm chữ ký tệp; tối đa 20 ảnh) lên báo cáo Mẫu 03 đang lập — chủ nhiệm, lãnh đạo phòng, Admin */
+        post: operations["extensionCntsKnqgAddPhoto"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}/photos/{photo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** W11.53b: tải một ảnh thực địa hiện hành của báo cáo */
+        get: operations["extensionCntsKnqgPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/knqg-docs/{ref}/photos/{photo}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** W11.53b: gỡ ảnh thực địa khỏi báo cáo Mẫu 03 đang lập (sổ ghi thêm dòng gỡ; tệp vẫn lưu) */
+        post: operations["extensionCntsKnqgRemovePhoto"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14769,12 +14838,12 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale" | "price_reminder" | "price_alert" | "price_verify_request" | "price_verify_reply" | "price_verify_decision" | "price_lock_summary" | "price_board_approved" | "price_board_reopened" | "price_proxy_entry";
+            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale" | "price_reminder" | "price_alert" | "price_verify_request" | "price_verify_reply" | "price_verify_decision" | "price_lock_summary" | "price_board_approved" | "price_board_reopened" | "price_proxy_entry" | "cnts_knqg_sent" | "cnts_knqg_reviewed" | "cnts_knqg_submitted";
             /** @enum {string} */
             severity: "urgent" | "normal";
             title: string;
             body: string;
-            /** @description Đường dẫn trong app: /extension/directives/{id}, /documents/{ref}, /extension/tasks/{id}, /sync/conflicts/{id}, /orgs/{ref} */
+            /** @description Đường dẫn trong app: /extension/directives/{id}, /documents/{ref}, /extension/tasks/{id}, /sync/conflicts/{id}, /orgs/{ref}, /kn/cnts/du-an-mau-bieu?doc={ref} (W11.53b: biểu dự án KNQG) */
             deep_link: string;
             /** Format: uuid */
             subject_ref: string | null;
@@ -22058,6 +22127,29 @@ export interface components {
                 recorded_at: string;
             }[];
         };
+        KHTCArchiveRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            period_name: string;
+            /** @enum {string} */
+            report_type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+            document_no: string;
+            /** Format: int64 */
+            version: number;
+            final: boolean;
+            provisional: boolean;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCArchive: {
+            items: components["schemas"]["KHTCArchiveRow"][];
+            has_more: boolean;
+            offset: number;
+        };
         KHTCReportPeriod: {
             /** Format: uuid */
             id: string;
@@ -24508,6 +24600,28 @@ export interface components {
             actor_ref: string;
             /** Format: date-time */
             at: string;
+        };
+        CNTSKNQGPhoto: {
+            /** Format: uuid */
+            ref: string;
+            name: string;
+            /** @enum {string} */
+            content_type: "image/jpeg" | "image/png";
+            size: number;
+            sha256: string;
+            caption: string | null;
+            /** Format: date-time */
+            uploaded_at: string;
+            /** Format: uuid */
+            uploaded_by: string;
+            uploaded_by_name: string | null;
+        };
+        CNTSKNQGPhotoList: {
+            items: components["schemas"]["CNTSKNQGPhoto"][];
+            /** @description Người gọi thêm/gỡ được ảnh (Mẫu 03 đang lập, người sửa được biểu) */
+            can_edit: boolean;
+            max_photos: number;
+            replayed: boolean;
         };
         CNTSBM11CreateInput: {
             /** @enum {string} */
@@ -45271,6 +45385,37 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionKhtcExportedReports: {
+        parameters: {
+            query: {
+                year: number;
+                kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+                q?: string;
+                versions?: boolean;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bản cuối của mỗi kỳ, hoặc bản xuất mới nhất nếu chưa có Bản cuối; versions=true hiện mọi phiên bản. Không có bản soạn. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCArchive"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionKhtcExternalIndicators: {
         parameters: {
             query?: never;
@@ -49386,6 +49531,133 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description extension.cnts_knqg_not_found | export.run_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgPhotos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách ảnh */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGPhotoList"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_not_found */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgAddPhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** @description Chú thích (không số điện thoại/CCCD) */
+                    caption?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Danh sách ảnh sau khi thêm */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGPhotoList"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_locked | extension.cnts_project_closed | extension.cnts_knqg_version_conflict */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_photo_invalid */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+                photo: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ảnh */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_not_found | extension.cnts_knqg_photo_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsKnqgRemovePhoto: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+                photo: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách ảnh sau khi gỡ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSKNQGPhotoList"];
+                };
+            };
+            /** @description forbidden | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_not_found | extension.cnts_knqg_photo_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_knqg_locked | extension.cnts_project_closed */
+            409: components["responses"]["Problem"];
         };
     };
     extensionCntsBM11List: {
