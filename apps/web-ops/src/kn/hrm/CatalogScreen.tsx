@@ -6,6 +6,8 @@
 // Quyền lấy từ máy chủ (can_manage): Admin thêm/sửa/ngừng; Cấp Tỉnh – HCTH chỉ xem. Không xóa (BR-01) — chỉ ngừng sử
 // dụng. Mục "Mẫu" là dữ liệu cài sẵn chưa được Phòng HCTH xác nhận (Q-070).
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
 import {
@@ -16,17 +18,16 @@ import {
   type Column,
 } from "@/components/patterns/list";
 import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
+import { catalogBase, catalogItemPath } from "./catalog-form";
 import {
   createHrmApi,
   dmy,
-  EQUIV_GROUPS,
   EQUIV_LABEL,
   FIXED_KINDS,
   GRADE_TYPE_LABEL,
   KIND_LABEL,
   MAIN_KINDS,
   normDecimal,
-  normGradeCode,
   RULE_LABEL,
   vnDecimal,
   type HrmAchievementConversion,
@@ -44,17 +45,6 @@ type View =
   | { t: "scales" }
   | { t: "rule"; key: HrmRuleKey };
 const PAGE = 20;
-
-/** Cấp quản lý của tài khoản (pf/accounts MgmtLevels, W11.07) — gắn tùy chọn với chức vụ. */
-const MGMT_LEVELS: [string, string][] = [
-  ["chuyen_vien", "Chuyên viên - Cán bộ"],
-  ["phu_trach", "Phụ trách"],
-  ["pho_truong_phong", "Phó trưởng phòng"],
-  ["truong_phong", "Trưởng phòng"],
-  ["lanh_dao_don_vi", "Lãnh đạo đơn vị"],
-  ["pho_giam_doc", "Phó Giám đốc"],
-  ["giam_doc", "Giám đốc"],
-];
 
 function vnToday(): string {
   return new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
@@ -75,9 +65,10 @@ function PlaceholderPill({ on }: { on: boolean }) {
   ) : null;
 }
 
-export function HrmCatalogScreen() {
+export function HrmCatalogScreen({ initialKind = "grade" }: { initialKind?: HrmKind }) {
   const ha = useHrmApi();
-  const [view, setView] = useState<View>({ t: "kind", kind: "grade" });
+  const base = catalogBase(usePathname());
+  const [view, setView] = useState<View>({ t: "kind", kind: initialKind });
   const [nonce, setNonce] = useState(0);
   const bump = () => setNonce((n) => n + 1);
   const status = useLoad(() => ha.status(), [nonce]);
@@ -201,6 +192,7 @@ export function HrmCatalogScreen() {
                 {view.t === "kind" ? (
                   <KindPanel
                     key={view.kind}
+                    base={base}
                     ha={ha}
                     kind={view.kind}
                     canManage={st.can_manage}
@@ -236,7 +228,7 @@ export function HrmCatalogScreen() {
 }
 
 /** Tóm tắt thuộc tính riêng của mục theo loại. */
-function attrsText(
+export function attrsText(
   kind: HrmKind,
   a: HrmAttrs,
   names: Map<string, string>,
@@ -280,12 +272,14 @@ function attrsText(
 }
 
 function KindPanel({
+  base,
   ha,
   kind,
   canManage,
   nonce,
   onChanged,
 }: {
+  base: string;
   ha: HrmApi;
   kind: HrmKind;
   canManage: boolean;
@@ -295,8 +289,6 @@ function KindPanel({
   const [all, setAll] = useState(false);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [edit, setEdit] = useState<HrmItem | "new" | null>(null);
-  const [hist, setHist] = useState<HrmItem | null>(null);
   const [grade, setGrade] = useState<string | null>(null);
   const list = useLoad(() => ha.list(kind, all), [kind, all, nonce]);
   const needsRefs = kind === "major" || kind === "major_group";
@@ -335,7 +327,7 @@ function KindPanel({
     {
       key: "code",
       header: kind === "grade" ? "Mã ngạch" : "Mã",
-      cell: (r) => <code>{r.code}</code>,
+      cell: (r) => <Link href={catalogItemPath(base, kind, r.code)}><code>{r.code}</code></Link>,
     },
     {
       key: "name",
@@ -386,23 +378,21 @@ function KindPanel({
       header: "",
       cell: (r) => (
         <div className="row">
-          <button
-            type="button"
+          <Link
             className="btn btn-o btn-sm"
-            onClick={() => setHist(r)}
+            href={catalogItemPath(base, kind, r.code)}
           >
             Lịch sử
-          </button>
+          </Link>
           {canManage ? (
             <>
-              <button
-                type="button"
+              <Link
                 className="btn btn-o btn-sm"
-                onClick={() => setEdit(r)}
+                href={`${catalogItemPath(base, kind, r.code)}/sua`}
                 aria-label={`Sửa ${r.code}`}
               >
                 Sửa
-              </button>
+              </Link>
               <button
                 type="button"
                 className={r.active ? "btn btn-d btn-sm" : "btn btn-o btn-sm"}
@@ -445,13 +435,12 @@ function KindPanel({
                 Hiện cả mục đã ngừng
               </label>
               {canManage ? (
-                <button
-                  type="button"
+                <Link
                   className="btn btn-p btn-sm"
-                  onClick={() => setEdit("new")}
+                  href={`${base}/${kind}/them-moi`}
                 >
                   Thêm
-                </button>
+                </Link>
               ) : null}
             </div>
             {act.view}
@@ -474,404 +463,10 @@ function KindPanel({
                 nonce={0}
               />
             ) : null}
-            {edit ? (
-              <ItemDialog
-                ha={ha}
-                kind={kind}
-                item={edit === "new" ? null : edit}
-                levels={levels.data?.items ?? []}
-                groups={groups.data?.items ?? []}
-                nextOrder={
-                  (d.items.reduce((m, x) => Math.max(m, x.sort_order), 0) ||
-                    0) + 10
-                }
-                onClose={() => setEdit(null)}
-                onSaved={() => (setEdit(null), onChanged())}
-              />
-            ) : null}
-            {hist ? (
-              <HistoryDialog
-                ha={ha}
-                kind={kind}
-                item={hist}
-                names={names}
-                onClose={() => setHist(null)}
-              />
-            ) : null}
           </>
         );
       }}
     </LoadState>
-  );
-}
-
-function ItemDialog({
-  ha,
-  kind,
-  item,
-  levels,
-  groups,
-  nextOrder,
-  onClose,
-  onSaved,
-}: {
-  ha: HrmApi;
-  kind: HrmKind;
-  item: HrmItem | null;
-  levels: HrmItem[];
-  groups: HrmItem[];
-  nextOrder: number;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [code, setCode] = useState(item?.code ?? "");
-  const [name, setName] = useState(item?.name ?? "");
-  const [order, setOrder] = useState(String(item?.sort_order ?? nextOrder));
-  const [a, setA] = useState<HrmAttrs>(
-    item?.attrs ??
-      (kind === "grade" ? { equiv_group: "CV", grade_type: "vien_chuc" } : {}),
-  );
-  const set = (p: Partial<HrmAttrs>) => setA((x) => ({ ...x, ...p }));
-  const act = useAction();
-  const save = () => {
-    const attrs: HrmAttrs = { ...a };
-    if (attrs.allowance !== undefined) {
-      const v = normDecimal(attrs.allowance);
-      if (v) attrs.allowance = v;
-      else delete attrs.allowance;
-    }
-    if (!attrs.mgmt_level) delete attrs.mgmt_level;
-    if (!attrs.salary_class) delete attrs.salary_class;
-    if (attrs.groups)
-      attrs.groups = Object.fromEntries(
-        Object.entries(attrs.groups).filter(([, g]) => g),
-      );
-    const body = {
-      name: name.trim(),
-      sort_order: Number(order) || 0,
-      attrs,
-      active: item?.active ?? true,
-    };
-    void act
-      .run(() =>
-        item
-          ? ha.revise(kind, item.code, body)
-          : ha.create(kind, {
-              ...body,
-              code: kind === "grade" ? normGradeCode(code) : code.trim(),
-            }),
-      )
-      .then((r) => r && onSaved());
-  };
-  return (
-    <Dialog
-      title={`${item ? "Sửa" : "Thêm"} ${KIND_LABEL[kind].toLowerCase()}`}
-      onClose={onClose}
-      actions={
-        <button
-          type="button"
-          className="btn btn-p btn-sm"
-          disabled={act.busy || !name.trim() || (!item && !code.trim())}
-          onClick={save}
-        >
-          Lưu
-        </button>
-      }
-    >
-      {act.view}
-      <div className="grid2">
-        <div className="field">
-          <label htmlFor="hr-code" className="req">
-            Mã
-          </label>
-          <input
-            id="hr-code"
-            className="input"
-            value={code}
-            disabled={!!item}
-            maxLength={60}
-            onChange={(e) => setCode(e.target.value)}
-          />
-          {kind === "grade" && !item ? (
-            <span className="mute small">
-              Khoảng trắng, xuống dòng được tự loại bỏ.
-            </span>
-          ) : null}
-        </div>
-        <div className="field">
-          <label htmlFor="hr-name" className="req">
-            Tên
-          </label>
-          <input
-            id="hr-name"
-            className="input"
-            value={name}
-            maxLength={200}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="hr-order">Thứ tự</label>
-          <input
-            id="hr-order"
-            className="input"
-            inputMode="numeric"
-            value={order}
-            onChange={(e) => setOrder(e.target.value.replace(/\D/g, ""))}
-          />
-        </div>
-        {kind === "position" ? (
-          <>
-            <div className="field">
-              <span className="lbl">Lãnh đạo, quản lý</span>
-              <label className="row">
-                <input
-                  type="checkbox"
-                  checked={!!a.leader}
-                  onChange={(e) =>
-                    set({
-                      leader: e.target.checked,
-                      ...(e.target.checked ? {} : { allowance: undefined }),
-                    })
-                  }
-                />
-                Chức vụ lãnh đạo, quản lý
-              </label>
-            </div>
-            <div className="field">
-              <label htmlFor="hr-pccv">Hệ số phụ cấp chức vụ</label>
-              <input
-                id="hr-pccv"
-                className="input"
-                inputMode="decimal"
-                disabled={!a.leader}
-                placeholder="vd 0,30"
-                value={a.allowance ? vnDecimal(a.allowance) : ""}
-                onChange={(e) => set({ allowance: e.target.value })}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="hr-mgmt">Cấp quản lý của tài khoản</label>
-              <select
-                id="hr-mgmt"
-                className="select"
-                value={a.mgmt_level ?? ""}
-                onChange={(e) => set({ mgmt_level: e.target.value })}
-              >
-                <option value="">—</option>
-                {MGMT_LEVELS.map(([c, l]) => (
-                  <option key={c} value={c}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </>
-        ) : null}
-        {kind === "grade" ? (
-          <>
-            <div className="field">
-              <label htmlFor="hr-equiv" className="req">
-                Nhóm tương đương (NS06)
-              </label>
-              <select
-                id="hr-equiv"
-                className="select"
-                value={a.equiv_group ?? ""}
-                onChange={(e) =>
-                  set({
-                    equiv_group: e.target.value as HrmAttrs["equiv_group"],
-                  })
-                }
-              >
-                {EQUIV_GROUPS.map((g) => (
-                  <option key={g} value={g}>
-                    {EQUIV_LABEL[g]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="hr-gtype" className="req">
-                Loại
-              </label>
-              <select
-                id="hr-gtype"
-                className="select"
-                value={a.grade_type ?? ""}
-                onChange={(e) =>
-                  set({ grade_type: e.target.value as HrmAttrs["grade_type"] })
-                }
-              >
-                {Object.entries(GRADE_TYPE_LABEL).map(([c, l]) => (
-                  <option key={c} value={c}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="hr-class">Loại bảng lương</label>
-              <input
-                id="hr-class"
-                className="input"
-                maxLength={20}
-                placeholder="vd A1, A2.1, B"
-                value={a.salary_class ?? ""}
-                onChange={(e) => set({ salary_class: e.target.value })}
-              />
-            </div>
-          </>
-        ) : null}
-        {kind === "education_level" ? (
-          <div className="field">
-            <label htmlFor="hr-rank" className="req">
-              Thứ hạng (cao hơn = lớn hơn)
-            </label>
-            <input
-              id="hr-rank"
-              className="input"
-              inputMode="numeric"
-              value={a.rank ?? ""}
-              onChange={(e) =>
-                set({
-                  rank: Number(e.target.value.replace(/\D/g, "")) || undefined,
-                })
-              }
-            />
-          </div>
-        ) : null}
-        {kind === "major_group" ? (
-          <div className="field">
-            <label htmlFor="hr-level" className="req">
-              Trình độ
-            </label>
-            <select
-              id="hr-level"
-              className="select"
-              value={a.level ?? ""}
-              onChange={(e) => set({ level: e.target.value })}
-            >
-              <option value="">—</option>
-              {levels.map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-        {kind === "ethnicity" ? (
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={!!a.minority}
-              onChange={(e) => set({ minority: e.target.checked })}
-            />{" "}
-            Dân tộc thiểu số
-          </label>
-        ) : null}
-        {kind === "religion" ? (
-          <label className="row">
-            <input
-              type="checkbox"
-              checked={!!a.no_religion}
-              onChange={(e) => set({ no_religion: e.target.checked })}
-            />{" "}
-            Mục “Không” (không tôn giáo)
-          </label>
-        ) : null}
-      </div>
-      {kind === "major" ? (
-        <fieldset className="card" style={{ marginTop: 12, padding: 12 }}>
-          <legend className="small">
-            Nhóm chuyên ngành theo trình độ (NS05)
-          </legend>
-          <div className="grid2">
-            {levels.map((l) => {
-              const opts = groups.filter((g) => g.attrs.level === l.code);
-              return (
-                <div className="field" key={l.code}>
-                  <label htmlFor={`hr-g-${l.code}`}>{l.name}</label>
-                  <select
-                    id={`hr-g-${l.code}`}
-                    className="select"
-                    value={a.groups?.[l.code] ?? ""}
-                    disabled={!opts.length}
-                    onChange={(e) =>
-                      set({
-                        groups: {
-                          ...(a.groups ?? {}),
-                          [l.code]: e.target.value,
-                        },
-                      })
-                    }
-                  >
-                    <option value="">—</option>
-                    {opts.map((g) => (
-                      <option key={g.code} value={g.code}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              );
-            })}
-          </div>
-        </fieldset>
-      ) : null}
-    </Dialog>
-  );
-}
-
-function HistoryDialog({
-  ha,
-  kind,
-  item,
-  names,
-  onClose,
-}: {
-  ha: HrmApi;
-  kind: HrmKind;
-  item: HrmItem;
-  names: Map<string, string>;
-  onClose: () => void;
-}) {
-  const h = useLoad(() => ha.history(kind, item.code), [kind, item.code]);
-  return (
-    <Dialog title={`Lịch sử ${item.code}`} onClose={onClose}>
-      <LoadState s={h}>
-        {(d) => (
-          <table className="dt">
-            <thead>
-              <tr>
-                <th scope="col">Phiên bản</th>
-                <th scope="col">Thời điểm</th>
-                <th scope="col">Tên</th>
-                <th scope="col">Thuộc tính</th>
-                <th scope="col">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.versions.map((v) => (
-                <tr key={v.version}>
-                  <td>{v.version}</td>
-                  <td>{new Date(v.recorded_at).toLocaleString("vi-VN")}</td>
-                  <td>{v.name}</td>
-                  <td className="small">
-                    {attrsText(kind, v.attrs, names) || "—"}
-                  </td>
-                  <td>
-                    {v.active ? "Đang dùng" : "Ngừng sử dụng"}{" "}
-                    <PlaceholderPill on={v.placeholder} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </LoadState>
-    </Dialog>
   );
 }
 
