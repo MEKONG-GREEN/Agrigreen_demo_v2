@@ -4,6 +4,7 @@
 // danh sách biên bản/báo cáo theo dự án, mẫu, trạng thái; lập biểu từ dự án (số liệu điền sẵn); soạn theo đúng mục, bảng của
 // mẫu Word gốc; trình duyệt/duyệt/trả lại (Mẫu 01), trình ký/tải bản đã ký (03, 04, 05), gửi Quốc gia và TW xác nhận/trả lại
 // (Mẫu 07); xuất Word đúng mẫu. Máy chủ quyết quyền và thao tác được phép (trường actions, can_edit).
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { fieldErrorMap } from "@/api/problem";
@@ -38,6 +39,7 @@ import {
 } from "./api";
 
 const FORMS = ["01", "03", "04", "05", "07"] as const;
+const KNQG_PATH = "/kn/cnts/du-an-mau-bieu";
 
 export function KnqgScreen() {
   const { api, kn } = useAuth();
@@ -53,8 +55,21 @@ export function KnqgScreen() {
     kapi ? () => kapi.list({ ...(project ? { project_ref: project } : {}), ...(form ? { form } : {}), ...(status ? { status } : {}) }) : null,
     [kapi, project, form, status],
   );
-  // W11.53b: thông báo hộp thư mở thẳng biểu (/kn/cnts/du-an-mau-bieu?doc=<mã>).
-  const [open, setOpen] = useState<string | null>(() => (typeof window === "undefined" ? null : docFromSearch(window.location.search)));
+  // W11.53b: thông báo hộp thư mở thẳng biểu (/kn/cnts/du-an-mau-bieu?doc=<mã>). Theo dõi tham số URL (không chỉ lúc
+  // tải trang) để bấm thông báo khi đang ở chính màn này vẫn mở đúng biểu; đóng/chọn biểu khác thì bỏ ?doc= khỏi URL để
+  // bấm lại cùng thông báo vẫn mở được.
+  const router = useRouter();
+  const linked = docFromSearch(useSearchParams()?.toString() ?? "");
+  const [open, setOpenState] = useState<string | null>(linked);
+  const [seenLinked, setSeenLinked] = useState(linked);
+  if (linked !== seenLinked) {
+    setSeenLinked(linked);
+    if (linked) setOpenState(linked);
+  }
+  const setOpen = (ref: string | null) => {
+    setOpenState(ref);
+    if (linked && ref !== linked) router.replace(KNQG_PATH);
+  };
   const [creating, setCreating] = useState(false);
   const loadSites = useCallback(async (ref: string) => (mapi ? (await mapi.project(ref)).sites.filter((s) => s.status === "active") : []), [mapi]);
   if (!kapi || !mapi) return null;
