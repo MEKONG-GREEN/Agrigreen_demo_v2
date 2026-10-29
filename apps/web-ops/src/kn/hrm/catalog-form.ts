@@ -11,7 +11,7 @@ export function catalogBase(pathname: string): string {
 }
 
 export function catalogItemPath(base: string, kind: HrmKind, code: string): string {
-  return `${base}/${kind}/${encodeURIComponent(code)}`;
+  return `${base}/${kind}/muc/${encodeURIComponent(code)}`;
 }
 
 export type CatalogValues = { code: string; name: string; order: string; allowance: string; rank: string };

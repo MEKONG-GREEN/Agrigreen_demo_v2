@@ -6,7 +6,7 @@ import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetHrm } from "@/api/mock/kn-hrm";
 import { createHrmApi, FIXED_KINDS, MAIN_KINDS, type HrmAttrs } from "./api";
 import { catalogHistory, HrmCatalogItemFormScreen, HrmCatalogItemScreen, HrmCatalogKindScreen } from "./CatalogItemScreens";
-import { catalogBase, validateCatalogItem, type CatalogValues } from "./catalog-form";
+import { catalogBase, catalogItemPath, validateCatalogItem, type CatalogValues } from "./catalog-form";
 
 const route = vi.hoisted(() => ({ params: { kind: "position", code: "vien_chuc" }, path: "/kn/nhan-su/danh-muc", push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useParams: () => route.params, usePathname: () => route.path, useRouter: () => ({ push: route.push }) }));
@@ -42,6 +42,8 @@ describe("FN-19: kiểm đầu vào trước khi tính", () => {
     expect(validateCatalogItem("position", { ...good, code: "", name: " ", order: "" }, {}).errors).toMatchObject({ code: expect.any(String), name: expect.any(String), order: expect.any(String) });
     expect(validateCatalogItem("major_group", good, {}).errors.level).toBeTruthy();
     expect(validateCatalogItem("grade", { ...good, code: " V.03.04.12 \n" }, { equiv_group: "CV", grade_type: "vien_chuc" }).body?.code).toBe("V.03.04.12");
+    // Mã ngạch hợp lệ "them-moi" phải mở được chi tiết, không trùng route Thêm.
+    expect(catalogItemPath("/kn/nhan-su/danh-muc", "grade", "them-moi")).toBe("/kn/nhan-su/danh-muc/grade/muc/them-moi");
   });
 
   it.each([...MAIN_KINDS, ...FIXED_KINDS])("%s giữ thuộc tính riêng khi lưu", (kind) => {
@@ -74,7 +76,7 @@ describe("FN-19: route thêm/sửa/chi tiết và quyền từ server", () => {
     expect((await ha.list("position")).items.some((x) => x.code === "truong_tram")).toBe(false);
     fireEvent.change(order, { target: { value: "80" } });
     await user.click(screen.getByRole("button", { name: "Lưu" }));
-    await waitFor(() => expect(route.push).toHaveBeenCalledWith("/kn/nhan-su/danh-muc/position/truong_tram"));
+    await waitFor(() => expect(route.push).toHaveBeenCalledWith("/kn/nhan-su/danh-muc/position/muc/truong_tram"));
     expect((await ha.list("position")).items.find((x) => x.code === "truong_tram")).toMatchObject({ name: "Trạm trưởng", sort_order: 80 });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "Log" })).toBeVisible();
@@ -88,14 +90,15 @@ describe("FN-19: route thêm/sửa/chi tiết và quyền từ server", () => {
     expect(await screen.findByLabelText(/^Mã/)).toBeDisabled();
     await user.clear(screen.getByLabelText(/^Tên/));
     await user.type(screen.getByLabelText(/^Tên/), "Viên chức đổi tên");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Cấp quản lý của tài khoản" }), "truong_phong");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(route.push).toHaveBeenCalled());
-    expect((await ha.history("position", "vien_chuc")).versions.at(-1)).toMatchObject({ code: "vien_chuc", name: "Viên chức đổi tên", active: false });
+    expect((await ha.history("position", "vien_chuc")).versions.at(-1)).toMatchObject({ code: "vien_chuc", name: "Viên chức đổi tên", active: false, attrs: { mgmt_level: "truong_phong" } });
     const versions = (await ha.history("position", "vien_chuc")).versions;
     const before = JSON.stringify(versions);
     const entries = catalogHistory("position", versions, new Map());
     expect(entries.map((entry) => entry.event)).toEqual(["Phiên bản 3", "Phiên bản 2", "Phiên bản 1 · Mẫu"]);
-    expect(entries[0]?.changes).toEqual([{ field: "Tên", old: "Viên chức", new: "Viên chức đổi tên" }]);
+    expect(entries[0]?.changes).toEqual([{ field: "Tên", old: "Viên chức", new: "Viên chức đổi tên" }, { field: "Cấp quản lý của tài khoản", old: null, new: "Trưởng phòng" }]);
     expect(entries[1]?.changes).toContainEqual({ field: "Trạng thái", old: "Đang dùng", new: "Ngừng sử dụng" });
     expect(JSON.stringify(versions)).toBe(before);
     form.unmount();
@@ -105,6 +108,7 @@ describe("FN-19: route thêm/sửa/chi tiết và quyền từ server", () => {
     expect(within(log).getByText("Phiên bản 3")).toBeVisible();
     expect(within(log).getByText("Phiên bản 1 · Mẫu")).toBeVisible();
     expect(screen.getByRole("columnheader", { name: "STT" })).toBeVisible();
+    expect(screen.getByText("Trưởng phòng", { selector: "dd" })).toBeVisible();
   });
 
   it("chuyên ngành giữ ánh xạ nhóm riêng theo trình độ NS05 khi lưu", async () => {
@@ -117,7 +121,7 @@ describe("FN-19: route thêm/sửa/chi tiết và quyền từ server", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "Đại học" }), "dh_nong_hoc");
     await user.selectOptions(screen.getByRole("combobox", { name: "Thạc sĩ" }), "ths_nong_hoc");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
-    await waitFor(() => expect(route.push).toHaveBeenCalledWith("/kn/nhan-su/danh-muc/major/chuyen_nganh_moi"));
+    await waitFor(() => expect(route.push).toHaveBeenCalledWith("/kn/nhan-su/danh-muc/major/muc/chuyen_nganh_moi"));
     expect((await ha.history("major", "chuyen_nganh_moi")).versions[0]?.attrs.groups).toEqual({ dai_hoc: "dh_nong_hoc", thac_si: "ths_nong_hoc" });
   });
 

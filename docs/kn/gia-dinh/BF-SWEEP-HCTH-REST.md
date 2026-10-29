@@ -1,5 +1,7 @@
 ## BF-SWEEP-HCTH-REST — phần đầu #163: mục danh mục nhân sự FN-19
 
+Route mục dùng `…/[kind]/muc/[code]` và `…/[kind]/muc/[code]/sua`; route Thêm là `…/[kind]/them-moi`. Namespace `muc` giúp mã ngạch hợp lệ `them-moi` không trùng trang Thêm, không đặt thêm hạn chế lên mã mà API chấp nhận.
+
 Ngày 29/10/2026. Phần này hoàn tất luồng danh sách → thêm/sửa → chi tiết và lịch sử cho 16 loại mục FN-19, cả route chính `/kn/nhan-su/danh-muc` lẫn alias `/kn/phong-ban/[dept]/danh-muc-nhan-su`. Mục Thêm/Sửa/Lịch sử không mở popup; trang dùng DetailPage/LogPanel, bảng dùng DataTable có STT. Quyền thêm/sửa lấy từ `GET /v1/hrm/status.can_manage`; khi chưa rõ quyền hoặc chỉ xem thì không mở form ghi. API và kiểm quyền mỗi request tại máy chủ giữ nguyên.
 
 Nguồn: BRD HCTH v3.0 (FN-19 P2058–2097; SHA-256 `1ed44aa50d2f797422ef63b32948f24c4f3856f0419814cf274cb64ac6f2db66`), hiện nằm trong thư mục `01. BRD/V1.0/`; PRD `kn-bugfix-brd-alignment` R-E1/R-A1–A5; [UI-KIT](../ui-kit.md); [ma trận BRD](../doi-chieu-brd-bugfix-2026-10.md). Không tự chuyển phạm vi sang BRD HCTH v4.0.

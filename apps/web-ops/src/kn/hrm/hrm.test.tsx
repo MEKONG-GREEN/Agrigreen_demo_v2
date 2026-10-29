@@ -148,8 +148,8 @@ describe("màn Danh mục nhân sự", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^Chức vụ/ }));
     expect(await screen.findByRole("link", { name: "Thêm" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/them-moi");
-    expect(screen.getByRole("link", { name: "Sửa vien_chuc" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/vien_chuc/sua");
-    expect(screen.getByRole("link", { name: "vien_chuc" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/vien_chuc");
+    expect(screen.getByRole("link", { name: "Sửa vien_chuc" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/muc/vien_chuc/sua");
+    expect(screen.getByRole("link", { name: "vien_chuc" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/muc/vien_chuc");
     expect(screen.getByRole("columnheader", { name: "STT" })).toBeVisible();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

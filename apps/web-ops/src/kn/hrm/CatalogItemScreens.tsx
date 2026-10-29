@@ -20,6 +20,10 @@ const MGMT_LEVELS = [
 ] as const;
 const MGMT_OPTIONS = MGMT_LEVELS.map(([value, label]) => ({ value, label }));
 
+function managementLabel(value: string | undefined): string | null {
+  return value ? MGMT_OPTIONS.find((option) => option.value === value)?.label ?? value : null;
+}
+
 function namesFor(levels: HrmItem[], groups: HrmItem[]) {
   return new Map([...levels, ...groups].map((item) => [`${item.kind}:${item.code}`, item.name]));
 }
@@ -37,6 +41,7 @@ export function catalogHistory(kind: HrmKind, versions: HrmItem[], names: Map<st
         { field: "Tên", old: previous?.name ?? null, new: item.name },
         { field: "Thứ tự", old: previous ? String(previous.sort_order) : null, new: String(item.sort_order) },
         { field: "Thuộc tính", old: previous ? attrsText(kind, previous.attrs, names) || null : null, new: attrsText(kind, item.attrs, names) || null },
+        { field: "Cấp quản lý của tài khoản", old: managementLabel(previous?.attrs.mgmt_level), new: managementLabel(item.attrs.mgmt_level) },
         { field: "Trạng thái", old: previous ? previous.active ? "Đang dùng" : "Ngừng sử dụng" : null, new: item.active ? "Đang dùng" : "Ngừng sử dụng" },
         { field: "Dữ liệu mẫu", old: previous ? previous.placeholder ? "Mẫu" : "Không" : null, new: item.placeholder ? "Mẫu" : "Không" },
       ].filter((change) => change.old !== change.new),
@@ -84,6 +89,7 @@ function CatalogItem({ kind, code, base }: { kind: HrmKind; code: string; base: 
         { label: "Mã", value: item.code }, { label: "Tên", value: item.name },
         { label: "Thứ tự", value: item.sort_order }, { label: "Phiên bản", value: item.version },
         { label: "Thuộc tính", value: attrsText(kind, item.attrs, names) },
+        ...(kind === "position" ? [{ label: "Cấp quản lý của tài khoản", value: managementLabel(item.attrs.mgmt_level) }] : []),
         { label: "Dữ liệu mẫu", value: item.placeholder ? "Mẫu — chờ Phòng HCTH xác nhận (Q-070)" : "Không" },
       ]} />
       <DataTable caption="Lịch sử phiên bản" rows={[...versions].sort((a, b) => b.version - a.version)} rowKey={(row) => String(row.version)} columns={[

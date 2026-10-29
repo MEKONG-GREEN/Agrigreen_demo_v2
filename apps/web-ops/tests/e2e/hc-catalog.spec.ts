@@ -34,7 +34,7 @@ test("hc-catalog: FN-19 thêm/sửa/chi tiết trên route, Log và lỗi số n
   await expect(page).toHaveURL(/\/them-moi$/);
   await page.getByLabel(/^Thứ tự/).fill("80");
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
-  await expect(page).toHaveURL(/\/position\/truong_tram_e2e$/);
+  await expect(page).toHaveURL(/\/position\/muc\/truong_tram_e2e$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Trạm trưởng E2E · truong_tram_e2e Đang dùng");
   await page.getByRole("link", { name: "Sửa", exact: true }).click();
   await expect(page).toHaveURL(/\/truong_tram_e2e\/sua$/);
@@ -49,4 +49,11 @@ test("hc-catalog: FN-19 thêm/sửa/chi tiết trên route, Log và lỗi số n
   await page.getByRole("link", { name: "Danh sách", exact: true }).click();
   await expect(page).toHaveURL(/\/position$/);
   await expect(page.getByRole("link", { name: "truong_tram_e2e", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^Ngạch\/CDNN/ }).click();
+  await page.getByRole("link", { name: "Thêm", exact: true }).click();
+  await page.getByLabel(/^Mã/).fill("them-moi");
+  await page.getByLabel(/^Tên/).fill("Ngạch không trùng route");
+  await page.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page).toHaveURL(/\/grade\/muc\/them-moi$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Ngạch không trùng route · them-moi");
 });
