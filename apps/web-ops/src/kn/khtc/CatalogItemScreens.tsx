@@ -40,6 +40,11 @@ export function KhtcCatalogEditScreen() { return <ExistingCatalog edit />; }
 
 function ExistingCatalog({ edit }: { edit: boolean }) {
   const { kind, code, retired } = useCatalogRoute();
+  // useLoad giữ data cũ khi tải lại; route khác phải có phiên tải/form riêng.
+  return <CatalogRecord key={`${kind}:${code}:${edit}`} kind={kind} code={code} retired={retired} edit={edit} />;
+}
+
+function CatalogRecord({ kind, code, retired, edit }: { kind: KhtcCatalogKind | null; code: string; retired: boolean; edit: boolean }) {
   const api = useKhtcApi();
   const rights = useKhtcRights();
   const s = useLoad(kind && (!edit || rights.catalog) ? () => api.catalogHistory(kind, code) : null, [api, kind, code, edit, rights.catalog]);

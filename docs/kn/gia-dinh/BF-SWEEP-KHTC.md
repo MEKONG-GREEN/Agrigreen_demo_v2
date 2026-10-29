@@ -8,6 +8,7 @@ Chuẩn hóa cả 7 loại trong Danh mục KHTC: Loại báo cáo, ĐVT, Lĩnh 
 
 - Danh sách dùng DataTable tự sinh STT, giữ số lượng theo loại và bộ lọc ngừng dùng; loại/bộ lọc lưu trong URL.
 - Thêm, sửa, xem có route riêng dưới menu Danh mục KHTC; DetailPage có liên kết danh sách, Lưu/Hủy và Log. Đoạn `/muc/[code]` tránh nhầm mã hợp lệ `them-moi` với trang tạo mới.
+- Khi đổi mã trên cùng màn, bỏ phiên tải/form của mục trước ngay; trong lúc chờ lịch sử mới không hiển thị dữ liệu hay thao tác ghi của mục cũ. Phản hồi Lưu về sau khi rời trang không kéo người dùng quay lại.
 - Log lấy từ API lịch sử hiện có, sắp phiên bản, hiển thị người/thời điểm và giá trị cũ → mới. Không dựng lịch sử giả từ trạng thái giao diện.
 - TextField/NumberField + validateForm: lỗi bắt buộc, mã 1–40 ký tự đúng quy tắc, tên tối đa 500, thuộc tính tối đa 300; Người ký bắt buộc Chức vụ. Lỗi máy chủ gắn về trường, kể cả trùng mã và xung đột người ký mặc định.
 - Thứ tự là số nguyên 0–100000, rỗng thành 0 như API hiện tại. Chặn độ dài thô trên 32 ký tự và số mũ **trước** bộ chuẩn hóa/Decimal của UI-KIT, cả khi nhập/blur và khi Lưu. Giá trị bị từ chối không thay bằng số cũ để gửi; người dùng phải sửa lại. Guard chỉ ở feature này, không sửa `components/form.tsx` đang thuộc #163.

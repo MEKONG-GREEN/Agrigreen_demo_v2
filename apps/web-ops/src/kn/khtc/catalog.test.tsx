@@ -19,7 +19,14 @@ const writes: { request: Request; body: Record<string, unknown> }[] = [];
 let failOnce = false;
 let writeGate: Promise<void> | null = null;
 let releaseWrite: (() => void) | undefined;
+let historyGate: Promise<void> | null = null;
+let releaseHistory: (() => void) | undefined;
 const trackedFetch: typeof mockFetchNoDelay = async (request) => {
+  if (request.method === "GET" && new URL(request.url).pathname.endsWith("/history") && historyGate) {
+    const gate = historyGate;
+    historyGate = null;
+    await gate;
+  }
   if (request.method === "POST" && new URL(request.url).pathname.startsWith("/v1/kn/khtc/catalogs/")) {
     writes.push({ request: request.clone(), body: await request.clone().json() });
     if (writeGate) {
@@ -38,14 +45,14 @@ const trackedFetch: typeof mockFetchNoDelay = async (request) => {
 beforeEach(async () => {
   vi.restoreAllMocks();
   nav.params = { kind: "unit", code: "ha" }; nav.query = ""; nav.push.mockReset(); nav.replace.mockReset();
-  auth.role = "admin"; auth.readOnly = false; writes.length = 0; failOnce = false; writeGate = null; releaseWrite = undefined;
+  auth.role = "admin"; auth.readOnly = false; writes.length = 0; failOnce = false; writeGate = null; releaseWrite = undefined; historyGate = null; releaseHistory = undefined;
   resetKhtcMock();
   const response = await mockFetchNoDelay(new Request("http://mock/v1/me/context", { method: "POST", headers: { Authorization: "Bearer mock.kn-admin", "Content-Type": "application/json", "Idempotency-Key": `ctx-${Math.random()}` }, body: JSON.stringify({ assignment_id: "asg-admin", department_code: null }) }));
   expect(response.status).toBe(201);
   const context = await response.json() as { context_id: string };
   auth.api = createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-admin", getContextId: () => context.context_id, fetch: trackedFetch });
 });
-afterEach(() => { cleanup(); releaseWrite?.(); });
+afterEach(() => { cleanup(); releaseWrite?.(); releaseHistory?.(); });
 
 async function fillNew(code = "ui-test", name = "Đơn vị kiểm thử") {
   await userEvent.setup().type(screen.getByRole("textbox", { name: "Mã" }), code);
@@ -181,6 +188,23 @@ describe("Danh mục KHTC — route, kiểm nhập và quyền", () => {
     await userEvent.setup().click(screen.getByRole("button", { name: "Dùng lại" }));
     await waitFor(() => expect(screen.getByRole("complementary", { name: "Log" })).toHaveTextContent("Dùng lại · v3"));
     expect(writes.map((x) => x.body.active)).toEqual([false, true]);
+  });
+
+  it.each([false, true])("đổi mã route khi edit=%s không giữ dữ liệu/hành động của mục cũ lúc tải", async (edit) => {
+    const Screen = edit ? KhtcCatalogEditScreen : KhtcCatalogDetailScreen;
+    const view = render(<Screen />);
+    if (edit) await screen.findByDisplayValue("Héc ta");
+    else await screen.findByRole("heading", { name: /^Héc ta/, level: 1 });
+    historyGate = new Promise<void>((resolve) => { releaseHistory = resolve; });
+    nav.params = { kind: "unit", code: "lop" };
+    view.rerender(<Screen />);
+    expect(screen.queryByDisplayValue("Héc ta")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Héc ta/, level: 1 })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: edit ? "Lưu" : "Ngừng dùng" })).not.toBeInTheDocument();
+    releaseHistory!();
+    if (edit) await screen.findByDisplayValue("Lớp tập huấn");
+    else await screen.findByRole("heading", { name: /^Lớp tập huấn/, level: 1 });
+    expect(writes).toHaveLength(0);
   });
 
   it.each([{ role: "kn_tinh", readOnly: false }, { role: "admin", readOnly: true }])("$role / readOnly=$readOnly không mở form ghi hoặc thấy hành động sửa", async ({ role, readOnly }) => {
