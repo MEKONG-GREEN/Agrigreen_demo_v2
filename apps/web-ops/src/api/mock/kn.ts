@@ -1922,6 +1922,12 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Báo cáo KHTC",
       "route": "/kn/phong-ban/{department}/bao-cao-khtc",
       "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_muc_luc_mau",
+      "label": "Mục lục mẫu báo cáo",
+      "route": "/kn/phong-ban/{department}/muc-luc-mau",
+      "icon": "report"
     }
   ],
   "thong_tin_truyen_thong": [
