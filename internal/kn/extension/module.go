@@ -149,8 +149,9 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	return m
 }
 
-// UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng.
-func (m *Module) UseContacts(c accport.StaffContacts) { m.svc.Contacts = c }
+// UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng: danh bạ trực (US-DIR-02) và cột
+// "ĐT viên chức" của lịch trực KSGM BM-03 (BF-CN-DUTY).
+func (m *Module) UseContacts(c accport.StaffContacts) { m.svc.Contacts, m.cal.Contacts = c, c }
 
 // UseFarmers nối cổng liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) — yêu cầu
 // hỗ trợ từ App HTX (HTX US-SUPPORT-01 → KN US-TASK-01). Gốc lắp ráp gọi sau khi dựng pf/accounts.

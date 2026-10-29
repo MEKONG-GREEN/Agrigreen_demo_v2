@@ -5,12 +5,14 @@ import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { parseProblemResponse } from "@/api/problem";
 import { parseNumberInput, type NumberRule } from "@/components/form";
+import { filenameFromDisposition } from "@/lib/files";
 
 type S = components["schemas"];
 export type DutyRoster = S["CNTSDutyRoster"];
 export type DutyCell = S["CNTSDutyCell"];
 export type Shift = DutyCell["shift"];
 export type MyDuties = S["CNTSMyDuties"];
+export type DutyRosterImport = S["CNTSDutyRosterImport"];
 export type VaccinationBatch = S["CNTSVaccinationBatch"];
 export type VaccinationBatchDetail = S["CNTSVaccinationBatchDetail"];
 export type VaccinationDose = S["CNTSVaccinationDose"];
@@ -85,17 +87,41 @@ export function weekdayLabel(month: string, day: number): string {
   return ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][new Date(Date.UTC(y!, m! - 1, day)).getUTCDay()]!;
 }
 
-/** Xuất CSV đúng bố cục lưới "Lịch trực ksgm": Cơ sở, Viên chức, ngày 1..n. */
-export function rosterCsv(r: Pick<DutyRoster, "days_in_month" | "facilities" | "officers">, grid: ReadonlyMap<string, Shift>, rows: [string, string][]): string {
-  const fname = new Map(r.facilities.map((f) => [f.ref, f.name]));
-  const oname = new Map(r.officers.map((o) => [o.ref, o.display ?? o.ref]));
-  const days = Array.from({ length: r.days_in_month }, (_, i) => i + 1);
-  const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-  const lines = [["Cơ sở", "Viên chức", ...days.map(String)].join(",")];
-  for (const [f, o] of rows) {
-    lines.push([esc(fname.get(f) ?? f), esc(oname.get(o) ?? o), ...days.map((d) => SHIFT_LABEL[grid.get(cellKey(f, o, d)) as Shift] ?? "")].join(","));
+/** Ngày cơ sở chưa có ai trực theo lưới đang sửa (như cảnh báo facility_uncovered của máy chủ) — để tô ô lưới. */
+export function uncoveredDays(grid: ReadonlyMap<string, Shift>, facilities: readonly string[], daysInMonth: number): Map<string, Set<number>> {
+  const covered = new Map<string, Set<number>>();
+  for (const k of grid.keys()) {
+    const [f, , d] = k.split("|");
+    if (!covered.has(f!)) covered.set(f!, new Set());
+    covered.get(f!)!.add(Number(d));
   }
-  return lines.join("\n");
+  const out = new Map<string, Set<number>>();
+  for (const f of facilities) {
+    const miss = new Set<number>();
+    for (let d = 1; d <= daysInMonth; d++) if (!covered.get(f)?.has(d)) miss.add(d);
+    if (miss.size) out.set(f, miss);
+  }
+  return out;
+}
+
+/** Liên kết "Cấp quyền" từ cảnh báo viên chức chưa được cấp quyền cơ sở: chọn sẵn viên chức, vai KSGM, xã, cơ sở. */
+export function grantHref(officer: string, facility: string, commune?: string | null): string {
+  const q = new URLSearchParams({ vien_chuc: officer, co_so: facility });
+  if (commune) q.set("xa", commune);
+  return `/kn/cnts/cap-quyen?${q.toString()}`;
+}
+
+/** Dòng lỗi của kết quả nạp tệp, dạng "Dòng 12: …". */
+export function issueText(i: DutyRosterImport["issues"][number]): string {
+  return i.line ? `Dòng ${i.line}: ${i.message}` : i.message;
+}
+
+/** Tệp nạp: chỉ .xlsx (máy chủ đọc), tối đa 4 MB. Trả lỗi hiển thị hoặc null. */
+export function importFileError(f: { kind: string; size: number }): string | null {
+  if (f.kind === "xls") return "Tệp .xls cũ — mở bằng Excel rồi lưu lại dạng .xlsx.";
+  if (f.kind !== "xlsx") return "Chọn tệp Excel .xlsx theo mẫu Lịch trực KSGM.";
+  if (f.size > 4 * 1024 * 1024) return "Tệp vượt 4 MB.";
+  return null;
 }
 
 export const BATCH_STATUS_LABEL: Record<BatchStatus, string> = { open: "Đang theo lịch", overdue: "Có mũi quá hạn", done: "Đã tiêm đủ", cancelled: "Đã hủy" };
@@ -169,6 +195,26 @@ export function createCntsCalApi(api: ApiClient) {
     roster: (month: string, province_code?: string): Promise<DutyRoster> => unwrap(api.GET("/v1/extension/cnts/duty-rosters/{month}", { params: { path: { month }, query: { province_code } } })),
     saveRoster: (month: string, body: S["CNTSDutyRosterSave"]): Promise<DutyRoster> =>
       unwrap(api.POST("/v1/extension/cnts/duty-rosters/{month}", { params: { path: { month }, ...idem() }, body })),
+    /** Nạp Excel BM-03: máy chủ chỉ đọc, trả ô + lỗi theo dòng + cảnh báo; lưu bằng saveRoster(source=excel). */
+    importRoster: (month: string, file: { body: string | Uint8Array; contentType: string }, province_code?: string): Promise<DutyRosterImport> =>
+      unwrap(
+        api.POST("/v1/extension/cnts/duty-rosters/{month}/import", {
+          params: { path: { month }, query: { province_code }, ...idem() },
+          body: file.body as unknown as string,
+          bodySerializer: (b: unknown) => b as BodyInit,
+          headers: { "Content-Type": file.contentType },
+        }),
+      ),
+    /** Xuất .xlsx đúng mẫu BM-03 của bản đã lưu. */
+    exportRoster: async (month: string, province_code?: string, basis?: string): Promise<{ blob: Blob; name: string }> => {
+      const p = api.GET("/v1/extension/cnts/duty-rosters/{month}/export.xlsx", {
+        params: { path: { month }, query: { province_code, ...(basis?.trim() ? { basis: basis.trim() } : {}) } },
+        parseAs: "blob",
+      });
+      const blob = (await unwrap(p)) as Blob;
+      const res = await p;
+      return { blob, name: filenameFromDisposition(res.response.headers.get("Content-Disposition"), `lich-truc-ksgm-${month}.xlsx`) };
+    },
     myDuties: (month: string, province_code?: string): Promise<MyDuties> => unwrap(api.GET("/v1/extension/cnts/my-duties", { params: { query: { month, province_code } } })),
     batches: async (q: { status?: BatchStatus; commune_code?: string; model_type_code?: string; project_ref?: string; site_ref?: string } = {}): Promise<VaccinationBatch[]> =>
       (await unwrap(api.GET("/v1/extension/cnts/vaccination-batches", { params: { query: q } }))).items,

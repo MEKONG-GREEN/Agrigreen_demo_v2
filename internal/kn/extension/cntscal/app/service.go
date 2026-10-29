@@ -69,6 +69,9 @@ type Service struct {
 	// Vault (tùy chọn, BF-CN-VACC #168): nhãn chủ hộ mô hình đã che bớt (kho định danh) cho danh sách lứa, bảng và tệp
 	// BM-07. nil → không có nhãn chủ hộ.
 	Vault client.Client
+	// Contacts (tùy chọn, BF-CN-DUTY): SĐT công vụ của viên chức (pf/accounts) đọc lúc dựng lưới, nạp/xuất BM-03; không
+	// lưu, không ghi log. Lưới chỉ trả SĐT đã che; tệp xuất chỉ có SĐT đầy đủ với người lập lịch. nil → không có cột ĐT.
+	Contacts accport.StaffContacts
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

@@ -26,7 +26,7 @@ test("W11.46 Admin lập lịch trực riêng theo tỉnh và xem lịch cũ", a
   await page.getByRole("combobox",{name:"Cơ sở",exact:true}).selectOption({index:1});
   await page.getByRole("combobox",{name:"Viên chức",exact:true}).selectOption({index:1});
   await page.getByRole("button",{name:"Thêm hàng"}).click();
-  await page.getByRole("button",{name:/ ngày 1: nghỉ$/}).click();
+  await page.getByRole("button",{name:/ ngày 1: nghỉ( \(cơ sở chưa có người trực\))?$/}).click();
   await page.getByLabel("Ghi chú lần lưu").fill("Phân ca kiểm thử theo tỉnh");
   await page.getByRole("button",{name:"Lưu",exact:true}).click();
   await expect(page.getByRole("region",{name:"Lịch sử lưu"})).toContainText("Phân ca kiểm thử theo tỉnh");
@@ -35,9 +35,20 @@ test("W11.46 Admin lập lịch trực riêng theo tỉnh và xem lịch cũ", a
   await expect(page.getByText("Phân ca kiểm thử theo tỉnh",{exact:false})).toHaveCount(0);
   await province.selectOption("91");
   await expect(page.getByRole("region",{name:"Lịch sử lưu"})).toContainText("Phân ca kiểm thử theo tỉnh");
+  // BF-CN-DUTY: cột Địa chỉ/ĐT; xuất Excel đúng mẫu BM-03 rồi nạp lại tệp vừa xuất (xem trước → áp vào lưới → lưu source=excel).
+  await expect(page.getByRole("columnheader",{name:"Địa chỉ",exact:true})).toBeVisible();
+  await expect(page.getByRole("columnheader",{name:"ĐT",exact:true})).toBeVisible();
+  await page.getByLabel("Dòng căn cứ (xuất Excel)").fill("theo thông báo số 1/TB ngày 01/10");
   const downloaded=page.waitForEvent("download");
-  await page.getByRole("button",{name:"Xuất CSV"}).click();
-  expect((await downloaded).suggestedFilename()).toMatch(/^lich-truc-ksgm-\d{4}-\d{2}\.csv$/);
+  await page.getByRole("button",{name:"Xuất Excel"}).click();
+  const download=await downloaded;
+  expect(download.suggestedFilename()).toMatch(/^lich-truc-ksgm-91-\d{4}-\d{2}\.xlsx$/);
+  await page.getByLabel("Tệp Excel lịch trực").setInputFiles(await download.path());
+  const preview=page.getByRole("region",{name:"Xem trước tệp nạp"});
+  await expect(preview).toContainText("Không có lỗi.");
+  await preview.getByRole("button",{name:"Áp dụng vào lưới"}).click();
+  await page.getByRole("button",{name:"Lưu",exact:true}).click();
+  await expect(page.getByRole("region",{name:"Lịch sử lưu"})).toContainText("nạp Excel");
   await province.selectOption("legacy");
   await expect(page.getByRole("button",{name:"Lưu",exact:true})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Thêm hàng"})).toHaveCount(0);
