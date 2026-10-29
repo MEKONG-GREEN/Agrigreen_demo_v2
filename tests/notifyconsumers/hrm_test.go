@@ -30,10 +30,11 @@ func TestAssemblyAddsHRMConsumerKindsBuilders_NotifyHCTH(t *testing.T) {
 	if err := json.Unmarshal(raw, &legacy); err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != len(legacy)+1 || !reflect.DeepEqual(got[:len(legacy)], legacy) {
+	// W11.53b: thêm pf.notify.cnts_knqg (thứ tự 18) sau HRM — kiểm ở TestAssemblyAddsKNQGConsumer_W1153b.
+	if len(got) != len(legacy)+2 || !reflect.DeepEqual(got[:len(legacy)], legacy) {
 		t.Fatalf("danh mục consumer cũ bị đổi:\n%v", got)
 	}
-	last := got[len(got)-1]
+	last := got[len(legacy)]
 	if last.Name != hrmport.NotifyConsumerHRM || last.Order != hrmport.NotifyConsumerHRMOrder ||
 		!slices.Equal(last.Events, []string{hrmport.EventPromotionDueDetected, hrmport.EventPlanReminded}) {
 		t.Fatalf("consumer HRM: %+v", last)

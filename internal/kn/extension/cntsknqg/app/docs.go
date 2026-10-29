@@ -618,6 +618,13 @@ func (s *Service) Update(ctx context.Context, in UpdateInput) (DocView, error) {
 // bản hiện hành rồi ghi một dòng sổ.
 func (s *Service) write(ctx context.Context, c caller, cur store.Doc, base *int64, idem string,
 	mutate func(fresh *pctx, diary *domain.DiaryFacts, d *store.Doc) error) (DocView, error) {
+	return s.writeEmit(ctx, c, cur, base, idem, mutate, nil)
+}
+
+// writeEmit là write kèm emit: chạy sau khi ghi dòng sổ, CÙNG giao dịch (outbox thông báo — W11.53b).
+func (s *Service) writeEmit(ctx context.Context, c caller, cur store.Doc, base *int64, idem string,
+	mutate func(fresh *pctx, diary *domain.DiaryFacts, d *store.Doc) error,
+	emit func(tx pgx.Tx, fresh *pctx, d store.Doc) error) (DocView, error) {
 	var d store.Doc
 	replayed := false
 	err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
@@ -654,7 +661,10 @@ func (s *Service) write(ctx context.Context, c caller, cur store.Doc, base *int6
 		if err := mutate(fresh, diary, &d); err != nil {
 			return err
 		}
-		return store.Insert(ctx, tx, c.p.TenantID, &d)
+		if err := store.Insert(ctx, tx, c.p.TenantID, &d); err != nil || emit == nil {
+			return err
+		}
+		return emit(tx, fresh, d)
 	})
 	if dup(err) {
 		return s.replayIdem(ctx, c, idem)
@@ -727,7 +737,11 @@ func (s *Service) transition(ctx context.Context, in ActInput, scan *store.Scan)
 		return DocView{}, ErrDocConflict
 	}
 	e := s.ext(ctx, pc, cur.Form, false)
-	return s.write(ctx, c, *cur, in.BaseVersion, idem, func(fresh *pctx, diary *domain.DiaryFacts, d *store.Doc) error {
+	recips := s.recipients(ctx, c, pc.p, cur.Form, in.Action) // NGOÀI giao dịch (W11.53b)
+	emit := func(tx pgx.Tx, fresh *pctx, d store.Doc) error {
+		return emitChanged(ctx, tx, c.p.TenantID, fresh.p, d, in.Action, recips, d.EventTime)
+	}
+	return s.writeEmit(ctx, c, *cur, in.BaseVersion, idem, func(fresh *pctx, diary *domain.DiaryFacts, d *store.Doc) error {
 		if step.NewRev {
 			d.Revision++
 			d.Scan = nil
@@ -753,7 +767,7 @@ func (s *Service) transition(ctx context.Context, in ActInput, scan *store.Scan)
 			d.StatusReason = reason
 		}
 		return nil
-	})
+	}, emit)
 }
 
 func utf8Len(s string) int { return len([]rune(s)) }
