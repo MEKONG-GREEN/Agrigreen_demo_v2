@@ -4587,6 +4587,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "admin.qt.nhat_ky_he_thong",
+        "label": "Nhật ký hệ thống",
+        "route": "/kn/quan-tri/nhat-ky-he-thong",
+        "icon": "shield",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      },
