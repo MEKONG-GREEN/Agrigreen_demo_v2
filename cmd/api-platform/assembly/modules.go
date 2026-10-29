@@ -203,7 +203,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	knUnits := extension.NewPublishedAdminUnits(unit)
 	knOrgs := extension.NewPublishedOrganizations(unit)
 	kn := extension.New(unit, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: knOrgs, Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs(),
-		Plots: knHTXData, Coops: knHTXData})
+		Plots: knHTXData, Coops: knHTXData, Store: store})
 	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
 	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
 
@@ -370,6 +370,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseRoleHolders(acc.RoleHolders())     // W11.46: người theo dõi lịch công tác
 	kn.UseXaScopes(acc.XaScopes())           // W11.46: viên chức Cấp Xã CNTS của lịch trực KSGM BM-03
 	kn.UseCNTSModelVault(ext.Vault)          // W11.47: chủ hộ mô hình CNTS ở kho định danh
+	kn.UseKNRecordsVault(ext.Vault)          // #67: người đại diện / chủ hộ của hồ sơ KN riêng HTX/Nông hộ/THT
 	wireCNTSDiary(kn, ev, ext.Vault)         // W11.48: ảnh nhật ký nuôi CNTS qua pf/evidence
 	kn.UseCNTSMapGeometry(g.AdminGeometry()) // W11.52: cảnh báo vùng vẽ ngoài địa giới xã (bản đồ CNTS)
 

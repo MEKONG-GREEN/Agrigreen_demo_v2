@@ -961,8 +961,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.du_an_knqg.mau_bieu",
                 "label": "Mẫu biểu dự án",
                 "route": "/kn/cnts/du-an-mau-bieu",
-                "icon": "table",
-                "soon": true
+                "icon": "table"
               }
             ]
           },
@@ -1142,8 +1141,21 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
           {
             "key": "tw.cnts.du_an_knqg",
             "label": "Dự án KNQG",
-            "route": "/kn/cnts/du-an",
-            "icon": "report"
+            "icon": "report",
+            "children": [
+              {
+                "key": "tw.cnts.du_an_knqg.du_an",
+                "label": "Dự án tại An Giang",
+                "route": "/kn/cnts/du-an",
+                "icon": "report"
+              },
+              {
+                "key": "tw.cnts.du_an_knqg.mau_bieu",
+                "label": "Mẫu biểu, nghiệm thu năm (07)",
+                "route": "/kn/cnts/du-an-mau-bieu",
+                "icon": "table"
+              }
+            ]
           }
         ]
       }
@@ -1267,8 +1279,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.khtc.so_lieu_ngoai",
             "label": "Số liệu nguồn ngoài",
             "route": "/kn/khtc/so-lieu-ngoai",
-            "icon": "database",
-            "soon": true
+            "icon": "database"
           },
           {
             "key": "tinh.van_ban",
