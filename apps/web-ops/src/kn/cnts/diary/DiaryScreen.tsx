@@ -17,6 +17,7 @@ import {
   cost6Label,
   createCntsDiaryApi,
   createPhotoDrafts,
+  type PhotoDraft,
   currentFix,
   dmy,
   expectedAlive,
@@ -662,14 +663,15 @@ function EntryForm({
               e.target.value = "";
               if (!file) return;
               // #172: chọn lại đúng ảnh sau mất phản hồi → cùng id/captured_at + thân tất định → cùng khóa, máy chủ phát lại.
-              // Lời gọi tải đứng sau await nén ảnh nên phải bọc bằng `idem` của lượt này.
-              const draft = photoDrafts.draft(c.household_ref, photoKind, file);
+              // Lời gọi tải đứng sau await (băm nội dung, nén ảnh) nên phải bọc bằng `idem` của lượt này.
+              const drafted: { d?: PhotoDraft } = {};
               const p = await act.run(async (idem) => {
+                const d = (drafted.d = await photoDrafts.draft(c.household_ref, photoKind, file));
                 const blob = await compressImage(file);
-                return idem(() => dapi.uploadPhoto(c.household_ref, photoKind, blob, draft));
+                return idem(() => dapi.uploadPhoto(c.household_ref, photoKind, blob, d));
               }, "Đã tải ảnh");
-              if (p) {
-                photoDrafts.done(draft);
+              if (p && drafted.d) {
+                photoDrafts.done(drafted.d);
                 setPhotos([...photos, p]);
               }
             }}

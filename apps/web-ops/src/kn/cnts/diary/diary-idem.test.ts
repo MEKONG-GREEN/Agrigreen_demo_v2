@@ -8,20 +8,22 @@ import { IdempotentOperation, withIdempotentOperation } from "@/api/idempotency"
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsDiary } from "@/api/mock/kn-cnts-diary";
 import { resetCntsModel } from "@/api/mock/kn-cnts-model";
-import { createCntsDiaryApi, createPhotoDrafts, type Photo } from "./api";
+import { createCntsDiaryApi, createPhotoDrafts, type Photo, type PhotoDraft } from "./api";
 
 const HH = "0190f1c4-7d3e-7000-8000-0000000c7301";
 
 function flaky() {
-  const sent: { path: string; key: string | null; replayed: boolean }[] = [];
+  const sent: { path: string; key: string | null; replayed: boolean; status: number; id: string | null }[] = [];
   let lose = false;
   const api = createApiClient({
     baseUrl: "http://mock",
     getAccessToken: () => "mock.setter",
     getContextId: () => null,
     fetch: async (req: Request) => {
+      const path = new URL(req.url).pathname;
+      const id = req.method === "POST" && path.endsWith("/diary-photos") ? String((await req.clone().formData()).get("id")) : null;
       const res = await mockFetchNoDelay(req);
-      if (req.method === "POST") sent.push({ path: new URL(req.url).pathname, key: req.headers.get("Idempotency-Key"), replayed: res.headers.get("Idempotent-Replayed") === "true" });
+      if (req.method === "POST") sent.push({ path, key: req.headers.get("Idempotency-Key"), replayed: res.headers.get("Idempotent-Replayed") === "true", status: res.status, id });
       if (lose) {
         lose = false;
         throw new TypeError("Failed to fetch"); // máy chủ đã lưu, phản hồi không về
@@ -34,14 +36,16 @@ function flaky() {
 
 /** Một lần chọn ảnh trên màn nhật ký (DiaryScreen EntryForm): lượt của useAction.run, nén (await) rồi tải trong `idem`. */
 function pick(dapi: ReturnType<typeof createCntsDiaryApi>, op: IdempotentOperation, drafts: ReturnType<typeof createPhotoDrafts>, kind: Photo["kind"], file: File) {
-  const draft = drafts.draft(HH, kind, file);
+  let draft: PhotoDraft | undefined;
   const turn = op.begin();
   return withIdempotentOperation(turn, async () => {
+    draft = await drafts.draft(HH, kind, file); // băm nội dung (await) trong lượt, như DiaryScreen
+    const d = draft;
     const blob: Blob = await Promise.resolve(file); // compressImage: ảnh nhỏ giữ nguyên
-    return withIdempotentOperation(turn, () => dapi.uploadPhoto(HH, kind, blob, draft));
+    return withIdempotentOperation(turn, () => dapi.uploadPhoto(HH, kind, blob, d));
   }).then((p) => {
     turn.complete();
-    drafts.done(draft);
+    drafts.done(draft!);
     return p;
   });
 }
@@ -86,13 +90,53 @@ describe("#172 tải ảnh nhật ký (multipart) giữ Idempotency-Key khi bấ
     expect(c.kind).toBe("other");
   });
 
-  it("tải xong rồi chọn lại cùng ảnh là lần tải mới (id mới)", () => {
+  it("tải xong rồi chọn lại cùng ảnh là lần tải mới (id mới)", async () => {
     const drafts = createPhotoDrafts(() => new Date("2027-10-01T01:00:00Z"));
     const f = jpg("x");
-    const a = drafts.draft(HH, "flock", f);
-    expect(drafts.draft(HH, "flock", new File([f], f.name, { type: f.type, lastModified: f.lastModified }))).toBe(a);
+    const a = await drafts.draft(HH, "flock", f);
+    expect(await drafts.draft(HH, "flock", new File([f], f.name, { type: f.type, lastModified: f.lastModified }))).toBe(a);
     expect(a.captured_at).toBe("2027-10-01T01:00:00.000Z");
     drafts.done(a);
-    expect(drafts.draft(HH, "flock", f).id).not.toBe(a.id);
+    expect((await drafts.draft(HH, "flock", f)).id).not.toBe(a.id);
+  });
+
+  // Review #172 (Codex): hai ảnh khác byte nhưng trùng tên/cỡ/kiểu/thời điểm sửa. Ảnh A đã lưu, mất phản hồi; chọn ảnh B
+  // → phải là lần tải mới (id mới, khóa mới) và được lưu, không dùng lại id của A (máy chủ sẽ báo "mã ảnh đã dùng").
+  it("khác nội dung, trùng metadata tệp → id mới, khóa mới, ảnh B được lưu", async () => {
+    const same = (tail: number) =>
+      new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 1, 2, tail])], "IMG_0001.jpg", { type: "image/jpeg", lastModified: 1_700_000_000_000 });
+    const a = same(65);
+    const b = same(66);
+    expect([a.name, a.size, a.type, a.lastModified]).toEqual([b.name, b.size, b.type, b.lastModified]);
+    const drafts = createPhotoDrafts();
+    expect((await drafts.draft(HH, "flock", b)).id).not.toBe((await drafts.draft(HH, "flock", a)).id);
+
+    const { dapi, sent, loseNext } = flaky();
+    const op = new IdempotentOperation();
+    const real = createPhotoDrafts();
+    loseNext();
+    await expect(pick(dapi, op, real, "flock", a)).rejects.toBeTruthy(); // A đã lưu, phản hồi mất
+    const pb = await pick(dapi, op, real, "flock", b);
+    const ups = sent.filter((s) => s.path.endsWith("/diary-photos"));
+    expect(ups).toHaveLength(2);
+    expect(ups[0]!.status).toBe(201);
+    expect(ups[1]!.status).toBe(201);
+    expect(ups[1]!.replayed).toBe(false);
+    expect(ups[1]!.key).not.toBe(ups[0]!.key);
+    expect(ups[1]!.id).not.toBe(ups[0]!.id);
+    expect(pb.file_ref).toBe(ups[1]!.id);
+    // A vẫn còn chờ: chọn lại đúng A → cùng id/khóa → phát lại, không lưu bản thứ hai.
+    await pick(dapi, op, real, "flock", new File([a], a.name, { type: a.type, lastModified: a.lastModified }));
+    const last = sent.filter((s) => s.path.endsWith("/diary-photos")).at(-1)!;
+    expect(last.id).toBe(ups[0]!.id);
+    expect(last.key).toBe(ups[0]!.key);
+    expect(last.replayed).toBe(true);
+  });
+
+  it("giả lập như máy chủ: khóa mới nhưng id ảnh đã lưu → 422 mã ảnh đã dùng", async () => {
+    const { dapi } = flaky();
+    const d = { id: "0190f1c4-7d3e-7000-8000-00000172a001", captured_at: "2027-10-01T01:00:00.000Z" };
+    await dapi.uploadPhoto(HH, "flock", jpg("a"), d);
+    await expect(dapi.uploadPhoto(HH, "flock", jpg("b"), d)).rejects.toMatchObject({ status: 422 });
   });
 });

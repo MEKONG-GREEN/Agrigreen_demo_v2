@@ -602,6 +602,18 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	}
 	ob, oct := photoBody(hCa, "weighing", pid, append(bytes.Clone(pngBytes), 0))
 	want(t, officer.uploadRaw(pk, oct, ob), 422, "idempotency_key_reused", "cùng khóa, khác ảnh")
+	// Review #172: khác ảnh + khóa mới nhưng dùng lại id ảnh đã lưu (cùng hộ) → 422 "mã ảnh đã dùng", không còn 409
+	// "chủ hộ chưa có khóa", và không mã hóa/lưu gì thêm.
+	reused := officer.uploadRaw(key(), oct, ob)
+	if want(t, reused, 422, "extension.cnts_diary_photo_invalid", "khóa mới, id ảnh đã dùng"); !bytes.Contains(reused.raw, []byte("mã ảnh đã dùng")) {
+		t.Fatalf("id ảnh đã dùng phải báo ở trường id: %s", reused.raw)
+	}
+	f.files.mu.Lock()
+	reAttach := f.files.attaches
+	f.files.mu.Unlock()
+	if reAttach != after {
+		t.Fatalf("id ảnh đã dùng không được Attach: %d → %d", after, reAttach)
+	}
 	want(t, officer.post(base+"diary-entries", merge(fish, map[string]any{"photo_refs": []string{ids.New().String()},
 		"metrics": merge(fish["metrics"].(map[string]any), map[string]any{"action_note": "Thay 30% nước"})})), 422,
 		"extension.cnts_diary_entry_invalid", "ảnh chưa tải")

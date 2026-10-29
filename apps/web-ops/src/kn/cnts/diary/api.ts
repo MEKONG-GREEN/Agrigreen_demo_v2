@@ -3,7 +3,7 @@
 // kiểm thử đơn vị; máy chủ kiểm lại (quy tắc chặn khi gửi, vị trí, cảnh báo).
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
-import { newIdempotencyKey, uuidv7 } from "@/api/idempotency";
+import { digestHex, newIdempotencyKey, uuidv7 } from "@/api/idempotency";
 import { stableMultipart } from "@/api/multipart";
 
 type S = components["schemas"];
@@ -405,16 +405,18 @@ export interface PhotoDraft {
 }
 
 /**
- * Nhớ id/captured_at theo ảnh đang tải (hộ + loại + tên/cỡ/kiểu/thời điểm sửa của tệp gốc): chọn lại đúng ảnh đó sau khi
- * mất phản hồi → cùng id/captured_at → cùng thân multipart → cùng Idempotency-Key → máy chủ phát lại ảnh đã lưu thay vì
- * lưu bản thứ hai. Tải xong (done) thì quên; ảnh/loại/hộ khác → lần tải mới.
+ * Nhớ id/captured_at theo ảnh đang tải (hộ + loại + kiểu/cỡ + băm NỘI DUNG tệp gốc): chọn lại đúng ảnh đó sau khi mất
+ * phản hồi → cùng id/captured_at → cùng thân multipart → cùng Idempotency-Key → máy chủ phát lại ảnh đã lưu thay vì lưu
+ * bản thứ hai. Tải xong (done) thì quên; hộ/loại/nội dung khác → lần tải mới với id mới. Review #172: chỉ dựa tên/cỡ/thời
+ * điểm sửa thì hai ảnh khác byte trùng các metadata này dùng chung id → máy chủ báo "mã ảnh đã dùng".
  */
 export function createPhotoDrafts(now: () => Date = () => new Date()) {
   const pending = new Map<string, PhotoDraft>();
-  const sig = (household_ref: string, kind: string, f: File) => [household_ref, kind, f.name, f.size, f.type, f.lastModified].join("\u0000");
+  const sig = async (household_ref: string, kind: string, f: File) =>
+    [household_ref, kind, f.type, f.size, await digestHex(new Uint8Array(await f.arrayBuffer()))].join("\u0000");
   return {
-    draft(household_ref: string, kind: Photo["kind"], file: File): PhotoDraft {
-      const k = sig(household_ref, kind, file);
+    async draft(household_ref: string, kind: Photo["kind"], file: File): Promise<PhotoDraft> {
+      const k = await sig(household_ref, kind, file);
       let d = pending.get(k);
       if (!d) {
         d = { id: uuidv7(), captured_at: now().toISOString() };
