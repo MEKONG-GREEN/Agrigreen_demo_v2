@@ -45,19 +45,25 @@ test("hc-hs-tl: Hồ sơ nhân viên → Thông tin làm việc, cập nhật ng
   const active = page.getByRole("button", { name: /^Đang làm việc/ });
   await expect(active).toContainText("3");
 
-  await page.getByRole("button", { name: "Cập nhật VC-00001" }).click();
-  const dlg = page.getByRole("dialog");
-  await dlg.getByLabel("Ngày nghỉ việc").fill("2026-09-30");
-  await dlg.getByLabel("Lý do nghỉ").selectOption("nghi_huu");
-  await dlg.getByRole("button", { name: "Lưu" }).click();
-  await expect(page.getByRole("status")).toContainText("Hồ sơ chuyển “Đã nghỉ việc”");
-  await expect(active).toContainText("2");
+  // #117 (BF-SWEEP-OTHERS): cập nhật chuyển từ popup sang trang riêng `/[id]/sua`; Lưu xong về trang chi tiết.
+  await page.getByRole("link", { name: "Cập nhật VC-00001" }).click();
+  await expect(page).toHaveURL(/\/kn\/nhan-su\/ho-so\/thong-tin-lam-viec\/[0-9a-f-]{36}\/sua$/);
+  await expect(page.getByRole("heading", { level: 1, name: /^Cập nhật thông tin làm việc/ })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByLabel("Ngày nghỉ việc").fill("2026-09-30");
+  await page.getByLabel("Lý do nghỉ").selectOption("nghi_huu");
+  await page.getByRole("button", { name: "Lưu", exact: true }).click();
 
-  await page.getByRole("link", { name: "Xem thông tin làm việc VC-00001" }).click();
+  await expect(page).toHaveURL(/\/kn\/nhan-su\/ho-so\/thong-tin-lam-viec\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1, name: /VC-00001/ })).toBeVisible();
   await expect(page.getByText("Có trong tháng 09/2026")).toBeVisible();
   await expect(page.getByText("Không còn từ tháng 10/2026")).toBeVisible();
   await expect(page.getByRole("link", { name: "Mở hồ sơ nhân viên" })).toBeVisible();
+
+  // Hồ sơ chuyển "Đã nghỉ việc": về danh sách, thẻ "Đang làm việc" giảm 3 → 2.
+  await page.getByRole("link", { name: "Thông tin làm việc", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/kn\/nhan-su\/ho-so\/thong-tin-lam-viec$/);
+  await expect(active).toContainText("2");
 });
 
 test("hc-dash: Dashboard nhân sự có thẻ chỉ số mở danh sách và khối Cảnh báo nâng bậc", async ({ page }) => {
