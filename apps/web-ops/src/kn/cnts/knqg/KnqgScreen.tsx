@@ -21,14 +21,17 @@ import {
   contentForSave,
   createErrors,
   createKnqgApi,
+  docFromSearch,
   emptyRow,
   periodLabel,
+  photoError,
   saveBlob,
   type Action,
   type Content,
   type Doc,
   type DocDetail,
   type KnqgApi,
+  type PhotoList,
   type Row,
   type Spec,
   type SpecTable,
@@ -50,7 +53,8 @@ export function KnqgScreen() {
     kapi ? () => kapi.list({ ...(project ? { project_ref: project } : {}), ...(form ? { form } : {}), ...(status ? { status } : {}) }) : null,
     [kapi, project, form, status],
   );
-  const [open, setOpen] = useState<string | null>(null);
+  // W11.53b: thông báo hộp thư mở thẳng biểu (/kn/cnts/du-an-mau-bieu?doc=<mã>).
+  const [open, setOpen] = useState<string | null>(() => (typeof window === "undefined" ? null : docFromSearch(window.location.search)));
   const [creating, setCreating] = useState(false);
   const loadSites = useCallback(async (ref: string) => (mapi ? (await mapi.project(ref)).sites.filter((s) => s.status === "active") : []), [mapi]);
   if (!kapi || !mapi) return null;
@@ -421,6 +425,7 @@ function DocEditor({ kapi, doc, spec, onSaved }: { kapi: KnqgApi; doc: DocDetail
           </button>
         ) : null}
       </div>
+      {doc.form === "03" ? <PhotoSection kapi={kapi} docRef={doc.ref} version={doc.version} /> : null}
       {reasonFor ? (
         <ReasonBox label={ACTION_LABEL[reasonFor]} busy={act.busy} onConfirm={(r) => run(reasonFor, r)} onCancel={() => setReasonFor(null)} />
       ) : null}
@@ -526,5 +531,90 @@ function TableEditor({ t, rows, edit, err, onChange }: { t: SpecTable; rows: Row
         </button>
       ) : null}
     </div>
+  );
+}
+
+// W11.53b (UR-TINH-21 "kiểm tra thực địa (kèm ảnh)"): ảnh thực địa của báo cáo Mẫu 03 — người sửa được biểu thêm/gỡ khi
+// đang lập; người xem được biểu xem ảnh. Máy chủ quyết quyền (can_edit) và kiểm lại kiểu, cỡ, số ảnh.
+function PhotoSection({ kapi, docRef, version }: { kapi: KnqgApi; docRef: string; version: number }) {
+  const photos = useLoad(() => kapi.photos(docRef), [kapi, docRef, version]);
+  const act = useAction();
+  const [file, setFile] = useState<File | null>(null);
+  const [caption, setCaption] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ ref: string; url: string } | null>(null);
+  useEffect(() => () => (preview ? URL.revokeObjectURL(preview.url) : undefined), [preview]);
+  const done = (l: PhotoList | undefined) => {
+    if (!l) return;
+    photos.reload();
+  };
+  const add = async () => {
+    const e = photoError(file, caption);
+    setError(e);
+    if (e || !file) return;
+    const l = await act.run(() => kapi.addPhoto(docRef, file, caption), "Đã thêm ảnh thực địa.");
+    if (l) {
+      setFile(null);
+      setCaption("");
+    }
+    done(l ?? undefined);
+  };
+  const show = async (ref: string) => {
+    const blob = await act.run(() => kapi.photo(docRef, ref));
+    if (blob) setPreview({ ref, url: URL.createObjectURL(blob) });
+  };
+  return (
+    <fieldset className="card-section" aria-label="Ảnh thực địa">
+      <legend>Ảnh thực địa (kèm báo cáo kiểm tra)</legend>
+      <LoadState s={photos}>
+        {(l) => (
+          <>
+            {l.items.length === 0 ? <p className="mute">Chưa có ảnh.</p> : null}
+            <ul>
+              {l.items.map((p) => (
+                <li key={p.ref}>
+                  <button className="link" disabled={act.busy} onClick={() => show(p.ref)}>
+                    {p.name}
+                  </button>
+                  {p.caption ? ` — ${p.caption}` : ""} · {Math.max(1, Math.round(p.size / 1024))} KB · {new Date(p.uploaded_at).toLocaleString("vi-VN")}
+                  {p.uploaded_by_name ? ` · ${p.uploaded_by_name}` : ""}
+                  {l.can_edit ? (
+                    <button className="btn btn-sm" disabled={act.busy} onClick={async () => done((await act.run(() => kapi.removePhoto(docRef, p.ref), "Đã gỡ ảnh.")) ?? undefined)}>
+                      Gỡ
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {preview ? (
+              <figure>
+                {/* eslint-disable-next-line @next/next/no-img-element -- ảnh blob đã tải có xác thực, next/image không áp dụng */}
+                <img src={preview.url} alt={l.items.find((p) => p.ref === preview.ref)?.caption ?? "Ảnh thực địa"} style={{ maxWidth: "100%", maxHeight: 360 }} />
+                <figcaption>
+                  <button className="link" onClick={() => setPreview(null)}>
+                    Đóng ảnh
+                  </button>
+                </figcaption>
+              </figure>
+            ) : null}
+            {l.can_edit && l.items.length < l.max_photos ? (
+              <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "end" }}>
+                <input type="file" aria-label="Chọn ảnh thực địa" accept=".jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                <label>
+                  Chú thích{" "}
+                  <input type="text" value={caption} maxLength={300} onChange={(e) => setCaption(e.target.value)} />
+                </label>
+                <button className="btn" disabled={act.busy} onClick={add}>
+                  Thêm ảnh
+                </button>
+              </div>
+            ) : null}
+            {l.can_edit ? <small className="mute">JPG, PNG ≤ 5 MB; tối đa {l.max_photos} ảnh. Đã trình ký thì không thêm/gỡ được.</small> : null}
+          </>
+        )}
+      </LoadState>
+      {error ? <span className="field-error">{error}</span> : null}
+      {act.view}
+    </fieldset>
   );
 }
