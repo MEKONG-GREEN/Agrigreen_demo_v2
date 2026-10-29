@@ -46,6 +46,19 @@ func TestAppraisalScopeUsesSubjectAndHS37_W1126(t *testing.T) {
 	}
 }
 
+func TestAppraisalReasonCountsCharacters_W1126(t *testing.T) {
+	e, _, manager, _ := appraisalEntryExample()
+	e.Status = AppraisalSelfSubmitted
+	if _, err := ChangeAppraisalEntry(e, appraisalExample(), AppraisalStepLocks{}, manager,
+		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "ááááá"}); err == nil {
+		t.Fatal("5 ký tự không được tính thành10 vì UTF8 có10byte")
+	}
+	if _, err := ChangeAppraisalEntry(e, appraisalExample(), AppraisalStepLocks{}, manager,
+		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Cần sửa lại phần căn cứ"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestAppraisalAuthenticatedFlowAndImmutableClose_W1126(t *testing.T) {
 	e, self, manager, center := appraisalEntryExample()
 	form := appraisalExample()

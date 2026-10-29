@@ -20,10 +20,11 @@ const (
 	PermSensitive Perm = "sensitive.view" // xem/sửa thẻ Thống kê BC Sở (TK-01..06)
 	PermExport    Perm = "export"         // xuất danh sách
 	PermAudit     Perm = "audit.view"     // xem nhật ký xem/xuất của hồ sơ
+	PermAppraisal Perm = "assessment"     // phiếu/đề xuất đánh giá (FN-15–18, FN-21)
 )
 
 // Perms theo thứ tự hiển thị. W11.24: hai nhóm quyền tài liệu (docs.go — FN-20 "quản lý tài liệu").
-var Perms = []Perm{PermView, PermEdit, PermSensitive, PermExport, PermAudit, PermDocView, PermDocManage}
+var Perms = []Perm{PermView, PermEdit, PermSensitive, PermExport, PermAudit, PermDocView, PermDocManage, PermAppraisal}
 
 // Scope là phạm vi của một nhóm quyền.
 type Scope string
@@ -70,6 +71,9 @@ func DefaultMatrix(group string) Matrix {
 	case GroupManager:
 		m[PermView], m[PermExport] = ScopeUnit, ScopeUnit
 		m[PermDocView] = ScopeUnit // W11.24 FN-14: lãnh đạo phòng xem tài liệu phòng mình
+		m[PermAppraisal] = ScopeUnit
+	case GroupTinh, GroupXa:
+		m[PermAppraisal] = ScopeSelf
 	}
 	return m
 }

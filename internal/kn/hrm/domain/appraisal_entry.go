@@ -30,6 +30,7 @@ type AppraisalMember struct {
 	ManagementUnit string     `json:"management_unit"`
 	Position       string     `json:"position"`
 	PositionName   string     `json:"position_name"`
+	PositionOrder  int        `json:"position_order"`
 	UnitName       string     `json:"unit_name"`
 	SummaryKind    string     `json:"summary_kind"`
 	ExcludedReason string     `json:"excluded_reason,omitempty"`
@@ -78,6 +79,14 @@ func CanReadAppraisal(a AppraisalAuthority, m AppraisalMember) bool {
 		return false
 	}
 	return a.center() || a.self(m) || a.management(m)
+}
+
+func CanSelfAppraisal(a AppraisalAuthority, m AppraisalMember) bool {
+	return !a.ReadOnly && CanReadAppraisal(a, m) && a.self(m)
+}
+
+func CanManageAppraisal(a AppraisalAuthority, m AppraisalMember) bool {
+	return !a.ReadOnly && CanReadAppraisal(a, m) && a.management(m)
 }
 
 type AppraisalStepLocks struct{ Self, Manager, Closed bool }
@@ -192,7 +201,7 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 		e.Status = AppraisalSent
 		e.ReturnedTo = ""
 	case "return":
-		if len(strings.TrimSpace(in.Reason)) < 10 {
+		if utf8.RuneCountInString(strings.TrimSpace(in.Reason)) < 10 {
 			return e, appraisalInvalid("reason", "lý do trả phiếu cần ít nhất 10 ký tự")
 		}
 		if in.ReturnTo == "self" {
@@ -220,7 +229,7 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 		if !slices.Contains(Ratings, in.OfficialRating) {
 			return e, appraisalInvalid("official_rating", "chọn kết quả xếp loại chính thức")
 		}
-		if in.OfficialRating != e.CollectiveRating && len(strings.TrimSpace(in.Reason)) < 10 {
+		if in.OfficialRating != e.CollectiveRating && utf8.RuneCountInString(strings.TrimSpace(in.Reason)) < 10 {
 			return e, appraisalInvalid("reason", "kết luận khác tập thể đề xuất cần lý do ít nhất 10 ký tự")
 		}
 		e.OfficialRating = in.OfficialRating
@@ -231,7 +240,7 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 		if !a.center() || e.Status != AppraisalClosed {
 			return e, appraisalInvalid("action", "chỉ HCTH mở lại một người đã chốt")
 		}
-		if len(strings.TrimSpace(in.Reason)) < 10 {
+		if utf8.RuneCountInString(strings.TrimSpace(in.Reason)) < 10 {
 			return e, appraisalInvalid("reason", "lý do mở lại cần ít nhất 10 ký tự")
 		}
 		e.Reopened, e.Status, e.ReturnedTo, e.CorrectionReason = true, AppraisalChangeRequested, "manager", strings.TrimSpace(in.Reason)

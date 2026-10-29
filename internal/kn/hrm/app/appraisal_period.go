@@ -133,7 +133,7 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 	}
 	excluded := map[uuid.UUID]string{}
 	for _, e := range in.Excluded {
-		if e.StaffID == uuid.Nil || len(strings.TrimSpace(e.Reason)) < 10 || utf8.RuneCountInString(e.Reason) > 2000 || excluded[e.StaffID] != "" {
+		if e.StaffID == uuid.Nil || utf8.RuneCountInString(strings.TrimSpace(e.Reason)) < 10 || utf8.RuneCountInString(e.Reason) > 2000 || excluded[e.StaffID] != "" {
 			return AppraisalPeriod{}, problem.Validation.WithField("excluded", "loại trừ cần đúng mã người, không trùng và lý do 10–2.000 ký tự")
 		}
 		excluded[e.StaffID] = strings.TrimSpace(e.Reason)
@@ -198,7 +198,7 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 			management = snap.MgmtUnit
 		}
 		member := domain.AppraisalMember{StaffID: h.StaffID, SubjectRef: h.SubjectRef, AccountRef: h.AccountRef, Code: h.Code, Type: h.Type, Group: group, Unit: snap.Unit,
-			ManagementUnit: management, Position: snap.Position, PositionName: position.Name, UnitName: unitNames[management], SummaryKind: domain.AppraisalSummaryCode(h.Type, position.Attrs.Leader), ExcludedReason: excluded[h.StaffID]}
+			ManagementUnit: management, Position: snap.Position, PositionName: position.Name, PositionOrder: position.SortOrder, UnitName: unitNames[management], SummaryKind: domain.AppraisalSummaryCode(h.Type, position.Attrs.Leader), ExcludedReason: excluded[h.StaffID]}
 		if member.ExcludedReason != "" {
 			seenExcluded[h.StaffID] = true
 		} else {
@@ -327,7 +327,7 @@ func (s *Service) AppraisalPeriods(ctx context.Context) ([]AppraisalPeriod, erro
 			if e != nil {
 				return e
 			}
-			entries, e := store.AppraisalCurrent(ctx, tx, "entry", &p.ID)
+			entries, e := store.AppraisalEntrySummaries(ctx, tx, p.ID, false)
 			if e != nil {
 				return e
 			}
@@ -338,7 +338,7 @@ func (s *Service) AppraisalPeriods(ctx context.Context) ([]AppraisalPeriod, erro
 				if e != nil {
 					return e
 				}
-				if !domain.CanReadAppraisal(appraisalAuthority(c), entry.Member) {
+				if !c.canRead(entry.Member) {
 					continue
 				}
 				visible++
@@ -349,10 +349,12 @@ func (s *Service) AppraisalPeriods(ctx context.Context) ([]AppraisalPeriod, erro
 					p.Counts[entry.Member.SummaryKind]++
 				}
 			}
-			if c.center() || visible > 0 {
-				if !c.center() {
+			if (c.center() && c.scope == domain.ScopeAll) || visible > 0 {
+				if !c.center() || c.scope != domain.ScopeAll {
 					p.Warnings = []string{}
 					p.SignedDocuments = map[string]uuid.UUID{}
+					p.Forms = map[string]AppraisalTemplate{}
+					p.Summaries = map[string]AppraisalTemplate{}
 				}
 				out = append(out, p)
 			}

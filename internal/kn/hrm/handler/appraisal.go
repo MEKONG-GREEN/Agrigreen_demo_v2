@@ -9,6 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -20,6 +22,10 @@ func (h Handler) registerAppraisals(rg *gin.RouterGroup) {
 	rg.POST("/hrm/appraisals/templates/:kind/:code", h.appraisalSaveTemplate)
 	rg.GET("/hrm/appraisals/periods", h.appraisalPeriods)
 	rg.POST("/hrm/appraisals/periods", h.appraisalOpenPeriod)
+	rg.GET("/hrm/appraisals/periods/:period/entries", h.appraisalEntries)
+	rg.GET("/hrm/appraisals/periods/:period/entries/:staff", h.appraisalEntry)
+	rg.POST("/hrm/appraisals/periods/:period/entries/:staff", h.appraisalChangeEntry)
+	rg.POST("/hrm/appraisals/periods/:period/entries/:staff/guest-link", h.appraisalGuestLink)
 }
 
 func appraisalDecode(c *gin.Context, value any) bool {
@@ -31,7 +37,7 @@ func appraisalDecode(c *gin.Context, value any) bool {
 		if errors.As(err, &tooLarge) {
 			httpx.Fail(c, problem.PayloadTooLarge.WithDetail("yêu cầu đánh giá tối đa 2 MiB"))
 		} else {
-			httpx.Fail(c, problem.Validation.WithDetail("thân yêu cầu đánh giá không hợp lệ: "+err.Error()))
+			httpx.Fail(c, problem.Validation.WithDetail("thân yêu cầu đánh giá không hợp lệ"))
 		}
 		return false
 	}
@@ -97,4 +103,67 @@ func (h Handler) appraisalOpenPeriod(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, v)
+}
+
+func (h Handler) appraisalEntries(c *gin.Context) {
+	period, ok := uuidParam(c, "period", port.ErrAppraisalNotFound)
+	if !ok {
+		return
+	}
+	items, err := h.Svc.AppraisalEntries(c.Request.Context(), period)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (h Handler) appraisalEntry(c *gin.Context) {
+	period, ok := uuidParam(c, "period", port.ErrAppraisalNotFound)
+	if !ok {
+		return
+	}
+	staff, ok := uuidParam(c, "staff", port.ErrAppraisalNotFound)
+	if !ok {
+		return
+	}
+	v, err := h.Svc.AppraisalEntryDetail(c.Request.Context(), period, staff)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, v)
+}
+
+func (h Handler) appraisalChangeEntry(c *gin.Context) {
+	period, ok := uuidParam(c, "period", port.ErrAppraisalNotFound)
+	if !ok {
+		return
+	}
+	staff, ok := uuidParam(c, "staff", port.ErrAppraisalNotFound)
+	if !ok {
+		return
+	}
+	var in domain.AppraisalEntryChange
+	if !appraisalDecode(c, &in) {
+		return
+	}
+	v, err := h.Svc.ChangeAppraisalEntry(c.Request.Context(), period, staff, appraisalIdem(c), in)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, v)
+}
+
+func (h Handler) appraisalGuestLink(c *gin.Context) {
+	period, ok := uuidParam(c, "period", port.ErrAppraisalNotFound)
+	if !ok {
+		return
+	}
+	staff, ok := uuidParam(c, "staff", port.ErrAppraisalNotFound)
+	if !ok {
+		return
+	}
+	httpx.Fail(c, h.Svc.AppraisalGuestLink(c.Request.Context(), period, staff))
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -59,6 +60,23 @@ func AppraisalCurrent(ctx context.Context, tx pgx.Tx, kind string, period *uuid.
 	return pgx.CollectRows(rows, scanAppraisalEvent)
 }
 
+// AppraisalEntrySummaries không chuyển toàn bộ câu trả lời tiêu chí ra màn danh sách/tiến độ.
+// keepText chỉ dành cho bảng MS05/06 xuất, vẫn không lấy câu trả lời chi tiết.
+func AppraisalEntrySummaries(ctx context.Context, tx pgx.Tx, period uuid.UUID, keepText bool) ([]AppraisalEvent, error) {
+	payload := `(payload #- '{self,answers}' #- '{manager,answers}')`
+	if !keepText {
+		payload = `(` + payload + ` - 'reason' - 'note' - 'personnel_proposal' - 'correction_reason')`
+	}
+	cols := strings.Replace(appraisalColumns, "payload", payload+" AS payload", 1)
+	rows, err := tx.Query(ctx, `SELECT `+cols+` FROM (
+    SELECT DISTINCT ON (entity_key) * FROM pf_hrm.appraisal_event
+    WHERE entity_kind = 'entry' AND period_ref = $1 ORDER BY entity_key, seq DESC) v ORDER BY entity_key`, period)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanAppraisalEvent)
+}
+
 func AppraisalHistory(ctx context.Context, tx pgx.Tx, kind, key string) ([]AppraisalEvent, error) {
 	rows, err := tx.Query(ctx, `SELECT `+appraisalColumns+` FROM pf_hrm.appraisal_event
     WHERE entity_kind = $1 AND entity_key = $2 ORDER BY seq`, kind, key)
@@ -84,6 +102,19 @@ func AppraisalLatest(ctx context.Context, tx pgx.Tx, kind, key string) (Appraisa
 // AppraisalVersion dùng id bản ghi bất biến mà đợt đã chọn, không lấy latest thay phiên bản.
 func AppraisalVersion(ctx context.Context, tx pgx.Tx, id uuid.UUID) (AppraisalEvent, bool, error) {
 	rows, err := tx.Query(ctx, `SELECT `+appraisalColumns+` FROM pf_hrm.appraisal_event WHERE id = $1`, id)
+	if err != nil {
+		return AppraisalEvent{}, false, err
+	}
+	x, err := pgx.CollectExactlyOneRow(rows, scanAppraisalEvent)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AppraisalEvent{}, false, nil
+	}
+	return x, err == nil, err
+}
+
+func AppraisalPeriodByRef(ctx context.Context, tx pgx.Tx, id uuid.UUID) (AppraisalEvent, bool, error) {
+	rows, err := tx.Query(ctx, `SELECT `+appraisalColumns+` FROM pf_hrm.appraisal_event
+    WHERE entity_kind = 'period' AND period_ref = $1 ORDER BY seq DESC LIMIT 1`, id)
 	if err != nil {
 		return AppraisalEvent{}, false, err
 	}

@@ -25,13 +25,14 @@ type appraisalActor struct {
 	ref, tenant, unitRef uuid.UUID
 	group, unit          string
 	manager, readOnly    bool
+	scope                domain.Scope
 }
 
 func (c appraisalActor) center() bool {
 	return c.group == domain.GroupAdmin || c.group == domain.GroupHCTH
 }
 func (c appraisalActor) needCenter(write bool) error {
-	if !c.center() || (write && c.readOnly) {
+	if !c.center() || c.scope != domain.ScopeAll || (write && c.readOnly) {
 		return problem.Forbidden.WithDetail("đánh giá: chỉ Phòng HCTH/Admin, ngữ cảnh chỉ xem không ghi")
 	}
 	return nil
@@ -52,7 +53,24 @@ func (s *Service) appraisalCaller(ctx context.Context) (appraisalActor, error) {
 	if c.group == domain.GroupTW || k.Role == "kn_tw" || k.ViewOnly {
 		return c, problem.Forbidden.WithDetail("Cấp TW không tham gia hoặc truy cập phiếu đánh giá")
 	}
+	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
+		m, e := s.matrixOf(ctx, tx, c.group, c.ref)
+		c.scope = m[domain.PermAppraisal]
+		return e
+	})
+	if err != nil {
+		return c, err
+	}
+	if c.scope == "" || c.scope == domain.ScopeNone {
+		return c, problem.Forbidden.WithDetail("không có quyền đánh giá nhân sự (FN-20)")
+	}
 	return c, nil
+}
+
+func (c appraisalActor) canRead(m domain.AppraisalMember) bool {
+	self := m.AccountRef != nil && *m.AccountRef == c.ref
+	unit := c.unit != "" && (m.Unit == c.unit || m.ManagementUnit == c.unit)
+	return c.scope.Allows(self, unit) && domain.CanReadAppraisal(appraisalAuthority(c), m)
 }
 
 func appraisalValidation(err error) error {
@@ -90,6 +108,11 @@ func appraisalJSON(value any) (json.RawMessage, error) {
 func appraisalKey(idem string) error {
 	if len(idem) < 8 || len(idem) > 200 {
 		return problem.Validation.WithField("Idempotency-Key", "thao tác ghi cần khóa từ 8 đến 200 ký tự")
+	}
+	for _, ch := range idem {
+		if ch < 0x21 || ch > 0x7e {
+			return problem.Validation.WithField("Idempotency-Key", "khóa chỉ gồm ký tự ASCII in được, không khoảng trắng")
+		}
 	}
 	return nil
 }
