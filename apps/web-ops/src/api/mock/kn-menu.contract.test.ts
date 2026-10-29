@@ -193,6 +193,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     expect(leaves("kn_xa/thong_tin_truyen_thong")).toEqual(
       expect.arrayContaining(["dieu_hanh:xa.bao_gia.nhap", "dieu_hanh:xa.bao_gia.xac_minh", "bao_cao:xa.bao_gia.bang_gia", "du_lieu:xa.bao_gia.lich_su"]),
     );
+    expect(leaves("kn_tw/ke_hoach_tai_chinh")).toContain("bao_cao:tw.khtc.bao_cao_tinh");
     expect(leaves("kn_tw/thong_tin_truyen_thong")).toContain("bao_cao:tw.bao_gia.gia_thanh"); // W11.78: Giá thành sản xuất (TW) có màn
     expect(leaves("kn_tinh/hanh_chinh_tong_hop")).toEqual(
       expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "dieu_hanh:tinh.hcth.ke_hoach" /* W11.27 */, "bao_cao:tinh.hcth.bao_cao_so",

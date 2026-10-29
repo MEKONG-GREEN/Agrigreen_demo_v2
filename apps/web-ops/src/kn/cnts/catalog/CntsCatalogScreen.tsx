@@ -22,6 +22,7 @@ import { toCsv } from "@/htx/rules";
 import { LoadState, ReadOnlyNotice, useAction, useLoad } from "@/kn/cycle/common";
 import { readUpload, saveBlob } from "@/lib/files";
 import { ReasonDialog } from "../ReasonDialog";
+import { CommuneField, useUnitNames } from "./CommuneField";
 import {
   CNTS_TABS,
   CNTS_THRESHOLDS,
@@ -33,6 +34,7 @@ import {
   parseDoses,
   tabOf,
   templateRows,
+  unitText,
   validateAttrs,
   type CatalogTab,
   type CntsCatalog,
@@ -126,7 +128,7 @@ function summary(tab: CatalogTab, it: Item, names: Record<string, string>): stri
     case "cnts_vaccination_schedule":
       return `${names[a.model_type ?? ""] ?? a.model_type ?? names[a.breed ?? ""] ?? a.breed ?? ""} · ${parseDoses(a.doses).length} mũi`;
     case "cnts_slaughter_facility":
-      return `Xã ${a.commune_code ?? "—"} · ${opt("facility_kind") ?? ""} · GS: ${a.stamp_codes_gs || "—"} · GC: ${a.stamp_codes_gc || "—"}`;
+      return `Xã ${unitText(a.commune_code, names) || "—"} · ${opt("facility_kind") ?? ""} · GS: ${a.stamp_codes_gs || "—"} · GC: ${a.stamp_codes_gc || "—"}`;
     case "cnts_aquaculture_object":
       return opt("scale_unit") ?? "—";
     case "cnts_indicator":
@@ -156,9 +158,26 @@ function fieldText(f: Field, value: string | undefined, names: Record<string, st
       return parseDoses(value)
         .map((d) => `${names[d.vaccine] ?? d.vaccine} lần ${d.shot} @ ${d.age_days} ngày tuổi`)
         .join("; ");
+    case "commune":
+      return unitText(value, names);
     default:
       return value;
   }
+}
+
+/** Cột danh sách: mặc định một cột tóm tắt; danh mục có `columns` thì mỗi thuộc tính một cột (CN-10: đủ trường CSGM). */
+function attrColumns(tab: CatalogTab, names: Record<string, string>): Column<Item>[] {
+  if (!tab.columns) return [{ key: "attrs", header: tab.summary, cell: (i) => <span className="small">{summary(tab, i, names)}</span> }];
+  return tab.columns.flatMap(({ key, header }): Column<Item>[] => {
+    const f = tab.fields.find((x) => x.key === key);
+    if (!f) return [];
+    if (f.kind === "commune")
+      return [
+        { key: `${key}.name`, header, cell: (i) => names[i.attrs[key] ?? ""] ?? "—" },
+        { key, header: `Mã ${header.toLowerCase()}`, cell: (i) => (i.attrs[key] ? <code>{i.attrs[key]}</code> : "—") },
+      ];
+    return [{ key, header, cell: (i) => <span className="small">{fieldText(f, i.attrs[key], names) || "—"}</span> }];
+  });
 }
 
 export function CntsCatalogScreen() {
@@ -179,9 +198,12 @@ export function CntsCatalogScreen() {
   const catalog = tab === "thresholds" ? null : tab;
   const rows = useLoad(catalog ? () => ca.list(catalog, at) : null, [catalog, at, nonce]);
   const refNames = useRefNames(at, nonce);
-  const names = refNames.data ?? {};
-  const reload = () => setNonce((n) => n + 1);
   const current = catalog ? tabOf(catalog) : null;
+  const communeKey = current?.fields.find((f) => f.kind === "commune")?.key;
+  const [commune, setCommune] = useState("");
+  const unitNames = useUnitNames(communeKey ? (rows.data ?? []).map((i) => i.attrs[communeKey] ?? "") : []);
+  const names = { ...(refNames.data ?? {}), ...unitNames };
+  const reload = () => setNonce((n) => n + 1);
 
   const setActive = (it: Item, active: boolean, reason?: string) =>
     act
@@ -204,7 +226,7 @@ export function CntsCatalogScreen() {
     ? [
         { key: "code", header: "Mã", cell: (i) => <code>{i.code}</code> },
         { key: "name", header: "Tên", cell: (i) => (i.active ? <b>{i.name}</b> : <span className="mute">{i.name}</span>) },
-        { key: "attrs", header: current.summary, cell: (i) => <span className="small">{summary(current, i, names)}</span> },
+        ...attrColumns(current, names),
         { key: "from", header: "Hiệu lực từ", cell: (i) => dmy(i.valid_from) },
         { key: "st", header: "Trạng thái", cell: (i) => (i.active ? <StatusPill tone="ok">Đang dùng</StatusPill> : <StatusPill>Ngừng dùng</StatusPill>) },
         {
@@ -260,7 +282,7 @@ export function CntsCatalogScreen() {
       {act.view}
       <div className="dtabs" role="tablist" aria-label="Danh mục CNTS">
         {[...CNTS_TABS.map((t) => ({ id: t.id as TabId, label: t.label })), { id: "thresholds" as TabId, label: "Ngưỡng mặc định" }].map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={t.id === tab} onClick={() => (setTab(t.id), setPage(1), setShowImport(false))}>
+          <button key={t.id} type="button" role="tab" aria-selected={t.id === tab} onClick={() => (setTab(t.id), setPage(1), setShowImport(false), setCommune(""))}>
             {t.label}
           </button>
         ))}
@@ -271,12 +293,29 @@ export function CntsCatalogScreen() {
           <input type="date" aria-label="Xem tại ngày" value={at} onChange={(e) => (setAt(e.target.value || vnToday()), setPage(1))} />
         </label>
         {current ? <SearchBox value={q} onChange={(v) => (setQ(v), setPage(1))} placeholder="Tìm mã, tên" /> : null}
+        {communeKey ? (
+          <label className="row small">
+            Lọc theo xã
+            <select className="select" aria-label="Lọc theo xã" value={commune} onChange={(e) => (setCommune(e.target.value), setPage(1))}>
+              <option value="">Tất cả xã</option>
+              {[...new Set((rows.data ?? []).map((i) => i.attrs[communeKey] ?? "").filter(Boolean))]
+                .sort((a, b) => (names[a] ?? a).localeCompare(names[b] ?? b, "vi"))
+                .map((c) => (
+                  <option key={c} value={c}>
+                    {unitText(c, names)}
+                  </option>
+                ))}
+            </select>
+          </label>
+        ) : null}
       </div>
       {showImport && current ? <ImportPanel tab={current} onDone={reload} /> : null}
       {current ? (
         <LoadState s={rows}>
           {(d) => {
-            const list = d.filter((i) => !q || `${i.code} ${i.name}`.toLowerCase().includes(q.toLowerCase()));
+            const list = d.filter(
+              (i) => (!q || `${i.code} ${i.name}`.toLowerCase().includes(q.toLowerCase())) && (!communeKey || !commune || i.attrs[communeKey] === commune),
+            );
             return (
               <DataTable
                 caption={current.label}
@@ -423,6 +462,7 @@ function ItemForm({ tab, item, base, at }: { tab: CatalogTab; item: Item | null;
               <FieldInput
                 key={f.key}
                 f={f}
+                at={validFrom}
                 value={attrs[f.key] ?? ""}
                 options={o}
                 error={err(f.key)}
@@ -464,12 +504,14 @@ function ItemForm({ tab, item, base, at }: { tab: CatalogTab; item: Item | null;
 export function CntsCatalogItemScreen() {
   const { tab, code, base, at, ca, item } = useRouteItem();
   const names = useRefNames(at);
+  const communeKey = tab?.fields.find((f) => f.kind === "commune")?.key;
+  const unitNames = useUnitNames(communeKey && item.data?.item ? [item.data.item.attrs[communeKey] ?? ""] : []);
   if (!tab || !code) return <NotFound base={base} what="Danh mục không tồn tại" />;
   return (
     <LoadState s={item}>
       {(d) =>
         d.item ? (
-          <ItemDetail tab={tab} item={d.item} base={base} at={at} canEdit={ca.canEdit} names={names.data ?? {}} />
+          <ItemDetail tab={tab} item={d.item} base={base} at={at} canEdit={ca.canEdit} names={{ ...(names.data ?? {}), ...unitNames }} />
         ) : (
           <NotFound base={withAt(`${base}?tab=${tab.id}`, at)} what={`Không có mục ${code}`} />
         )
@@ -547,6 +589,7 @@ function ItemDetail({ tab, item, base, at, canEdit, names }: { tab: CatalogTab; 
 
 function FieldInput({
   f,
+  at,
   value,
   onChange,
   onBlurError,
@@ -555,6 +598,8 @@ function FieldInput({
   error,
 }: {
   f: Field;
+  /** Ngày áp dụng đang chọn ở form. */
+  at: string;
   value: string;
   onChange: (v: string) => void;
   onBlurError: (error: string | undefined) => void;
@@ -625,6 +670,8 @@ function FieldInput({
       return <DosesEditor value={value} onChange={onChange} onInputError={onDosesInput} vaccines={(options.cnts_vaccine ?? []).filter((v) => v.active)} error={error} />;
     case "codes":
       return <TextField label={f.label} value={value} onChange={onChange} error={error} hint={f.hint} />;
+    case "commune":
+      return <CommuneField label={f.label} required={required} value={value} at={at || vnToday()} onChange={onChange} error={error} />;
     default:
       return <TextField label={f.label} required={required} value={value} onChange={onChange} error={error} maxLength={f.max} />;
   }

@@ -23,7 +23,9 @@ export type Field =
   | { key: string; label: string; kind: "int" }
   | { key: string; label: string; kind: "ref"; catalog: CntsCatalog; multi: boolean; required?: boolean }
   | { key: string; label: string; kind: "codes"; hint: string }
-  | { key: string; label: string; kind: "doses"; required: true };
+  | { key: string; label: string; kind: "doses"; required: true }
+  /** Mã xã/phường/đặc khu chọn từ danh mục ĐVHC (FN-01 AC-02): lưu mã, hiện "Tên (mã)". */
+  | { key: string; label: string; kind: "commune"; required?: boolean };
 
 const desc: Field = { key: "description", label: "Mô tả", kind: "text", max: 500 };
 const order: Field = { key: "order", label: "Thứ tự cột", kind: "int" };
@@ -47,6 +49,15 @@ export interface CatalogTab {
   fields: Field[];
   /** Tên cột thuộc tính tóm tắt trong bảng. */
   summary: string;
+  /** Có thì danh sách hiện mỗi thuộc tính một cột riêng (thay cột tóm tắt); trường kiểu "commune" tách thành hai cột Xã, Mã xã. */
+  columns?: { key: string; header: string }[];
+}
+
+/** "Tên (mã)" của một ĐVHC; chưa có tên thì chỉ hiện mã. */
+export function unitText(code: string | undefined, names: Record<string, string>): string {
+  if (!code) return "";
+  const n = names[code];
+  return n && n !== code ? `${n} (${code})` : code;
 }
 
 /** Thứ tự tab theo FN-06. */
@@ -129,8 +140,16 @@ export const CNTS_TABS: CatalogTab[] = [
     id: "cnts_slaughter_facility",
     label: "Cơ sở giết mổ",
     summary: "Xã · Loại · Mộc dấu GS / GC",
+    columns: [
+      { key: "commune_code", header: "Xã" },
+      { key: "facility_kind", header: "Loại" },
+      { key: "stamp_codes_gs", header: "Mộc dấu GS" },
+      { key: "stamp_codes_gc", header: "Mộc dấu GC" },
+      { key: "species", header: "Loài" },
+      { key: "address", header: "Địa chỉ" },
+    ],
     fields: [
-      { key: "commune_code", label: "Mã xã/phường/đặc khu", kind: "text", required: true, max: 40 },
+      { key: "commune_code", label: "Xã/phường/đặc khu", kind: "commune", required: true },
       { key: "facility_kind", label: "Loại cơ sở", kind: "select", options: FACILITY_KIND, required: true },
       { key: "stamp_codes_gs", label: "Mã số khắc mộc dấu gia súc (GS)", kind: "codes", hint: "Nhiều mã cách nhau dấu phẩy, vd 91.589.05, 91.589.05.1" },
       { key: "stamp_codes_gc", label: "Mã số khắc mộc dấu gia cầm (GC)", kind: "codes", hint: "Trống nếu cơ sở không giết mổ gia cầm" },

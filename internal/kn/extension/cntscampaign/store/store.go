@@ -5,6 +5,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -178,6 +179,75 @@ func Events(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID][]Ev
 // Lock giữ khóa tư vấn của đợt trong giao dịch (cùng khóa của hai trigger) — tuần tự hóa thao tác ghi đồng thời.
 func Lock(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) error {
 	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('cnts_campaign:' || $1::text || ':' || $2::text, 0))`, tid.String(), id.String())
+	return err
+}
+
+// Claim ghi ý định thao tác của đợt (BF-CNTS-CAMPAIGN-POOL, #156; pf 20261028222212) hạn lease tính bằng giờ DB; ý định khác
+// còn hạn → false. Gọi trong giao dịch đã giữ Lock.
+func Claim(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, action string, lease time.Duration) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_campaign_intent (tenant_id, campaign_id, claim_id, action, claim_until, updated_at)
+	  VALUES ($1, $2, $3, $4, now() + $5::interval, now())
+	  ON CONFLICT (tenant_id, campaign_id) DO UPDATE SET claim_id = EXCLUDED.claim_id, action = EXCLUDED.action,
+	    claim_until = EXCLUDED.claim_until, updated_at = now()
+	  WHERE cnts_campaign_intent.claim_until IS NULL OR cnts_campaign_intent.claim_until <= now()
+	  RETURNING true`, tid, id, token, action, strconv.FormatInt(int64(lease/time.Second), 10)+" seconds").Scan(&ok)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return ok, err
+}
+
+// Release bỏ ý định của token. live → chỉ khi ý định CÒN HẠN (giờ DB). released=false: token không còn giữ ý định (hết hạn /
+// người khác đã nhận) — bên gọi quyết định đó có phải lỗi (ghi kết quả: có; bỏ khi lỗi: không, ý định đã tự hết).
+func Release(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, live bool) (released bool, err error) {
+	q := `UPDATE pf_extension.cnts_campaign_intent SET claim_id = NULL, action = NULL, claim_until = NULL, updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3`
+	if live {
+		q += ` AND claim_until > now()`
+	}
+	tag, err := tx.Exec(ctx, q, tid, id, token)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// Renew gia hạn ý định CÒN HẠN của token thêm lease (giờ DB). false: token không còn giữ ý định.
+func Renew(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, lease time.Duration) (bool, error) {
+	tag, err := tx.Exec(ctx, `UPDATE pf_extension.cnts_campaign_intent SET claim_until = now() + $4::interval, updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3 AND claim_until > now()`,
+		tid, id, token, strconv.FormatInt(int64(lease/time.Second), 10)+" seconds")
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// MarkStale ghi nhận kỳ native của đợt có thể lệch sổ đợt (review #156 [P2]): một lời gọi cap/forms ghi kỳ native đã trả về
+// mà yêu cầu gọi nó không còn giữ ý định (hoặc không rõ kết quả). Gọi trong giao dịch đã giữ Lock, SAU khi lời gọi đã trả về.
+func MarkStale(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_extension.cnts_campaign_intent (tenant_id, campaign_id, stale_gen, updated_at)
+	  VALUES ($1, $2, 1, now())
+	  ON CONFLICT (tenant_id, campaign_id) DO UPDATE SET stale_gen = cnts_campaign_intent.stale_gen + 1, updated_at = now()`, tid, id)
+	return err
+}
+
+// StaleGen đọc thế hệ lệch hiện tại; dirty = còn lần lệch chưa đối soát.
+func StaleGen(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) (gen int64, dirty bool, err error) {
+	var synced int64
+	err = tx.QueryRow(ctx, `SELECT stale_gen, synced_gen FROM pf_extension.cnts_campaign_intent WHERE tenant_id = $1 AND campaign_id = $2`,
+		tid, id).Scan(&gen, &synced)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	return gen, gen > synced, err
+}
+
+// MarkSynced ghi nhận kỳ native đã khớp sổ đợt tới thế hệ gen (đọc TRƯỚC khi đối soát).
+func MarkSynced(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID, gen int64) error {
+	_, err := tx.Exec(ctx, `UPDATE pf_extension.cnts_campaign_intent SET synced_gen = GREATEST(synced_gen, $3), updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2`, tid, id, gen)
 	return err
 }
 

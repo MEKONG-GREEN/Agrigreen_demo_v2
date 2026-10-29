@@ -277,6 +277,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 	acc := accounts.New(unit, clk, accounts.Deps{Sessions: sessionRegistry, Navigation: pty.ContextNavigation(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+		SessionPolicies: extension.AccountSessionPolicies(pty.Departments()), // #60: nhật ký hỗ trợ + đơn vị mặc định do chủ KN chiếu
+
 		Households: coop.PartyHouseholds(), Vault: ext.Vault, Params: md.Params(),
 		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames(), // KN v7.7 P1
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được

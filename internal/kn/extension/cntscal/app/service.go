@@ -65,6 +65,9 @@ type Service struct {
 	Officers accport.XaScopes
 	// Names (tùy chọn): tên cán bộ.
 	Names func() partyport.ActorNames
+	// Contacts (tùy chọn, BF-CN-DUTY): SĐT công vụ của viên chức (pf/accounts) đọc lúc dựng lưới, nạp/xuất BM-03; không
+	// lưu, không ghi log. Lưới chỉ trả SĐT đã che; tệp xuất chỉ có SĐT đầy đủ với người lập lịch. nil → không có cột ĐT.
+	Contacts accport.StaffContacts
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

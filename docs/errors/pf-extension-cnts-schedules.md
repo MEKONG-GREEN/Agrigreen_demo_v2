@@ -6,6 +6,7 @@ Dùng lại mã đã có của module: `extension.read_only`, `extension.out_of_
 | HTTP | code | Khi nào |
 |---|---|---|
 | 422 | `extension.cnts_roster_invalid` | Lịch trực sai: ngày ngoài tháng, ca không phải N/Đ/NĐ, trùng ô (cơ sở, viên chức, ngày), cơ sở giết mổ không hoạt động trong tháng, ghi chú có số điện thoại/CCCD |
+| 422 | `extension.cnts_roster_import_invalid` | Nạp lịch trực (BF-CN-DUTY): tệp không phải .xlsx (kể cả .xls cũ), không mở được, vượt 4 MB hoặc 2000 dòng viên chức, không có dòng tiêu đề cột BM-03 (STT, Tên cơ sở giết mổ, Viên chức trực KSGM…), không có sheet đúng tháng. Lỗi từng dòng (không khớp cơ sở/viên chức, ký hiệu ca lạ) KHÔNG trả lỗi này mà nằm trong `issues` của kết quả 200 |
 | 409 | `extension.cnts_roster_version_conflict` | `base_version` khác phiên bản hiện hành của lịch tháng (khóa lạc quan); `current_version` trong phần mở rộng |
 | 404 | `extension.cnts_vaccination_not_found` | Lứa không có hoặc ngoài phạm vi người gọi |
 | 422 | `extension.cnts_vaccination_invalid` | Lịch tiêm sai: thiếu hộ/địa bàn, tuổi lúc nhận, xã không hợp lệ, loại mô hình/giống không dùng tại ngày nhận giống, Cấp Xã sửa ngày dự kiến, ngày tiêm thực tế ở tương lai hoặc trước ngày nhận giống, không có thay đổi, thiếu lý do hủy |

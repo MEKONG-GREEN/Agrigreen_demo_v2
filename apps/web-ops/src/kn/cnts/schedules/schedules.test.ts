@@ -9,11 +9,14 @@ import {
   createCntsCalApi,
   expectedDate,
   fromGrid,
+  grantHref,
+  importFileError,
+  issueText,
   nextShift,
-  rosterCsv,
   rowsOf,
   shiftMonth,
   toGrid,
+  uncoveredDays,
   weekdayLabel,
   type DutyCell,
 } from "./api";
@@ -41,16 +44,26 @@ describe("lịch trực KSGM BM-03 — quy tắc lưới (W11.46)", () => {
     ]);
   });
 
-  it("tháng trước/sau, thứ trong tuần, CSV theo mẫu", () => {
+  it("tháng trước/sau, thứ trong tuần", () => {
     expect(shiftMonth("2027-01", -1)).toBe("2026-12");
     expect(shiftMonth("2026-12", 1)).toBe("2027-01");
     expect(weekdayLabel("2027-10", 13)).toBe("T4");
-    const csv = rosterCsv(
-      { days_in_month: 2, facilities: [{ ref: F, code: "CS", name: "Lò, mổ", commune_code: "1", kind: null }], officers: [{ ref: O1, display: "An", commune_codes: [], facility_refs: [] }] },
-      toGrid([{ facility_ref: F, officer_ref: O1, day: 2, shift: "ND" }]),
-      [[F, O1]],
-    );
-    expect(csv).toBe('Cơ sở,Viên chức,1,2\n"Lò, mổ",An,,NĐ');
+  });
+
+  it("BF-CN-DUTY: tô ngày cơ sở chưa có người trực theo lưới đang sửa; liên kết cấp quyền; tệp nạp", () => {
+    const g = toGrid([
+      { facility_ref: F, officer_ref: O1, day: 1, shift: "N" },
+      { facility_ref: F, officer_ref: O2, day: 3, shift: "D" },
+    ]);
+    expect([...(uncoveredDays(g, [F], 4).get(F) ?? [])]).toEqual([2, 4]);
+    expect(uncoveredDays(toGrid([1, 2].map((day) => ({ facility_ref: F, officer_ref: O1, day, shift: "N" as const }))), [F], 2).has(F)).toBe(false);
+    expect(grantHref(O1, F, "30292")).toBe(`/kn/cnts/cap-quyen?vien_chuc=${O1}&co_so=${F}&xa=30292`);
+    expect(importFileError({ kind: "xls", size: 10 })).toMatch(/\.xlsx/);
+    expect(importFileError({ kind: "csv", size: 10 })).toMatch(/Excel/);
+    expect(importFileError({ kind: "xlsx", size: 5 * 1024 * 1024 })).toMatch(/4 MB/);
+    expect(importFileError({ kind: "xlsx", size: 1000 })).toBeNull();
+    expect(issueText({ line: 12, field: "officer", message: "Không khớp" })).toBe("Dòng 12: Không khớp");
+    expect(issueText({ line: null, field: "row", message: "Quá nhiều ô" })).toBe("Quá nhiều ô");
   });
 });
 
@@ -108,5 +121,28 @@ describe("giả lập lịch trực, lịch tiêm", () => {
     const u = await capi.updateDoses(b.ref, { base_version: 1, doses: [{ vaccine_code: "VX_ND_F", shot: 1, actual_date: "2027-10-03" }] });
     expect(u.event).toBe("dose_recorded");
     expect(u.versions).toHaveLength(2);
+  });
+
+  it("BF-CN-DUTY: xuất .xlsx BM-03 rồi nạp lại ra cùng lịch; SĐT che với người lập lịch; tệp sai bị từ chối", async () => {
+    const r = await capi.roster("2027-10", "91");
+    const f = r.facilities[0]!.ref;
+    const o = r.officers[0]!.ref;
+    const cells: DutyCell[] = [
+      { facility_ref: f, officer_ref: o, day: 1, shift: "N" },
+      { facility_ref: f, officer_ref: o, day: 31, shift: "ND" },
+    ];
+    const saved = await capi.saveRoster("2027-10", { province_code: "91", base_version: 0, cells });
+    expect(saved.can_view_phone).toBe(true);
+    expect(saved.officers[0]!.phone_masked).toMatch(/^\d{4}•••\d{3}$/);
+    const x = await capi.exportRoster("2027-10", "91", "theo thông báo số 1/TB");
+    expect(x.name).toBe("lich-truc-ksgm-91-2027-10.xlsx");
+    const bytes = new Uint8Array(await x.blob.arrayBuffer());
+    const imp = await capi.importRoster("2027-10", { body: bytes, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }, "91");
+    expect(imp.issues).toEqual([]);
+    expect(imp.cells).toEqual(cells);
+    expect(imp.basis).toBe("(theo thông báo số 1/TB)");
+    await expect(capi.importRoster("2027-11", { body: bytes, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }, "91")).rejects.toThrow();
+    await expect(capi.importRoster("2027-10", { body: "STT,TÊN", contentType: "text/csv" }, "91")).rejects.toThrow();
+    await expect(capi.exportRoster("2027-10", "91", "gọi 0912345678")).rejects.toThrow();
   });
 });

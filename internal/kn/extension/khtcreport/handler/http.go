@@ -20,6 +20,7 @@ import (
 type Handler struct{ Svc *app.Service }
 
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
+	rg.GET("/extension/khtc/exported-reports", h.archive)
 	g := rg.Group("/extension/khtc/periods/:id/report")
 	g.GET("", h.get)
 	g.POST("/draft", h.save)

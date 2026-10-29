@@ -101,7 +101,7 @@ func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport
 
 func (c catalogs) FacilitiesAt(context.Context, time.Time, []string) ([]knport.SlaughterFacility, error) {
 	out := []knport.SlaughterFacility{
-		{Ref: fac1, Code: "CS1", Name: "Lò mổ 1", CommuneCode: "30001", Kind: knport.FacilityConcentrated, Active: true},
+		{Ref: fac1, Code: "CS1", Name: "Lò mổ 1", CommuneCode: "30001", Kind: knport.FacilityConcentrated, Active: true, Address: "Ấp Hư Cấu"},
 		{Ref: fac2, Code: "CS2", Name: "Lò mổ 2", CommuneCode: "30002", Kind: knport.FacilitySmall, Active: true},
 	}
 	if c.multiProvince {
@@ -159,13 +159,30 @@ type fix struct {
 	mu     sync.Mutex
 	ctxs   map[uuid.UUID]*authz.KNContext
 	xa     *xaScopes
+	phones *staffPhones
+}
+
+// staffPhones: SĐT công vụ giả của viên chức (pf/accounts StaffContacts) — số hư cấu.
+type staffPhones struct {
+	mu sync.Mutex
+	m  map[uuid.UUID]string
+}
+
+func (p *staffPhones) PhoneOf(_ context.Context, _ uuid.UUID, actor uuid.UUID) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if s, ok := p.m[actor]; ok {
+		return s, nil
+	}
+	return "", accport.ErrNoPhone
 }
 
 func newFix(t *testing.T, multi ...bool) *fix {
 	env := pgtest.Get(t)
-	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}}
+	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, phones: &staffPhones{m: map[uuid.UUID]string{}}}
 	f.pool = env.AdminPool(t, migrations.PF)
 	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}, Orgs: provinceOrgs{}})
+	mod.UseContacts(f.phones)
 	mod.UseCNTSCatalogs(catalogs{multiProvince: len(multi) > 0 && multi[0]})
 	if len(multi) < 2 || multi[1] {
 		mod.UseXaScopes(f.xa)
