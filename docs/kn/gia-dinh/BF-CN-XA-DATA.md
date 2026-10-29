@@ -1,4 +1,4 @@
-## BF-CN-XA-DATA (#175) — Số liệu cấp xã của Tỉnh: Nhập liệu tuần BM-04 và Nhật ký sản xuất
+## BF-CN-XA-DATA — Số liệu cấp xã của Tỉnh: Nhập liệu tuần BM-04 và Nhật ký sản xuất (#175)
 
 Đặc tả: BRD CNTS v3.7 (07/10/2026) FN-09 (Cấp Tỉnh R, yêu cầu điều chỉnh/xác thực khi là người phụ trách biểu; BR-01, BR-02, AC-01…AC-06), FN-10 (Tỉnh đọc nhật ký), FN-13/UR-TINH-12. Prototype chỉ là đặc tả menu (`menus/base.json`).
 
