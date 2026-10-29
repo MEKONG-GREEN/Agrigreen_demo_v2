@@ -295,6 +295,22 @@ func writeFormTexts(w *workbook, data domain.Data, hcth bool) {
 	}
 }
 
+// writeExternal ghi các ô Nhập ngoài (W11.67, BR-DL-19) kèm nguồn: cơ quan, văn bản/kênh, ngày, tệp minh chứng.
+func writeExternal(w *workbook, figures []domain.ExternalFigure) {
+	if len(figures) == 0 {
+		return
+	}
+	w.line("Số liệu nguồn ngoài (Nhập ngoài) — chỉ sửa tại Số liệu nguồn ngoài")
+	w.line("Chỉ tiêu", "Giá trị", "ĐVT", "Cơ quan cung cấp", "Văn bản / kênh", "Ngày", "Minh chứng")
+	for _, x := range figures {
+		files := make([]string, 0, len(x.Evidence))
+		for _, ev := range x.Evidence {
+			files = append(files, ev.FileName)
+		}
+		w.numericLine([]string{x.Name, x.Value, x.Unit, x.Agency, x.Document, x.SourceDate, strings.Join(files, "; ")}, 1)
+	}
+}
+
 func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, error) {
 	file := excelize.NewFile()
 	defer func() { _ = file.Close() }()
@@ -349,6 +365,9 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 			title += " — " + nextPeriod(data.Period)
 		}
 		w.title(section.Key + ". " + title)
+		if section.Key == "A" && data.Template == "mau_1" || section.Key == "I" {
+			writeExternal(w, data.External)
+		}
 		switch section.Key {
 		case "A.I.1", "A.I.2", "A.I.3", "A.III":
 			writeMetrics(w, data.Metrics, section.Key)
@@ -425,6 +444,12 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 		w.line("Ảnh chụp nguồn", data.Sources.ID.String(), strconv.FormatInt(data.Sources.Version, 10), data.Sources.At.Format(time.RFC3339))
 		w.line("Băm số", data.Sources.FiguresHash)
 		w.line("Băm trạng thái HTX", data.Sources.StatusHash)
+	}
+	if len(data.External) > 0 {
+		w.line("Số liệu nguồn ngoài", "Mã chỉ tiêu", "Bản ghi", "Phiên bản", "Lúc ghi")
+		for _, x := range data.External {
+			w.line(x.Name, x.Code, x.EntryID.String(), strconv.FormatInt(x.Version, 10), x.At.Format(time.RFC3339))
+		}
 	}
 	w.line("Kỳ phiếu", "Phòng", "Bài nộp", "Lần gửi", "Bảng niêm phong", "Băm bảng")
 	for _, ref := range data.Submissions {
