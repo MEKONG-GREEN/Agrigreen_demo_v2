@@ -7,7 +7,14 @@ import { uuidv7 } from "../idempotency";
 import fixture from "./fixtures/knqg-specs.json";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext, personaForContext } from "./kn";
+import { KN_ACCOUNTS } from "./kn-accounts";
 import { cntsMockProjectInfo } from "./kn-cnts-model";
+
+/** Cấp quản lý có quyền lãnh đạo (như máy chủ: accport.IsManager) — ngữ cảnh giả lập chưa mang cờ manager. */
+const MANAGER_LEVELS = ["Phụ trách", "Phó trưởng phòng", "Trưởng phòng", "Lãnh đạo đơn vị", "Phó Giám đốc", "Giám đốc"];
+const managerByLevel = (assignmentId: string | null | undefined) =>
+  !!assignmentId &&
+  KN_ACCOUNTS.some((a) => a.assignments.some((x) => x.assignment_id === assignmentId && MANAGER_LEVELS.includes(x.mgmt_level ?? "")));
 
 type S = components["schemas"];
 type Spec = S["CNTSKNQGSpec"];
@@ -20,12 +27,15 @@ const INDICATORS = fixture.indicator_rows as Record<string, Row[]>;
 const CHECKLIST = fixture.doc_checklist as string[];
 const DOCS = new Map<string, Doc[]>(); // ref → phiên bản (mới nhất cuối)
 const WORDS = new Map<string, S["CNTSKNQGWordRun"][]>();
+const PHOTOS = new Map<string, S["CNTSKNQGPhoto"][]>(); // W11.53b: ảnh thực địa hiện hành của Mẫu 03
+const MAX_PHOTOS = 20;
 let reportNo = 0;
 
 /** Xóa trạng thái (kiểm thử). */
 export function resetCntsKnqg() {
   DOCS.clear();
   WORDS.clear();
+  PHOTOS.clear();
   reportNo = 0;
 }
 
@@ -35,7 +45,7 @@ function who(ctx: Ctx) {
   const p = personaForContext(ctx.persona, id);
   const role = kc?.role ?? (p.me.roles.includes("platform_admin") ? "admin" : p.me.roles.includes("kn_national_admin") ? "kn_tw" : p.me.scope.level === "commune" ? "kn_xa" : "kn_tinh");
   const communes = role === "kn_xa" ? (kc?.communes.map((c) => c.code) ?? p.me.scope.units) : null;
-  return { role, communes, actor: p.me.actor_ref, readOnly: !!kc?.read_only, manager: !!kc?.manager || kc?.province_group === "lanh_dao_phong" };
+  return { role, communes, actor: p.me.actor_ref, readOnly: !!kc?.read_only, manager: !!kc?.manager || kc?.province_group === "lanh_dao_phong" || managerByLevel(kc?.assignment_id) };
 }
 type Who = ReturnType<typeof who>;
 type Info = NonNullable<ReturnType<typeof cntsMockProjectInfo>>;
@@ -213,12 +223,18 @@ const notFound = () => problem(404, "extension.cnts_knqg_not_found", "Không có
 const readOnly = () => problem(403, "extension.read_only", "Ngữ cảnh chỉ xem");
 const base = (ctx: Ctx) => (ctx.body as { base_version?: number } | undefined)?.base_version;
 
-function multipartMeta(ctx: Ctx): { base?: number; name?: string } {
+function multipartMeta(ctx: Ctx): { base?: number; name?: string; caption?: string; size?: number } {
   if (!(ctx.body instanceof Uint8Array)) return {};
   let raw = "";
   for (const x of ctx.body.slice(0, 4096)) raw += String.fromCharCode(x);
   const b = /"base_version"\s*:\s*(\d+)/.exec(raw)?.[1];
-  return { base: b ? Number(b) : undefined, name: /filename="([^"]+)"/.exec(raw)?.[1] };
+  const cap = /name="caption"\r\n\r\n([^\r]*)\r\n/.exec(raw)?.[1];
+  return { base: b ? Number(b) : undefined, name: /filename="([^"]+)"/.exec(raw)?.[1], caption: cap ? new TextDecoder().decode(Uint8Array.from(cap, (c) => c.charCodeAt(0))) : undefined,
+    size: ctx.body.length };
+}
+
+function photoList(w: Who, l: NonNullable<ReturnType<typeof load>>, replayed = false): S["CNTSKNQGPhotoList"] {
+  return { items: PHOTOS.get(l.cur.ref) ?? [], can_edit: l.cur.form === "03" && editable(l.cur.status) && editor(w, l.info), max_photos: MAX_PHOTOS, replayed };
 }
 
 export const cntsKnqgRoutes: Route[] = [
@@ -355,6 +371,65 @@ export const cntsKnqgRoutes: Route[] = [
       if (!scan) return problem(404, "extension.cnts_knqg_scan_not_found", "Biểu chưa có bản scan đã ký");
       return new Response(new Blob(["%PDF-1.4\n%%EOF\n"]), { status: 200, headers: { "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${encodeURIComponent(scan.name)}"` } });
+    },
+  },
+  // W11.53b: ảnh thực địa Mẫu 03 (giả lập: chỉ giữ siêu dữ liệu, tải ảnh trả PNG 1×1).
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/knqg-docs\/([^/]+)\/photos$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      const l = load(ctx, w);
+      return l ? json(photoList(w, l)) : notFound();
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/knqg-docs\/([^/]+)\/photos$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      if (w.readOnly || w.role === "kn_tw") return readOnly();
+      const l = load(ctx, w);
+      if (!l) return notFound();
+      if (l.cur.form !== "03") return problem(422, "extension.cnts_knqg_photo_invalid", "chỉ báo cáo kiểm tra Mẫu 03 có ảnh thực địa");
+      if (!editor(w, l.info)) return problem(403, "forbidden", "chỉ chủ nhiệm của dự án, lãnh đạo phòng hoặc Admin thêm/gỡ ảnh");
+      if (!editable(l.cur.status)) return problem(409, "extension.cnts_knqg_locked", "báo cáo đã trình ký/ký — lập bản điều chỉnh để thêm/gỡ ảnh");
+      const m = multipartMeta(ctx);
+      const items = PHOTOS.get(l.cur.ref) ?? [];
+      if (!m.name || !/\.(jpe?g|png)$/i.test(m.name) || (m.size ?? 0) > 5 * 1024 * 1024 || items.length >= MAX_PHOTOS)
+        return problem(422, "extension.cnts_knqg_photo_invalid", "Ảnh thực địa phải là JPG hoặc PNG, tối đa 5 MB; tối đa 20 ảnh mỗi báo cáo");
+      PHOTOS.set(l.cur.ref, [...items, { ref: uuidv7(), name: m.name, content_type: /\.png$/i.test(m.name) ? "image/png" : "image/jpeg",
+        size: m.size ?? 0, sha256: "0".repeat(64), caption: m.caption?.trim() || null, uploaded_at: new Date().toISOString(), uploaded_by: w.actor,
+        uploaded_by_name: null }]);
+      return json(photoList(w, l));
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/knqg-docs\/([^/]+)\/photos\/([^/]+)$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      const l = load(ctx, w);
+      const ph = l ? (PHOTOS.get(l.cur.ref) ?? []).find((x) => x.ref === ctx.params[1]) : null;
+      if (!ph) return problem(404, "extension.cnts_knqg_photo_not_found", "Không có ảnh thực địa này trong báo cáo");
+      const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+      return new Response(new Blob([png]), { status: 200, headers: { "Content-Type": "image/png" } });
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/knqg-docs\/([^/]+)\/photos\/([^/]+)\/remove$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      if (w.readOnly || w.role === "kn_tw") return readOnly();
+      const l = load(ctx, w);
+      if (!l) return notFound();
+      if (!editor(w, l.info)) return problem(403, "forbidden", "chỉ chủ nhiệm của dự án, lãnh đạo phòng hoặc Admin thêm/gỡ ảnh");
+      if (!editable(l.cur.status)) return problem(409, "extension.cnts_knqg_locked", "báo cáo đã trình ký/ký — lập bản điều chỉnh để thêm/gỡ ảnh");
+      const items = PHOTOS.get(l.cur.ref) ?? [];
+      if (!items.some((x) => x.ref === ctx.params[1])) return problem(404, "extension.cnts_knqg_photo_not_found", "Không có ảnh thực địa này trong báo cáo");
+      PHOTOS.set(l.cur.ref, items.filter((x) => x.ref !== ctx.params[1]));
+      return json(photoList(w, l));
     },
   },
   {

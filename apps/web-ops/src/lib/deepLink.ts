@@ -5,6 +5,7 @@
 // và "đã duyệt") nên loại thông báo (`kind`) quyết định trang đích khi có.
 
 const UUID = "[0-9a-fA-F-]{8,64}";
+const KNQG_FORMS = "/kn/cnts/du-an-mau-bieu";
 
 type Rule = { re: RegExp; to: (id: string, kind: string | undefined) => string };
 
@@ -37,11 +38,27 @@ const KIND_FALLBACK: Readonly<Record<string, string>> = {
   household_membership_changed: "/htx",
   integration_dead_lettered: "/quan-tri/giam-sat-dong-bo",
   area_feed_stale: "/cgh",
+  // W11.53b (#158): biểu dự án KNQG gửi Cấp TW / được xác nhận, trả lại / trình duyệt → màn Mẫu biểu dự án KNQG.
+  cnts_knqg_sent: KNQG_FORMS,
+  cnts_knqg_reviewed: KNQG_FORMS,
+  cnts_knqg_submitted: KNQG_FORMS,
 };
+
+/** Mã biểu trong `?doc=` phải là UUID đầy đủ (không nhận chuỗi tuỳ ý); sai dạng → mở màn danh sách. */
+const STRICT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `deep_link` của biểu KNQG mang mã biểu ở tham số `doc` (pf/extension module_notify_knqg.go). */
+function knqgHref(deepLink: string): string {
+  const q = deepLink.split("#")[0]?.split("?")[1] ?? "";
+  const doc = new URLSearchParams(q).get("doc");
+  return doc && STRICT_UUID.test(doc) ? `${KNQG_FORMS}?doc=${doc.toLowerCase()}` : KNQG_FORMS;
+}
 
 export function deepLinkHref(deepLink: string | null | undefined, kind?: string | null): string | null {
   const k = kind ?? undefined;
-  const path = (deepLink ?? "").trim().split(/[?#]/)[0] ?? "";
+  const raw = (deepLink ?? "").trim();
+  const path = raw.split(/[?#]/)[0] ?? "";
+  if (path === KNQG_FORMS) return knqgHref(raw);
   if (path) {
     for (const r of RULES) {
       const m = r.re.exec(path);
