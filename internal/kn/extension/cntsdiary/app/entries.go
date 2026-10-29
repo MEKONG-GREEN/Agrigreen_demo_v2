@@ -11,6 +11,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -223,15 +224,15 @@ func photosOf(ctx context.Context, tx pgx.Tx, household uuid.UUID, refs []uuid.U
 func itoa(i int) string { return decimal.NewFromInt(int64(i)).String() }
 
 // evaluate dựng kết quả kiểm tra tự động của bản en (mã ref) so với các lần ghi khác của lứa.
-// cat: ngưỡng mặc định của danh mục chỉ tiêu, đọc trước giao dịch (indicatorRanges).
-func (s *Service) evaluate(ctx context.Context, tx pgx.Tx, cy store.Cycle, modelType string, ref uuid.UUID, en domain.Entry, captured time.Time,
-	weighing int, loc domain.Location, cat map[string]indicatorRange) ([]domain.Check, error) {
+// env: ngưỡng, tham số đã nạp NGOÀI giao dịch (loadEnv) — trong giao dịch không gọi port của module khác.
+func (s *Service) evaluate(ctx context.Context, tx pgx.Tx, cy store.Cycle, env evalEnv, ref uuid.UUID, en domain.Entry, captured time.Time,
+	weighing int, loc domain.Location) ([]domain.Check, error) {
 	others, err := store.ListEntries(ctx, tx, store.EntryFilter{Cycle: &cy.Ref})
 	if err != nil {
 		return nil, err
 	}
 	in := domain.EvalInput{Form: cy.Form, Entry: en, InitialCount: cy.InitialCount, WeighingPhotos: weighing, Location: loc,
-		Thresholds: s.thresholds(ctx, modelType, cat), MaxDistM: s.param(ctx, ParamDistance, "200"), MaxAccM: s.param(ctx, ParamAccuracy, "50")}
+		Thresholds: env.th, MaxDistM: env.maxDist, MaxAccM: env.maxAcc}
 	var prev, prevW *store.Entry
 	for i := range others {
 		o := others[i]
@@ -312,11 +313,11 @@ func dayTaken(ctx context.Context, tx pgx.Tx, cy store.Cycle, ref uuid.UUID, day
 }
 
 // alerts sinh / tự đóng cảnh báo dòng 6–9 cho lần ghi vừa gửi.
-func (s *Service) alerts(ctx context.Context, tx pgx.Tx, c caller, hc *hctx, e store.Entry) error {
+// province: tỉnh của xã e.CommuneCode, tra NGOÀI giao dịch (evalEnv).
+func (s *Service) alerts(ctx context.Context, tx pgx.Tx, c caller, hc *hctx, e store.Entry, province string) error {
 	if s.Alerts == nil {
 		return nil
 	}
-	province := s.provinceOf(ctx, e.CommuneCode)
 	for _, kind := range domain.AlertKinds {
 		hits := domain.Hits(e.Checks, kind)
 		var fs []alertdomain.Finding
@@ -375,15 +376,55 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 	if _, err := s.editDays(ctx, day); err != nil {
 		return EntryView{}, err
 	}
-	cat, err := s.indicatorRanges(ctx) // ngưỡng mặc định của danh mục chỉ tiêu: đọc NGOÀI giao dịch (#170)
+	// Ngưỡng, tham số, tỉnh của xã: nạp NGOÀI giao dịch ghi theo loại mô hình, xã đọc trước (#170, AUTO-REVIEW §4); đổi giữa
+	// chừng → nạp lại.
+	for attempt := 0; ; attempt++ {
+		var env evalEnv
+		if env, err = s.createEnv(ctx, c, in.CycleRef); err != nil {
+			return EntryView{}, err
+		}
+		err = s.createTx(ctx, c, in, ref, retention, env, &out, &replayed)
+		if !errors.Is(err, errEnvStale) || attempt+1 >= envRetries {
+			break
+		}
+	}
+	if errors.Is(err, errEnvStale) {
+		err = ErrCycleConflict
+	}
+	if dup(err) {
+		return s.CreateEntry(ctx, in)
+	}
 	if err != nil {
 		return EntryView{}, err
 	}
-	vnames := s.vaccineNames(ctx) // BF-CN-VACC: tên vaccine cho NC-11 → lịch tiêm, đọc NGOÀI giao dịch
-	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+	v, err := s.GetEntry(ctx, out.Ref)
+	v.Replayed = replayed
+	return v, err
+}
+
+// createEnv đọc loại mô hình, xã của hộ của lứa (giao dịch đọc ngắn) rồi nạp evalEnv — NGOÀI giao dịch ghi.
+func (s *Service) createEnv(ctx context.Context, c caller, cycleRef uuid.UUID) (evalEnv, error) {
+	var mt, commune string
+	if err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+		cy, err := store.LatestCycle(ctx, tx, cycleRef)
+		if err != nil || cy == nil {
+			return err
+		}
+		mt, commune, err = peekHousehold(ctx, tx, cy.HouseholdRef)
+		return err
+	}); err != nil {
+		return evalEnv{}, err
+	}
+	return s.loadEnv(ctx, mt, commune)
+}
+
+// createTx là giao dịch ghi của CreateEntry: chỉ dùng dữ liệu thuần env, không gọi port của module khác.
+func (s *Service) createTx(ctx context.Context, c caller, in EntryInput, ref uuid.UUID, retention int, env evalEnv, out *store.Entry,
+	replayed *bool) error {
+	return s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
 			if prev != nil {
-				out, replayed = *prev, true
+				*out, *replayed = *prev, true
 			}
 			return err
 		}
@@ -413,6 +454,9 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 		if cy.Event == domain.EventClosed || !hc.open() {
 			return ErrCycleClosed
 		}
+		if err := env.check(hc.x.ModelType, hc.h.CommuneCode); err != nil {
+			return err
+		}
 		en, captured, err := s.normalizeInput(&in, *cy)
 		if err != nil {
 			return err
@@ -439,8 +483,8 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 				return err
 			}
 		}
-		loc := domain.EvaluateLocation(in.Fix, tp, s.param(ctx, ParamDistance, "200"), s.param(ctx, ParamAccuracy, "50"), others)
-		checks, err := s.evaluate(ctx, tx, *cy, hc.x.ModelType, ref, en, captured, weighing, loc, cat)
+		loc := domain.EvaluateLocation(in.Fix, tp, env.maxDist, env.maxAcc, others)
+		checks, err := s.evaluate(ctx, tx, *cy, env, ref, en, captured, weighing, loc)
 		if err != nil {
 			return err
 		}
@@ -451,11 +495,11 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 			}
 			status = domain.StatusSubmitted
 		}
-		out = store.Entry{Meta: c.meta(s.now(), idemEntry(in.IdemKey)), Ref: ref, Event: domain.EventCreated, Status: status,
+		*out = store.Entry{Meta: c.meta(s.now(), idemEntry(in.IdemKey)), Ref: ref, Event: domain.EventCreated, Status: status,
 			CycleRef: cy.Ref, HouseholdRef: hc.h.Ref, SiteRef: hc.x.Ref, ProjectRef: hc.p.Ref, CommuneCode: hc.h.CommuneCode,
 			Form: cy.Form, CapturedAt: captured, Photos: in.Photos, Checks: checks, Location: loc, FixStored: in.Fix != nil,
 			AuthorRef: c.me(), Entry: en}
-		if err := store.InsertEntry(ctx, tx, c.p.TenantID, &out); err != nil {
+		if err := store.InsertEntry(ctx, tx, c.p.TenantID, out); err != nil {
 			return err
 		}
 		if in.Fix != nil {
@@ -465,22 +509,13 @@ func (s *Service) CreateEntry(ctx context.Context, in EntryInput) (EntryView, er
 			}
 		}
 		if status == domain.StatusSubmitted {
-			if err := s.alerts(ctx, tx, c, hc, out); err != nil {
+			if err := s.alerts(ctx, tx, c, hc, *out, env.province); err != nil {
 				return err
 			}
-			return s.syncVaccinations(ctx, tx, c, *cy, out, vnames)
+			return s.syncVaccinations(ctx, tx, c, *cy, *out, env.vnames)
 		}
 		return nil
 	})
-	if dup(err) {
-		return s.CreateEntry(ctx, in)
-	}
-	if err != nil {
-		return EntryView{}, err
-	}
-	v, err := s.GetEntry(ctx, out.Ref)
-	v.Replayed = replayed
-	return v, err
 }
 
 // change ghi phiên bản mới của lần ghi theo hành động act.
@@ -516,23 +551,65 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 			}
 		}
 	}
-	var cat map[string]indicatorRange
-	if act != domain.ActReturn && act != domain.ActVerify { // chỉ các hành động chạy kiểm tra tự động (#170)
-		if cat, err = s.indicatorRanges(ctx); err != nil {
-			return EntryView{}, err
+	// Hành động chạy kiểm tra tự động / cảnh báo: ngưỡng, tham số, tỉnh của xã nạp NGOÀI giao dịch ghi (#170, AUTO-REVIEW §4)
+	// theo loại mô hình, xã đọc trước; đổi giữa chừng → nạp lại.
+	evals := act != domain.ActReturn && act != domain.ActVerify
+	for attempt := 0; ; attempt++ {
+		var env evalEnv
+		if evals {
+			if env, err = s.changeEnv(ctx, c, ref); err != nil {
+				return EntryView{}, err
+			}
+		}
+		err = s.changeTx(ctx, c, ref, act, in, editDate, editDays, evals, env)
+		if !errors.Is(err, errEnvStale) || attempt+1 >= envRetries {
+			break
 		}
 	}
-	var vnames map[string]string
-	if act == domain.ActSubmit || act == domain.ActUpdate || act == domain.ActCorrect {
-		vnames = s.vaccineNames(ctx) // BF-CN-VACC: đọc NGOÀI giao dịch
+	if errors.Is(err, errEnvStale) {
+		err = ErrEntryConflict
 	}
-	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+	if dup(err) {
+		err = nil
+	}
+	if err != nil {
+		return EntryView{}, err
+	}
+	return s.GetEntry(ctx, ref)
+}
+
+// changeEnv đọc loại mô hình của điểm, xã của lần ghi (giao dịch đọc ngắn) rồi nạp evalEnv — NGOÀI giao dịch ghi.
+func (s *Service) changeEnv(ctx context.Context, c caller, ref uuid.UUID) (evalEnv, error) {
+	var mt, commune string
+	if err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+		e, err := store.LatestEntry(ctx, tx, ref)
+		if err != nil || e == nil {
+			return err
+		}
+		mt, _, err = peekHousehold(ctx, tx, e.HouseholdRef)
+		commune = e.CommuneCode
+		return err
+	}); err != nil {
+		return evalEnv{}, err
+	}
+	return s.loadEnv(ctx, mt, commune)
+}
+
+// changeTx là giao dịch ghi của change: chỉ dùng dữ liệu thuần env (evals), không gọi port của module khác.
+func (s *Service) changeTx(ctx context.Context, c caller, ref uuid.UUID, act string, in EntryInput, editDate time.Time, editDays int,
+	evals bool, env evalEnv) error {
+	return s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if prev, err := store.EntryByIdem(ctx, tx, idemEntry(in.IdemKey)); err != nil || prev != nil {
 			return err
 		}
 		e, cy, hc, err := s.lockEntry(ctx, tx, c, ref)
 		if err != nil {
 			return err
+		}
+		if evals {
+			if err := env.check(hc.x.ModelType, e.CommuneCode); err != nil {
+				return err
+			}
 		}
 		event, next, ok := domain.Transition(e.Status, act)
 		if !ok {
@@ -597,12 +674,12 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 		case domain.ActVerify:
 			n.ReviewerRef = &c.p.ActorRef
 		}
-		if act != domain.ActReturn && act != domain.ActVerify {
+		if evals {
 			weighing, err := photosOf(ctx, tx, hc.h.Ref, n.Photos)
 			if err != nil {
 				return err
 			}
-			if n.Checks, err = s.evaluate(ctx, tx, *cy, hc.x.ModelType, ref, n.Entry, n.CapturedAt, weighing, n.Location, cat); err != nil {
+			if n.Checks, err = s.evaluate(ctx, tx, *cy, env, ref, n.Entry, n.CapturedAt, weighing, n.Location); err != nil {
 				return err
 			}
 			if next == domain.StatusSubmitted {
@@ -615,22 +692,15 @@ func (s *Service) change(ctx context.Context, ref uuid.UUID, act string, in Entr
 			return err
 		}
 		if next == domain.StatusSubmitted && act != domain.ActVerify {
-			if err := s.alerts(ctx, tx, c, hc, n); err != nil {
+			if err := s.alerts(ctx, tx, c, hc, n, env.province); err != nil {
 				return err
 			}
 		}
 		if (next == domain.StatusSubmitted && act != domain.ActVerify) || act == domain.ActCorrect {
-			return s.syncVaccinations(ctx, tx, c, *cy, n, vnames)
+			return s.syncVaccinations(ctx, tx, c, *cy, n, env.vnames)
 		}
 		return nil
 	})
-	if dup(err) {
-		err = nil
-	}
-	if err != nil {
-		return EntryView{}, err
-	}
-	return s.GetEntry(ctx, ref)
 }
 
 // UpdateEntry sửa lần ghi (nháp, yêu cầu bổ sung, đã gửi trong hạn sửa); Submit = gửi luôn (nháp, yêu cầu bổ sung).

@@ -17,14 +17,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -41,8 +44,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -69,21 +74,26 @@ func (units) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUn
 func (units) Descendants(context.Context, string, time.Time) ([]string, error) { return nil, nil }
 func (units) Current(context.Context, string, time.Time) ([]string, error)     { return nil, nil }
 
-type catalogs struct{ knport.CNTSCatalogs }
+type catalogs struct {
+	knport.CNTSCatalogs
+	g *txGuard
+}
 
 var items = map[string]mdport.CatalogItem{
 	"cnts_model_type:GA_TP": {Catalog: "cnts_model_type", Code: "GA_TP", Name: "Gà thương phẩm", Active: true},
 	"cnts_model_type:CA":    {Catalog: "cnts_model_type", Code: "CA", Name: "Cá", Active: true},
 }
 
-func (catalogs) ItemAt(_ context.Context, catalog, code string, _ time.Time) (mdport.CatalogItem, error) {
+func (c catalogs) ItemAt(_ context.Context, catalog, code string, _ time.Time) (mdport.CatalogItem, error) {
+	c.g.port("catalogs.ItemAt " + catalog)
 	if it, ok := items[catalog+":"+code]; ok {
 		return it, nil
 	}
 	return mdport.CatalogItem{}, fmt.Errorf("giả: %w", mdport.ErrCatalogItemNotFound)
 }
 
-func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport.CatalogItem, error) {
+func (c catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport.CatalogItem, error) {
+	c.g.port("catalogs.ListAt " + catalog)
 	out := []mdport.CatalogItem{}
 	for _, it := range items {
 		if it.Catalog == catalog {
@@ -91,6 +101,93 @@ func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport
 		}
 	}
 	return out, nil
+}
+
+// txGuard bọc pool của module (Codex #170 [P2]): đếm giao dịch đang mở; port của module khác (tham số, danh mục, đơn vị hành
+// chính) được gọi từ mã cntsdiary trong lúc có giao dịch đang mở → ghi vi phạm (AUTO-REVIEW §4: không gọi port trong TX).
+// Test chạy tuần tự từng request nên một bộ đếm chung đủ.
+type txGuard struct {
+	b      tenant.Beginner
+	active atomic.Int64
+	mu     sync.Mutex
+	calls  int
+	bad    []string
+}
+
+type guardTx struct {
+	pgx.Tx
+	g    *txGuard
+	done atomic.Bool
+}
+
+func (g *txGuard) BeginTx(ctx context.Context, o pgx.TxOptions) (pgx.Tx, error) {
+	tx, err := g.b.BeginTx(ctx, o)
+	if err != nil {
+		return nil, err
+	}
+	g.active.Add(1)
+	return &guardTx{Tx: tx, g: g}, nil
+}
+
+func (x *guardTx) end() {
+	if x.done.CompareAndSwap(false, true) {
+		x.g.active.Add(-1)
+	}
+}
+func (x *guardTx) Commit(ctx context.Context) error   { defer x.end(); return x.Tx.Commit(ctx) }
+func (x *guardTx) Rollback(ctx context.Context) error { defer x.end(); return x.Tx.Rollback(ctx) }
+
+// port ghi lời gọi port; gọi từ mã cntsdiary khi đang có giao dịch → vi phạm.
+func (g *txGuard) port(what string) {
+	if g == nil {
+		return
+	}
+	pcs := make([]uintptr, 64)
+	n := runtime.Callers(2, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+	diary := false
+	for {
+		fr, more := frames.Next()
+		if strings.Contains(fr.Function, "/cntsdiary/app.") {
+			diary = true
+		}
+		if !more {
+			break
+		}
+	}
+	if !diary {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.calls++
+	if g.active.Load() > 0 {
+		g.bad = append(g.bad, what)
+	}
+}
+
+func (g *txGuard) report() (int, []string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.calls, slices.Clone(g.bad)
+}
+
+// guardParams: chưa có tham số đã duyệt nào (như Params nil) nhưng ghi lời gọi để txGuard kiểm.
+type guardParams struct{ g *txGuard }
+
+func (p guardParams) At(_ context.Context, key string, _ time.Time) (params.ParamValue, error) {
+	p.g.port("params.At " + key)
+	return params.ParamValue{}, params.ErrParamNotFound
+}
+
+type guardUnits struct {
+	units
+	g *txGuard
+}
+
+func (u guardUnits) Get(ctx context.Context, code string, at time.Time) (partyport.AdminUnit, error) {
+	u.g.port("units.Get " + code)
+	return u.units.Get(ctx, code, at)
 }
 
 type xaScopes struct{ list []accport.XaScope }
@@ -165,6 +262,7 @@ type fix struct {
 	xa     *xaScopes
 	vault  *clienttest.Fake
 	files  *files
+	guard  *txGuard
 }
 
 func newFix(t *testing.T) *fix {
@@ -172,8 +270,9 @@ func newFix(t *testing.T) *fix {
 	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, vault: clienttest.New(),
 		clk: clock.NewFixed(t0)}
 	f.pool = env.AdminPool(t, migrations.PF)
-	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, extension.Deps{Units: units{}})
-	mod.UseCNTSCatalogs(catalogs{})
+	f.guard = &txGuard{b: env.Pool(t, migrations.PF, dbadmin.AppPlatform)}
+	mod := extension.New(f.guard, f.clk, extension.Deps{Units: guardUnits{g: f.guard}, Params: guardParams{g: f.guard}})
+	mod.UseCNTSCatalogs(catalogs{g: f.guard})
 	mod.UseXaScopes(f.xa)
 	mod.UseCNTSModelVault(f.vault)
 	f.files = &files{resolver: mod.DiaryFileResolver(), vault: f.vault, byRef: map[uuid.UUID]evport.File{}, blobs: map[uuid.UUID][]byte{}}
@@ -624,6 +723,21 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	if l := list(want(t, chu.get(base+"diary-entries?cycle_ref="+ccref), 200, "", "chủ nhiệm"), "items"); len(l) != 1 {
 		t.Fatalf("bản nháp chỉ người ghi thấy: %v", l)
 	}
+	// Sửa + gửi (đường change: cập nhật rồi gửi) vẫn áp ngưỡng mới; NT-12 bắt biện pháp xử lý.
+	envM := map[string]any{"loss": "0", "ph": "7.8", "do_mgl": "5", "temp_c": "34.5", "feed_kg": "35"}
+	want(t, officer.post(base+"diary-entries/"+str(draft, "ref"), map[string]any{"base_version": json.Number(num(draft, "version")),
+		"entry_kind": "env", "metrics": envM, "submit": true}), 422, "extension.cnts_diary_entry_blocked", "NT-12: vượt ngưỡng nhiệt độ phải ghi biện pháp")
+	envM["action_note"] = "Thay 30% nước, che lưới"
+	draft = want(t, officer.get(base+"diary-entries/"+str(draft, "ref")), 200, "", "bản nháp đã sửa (bước gửi bị chặn)")
+	sent := want(t, officer.post(base+"diary-entries/"+str(draft, "ref"), map[string]any{"base_version": json.Number(num(draft, "version")),
+		"entry_kind": "env", "metrics": envM, "submit": true}), 200, "", "gửi lần ghi môi trường có biện pháp")
+	if got := checkCodes(sent); str(sent, "status") != "submitted" || !slices.Contains(got, "temp_c_out_of_range") {
+		t.Fatalf("gửi: %s %v", str(sent, "status"), got)
+	}
+	// Codex #170 [P2]: ngưỡng/tham số/tỉnh của xã nạp NGOÀI giao dịch ghi — không lời gọi port nào từ cntsdiary trong TX.
+	if calls, bad := f.guard.report(); calls == 0 || len(bad) > 0 {
+		t.Fatalf("port của module khác gọi trong giao dịch nhật ký (%d lời gọi): %v", calls, bad)
+	}
 	f.clk.Advance(9 * 24 * time.Hour)
 	want(t, officer.post(base+"diary-entries/"+str(fe, "ref"), map[string]any{"base_version": 1, "entry_kind": "growth_env",
 		"metrics": fish["metrics"], "photo_refs": []string{photo}}), 409, "extension.cnts_diary_entry_locked", "quá 7 ngày không sửa lần ghi đã gửi")
@@ -644,6 +758,9 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	}
 	if rr := open(chu); rr.status == 200 {
 		t.Fatal("xóa định danh chủ hộ → ảnh không còn đọc được")
+	}
+	if calls, bad := f.guard.report(); calls == 0 || len(bad) > 0 {
+		t.Fatalf("port của module khác gọi trong giao dịch nhật ký (%d lời gọi): %v", calls, bad)
 	}
 }
 
