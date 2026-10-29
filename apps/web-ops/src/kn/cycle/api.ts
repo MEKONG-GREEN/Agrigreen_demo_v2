@@ -451,9 +451,8 @@ export function createCollectApi(opts: KnHttpOptions) {
       call<KnProducerDetail>("POST", `/v1/kn/producer-records/${ref}/${deactivate ? "deactivate" : "reactivate"}`, b, undefined, idem),
     /** HTX đã công bố trong phạm vi (chỉ đọc) — chọn để liên kết đối chiếu khi thêm hồ sơ HTX. */
     htxCandidates: (commune?: string) => call<{ items: KnHTXCandidate[] }>("GET", "/v1/kn/producer-htx-candidates", undefined, { commune }),
-    // Đọc HTX nền tảng (legacy GET, chỉ đọc) — bộ chọn HTX của màn Máy móc/Thửa (khai báo máy, thửa vẫn ở module nền).
-    // Chuyển sang publication ở ticket con của #67; KHÔNG dùng các route ghi /v1/kn/cooperatives nữa.
-    cooperatives: (q: { commune?: string; status?: "active" | "inactive" | "all"; q?: string } = {}) => call<A["KNCooperativeList"]>("GET", "/v1/kn/cooperatives", undefined, { ...q, limit: 200 }),
+    // #162 mục 1: web KN không còn đọc GET legacy /v1/kn/cooperatives — bộ chọn HTX của Máy móc/Thửa đọc hồ sơ KN (records,
+    // htx_ref) và tên HTX đã công bố qua htxCandidates. Khai báo máy/thửa vẫn ghi module nền (mục 2–3 chờ PO).
     machines: (commune?: string) => call<KnMachineOverview>("GET", "/v1/kn/machine-counts", undefined, { commune }),
     coopMachines: (ref: string) => call<KnCoopMachines>("GET", `/v1/kn/machine-counts/${ref}`),
     putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[], idem?: string) =>
