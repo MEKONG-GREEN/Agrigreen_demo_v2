@@ -119,23 +119,33 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
 }
 
-func (s *Service) param(ctx context.Context, key string, def string) decimal.Decimal {
-	if v := s.optParam(ctx, key); v != nil {
-		return *v
+// param: tham số đã duyệt, chưa có → mặc định def; lỗi tra cứu → 503 (không âm thầm rơi về mặc định, như dayParam).
+// Chỉ gọi NGOÀI giao dịch ghi (port masterdata mở giao dịch riêng trên cùng pool — AUTO-REVIEW §4, #170).
+func (s *Service) param(ctx context.Context, key string, def string) (decimal.Decimal, error) {
+	v, err := s.optParam(ctx, key)
+	if err != nil {
+		return decimal.Decimal{}, err
 	}
-	return decimal.RequireFromString(def)
+	if v != nil {
+		return *v, nil
+	}
+	return decimal.RequireFromString(def), nil
 }
 
-func (s *Service) optParam(ctx context.Context, key string) *decimal.Decimal {
+// optParam: tham số đã duyệt có hiệu lực; chưa có phiên bản đã duyệt (hoặc chưa nối Params) → nil; lỗi khác → 503.
+func (s *Service) optParam(ctx context.Context, key string) (*decimal.Decimal, error) {
 	if s.Params == nil {
-		return nil
+		return nil, nil
 	}
 	v, err := s.Params.At(ctx, key, s.now())
+	if errors.Is(err, params.ErrParamNotFound) {
+		return nil, nil
+	}
 	if err != nil {
-		return nil
+		return nil, ErrDependency.WithDetail("không đọc được tham số " + key).WithCause(err)
 	}
 	d := v.Value
-	return &d
+	return &d, nil
 }
 
 // indicatorRange là ngưỡng mặc định của danh mục chỉ tiêu theo dõi gắn với một chỉ số nhật ký (BF-CN-CATALOG #170).
@@ -147,10 +157,12 @@ type indicatorRange struct {
 // legacyIndicator: chỉ tiêu PH, DO nạp sẵn trước #170 chưa có diary_metric vẫn áp vào ph, do_mgl như cũ.
 var legacyIndicator = map[string]string{"ph": "PH", "do_mgl": "DO"}
 
-// indicatorRanges đọc danh mục chỉ tiêu (đang dùng hôm nay) NGOÀI giao dịch ghi: chỉ số nhật ký → chỉ tiêu + ngưỡng mặc định.
-// Nhiều chỉ tiêu cùng gắn một chỉ số → lấy mã nhỏ nhất. Chưa nối danh mục → rỗng (chỉ dùng tham số và mặc định trong mã).
-func (s *Service) indicatorRanges(ctx context.Context) (map[string]indicatorRange, error) {
-	out := map[string]indicatorRange{}
+// indicatorRanges đọc danh mục chỉ tiêu (đang dùng hôm nay) NGOÀI giao dịch ghi: chỉ số nhật ký → MỌI chỉ tiêu gắn chỉ số
+// đó, theo thứ tự mã. Nhiều chỉ tiêu cùng gắn một chỉ số (vd seed NHIET_DO chưa có ngưỡng và NHIET_DO_AO 25–32 cùng temp_c)
+// thì giữ cả; thresholds lấy từng biên từ chỉ tiêu đầu tiên CÓ biên đó — chỉ tiêu chưa đặt ngưỡng không che ngưỡng của chỉ
+// tiêu khác. Chưa nối danh mục → rỗng (chỉ dùng tham số và mặc định trong mã).
+func (s *Service) indicatorRanges(ctx context.Context) (map[string][]indicatorRange, error) {
+	out := map[string][]indicatorRange{}
 	if s.Catalogs == nil {
 		return out, nil
 	}
@@ -173,45 +185,55 @@ func (s *Service) indicatorRanges(ctx context.Context) (map[string]indicatorRang
 				}
 			}
 		}
-		if _, taken := out[metric]; metric == "" || taken || !slices.Contains(knport.DiaryWaterMetrics, metric) {
+		if metric == "" || !slices.Contains(knport.DiaryWaterMetrics, metric) {
 			continue
 		}
-		out[metric] = indicatorRange{code: it.Code, lo: knport.ParseThreshold(it.Attrs[knport.AttrThresholdMin]),
-			hi: knport.ParseThreshold(it.Attrs[knport.AttrThresholdMax])}
+		out[metric] = append(out[metric], indicatorRange{code: it.Code, lo: knport.ParseThreshold(it.Attrs[knport.AttrThresholdMin]),
+			hi: knport.ParseThreshold(it.Attrs[knport.AttrThresholdMax])})
 	}
 	return out, nil
 }
 
 // indicatorParam: tham số đã duyệt theo loại mô hình, rồi theo chỉ tiêu (ghi đè ngưỡng mặc định của danh mục).
-func (s *Service) indicatorParam(ctx context.Context, prefix, code, modelType string) *decimal.Decimal {
+func (s *Service) indicatorParam(ctx context.Context, prefix, code, modelType string) (*decimal.Decimal, error) {
 	if modelType != "" {
-		if v := s.optParam(ctx, knport.IndicatorKey(prefix, code, modelType)); v != nil {
-			return v
+		if v, err := s.optParam(ctx, knport.IndicatorKey(prefix, code, modelType)); err != nil || v != nil {
+			return v, err
 		}
 	}
 	return s.optParam(ctx, knport.IndicatorKey(prefix, code, ""))
 }
 
-// thresholds: ngưỡng của lần ghi. Mỗi chỉ số môi trường nước: tham số đã duyệt (loại mô hình → chỉ tiêu) > ngưỡng mặc định
-// của danh mục chỉ tiêu (cat, đọc trước giao dịch) > mặc định trong mã (chỉ pH 7,5–8,5, oxy ≥ 4 như trước #170).
-func (s *Service) thresholds(ctx context.Context, modelType string, cat map[string]indicatorRange) domain.Thresholds {
-	resolve := func(metric string) (lo, hi *decimal.Decimal) {
-		r, ok := cat[metric]
-		if !ok {
-			r = indicatorRange{code: legacyIndicator[metric]}
+// thresholds: ngưỡng của lần ghi — chỉ gọi NGOÀI giao dịch ghi (loadEnv). Mỗi biên của mỗi chỉ số môi trường nước: tham số
+// đã duyệt (loại mô hình → chỉ tiêu; chỉ tiêu đầu tiên theo mã có tham số) > ngưỡng mặc định của danh mục chỉ tiêu (cat; chỉ
+// tiêu đầu tiên có biên đó) > mặc định trong mã (chỉ pH 7,5–8,5, oxy ≥ 4 như trước #170). Lỗi tra tham số → 503.
+func (s *Service) thresholds(ctx context.Context, modelType string, cat map[string][]indicatorRange) (domain.Thresholds, error) {
+	resolve := func(metric string) (lo, hi *decimal.Decimal, err error) {
+		rs, ok := cat[metric]
+		if !ok && legacyIndicator[metric] != "" {
+			rs = []indicatorRange{{code: legacyIndicator[metric]}}
 		}
-		if r.code == "" {
-			return nil, nil
+		for _, r := range rs {
+			if lo == nil {
+				if lo, err = s.indicatorParam(ctx, knport.ParamCNTSIndicatorMinPrefix, r.code, modelType); err != nil {
+					return nil, nil, err
+				}
+			}
+			if hi == nil {
+				if hi, err = s.indicatorParam(ctx, knport.ParamCNTSIndicatorMaxPrefix, r.code, modelType); err != nil {
+					return nil, nil, err
+				}
+			}
 		}
-		lo = s.indicatorParam(ctx, knport.ParamCNTSIndicatorMinPrefix, r.code, modelType)
-		hi = s.indicatorParam(ctx, knport.ParamCNTSIndicatorMaxPrefix, r.code, modelType)
-		if lo == nil {
-			lo = r.lo
+		for _, r := range rs {
+			if lo == nil {
+				lo = r.lo
+			}
+			if hi == nil {
+				hi = r.hi
+			}
 		}
-		if hi == nil {
-			hi = r.hi
-		}
-		return lo, hi
+		return lo, hi, nil
 	}
 	def := func(d *decimal.Decimal, v string) *decimal.Decimal {
 		if d != nil {
@@ -220,23 +242,95 @@ func (s *Service) thresholds(ctx context.Context, modelType string, cat map[stri
 		x := decimal.RequireFromString(v)
 		return &x
 	}
-	t := domain.Thresholds{MortalityMaxPct: s.optParam(ctx, ParamMortality+":"+modelType)}
-	t.PHMin, t.PHMax = resolve("ph")
+	var t domain.Thresholds
+	var err error
+	if modelType != "" {
+		if t.MortalityMaxPct, err = s.optParam(ctx, ParamMortality+":"+modelType); err != nil {
+			return t, err
+		}
+	}
+	if t.PHMin, t.PHMax, err = resolve("ph"); err != nil {
+		return t, err
+	}
 	t.PHMin, t.PHMax = def(t.PHMin, "7.5"), def(t.PHMax, "8.5")
-	t.DOMin, t.DOMax = resolve("do_mgl")
+	if t.DOMin, t.DOMax, err = resolve("do_mgl"); err != nil {
+		return t, err
+	}
 	t.DOMin = def(t.DOMin, "4")
 	for _, m := range knport.DiaryWaterMetrics {
 		if _, legacy := legacyIndicator[m]; legacy {
 			continue
 		}
-		if lo, hi := resolve(m); lo != nil || hi != nil {
+		lo, hi, err := resolve(m)
+		if err != nil {
+			return t, err
+		}
+		if lo != nil || hi != nil {
 			if t.Others == nil {
 				t.Others = map[string]domain.Range{}
 			}
 			t.Others[m] = domain.Range{Min: lo, Max: hi}
 		}
 	}
-	return t
+	return t, nil
+}
+
+// evalEnv là dữ liệu của module khác mà kiểm tra tự động và cảnh báo của một lần ghi cần — tham số đã duyệt (pf/masterdata),
+// danh mục chỉ tiêu, tỉnh của xã (pf/party) — nạp NGOÀI giao dịch ghi rồi truyền dạng dữ liệu thuần vào giao dịch (AUTO-REVIEW
+// §4, #170: port của module khác mở giao dịch riêng trên cùng pool). Nạp theo loại mô hình của điểm và xã đọc trước; trong
+// giao dịch hai giá trị này khác → errEnvStale, nạp lại.
+type evalEnv struct {
+	modelType, commune, province string
+	th                           domain.Thresholds
+	maxDist, maxAcc              decimal.Decimal
+}
+
+// errEnvStale: loại mô hình của điểm hoặc xã đổi giữa lúc nạp evalEnv và giao dịch ghi.
+var errEnvStale = errors.New("cntsdiary: loại mô hình hoặc xã đổi trong lúc nạp tham số")
+
+// envRetries: số lần nạp lại evalEnv khi errEnvStale trước khi trả xung đột.
+const envRetries = 3
+
+// loadEnv nạp evalEnv (gọi NGOÀI giao dịch).
+func (s *Service) loadEnv(ctx context.Context, modelType, commune string) (evalEnv, error) {
+	e := evalEnv{modelType: modelType, commune: commune}
+	cat, err := s.indicatorRanges(ctx)
+	if err != nil {
+		return e, err
+	}
+	if e.th, err = s.thresholds(ctx, modelType, cat); err != nil {
+		return e, err
+	}
+	if e.maxDist, err = s.param(ctx, ParamDistance, "200"); err != nil {
+		return e, err
+	}
+	if e.maxAcc, err = s.param(ctx, ParamAccuracy, "50"); err != nil {
+		return e, err
+	}
+	e.province = s.provinceOf(ctx, commune)
+	return e, nil
+}
+
+// check: loại mô hình, xã đọc trong giao dịch khớp lúc nạp.
+func (e evalEnv) check(modelType, commune string) error {
+	if e.modelType != modelType || e.commune != commune {
+		return errEnvStale
+	}
+	return nil
+}
+
+// peekHousehold đọc (giao dịch đọc ngắn, trước giao dịch ghi) loại mô hình của điểm và xã của hộ. Không có hộ/điểm → rỗng
+// (giao dịch ghi tự trả lỗi không tìm thấy).
+func peekHousehold(ctx context.Context, tx pgx.Tx, household uuid.UUID) (modelType, commune string, err error) {
+	h, err := mstore.LatestHousehold(ctx, tx, household)
+	if err != nil || h == nil {
+		return "", "", err
+	}
+	x, err := mstore.LatestSite(ctx, tx, h.SiteRef)
+	if err != nil || x == nil {
+		return "", h.CommuneCode, err
+	}
+	return x.ModelType, h.CommuneCode, nil
 }
 
 // caller là người gọi đã giải ngữ cảnh phiên KN.
