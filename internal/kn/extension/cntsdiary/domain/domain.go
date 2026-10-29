@@ -932,7 +932,10 @@ func Evaluate(in EvalInput) []Check {
 		for _, d := range aquatic {
 			r, ok := in.Thresholds.Others[d.Code]
 			v := Dec(m, d.Code)
-			if !ok || v == nil || !((r.Min != nil && v.LessThan(*r.Min)) || (r.Max != nil && v.GreaterThan(*r.Max))) {
+			if !ok || v == nil {
+				continue
+			}
+			if below, above := r.Min != nil && v.LessThan(*r.Min), r.Max != nil && v.GreaterThan(*r.Max); !below && !above {
 				continue
 			}
 			water = true

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminApiClient, createApiClient, unwrap } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsVersions } from "@/api/mock/kn-cnts-catalogs";
+import { toCsv } from "@/htx/rules";
 import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase } from "./CntsCatalogScreen";
 import { CNTS_TABS, cleanAttrs, effectiveThreshold, expectedDate, exportRows, formatDoses, normalizeAttrs, parseDoses, tabOf, templateRows, validateAttrs } from "./schema";
 
@@ -74,6 +75,39 @@ describe("danh mục CNTS — trường thuộc tính (W11.41)", () => {
     expect(validateAttrs(tab, {})).toMatchObject({ commune_code: "Bắt buộc nhập.", facility_kind: "Bắt buộc nhập." });
     expect(validateAttrs(tab, { commune_code: "30292", facility_kind: "tap_trung", stamp_codes_gs: "91.1, 91.2", stamp_codes_gc: "91.2" }).stamp_codes_gc).toMatch(/91.2/);
     expect(cleanAttrs({ facility_ref: "x", commune_code: " 30292 ", address: " " })).toEqual({ commune_code: "30292" });
+  });
+});
+
+describe("Xuất danh mục → Nạp lại (#170, review Codex #168)", () => {
+  it("tệp vừa xuất (có valid_from, trang_thai, chỉ tiêu ngưỡng 25–32) nạp lại nguyên vẹn: mọi dòng bỏ qua, không dòng lỗi", async () => {
+    resetCntsVersions();
+    const admin = createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", fetch: mockAdminFetchNoDelay });
+    const tab = tabOf("cnts_indicator");
+    const at = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    await unwrap(
+      admin.POST("/v1/masterdata/catalogs/{catalog}/items", {
+        params: { path: { catalog: "cnts_indicator" } },
+        body: { code: "NHIET_DO_RT", name: "Nhiệt độ ao (xuất-nạp)", valid_from: at, attrs: { value_type: "decimal", unit: "°C", diary_metric: "temp_c", threshold_min: "25", threshold_max: "32" } },
+      } as never),
+    );
+    const page = await unwrap(
+      admin.GET("/v1/masterdata/catalogs/{catalog}/items", { params: { path: { catalog: "cnts_indicator" }, query: { at, include_inactive: true } } }),
+    );
+    const items = page.items as { code: string; name: string; attrs: Record<string, string>; active: boolean; valid_from?: string | null }[];
+    expect(items.find((i) => i.code === "NHIET_DO_RT")?.attrs.threshold_max).toBe("32");
+    const rows = exportRows(tab, items);
+    expect(rows[0]).toEqual(expect.arrayContaining(["valid_from", "trang_thai"]));
+    expect(rows.find((r) => r[1] === "NHIET_DO_RT")?.[3]).toBe(at);
+    const res = await unwrap(
+      admin.POST("/v1/masterdata/catalog-imports", {
+        params: { header: { "Idempotency-Key": "rt-170" } },
+        body: toCsv(rows),
+        bodySerializer: (b: unknown) => b as BodyInit,
+        headers: { "Content-Type": "text/csv" },
+      } as never),
+    );
+    expect(items.length).toBeGreaterThanOrEqual(4);
+    expect(res).toMatchObject({ total: items.length, skipped: items.length, created: 0, rejected: 0 });
   });
 });
 

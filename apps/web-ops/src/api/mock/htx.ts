@@ -373,6 +373,9 @@ export const htxAppRoutes: Route[] = [
 // Admin API
 // --------------------------------------------------------------------------
 const CATALOG_CODE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/;
+/** Cột không phải thuộc tính mục — như catalogImportAliases của máy chủ (masterdata/app/catalog_import.go): ngày áp dụng
+ * (valid_from) và cột trạng thái chỉ để đọc của tệp "Xuất danh mục" (#170) không so với attrs, nên tệp xuất nạp lại được. */
+const IMPORT_META = new Set(["catalog", "danh_muc", "code", "ma", "ma_muc", "name", "ten", "ten_muc", "valid_from", "hieu_luc_tu", "ngay_hieu_luc", "trang_thai", "status"]);
 
 export const htxAdminRoutes: Route[] = [
   {
@@ -409,7 +412,7 @@ export const htxAdminRoutes: Route[] = [
         const name = (r[iName] ?? "").trim();
         const attrs: Record<string, string> = {};
         header.forEach((h, j) => {
-          if (j !== iCat && j !== iCode && j !== iName && (r[j] ?? "").trim()) attrs[h] = (r[j] ?? "").trim();
+          if (j !== iCat && j !== iCode && j !== iName && !IMPORT_META.has(h) && (r[j] ?? "").trim()) attrs[h] = (r[j] ?? "").trim();
         });
         const list = CATALOGS[catalog as CatalogName];
         if (!list) return { row, status: "rejected" as const, catalog, code, reason: `Danh mục "${catalog}" không tồn tại` };
