@@ -268,7 +268,8 @@ func BatchVersions(ctx context.Context, tx pgx.Tx, ref uuid.UUID) ([]Batch, erro
 	return out, rows.Err()
 }
 
-// BatchFilter lọc danh sách lứa (bản hiện hành). Communes rỗng + All = mọi xã.
+// BatchFilter lọc danh sách lứa (bản hiện hành). Communes rỗng + All = mọi xã. MỌI bộ lọc (phạm vi xã, giới hạn hộ, dự án,
+// điểm, trạng thái) áp TRONG truy vấn, trước LIMIT — lọc sau giới hạn làm mất hàng khớp (Codex #168, AUTO-REVIEW §4).
 type BatchFilter struct {
 	All       bool
 	Communes  []string
@@ -276,24 +277,49 @@ type BatchFilter struct {
 	Household *uuid.UUID
 	ModelType string     // rỗng = mọi loại mô hình
 	From, To  *time.Time // ngày nhận giống
-	Limit     int
+	// LimitHouseholds: Cấp Xã có giới hạn hộ (W11.07) — chỉ lứa theo địa bàn hoặc lứa của hộ trong Households.
+	LimitHouseholds bool
+	Households      []uuid.UUID
+	Project, Site   *uuid.UUID // dự án / điểm của hộ mô hình (bản hiện hành của sổ W11.47)
+	Status          string     // trạng thái suy diễn tại Today (domain.StatusOf); rỗng = mọi
+	Today           time.Time
+	After           *BatchCursor // phân trang khóa: lứa đứng sau con trỏ theo thứ tự trả về
+	Limit           int
 }
+
+// BatchCursor là vị trí của một lứa theo thứ tự ListBatches (ngày nhận giống giảm dần, mã lứa tăng dần).
+type BatchCursor struct {
+	Received time.Time
+	Ref      uuid.UUID
+}
+
+// CursorOf trả con trỏ của lứa b.
+func CursorOf(b Batch) *BatchCursor { return &BatchCursor{Received: b.Received, Ref: b.Ref} }
 
 // ListBatches trả bản hiện hành của các lứa theo bộ lọc (ngày nhận giống mới trước).
 func ListBatches(ctx context.Context, tx pgx.Tx, f BatchFilter) ([]Batch, error) {
-	var from, to *string
-	if f.From != nil {
-		s := f.From.Format(time.DateOnly)
-		from = &s
-	}
-	if f.To != nil {
-		s := f.To.Format(time.DateOnly)
-		to = &s
+	date := func(t *time.Time) *string {
+		if t == nil {
+			return nil
+		}
+		s := t.Format(time.DateOnly)
+		return &s
 	}
 	communes := f.Communes
 	if communes == nil {
 		communes = []string{}
 	}
+	households := make([]string, 0, len(f.Households)) // pgx không mã hóa []uuid.UUID (google/uuid) — gửi dạng chuỗi
+	for _, h := range f.Households {
+		households = append(households, h.String())
+	}
+	var afterDate *string
+	var afterRef *uuid.UUID
+	if f.After != nil {
+		afterDate, afterRef = date(&f.After.Received), &f.After.Ref
+	}
+	// Trạng thái suy diễn như domain.StatusOf: hủy → cancelled; có mũi chưa tiêm quá ngày dự kiến → overdue; mọi mũi đã tiêm →
+	// done; còn lại open.
 	rows, err := tx.Query(ctx, `SELECT `+batchCols+` FROM (
 	    SELECT DISTINCT ON (batch_ref) * FROM pf_extension.cnts_vaccination_batch
 	    WHERE ($1 OR commune_code = ANY ($2::text[])) AND ($3 = '' OR commune_code = $3)
@@ -301,7 +327,20 @@ func ListBatches(ctx context.Context, tx pgx.Tx, f BatchFilter) ([]Batch, error)
 	      AND ($6::date IS NULL OR received_date <= $6::date)
 	    ORDER BY batch_ref, seq DESC) b
 	  WHERE ($8 = '' OR b.model_type_code = $8)
-	  ORDER BY received_date DESC, batch_ref LIMIT $7`, f.All, communes, f.Commune, f.Household, from, to, f.Limit, f.ModelType)
+	    AND (NOT $9 OR b.household_ref IS NULL OR b.household_ref = ANY ($10::uuid[]))
+	    AND (($11::uuid IS NULL AND $12::uuid IS NULL) OR b.household_ref IN (
+	      SELECT h.household_ref FROM (SELECT DISTINCT ON (household_ref) household_ref, site_ref, project_ref
+	        FROM pf_extension.cnts_model_household ORDER BY household_ref, seq DESC) h
+	      WHERE ($11::uuid IS NULL OR h.project_ref = $11) AND ($12::uuid IS NULL OR h.site_ref = $12)))
+	    AND ($13 = '' OR $13 = CASE
+	      WHEN b.event = '`+domain.BatchCancelled+`' THEN '`+domain.StatusCancelled+`'
+	      WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(b.doses) d
+	        WHERE d->>'actual' IS NULL AND (d->>'expected')::date < $14::date) THEN '`+domain.StatusOverdue+`'
+	      WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(b.doses) d WHERE d->>'actual' IS NULL) THEN '`+domain.StatusDone+`'
+	      ELSE '`+domain.StatusOpen+`' END)
+	    AND ($15::date IS NULL OR b.received_date < $15::date OR (b.received_date = $15::date AND b.batch_ref > $16::uuid))
+	  ORDER BY received_date DESC, batch_ref LIMIT $7`, f.All, communes, f.Commune, f.Household, date(f.From), date(f.To), f.Limit,
+		f.ModelType, f.LimitHouseholds, households, f.Project, f.Site, f.Status, f.Today.Format(time.DateOnly), afterDate, afterRef)
 	if err != nil {
 		return nil, err
 	}

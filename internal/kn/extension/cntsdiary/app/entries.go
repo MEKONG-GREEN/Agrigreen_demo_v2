@@ -512,7 +512,7 @@ func (s *Service) createTx(ctx context.Context, c caller, in EntryInput, ref uui
 			if err := s.alerts(ctx, tx, c, hc, *out, env.province); err != nil {
 				return err
 			}
-			return s.syncVaccinations(ctx, tx, c, *cy, *out, env.vnames)
+			return s.syncVaccinations(ctx, tx, c, *cy, *out, env)
 		}
 		return nil
 	})
@@ -697,7 +697,7 @@ func (s *Service) changeTx(ctx context.Context, c caller, ref uuid.UUID, act str
 			}
 		}
 		if (next == domain.StatusSubmitted && act != domain.ActVerify) || act == domain.ActCorrect {
-			return s.syncVaccinations(ctx, tx, c, *cy, n, env.vnames)
+			return s.syncVaccinations(ctx, tx, c, *cy, n, env)
 		}
 		return nil
 	})

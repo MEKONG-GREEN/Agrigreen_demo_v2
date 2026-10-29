@@ -115,11 +115,14 @@ func (s *Service) listBatches(ctx context.Context, c caller, q BatchQuery) ([]Ba
 	if q.Limit <= 0 || q.Limit > domain.MaxMatrixRows {
 		q.Limit = 200
 	}
+	// Phạm vi (xã thấy được, giới hạn hộ của Cấp Xã — như seesBatch), dự án, điểm, trạng thái áp TRONG truy vấn trước giới hạn
+	// số lứa (Codex #168): lọc sau LIMIT làm mất hàng khớp khi có nhiều lứa mới hơn ở nơi khác. Bước lọc ở tầng ứng dụng bên
+	// dưới giữ làm phòng thủ, cùng điều kiện.
 	f := store.BatchFilter{All: c.admin() || c.k.Scope.All, Communes: c.k.Scope.Units, Commune: strings.TrimSpace(q.Commune),
-		Household: q.Household, ModelType: strings.TrimSpace(q.ModelType), From: q.From, To: q.To, Limit: q.Limit}
-	if c.k.Role == knport.SessionRoleProvince && !c.k.Scope.All {
-		// Cấp Tỉnh: Scope là Nút tỉnh — mọi xã của tỉnh; lọc theo phạm vi ở tầng ứng dụng.
-		f.All = true
+		Household: q.Household, ModelType: strings.TrimSpace(q.ModelType), From: q.From, To: q.To, Project: q.Project, Site: q.Site,
+		Status: q.Status, Today: s.today(), Limit: q.Limit}
+	if c.k.Role == knport.SessionRoleCommune && (len(c.k.Facilities) > 0 || len(c.k.Households) > 0) {
+		f.LimitHouseholds, f.Households = true, c.k.Households
 	}
 	var list []store.Batch
 	var models map[uuid.UUID]*ModelInfo

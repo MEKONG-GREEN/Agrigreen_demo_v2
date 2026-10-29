@@ -5,6 +5,7 @@ package domain
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -96,6 +97,17 @@ func normName(s string) string {
 // khoảng trắng); lần > 0 khớp đúng lần, lần 0 lấy mũi chưa tiêm sớm nhất của vaccine đó. Chỉ điền mũi CHƯA có ngày thực tế
 // (không ghi đè ngày Cấp Xã/nông hộ đã ghi); ngày ngoài [ngày nhận giống, hôm nay] bỏ qua. names: mã vaccine → tên.
 func MatchDiaryDoses(cur []Dose, in []DiaryDose, names map[string]string, received, today time.Time) []DoseUpdate {
+	return MatchDiaryDosesOwned(cur, in, names, received, today, nil)
+}
+
+// MatchDiaryDosesOwned như MatchDiaryDoses nhưng giữ ánh xạ dòng NC-11 → mũi ỔN ĐỊNH qua các phiên bản của cùng lần ghi
+// (Codex #168: điều chỉnh/gửi lại không được biến cùng một dòng thành mũi mới). Ba lượt, mỗi mũi dùng tối đa một lần:
+//  1. dòng trùng vaccine (và lần, nếu > 0) với một mũi ĐÃ có đúng ngày đó → mũi ấy đã ghi, không điền thêm;
+//  2. dòng còn lại dùng trước các mũi mà phiên bản trước của CHÍNH lần ghi này đã điền (owned: khóa mũi) — dòng đổi ngày
+//     không điền mũi mới, cũng không ghi đè ngày đã có;
+//  3. dòng còn lại mới điền mũi chưa tiêm (lần 0: mũi chưa tiêm sớm nhất).
+func MatchDiaryDosesOwned(cur []Dose, in []DiaryDose, names map[string]string, received, today time.Time,
+	owned map[string]bool) []DoseUpdate {
 	if len(in) > MaxDiaryDoses {
 		in = in[:MaxDiaryDoses]
 	}
@@ -108,32 +120,77 @@ func MatchDiaryDoses(cur []Dose, in []DiaryDose, names map[string]string, receiv
 			}
 		}
 	}
-	used := map[string]bool{}
-	var out []DoseUpdate
+	type row struct {
+		code string
+		x    DiaryDose
+	}
+	var rows []row
 	for _, x := range in {
 		code, ok := byName[normName(x.Vaccine)]
 		if !ok || x.Date.IsZero() || x.Date.Before(received) || x.Date.After(today) {
 			continue
 		}
-		pick := -1
+		rows = append(rows, row{code: code, x: x})
+	}
+	used := map[string]bool{}
+	done := make([]bool, len(rows))
+	// pick chọn mũi chưa dùng khớp dòng r thỏa ok, ngày dự kiến sớm nhất.
+	pick := func(r row, ok func(Dose) bool) int {
+		p := -1
 		for i, d := range cur {
-			if d.Vaccine != code || d.Actual != nil || used[d.Key()] {
+			if d.Vaccine != r.code || used[d.Key()] || (r.x.Shot > 0 && d.Shot != r.x.Shot) || !ok(d) {
 				continue
 			}
-			if x.Shot > 0 && d.Shot != x.Shot {
-				continue
-			}
-			if pick < 0 || d.Expected.Before(cur[pick].Expected) {
-				pick = i
+			if p < 0 || d.Expected.Before(cur[p].Expected) {
+				p = i
 			}
 		}
-		if pick < 0 {
+		return p
+	}
+	passes := []func(Dose, DiaryDose) bool{
+		func(d Dose, x DiaryDose) bool { return d.Actual != nil && d.Actual.Equal(x.Date) },
+		func(d Dose, _ DiaryDose) bool { return d.Actual != nil && owned[d.Key()] },
+	}
+	for _, ok := range passes {
+		for k, r := range rows {
+			if done[k] {
+				continue
+			}
+			if p := pick(r, func(d Dose) bool { return ok(d, r.x) }); p >= 0 {
+				used[cur[p].Key()], done[k] = true, true
+			}
+		}
+	}
+	var out []DoseUpdate
+	for k, r := range rows {
+		if done[k] {
 			continue
 		}
-		d := cur[pick]
+		p := pick(r, func(d Dose) bool { return d.Actual == nil })
+		if p < 0 {
+			continue
+		}
+		d := cur[p]
 		used[d.Key()] = true
-		date := x.Date
+		date := r.x.Date
 		out = append(out, DoseUpdate{Vaccine: d.Vaccine, Shot: d.Shot, Actual: &date})
+	}
+	return out
+}
+
+// FilledBy trả khóa các mũi mà phiên bản next điền ngày thực tế so với phiên bản prev (prev chưa có ngày).
+func FilledBy(prev, next []Dose) map[string]bool {
+	had := map[string]bool{}
+	for _, d := range prev {
+		if d.Actual != nil {
+			had[d.Key()] = true
+		}
+	}
+	out := map[string]bool{}
+	for _, d := range next {
+		if d.Actual != nil && !had[d.Key()] {
+			out[d.Key()] = true
+		}
 	}
 	return out
 }
@@ -151,4 +208,22 @@ type DiaryRecord struct {
 	Today         time.Time
 	Doses         []DiaryDose
 	Names         map[string]string // mã vaccine → tên (danh mục, đọc ngoài giao dịch)
+	// Phạm vi (Codex #168 [P1]): xã của hộ của lần ghi, loại mô hình của điểm của hộ, phạm vi xã của người ghi.
+	Commune   string
+	ModelType string
+	ScopeAll  bool
+	Scope     []string
+}
+
+// Covers: lịch (xã commune, hộ household, loại mô hình modelType) được đồng bộ từ lần ghi r — lịch của CHÍNH hộ của lần ghi,
+// hoặc lịch theo địa bàn cùng xã, cùng loại mô hình với hộ; và xã của lịch trong phạm vi người ghi. Ngoài các trường hợp này
+// (lứa nhật ký gắn nhầm/cố ý mã lịch của xã khác) → không ghi.
+func (r DiaryRecord) Covers(commune string, household *uuid.UUID, modelType string) bool {
+	if !r.ScopeAll && !slices.Contains(r.Scope, commune) {
+		return false
+	}
+	if household != nil {
+		return *household == r.Household
+	}
+	return commune != "" && commune == r.Commune && modelType != "" && modelType == r.ModelType
 }

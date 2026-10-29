@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"github.com/google/uuid"
+
 	"testing"
 	"time"
 )
@@ -74,5 +76,63 @@ func TestMatchDiaryDoses(t *testing.T) {
 	big := make([]DiaryDose, MaxDiaryDoses+10)
 	if len(MatchDiaryDoses(cur, big, names, recv, today)) != 0 {
 		t.Fatal("dòng rỗng không khớp")
+	}
+}
+
+// Codex #168 [P2]: cùng một dòng NC-11 qua các phiên bản của lần ghi (điều chỉnh, gửi lại) không thành mũi mới.
+func TestMatchDiaryDosesOwnedStable(t *testing.T) {
+	recv, today := d("2027-10-01"), d("2027-10-20")
+	l1 := d("2027-10-08")
+	cur := []Dose{
+		{Vaccine: "VX_GUMBORO", Shot: 1, Expected: d("2027-10-07"), Actual: &l1}, // phiên bản trước của lần ghi đã điền
+		{Vaccine: "VX_GUMBORO", Shot: 2, Expected: d("2027-10-21")},
+	}
+	owned := map[string]bool{"VX_GUMBORO/1": true}
+	same := []DiaryDose{{Vaccine: "VX_GUMBORO", Date: d("2027-10-08")}}
+	if ups := MatchDiaryDosesOwned(cur, same, nil, recv, today, owned); len(ups) != 0 {
+		t.Fatalf("gửi lại cùng dòng (lần 0) điền mũi mới: %+v", ups)
+	}
+	if ups := MatchDiaryDosesOwned(cur, same, nil, recv, today, nil); len(ups) != 0 {
+		t.Fatalf("mũi đã có đúng ngày (ghi tay) — dòng lần 0 cùng ngày không điền L2: %+v", ups)
+	}
+	fixed := []DiaryDose{{Vaccine: "VX_GUMBORO", Date: d("2027-10-09")}} // điều chỉnh ngày của chính dòng đó
+	if ups := MatchDiaryDosesOwned(cur, fixed, nil, recv, today, owned); len(ups) != 0 {
+		t.Fatalf("dòng đổi ngày không được điền mũi mới (không ghi đè L1): %+v", ups)
+	}
+	// Dòng mới thêm ở phiên bản sau (thứ tự bất kỳ) vẫn điền L2; dòng cũ giữ L1.
+	more := []DiaryDose{{Vaccine: "VX_GUMBORO", Date: d("2027-10-19")}, {Vaccine: "VX_GUMBORO", Date: d("2027-10-08")}}
+	ups := MatchDiaryDosesOwned(cur, more, nil, recv, today, owned)
+	if len(ups) != 1 || ups[0].Shot != 2 || !ups[0].Actual.Equal(d("2027-10-19")) {
+		t.Fatalf("dòng mới → L2: %+v", ups)
+	}
+	if f := FilledBy([]Dose{cur[1]}, []Dose{{Vaccine: "VX_GUMBORO", Shot: 2, Actual: &l1}}); !f["VX_GUMBORO/2"] || len(f) != 1 {
+		t.Fatalf("FilledBy: %v", f)
+	}
+}
+
+// Codex #168 [P1]: NC-11 chỉ ghi lịch của hộ của lần ghi, hoặc lịch địa bàn cùng xã/loại mô hình trong phạm vi người ghi.
+func TestDiaryRecordCovers(t *testing.T) {
+	h, other := uuid.New(), uuid.New()
+	r := DiaryRecord{Household: h, Commune: "30001", ModelType: "GA_TP", Scope: []string{"30001"}}
+	for _, tc := range []struct {
+		commune   string
+		household *uuid.UUID
+		model     string
+		want      bool
+	}{
+		{"30001", &h, "GA_TP", true},
+		{"30001", &other, "GA_TP", false}, // hộ khác
+		{"30001", nil, "GA_TP", true},     // lịch địa bàn cùng xã, loại mô hình
+		{"30002", nil, "GA_TP", false},    // lịch địa bàn xã khác (ngoài phạm vi)
+		{"30001", nil, "CA", false},       // khác loại mô hình
+		{"30002", &h, "GA_TP", false},     // xã ngoài phạm vi
+	} {
+		if got := r.Covers(tc.commune, tc.household, tc.model); got != tc.want {
+			t.Fatalf("Covers(%s, %v, %s) = %v", tc.commune, tc.household, tc.model, got)
+		}
+	}
+	admin := DiaryRecord{Household: h, Commune: "30002", ModelType: "GA_TP", ScopeAll: true}
+	if !admin.Covers("30002", nil, "GA_TP") || admin.Covers("30001", nil, "GA_TP") {
+		t.Fatal("Admin: vẫn chỉ lịch địa bàn cùng xã của hộ")
 	}
 }

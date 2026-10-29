@@ -8,6 +8,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"maps"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -18,7 +20,9 @@ import (
 )
 
 // RecordFromDiary ghi ngày tiêm từ nhật ký sang lịch tiêm của lứa r.Batch trong giao dịch tx của nhật ký. Lứa không có,
-// đã hủy, thuộc hộ khác, hoặc không mũi nào khớp → bỏ qua (nil). Gọi lặp cùng (lần ghi, phiên bản) → không ghi thêm.
+// đã hủy, ngoài phạm vi của lần ghi (r.Covers: hộ khác; lịch địa bàn khác xã / khác loại mô hình; xã ngoài phạm vi người
+// ghi), hoặc không mũi nào khớp → bỏ qua (nil), không ghi. Gọi lặp cùng (lần ghi, phiên bản) → không ghi thêm; phiên bản
+// sau của cùng lần ghi (điều chỉnh, gửi lại) giữ ánh xạ dòng → mũi của các lần đồng bộ trước (MatchDiaryDosesOwned).
 func (s *Service) RecordFromDiary(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r domain.DiaryRecord) error {
 	if r.Batch == uuid.Nil || len(r.Doses) == 0 {
 		return nil
@@ -31,10 +35,14 @@ func (s *Service) RecordFromDiary(ctx context.Context, tx pgx.Tx, tid uuid.UUID,
 		return err
 	}
 	cur, err := store.LatestBatch(ctx, tx, r.Batch)
-	if err != nil || cur == nil || cur.Event == domain.BatchCancelled || (cur.HouseholdRef != nil && *cur.HouseholdRef != r.Household) {
+	if err != nil || cur == nil || cur.Event == domain.BatchCancelled || !r.Covers(cur.CommuneCode, cur.HouseholdRef, cur.ModelType) {
 		return err
 	}
-	ups := domain.MatchDiaryDoses(cur.Doses, r.Doses, r.Names, cur.Received, r.Today)
+	owned, err := filledByEntry(ctx, tx, r.Batch, r.Entry)
+	if err != nil {
+		return err
+	}
+	ups := domain.MatchDiaryDosesOwned(cur.Doses, r.Doses, r.Names, cur.Received, r.Today, owned)
 	if len(ups) == 0 {
 		return nil
 	}
@@ -47,4 +55,20 @@ func (s *Service) RecordFromDiary(ctx context.Context, tx pgx.Tx, tid uuid.UUID,
 	next.Event, next.Doses, next.CapturedAt = domain.BatchDoseRecorded, doses, nil
 	next.StatusReason = "Ghi từ nhật ký NC-11 (lần ghi " + r.Entry.String() + ")"
 	return store.InsertBatch(ctx, tx, tid, &next)
+}
+
+// filledByEntry trả khóa các mũi mà các lần đồng bộ trước của lần ghi entry đã điền vào lịch batch.
+func filledByEntry(ctx context.Context, tx pgx.Tx, batch, entry uuid.UUID) (map[string]bool, error) {
+	vs, err := store.BatchVersions(ctx, tx, batch)
+	if err != nil {
+		return nil, err
+	}
+	prefix := idemBatch("diary:" + entry.String() + ":")
+	out := map[string]bool{}
+	for i := 1; i < len(vs); i++ {
+		if strings.HasPrefix(vs[i].IdemKey, prefix) {
+			maps.Copy(out, domain.FilledBy(vs[i-1].Doses, vs[i].Doses))
+		}
+	}
+	return out, nil
 }

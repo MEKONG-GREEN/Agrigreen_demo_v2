@@ -33,7 +33,9 @@ func (s *Service) vaccineNames(ctx context.Context) map[string]string {
 }
 
 // syncVaccinations ghi ngày tiêm NC-11 của lần ghi e sang lịch tiêm của lứa cy (không có lịch / không có NC-11 → bỏ qua).
-func (s *Service) syncVaccinations(ctx context.Context, tx pgx.Tx, c caller, cy store.Cycle, e store.Entry, names map[string]string) error {
+// env: tên vaccine, loại mô hình của điểm đã nạp ngoài giao dịch. Lịch chỉ được ghi khi thuộc hộ của lần ghi hoặc là lịch địa
+// bàn cùng xã, loại mô hình và trong phạm vi xã của người ghi (Codex #168 [P1], cntscal kiểm DiaryRecord.Covers trong giao dịch).
+func (s *Service) syncVaccinations(ctx context.Context, tx pgx.Tx, c caller, cy store.Cycle, e store.Entry, env evalEnv) error {
 	if s.Vaccinations == nil || cy.VaccinationBatch == nil || len(e.Tables.Vaccinations) == 0 {
 		return nil
 	}
@@ -47,5 +49,6 @@ func (s *Service) syncVaccinations(ctx context.Context, tx pgx.Tx, c caller, cy 
 	}
 	return s.Vaccinations.RecordFromDiary(ctx, tx, c.p.TenantID, caldomain.DiaryRecord{Batch: *cy.VaccinationBatch, Household: cy.HouseholdRef,
 		Entry: e.Ref, EntrySeq: e.Seq, Actor: e.ActorRef, OnBehalfOf: e.OnBehalfOf, SupportReason: e.SupportReason, At: e.EventTime,
-		Today: s.today(), Doses: ds, Names: names})
+		Today: s.today(), Doses: ds, Names: env.vnames, Commune: e.CommuneCode, ModelType: env.modelType, ScopeAll: c.admin() || c.k.Scope.All,
+		Scope: c.k.Scope.Units})
 }
