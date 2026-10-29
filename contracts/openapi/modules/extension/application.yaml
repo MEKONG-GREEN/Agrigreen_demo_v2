@@ -1745,7 +1745,7 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
-  # --- pf/extension: bộ đọc nguồn module của Kỳ KHTC (W11.64 — BRD KHTC v2.2 BR-DL-02…04; ADR-0053 §8). "Cập nhật số liệu" chụp
+  # --- pf/extension: bộ đọc nguồn module của Kỳ KHTC (W11.64 — BRD KHTC v2.2 BR-DL-02…04; ADR-0053 `8). "Cập nhật số liệu" chụp
   # bất biến port KHTCSources (chỉ cán bộ KHTC phụ trách kỳ — người mở kỳ, ⚑3); "Nguồn đã thay đổi" so figures_hash (không so
   # status_hash), chỉ cảnh báo. Số thập phân là chuỗi.
 # @ag-order: 345
@@ -3649,6 +3649,9 @@ components:
         last_submitted_at: {type: [string, "null"], format: date-time}
         reviewed_at: {type: [string, "null"], format: date-time}
         review_note: {type: string}
+        native_late: {type: boolean}
+        request_due_at: {type: string, format: date-time}
+        request_state: {type: string}
         late: {type: boolean}
 # @ag-order: 1095
     KHTCDepartmentForm:
@@ -3822,6 +3825,9 @@ components:
       type: object
       required: [cells, adjustments, texts]
       properties:
+        adhoc_request_id: {type: string, format: uuid, description: "Mã yêu cầu người nhập đã đọc; không tự gắn vào nội dung cũ"}
+        adhoc_values: {type: object, maxProperties: 20, additionalProperties: {type: string, maxLength: 23}}
+        adhoc_text: {type: string, maxLength: 8000}
         cells: {type: object, additionalProperties: {$ref: "#/components/schemas/KHTCFormCell"}}
         adjustments: {type: array, items: {$ref: "#/components/schemas/KHTCFormAdjustment"}}
         texts: {type: object, additionalProperties: {type: string}}
@@ -3878,6 +3884,7 @@ components:
         can_review, editable, overdue, request_note, template, grid, plan_missing, plan, tabs, content, content_source, draft_at, valid,
         issues, adj_periods, submissions]
       properties:
+        supplement: {$ref: "#/components/schemas/KHTCAdhocRequest"}
         period:
           type: object
           required: [id, name, report_type, year, from_date, to_date, cutoff_date, due_at, max_submissions, terminal]
@@ -3943,6 +3950,7 @@ components:
               attempt: {type: integer}
               submitted_at: {type: string, format: date-time}
               late: {type: boolean}
+              native_late: {type: boolean}
               decision: {type: string}
               review_note: {type: string}
               reviewed_at: {type: [string, "null"], format: date-time}

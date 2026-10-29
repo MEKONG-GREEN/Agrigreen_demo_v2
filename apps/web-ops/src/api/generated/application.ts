@@ -9828,6 +9828,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/periods/{id}/adhoc-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Yêu cầu bổ sung của kỳ phát sinh */
+        get: operations["extensionKhtcAdhocRequestList"];
+        put?: never;
+        /** Phát hành yêu cầu trên phiếu native đã giao; giữ bốn mắt và trần3 */
+        post: operations["extensionKhtcAdhocRequestCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/adhoc-requests/{requestID}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đối chiếu tác động native sau timeout; không mở lại kỳ */
+        post: operations["extensionKhtcAdhocRequestReconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/adhoc-requests/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chỉ yêu cầu hiện hành của phòng đang chọn; lọc phạm vi trước LIMIT */
+        get: operations["extensionKhtcAdhocInbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/adhoc-open-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ý định dang dở của chính actor và canonical scope; không trả khóa native */
+        get: operations["extensionKhtcAdhocOpenRecoveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/adhoc-open-intents/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đối chiếu cùng đợt; tiếp nhận append-only khi phiên cũ hết hạn */
+        post: operations["extensionKhtcAdhocOpenReconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/exports/templates": {
         parameters: {
             query?: never;
@@ -21190,6 +21276,10 @@ export interface components {
             /** Format: date-time */
             reviewed_at: string | null;
             review_note: string;
+            native_late?: boolean;
+            /** Format: date-time */
+            request_due_at?: string;
+            request_state?: string;
             late: boolean;
         };
         /** @description Một phiếu KHTC của phòng trong một kỳ (W11.11, FN-PN-03.01) */
@@ -21386,6 +21476,15 @@ export interface components {
             reason: string;
         };
         KHTCFormContent: {
+            /**
+             * Format: uuid
+             * @description Mã yêu cầu người nhập đã đọc; không tự gắn vào nội dung cũ
+             */
+            adhoc_request_id?: string;
+            adhoc_values?: {
+                [key: string]: string;
+            };
+            adhoc_text?: string;
             cells: {
                 [key: string]: components["schemas"]["KHTCFormCell"];
             };
@@ -21439,6 +21538,7 @@ export interface components {
             rows: components["schemas"]["KHTCFormRow"][];
         };
         KHTCFormSheet: {
+            supplement?: components["schemas"]["KHTCAdhocRequest"];
             period: {
                 /** Format: uuid */
                 id: string;
@@ -21505,6 +21605,7 @@ export interface components {
                 /** Format: date-time */
                 submitted_at: string;
                 late: boolean;
+                native_late?: boolean;
                 decision: string;
                 review_note: string;
                 /** Format: date-time */
@@ -22075,6 +22176,69 @@ export interface components {
                 recorded_at: string;
             }[];
         };
+        KHTCReportSupplement: {
+            /** Format: uuid */
+            id: string;
+            department: string;
+            instruction: string;
+            /** @enum {string} */
+            state: "intent" | "issued" | "fulfilled" | "cancelled" | "failed";
+            /** Format: date-time */
+            due_at: string;
+            /** Format: uuid */
+            native_submission_ref: string | null;
+            return_applied: boolean | null;
+        };
+        KHTCAdhocIndicator: {
+            code: string;
+            name: string;
+            unit: string;
+        };
+        KHTCAdhocRequestInput: {
+            department: string;
+            instruction: string;
+            /** Format: date-time */
+            due_at: string;
+            indicators: components["schemas"]["KHTCAdhocIndicator"][];
+        };
+        KHTCAdhocRequest: {
+            department: string;
+            instruction: string;
+            /** Format: date-time */
+            due_at: string;
+            indicators: components["schemas"]["KHTCAdhocIndicator"][];
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            /** @enum {string} */
+            state: "intent" | "issued" | "fulfilled" | "cancelled" | "failed";
+            overdue: boolean;
+            return_applied: boolean | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCAdhocOpenRecovery: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            departments: string[];
+            generation: number;
+            requires_adoption: boolean;
+            can_adopt: boolean;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            lease_expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+        };
         KHTCArchiveRow: {
             /** Format: uuid */
             id: string;
@@ -22159,6 +22323,7 @@ export interface components {
                 closed: boolean;
                 figures_hash: string | null;
             }[];
+            text?: string;
         };
         KHTCReportSourceValue: {
             Cumulative: string | null;
@@ -22255,6 +22420,7 @@ export interface components {
             input_hash: string;
             /** Format: date-time */
             captured_at: string;
+            supplements?: components["schemas"]["KHTCReportSupplement"][];
         };
         KHTCReportAdminField: {
             system: string;
@@ -45261,6 +45427,210 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocRequestList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCAdhocRequest"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocRequestCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCAdhocRequestInput"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCAdhocRequest"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocRequestReconcile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                requestID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCAdhocRequest"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocInbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCAdhocRequest"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocOpenRecoveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCAdhocOpenRecovery"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocOpenReconcile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_generation: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };

@@ -219,3 +219,11 @@ func LastClosedCutoff(ctx context.Context, tx pgx.Tx, year int) (*time.Time, err
 	                  AND e.action = 'closed')`, year).Scan(&t)
 	return t, err
 }
+
+func PeriodsForReader(ctx context.Context, tx pgx.Tx, year, limit int, includeAdhoc bool) ([]Period, error) {
+	rows, err := tx.Query(ctx, `SELECT `+periodCols+` FROM pf_extension.khtc_period WHERE ($1=0 OR plan_year=$1) AND ($3 OR report_type<>'adhoc') ORDER BY id DESC LIMIT $2`, year, limit, includeAdhoc)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Period, error) { return scanPeriod(r) })
+}

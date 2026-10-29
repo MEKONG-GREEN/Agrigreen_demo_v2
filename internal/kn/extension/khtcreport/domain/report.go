@@ -69,6 +69,7 @@ type SourceTrace struct {
 }
 
 type SourceMetric struct {
+	Text       string        `json:"text,omitempty"`
 	Trace      []SourceTrace `json:"trace,omitempty"`
 	Unit       string        `json:"unit"`
 	Key        string        `json:"key"`
@@ -145,7 +146,18 @@ type ExternalFigure struct {
 	At          time.Time          `json:"at"`
 }
 
+// Supplement pins the request lifecycle in the immutable report input.
+type Supplement struct {
+	ID                  uuid.UUID  `json:"id"`
+	Department          string     `json:"department"`
+	Instruction         string     `json:"instruction"`
+	State               string     `json:"state"`
+	DueAt               time.Time  `json:"due_at"`
+	NativeSubmissionRef *uuid.UUID `json:"native_submission_ref"`
+	ReturnApplied       *bool      `json:"return_applied"`
+}
 type Data struct {
+	Supplements []Supplement                 `json:"supplements,omitempty"`
 	Period      Period                       `json:"period"`
 	Template    string                       `json:"template"`
 	Plan        port.KHTCPlan                `json:"plan"`
@@ -539,9 +551,13 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 	for _, entry := range plan.Entries {
 		entries[entry.Ref] = entry
 	}
+	trackedAt := period.From
+	if period.Type == "adhoc" && trackedAt.Year() < plan.Year {
+		trackedAt = time.Date(plan.Year, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
 	tracked := func(entry port.KHTCPlanEntry) bool {
 		for depth := 0; depth < 16; depth++ {
-			if !form.TrackedIn(entry, period.From) {
+			if !form.TrackedIn(entry, trackedAt) {
 				return false
 			}
 			if entry.ParentRef == nil {

@@ -83,6 +83,11 @@ func AdhocData(d Draft) Data {
 	out.Metrics = []SourceMetric{}
 	out.External = nil
 	out.Provisional = []string{}
+	for _, r := range out.Supplements {
+		if r.State == "intent" || r.State == "issued" {
+			out.Provisional = append(out.Provisional, "Yêu cầu bổ sung chưa hoàn tất: "+r.Department)
+		}
+	}
 	if d.Adhoc == nil {
 		out.Provisional = []string{"Chưa chọn chỉ tiêu"}
 		return out
@@ -106,17 +111,22 @@ func AdhocData(d Draft) Data {
 	return out
 }
 
-type AdhocFigure struct{ Name, Unit, Value, Source string }
+type AdhocFigure struct {
+	Name, Unit, Value, Source string
+	Literal                   bool
+}
 
 func AdhocFigures(d Data) []AdhocFigure {
 	out := make([]AdhocFigure, 0, len(d.Rows)+len(d.Metrics))
 	for _, r := range d.Rows {
-		out = append(out, AdhocFigure{r.Name, r.Unit, r.InPeriod, "Phiếu đã gửi · " + r.Department})
+		out = append(out, AdhocFigure{r.Name, r.Unit, r.InPeriod, fmt.Sprintf("Phiếu đã gửi · %s · kế hoạch %d/%s", r.Department, d.Plan.Year, d.Plan.VersionID), false})
 	}
 	for _, m := range d.Metrics {
 		value := "—"
 		v := m.Value
 		switch {
+		case m.Text != "":
+			value = m.Text
 		case v.Min != nil && v.Max != nil:
 			value = v.Min.String() + " – " + v.Max.String()
 		case m.Stock && v.Cumulative != nil:
@@ -128,7 +138,7 @@ func AdhocFigures(d Data) []AdhocFigure {
 		case v.Cumulative != nil:
 			value = v.Cumulative.String()
 		}
-		out = append(out, AdhocFigure{m.Label, m.Unit, value, m.Department + " · " + strings.Join(v.SourceKeys, ", ")})
+		out = append(out, AdhocFigure{m.Label, m.Unit, value, m.Department + " · " + strings.Join(v.SourceKeys, ", "), m.Text != ""})
 	}
 	return out
 }

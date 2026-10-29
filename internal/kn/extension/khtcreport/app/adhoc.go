@@ -22,7 +22,11 @@ func adhocWordTable() doctpl.Block {
 func adhocWordItems(data domain.Data) []doctpl.Item {
 	out := []doctpl.Item{}
 	for _, f := range domain.AdhocFigures(data) {
-		out = append(out, doctpl.Item{"ten": f.Name, "dvt": f.Unit, "gia_tri": VNNumber(f.Value), "nguon": f.Source})
+		value := f.Value
+		if !f.Literal {
+			value = VNNumber(value)
+		}
+		out = append(out, doctpl.Item{"ten": f.Name, "dvt": f.Unit, "gia_tri": value, "nguon": f.Source})
 	}
 	return out
 }

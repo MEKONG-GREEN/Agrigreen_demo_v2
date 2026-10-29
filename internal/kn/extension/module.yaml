@@ -33,6 +33,7 @@ provides:
     - HTXConfirmations
     - HTXData
     - KHTCMetricNames
+    - KHTCOperationSource
     - KHTCPlanDepartments
     - KHTCPlanVersions
     - KHTCPlans

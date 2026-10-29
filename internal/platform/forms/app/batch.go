@@ -109,13 +109,40 @@ func refOf(t store.Template) (port.TemplateRef, error) {
 
 // PublishBatch thực hiện port.Publisher: mọi kỳ của lô cùng biểu, cùng đơn vị nhận, trong MỘT giao dịch.
 func (pb Publisher) PublishBatch(ctx context.Context, in port.BatchInput, idem string) ([]port.PublishedPeriod, error) {
+	return pb.publishBatch(ctx, in, idem, false)
+}
+func (pb Publisher) PublishBatchOnce(ctx context.Context, in port.BatchInput, idem string) ([]port.PublishedPeriod, error) {
+	if idem == "" {
+		return nil, problem.IdempotencyRequired
+	}
+	return pb.publishBatch(ctx, in, idem, true)
+}
+func (pb Publisher) publishBatch(ctx context.Context, in port.BatchInput, idem string, replay bool) ([]port.PublishedPeriod, error) {
 	s := pb.Svc
 	prof, a, err := s.resolve(ctx, in.Profile)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.need(prof.PublishBy, "phát hành kỳ"); err != nil {
-		return nil, err
+	publicationLevel := a.level
+	publicationSource := ""
+	if a.level != prof.PublishBy {
+		// Bound raw collections before computing the optional invocation fingerprint.
+		if len(in.Periods) > MaxBatchPeriods || len(in.Units) > 2000 {
+			return nil, problem.Validation.WithDetail("Lô kỳ quá lớn")
+		}
+		hash, err := port.OperationHash(in)
+		if err != nil {
+			return nil, err
+		}
+		grant, err := needOperation(ctx, prof, a, prof.PublishBy, "phát hành kỳ", port.Operation{Action: port.OperationPublishBatch, Profile: in.Profile, PayloadHash: hash, IdemKey: idem})
+		if err != nil {
+			return nil, err
+		}
+		if !grant.Allowed {
+			return nil, problem.Forbidden
+		}
+		// This is the task's configured publication level, never an actor role alias.
+		publicationLevel, publicationSource = prof.PublishBy, grant.Source
 	}
 	if len(in.Periods) == 0 || len(in.Periods) > MaxBatchPeriods {
 		return nil, problem.Validation.WithField("periods", "1–366 kỳ mỗi lô")
@@ -145,9 +172,30 @@ func (pb Publisher) PublishBatch(ctx context.Context, in port.BatchInput, idem s
 			return nil, problem.Forbidden.WithDetail("đơn vị " + u + " ngoài phạm vi người phát hành")
 		}
 	}
+	storageKey := idem
+	if replay {
+		digest, e := port.OperationHash(idem)
+		if e != nil {
+			return nil, e
+		}
+		storageKey = "forms:publish_once:" + digest
+	}
 	now := s.Clock.Now().UTC()
 	var out []port.PublishedPeriod
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
+		if replay {
+			if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('forms:publish_once:'||$1::uuid::text||':'||$2,0))", a.tenant, idem); err != nil {
+				return err
+			}
+			receipts, exists, err := batchReceipts(ctx, tx, a, in, specs, storageKey)
+			if err != nil {
+				return err
+			}
+			if exists {
+				out = receipts
+				return nil
+			}
+		}
 		t, err := store.TemplateByID(ctx, tx, in.TemplateID)
 		if err != nil {
 			return err
@@ -164,19 +212,22 @@ func (pb Publisher) PublishBatch(ctx context.Context, in port.BatchInput, idem s
 				key = pd.From.Format(time.DateOnly)
 			}
 			p := store.Period{ID: ids.New(), TemplateID: t.ID, Label: strings.TrimSpace(pd.Label), DueAt: pd.DueAt, Units: in.Units,
-				PublisherLevel: a.level, ActorRef: a.ref, EventTime: now}
+				PublisherLevel: publicationLevel, ActorRef: a.ref, EventTime: now}
 			if a.node != uuid.Nil {
 				owner := a.node
 				p.OwnerRef = &owner
 			}
-			if err := store.InsertPeriod(ctx, tx, a.tenant, &p, idemOr(idem, "period:"+key)); err != nil {
+			if err := store.InsertPeriod(ctx, tx, a.tenant, &p, idemOr(storageKey, "period:"+key)); err != nil {
 				return err
 			}
-			if err := store.InsertSpec(ctx, tx, a.tenant, p.ID, specs[i], a.ref, now, idemOr(idem, "spec:"+key)); err != nil {
+			if err := store.InsertSpec(ctx, tx, a.tenant, p.ID, specs[i], a.ref, now, idemOr(storageKey, "spec:"+key)); err != nil {
 				return err
 			}
 			ev := domain.Event{ID: ids.New(), Action: "published", Mode: port.ModeManual, Actor: a.ref, At: now}
-			if err := store.InsertEvent(ctx, tx, a.tenant, p.ID, p.Profile, &ev, idemOr(idem, "published:"+key)); err != nil {
+			if publicationSource != "" {
+				ev.Reason = "Nguồn cấp quyền: " + publicationSource
+			}
+			if err := store.InsertEvent(ctx, tx, a.tenant, p.ID, p.Profile, &ev, idemOr(storageKey, "published:"+key)); err != nil {
 				return err
 			}
 			out = append(out, port.PublishedPeriod{ID: p.ID, Key: pd.Key, Label: p.Label, DueAt: p.DueAt})

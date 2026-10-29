@@ -367,7 +367,7 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 	if filter.Department != "" || filter.Program != "" || filter.Commune != "" || filter.Level != "" {
 		w.line("Xuất theo bộ lọc", departmentName(filter.Department), filter.Program, filter.Commune, filter.Level)
 	}
-	if data.Template == "mau_5" {
+	if data.Template == "mau_5" || data.Template == "adhoc" {
 		w.line("Kính gửi", admin(d, "recipient"))
 		w.line("Căn cứ", admin(d, "basis"))
 	}

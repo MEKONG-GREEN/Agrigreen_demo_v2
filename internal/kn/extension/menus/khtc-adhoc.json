@@ -1,0 +1,46 @@
+{
+  "id": "extension-khtc-adhoc",
+  "order": 113,
+  "tables": {
+    "deptMenus": {
+      "ke_hoach_tai_chinh": {
+        "kn_tinh": [
+          {
+            "Key": "bao_cao_phat_sinh", "Label":"Báo cáo phát sinh",
+            "Items": [
+              {
+                "Key": "tinh.khtc.phat_sinh",
+                "Label": "Báo cáo phát sinh",
+                "Route": "/kn/khtc/bao-cao-phat-sinh",
+                "Icon": "report",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "adminDeptBusiness": {
+      "ke_hoach_tai_chinh": [
+        {
+          "Key": "admin.pb.khtc_phat_sinh",
+          "Label": "Báo cáo phát sinh",
+          "Route": "/kn/khtc/bao-cao-phat-sinh",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ]
+    },
+    "menuModules": {
+      "/kn/khtc/bao-cao-phat-sinh": "pf/extension"
+    }
+  }
+}
