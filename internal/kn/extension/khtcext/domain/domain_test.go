@@ -65,12 +65,14 @@ func allocBytes(f func()) uint64 {
 
 // Số mũ ngắn do người dùng nhập không được phóng thành bigint trước khi bị từ chối (qua ParseValue, API Validate, Excel CheckRows).
 // Dưới -race, sync.Pool bỏ ngẫu nhiên phần tử khi Put nên máy so khớp regexp trong CheckRows bị cấp phát lại ngẫu nhiên (CI
-// 29/10: dòng lỗi 76384 B so với dòng hợp lệ 39832 B, chỉ ở một giá trị) — khi đó chỉ kiểm từ chối, không so số byte. Bản
-// build thường (go test không -race) vẫn giữ ngân sách byte.
+// 29/10: dòng lỗi 76384 B so với dòng hợp lệ 39832 B, chỉ ở một giá trị) — riêng CheckRows dưới -race chỉ kiểm từ chối.
+// ParseValue và FigureInput.Validate không qua regexp nên giữ ngân sách 16 KiB cả dưới -race (CI chỉ chạy go test -race;
+// Codex #185 P2). Bản build thường giữ ngân sách cho cả ba.
 func TestParseValueRejectsHostileInputWithinBudget(t *testing.T) {
-	budget := uint64(16 << 10)
+	budget := uint64(16 << 10) // ParseValue, FigureInput.Validate: không qua regexp, ổn định cả dưới -race (giữ ngân sách)
+	rowBudget := budget
 	if raceEnabled {
-		budget = math.MaxUint64 / 2 // chỉ kiểm lỗi; base+budget không tràn
+		rowBudget = math.MaxUint64 / 2 // chỉ CheckRows (regexp matchPool): kiểm từ chối; base+rowBudget không tràn
 	}
 	now := time.Date(2026, 10, 28, 0, 0, 0, 0, time.UTC)
 	for _, raw := range []string{"1e100000", "1e-100000", "1e2147483647", "1e-2147483648", strings.Repeat("9", 1<<16)} {
@@ -89,7 +91,7 @@ func TestParseValueRejectsHostileInputWithinBudget(t *testing.T) {
 		valid[0].Value = "12.450"
 		base := allocBytes(func() { _ = CheckRows(valid, []PeriodRef{w39}, []IndicatorRef{ind}, nil, now) })
 		var res CheckResult
-		if used := allocBytes(func() { res = CheckRows(rows, []PeriodRef{w39}, []IndicatorRef{ind}, nil, now) }); res.Errors != 1 || used > base+budget {
+		if used := allocBytes(func() { res = CheckRows(rows, []PeriodRef{w39}, []IndicatorRef{ind}, nil, now) }); res.Errors != 1 || used > base+rowBudget {
 			t.Errorf("CheckRows(value=%.20q…): %d lỗi, cấp phát %d byte (dòng hợp lệ %d)", raw, res.Errors, used, base)
 		}
 	}
