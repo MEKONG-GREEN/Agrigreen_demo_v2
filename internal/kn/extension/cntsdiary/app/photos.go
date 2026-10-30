@@ -66,11 +66,14 @@ func (s *Service) UploadPhoto(ctx context.Context, in PhotoInput) (store.Photo, 
 	}
 	var person uuid.UUID
 	if err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
-		if p, err := store.PhotoByRef(ctx, tx, ref); err != nil || p != nil {
-			if p != nil && p.HouseholdRef != in.HouseholdRef {
-				return ErrPhotoInvalid.WithField("id", "mã ảnh đã dùng")
-			}
+		// Mã ảnh đã có (dù cùng hộ): không lưu lại. Trước đây cùng hộ thì đi tiếp với person rỗng → 409 "chưa có khóa"
+		// sai lệch (#172). Bấm lại đúng ảnh cũ thì lớp Idempotency-Key đã phát lại trước khi tới đây.
+		p, err := store.PhotoByRef(ctx, tx, ref)
+		if err != nil {
 			return err
+		}
+		if p != nil {
+			return ErrPhotoInvalid.WithField("id", "mã ảnh đã dùng")
 		}
 		hc, err := s.loadHousehold(ctx, tx, c, in.HouseholdRef)
 		if err != nil {

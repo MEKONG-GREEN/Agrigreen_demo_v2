@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -36,12 +37,14 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 type fixtureDeps struct {
 	Roles           *accport.RoleCatalog
 	AssignmentRules accport.AssignmentRules
+	Attributes      *accport.AttributeCatalog
 }
 
 type fixture struct {
 	t      *testing.T
 	iss    *authztest.FakeIssuer
-	srv    *httptest.Server
+	srv    *httptest.Server // Admin API (MFA)
+	app    *httptest.Server // Application API (ngữ cảnh phiên X-AG-Context)
 	dir    *accounts.MemoryDirectory
 	tenant uuid.UUID
 	depts  *fakeDepartments
@@ -62,14 +65,25 @@ func newFixture(t *testing.T, d fixtureDeps) *fixture {
 	f.coop30292 = pty.add(f.tenant, partyport.OrgCooperative, "30292")
 	f.team31120 = pty.add(f.tenant, partyport.OrgExtensionTeam, "31120")
 	f.depts = newFakeDepartments(f)
+	// Phiên chủ KN như gốc lắp ráp (bản tĩnh, không sổ cnts_grant).
+	sessions, err := authz.NewSessionRegistry(extension.SessionProjection())
+	if err != nil {
+		t.Fatal(err)
+	}
 	mod := accounts.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{
-		Directory: f.dir, Scope: pty, Orgs: pty, Roles: d.Roles, AssignmentRules: d.AssignmentRules, Departments: f.depts,
+		Directory: f.dir, Scope: pty, Orgs: pty, Roles: d.Roles, AssignmentRules: d.AssignmentRules, Attributes: d.Attributes,
+		Departments: f.depts, Sessions: sessions,
 	})
-	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
-	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(),
-		idempotency.Middleware(env.Pool(t, migrations.PF, "platform_api"))))
+	ops := env.Pool(t, migrations.PF, "platform_api")
+	log := telemetry.NewLogger("test", io.Discard)
+	eng := httpx.NewEngine(log, 1<<20)
+	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(), mod.Middleware(), idempotency.Middleware(ops)))
 	f.srv = httptest.NewServer(eng)
 	t.Cleanup(f.srv.Close)
+	appEng := httpx.NewEngine(log, 1<<20)
+	mod.RegisterApp(appEng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), mod.Middleware(), idempotency.Middleware(ops)))
+	f.app = httptest.NewServer(appEng)
+	t.Cleanup(f.app.Close)
 	return f
 }
 
@@ -89,6 +103,11 @@ type resp struct {
 
 func (c caller) raw(method, path, idem, ctype string, body []byte) resp {
 	c.f.t.Helper()
+	return c.rawWith(method, path, idem, ctype, body, nil)
+}
+
+func (c caller) rawWith(method, path, idem, ctype string, body []byte, hdr map[string]string) resp {
+	c.f.t.Helper()
 	var rd io.Reader
 	if body != nil {
 		rd = bytes.NewReader(body)
@@ -102,6 +121,9 @@ func (c caller) raw(method, path, idem, ctype string, body []byte) resp {
 		req.Header.Set("Idempotency-Key", idem)
 	}
 	req.Header.Set("Content-Type", ctype)
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		c.f.t.Fatal(err)
