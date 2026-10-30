@@ -1,10 +1,12 @@
 package domain
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
@@ -33,6 +35,10 @@ func LegacySnapshot(key, rule string, sections json.RawMessage, word doctpl.Temp
 	if err != nil {
 		return port.KHTCTemplateSnapshot{}, err
 	}
+	raw, err = canonicalLegacyJSON(raw)
+	if err != nil {
+		return port.KHTCTemplateSnapshot{}, err
+	}
 	sum := sha256.Sum256(raw)
 	return port.KHTCTemplateSnapshot{Mode: "legacy", Rule: rule, Key: key, Version: 1, Hash: hex.EncodeToString(sum[:]), Definition: raw, ApplicableFrom: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), WordKey: word.Key, WordVersion: word.Version, WordHash: word.Hash(), ExcelRule: rule}, nil
 }
@@ -55,9 +61,28 @@ func ValidateLegacy(pinned port.KHTCTemplateSnapshot) error {
 	if err := doctpl.Validate(definition.Word); err != nil {
 		return invalid("template", "Định nghĩa bộ dựng nền không hợp lệ")
 	}
-	sum := sha256.Sum256(pinned.Definition)
+	canonical, err := canonicalLegacyJSON(pinned.Definition)
+	if err != nil {
+		return invalid("template", "Không đọc được nguồn mẫu nền")
+	}
+	sum := sha256.Sum256(canonical)
 	if hex.EncodeToString(sum[:]) != pinned.Hash {
 		return invalid("template", "Băm nguồn mẫu nền không khớp")
 	}
 	return nil
+}
+
+// JSONB preserves JSON values rather than whitespace/object order. Use a
+// canonical JSON value (with exact numbers) for the immutable source digest.
+func canonicalLegacyJSON(raw []byte) ([]byte, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		return nil, err
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return nil, fmt.Errorf("invalid legacy JSON suffix")
+	}
+	return json.Marshal(value)
 }

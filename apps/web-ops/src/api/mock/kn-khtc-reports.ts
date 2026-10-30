@@ -10,14 +10,19 @@ import { khtcMockStore, type Stored } from "./kn-khtc-periods";
 import { khtcReportInputs } from "./kn-khtc-forms";
 import { khtcReportSource } from "./kn-khtc-sources";
 import { khtcExternalForPeriod } from "./kn-khtc-external";
+import { selectKhtcMockTemplate } from "./kn-khtc-templates";
+import { canonical, invalidDefinition, isFixedKey, mockDigest, renderTemplate, type Definition } from "./kn-khtc-template-render";
+import { templateContext } from "./kn-khtc-template-context";
 type S = components["schemas"];
-type Detail = S["KHTCReportDetail"];
-type Content = S["KHTCReportContent"];
+// Internal ledger is mutable; these fields remain readOnly in the HTTP contract.
+type Content = Omit<S["KHTCReportContent"], "template_terminal"> & { template_terminal?: string };
+type Detail = Omit<S["KHTCReportDetail"], "content" | "locked_admin"> & { content: Content; locked_admin?: string[] };
 type Export = S["KHTCReportExport"];
 const STORE = new Map<string, {
     detail: Detail;
     exports: {
         meta: Export;
+        content: Content;
         body: string;
         documentNo: string;
     }[];
@@ -102,7 +107,7 @@ function capture(ctx: Ctx, s: Stored, refresh: boolean): Content {
     const external = khtcExternalForPeriod(p.id);
     return { data: { period: { id: p.id, no: p.no ?? null, scope: p.scope ?? null, type: p.report_type as S["KHTCReportPeriod"]["type"], year: p.year, name: p.name, from: p.from_date, to: p.to_date, cutoff: p.cutoff_date, departments: p.departments.map(d => d.code) }, template: ({ week: "mau_1", month: "mau_2", quarter: "mau_3", year: "mau_4", program: "mau_5" } as const)[p.report_type as "week"] ?? "mau_1", plan: { VersionID: p.id, Version: 1, Year: p.year, DecisionNo: "MINH HỌA", Entries: [] }, sources: state.snapshot ? { id: state.snapshot.id, version: state.snapshot.no, plan_version_id: null, figures_hash: state.snapshot.figures_hash, status_hash: state.snapshot.status_hash, closed: state.snapshot.closed, at: state.snapshot.taken_at } : null, metrics: [], submissions, rows, form_texts: texts, provisional, input_hash: JSON.stringify([submissions, state.snapshot?.id, external.map(x => [x.entry_id, x.version])]), captured_at: now, ...(external.length ? { external } : {}) }, admin: Object.fromEntries(ADMIN.map(k => [k, { system: k === "report_date" ? now.slice(0, 10) : "", override: null, actor: null, at: null, system_changed: false }])), texts: Object.fromEntries(sections(p.report_type).filter(s => s.editable).map(s => [s.key, s.key === "D" ? "Không có." : ""])) };
 }
-function load(ctx: Ctx, s: Stored) {
+function load(ctx: Ctx, s: Stored, preview = false) {
     let value = STORE.get(s.p.id);
     if (!value) {
         value = { detail: { period_id: s.p.id, draft_id: null, version: 0, content: capture(ctx, s, false), sections: sections(s.p.report_type), final: null, editable: false, can_refresh: false, source_changed: false, source_error: "", terminal: s.terminal }, exports: [] };
@@ -112,6 +117,13 @@ function load(ctx: Ctx, s: Stored) {
                 value.detail.content.texts.II = previous.detail.content.texts.II!;
         }
         STORE.set(s.p.id, value);
+    }
+    if (!preview) {
+        if (!value.detail.version && isFixedKey(value.detail.content.data.template)) {
+            value.detail.content.template_snapshot = selectKhtcMockTemplate(ctx, value.detail.content.data.template, value.detail.content.data.period.from, sections(s.p.report_type));
+            value.detail.content.template_terminal = s.terminal;
+        }
+        decorateFixedReport(value.detail);
     }
     const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
     value.detail.editable = (!kc || kc.role === "kn_tinh" && kc.department_code === KHTC && !kc.read_only) && !value.detail.final && s.terminal !== "cancelled";
@@ -123,7 +135,7 @@ function load(ctx: Ctx, s: Stored) {
 /** Read-only preview seam: the template editor shares the composer's projection. */
 export function khtcTemplatePreviewContent(ctx: Ctx, periodId: string): Content | null {
  const period=templatePeriod(ctx,periodId);
- return period ? structuredClone(load(ctx,period).detail.content) : null;
+ return period ? structuredClone(load(ctx,period,true).detail.content) : null;
 }
 export const khtcReportRoutes: Route[] = [{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
 function handle(ctx: Ctx): Response {
@@ -134,7 +146,9 @@ function handle(ctx: Ctx): Response {
     const s = khtcMockStore().find(x => x.p.id === id);
     if (!s)
         return code("not_found", "Không có báo cáo", 404);
-    const value = load(ctx, s), d = value.detail;
+    let value: ReturnType<typeof load>;
+    try { value=load(ctx,s); } catch(e) { return code("invalid",e instanceof Error?e.message:"Không đọc được mẫu đã ghim",422); }
+    const d=value.detail;
     if (ctx.request.method === "GET") {
         if (action === "download") {
             const x = value.exports.find(x => x.meta.id === exportID);
@@ -174,9 +188,11 @@ function handle(ctx: Ctx): Response {
         if (filter.level && !["achieved", "progressing", "slow", "qualitative"].includes(filter.level))
             return code("invalid", "Mức đạt không hợp lệ", 422);
         const rows = filterRows(d.content.data.rows ?? [], filter), esc = (s: string) => `"${s.replaceAll('"', '""')}"`;
-        const bytes = "\uFEFF" + [["GIẢ LẬP KHTC", d.content.data.period.name], ["Hạng mục", "Trong kỳ", "Điều chỉnh", "Lũy kế năm"], ...rows.map(r => [r.name, r.in_period, r.adjustment, r.year_to_date])].map(r => r.map(esc).join(",")).join("\r\n");
+        const document=renderKhtcMockFixed(d.content,filter);
+        const compiled=document?.nodes.flatMap(n=>[[`${n.number}. ${n.title}`],...n.rows.map(r=>[r.preamble??"",r.tokens.map(t=>t.text).join("")])])??[];
+        const bytes = "\uFEFF" + [...compiled,["GIẢ LẬP KHTC", d.content.data.period.name], ["Hạng mục", "Trong kỳ", "Điều chỉnh", "Lũy kế năm"], ...rows.map(r => [r.name, r.in_period, r.adjustment, r.year_to_date])].map(r => r.map(esc).join(",")).join("\r\n");
         const x: Export = { id: uuidv7(), period_id: s.p.id, version: value.exports.length + 1, draft_id: d.draft_id!, file_name: `gia-lap-khtc-v${value.exports.length + 1}.csv`, body_hash: "0".repeat(64), input_hash: d.content.data.input_hash, provisional: !!d.content.data.provisional.length, filter, actor_ref: ctx.persona.me.actor_ref, at: new Date().toISOString() };
-        value.exports.push({ meta: x, body: bytes, documentNo: d.content.admin.document_no?.override ?? d.content.admin.document_no?.system ?? "" });
+        value.exports.push({ meta: x, content: structuredClone(d.content), body: bytes, documentNo: d.content.admin.document_no?.override ?? d.content.admin.document_no?.system ?? "" });
         return json(x, 201);
     }
     if (op === "refresh") {
@@ -185,10 +201,11 @@ function handle(ctx: Ctx): Response {
         const fresh = capture(ctx, s, true);
         fresh.admin = d.content.admin;
         fresh.texts = d.content.texts;
+        if(d.content.template_snapshot) { fresh.template_snapshot=structuredClone(d.content.template_snapshot);fresh.template_terminal=s.terminal; }
         d.content = fresh;
     }
     else {
-        if (Object.keys(body).some(k => !["base_version", "admin", "texts"].includes(k)) || Object.keys(body.admin ?? {}).some(k => !ADMIN.includes(k)) || Object.keys(body.texts ?? {}).some(k => !d.sections.some(s => s.key === k && s.editable)))
+        if (Object.keys(body).some(k => !["base_version", "admin", "texts"].includes(k)) || Object.keys(body.admin ?? {}).some(k => !ADMIN.includes(k) || d.locked_admin?.includes(k)) || Object.keys(body.texts ?? {}).some(k => !d.sections.some(s => s.key === k && s.editable)))
             return code("invalid", "Ô số và mục hệ thống chỉ đọc", 422);
         for (const [key, text] of Object.entries(body.admin ?? {})) {
             if (text !== null && text.length > 2000)
@@ -204,6 +221,8 @@ function handle(ctx: Ctx): Response {
             d.content.texts[key] = text;
         }
     }
+    if(d.content.template_snapshot) d.content.template_terminal=s.terminal;
+    try { decorateFixedReport(d); } catch(e) { return code("invalid",e instanceof Error?e.message:"Không dựng được mẫu đã ghim",422); }
     d.version++;
     d.draft_id = uuidv7();
     recordNarrativeRevision(ctx,d);
@@ -212,7 +231,7 @@ function handle(ctx: Ctx): Response {
 /** W10.17: bản xuất Excel đã lưu cùng bản soạn hiện tại — nguồn của Word giả lập (kn-khtc-words). */
 export function khtcReportExport(periodId: string, exportId: string) {
     const value = STORE.get(periodId), x = value?.exports.find(e => e.meta.id === exportId);
-    return value && x ? { detail: value.detail, meta: x.meta } : undefined;
+    return value && x ? { detail: {...value.detail, content: structuredClone(x.content)}, meta: x.meta } : undefined;
 }
 
 function archive(ctx: Ctx): Response {
@@ -230,4 +249,26 @@ function archive(ctx: Ctx): Response {
  }
  rows.sort((a,b)=>b.at.localeCompare(a.at)||b.id.localeCompare(a.id));const offset=+rawOffset,limit=+rawLimit;
  return json({items:rows.slice(offset,offset+limit),has_more:rows.length>offset+limit,offset},200,{"Cache-Control":"no-store"});
+}
+
+export function renderKhtcMockFixed(content:Content, filter:S["KHTCReportFilter"]={}):S["KHTCTemplateRendered"]|undefined {
+ const snapshot=content.template_snapshot;
+ if(!snapshot || snapshot.mode==="legacy")return undefined;
+ const definition=snapshot.definition as unknown as Definition;
+ if(snapshot.key!==content.data.template || snapshot.rule!=="khtc-template/v2.3-1" || snapshot.hash!==mockDigest(canonical(definition)) || invalidDefinition(definition))throw new Error("Nguồn mẫu đã ghim không khớp");
+ const selected=structuredClone(content);selected.data.rows=filterRows(selected.data.rows,filter);
+ return renderTemplate(definition,templateContext(selected,content.template_terminal??""),"actual");
+}
+function decorateFixedReport(detail:Detail):void {
+ const document=renderKhtcMockFixed(detail.content);
+ if(!document) {
+  delete detail.template_document;delete detail.locked_admin;
+  const embedded=detail.content.template_snapshot?.definition.sections;
+  if(detail.content.template_snapshot?.mode==="legacy" && Array.isArray(embedded))detail.sections=structuredClone(embedded) as S["KHTCReportSection"][];
+  return;
+ }
+ detail.template_document=document;
+ detail.sections=document.nodes.map(n=>({key:n.id,title:n.title,editable:n.text_slot}));
+ const definition=detail.content.template_snapshot!.definition as unknown as Definition;
+ detail.locked_admin=[...new Set(definition.nodes.flatMap(n=>n.locked_admin))].sort();
 }

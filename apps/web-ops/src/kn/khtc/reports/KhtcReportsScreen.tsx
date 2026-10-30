@@ -7,6 +7,7 @@ import { DEPT_LABEL, TEMPLATE_LABEL } from "../api";
 import { REPORT_TYPES, createKhtcPeriodApi } from "../periods/api";
 import { createReportApi, filterRows, type ReportApi, type ReportDetail, type ReportFilter } from "./api";
 import { ExternalCells } from "../external/ExternalCells";
+import { CompiledTemplateDocument } from "../templates/CompiledTemplateDocument";
 const ADMIN: Record<string, string> = { document_no: "Số văn bản", place: "Địa danh", report_date: "Ngày báo cáo", recipient: "Kính gửi", basis: "Căn cứ", recipients: "Nơi nhận", authority: "Thẩm quyền ký", signer_title: "Chức vụ", signer: "Người ký" };
 function saveFile(file: {
     blob: Blob;
@@ -31,7 +32,7 @@ export function KhtcReportsScreen({ mode = "editor" }: {
     const list = useLoad(periods ? () => periods.list(year) : null, [periods, year]);
     const detail = useLoad(reports && selected ? () => reports.get(selected) : null, [reports, selected]);
     return <>
-  <PageHeader title={mode === "history" ? "Báo cáo đã xuất" : mode === "progress" ? "Tiến độ các chương trình" : "Soạn báo cáo KHTC"}><p>Mẫu 1–5 · Số liệu lấy từ nguồn đã chốt và phiếu đã gửi của các phòng.</p></PageHeader>
+  <PageHeader title={mode === "history" ? "Báo cáo đã xuất" : mode === "progress" ? "Tiến độ các chương trình" : "Soạn báo cáo KHTC"}>Mẫu 1–5 · Số liệu lấy từ nguồn đã chốt và phiếu đã gửi của các phòng.</PageHeader>
   <section className="card sec">
    <label>Năm <input type="number" min="2000" max="2100" value={year} onChange={e => { setYear(Number(e.target.value)); setSelected(""); }}/></label>{" "}
    <label>Loại báo cáo <select value={kind} onChange={e => setKind(e.target.value)}><option value="">Tất cả</option>{REPORT_TYPES.filter(t => t.value !== "adhoc").map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
@@ -76,15 +77,17 @@ function ReportEditor({ d, api, mode, reload }: {
     {Object.entries(ADMIN).map(([key, label]) => {
                     const field = d.content.admin[key];
                     const value = key in admin ? admin[key] ?? field?.system ?? "" : field?.override ?? field?.system ?? "";
-                    return <div key={key}><label>{label} <input type={key === "report_date" ? "date" : "text"} maxLength={2000} disabled={!writable} value={value} onChange={e => setAdmin({ ...admin, [key]: e.target.value })}/></label>{" "}<button className="btn" disabled={!writable} onClick={() => setAdmin({ ...admin, [key]: null })}>Về mặc định</button>{field?.override !== null && field?.override !== undefined && <small> Đã sửa thủ công {dt(field.at)}</small>}{field?.system_changed && <small> · Giá trị mặc định đã đổi: {field.system}</small>}</div>;
+                    return <div key={key}><label>{label} <input type={key === "report_date" ? "date" : "text"} maxLength={2000} disabled={!writable || d.locked_admin?.includes(key)} value={value} onChange={e => setAdmin({ ...admin, [key]: e.target.value })}/></label>{" "}<button className="btn" disabled={!writable || d.locked_admin?.includes(key)} onClick={() => setAdmin({ ...admin, [key]: null })}>Về mặc định</button>{field?.override !== null && field?.override !== undefined && <small> Đã sửa thủ công {dt(field.at)}</small>}{field?.system_changed && <small> · Giá trị mặc định đã đổi: {field.system}</small>}</div>;
                 })}
     <h3>Nội dung lời văn</h3>
+    {!!d.locked_admin?.length && <p>Các ô hành chính đã được khóa trong mẫu chỉ đọc.</p>}
     {data.template === "mau_5" && <p>Mục II được khởi tạo từ báo cáo tiến độ kỳ trước, nếu có. Nội dung đã lưu của kỳ này được giữ khi cập nhật số liệu.</p>}
-    {d.sections.filter(s => s.editable).map(s => <div key={s.key}><label>{s.key} {s.title}<textarea rows={4} maxLength={12000} disabled={!writable} value={texts[s.key] ?? d.content.texts[s.key] ?? ""} onChange={e => setTexts({ ...texts, [s.key]: e.target.value })}/></label></div>)}
+    {d.sections.filter(s => s.editable).map(s => <div key={s.key}><label>{d.template_document?.nodes.find(n => n.id === s.key)?.number ?? s.key} {s.title}<textarea rows={4} maxLength={12000} disabled={!writable} value={texts[s.key] ?? d.content.texts[s.key] ?? ""} onChange={e => setTexts({ ...texts, [s.key]: e.target.value })}/></label></div>)}
     <button className="btn btn-primary" disabled={!writable} onClick={() => act.run(async () => { await api.save(id, { base_version: d.version, admin, texts }); reload(); }, "Đã lưu bản soạn")}>Lưu bản soạn</button>{" "}
     <button className="btn" disabled={!d.can_refresh || act.busy || dirty} onClick={() => act.run(async () => { await api.refresh(id, d.version); reload(); }, "Đã cập nhật số liệu")}>Cập nhật số liệu</button>
     {dirty && <p role="status">Có thay đổi chưa lưu. Lưu bản soạn trước khi cập nhật hoặc xuất Excel.</p>}
    </>}
+   {d.template_document && <section aria-label="Bản báo cáo theo mẫu đã lưu"><h3>Nội dung báo cáo</h3>{dirty && <p>Lưu bản soạn để cập nhật nội dung xem trước.</p>}<CompiledTemplateDocument document={d.template_document} /></section>}
    <dl className="row" aria-label="Thẻ đếm tiến độ">{[["Tổng hạng mục", allItems.length], ["Đạt kế hoạch", allItems.filter(r => r.level === "achieved").length], ["30 – dưới 100%", allItems.filter(r => r.level === "progressing").length], ["Dưới 30%", allItems.filter(r => r.level === "slow").length]].map(([label, count]) => <div key={String(label)}><dt>{label}</dt><dd>{count}</dd></div>)}</dl>
    <h3>Số liệu tổng hợp</h3><p>Chỉ đọc · Các số lượng và tỷ lệ được hệ thống tính từ nguồn đã lưu.</p>
    {(data.template === "mau_5" || mode === "progress") && <div>

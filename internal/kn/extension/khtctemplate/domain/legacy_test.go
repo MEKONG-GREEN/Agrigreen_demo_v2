@@ -42,3 +42,23 @@ func TestLegacySourceFingerprintAndVersion(t *testing.T) {
 		t.Fatal("invalid source descriptor accepted")
 	}
 }
+func TestLegacyFingerprintSurvivesJSONBRepresentation(t *testing.T) {
+	word := doctpl.Template{Key: "khtc.mau_1", Version: 1, Title: "Mẫu nền", Owner: "pf/extension", Body: []doctpl.Block{{Kind: doctpl.KindParagraph, Text: "Nội dung nền"}}}
+	pinned, err := LegacySnapshot("mau_1", "khtc-report/g1-v1", json.RawMessage(`[{"key":"A","title":"Kết quả","editable":false}]`), word)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var object any
+	if err = json.Unmarshal(pinned.Definition, &object); err != nil {
+		t.Fatal(err)
+	}
+	// PostgreSQL JSONB preserves the value, not the writer's key order/spacing.
+	stored, err := json.MarshalIndent(object, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pinned.Definition = stored
+	if err = ValidateLegacy(pinned); err != nil {
+		t.Fatalf("same JSON value rejected after storage: %v", err)
+	}
+}

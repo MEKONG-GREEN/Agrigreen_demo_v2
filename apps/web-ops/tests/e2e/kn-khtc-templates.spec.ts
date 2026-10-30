@@ -38,9 +38,21 @@ test("W11.65 Admin cấu hình, xem trước, phát hành và khôi phục một
 
   const periods = page.getByRole("combobox", { name: "Kỳ bắt đầu áp dụng", exact: true });
   await periods.selectOption({ index: 1 });
+  const reportName = await periods.locator("option:checked").textContent();
+  expect(reportName).toBeTruthy();
   await page.getByRole("button", { name: "Phát hành bản nháp", exact: true }).click();
   const log = page.getByRole("complementary", { name: "Log", exact: true });
   await expect(log).toContainText("Phát hành v2");
+
+  // The consumer uses the published source rather than the latest authoring draft.
+  await sidebar(page).getByRole("link", { name: "Báo cáo KHTC", exact: true }).click();
+  await page.getByRole("button", { name: reportName!, exact: true }).click();
+  const compiled = page.getByRole("region", { name: "Bản báo cáo theo mẫu đã lưu", exact: true });
+  await expect(compiled).toContainText("Mục cấu hình E2E 31");
+  await expect(compiled).toContainText("Nội dung cấu hình vẫn giữ sau phát hành.");
+  await expect(page.getByRole("button", { name: "Lưu bản soạn", exact: true })).toBeDisabled();
+  await sidebar(page).getByRole("link", { name: "Mục lục mẫu báo cáo", exact: true }).click();
+  await page.getByRole("link", { name: "Mẫu 1 — Báo cáo tuần", exact: true }).click();
 
   const versions = page.getByRole("combobox", { name: "Phiên bản nguồn", exact: true });
   const firstVersion = await versions.locator("option").filter({ hasText: /^Phiên bản 1 ·/ }).getAttribute("value");

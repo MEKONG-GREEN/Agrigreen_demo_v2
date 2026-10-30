@@ -474,5 +474,5 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	return buffer.Bytes(), nil
+	return fixedWorkbook(buffer.Bytes(), d.TemplateSnapshot, d, templateTerminal(d), filter, version)
 }

@@ -22427,6 +22427,8 @@ export interface components {
             texts: {
                 [key: string]: string;
             };
+            template_snapshot?: components["schemas"]["KHTCFixedTemplateSnapshot"];
+            readonly template_terminal?: string;
         };
         KHTCReportSection: {
             key: string;
@@ -22455,6 +22457,8 @@ export interface components {
             source_changed: boolean;
             source_error: string;
             terminal: string;
+            template_document?: components["schemas"]["KHTCTemplateRendered"];
+            readonly locked_admin?: string[];
         };
         KHTCReportSave: {
             base_version: number;

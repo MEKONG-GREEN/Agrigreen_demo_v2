@@ -37,6 +37,11 @@ func checkNewFixedSelection(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, 
 		if pinned.Mode != "legacy" {
 			return ErrVersion.WithDetail("Mẫu áp dụng đã thay đổi, tải lại trước khi lưu")
 		}
+		pinned.LegacyUntil = nil
+		if first != nil {
+			until := *first
+			pinned.LegacyUntil = &until
+		}
 		return nil
 	}
 	if pinned.Mode != "published" {

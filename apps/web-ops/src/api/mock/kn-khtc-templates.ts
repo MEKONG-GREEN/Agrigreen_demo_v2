@@ -90,7 +90,7 @@ function preview(ctx: Ctx, key: Key, s: State): Response {
     if (!content || content.data.template !== key)
         return code("invalid", "Kỳ không thuộc mẫu đã chọn", 422);
     try {
-        const context = templateContext(content, period.terminal), scenario = typeof b.scenario === "string" ? b.scenario : "actual";
+        const context = templateContext(content, content.template_terminal ?? period.terminal), scenario = typeof b.scenario === "string" ? b.scenario : "actual";
         return json({ context, document: renderTemplate(d, context, scenario), definition_hash: mockDigest(canonical(d)), scenario });
     }
     catch (e) {
@@ -165,3 +165,17 @@ function handle(ctx: Ctx): Response {
     return json(result, 201);
 }
 export const khtcTemplateRoutes: Route[] = [{ method: "GET", pattern: /^\/v1\/extension\/khtc\/templates(?:\/([^/]+))?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/templates\/([^/]+)\/(versions|restore|publish|preview)$/, handler: handle }];
+
+/** The composer selects once for a new revision; saved content never resolves latest. */
+export function selectKhtcMockTemplate(ctx: Ctx, key: Key, start: string, sections: S["KHTCReportSection"][]): S["KHTCFixedTemplateSnapshot"] {
+ const ledger=state(ctx.persona.me.tenant_id,key), day=start.slice(0,10);
+ const first=[...ledger.publications].sort((a,b)=>a.applies_from.localeCompare(b.applies_from))[0];
+ if(!first || day<first.applies_from.slice(0,10)) {
+  const definition={sections:structuredClone(sections)};
+  return {mode:"legacy",key,id:"00000000-0000-0000-0000-000000000000",version:1,rule:"khtc-report/g1-v1",hash:mockDigest(definition),definition,applicable_from:"0001-01-01T00:00:00Z",...(first?{legacy_until:first.applies_from}:{}),word_key:`khtc.${key}`,word_version:1,word_hash:mockDigest({key,sections}),excel_rule:"khtc-report/g1-v1"};
+ }
+ const publication=ledger.publications.filter(p=>p.applies_from.slice(0,10)<=day).sort((a,b)=>b.applies_from.localeCompare(a.applies_from)||b.sequence-a.sequence)[0];
+ const version=ledger.versions.find(v=>v.id===publication?.version_id);
+ if(!publication || !version || version.key!==key || version.version!==publication.version || version.hash!==publication.hash || version.rule!==RULE || version.hash!==mockDigest(canonical(version.definition)) || invalidDefinition(version.definition))throw new Error("Nguồn mẫu đã phát hành không khớp");
+ return {mode:"published",key,id:version.id,version:version.version,rule:version.rule,hash:version.hash,definition:structuredClone(version.definition) as unknown as Record<string,unknown>,applicable_from:publication.applies_from,word_key:"khtc.fixed",word_version:1,word_hash:mockDigest("khtc.fixed/v1"),excel_rule:"khtc-xlsx/fixed-v1"};
+}

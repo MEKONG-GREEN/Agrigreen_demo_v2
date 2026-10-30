@@ -51,6 +51,9 @@ func (s *Service) TemplateContext(ctx context.Context, key string, id uuid.UUID)
 	}
 	if draft != nil {
 		content = draft.Content
+		if content.TemplateTerminal != nil {
+			term = *content.TemplateTerminal
+		}
 	} else {
 		// Capture can call ports. The period read transaction above has already ended.
 		var pErr error
@@ -173,4 +176,60 @@ func selectFixedTemplate(ctx context.Context, provider port.KHTCFixedTemplates, 
 		cloned.ExcelRule = fixedWorkbookRule
 	}
 	return &cloned, nil
+}
+
+// pinNewTemplate is only used before a draft has a persisted revision. Selection
+// happens outside the report write transaction; its publication fence is checked
+// using the write transaction's same connection before the insert.
+func (s *Service) pinNewTemplate(ctx context.Context, content *domain.Draft, terminal string) error {
+	pinned, err := selectFixedTemplate(ctx, s.Templates, *content)
+	if err != nil {
+		return err
+	}
+	content.TemplateSnapshot = pinned
+	return captureTemplateTerminal(content, terminal)
+}
+func templateTerminal(content domain.Draft) string {
+	if content.TemplateTerminal != nil {
+		return *content.TemplateTerminal
+	}
+	return ""
+}
+
+// Every saved revision captures terminal state independently of its source frame.
+// Historical nil snapshots retain their byte-compatible original pipeline.
+func captureTemplateTerminal(content *domain.Draft, terminal string) error {
+	if content.TemplateSnapshot == nil {
+		return nil
+	}
+	content.TemplateTerminal = &terminal
+	_, err := renderFixedTemplate(content.TemplateSnapshot, *content, terminal, domain.Filter{})
+	return err
+}
+func decorateFixedDetail(out *Detail) error {
+	var err error
+	out.Sections, err = fixedTemplateSections(out.Content.TemplateSnapshot, out.Content)
+	if err != nil {
+		return err
+	}
+	out.Document, err = renderFixedTemplate(out.Content.TemplateSnapshot, out.Content, templateTerminal(out.Content), domain.Filter{})
+	if err != nil {
+		return err
+	}
+	out.LockedAdmin = []string{}
+	if out.Content.TemplateSnapshot != nil && out.Content.TemplateSnapshot.Mode == "published" {
+		definition, e := templatedomain.PinnedDefinition(*out.Content.TemplateSnapshot, out.Content.Data.Template, out.Content.Data.Period.From)
+		if e != nil {
+			return ErrInvalid.WithCause(e)
+		}
+		for _, node := range definition.Nodes {
+			for _, field := range node.LockedAdmin {
+				if !slices.Contains(out.LockedAdmin, field) {
+					out.LockedAdmin = append(out.LockedAdmin, field)
+				}
+			}
+		}
+		slices.Sort(out.LockedAdmin)
+	}
+	return nil
 }

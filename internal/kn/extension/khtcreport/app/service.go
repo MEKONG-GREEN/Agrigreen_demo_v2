@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	source "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/app"
+	templatedomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtctemplate/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	forms "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
@@ -41,6 +42,7 @@ var (
 )
 
 type Service struct {
+	Templates  port.KHTCFixedTemplates
 	DB         tenant.Beginner
 	Clock      clock.Clock
 	Plans      port.KHTCPlans
@@ -258,6 +260,9 @@ type Detail struct {
 	SourceChanged bool
 	SourceError   string
 	Terminal      string
+	Sections      []domain.Section
+	Document      *templatedomain.Rendered
+	LockedAdmin   []string
 }
 
 func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
@@ -297,11 +302,17 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 		if e != nil {
 			return Detail{}, e
 		}
+		if e = s.pinNewTemplate(ctx, &out.Content, term); e != nil {
+			return Detail{}, e
+		}
 	} else {
 		out.Content = draft.Content
 		out.Version = draft.Version
 		did := draft.ID
 		out.DraftID = &did
+	}
+	if err = decorateFixedDetail(&out); err != nil {
+		return Detail{}, err
 	}
 	changed, reason := s.changed(ctx, c, p, out.Content.Data)
 	out.SourceChanged, out.SourceError = changed, reason
