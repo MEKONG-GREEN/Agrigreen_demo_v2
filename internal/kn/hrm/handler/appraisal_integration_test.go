@@ -89,7 +89,8 @@ func TestHRMAppraisalTemplatesHTTP_W1126(t *testing.T) {
 		}(key)
 	}
 	a, b := <-responses, <-responses
-	if !((a == http.StatusCreated && b == http.StatusConflict) || (b == http.StatusCreated && a == http.StatusConflict)) {
+	oneCreatedOneConflict := (a == http.StatusCreated && b == http.StatusConflict) || (b == http.StatusCreated && a == http.StatusConflict)
+	if !oneCreatedOneConflict {
 		t.Fatalf("concurrent=%d,%d", a, b)
 	}
 	// Đầu vào số sai bị chặn trước ghi sổ/Decimal, kể cả gọi API trực tiếp.

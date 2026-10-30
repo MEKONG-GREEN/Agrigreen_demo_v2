@@ -61,7 +61,7 @@ func (s *Service) appraisalExportCaller(ctx context.Context, write bool) (apprai
 	if err = s.appraisalRecords(); err != nil {
 		return c, domain.ScopeNone, err
 	}
-	if (write && c.readOnly) || !(c.center() || c.group == domain.GroupManager) {
+	if (write && c.readOnly) || (!c.center() && c.group != domain.GroupManager) {
 		return c, domain.ScopeNone, problem.Forbidden.WithDetail("chỉ HCTH/Admin hoặc lãnh đạo đơn vị được xuất đề xuất")
 	}
 	scope := domain.ScopeNone

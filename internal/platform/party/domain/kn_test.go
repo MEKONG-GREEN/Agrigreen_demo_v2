@@ -123,7 +123,7 @@ var implementedMenu = map[string]bool{"admin.pb.bao_cao_khtc": true, "admin.pb.b
 // chưa có là "Sắp có"; phòng ban seed cũ (menu_profile generic) nhận khuôn riêng theo mã. BF-MENU (#98, kn.menu/v6, R-A6):
 // mục nghiệp vụ nằm trong 3 nhóm Điều hành / Báo cáo / Dữ liệu, không còn nhóm "Nghiệp vụ".
 func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
-	if domain.MenuVersion != "kn.menu/v7" {
+	if domain.MenuVersion != "kn.menu/v11" {
 		t.Fatal(domain.MenuVersion)
 	}
 	keys := func(gs []domain.MenuGroup) []string {
@@ -162,6 +162,13 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 		if code == port.DeptThongTinTruyenThong { // W11.72: Xã báo giá, Kỳ báo giá & giờ khóa đã mở; Mặt hàng Sắp có
 			if n := len(admin); admin[n-3].ComingSoon || admin[n-2].Route != "/kn/phong-ban/"+code+"/bao-gia-lich" || !admin[n-1].ComingSoon {
 				t.Fatalf("%s: mục Admin Báo giá: %+v", code, admin[n-3:])
+			}
+			continue
+		}
+		if code == port.DeptHanhChinhTongHop { // W11.26: lá nghiệp vụ dùng canonical HRM, không dùng alias theo phòng.
+			last := admin[len(admin)-1]
+			if last.Key != "admin.pb.hcth_danh_gia" || last.ComingSoon || !implementedMenu[last.Key] || last.Route != "/kn/nhan-su/danh-gia" {
+				t.Fatalf("%s: mục Admin Đánh giá HCTH: %+v", code, last)
 			}
 			continue
 		}

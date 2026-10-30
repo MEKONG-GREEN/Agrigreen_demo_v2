@@ -18,9 +18,10 @@ import (
 
 func appraisalNotice(p AppraisalPeriod, c appraisalActor, action, step string, id uuid.UUID) port.AppraisalChangedV1 {
 	due := p.SelfDueAt
-	if step == "manager" {
+	switch step {
+	case "manager":
 		due = p.ManagerDueAt
-	} else if step == "summary" {
+	case "summary":
 		due = p.SummaryDueAt
 	}
 	return port.AppraisalChangedV1{NoticeID: id, PeriodRef: p.ID, NodeRef: p.NodeRef, Year: p.Year, Quarter: p.Quarter,
@@ -78,15 +79,16 @@ func (s *Service) appraisalEntryNotice(ctx context.Context, tx pgx.Tx, c apprais
 	n := appraisalNotice(p, c, row.Action, step, row.ID)
 	staff := e.Member.StaffID
 	n.StaffRef = &staff
-	if step == "self" {
+	switch step {
+	case "self":
 		if e.Member.AccountRef != nil {
 			n.Targets = append(n.Targets, *e.Member.AccountRef)
 		} else {
 			appraisalManagerAudience(&n, e.Member) // nhập thay có scan; không giả đã gửi OTP khách
 		}
-	} else if step == "summary" {
+	case "summary":
 		n.Center = true
-	} else {
+	default:
 		appraisalManagerAudience(&n, e.Member)
 	}
 	return s.enqueueAppraisalNotice(ctx, tx, c, n)
@@ -111,7 +113,7 @@ func (s *Service) remindAppraisal(ctx context.Context, tx pgx.Tx, c appraisalAct
 		}
 		switch step {
 		case "self":
-			if x.Status != domain.AppraisalNotStarted && !(x.Status == domain.AppraisalChangeRequested && x.ReturnedTo == "self") {
+			if x.Status != domain.AppraisalNotStarted && (x.Status != domain.AppraisalChangeRequested || x.ReturnedTo != "self") {
 				continue
 			}
 			if x.Member.AccountRef != nil {
@@ -120,7 +122,7 @@ func (s *Service) remindAppraisal(ctx context.Context, tx pgx.Tx, c appraisalAct
 				appraisalManagerAudience(&n, x.Member)
 			}
 		case "manager":
-			if x.Status != domain.AppraisalSelfSubmitted && !(x.Status == domain.AppraisalChangeRequested && x.ReturnedTo == "manager") {
+			if x.Status != domain.AppraisalSelfSubmitted && (x.Status != domain.AppraisalChangeRequested || x.ReturnedTo != "manager") {
 				continue
 			}
 			appraisalManagerAudience(&n, x.Member)

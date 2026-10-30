@@ -160,7 +160,8 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 		if (!proxy && !a.self(e.Member)) || (proxy && (!a.management(e.Member) || !a.ProofVerified || in.ProxyDocument == nil)) {
 			return e, appraisalInvalid("action", "chỉ chủ thể tự chấm; nhập thay cần người quản lý và bản scan đã kiểm quyền")
 		}
-		if (locks.Self && !e.Reopened) || !(e.Status == AppraisalNotStarted || (e.Status == AppraisalChangeRequested && e.ReturnedTo == "self")) {
+		selfOpen := e.Status == AppraisalNotStarted || (e.Status == AppraisalChangeRequested && e.ReturnedTo == "self")
+		if (locks.Self && !e.Reopened) || !selfOpen {
 			return e, appraisalInvalid("action", "bước tự đánh giá đã khóa hoặc đã nộp")
 		}
 		complete := in.Action != "self_draft"
@@ -193,7 +194,8 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 		if !a.management(e.Member) {
 			return e, appraisalInvalid("action", "chỉ cấp quản lý được phân công; MS06 do HCTH nhập kết quả tập thể")
 		}
-		if (locks.Manager && !e.Reopened) || !(e.Status == AppraisalSelfSubmitted || e.Status == AppraisalManagerSubmitted || (e.Status == AppraisalChangeRequested && e.ReturnedTo == "manager")) {
+		managerOpen := e.Status == AppraisalSelfSubmitted || e.Status == AppraisalManagerSubmitted || (e.Status == AppraisalChangeRequested && e.ReturnedTo == "manager")
+		if (locks.Manager && !e.Reopened) || !managerOpen {
 			return e, appraisalInvalid("action", "chưa có phiếu tự nộp, đã gửi HCTH hoặc bước quản lý đã khóa")
 		}
 		complete := in.Action == "manager_submit"
@@ -229,21 +231,22 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 		if utf8.RuneCountInString(strings.TrimSpace(in.Reason)) < 10 {
 			return e, appraisalInvalid("reason", "lý do trả phiếu cần ít nhất 10 ký tự")
 		}
-		if in.ReturnTo == "self" {
+		switch in.ReturnTo {
+		case "self":
 			if !a.management(e.Member) || e.Status == AppraisalNotStarted || e.Status == AppraisalClosed || e.Status == AppraisalSent || (locks.Self && !e.Reopened && !a.center()) {
 				return e, appraisalInvalid("action", "không trả được phiếu về bước tự đánh giá")
 			}
 			if a.center() && locks.Self {
 				e.Reopened = true
 			}
-		} else if in.ReturnTo == "manager" {
+		case "manager":
 			if !a.center() || e.Status != AppraisalSent {
 				return e, appraisalInvalid("action", "chỉ HCTH trả đề xuất đã gửi")
 			}
 			if locks.Manager {
 				e.Reopened = true
 			}
-		} else {
+		default:
 			return e, appraisalInvalid("return_to", "chọn self hoặc manager")
 		}
 		e.Status, e.ReturnedTo, e.CorrectionReason = AppraisalChangeRequested, in.ReturnTo, strings.TrimSpace(in.Reason)

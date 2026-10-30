@@ -153,7 +153,7 @@ func (s *Service) AppraisalEntries(ctx context.Context, period uuid.UUID) ([]App
 				staff = append(staff, v.Member.StaffID)
 			}
 		}
-		if len(out) == 0 && !(c.center() && c.scope == domain.ScopeAll) {
+		if len(out) == 0 && (!c.center() || c.scope != domain.ScopeAll) {
 			return port.ErrAppraisalNotFound
 		}
 		return store.InsertAppraisalAccess(ctx, tx, c.tenant, store.Access{ID: ids.New(), Action: "view", StaffIDs: staff,

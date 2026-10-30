@@ -40,7 +40,8 @@ func redactedAppraisalPeriod(c appraisalActor, p AppraisalPeriod) AppraisalPerio
 
 func appraisalPeriodPermission(c appraisalActor, action string) error {
 	if action == "send" {
-		if c.readOnly || !(c.center() || (c.group == domain.GroupManager && c.manager)) {
+		canSend := c.center() || (c.group == domain.GroupManager && c.manager)
+		if c.readOnly || !canSend {
 			return problem.Forbidden.WithDetail("chỉ cấp quản lý được gửi đề xuất thuộc phân công")
 		}
 		return nil
@@ -124,12 +125,13 @@ func (s *Service) ChangeAppraisalPeriod(ctx context.Context, period uuid.UUID, i
 	}
 	proofs := map[string]store.DocRow{}
 	var documents map[string]uuid.UUID
-	if in.Action == "attach_signed" {
+	switch in.Action {
+	case "attach_signed":
 		documents = in.SignedDocuments
 		if len(documents) == 0 {
 			return AppraisalPeriod{}, problem.Validation.WithField("signed_documents", "chọn bản ký MS05/MS06")
 		}
-	} else if in.Action == "close" {
+	case "close":
 		documents = pre.SignedDocuments
 	}
 	// Quyền/tệp chứng từ được đọc ngoài giao dịch ghi; stale version và replay đã được kiểm phía trên.

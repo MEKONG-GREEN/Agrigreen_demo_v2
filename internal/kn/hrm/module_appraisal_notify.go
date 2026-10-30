@@ -83,11 +83,12 @@ func appraisalDrafts(ctx context.Context, acc port.Access, dir port.NotifyDirect
 	}
 	title := "Phiếu đánh giá " + label
 	body := "Đợt đánh giá đã có bước cần thực hiện. Mở phiếu/đề xuất được phân công để kiểm tra."
-	if p.Action == "open" {
+	switch p.Action {
+	case "open":
 		body = "Đợt đã mở. Hãy hoàn tất phiếu tự đánh giá được phát hành cho mình."
-	} else if p.Action == "remind" {
+	case "remind":
 		title = "Nhắc hoàn tất đánh giá " + label
-	} else if p.Action == "return" || p.Action == "reopen" {
+	case "return", "reopen":
 		title = "Phiếu đánh giá cần điều chỉnh " + label
 	}
 	subject := p.PeriodRef
