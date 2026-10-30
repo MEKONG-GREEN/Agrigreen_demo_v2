@@ -13,8 +13,22 @@ import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { ReasonBox } from "@/kn/cnts/model/parts";
 import { dt, LoadState, num, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
-import { createCntsPeriodApi, STATUS_LABEL, STATUS_TONE, type CntsPeriodApi, type FormsTask, type TaskStatus } from "./api";
-import { BM04_CODE, bm04Data, cellValue, changesBetween, columnGroups, columnTotal, cumulative, editedAfterAccept, isFlow, type Bm04Data, type CumBasis } from "./bm04";
+import { createCntsPeriodApi, STATUS_LABEL, STATUS_TONE, type CntsPeriodApi, type FormsField, type FormsTask, type TaskStatus } from "./api";
+import {
+  BM04_CODE,
+  bm04Data,
+  cellText,
+  cellValue,
+  changesBetween,
+  columnGroups,
+  columnTotal,
+  cumulative,
+  editedAfterAccept,
+  isFlow,
+  isNumeric,
+  type Bm04Data,
+  type CumBasis,
+} from "./bm04";
 
 type Mode = "week" | CumBasis;
 
@@ -115,9 +129,12 @@ function Body({
     if (commune && u !== commune) return false;
     return !status || t.status === status;
   });
-  const fields = mode === "week" ? data.fields : data.fields.filter((f) => isFlow(f.key));
+  // Số liệu tuần: đủ cột của biểu theo thứ tự mẫu, gồm CN-10 Ghi chú ở cột cuối; lũy kế: chỉ cột phát sinh trong tuần.
+  const fields = mode === "week" ? data.columns : data.fields.filter((f) => isFlow(f.key));
   const cum = mode === "week" ? null : new Map(rows.map((u) => [u, cumulative(data, u, week, mode)]));
   const valueOf = (u: string, key: string) => (cum ? (cum.get(u)?.values[key] ?? null) : cellValue(data.cell(week, u), key));
+  const cellOf = (u: string, f: FormsField) =>
+    isNumeric(f) ? num(valueOf(u, f.key), f.type === "decimal" ? 3 : 0) : (cellText(data.cell(week, u), f.key) ?? "—");
   const years = [thisYear() + 1, thisYear(), thisYear() - 1, thisYear() - 2];
   const me = principal?.subject ?? "";
   const tinh = kn.context?.role === "kn_tinh";
@@ -204,7 +221,7 @@ function Body({
                 </tr>
                 <tr>
                   {fields.map((f) => (
-                    <th key={f.key} className="num">
+                    <th key={f.key} className={isNumeric(f) ? "num" : undefined}>
                       {f.label}
                       {f.unit ? ` (${f.unit})` : ""}
                     </th>
@@ -226,8 +243,8 @@ function Body({
                           {t.nil_report ? <span className="mute"> · không phát sinh</span> : null}
                         </td>
                         {fields.map((f) => (
-                          <td key={f.key} className="num">
-                            {num(valueOf(u, f.key), f.type === "decimal" ? 3 : 0)}
+                          <td key={f.key} className={isNumeric(f) ? "num" : undefined}>
+                            {cellOf(u, f)}
                           </td>
                         ))}
                         {c ? (
@@ -256,11 +273,15 @@ function Body({
                     <td colSpan={3}>
                       <strong>TỔNG</strong>
                     </td>
-                    {fields.map((f) => (
-                      <td key={f.key} className="num">
-                        <strong>{num(columnTotal(rows.map((u) => valueOf(u, f.key))), f.type === "decimal" ? 3 : 0)}</strong>
-                      </td>
-                    ))}
+                    {fields.map((f) =>
+                      isNumeric(f) ? (
+                        <td key={f.key} className="num">
+                          <strong>{num(columnTotal(rows.map((u) => valueOf(u, f.key))), f.type === "decimal" ? 3 : 0)}</strong>
+                        </td>
+                      ) : (
+                        <td key={f.key} />
+                      ),
+                    )}
                     {mode !== "week" ? <td /> : null}
                     <td />
                   </tr>

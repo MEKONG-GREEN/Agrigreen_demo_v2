@@ -14,7 +14,7 @@ export const BM04_CODE = "CNTS-BM04";
 export const FLOW_PREFIXES = ["tiem_", "hoa_chat_", "ksgm_"] as const;
 export const isFlow = (key: string) => FLOW_PREFIXES.some((p) => key.startsWith(p));
 
-const isNumeric = (f: FormsField) => f.type === "integer" || f.type === "decimal";
+export const isNumeric = (f: FormsField) => f.type === "integer" || f.type === "decimal";
 
 export interface Bm04Week {
   /** Khóa tuần (period_key, vd "2026-W40") — các lô phát hành khác nhau của cùng tuần gộp một cột. */
@@ -32,6 +32,11 @@ export interface Bm04Data {
   units: string[];
   /** Trường số của biểu (đúng thứ tự mẫu, AC-01). */
   fields: FormsField[];
+  /**
+   * Cột bảng tuần (chế độ Số liệu tuần): trường số và trường chữ của biểu theo đúng thứ tự mẫu — gồm "CN-10 Ghi chú" ở cột
+   * cuối biểu (BRD CNTS v3.7 UR-XA-07, FN-09 AC-01). Trường chữ không cộng ở dòng TỔNG, không có lũy kế.
+   */
+  columns: FormsField[];
   /** Công việc theo `${weekKey}|${unit}`. */
   cell: (weekKey: string, unit: string) => FormsTask | undefined;
 }
@@ -51,11 +56,13 @@ export function bm04Data(tasks: FormsTask[]): Bm04Data {
     const cur = cells.get(k(wk, t.unit));
     if (!cur || (t.submitted_at ?? "") > (cur.submitted_at ?? "")) cells.set(k(wk, t.unit), t);
   }
-  const fields = (ts.find((t) => t.fields.length)?.fields ?? []).filter(isNumeric);
+  const all = ts.find((t) => t.fields.length)?.fields ?? [];
+  const fields = all.filter(isNumeric);
   return {
     weeks: [...weeks.values()].sort((a, b) => a.from.localeCompare(b.from) || a.key.localeCompare(b.key)),
     units: [...units].sort(),
     fields,
+    columns: all.filter((f) => isNumeric(f) || f.type === "text"),
     cell: (w, u) => cells.get(k(w, u)),
   };
 }
@@ -71,6 +78,13 @@ export function cellValue(t: FormsTask | undefined, key: string): string | null 
   if (t.nil_report) return "0";
   const v = t.values[key];
   return v === undefined || v === "" ? null : v;
+}
+
+/** Giá trị trường chữ (vd CN-10 Ghi chú) của tuần: nguyên văn đã nộp, null khi chưa nộp/để trống — không quy "0" khi báo không phát sinh. */
+export function cellText(t: FormsTask | undefined, key: string): string | null {
+  if (!t || t.version === 0) return null;
+  const v = t.values[key];
+  return v === undefined || v.trim() === "" ? null : v;
 }
 
 export type CumBasis = "year" | "quarter";

@@ -8,7 +8,7 @@ import { resetKnAdmin } from "@/api/mock/kn-admin";
 import { resetCntsPeriods } from "@/api/mock/kn-cnts-periods";
 import { createKnAdminApi } from "@/kn/cycle/api";
 import { createCntsPeriodApi, type FormsField, type FormsSubmission, type FormsTask } from "./api";
-import { BM04_CODE, bm04Data, cellValue, changesBetween, columnGroups, columnTotal, cumulative, editedAfterAccept, isFlow } from "./bm04";
+import { BM04_CODE, bm04Data, cellText, cellValue, changesBetween, columnGroups, columnTotal, cumulative, editedAfterAccept, isFlow } from "./bm04";
 import { Bm04ProvinceScreen } from "./Bm04ProvinceScreen";
 
 vi.mock("next/navigation", () => ({
@@ -114,6 +114,15 @@ describe("BM-04 Tỉnh — hàm thuần", () => {
     expect(columnTotal([null, null])).toBeNull();
   });
 
+  it("#175 review: cột bảng tuần gồm CN-10 Ghi chú ở cuối biểu; ghi chú giữ nguyên văn, không quy 0", () => {
+    const d = bm04Data([task(1, "A", { values: { tiem_ta_heo_cp: "3", ghi_chu: "Heo bệnh tai xanh" } }), task(1, "B", { nil_report: true, values: {} })]);
+    expect(d.columns.map((f) => f.key)).toEqual(["tong_dan_heo", "tiem_ta_heo_cp", "hoa_chat_gia_suc", "ghi_chu"]);
+    expect(d.fields.map((f) => f.key)).not.toContain("ghi_chu"); // không vào lũy kế / TỔNG
+    expect(cellText(d.cell("2026-W01", "A"), "ghi_chu")).toBe("Heo bệnh tai xanh");
+    expect(cellText(d.cell("2026-W01", "B"), "ghi_chu")).toBeNull();
+    expect(cellText(task(1, "C", { version: 0, values: { ghi_chu: "nháp" } }), "ghi_chu")).toBeNull();
+  });
+
   it("AC-06 cờ Đã sửa sau xác thực; AC-05 lịch sử giá trị cũ → mới", () => {
     expect(editedAfterAccept([sub(2, "submitted", {}), sub(1, "accepted", {})])).toBe(true);
     expect(editedAfterAccept([sub(2, "accepted", {}), sub(1, "accepted", {})])).toBe(false);
@@ -140,7 +149,7 @@ const apiOf = (persona: string, ctx: string | null) =>
 
 describe("màn Nhập liệu tuần — Cấp Tỉnh", () => {
   const y = new Date().getFullYear();
-  async function setup(owner?: string) {
+  async function setup(owner?: string, note?: string) {
     resetKnAdmin();
     resetCntsPeriods();
     const adminCtx = await contextOf("kn-admin", "asg-admin", null);
@@ -153,7 +162,7 @@ describe("màn Nhập liệu tuần — Cấp Tỉnh", () => {
     const xa = createCntsPeriodApi(apiOf("kn-an", await contextOf("kn-an", "asg-an-xa", "chan_nuoi_thuy_san")));
     const t = (await xa.tasks(BM04_CODE)).find((x) => x.unit === "91301")!;
     const values = Object.fromEntries(t.fields.filter((f) => f.type !== "text").map((f) => [f.key, "1"]));
-    await xa.submit(t.period_id, { unit: "91301", values: { ...values, tiem_ta_heo_cp: "12" }, base_version: 0, nil_report: false, explanation: "Mất mạng" });
+    await xa.submit(t.period_id, { unit: "91301", values: { ...values, tiem_ta_heo_cp: "12", ...(note ? { ghi_chu: note } : {}) }, base_version: 0, nil_report: false, explanation: "Mất mạng" });
     auth.role = "kn_tinh";
     auth.api = apiOf("kn-binh", null);
   }
@@ -186,6 +195,25 @@ describe("màn Nhập liệu tuần — Cấp Tỉnh", () => {
     await waitFor(() => expect(screen.getAllByText("Đã xác thực").length).toBeGreaterThan(0));
     // Không có nút sửa số liệu xã.
     expect(screen.queryByRole("button", { name: /Gửi|Lưu/ })).not.toBeInTheDocument();
+  });
+
+  it("#175 review (UR-XA-07): Số liệu tuần có cột CN-10 Ghi chú ở cuối biểu, hiện ghi chú xã; TỔNG để trống; lũy kế không có cột này", async () => {
+    await setup(undefined, "Dịch tả heo châu Phi ở ấp 3");
+    const u = userEvent.setup();
+    render(<Bm04ProvinceScreen />);
+    const table = await screen.findByRole("table", { name: "Số liệu BM-04 theo xã" });
+    await waitFor(() => expect(within(table).getByText("Mỹ Hòa Hưng")).toBeInTheDocument());
+    const [, fieldHeader] = within(table).getAllByRole("row");
+    const heads = within(fieldHeader!).getAllByRole("columnheader").map((h) => h.textContent);
+    expect(heads.at(-1)).toBe("CN-10 Ghi chú");
+    const col = 3 + heads.length - 1; // STT, Xã, Trạng thái, rồi các cột biểu
+    const rowOf = (text: string) => within(table).getByText(text).closest("tr")!;
+    expect(within(rowOf("Mỹ Hòa Hưng")).getAllByRole("cell")[col]).toHaveTextContent("Dịch tả heo châu Phi ở ấp 3");
+    expect(within(rowOf("Bình Đức")).getAllByRole("cell")[col]).toHaveTextContent("—");
+    // Dòng TỔNG: ô TỔNG gộp 3 cột → ô ghi chú ở vị trí heads.length, để trống (không cộng trường chữ).
+    expect(within(rowOf("TỔNG")).getAllByRole("cell")[heads.length]).toHaveTextContent(/^$/);
+    await u.selectOptions(screen.getByRole("combobox", { name: "Hiển thị" }), "year");
+    expect(within(table).queryByRole("columnheader", { name: "CN-10 Ghi chú" })).not.toBeInTheDocument();
   });
 
   it("người không phụ trách biểu chỉ xem", async () => {
