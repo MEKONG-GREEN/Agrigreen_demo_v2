@@ -23,6 +23,13 @@ describe("Mục lục năm mẫu cố định", () => {
     expect(validateNode(node, "1", detail.definition).errors.body).toContain("chưa gắn nguồn");
     node.bindings = [{ variable: "chua_co_nguon", source: "module", field: "household_phone" }]; expect(validateNode(node, "1", detail.definition).errors.bindings).toBeTruthy();
   });
+  it("log distinguishes equal section titles without dropping a change", () => {
+    const version = { id: "v1", key: "mau_1" as const, rule: "khtc-template/v2.3-1", version: 1, action: "save" as const, definition: structuredClone(detail.definition), hash: "h1", actor: "actor", actor_display: "Người kiểm thử", at: "2026-10-01T00:00:00Z" };
+    expect(version.definition.nodes.filter(n => n.title === "Công tác khác")).toHaveLength(2);
+    const changes = templateLog({ ...detail, history: [version] })[0]!.changes!;
+    expect(changes).toHaveLength(version.definition.nodes.length);
+    expect(new Set(changes.map(change => change.field)).size).toBe(changes.length);
+  });
   it("log đọc các phiên bản bất biến và chỉ rõ thay đổi", () => {
     const first = { id: "v1", key: "mau_1" as const, rule: "khtc-template/v2.3-1", version: 1, action: "save" as const, definition: structuredClone(detail.definition), hash: "h1", actor: "actor", actor_display: "Người kiểm thử", at: "2026-10-01T00:00:00Z" };
     const second = { ...first, id: "v2", version: 2, definition: structuredClone(first.definition), at: "2026-10-02T00:00:00Z" }; second.definition.nodes.find((n) => n.id === "B")!.body = "Lời văn khác";

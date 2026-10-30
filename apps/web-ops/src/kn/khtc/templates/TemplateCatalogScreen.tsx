@@ -14,7 +14,7 @@ export function TemplateCatalogScreen() {
 }
 function Catalog() {
   const api = useTemplateApi(); const state = useLoad(() => api.catalog(), [api]);
-  return <><PageHeader title="Mục lục mẫu báo cáo"><p>Cấu hình năm mẫu cố định. Phiên bản phát hành áp dụng từ ngày bắt đầu kỳ; bản soạn đang có giữ phiên bản đã chọn.</p></PageHeader>
+  return <><PageHeader title="Mục lục mẫu báo cáo">Cấu hình năm mẫu cố định. Phiên bản phát hành áp dụng từ ngày bắt đầu kỳ; bản soạn đang có giữ phiên bản đã chọn.</PageHeader>
     <LoadState s={state}>{(rows) => <DataTable caption="Năm mẫu báo cáo KHTC" rows={rows} rowKey={(row) => row.key} columns={[
       { key: "title", header: "Mẫu báo cáo", cell: (row) => <Link href={templateHref(row.key)}>{TEMPLATE_TITLES[row.key]}</Link> },
       { key: "version", header: "Bản nháp mới nhất", cell: (row) => row.version ? `Phiên bản ${row.version}` : "Khung ban đầu — chưa lưu" },

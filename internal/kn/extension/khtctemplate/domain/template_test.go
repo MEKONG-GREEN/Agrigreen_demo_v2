@@ -36,7 +36,7 @@ func TestOfficialHeadingsParentAndVariablesCannotBeForged(t *testing.T) {
 		"delete official child": func(d *Definition) { d.Nodes = d.Nodes[1:] },
 		"cycle":                 func(d *Definition) { d.Nodes[2].Parent = d.Nodes[2].ID },
 		"unbound":               func(d *Definition) { d.Nodes[2].Body = "{bi_mat}" },
-		"invalid source":        func(d *Definition) { d.Nodes[2].Bindings[0].Source = "vault.identity" },
+		"invalid source":        func(d *Definition) { d.Nodes[2].Bindings[0].Source = "unknown_source" },
 		"source field":          func(d *Definition) { d.Nodes[2].Bindings[0].Field = "household_phone" },
 		"missing body":          func(d *Definition) { d.Nodes[2].Body = "" },
 		"huge order":            func(d *Definition) { d.Nodes[2].Order = 10001 },

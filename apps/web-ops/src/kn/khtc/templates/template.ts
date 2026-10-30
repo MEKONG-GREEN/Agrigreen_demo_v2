@@ -50,15 +50,18 @@ export function templateLog(detail: TemplateDetail): LogEntry[] {
   const history = [...detail.history].sort((a, b) => a.version - b.version);
   const short = (value: unknown) => typeof value === "string" ? value.slice(0, 160) : JSON.stringify(value).slice(0, 160);
   const entries: LogEntry[] = history.map((v, i) => {
-    const before = new Map(history[i - 1]?.definition.nodes.map((n) => [n.id, n]) ?? []);
+    const previous = history[i - 1]?.definition;
+    const currentLabels = new Map(outline(v.definition).map(node => [node.id, `${node.number}. ${node.title}`]));
+    const previousLabels = new Map(previous ? outline(previous).map(node => [node.id, `${node.number}. ${node.title}`]) : []);
+    const before = new Map(previous?.nodes.map((n) => [n.id, n]) ?? []);
     const changes: NonNullable<LogEntry["changes"]> = [];
     for (const node of v.definition.nodes) {
       const old = before.get(node.id); before.delete(node.id);
-      if (!old) { changes.push({ field: node.title, old: null, new: "Thêm mục" }); continue; }
+      if (!old) { changes.push({ field: currentLabels.get(node.id) ?? node.title, old: null, new: "Thêm mục" }); continue; }
       const labels = { title: "Tên mục", order: "Thứ tự", body: "Khuôn câu", repeat: "Phạm vi lặp", preamble: "Câu mở đầu", text_slot: "Vùng lời văn", bindings: "Biến và nguồn", locked_admin: "Ô hành chính khóa thêm" };
-      for (const key of ["title", "order", "body", "repeat", "preamble", "text_slot", "bindings", "locked_admin"] as const) if (JSON.stringify(old[key]) !== JSON.stringify(node[key])) changes.push({ field: `${node.title} / ${labels[key]}`, old: short(old[key] ?? ""), new: short(node[key] ?? "") });
+      for (const key of ["title", "order", "body", "repeat", "preamble", "text_slot", "bindings", "locked_admin"] as const) if (JSON.stringify(old[key]) !== JSON.stringify(node[key])) changes.push({ field: `${currentLabels.get(node.id) ?? node.title} / ${labels[key]}`, old: short(old[key] ?? ""), new: short(node[key] ?? "") });
     }
-    for (const node of before.values()) changes.push({ field: node.title, old: "Có mục", new: null });
+    for (const node of before.values()) changes.push({ field: previousLabels.get(node.id) ?? node.title, old: "Có mục", new: null });
     return { event: `${v.action === "restore" ? "Khôi phục thành bản nháp" : "Lưu bản nháp"} v${v.version}`, actor_display: v.actor_display || "—", at: v.at, changes };
   });
   for (const p of detail.publications) entries.push({ event: `Phát hành v${p.version}`, actor_display: p.actor_display || "—", at: p.at, changes: [{ field: "Áp dụng từ ngày bắt đầu kỳ", old: null, new: p.applies_from.slice(0, 10) }] });

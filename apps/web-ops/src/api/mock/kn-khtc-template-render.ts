@@ -194,7 +194,7 @@ export function renderTemplate(d: Definition, c: Context, scenario = "actual"): 
                             throw Error("Nguồn không cung cấp ô đã chọn");
                         value = captured;
                     }
-                    if (length(value) > 12000)
+                    if (length(value) > 20000)
                         throw Error("Giá trị nguồn quá dài");
                     bindings.set(b.variable, { text: value, variable: b.variable, source, field: b.field, locked: !["admin", "text"].includes(source) || source === "admin" && (n.locked_admin ?? []).includes(b.field) });
                 }

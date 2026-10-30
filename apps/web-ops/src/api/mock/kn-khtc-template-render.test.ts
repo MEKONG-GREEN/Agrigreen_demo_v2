@@ -44,6 +44,19 @@ describe("mock KHTC template compiler", () => {
         expect(out.nodes.find(n => n.id === "extra")!.rows[0]!.tokens).toEqual([{ text: "7", variable: "so", source: "module", field: "value", locked: true }]);
         expect(d).toEqual(before);
     });
+    it("keeps the native 20000-rune bound for captured source text", () => {
+        const d = custom(), c = context();
+        for (const n of d.nodes)
+            for (const b of n.bindings)
+                c.values[`${b.source}.${b.field}`] = "";
+        d.nodes.at(-1)!.bindings[0]!.field = "content";
+        const text = "đ".repeat(20000);
+        c.lists.metric![0]!.values["module.content"] = text;
+        const rendered = renderTemplate(d, c).nodes.find(n => n.id === "extra")!;
+        expect(rendered.rows[0]!.tokens[0]!.text).toBe(text);
+        c.lists.metric![0]!.values["module.content"] = text + "đ";
+        expect(() => renderTemplate(d, c)).toThrow("Giá trị nguồn quá dài");
+    });
     it("fails closed for a missing source even when the binding is unused or status overrides the body", () => {
         const d = custom();
         d.nodes.at(-1)!.body = "Câu tĩnh";
