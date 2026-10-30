@@ -113,9 +113,10 @@ func ContextFromDraft(d report.Draft, terminal string) port.KHTCTemplateContext 
 			status = "no_activity"
 		}
 		r := port.KHTCTemplateRow{Ref: row.Ref.String(), ParentRef: parentRef, ProgramRef: programRef, Department: row.Department, Status: status, Values: values}
-		if row.Kind == "item" {
+		switch row.Kind {
+		case "item":
 			c.Lists["plan_item"] = append(c.Lists["plan_item"], r)
-		} else if row.Kind == "program" {
+		case "program":
 			c.Lists["program"] = append(c.Lists["program"], r)
 		}
 	}
@@ -168,7 +169,7 @@ func ContextFromDraft(d report.Draft, terminal string) port.KHTCTemplateContext 
 				v["module.to_price"] = last.Max.String()
 			}
 			c.Lists["commodity"] = append(c.Lists["commodity"], r)
-		} else if !(section == "A.I.3" && hasAquacultureTotal && (m.Form == "cnts-bm17" || m.Form == "bm-17")) {
+		} else if section != "A.I.3" || !hasAquacultureTotal || m.Form != "cnts-bm17" && m.Form != "bm-17" {
 			c.Lists["metric"] = append(c.Lists["metric"], r)
 		}
 	}
