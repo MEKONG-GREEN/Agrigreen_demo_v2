@@ -68,6 +68,7 @@ const PERMS = [
   "audit.view",
   "docs.view", // W11.24 kho tài liệu
   "docs.manage",
+  "assessment", // W11.26: quyền đánh giá độc lập hồ sơ
 ] as const;
 const GROUPS = ["admin", "hcth", "manager", "tinh", "xa", "tw"];
 const UNITS = [
@@ -372,7 +373,9 @@ function defaults(group: string): Matrix {
       "profile.view": "unit",
       export: "unit",
       "docs.view": "unit",
+      assessment: "unit",
     });
+  if (group === "tinh" || group === "xa") m.assessment = "self";
   return m;
 }
 const lastPerm = (kind: string, grantee: string) =>

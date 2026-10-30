@@ -99,6 +99,18 @@ func AppraisalLatest(ctx context.Context, tx pgx.Tx, kind, key string) (Appraisa
 	return x, err == nil, err
 }
 
+// AppraisalEntryHistory lấy tối đa 51 dòng chỉ chứa tóm tắt; dòng thứ51 xác định còn trang tiếp.
+func AppraisalEntryHistory(ctx context.Context, tx pgx.Tx, key string, before int64) ([]AppraisalEvent, error) {
+	cols := strings.Replace(appraisalColumns, "payload", `(payload #- '{self,answers}' #- '{manager,answers}') AS payload`, 1)
+	rows, err := tx.Query(ctx, `SELECT `+cols+` FROM pf_hrm.appraisal_event
+    WHERE entity_kind = 'entry' AND entity_key = $1 AND ($2::bigint = 0 OR seq < $2)
+    ORDER BY seq DESC LIMIT 51`, key, before)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanAppraisalEvent)
+}
+
 // AppraisalVersion dùng id bản ghi bất biến mà đợt đã chọn, không lấy latest thay phiên bản.
 func AppraisalVersion(ctx context.Context, tx pgx.Tx, id uuid.UUID) (AppraisalEvent, bool, error) {
 	rows, err := tx.Query(ctx, `SELECT `+appraisalColumns+` FROM pf_hrm.appraisal_event WHERE id = $1`, id)

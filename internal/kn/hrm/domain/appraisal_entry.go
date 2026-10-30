@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -36,22 +37,37 @@ type AppraisalMember struct {
 	ExcludedReason string     `json:"excluded_reason,omitempty"`
 }
 
+// AppraisalQuarterSnapshot giữ kết quả/tham chiếu quý tại lúc mở đợt năm.
+// Member chỉ phục vụ giao quyền lịch sử; lớp app bỏ trường này khỏi phản hồi.
+type AppraisalQuarterSnapshot struct {
+	Quarter      int             `json:"quarter"`
+	PeriodID     uuid.UUID       `json:"period_id"`
+	EntryVersion uuid.UUID       `json:"entry_version"`
+	Version      int64           `json:"version"`
+	Status       string          `json:"status"`
+	Rating       string          `json:"rating"`
+	Member       AppraisalMember `json:"member"`
+}
+
 type AppraisalEntry struct {
-	Member            AppraisalMember  `json:"member"`
-	Status            string           `json:"status"`
-	Self              AppraisalScoring `json:"self"`
-	Manager           AppraisalScoring `json:"manager"`
-	SelfRating        string           `json:"self_rating"`
-	CollectiveRating  string           `json:"collective_rating"`
-	OfficialRating    string           `json:"official_rating"`
-	ClosedRating      string           `json:"closed_rating"`
-	Reason            string           `json:"reason"`
-	PersonnelProposal string           `json:"personnel_proposal"`
-	Note              string           `json:"note"`
-	CorrectionReason  string           `json:"correction_reason"`
-	ReturnedTo        string           `json:"returned_to"`
-	Reopened          bool             `json:"reopened"`
-	ProxyDocument     *uuid.UUID       `json:"proxy_document,omitempty"`
+	QuarterResults     []AppraisalQuarterSnapshot `json:"quarter_results,omitempty"`
+	Member             AppraisalMember            `json:"member"`
+	Status             string                     `json:"status"`
+	Self               AppraisalScoring           `json:"self"`
+	Manager            AppraisalScoring           `json:"manager"`
+	SelfRating         string                     `json:"self_rating"`
+	CollectiveRating   string                     `json:"collective_rating"`
+	OfficialRating     string                     `json:"official_rating"`
+	ClosedRating       string                     `json:"closed_rating"`
+	Reason             string                     `json:"reason"`
+	PersonnelProposal  string                     `json:"personnel_proposal"`
+	Note               string                     `json:"note"`
+	CorrectionReason   string                     `json:"correction_reason"`
+	ReturnedTo         string                     `json:"returned_to"`
+	Reopened           bool                       `json:"reopened"`
+	ProxyDocument      *uuid.UUID                 `json:"proxy_document,omitempty"`
+	SelfSubmittedAt    *time.Time                 `json:"self_submitted_at,omitempty"`
+	ManagerSubmittedAt *time.Time                 `json:"manager_submitted_at,omitempty"`
 }
 
 // AppraisalAuthority chỉ được dựng từ phiên server và bản chụp; không giải mã từ request HTTP.
@@ -70,7 +86,7 @@ func (a AppraisalAuthority) management(m AppraisalMember) bool {
 	if m.SummaryKind == "MS06" {
 		return a.center()
 	}
-	return a.Group == GroupAdmin || (a.Manager && a.Unit != "" && a.Unit == m.ManagementUnit && !a.self(m))
+	return a.Group == GroupAdmin || (a.Manager && (a.Group == GroupManager || a.Group == GroupHCTH) && a.Unit != "" && a.Unit == m.ManagementUnit && !a.self(m))
 }
 
 // CanReadAppraisal không suy quyền từ tên/email hay đơn vị của người gọi do client tự khai.
@@ -107,6 +123,7 @@ type AppraisalEntryChange struct {
 // ChangeAppraisalEntry không ghi DB, không I/O. Gọi sau khi ứng dụng đã kiểm tenant, idempotency và phiên bản.
 func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks AppraisalStepLocks, a AppraisalAuthority, in AppraisalEntryChange) (AppraisalEntry, error) {
 	e := old
+	e.QuarterResults = slices.Clone(old.QuarterResults)
 	e.Self.Answers = slices.Clone(old.Self.Answers)
 	e.Manager.Answers = slices.Clone(old.Manager.Answers)
 	if old.Member.AccountRef != nil {
@@ -116,6 +133,14 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 	if old.ProxyDocument != nil {
 		document := *old.ProxyDocument
 		e.ProxyDocument = &document
+	}
+	if old.SelfSubmittedAt != nil {
+		at := *old.SelfSubmittedAt
+		e.SelfSubmittedAt = &at
+	}
+	if old.ManagerSubmittedAt != nil {
+		at := *old.ManagerSubmittedAt
+		e.ManagerSubmittedAt = &at
 	}
 	if a.ReadOnly || !CanReadAppraisal(a, e.Member) {
 		return e, appraisalInvalid("action", "không có quyền ghi phiếu này")
@@ -205,7 +230,7 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 			return e, appraisalInvalid("reason", "lý do trả phiếu cần ít nhất 10 ký tự")
 		}
 		if in.ReturnTo == "self" {
-			if !a.management(e.Member) || e.Status == AppraisalNotStarted || e.Status == AppraisalClosed || e.Status == AppraisalSent || (locks.Self && !a.center()) {
+			if !a.management(e.Member) || e.Status == AppraisalNotStarted || e.Status == AppraisalClosed || e.Status == AppraisalSent || (locks.Self && !e.Reopened && !a.center()) {
 				return e, appraisalInvalid("action", "không trả được phiếu về bước tự đánh giá")
 			}
 			if a.center() && locks.Self {

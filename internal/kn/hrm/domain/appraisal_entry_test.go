@@ -166,3 +166,23 @@ func TestAppraisalReturnRequiresReasonAndAssignment_W1126(t *testing.T) {
 		t.Fatal("trả đề xuất chưa được gửi HCTH")
 	}
 }
+
+func TestAppraisalIndividualReturnDoesNotUnlockOtherEntries_W1126(t *testing.T) {
+	e, _, manager, center := appraisalEntryExample()
+	e.Status = AppraisalSent
+	locks := AppraisalStepLocks{Self: true, Manager: true}
+	returned, err := ChangeAppraisalEntry(e, appraisalExample(), locks, center,
+		AppraisalEntryChange{Action: "return", ReturnTo: "manager", Reason: "Cần đơn vị rà soát lại đề xuất"})
+	if err != nil || !returned.Reopened {
+		t.Fatalf("HCTH trả riêng: %+v %v", returned, err)
+	}
+	returned, err = ChangeAppraisalEntry(returned, appraisalExample(), locks, manager,
+		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Cần cá nhân bổ sung căn cứ"})
+	if err != nil || returned.ReturnedTo != "self" {
+		t.Fatalf("lãnh đạo trả tiếp đúng phiếu đã mở riêng: %+v %v", returned, err)
+	}
+	if _, err = ChangeAppraisalEntry(e, appraisalExample(), locks, manager,
+		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Không được tự mở phiếu khác"}); err == nil {
+		t.Fatal("mở riêng một phiếu làm mở khóa cả đơn vị")
+	}
+}

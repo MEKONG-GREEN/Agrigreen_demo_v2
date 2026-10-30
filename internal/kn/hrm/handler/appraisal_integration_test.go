@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -21,7 +22,9 @@ func appraisalRequest(f *recFixture, as, method, path, key string, body any) *ht
 	if body != nil {
 		raw, _ = json.Marshal(body)
 	}
-	r := httptest.NewRequest(method, path, bytes.NewReader(raw))
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	r := httptest.NewRequestWithContext(ctx, method, path, bytes.NewReader(raw))
 	r.Header.Set("X-Test-As", as)
 	r.Header.Set("Idempotency-Key", key)
 	w := httptest.NewRecorder()

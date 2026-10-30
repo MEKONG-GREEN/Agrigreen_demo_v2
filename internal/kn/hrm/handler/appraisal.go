@@ -17,15 +17,24 @@ import (
 )
 
 func (h Handler) registerAppraisals(rg *gin.RouterGroup) {
-	rg.GET("/hrm/appraisals/templates/:kind", h.appraisalTemplates)
-	rg.GET("/hrm/appraisals/templates/:kind/:code/history", h.appraisalTemplateHistory)
-	rg.POST("/hrm/appraisals/templates/:kind/:code", h.appraisalSaveTemplate)
-	rg.GET("/hrm/appraisals/periods", h.appraisalPeriods)
-	rg.POST("/hrm/appraisals/periods", h.appraisalOpenPeriod)
-	rg.GET("/hrm/appraisals/periods/:period/entries", h.appraisalEntries)
-	rg.GET("/hrm/appraisals/periods/:period/entries/:staff", h.appraisalEntry)
-	rg.POST("/hrm/appraisals/periods/:period/entries/:staff", h.appraisalChangeEntry)
-	rg.POST("/hrm/appraisals/periods/:period/entries/:staff/guest-link", h.appraisalGuestLink)
+	r := rg.Group("/hrm/appraisals")
+	r.Use(func(c *gin.Context) { c.Header("Cache-Control", "no-store"); c.Next() })
+	r.GET("/templates/:kind", h.appraisalTemplates)
+	r.GET("/templates/:kind/:code/history", h.appraisalTemplateHistory)
+	r.POST("/templates/:kind/:code", h.appraisalSaveTemplate)
+	r.GET("/periods", h.appraisalPeriods)
+	r.POST("/periods", h.appraisalOpenPeriod)
+	r.POST("/periods/:period", h.appraisalChangePeriod)
+	r.GET("/periods/:period/entries", h.appraisalEntries)
+	r.GET("/periods/:period/entries/:staff", h.appraisalEntry)
+	r.POST("/periods/:period/entries/:staff", h.appraisalChangeEntry)
+	r.GET("/periods/:period/entries/:staff/history", h.appraisalEntryHistory)
+	r.GET("/periods/:period/entries/:staff/versions/:version", h.appraisalEntryVersion)
+	r.POST("/periods/:period/entries/:staff/guest-link", h.appraisalGuestLink)
+	r.GET("/periods/:period/paper/:kind", h.appraisalPaper)
+	r.GET("/periods/:period/exports", h.appraisalExports)
+	r.POST("/periods/:period/exports", h.appraisalExport)
+	r.GET("/periods/:period/exports/:export/file", h.appraisalExportFile)
 }
 
 func appraisalDecode(c *gin.Context, value any) bool {
@@ -98,6 +107,23 @@ func (h Handler) appraisalOpenPeriod(c *gin.Context) {
 		return
 	}
 	v, err := h.Svc.OpenAppraisalPeriod(c.Request.Context(), appraisalIdem(c), in)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, v)
+}
+
+func (h Handler) appraisalChangePeriod(c *gin.Context) {
+	period, ok := uuidParam(c, "period", port.ErrAppraisalNotFound)
+	if !ok {
+		return
+	}
+	var in app.AppraisalPeriodChange
+	if !appraisalDecode(c, &in) {
+		return
+	}
+	v, err := h.Svc.ChangeAppraisalPeriod(c.Request.Context(), period, appraisalIdem(c), in)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

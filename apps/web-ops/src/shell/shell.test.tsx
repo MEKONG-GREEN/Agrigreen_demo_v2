@@ -310,3 +310,31 @@ describe("AppShell: nguồn menu và kiểm hiển thị", () => {
     expect(isBareRoute("/kn/dashboard")).toBe(false);
   });
 });
+
+
+describe("HRM canonical links use the existing own appraisal leaf (W11.26)",()=>{
+ const period="019abcde-0000-7000-8000-000000000001",staff="019abcde-0000-7000-8000-000000000002";
+ const canonical=`/kn/nhan-su/danh-gia/dot/${period}/phieu/${staff}`;
+ const ownTree=():MenuTree=>({version:"test",role:"kn_xa",department_code:"hanh_chinh_tong_hop",groups:[{key:"dieu_hanh",label:"Điều hành",items:[{key:"xa.hcth.danh_gia",label:"Nhãn có thể đổi",icon:"approve",href:"/kn/nhan-su/danh-gia-cua-toi",status:"active"}]}]});
+ it("maps exact UUID period/entry to an existing usable own-menu href and breadcrumb",()=>{
+  const tree=ownTree();expect(menuAllows(tree,canonical)).toBe(true);
+  expect(findActive(tree,canonical)?.node.href).toBe("/kn/nhan-su/danh-gia-cua-toi");
+  expect(menuAllows(tree,`/kn/nhan-su/danh-gia/dot/${period}`)).toBe(true);
+  expect(crumbsFor(tree,canonical)).toEqual(["Điều hành","Nhãn có thể đổi"]);
+ });
+ it("denies disabled/missing own leaf, TW, other department, malformed or additional path",()=>{
+  for(const role of ["kn_tw",null] as const){const tree=ownTree();tree.role=role;expect(menuAllows(tree,canonical)).toBe(false);}
+  const other=ownTree();other.department_code="trong_trot";expect(menuAllows(other,canonical)).toBe(false);
+  const disabled=ownTree();disabled.groups[0]!.items[0]!.status="coming_soon";expect(menuAllows(disabled,canonical)).toBe(false);
+  const absent=ownTree();absent.groups[0]!.items[0]!.href="/kn/nhan-su/ho-so";expect(menuAllows(absent,canonical)).toBe(false);
+  for(const path of [canonical+"/extra",canonical+"?x=1",canonical.replace(period,"not-a-uuid"),canonical.replace(staff,"%2F"),"/kn/nhan-su/danh-gia/unknown","/kn/nhan-su/ho-so/new"]){expect(menuAllows(ownTree(),path)).toBe(false);}
+  const center=ownTree();center.role="kn_tinh";center.groups[0]!.items[0]!.href="/kn/nhan-su/danh-gia";
+  expect(menuAllows(center,canonical)).toBe(true);expect(menuAllows(center,canonical+"/extra")).toBe(false);
+  expect(menuAllows(center,"/kn/nhan-su/danh-gia/dot/them-moi")).toBe(true);
+  expect(menuAllows(center,"/kn/nhan-su/danh-gia/mau/them-moi")).toBe(true);
+  expect(menuAllows(ownTree(),"/kn/nhan-su/danh-gia/mau/them-moi")).toBe(false);
+  const admin=structuredClone(center);admin.role="admin";admin.department_code=null;
+  expect(menuAllows(admin,canonical)).toBe(true);admin.groups[0]!.items=[];expect(menuAllows(admin,canonical)).toBe(false);
+
+ });
+});

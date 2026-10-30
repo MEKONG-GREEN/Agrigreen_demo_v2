@@ -53,6 +53,12 @@ func Ratings(ctx context.Context, tx pgx.Tx, staffID uuid.UUID) ([]RatingRow, er
 	return pgx.CollectRows(rows, scanRating)
 }
 
+// LockRating dùng chung cho nhập/chỉnh kết quả năm và chốt đợt đánh giá, trước đọc dòng bị thay.
+func LockRating(ctx context.Context, tx pgx.Tx, tenant, staff uuid.UUID) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('pf_hrm.rating:' || $1::text || ':' || $2::text, 0))`, tenant, staff)
+	return err
+}
+
 // InsertRating ghi một dòng xếp loại (thêm, thay — supersedes + lý do, hoặc hủy).
 func InsertRating(ctx context.Context, tx pgx.Tx, tid uuid.UUID, x RatingRow, at time.Time, idem string) (int64, error) {
 	action := "add"

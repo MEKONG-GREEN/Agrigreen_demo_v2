@@ -19,27 +19,73 @@ import (
 
 type AppraisalItem struct {
 	domain.AppraisalEntry
-	ID         uuid.UUID `json:"id"`
-	PeriodID   uuid.UUID `json:"period_id"`
-	Version    int64     `json:"version"`
-	RecordedAt time.Time `json:"recorded_at"`
-	Actor      uuid.UUID `json:"actor_ref"`
-	Name       string    `json:"name,omitempty"` // chỉ được ghép trong bộ nhớ, sau audit và ngoài TX
-	CanSelf    bool      `json:"can_self"`
-	CanManage  bool      `json:"can_manage"`
-	CanCenter  bool      `json:"can_center"`
+	ID             uuid.UUID                `json:"id"`
+	PeriodID       uuid.UUID                `json:"period_id"`
+	Version        int64                    `json:"version"`
+	RecordedAt     time.Time                `json:"recorded_at"`
+	Actor          uuid.UUID                `json:"actor_ref"`
+	Action         string                   `json:"action"`
+	ChangeReason   string                   `json:"change_reason,omitempty"`
+	QuarterResults []AppraisalQuarterResult `json:"quarter_results,omitempty"`
+	Name           string                   `json:"name,omitempty"` // chỉ được ghép trong bộ nhớ, sau audit và ngoài TX
+	CanSelf        bool                     `json:"can_self"`
+	CanManage      bool                     `json:"can_manage"`
+	CanCenter      bool                     `json:"can_center"`
+	SelfLate       bool                     `json:"self_late"`
+	ManagerLate    bool                     `json:"manager_late"`
 }
 
 func appraisalEntryKey(period, staff uuid.UUID) string { return period.String() + ":" + staff.String() }
+
+func appraisalSubmissionTimes(e *domain.AppraisalEntry, action string, now time.Time) {
+	at := now.UTC()
+	switch action {
+	case "self_draft":
+		e.SelfSubmittedAt = nil
+	case "self_submit", "proxy_self":
+		e.SelfSubmittedAt, e.ManagerSubmittedAt = &at, nil
+	case "manager_draft":
+		e.ManagerSubmittedAt = nil
+	case "manager_submit":
+		e.ManagerSubmittedAt = &at
+	case "reopen", "return":
+		e.ManagerSubmittedAt = nil
+		if e.ReturnedTo == "self" {
+			e.SelfSubmittedAt = nil
+		}
+	}
+}
+
+func appraisalLate(item *AppraisalItem, p AppraisalPeriod, now time.Time) {
+	if item.Member.ExcludedReason != "" {
+		return
+	}
+	if item.SelfSubmittedAt != nil {
+		item.SelfLate = item.SelfSubmittedAt.After(p.SelfDueAt)
+	} else if item.Status == domain.AppraisalNotStarted || (item.Status == domain.AppraisalChangeRequested && item.ReturnedTo == "self") {
+		item.SelfLate = now.After(p.SelfDueAt)
+	}
+	if item.ManagerSubmittedAt != nil {
+		item.ManagerLate = item.ManagerSubmittedAt.After(p.ManagerDueAt)
+	} else if item.Status == domain.AppraisalSelfSubmitted || (item.Status == domain.AppraisalChangeRequested && item.ReturnedTo == "manager") {
+		item.ManagerLate = now.After(p.ManagerDueAt)
+	}
+}
 
 func appraisalItem(row store.AppraisalEvent, c appraisalActor) (AppraisalItem, error) {
 	e, err := appraisalsReadObject[domain.AppraisalEntry](row)
 	if err != nil {
 		return AppraisalItem{}, err
 	}
-	v := AppraisalItem{AppraisalEntry: e, ID: row.ID, Version: row.Seq, Actor: row.Actor, RecordedAt: row.RecordedAt}
+	v := AppraisalItem{AppraisalEntry: e, ID: row.ID, Version: row.Seq, Actor: row.Actor, RecordedAt: row.RecordedAt, Action: row.Action, ChangeReason: row.Reason}
 	if row.PeriodRef != nil {
 		v.PeriodID = *row.PeriodRef
+	}
+	// Chỉ trả tham chiếu quý có phân công đóng băng mà caller hiện tại được đọc.
+	for _, q := range e.QuarterResults {
+		if c.canRead(q.Member) {
+			v.QuarterResults = append(v.QuarterResults, AppraisalQuarterResult{Quarter: q.Quarter, PeriodID: q.PeriodID, EntryVersion: q.EntryVersion, Version: q.Version, Status: q.Status, Rating: q.Rating})
+		}
 	}
 	a := appraisalAuthority(c)
 	v.CanSelf = c.canRead(e.Member) && domain.CanSelfAppraisal(a, e.Member)
@@ -87,7 +133,8 @@ func (s *Service) AppraisalEntries(ctx context.Context, period uuid.UUID) ([]App
 	}
 	out := []AppraisalItem{}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
-		if _, e := loadAppraisalPeriod(ctx, tx, period); e != nil {
+		p, e := loadAppraisalPeriod(ctx, tx, period)
+		if e != nil {
 			return e
 		}
 		rows, e := store.AppraisalEntrySummaries(ctx, tx, period, false)
@@ -101,6 +148,7 @@ func (s *Service) AppraisalEntries(ctx context.Context, period uuid.UUID) ([]App
 				return e
 			}
 			if c.canRead(v.Member) {
+				appraisalLate(&v, p, s.Clock.Now())
 				out = append(out, v)
 				staff = append(staff, v.Member.StaffID)
 			}
@@ -108,7 +156,7 @@ func (s *Service) AppraisalEntries(ctx context.Context, period uuid.UUID) ([]App
 		if len(out) == 0 && !(c.center() && c.scope == domain.ScopeAll) {
 			return port.ErrAppraisalNotFound
 		}
-		return store.InsertAccess(ctx, tx, c.tenant, store.Access{ID: ids.New(), Action: "view", StaffIDs: staff,
+		return store.InsertAppraisalAccess(ctx, tx, c.tenant, store.Access{ID: ids.New(), Action: "view", StaffIDs: staff,
 			ItemCount: len(staff), Scope: string(c.scope), Actor: c.ref, Query: map[string]string{"appraisal_period": period.String()}}, s.Clock.Now())
 	})
 	if err != nil {
@@ -149,10 +197,11 @@ func (s *Service) appraisalNames(ctx context.Context, items []AppraisalItem) ([]
 }
 
 type AppraisalDetail struct {
-	Item    AppraisalItem     `json:"item"`
-	Period  AppraisalPeriod   `json:"period"`
-	Form    AppraisalTemplate `json:"form"`
-	History []AppraisalItem   `json:"history"`
+	Item        AppraisalItem     `json:"item"`
+	Period      AppraisalPeriod   `json:"period"`
+	Form        AppraisalTemplate `json:"form"`
+	History     []AppraisalItem   `json:"history"`
+	HistoryMore bool              `json:"history_more"`
 }
 
 func (s *Service) AppraisalEntryDetail(ctx context.Context, period, staff uuid.UUID) (AppraisalDetail, error) {
@@ -175,10 +224,13 @@ func (s *Service) AppraisalEntryDetail(ctx context.Context, period, staff uuid.U
 			return e
 		}
 		v.Form = v.Period.Forms[v.Item.Member.Group] // phiên bản bất biến của đợt, không lấy mẫu mới
-		rows, e := store.AppraisalHistory(ctx, tx, "entry", appraisalEntryKey(period, staff))
+		appraisalLate(&v.Item, v.Period, s.Clock.Now())
+		rows, e := store.AppraisalEntryHistory(ctx, tx, appraisalEntryKey(period, staff), 0)
 		if e != nil {
 			return e
 		}
+		v.HistoryMore = len(rows) > 50
+		rows = rows[:min(len(rows), 50)]
 		for _, row := range rows {
 			it, e := appraisalItem(row, c)
 			if e != nil {
@@ -191,7 +243,7 @@ func (s *Service) AppraisalEntryDetail(ctx context.Context, period, staff uuid.U
 			v.Period.SignedDocuments = map[string]uuid.UUID{}
 			v.Period.Forms, v.Period.Summaries = map[string]AppraisalTemplate{}, map[string]AppraisalTemplate{}
 		}
-		return store.InsertAccess(ctx, tx, c.tenant, store.Access{ID: ids.New(), Action: "view", StaffID: &staff,
+		return store.InsertAppraisalAccess(ctx, tx, c.tenant, store.Access{ID: ids.New(), Action: "view", StaffID: &staff,
 			ItemCount: 1, Scope: string(c.scope), Actor: c.ref, Query: map[string]string{"appraisal_period": period.String()}}, s.Clock.Now())
 	})
 	if err != nil {
@@ -284,6 +336,7 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 		return AppraisalItem{}, err
 	}
 	var replay *store.AppraisalEvent
+	var resultPeriod AppraisalPeriod
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		old, ok, e := appraisalReplay(ctx, tx, c, idem, hash)
 		if e != nil {
@@ -294,6 +347,10 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 			return e
 		}
 		if e = appraisalActionPermission(c, item, in); e != nil {
+			return e
+		}
+		resultPeriod, e = loadAppraisalPeriod(ctx, tx, period)
+		if e != nil {
 			return e
 		}
 		if !ok && in.Version != item.Version {
@@ -308,7 +365,9 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 		return AppraisalItem{}, err
 	}
 	if replay != nil {
-		return appraisalItem(*replay, c)
+		item, e := appraisalItem(*replay, c)
+		appraisalLate(&item, resultPeriod, s.Clock.Now())
+		return item, e
 	}
 	var proof *store.DocRow
 	if in.Action == "proxy_self" {
@@ -334,6 +393,9 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 			}
 			e = appraisalActionPermission(c, item, in)
 			saved = old
+			if e == nil {
+				resultPeriod, e = loadAppraisalPeriod(ctx, tx, period)
+			}
 			return e
 		}
 		if e = store.LockAppraisal(ctx, tx, c.tenant, "period-id:"+period.String()); e != nil {
@@ -343,6 +405,7 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 		if e != nil {
 			return e
 		}
+		resultPeriod = p
 		row, current, e := loadAppraisalItem(ctx, tx, c, period, staff)
 		if e != nil {
 			return e
@@ -369,18 +432,24 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 		if e != nil {
 			return appraisalValidation(e)
 		}
+		appraisalSubmissionTimes(&next, in.Action, s.Clock.Now())
 		raw, e := appraisalJSON(next)
 		if e != nil {
 			return e
 		}
 		saved, e = store.InsertAppraisal(ctx, tx, c.tenant, store.AppraisalEvent{ID: ids.New(), Kind: "entry", Key: row.Key,
 			PeriodRef: &period, StaffRef: &staff, Action: in.Action, Payload: raw, Reason: in.Reason, RequestHash: hash, IdemKey: idem, Actor: c.ref}, s.Clock.Now())
-		return e
+		if e != nil {
+			return e
+		}
+		return s.appraisalEntryNotice(ctx, tx, c, p, saved, next)
 	})
 	if err != nil {
 		return AppraisalItem{}, classify(err)
 	}
-	return appraisalItem(saved, c)
+	item, err := appraisalItem(saved, c)
+	appraisalLate(&item, resultPeriod, s.Clock.Now())
+	return item, err
 }
 
 func (s *Service) AppraisalGuestLink(ctx context.Context, period, staff uuid.UUID) error {

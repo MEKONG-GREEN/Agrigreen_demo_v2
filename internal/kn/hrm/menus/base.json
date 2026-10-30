@@ -36,6 +36,17 @@
           "ComingSoon": false,
           "Needs": "",
           "Children": null
+        },
+        {
+          "Key": "admin.pb.hcth_danh_gia",
+          "Label": "Đánh giá nhân sự",
+          "Route": "/kn/nhan-su/danh-gia",
+          "Icon": "approve",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
         }
       ]
     },
@@ -164,7 +175,7 @@
                 "Icon": "approve",
                 "BadgeSource": "",
                 "Requires": null,
-                "ComingSoon": true,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               }
@@ -309,7 +320,7 @@
                 "Icon": "approve",
                 "BadgeSource": "",
                 "Requires": null,
-                "ComingSoon": true,
+                "ComingSoon": false,
                 "Needs": "",
                 "Children": null
               }

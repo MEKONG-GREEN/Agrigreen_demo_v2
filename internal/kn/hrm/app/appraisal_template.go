@@ -44,6 +44,9 @@ func (s *Service) appraisalCaller(ctx context.Context) (appraisalActor, error) {
 	if !ok {
 		return appraisalActor{}, problem.Unauthenticated
 	}
+	if p.ActorRef == uuid.Nil || p.TenantID == uuid.Nil {
+		return appraisalActor{}, problem.Unauthenticated
+	}
 	k, err := s.recordSession(ctx)
 	if err != nil {
 		return appraisalActor{}, err

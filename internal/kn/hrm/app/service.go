@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/store"
+	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
@@ -43,6 +44,8 @@ type Service struct {
 	Promo PromotionConfig
 	// Plans: kế hoạch nhân lực năm (W11.27, plan.go) — cổng cap/forms; nil cho tới UsePlans.
 	Plans *PlanDeps
+	// AppraisalExporter: Word MS05/MS06, chỉ gọi sau kiểm quyền HRM và ngoài giao dịch.
+	AppraisalExporter exportport.Exporter
 }
 
 var _ port.Catalog = (*Service)(nil)

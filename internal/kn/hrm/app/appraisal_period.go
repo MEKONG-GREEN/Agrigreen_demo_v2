@@ -40,6 +40,7 @@ type AppraisalPeriod struct {
 	Version         int64                        `json:"version"`
 	Year            int                          `json:"year"`
 	Quarter         int                          `json:"quarter"`
+	NodeRef         uuid.UUID                    `json:"node_ref"`
 	Label           string                       `json:"label"`
 	CutoffOn        string                       `json:"cutoff_on"`
 	KnownAt         time.Time                    `json:"known_at"`
@@ -116,6 +117,12 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 	if err = s.appraisalRecords(); err != nil {
 		return AppraisalPeriod{}, err
 	}
+	if c.unitRef == uuid.Nil {
+		return AppraisalPeriod{}, port.ErrAppraisalUnavailable.WithDetail("chưa có Nút quản lý nhân sự của phiên")
+	}
+	if s.Rec.Units == nil {
+		return AppraisalPeriod{}, port.ErrAppraisalUnavailable.WithDetail("chưa nối danh mục đơn vị quản lý")
+	}
 	if err = appraisalKey(idem); err != nil {
 		return AppraisalPeriod{}, err
 	}
@@ -167,7 +174,7 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 	if in.Quarter > 0 {
 		label = fmt.Sprintf("Quý %s/%d", []string{"", "I", "II", "III", "IV"}[in.Quarter], in.Year)
 	}
-	p := AppraisalPeriod{ID: ids.New(), Year: in.Year, Quarter: in.Quarter, Label: label, CutoffOn: in.CutoffOn, KnownAt: pop.known,
+	p := AppraisalPeriod{ID: ids.New(), Year: in.Year, Quarter: in.Quarter, NodeRef: c.unitRef, Label: label, CutoffOn: in.CutoffOn, KnownAt: pop.known,
 		SelfDueAt: selfDue, ManagerDueAt: managerDue, SummaryDueAt: summaryDue, Forms: map[string]AppraisalTemplate{}, Summaries: map[string]AppraisalTemplate{}, SignedDocuments: map[string]uuid.UUID{}, Warnings: []string{}, Counts: map[string]int{}}
 	unitNames := map[string]string{}
 	for _, u := range pop.cat.Units {
@@ -213,6 +220,9 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 	}
 	if len(members) == 0 || len(members) > 5000 {
 		return AppraisalPeriod{}, port.ErrAppraisalBlocked.WithDetail("cần 1–5.000 người đang công tác trong nhóm đã chọn")
+	}
+	if len(members) == len(seenExcluded) {
+		return AppraisalPeriod{}, port.ErrAppraisalBlocked.WithDetail("cần ít nhất một người tham gia chưa bị loại trừ")
 	}
 	if len(seenExcluded) != len(excluded) {
 		return AppraisalPeriod{}, problem.Validation.WithField("excluded", "người loại trừ không thuộc danh sách tại ngày chốt/nhóm đã chọn")
@@ -284,6 +294,11 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 			}
 			p.Summaries[kind] = v
 		}
+		if in.Quarter == 0 {
+			if e := pinAppraisalQuarters(ctx, tx, in.Year, members); e != nil {
+				return e
+			}
+		}
 		for _, entry := range members {
 			raw, e := appraisalJSON(entry)
 			if e != nil {
@@ -300,7 +315,16 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 			return e
 		}
 		saved, e = store.InsertAppraisal(ctx, tx, c.tenant, store.AppraisalEvent{ID: ids.New(), Kind: "period", Key: key, PeriodRef: &p.ID, Action: "open", Payload: raw, RequestHash: hash, IdemKey: idem, Actor: c.ref}, s.Clock.Now())
-		return e
+		if e != nil {
+			return e
+		}
+		n := appraisalNotice(p, c, "open", "self", saved.ID)
+		for _, entry := range members {
+			if entry.Member.ExcludedReason == "" && entry.Member.AccountRef != nil {
+				n.Targets = append(n.Targets, *entry.Member.AccountRef)
+			}
+		}
+		return s.enqueueAppraisalNotice(ctx, tx, c, n)
 	})
 	if err != nil {
 		return AppraisalPeriod{}, classify(err)
