@@ -277,12 +277,21 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		return Modules{}, pools, err
 	}
 	acc := accounts.New(unit, clk, accounts.Deps{Sessions: sessionRegistry, Navigation: pty.ContextNavigation(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+		SessionPolicies: extension.AccountSessionPolicies(pty.Departments()), // #60: nhật ký hỗ trợ + đơn vị mặc định do chủ KN chiếu
+
 		Households: coop.PartyHouseholds(), Vault: ext.Vault, Params: md.Params(),
 		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames(), // KN v7.7 P1
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được
 	// KN v7.7 P1 ↔ P2: menu theo ngữ cảnh phiên, số tài khoản theo phòng ban (mở khóa "xóa" phòng ban),
 	// dòng tài khoản của bảng Ảnh hưởng, tên người thao tác trong Log (Keycloak, dự phòng danh bạ cán bộ).
 	acc.UseFacilityCatalog(cntsCatalogs) // W11.41: phạm vi Cấp Xã theo cơ sở giết mổ của danh mục CNTS
+	// AUDIT-LOG-KN (#73): nhật ký hệ thống GET /v1/accounts/audit — nguồn gốc account_event + nguồn KN; chỉ phiên Admin KN
+	// xem, mỗi lượt xem/bị từ chối ghi bền vào sổ pf_extension.kn_audit_view trước khi trả dữ liệu.
+	auditRegistry, err := accport.NewAuditRegistry(append([]accport.AuditSource{acc.NativeAuditSource()}, kn.AuditSources()...)...)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	acc.UseAudit(auditRegistry, kn.AuditAccess())
 	pty.UseSessionContext(acc.SessionContext())
 	pty.UseDepartmentUsage(acc.DepartmentUsage())
 	pty.UseOrgImpact(acc.OrgImpact())

@@ -56,6 +56,19 @@ describe("deepLinkHref — liên kết thông báo sang trang web", () => {
     expect(deepLinkHref("/x", "household_membership_changed")).toBe("/htx");
   });
 
+  it("W11.53b: thông báo biểu dự án KNQG (gửi/xác nhận-trả lại/trình) → màn Mẫu biểu mở đúng biểu", () => {
+    const doc = "0192f0a0-1234-7abc-8def-0123456789ab";
+    for (const kind of ["cnts_knqg_sent", "cnts_knqg_reviewed", "cnts_knqg_submitted"]) {
+      expect(deepLinkHref(`/kn/cnts/du-an-mau-bieu?doc=${doc}`, kind)).toBe(`/kn/cnts/du-an-mau-bieu?doc=${doc}`);
+      expect(deepLinkHref(`/kn/cnts/du-an-mau-bieu?doc=${doc.toUpperCase()}#x`, kind)).toBe(`/kn/cnts/du-an-mau-bieu?doc=${doc}`);
+      // mã sai dạng/chèn thêm → chỉ mở màn danh sách, không mang chuỗi tuỳ ý sang URL
+      expect(deepLinkHref("/kn/cnts/du-an-mau-bieu?doc=../../admin", kind)).toBe("/kn/cnts/du-an-mau-bieu");
+      expect(deepLinkHref(`/kn/cnts/du-an-mau-bieu?doc=${doc}x`, kind)).toBe("/kn/cnts/du-an-mau-bieu");
+      expect(deepLinkHref(null, kind)).toBe("/kn/cnts/du-an-mau-bieu");
+    }
+    expect(deepLinkHref(`/kn/cnts/du-an-mau-bieu/../../x?doc=${doc}`, "cnts_knqg_sent")).toBe("/kn/cnts/du-an-mau-bieu");
+  });
+
   it("kind lạ và đường dẫn lạ → null (chỉ mở hộp thư)", () => {
     expect(deepLinkHref("/unknown/path", "unknown_kind")).toBeNull();
     expect(deepLinkHref("https://evil.example/extension/tasks/abc", "task_assigned")).toBeNull();

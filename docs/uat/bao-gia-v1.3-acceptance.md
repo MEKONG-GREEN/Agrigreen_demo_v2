@@ -126,3 +126,14 @@ cd apps/web-ops; npx vitest run src/kn/price
 | Mã | Yêu cầu | Gói | Phạm vi G1 | Tiêu chí chấp nhận | Kiểm thử | Trạng thái |
 |---|---|---|---|---|---|---|
 | BG-KHTC | Bảng giá đã duyệt theo ngày (min/max toàn tỉnh) và số phiếu theo tuần báo cáo cho KHTC Mẫu 1 A.III, đọc qua view `_pub`, không nhập lại (KHTC v2.2 §3.4, Q-084) | W11.10 (hợp đồng), W11.76 (view) | trong G1 | Theo ca golden G02B ([khtc-week-mapping.md](khtc-week-mapping.md)): ngày chưa duyệt không có dòng; hai cột Mẫu 1 là hai ngày đã duyệt gần nhất không sau ngày chốt; số phiếu tuần chỉ đếm bảng đã duyệt; tuần "đã chốt" khi mọi ngày báo giá theo lịch đã duyệt. Khóa tuần theo lịch kỳ W11.03 (`TestDefaultWeekOf_W1176`: 04/11/2026 → 2026-W45). | `TestPriceBoardsHTTP_W1176` (view `_pub` đúng số), `TestDefaultWeekOf_W1176`; `TestKHTCQA_GoldenDatasetConsistent` (G02B) | **một phần** (**mã**: bên đọc KHTC W11.64; view đã có) |
+
+## BF-SWEEP-PRICE (#165) — bằng chứng kỹ thuật bổ sung, 30/10/2026
+
+Lát #165 chỉ gồm CalendarConfig/FN-AD-04.04–06, theo BRD v1.3 ngày07/10/2026. Không suy rộng sang toàn Báo giá;
+items/points/tickets/reports/surveys tiếp ở #182. Đây là đối chiếu/kiểm kỹ thuật, không thay biên bản UAT của PO.
+
+| Chức năng | Bổ sung của lát UI-KIT | Bằng chứng cần đọc cùng marker READY |
+|---|---|---|
+| BG-FN-AD-04.04 | Route xem/sửa kỳ, thêm/xem ngoại lệ; lỗi từng ô; DataTable/STT; log lịch từ history. API ngoại lệ chưa trả actor/time/history nên Log nói rõ giới hạn | `calendar-config.test.tsx`, `calendar-form.test.ts`, `price-config.spec.ts`, `TestPriceCalendarHTTP_W1174` |
+| BG-FN-AD-04.05 | Route xem/sửa nhắc, giữ thứ tự giờ/biến mẫu/ngày hiệu lực; gửi thử cấu hình đã lưu; lịch sử gửi dùng DataTable | Các test UI/E2E trên và test nhắc hiện hành |
+| BG-FN-AD-04.06 | Route mặc định/nhóm/mặt hàng; định danh bất biến khi sửa; NumberField/validateForm và guard trước Decimal; Log actor/thời điểm/cũ→mới; xóa có xác nhận, không xóa mặc định | `TestConfigDecimalBounds`, hostile HTTP trong `TestPriceCalendarHTTP_W1174`, UI/E2E trên |

@@ -2301,7 +2301,7 @@
    "ad_hoc": false,
    "menu": {
     "audience": "kn_tw",
-    "default_route": "/kn/dashboard",
+    "default_route": "/kn/khtc/bao-cao-da-xuat",
     "department": {
      "code": "ke_hoach_tai_chinh",
      "name": "Phòng Kế hoạch - Tài chính",
@@ -2370,9 +2370,7 @@
         "route": "/kn/khtc/bao-cao-da-xuat",
         "icon": "report",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -4586,6 +4584,15 @@
         "label": "Mẫu văn bản \u0026 lịch sử xuất",
         "route": "/kn/quan-tri/mau-van-ban",
         "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "admin.qt.nhat_ky_he_thong",
+        "label": "Nhật ký hệ thống",
+        "route": "/kn/quan-tri/nhat-ky-he-thong",
+        "icon": "shield",
         "badge_source": null,
         "enabled": true,
         "children": []

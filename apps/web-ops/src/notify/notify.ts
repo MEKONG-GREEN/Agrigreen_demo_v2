@@ -39,6 +39,10 @@ export const KIND_LABEL: Record<Notification["kind"], string> = {
   price_board_approved: "Bảng giá đã duyệt",
   price_board_reopened: "Bảng giá đang mở duyệt",
   price_proxy_entry: "Cấp Tỉnh nhập thay báo giá", // W11.77 (FN-TI-02.09)
+  // Mẫu biểu dự án KNQG (W11.53b, FN-19 AC-02, UR-QG-01)
+  cnts_knqg_sent: "Biểu KNQG chờ Cấp TW xác nhận",
+  cnts_knqg_reviewed: "Kết quả xác nhận biểu KNQG",
+  cnts_knqg_submitted: "Biểu KNQG chờ duyệt",
 };
 
 export function unreadCount(api: ApiClient): Promise<number> {

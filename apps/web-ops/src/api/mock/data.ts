@@ -588,6 +588,22 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
       "Cơ sở giết mổ Bình Đức (giả lập)",
       { facility_ref: "0190f1c4-7d3e-7000-8000-00000000c501", commune_code: "30292", facility_kind: "tap_trung", stamp_codes_gs: "91.589.05,91.589.05.1", species: "HEO,TRAU" },
     ],
+    // BF-CN-SLAUGHTER #169: thêm cơ sở mẫu (tên, địa chỉ, mộc dấu đều giả lập) để danh mục và lưới lịch trực không trống.
+    [
+      "CSGM_MAU_02",
+      "Cơ sở giết mổ tập trung mẫu số 2 (giả lập)",
+      { facility_ref: "0190f1c4-7d3e-7000-8000-00000000c502", commune_code: "91101", facility_kind: "tap_trung", stamp_codes_gs: "91.900.21", stamp_codes_gc: "91.900.22", species: "GA,HEO,VIT", address: "Ấp Mẫu 2" },
+    ],
+    [
+      "CSGM_MAU_03",
+      "Cơ sở giết mổ nhỏ lẻ mẫu số 3 (giả lập)",
+      { facility_ref: "0190f1c4-7d3e-7000-8000-00000000c503", commune_code: "91102", facility_kind: "nho_le", stamp_codes_gs: "91.900.31", species: "HEO", address: "Ấp Mẫu 3" },
+    ],
+    [
+      "CSGM_MAU_04",
+      "Cơ sở giết mổ gia cầm mẫu số 4 (giả lập)",
+      { facility_ref: "0190f1c4-7d3e-7000-8000-00000000c504", commune_code: "91103", facility_kind: "nho_le", stamp_codes_gc: "91.900.41", species: "GA,VIT", address: "Ấp Mẫu 4" },
+    ],
   ]),
   cnts_aquaculture_object: cat("cnts_aquaculture_object", [["CA_TRA", "Cá tra", { scale_unit: "ha" }]]),
   cnts_fishing_group: cat("cnts_fishing_group", [
