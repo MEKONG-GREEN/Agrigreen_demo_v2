@@ -229,6 +229,9 @@ func (s *Service) draft(ctx context.Context, c caller, in OpenInput, strict bool
 		return Draft{}, inputErr(err)
 	}
 	d := Draft{Plan: plan, DueRequired: plan.DueRequired, MaxSubmissions: s.maxSubmissions(ctx, plan.Cutoff)}
+	if plan.Type == domain.TypeAdhoc {
+		d.MaxSubmissions = 3
+	}
 	names, avail, loaded := s.unitDepartments(ctx, c.k)
 	d.DepartmentsLoaded = loaded
 	codes, err := s.pickDepartments(ctx, in.Departments, avail, loaded, plan, &d)
@@ -310,7 +313,7 @@ func (s *Service) pickDepartments(ctx context.Context, req, avail []string, load
 
 // Preview dựng kỳ "Nháp" của popup (không ghi).
 func (s *Service) Preview(ctx context.Context, in OpenInput) (Draft, error) {
-	c, err := s.writer(ctx)
+	c, err := s.openingWriter(ctx, in)
 	if err != nil {
 		return Draft{}, err
 	}
@@ -323,12 +326,15 @@ func openIdem(idem string) string { return "khtc:open:" + idem }
 // trong một giao dịch pf_extension. Ghi kỳ KHTC lỗi → hủy bù kỳ native (không để phiếu mồ côi ở module các phòng).
 // Gọi lặp cùng Idempotency-Key → trả kỳ đã mở.
 func (s *Service) Open(ctx context.Context, in OpenInput, idem string) (Detail, error) {
-	c, err := s.writer(ctx)
+	c, err := s.openingWriter(ctx, in)
 	if err != nil {
 		return Detail{}, err
 	}
 	if idem == "" {
 		return Detail{}, problem.IdempotencyRequired
+	}
+	if in.Request.Type == domain.TypeAdhoc {
+		return s.openAdhoc(ctx, c, in, idem)
 	}
 	var prev *store.Period
 	if err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
@@ -361,6 +367,9 @@ func (s *Service) Open(ctx context.Context, in OpenInput, idem string) (Detail, 
 		units = append(units, dp.Code)
 	}
 	maxSub := d.MaxSubmissions
+	if p.Type == domain.TypeAdhoc {
+		maxSub = 3
+	}
 	pub, err := s.Forms.PublishBatch(ctx, formsport.BatchInput{Profile: domain.ProfileKHTC, TemplateID: ref.ID, UnitKind: formsport.UnitDepartment,
 		Units: units, MaxSubmissions: &maxSub, Periods: []formsport.PeriodDef{{Label: p.Name, DueAt: p.DueAt, Kind: p.FormsKind, Key: p.FormsKey,
 			From: p.From, To: p.To, Rule: p.Rule}}}, "khtc:"+idem)

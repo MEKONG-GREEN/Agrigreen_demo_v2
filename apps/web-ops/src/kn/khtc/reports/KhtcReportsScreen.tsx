@@ -8,6 +8,8 @@ import { REPORT_TYPES, createKhtcPeriodApi } from "../periods/api";
 import { createReportApi, filterRows, type ReportApi, type ReportDetail, type ReportFilter } from "./api";
 import { ExternalCells } from "../external/ExternalCells";
 import { CompiledTemplateDocument } from "../templates/CompiledTemplateDocument";
+import {AdhocRequestsPanel} from "../adhoc/AdhocRequestsPanel";
+import { AdhocSelector, type AdhocSelection } from "../adhoc/AdhocSelector";
 const ADMIN: Record<string, string> = { document_no: "Số văn bản", place: "Địa danh", report_date: "Ngày báo cáo", recipient: "Kính gửi", basis: "Căn cứ", recipients: "Nơi nhận", authority: "Thẩm quyền ký", signer_title: "Chức vụ", signer: "Người ký" };
 function saveFile(file: {
     blob: Blob;
@@ -20,7 +22,8 @@ function saveFile(file: {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function KhtcReportsScreen({ mode = "editor" }: {
+export function KhtcReportsScreen({ mode = "editor", adhoc = false }: {
+    adhoc?: boolean;
     mode?: "editor" | "progress" | "history";
 }) {
     const { api } = useAuth();
@@ -32,11 +35,11 @@ export function KhtcReportsScreen({ mode = "editor" }: {
     const list = useLoad(periods ? () => periods.list(year) : null, [periods, year]);
     const detail = useLoad(reports && selected ? () => reports.get(selected) : null, [reports, selected]);
     return <>
-  <PageHeader title={mode === "history" ? "Báo cáo đã xuất" : mode === "progress" ? "Tiến độ các chương trình" : "Soạn báo cáo KHTC"}>Mẫu 1–5 · Số liệu lấy từ nguồn đã chốt và phiếu đã gửi của các phòng.</PageHeader>
+  <PageHeader title={adhoc ? "Báo cáo phát sinh" : mode === "history" ? "Báo cáo đã xuất" : mode === "progress" ? "Tiến độ các chương trình" : "Soạn báo cáo KHTC"}>{adhoc ? "Chọn chỉ tiêu từ dữ liệu đã có trong khoảng thời gian của kỳ; số liệu có truy vết, Word và Excel giữ cùng ảnh chụp." : "Mẫu 1–5 · Số liệu lấy từ nguồn đã chốt và phiếu đã gửi của các phòng."}</PageHeader>
   <section className="card sec">
-   <label>Năm <input type="number" min="2000" max="2100" value={year} onChange={e => { setYear(Number(e.target.value)); setSelected(""); }}/></label>{" "}
-   <label>Loại báo cáo <select value={kind} onChange={e => setKind(e.target.value)}><option value="">Tất cả</option>{REPORT_TYPES.filter(t => t.value !== "adhoc").map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
-   <LoadState s={list}>{items => <ul>{items.filter(p => p.report_type !== "adhoc" && p.state !== "cancelled" && (!kind || p.report_type === kind)).map(p => <li key={p.id}><button className="btn" aria-pressed={selected === p.id} onClick={() => setSelected(p.id)}>{p.name}</button></li>)}{!items.length && <li>Chưa có kỳ báo cáo trong năm.</li>}</ul>}</LoadState>
+   <label>Năm {adhoc?<select value={year} onChange={e=>{setYear(Number(e.target.value));setSelected("")}}>{Array.from({length:101},(_,i)=>2000+i).map(y=><option key={y} value={y}>{y}</option>)}</select>:<input type="number" min="2000" max="2100" value={year} onChange={e => { setYear(Number(e.target.value)); setSelected(""); }}/>}</label>{" "}
+   <label>Loại báo cáo <select value={kind} onChange={e => setKind(e.target.value)}><option value="">Tất cả</option>{REPORT_TYPES.filter(t => adhoc ? t.value === "adhoc" : t.value !== "adhoc").map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
+   <LoadState s={list}>{items => <ul>{items.filter(p => (adhoc ? p.report_type === "adhoc" : p.report_type !== "adhoc") && p.state !== "cancelled" && (!kind || p.report_type === kind)).map(p => <li key={p.id}><button className="btn" aria-pressed={selected === p.id} onClick={() => setSelected(p.id)}>{p.name}</button></li>)}{!items.length && <li>Chưa có kỳ báo cáo trong năm.</li>}</ul>}</LoadState>
   </section>
   {selected && reports && <LoadState s={detail}>{d => <ReportEditor key={`${d.period_id}:${d.version}:${d.final?.export_id ?? ""}`} d={d} api={reports} mode={mode} reload={detail.reload}/>}</LoadState>}
  </>;
@@ -51,6 +54,7 @@ function ReportEditor({ d, api, mode, reload }: {
     const { data } = d.content;
     const [admin, setAdmin] = useState<Record<string, string | null>>({});
     const [texts, setTexts] = useState<Record<string, string>>({});
+    const [adhocSelection, setAdhocSelection] = useState<AdhocSelection>();
     const [ack, setAck] = useState(false);
     const [filter, setFilter] = useState<ReportFilter>({});
     const [exportFiltered, setExportFiltered] = useState(false);
@@ -58,9 +62,10 @@ function ReportEditor({ d, api, mode, reload }: {
     const history = useLoad(() => api.history(id), [api, id]);
     const words = useLoad(() => api.words(id), [api, id]);
     const act = useAction();
-    const dirty = Object.keys(admin).length > 0 || Object.keys(texts).length > 0;
+    const dirty = Object.keys(admin).length > 0 || Object.keys(texts).length > 0 || adhocSelection !== undefined;
     const writable = d.editable && !act.busy;
-    const rows = filterRows(data.rows ?? [], filter);
+    const selected=adhocSelection??d.content.adhoc;
+    const rows = filterRows(data.template==="adhoc"?(data.rows??[]).filter(r=>selected?.rows.includes(r.ref)):data.rows??[], filter);
     const depts = [...new Set((data.rows ?? []).map(r => r.department).filter(Boolean))];
     const communes = [...new Set((data.rows ?? []).flatMap(r => r.communes ?? []))];
     return <section className="card sec">
@@ -79,11 +84,13 @@ function ReportEditor({ d, api, mode, reload }: {
                     const value = key in admin ? admin[key] ?? field?.system ?? "" : field?.override ?? field?.system ?? "";
                     return <div key={key}><label>{label} <input type={key === "report_date" ? "date" : "text"} maxLength={2000} disabled={!writable || d.locked_admin?.includes(key)} value={value} onChange={e => setAdmin({ ...admin, [key]: e.target.value })}/></label>{" "}<button className="btn" disabled={!writable || d.locked_admin?.includes(key)} onClick={() => setAdmin({ ...admin, [key]: null })}>Về mặc định</button>{field?.override !== null && field?.override !== undefined && <small> Đã sửa thủ công {dt(field.at)}</small>}{field?.system_changed && <small> · Giá trị mặc định đã đổi: {field.system}</small>}</div>;
                 })}
+    {data.template === "adhoc" && <AdhocRequestsPanel id={id} departments={data.period.departments} disabled={!writable||!!d.terminal} onChanged={reload}/>}
+    {data.template === "adhoc" && <AdhocSelector data={data} value={adhocSelection ?? d.content.adhoc} onChange={setAdhocSelection} disabled={!writable}/>}
     <h3>Nội dung lời văn</h3>
     {!!d.locked_admin?.length && <p>Các ô hành chính đã được khóa trong mẫu chỉ đọc.</p>}
     {data.template === "mau_5" && <p>Mục II được khởi tạo từ báo cáo tiến độ kỳ trước, nếu có. Nội dung đã lưu của kỳ này được giữ khi cập nhật số liệu.</p>}
-    {d.sections.filter(s => s.editable).map(s => <div key={s.key}><label>{d.template_document?.nodes.find(n => n.id === s.key)?.number ?? s.key} {s.title}<textarea rows={4} maxLength={12000} disabled={!writable} value={texts[s.key] ?? d.content.texts[s.key] ?? ""} onChange={e => setTexts({ ...texts, [s.key]: e.target.value })}/></label></div>)}
-    <button className="btn btn-primary" disabled={!writable} onClick={() => act.run(async () => { await api.save(id, { base_version: d.version, admin, texts }); reload(); }, "Đã lưu bản soạn")}>Lưu bản soạn</button>{" "}
+    {d.sections.filter(s => s.editable).map(s => <div key={s.key}><label>{data.template === "adhoc" ? s.title : `${d.template_document?.nodes.find(n => n.id === s.key)?.number ?? s.key} ${s.title}`}<textarea rows={4} maxLength={12000} disabled={!writable} value={texts[s.key] ?? d.content.texts[s.key] ?? ""} onChange={e => setTexts({ ...texts, [s.key]: e.target.value })}/></label></div>)}
+    <button className="btn btn-primary" disabled={!writable} onClick={() => act.run(async () => { await api.save(id, { base_version: d.version, admin, texts, ...(adhocSelection ? { adhoc: adhocSelection } : {}) }); reload(); }, "Đã lưu bản soạn")}>Lưu bản soạn</button>{" "}
     <button className="btn" disabled={!d.can_refresh || act.busy || dirty} onClick={() => act.run(async () => { await api.refresh(id, d.version); reload(); }, "Đã cập nhật số liệu")}>Cập nhật số liệu</button>
     {dirty && <p role="status">Có thay đổi chưa lưu. Lưu bản soạn trước khi cập nhật hoặc xuất Excel.</p>}
    </>}
@@ -98,7 +105,7 @@ function ReportEditor({ d, api, mode, reload }: {
    </div>}
    <div className="table-wrap"><table><thead><tr>{["CT/DA, hạng mục", "ĐVT", "Kế hoạch", "Trong kỳ", "Điều chỉnh", "Lũy kế năm", "% KH", "Nội dung"].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map(r => <tr key={r.ref}><td>{r.roman} {r.name}{r.missing && " — Chưa gửi số liệu"}</td><td>{r.unit}</td><td>{r.planned ?? "–"}</td><td>{r.in_period}</td><td>{r.adjustment}</td><td>{r.year_to_date}</td><td>{r.percent ?? "–"}</td><td>{r.content}</td></tr>)}</tbody></table></div>
    <ExternalCells items={data.external}/>
-   <details><summary>Số liệu nguồn và phiếu đã gửi</summary>{(data.metrics ?? []).map(m => <details key={m.key}><summary>{m.label}: {m.value.Cumulative ?? m.value.Sum ?? m.value.Min ?? "–"} {m.unit}</summary><p>{m.value.Closed ? "Đã chốt" : "Tạm tính"} · Lũy kế năm KHTC {m.value.YearToDate ?? "–"} · Chưa xác nhận {m.value.Unconfirmed ?? "–"}</p><p>Trong kỳ {m.value.Increment ?? m.value.Sum ?? "–"} · Gốc {m.value.Base ?? "–"} · Cách lấy gốc: {m.value.BaseRef || "–"}</p>{(m.value.PriceDays ?? []).map(day => <p key={day.Day}>{day.Day}: {day.Min} – {day.Max} {m.unit}</p>)}<ul>{(m.trace ?? []).map((t, i) => <li key={i}>{t.module} · {t.calendar} · {t.native_key} · {t.from?.slice(0, 10)} – {t.to?.slice(0, 10)} · {t.closed ? "Đã chốt" : "Chưa chốt"} · Tuần KHTC {t.target_key}</li>)}</ul></details>)}<p>Ảnh chụp nguồn v{data.sources?.version ?? "–"} · {dt(data.captured_at)}</p><ul>{(data.submissions ?? []).map(s => <li key={s.submission_id}>{DEPT_LABEL[s.department] ?? s.department} · lần gửi {s.attempt} · mã bảng {s.sheet_id}</li>)}</ul></details>
+   <details><summary>Số liệu nguồn và phiếu đã gửi</summary>{(data.metrics ?? []).map(m => <details key={m.key}><summary>{m.label}: {m.text ?? m.value.Cumulative ?? m.value.Sum ?? m.value.Min ?? "–"} {m.unit}</summary><p>{m.value.Closed ? "Đã chốt" : "Tạm tính"} · Lũy kế năm KHTC {m.value.YearToDate ?? "–"} · Chưa xác nhận {m.value.Unconfirmed ?? "–"}</p><p>Trong kỳ {m.value.Increment ?? m.value.Sum ?? "–"} · Gốc {m.value.Base ?? "–"} · Cách lấy gốc: {m.value.BaseRef || "–"}</p>{(m.value.PriceDays ?? []).map(day => <p key={day.Day}>{day.Day}: {day.Min} – {day.Max} {m.unit}</p>)}<ul>{(m.trace ?? []).map((t, i) => <li key={i}>{t.module} · {t.calendar} · {t.native_key} · {t.from?.slice(0, 10)} – {t.to?.slice(0, 10)} · {t.closed ? "Đã chốt" : "Chưa chốt"} · Tuần KHTC {t.target_key}</li>)}</ul></details>)}<p>Ảnh chụp nguồn v{data.sources?.version ?? "–"} · {dt(data.captured_at)}</p><ul>{(data.submissions ?? []).map(s => <li key={s.submission_id}>{DEPT_LABEL[s.department] ?? s.department} · lần gửi {s.attempt} · mã bảng {s.sheet_id}</li>)}</ul></details>
    {!d.final && d.editable && <div>
     {(data.template === "mau_5" || mode === "progress") && <label><input type="checkbox" checked={exportFiltered} onChange={e => setExportFiltered(e.target.checked)}/> Xuất theo bộ lọc đang chọn</label>}
     {!!data.provisional?.length && <label><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)}/> Tôi xác nhận xuất bản Tạm tính</label>}

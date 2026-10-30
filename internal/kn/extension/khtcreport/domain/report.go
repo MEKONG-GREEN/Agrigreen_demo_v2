@@ -69,6 +69,7 @@ type SourceTrace struct {
 }
 
 type SourceMetric struct {
+	Text       string        `json:"text,omitempty"`
 	Trace      []SourceTrace `json:"trace,omitempty"`
 	Unit       string        `json:"unit"`
 	Key        string        `json:"key"`
@@ -145,7 +146,18 @@ type ExternalFigure struct {
 	At          time.Time          `json:"at"`
 }
 
+// Supplement pins the request lifecycle in the immutable report input.
+type Supplement struct {
+	ID                  uuid.UUID  `json:"id"`
+	Department          string     `json:"department"`
+	Instruction         string     `json:"instruction"`
+	State               string     `json:"state"`
+	DueAt               time.Time  `json:"due_at"`
+	NativeSubmissionRef *uuid.UUID `json:"native_submission_ref"`
+	ReturnApplied       *bool      `json:"return_applied"`
+}
 type Data struct {
+	Supplements []Supplement                 `json:"supplements,omitempty"`
 	Period      Period                       `json:"period"`
 	Template    string                       `json:"template"`
 	Plan        port.KHTCPlan                `json:"plan"`
@@ -186,6 +198,8 @@ func WithExternal(data Data, figures []ExternalFigure) (Data, error) {
 
 func Template(kind string) string {
 	switch kind {
+	case "adhoc":
+		return "adhoc"
 	case "week":
 		return "mau_1"
 	case "month":
@@ -202,6 +216,8 @@ func Template(kind string) string {
 
 func Sections(template string) []Section {
 	switch template {
+	case "adhoc":
+		return []Section{{"noi_dung", "Nội dung báo cáo", true}, {"chi_tieu", "Chỉ tiêu được chọn", false}}
 	case "mau_1":
 		return []Section{
 			{"A", "KẾT QUẢ ĐẠT ĐƯỢC", false},
@@ -233,11 +249,20 @@ var AdminKeys = []string{"document_no", "place", "report_date", "recipient", "ba
 
 // Edits contains only fields explicitly editable in G1. Numeric/system values have no write representation.
 type Edits struct {
+	Adhoc *AdhocSelection    `json:"adhoc,omitempty"`
 	Admin map[string]*string `json:"admin"`
 	Texts map[string]string  `json:"texts"`
 }
 
 func (e Edits) Validate(template string) error {
+	if e.Adhoc != nil {
+		if template != "adhoc" {
+			return ErrInput
+		}
+		if err := e.Adhoc.Validate(); err != nil {
+			return err
+		}
+	}
 	for key, value := range e.Admin {
 		if !slices.Contains(AdminKeys, key) {
 			return fmt.Errorf("%w: ô hành chính %s", ErrInput, key)
@@ -279,6 +304,7 @@ func (f AdminField) Value() string {
 }
 
 type Draft struct {
+	Adhoc *AdhocSelection       `json:"adhoc,omitempty"`
 	Data  Data                  `json:"data"`
 	Admin map[string]AdminField `json:"admin"`
 	Texts map[string]string     `json:"texts"`
@@ -306,6 +332,12 @@ func Edit(d Draft, in Edits, actor uuid.UUID, at time.Time) (Draft, error) {
 	if out.Texts == nil {
 		out.Texts = map[string]string{}
 	}
+	if in.Adhoc != nil {
+		if err := in.Adhoc.ValidateData(out.Data); err != nil {
+			return Draft{}, err
+		}
+		out.Adhoc = in.Adhoc.Clone()
+	}
 	for key, value := range in.Admin {
 		field := out.Admin[key]
 		field.Override, field.Changed = nil, false
@@ -324,11 +356,14 @@ func Edit(d Draft, in Edits, actor uuid.UUID, at time.Time) (Draft, error) {
 	for key, value := range in.Texts {
 		out.Texts[key] = strings.TrimSpace(value)
 	}
+	if out.Data.Template == "adhoc" {
+		out.Data.Provisional = AdhocData(out).Provisional
+	}
 	return out, nil
 }
 
 func Refresh(d Draft, data Data, defaults map[string]string) Draft {
-	out := Draft{Data: data, Admin: map[string]AdminField{}, Texts: map[string]string{}}
+	out := Draft{Data: data, Adhoc: d.Adhoc.Clone(), Admin: map[string]AdminField{}, Texts: map[string]string{}}
 	if d.TemplateSnapshot != nil {
 		copy := *d.TemplateSnapshot
 		copy.Definition = append(json.RawMessage(nil), copy.Definition...)
@@ -400,6 +435,9 @@ func Refresh(d Draft, data Data, defaults map[string]string) Draft {
 		next := AdminField{System: defaults[key], Override: previous.Override, Actor: previous.Actor, At: previous.At}
 		next.Changed = previous.Override != nil && (previous.Changed || previous.System != next.System)
 		out.Admin[key] = next
+	}
+	if out.Data.Template == "adhoc" {
+		out.Data.Provisional = AdhocData(out).Provisional
 	}
 	return out
 }
@@ -517,7 +555,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 		}
 	}
 	for _, department := range period.Departments {
-		if _, ok := current[department]; !ok {
+		if _, ok := current[department]; !ok && period.Type != "adhoc" {
 			missing("Phòng " + department + " chưa gửi số liệu")
 		}
 	}
@@ -529,9 +567,13 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 	for _, entry := range plan.Entries {
 		entries[entry.Ref] = entry
 	}
+	trackedAt := period.From
+	if period.Type == "adhoc" && trackedAt.Year() < plan.Year {
+		trackedAt = time.Date(plan.Year, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
 	tracked := func(entry port.KHTCPlanEntry) bool {
 		for depth := 0; depth < 16; depth++ {
-			if !form.TrackedIn(entry, period.From) {
+			if !form.TrackedIn(entry, trackedAt) {
 				return false
 			}
 			if entry.ParentRef == nil {
@@ -561,6 +603,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 			continue
 		}
 		done, adjustment, total, people, budget := decimal.Zero, decimal.Zero, decimal.Zero, decimal.Zero, decimal.Zero
+		hasRangeSheet := false
 		for _, sheet := range data.Submissions {
 			if sheet.Department != entry.Department || sheet.Type != "week" {
 				continue
@@ -573,8 +616,8 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				if strings.TrimSpace(raw) == "" {
 					return decimal.Zero, nil
 				}
-				n, err := decimal.NewFromString(raw)
-				if err != nil {
+				n, ok := form.ParseNumber(raw)
+				if !ok {
 					return decimal.Zero, fmt.Errorf("%w: số liệu phiếu", ErrInput)
 				}
 				return n, nil
@@ -585,6 +628,9 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 			}
 			total = total.Add(n)
 			if !sheet.To.Before(period.From) {
+				if _, exists := sheet.Sheet.Cells[entry.Ref.String()]; exists {
+					hasRangeSheet = true
+				}
 				done = done.Add(n)
 				p, err := parse(cell.People)
 				if err != nil {
@@ -631,7 +677,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				}
 				adjustment = decimal.Zero
 			}
-		} else if _, ok := current[entry.Department]; !ok {
+		} else if _, ok := current[entry.Department]; !ok && (period.Type != "adhoc" || !hasRangeSheet) {
 			row.Missing = true
 			missing("Phòng " + entry.Department + " chưa gửi số liệu")
 		}

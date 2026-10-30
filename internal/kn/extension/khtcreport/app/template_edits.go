@@ -45,7 +45,7 @@ func editFixedTemplate(pinned *port.KHTCTemplateSnapshot, content domain.Draft, 
 			return domain.Draft{}, ErrInvalid.WithField("texts."+field, "Vùng lời văn không hợp lệ hoặc vượt giới hạn")
 		}
 	}
-	out, err := domain.Edit(content, domain.Edits{Admin: edits.Admin}, actor, at)
+	out, err := domain.Edit(content, domain.Edits{Admin: edits.Admin, Adhoc: edits.Adhoc}, actor, at)
 	if err != nil {
 		return domain.Draft{}, err
 	}

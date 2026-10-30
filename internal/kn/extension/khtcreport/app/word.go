@@ -119,7 +119,7 @@ func WordTemplate(template string) doctpl.Template {
 			{Kind: doctpl.KindLoop, Each: listReasons, Blocks: []doctpl.Block{{Kind: doctpl.KindParagraph, Text: "- {tam_tinh.ly_do}", Italic: true}}}}},
 		{Kind: doctpl.KindParagraph, Text: "Xuất theo bộ lọc: {loc}", If: "loc", Italic: true},
 	}
-	if template == "mau_5" {
+	if template == "mau_5" || template == "adhoc" {
 		body = append(body,
 			doctpl.Block{Kind: doctpl.KindParagraph, Text: "Kính gửi: {kinh_gui}", If: "kinh_gui", Align: doctpl.AlignCenter},
 			doctpl.Block{Kind: doctpl.KindParagraph, Text: "{can_cu}", If: "can_cu", Indent: true, Align: doctpl.AlignJustify})
@@ -141,6 +141,9 @@ func WordTemplate(template string) doctpl.Template {
 		}
 		sec := doctpl.Block{Kind: doctpl.KindSection, Key: section.Key, Text: title}
 		switch section.Key {
+		case "chi_tieu":
+			addList("adhoc_figures", "Chỉ tiêu được chọn", []string{"ten", "dvt", "gia_tri", "nguon"})
+			sec.Blocks = append(sec.Blocks, adhocWordTable())
 		case "A.I.1", "A.I.2", "A.I.3":
 			list := metricList(section.Key)
 			addList(list, "Chỉ tiêu "+section.Key, metricFields)
@@ -195,8 +198,8 @@ func WordTemplate(template string) doctpl.Template {
 
 // WordTemplates là mẫu Word của Mẫu 1–5 (đăng ký vào pf/export ở gốc lắp ráp).
 func WordTemplates() []doctpl.Template {
-	out := make([]doctpl.Template, 0, 6)
-	for _, m := range []string{"mau_1", "mau_2", "mau_3", "mau_4", "mau_5"} {
+	out := make([]doctpl.Template, 0, 7)
+	for _, m := range []string{"mau_1", "mau_2", "mau_3", "mau_4", "mau_5", "adhoc"} {
 		out = append(out, WordTemplate(m))
 	}
 	out = append(out, FixedWordTemplate())
@@ -389,10 +392,17 @@ func formTextItems(data domain.Data, hcth bool) []doctpl.Item {
 // và dòng địa danh/ngày để trống khi ô hành chính trống — pf/export tự cấp/điền lúc xuất.
 func WordData(d domain.Draft, filter domain.Filter, version int64) doctpl.Data {
 	data := d.Data
+	if data.Template == "adhoc" {
+		data = domain.AdhocData(d)
+		d.Data = data
+	}
 	rows := domain.SelectRows(data.Rows, filter)
 	title := "Kết quả thực hiện nhiệm vụ công tác khuyến nông " + data.Period.Name
 	if data.Template == "mau_5" {
 		title = fmt.Sprintf("Kết quả tiến độ thực hiện Chương trình khuyến nông địa phương năm %d — %s", data.Period.Year, data.Period.Name)
+	}
+	if data.Template == "adhoc" {
+		title = data.Period.Name
 	}
 	place := strings.TrimSpace(admin(d, "place"))
 	vars := map[string]string{
@@ -437,6 +447,9 @@ func WordData(d domain.Draft, filter domain.Filter, version int64) doctpl.Data {
 	lists := map[string][]doctpl.Item{
 		listReasons: reasons, listPrevious: programItems(rows, "previous"), listCurrent: programItems(rows, "current"),
 		listOther: formTextItems(data, false), listHCTH: formTextItems(data, true), listPrice: priceItems(data.Metrics), listAppendix: appendixItems(rows),
+	}
+	if data.Template == "adhoc" {
+		lists["adhoc_figures"] = adhocWordItems(data)
 	}
 	for _, s := range []string{"A.I.1", "A.I.2", "A.I.3"} {
 		lists[metricList(s)] = metricItems(data.Metrics, s)

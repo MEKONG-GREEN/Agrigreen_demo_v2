@@ -30,6 +30,7 @@ func TestFixedEditsOnlyNarrativeAndUnlockedAdmin(t *testing.T) {
 		t.Fatal("mutated prior payload")
 	}
 	for name, edits := range map[string]domain.Edits{
+		"adhoc":       {Adhoc: &domain.AdhocSelection{Rows: []string{uuid.NewString()}}},
 		"locked":      {Admin: map[string]*string{"signer": &place}},
 		"clearlocked": {Admin: map[string]*string{"signer": nil}},
 		"source":      {Texts: map[string]string{"plan.value": "999"}},

@@ -34,6 +34,7 @@ provides:
     - HTXData
     - KHTCFixedTemplates
     - KHTCMetricNames
+    - KHTCOperationSource
     - KHTCPlanDepartments
     - KHTCPlanVersions
     - KHTCPlans

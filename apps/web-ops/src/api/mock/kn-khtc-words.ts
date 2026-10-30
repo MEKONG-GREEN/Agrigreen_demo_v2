@@ -23,9 +23,12 @@ function allowed(ctx: Ctx, write: boolean): boolean {
 }
 function create(ctx: Ctx): Response {
     const [id, exportID] = ctx.params as [string, string];
-    if (!allowed(ctx, true))
-        return problem(403, "forbidden", "Chỉ cán bộ KHTC phụ trách được xuất Word");
     const s = khtcMockStore().find(x => x.p.id === id), x = khtcReportExport(id, exportID);
+    const kc=knContext(ctx.request.headers.get("X-AG-Context")??"");
+    if(s?.p.report_type==="adhoc"){
+      if(!kc || kc.read_only || !(kc.role==="admin"||kc.role==="kn_tinh"&&kc.department_code===KHTC&&s.adhocOwner===ctx.persona.me.actor_ref))return problem(403,"forbidden","Không có quyền xuất Word");
+      if(s.adhocTenant!==ctx.persona.me.tenant_id)return problem(404,"extension.khtc_report_not_found","Không có báo cáo");
+    }else if(!allowed(ctx,true))return problem(403,"forbidden","Chỉ cán bộ KHTC phụ trách được xuất Word");
     if (!s || !x)
         return problem(404, "extension.khtc_report_not_found", "Không có bản xuất");
     if (s.terminal === "cancelled")
@@ -38,7 +41,7 @@ function create(ctx: Ctx): Response {
     const compiled=document?.nodes.flatMap(n=>[`${n.number}. ${n.title}`,...n.rows.flatMap(r=>[r.preamble??"",r.tokens.map(t=>t.text).join("")])])??[];
     const run = mockExportRun({ template: document ? "khtc.fixed" : `khtc.${x.detail.content.data.template}`, subject: subject(id), fileName: `bao-cao-khtc-${x.detail.content.data.template}-${id}-v${x.meta.version}.docx`,
         docNumber: no ? (no.includes("/") ? no : `${no}/BC-TTKN`) : x.meta.provisional ? "…/BC-TTKN" : "", series: x.meta.provisional ? undefined : "BC-TTKN", actor: ctx.persona.me.actor_ref,
-        lines: [date, "BÁO CÁO", x.detail.content.data.period.name, `Bản xuất Excel phiên bản ${x.meta.version}`, ...compiled, ...x.detail.content.data.rows.map(r => `${r.name}: trong kỳ ${r.in_period}, lũy kế ${r.year_to_date}`)] });
+        lines: [date, "BÁO CÁO", x.detail.content.data.period.name, `Bản xuất Excel phiên bản ${x.meta.version}`, ...compiled, ...x.detail.content.data.rows.map(r => `${r.name}: trong kỳ ${r.in_period}, lũy kế ${r.year_to_date}`),...x.detail.content.data.metrics.map(m=>m.label+": "+(m.text??m.value.Increment??m.value.Sum??m.value.Cumulative??"")), ...Object.values(x.detail.content.texts)] });
     return json(word(run), 201);
 }
 function read(ctx: Ctx): Response {

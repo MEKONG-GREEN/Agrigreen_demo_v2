@@ -502,3 +502,21 @@ func InsertDue(ctx context.Context, tx pgx.Tx, tid, periodID uuid.UUID, due time
 		ids.New(), tid, periodID, due.UTC(), nilIfEmpty(reason), at.UTC(), actor, idem, domain.RuleVersion)
 	return err
 }
+
+// PeriodByIdem reads the durable receipt even after the shared30-day dedupe TTL.
+func PeriodByIdem(ctx context.Context, tx pgx.Tx, key string) (*Period, error) {
+	p, err := scanPeriod(tx.QueryRow(ctx, `SELECT `+"id, profile, template_id, template_code, template_version, label, due_at, units, owner_ref, publisher_level, actor_ref, event_time"+` FROM pf_forms.period WHERE idem_key=$1 ORDER BY recorded_at DESC LIMIT 1`, key))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &p, err
+}
+
+// No receipt from another batch/profile may be mistaken for an empty batch.
+// The caller holds the tenant+batch advisory lock; RLS still isolates tenants.
+func PublishReceiptCount(ctx context.Context, tx pgx.Tx, key string) (int, error) {
+	var n int
+	err := tx.QueryRow(ctx, `SELECT count(*) FROM(SELECT 1 FROM pf_forms.period
+ WHERE starts_with(idem_key,$1||':period:') LIMIT 367) bounded`, key).Scan(&n)
+	return n, err
+}

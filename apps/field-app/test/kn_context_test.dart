@@ -246,11 +246,11 @@ void main() {
   test('KN P1 FakeServer: ghi lại sendJson (PUT) theo khóa', () async {
     final r = await h.fake.sendJson(
       method: 'PUT',
-      path: '/v1/kn/households/x',
+      path: '/v1/kn/plots/x',
       idempotencyKey: 'act:1',
-      body: const {'cultivated_area_ha': '1.5'},
+      body: const {'name': 'Thửa 1'},
     );
-    expect(r['path'], '/v1/kn/households/x');
+    expect(r['path'], '/v1/kn/plots/x');
     expect(h.fake.sendCalls.single.$1, 'PUT');
     expect(h.fake, isA<FakeServer>());
   });
