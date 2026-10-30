@@ -115,6 +115,7 @@ type fix struct {
 	mu     sync.Mutex
 	ctxs   map[uuid.UUID]*authz.KNContext
 	xa     *xaScopes
+	mod    *extension.Module // W11.53b: nối thêm danh bạ người nhận thông báo sau newFix
 }
 
 func newFix(t *testing.T) *fix {
@@ -126,6 +127,7 @@ func newFix(t *testing.T) *fix {
 	mod := extension.New(pool, clk, extension.Deps{Units: units{}})
 	mod.UseCNTSCatalogs(catalogs{})
 	mod.UseXaScopes(f.xa)
+	f.mod = mod
 	mod.UseCNTSModelVault(clienttest.New())
 	st, err := objstore.NewLocal(t.TempDir(), objstore.LocalOptions{})
 	if err != nil {

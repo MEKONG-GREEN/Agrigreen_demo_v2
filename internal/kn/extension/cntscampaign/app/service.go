@@ -39,9 +39,14 @@ var (
 	ErrTemplate = problem.New(http.StatusUnprocessableEntity, "extension.cnts_campaign_template",
 		"Biểu điều tra chưa có ở cấu hình biểu CNTS (thiết kế biểu trước — FN-07)")
 	ErrDependency = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
-	errNotCNTS    = problem.Forbidden.WithDetail("chiến dịch điều tra chỉ dành cho Phòng Chăn nuôi – Thủy sản (Cấp Tỉnh, Cấp Quốc gia xem) và Admin xem")
-	errNotWriter  = problem.Forbidden.WithDetail("chỉ Cấp Tỉnh Phòng Chăn nuôi – Thủy sản tạo, phát hành, gia hạn, nhắc, đóng đợt")
-	errNotLeader  = problem.Forbidden.WithDetail("mở lại đợt chỉ Lãnh đạo phòng (hoặc người được ủy quyền mở lại kỳ)")
+	// ErrBusy, ErrInterrupted: ý định thao tác của đợt (BF-CNTS-CAMPAIGN-POOL, #156).
+	ErrBusy = problem.New(http.StatusConflict, "extension.cnts_campaign_busy",
+		"Đợt đang có thao tác khác chưa xong (phát hành, gia hạn, nhắc, đóng, mở lại) — thử lại sau ít phút")
+	ErrInterrupted = problem.New(http.StatusConflict, "extension.cnts_campaign_interrupted",
+		"Thao tác đợt bị gián đoạn (quá hạn giữ đợt, thao tác khác đang giữ) — chưa ghi kết quả; tải lại đợt rồi thử lại")
+	errNotCNTS   = problem.Forbidden.WithDetail("chiến dịch điều tra chỉ dành cho Phòng Chăn nuôi – Thủy sản (Cấp Tỉnh, Cấp Quốc gia xem) và Admin xem")
+	errNotWriter = problem.Forbidden.WithDetail("chỉ Cấp Tỉnh Phòng Chăn nuôi – Thủy sản tạo, phát hành, gia hạn, nhắc, đóng đợt")
+	errNotLeader = problem.Forbidden.WithDetail("mở lại đợt chỉ Lãnh đạo phòng (hoặc người được ủy quyền mở lại kỳ)")
 )
 
 // Reopener là phần cổng điều khiển kỳ native mở lại kỳ đã chốt (pf/forms app.Control.ReopenPeriod). Cổng
@@ -66,6 +71,8 @@ type Service struct {
 	Units   partyport.AdminUnits
 	Regions func() partyport.Regions
 	Names   func() partyport.ActorNames
+	// Lease là hạn ý định thao tác của đợt (0 → DefaultLease; kiểm thử đặt ngắn).
+	Lease time.Duration
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
@@ -161,6 +168,8 @@ func classify(err error) error {
 	switch pg.ConstraintName {
 	case "cnts_campaign_not_draft", "cnts_campaign_event_state":
 		return ErrState.WithCause(err)
+	case "cnts_campaign_busy":
+		return ErrBusy.WithCause(err)
 	}
 	if pg.Code == "23505" {
 		return problem.Conflict.WithCause(err)
@@ -202,20 +211,9 @@ func build(v store.Version, es []store.Event) Campaign {
 func (s *Service) load(ctx context.Context, c caller, id uuid.UUID) (Campaign, error) {
 	var out Campaign
 	err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
-		v, err := store.Latest(ctx, tx, id)
-		if err != nil {
-			return err
-		}
-		if v == nil || !c.sees(*v) {
-			return ErrNotFound
-		}
-		es, err := store.Events(ctx, tx, []uuid.UUID{id})
-		if err != nil {
-			return err
-		}
-		// Đợt đã phát hành: phiên bản mới nhất là phiên bản đã phát hành (trigger chặn phiên bản sau phát hành).
-		out = build(*v, es[id])
-		return nil
+		var err error
+		out, err = s.current(ctx, tx, c, id)
+		return err
 	})
 	return out, err
 }

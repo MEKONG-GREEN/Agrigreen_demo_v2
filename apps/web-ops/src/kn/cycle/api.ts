@@ -157,6 +157,20 @@ export type KnAccountLog = D["KNAccountLogEntry"];
 export type KnSupportLog = D["KNSupportLogEntry"];
 export type KnSessionContext = D["KNSessionContext"];
 export type AccountsUser = D["AccountsUser"];
+/** AUDIT-LOG-KN (#73): nhật ký hệ thống GET /v1/accounts/audit (cổng #70). */
+export type AuditPage = D["AuditPage"];
+export type AuditItem = D["AuditItem"];
+export type AuditChange = D["AuditChange"];
+export interface AuditQuery {
+  from: string;
+  to: string;
+  actor_ref?: string;
+  department?: string;
+  module?: string;
+  action?: string;
+  limit?: number;
+  cursor?: string;
+}
 export type KnDepartment = D["KNDepartment"];
 export type KnRegion = D["KNRegion"];
 export type KnOrgTreeNode = D["KNOrgTreeNode"];
@@ -393,6 +407,8 @@ export function createKnAdminApi(opts: KnHttpOptions) {
     startSupport: (body: { target_assignment_id?: string; role?: "kn_tw" | "kn_tinh" | "kn_xa"; org_ref?: string; commune_codes?: string[]; department_code: string; reason: string }) =>
       call<KnSessionContext>("POST", "/v1/accounts/support-sessions", body),
     endSupport: (id: string) => call<{ support_session_id: string; ended_at: string | null }>("POST", `/v1/accounts/support-sessions/${id}/end`),
+    /** AUDIT-LOG-KN (#73): một trang nhật ký hệ thống; mỗi lần gọi máy chủ ghi một lượt xem. Bộ lọc rỗng không gửi. */
+    audit: (q: AuditQuery) => call<AuditPage>("GET", "/v1/accounts/audit", undefined, { ...q }),
     supportLog: () => call<{ items: KnSupportLog[]; next_cursor: string | null }>("GET", "/v1/accounts/support-log", undefined, { limit: 200 }),
     departments: () => call<{ org_ref: string; items: KnDepartment[] }>("GET", "/v1/departments"),
     departmentStatus: (id: string, status: KnDepartment["status"], reason?: string) =>
