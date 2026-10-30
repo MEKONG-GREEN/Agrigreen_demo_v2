@@ -6,9 +6,38 @@ import 'package:agrigreen_mobile/data/catalog/catalog_cache.dart';
 import 'package:agrigreen_mobile/data/db/local_db.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
-/// Số ký tự tối thiểu của lý do vô hiệu hóa HTX (FN-XA-03.03) — bằng ràng buộc
-/// CHECK của sổ `pf_party.org_event` và `party/domain.MinDeactivateReason`.
-const kDeactivateReasonMin = 20;
+/// Lý do vô hiệu hóa / kích hoạt lại hồ sơ KN (FN-XA-03.03): 10–1000 ký tự —
+/// bằng `knrecords/domain.MinReason`, `MaxReason` (KNSPLIT-2-KN-RECORDS #67).
+const kReasonMin = 10;
+const kReasonMax = 1000;
+
+/// Loại hồ sơ KN riêng (`/v1/kn/producer-records`, #67) — không đổi sau khi tạo.
+abstract final class KnRecordKind {
+  static const cooperative = 'cooperative';
+  static const household = 'household';
+  static const coopGroup = 'coop_group';
+}
+
+/// Diện tích (ha) như máy chủ (`knrecords/domain.ParseArea`): số thập phân
+/// thường (dấu phẩy được đổi thành chấm), không số mũ, không dấu, ≤ 16 ký
+/// tự, ≤ 4 chữ số lẻ, 0–1.000.000. Kiểm chuỗi TRƯỚC khi đọc thành số. Trả
+/// (giá trị chuẩn hóa, lỗi); rỗng → (null, null).
+(String?, String?) normalizeAreaHa(String? raw) {
+  final v = (raw ?? '').trim().replaceAll(',', '.');
+  if (v.isEmpty) return (null, null);
+  if (v.length > 16 || !RegExp(r'^[0-9]{1,7}(\.[0-9]{1,4})?$').hasMatch(v)) {
+    return (
+      null,
+      'Diện tích: số ≥ 0, tối đa 4 chữ số lẻ, không quá 1.000.000 ha',
+    );
+  }
+  final whole = int.parse(v.split('.').first);
+  final frac = v.contains('.') ? v.split('.').last : '';
+  if (whole > 1000000 || (whole == 1000000 && frac.replaceAll('0', '') != '')) {
+    return (null, 'Diện tích không quá 1.000.000 ha');
+  }
+  return (v, null);
+}
 
 /// Một trang danh sách REST (cursor) — có thể lấy từ bản đệm khi ngoại tuyến.
 class KnPage {
@@ -39,7 +68,16 @@ class KnCommandError implements Exception {
 
 /// Thông điệp tiếng Việt cho mã lỗi `problem.*` của API thu thập dữ liệu.
 String knErrorMessage(String code, [String? detail]) => switch (code) {
-  'party.cooperative_name_taken' => 'Tên HTX đã có. Đặt tên khác.',
+  'extension.kn_record_name_taken' =>
+    'Tên đã có trong xã (cùng loại, đang hoạt động). Đặt tên khác.',
+  'extension.kn_record_household_exists' =>
+    'Chủ hộ đã có hồ sơ Nông hộ đang hoạt động.',
+  'extension.kn_record_version_conflict' =>
+    'Hồ sơ đã được người khác cập nhật — tải lại rồi sửa.',
+  'extension.kn_record_state_conflict' =>
+    'Trạng thái hồ sơ không cho phép thao tác này${detail == null ? '' : ': $detail'}.',
+  'extension.kn_record_not_found' =>
+    'Không tìm thấy hồ sơ trong phạm vi phụ trách.',
   'party.out_of_scope' ||
   'mechanization.out_of_scope' ||
   'geo.out_of_scope' ||
@@ -264,7 +302,57 @@ class KnCollectionService {
   }
 
   // ------------------------------------------------ HTX & nông hộ (03.03)
+  //
+  // KNSPLIT-2-KN-RECORDS (#67, #161): HTX / Nông hộ / Tổ hợp tác của màn KN là
+  // hồ sơ KN riêng (`/v1/kn/producer-records`, sổ `pf_extension.kn_producer`).
+  // KN KHÔNG tạo/sửa HTX nền tảng: không còn lệnh ghi `/v1/kn/cooperatives…`.
 
+  static const _records = '/v1/kn/producer-records';
+
+  /// Một trang hồ sơ KN theo loại (`kind` bắt buộc). Nông hộ không lọc theo
+  /// tên (tên chủ hộ ở kho định danh) — lọc theo HTX/THT cha ([parentRef]).
+  Future<KnPage> records({
+    required String kind,
+    String? commune,
+    String status = 'active',
+    String? q,
+    String? parentRef,
+    String? cursor,
+  }) => _page(_records, {
+    'kind': kind,
+    'commune': ?commune,
+    'status': status,
+    if (kind != KnRecordKind.household && q != null && q.trim().isNotEmpty)
+      'q': q.trim(),
+    if (kind == KnRecordKind.household) 'parent_ref': ?parentRef,
+  }, cursor: cursor);
+
+  /// Chi tiết hồ sơ (kèm `version`, `log`) — đệm để xem ngoại tuyến.
+  Future<(Map<String, Object?>, bool)> record(String ref) =>
+      _getCached('$_records/$ref');
+
+  /// Nông hộ (đang hoạt động) thuộc một hồ sơ HTX/THT.
+  Future<KnPage> households(String parentRef, {String? cursor}) => records(
+    kind: KnRecordKind.household,
+    parentRef: parentRef,
+    cursor: cursor,
+  );
+
+  /// HTX đã công bố trong phạm vi (chỉ đọc) — chọn để liên kết đối chiếu
+  /// (`htx_ref`) khi thêm/sửa hồ sơ HTX; máy móc, thửa đọc theo `htx_ref`.
+  Future<List<Map<String, Object?>>> htxCandidates(String commune) async {
+    final (j, _) = await _getCached(
+      '/v1/kn/producer-htx-candidates',
+      query: {'commune': commune},
+    );
+    return [
+      for (final i in (j['items'] as List?) ?? const [])
+        if (i is Map) i.cast<String, Object?>(),
+    ];
+  }
+
+  /// HTX nền tảng (legacy GET, CHỈ ĐỌC) — bộ chọn HTX của màn Thửa (khai báo
+  /// thửa, máy vẫn ở module nền, #162). Không dùng để ghi.
   Future<KnPage> cooperatives({
     String? commune,
     String status = 'active',
@@ -276,115 +364,135 @@ class KnCollectionService {
     if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
   }, cursor: cursor);
 
-  Future<(Map<String, Object?>, bool)> cooperative(String ref) =>
-      _getCached('/v1/kn/cooperatives/$ref');
+  static String? _opt(String? v) {
+    final t = v?.trim();
+    return t == null || t.isEmpty ? null : t;
+  }
 
-  Future<KnPage> households(String coopRef, {String? cursor}) => _page(
-    '/v1/kn/cooperatives/$coopRef/households',
-    const {},
-    cursor: cursor,
-  );
+  static Map<String, Object?>? _person(String? name, String? phone) {
+    final n = _opt(name);
+    if (n == null) return null;
+    return {'full_name': n, 'phone': _opt(phone) ?? ''};
+  }
 
-  Future<KnCommandResult> createCooperative({
-    required String name,
+  static String _area(String? raw) {
+    final (v, err) = normalizeAreaHa(raw);
+    if (err != null) throw KnCommandError('validation_failed', err);
+    return v ?? '';
+  }
+
+  /// Thêm hồ sơ KN. HTX, THT: [name], người đại diện ([personName],
+  /// [personPhone]) bắt buộc; Nông hộ: chủ hộ bắt buộc, thuộc [parentRef]
+  /// (HTX/THT), không tên/địa chỉ/MST. [htxRef] chỉ cho HTX.
+  Future<KnCommandResult> createRecord({
+    required String kind,
     required String communeCode,
-    String? areaHa,
-    String? taxCode,
-    String? headOffice,
-    String? repName,
-    String? repPhone,
-  }) => run(
-    ApiActionKind.knCooperativeCreate,
-    body: {
-      'name': name.trim(),
-      'commune_code': communeCode,
-      if (areaHa != null && areaHa.trim().isNotEmpty)
-        'area_ha': areaHa.trim().replaceAll(',', '.'),
-      if (taxCode != null && taxCode.trim().isNotEmpty)
-        'tax_code': taxCode.trim(),
-      if (headOffice != null && headOffice.trim().isNotEmpty)
-        'head_office': headOffice.trim(),
-      if (repName != null && repName.trim().isNotEmpty)
-        'representative': {
-          'full_name': repName.trim(),
-          'phone': ?repPhone?.trim(),
-        },
-    },
-  );
-
-  Future<KnCommandResult> updateCooperative(
-    String ref, {
     String? name,
     String? areaHa,
     String? taxCode,
-    String? headOffice,
-    String? repName,
-    String? repPhone,
-    String? reason,
-  }) => run(
-    ApiActionKind.knCooperativeUpdate,
-    target: ref,
-    body: {
-      'name': ?name?.trim(),
-      if (areaHa != null && areaHa.trim().isNotEmpty)
-        'area_ha': areaHa.trim().replaceAll(',', '.'),
-      'tax_code': ?taxCode?.trim(),
-      'head_office': ?headOffice?.trim(),
-      if (repName != null && repName.trim().isNotEmpty)
-        'representative': {
-          'full_name': repName.trim(),
-          'phone': ?repPhone?.trim(),
-        },
-      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
-    },
-  );
-
-  /// Vô hiệu hóa (không xóa cứng). Lý do ≥ 20 ký tự — cùng ràng buộc sổ
-  /// `pf_party.org_event` và máy chủ (US-HTXSTATUS-01 AC-3; BRD v7.7 không
-  /// nêu số). Trả cảnh báo dữ liệu liên kết (`warnings: {households, plots,
-  /// machines}`).
-  Future<KnCommandResult> deactivateCooperative(String ref, String reason) {
-    if (reason.trim().runes.length < kDeactivateReasonMin) {
+    String? address,
+    String? personName,
+    String? personPhone,
+    String? parentRef,
+    String? htxRef,
+  }) {
+    final household = kind == KnRecordKind.household;
+    final area = _area(areaHa);
+    final person = _person(personName, personPhone);
+    if (person == null) {
       throw KnCommandError(
         'validation_failed',
-        'Lý do cần ít nhất $kDeactivateReasonMin ký tự.',
+        household ? 'Nhập chủ hộ và SĐT.' : 'Nhập người đại diện và SĐT.',
       );
     }
     return run(
-      ApiActionKind.knCooperativeDeactivate,
-      target: ref,
-      body: {'reason': reason.trim()},
+      ApiActionKind.knRecordCreate,
+      body: {
+        'kind': kind,
+        'commune_code': communeCode,
+        if (!household) 'name': ?_opt(name),
+        if (area.isNotEmpty) 'area_ha': area,
+        if (kind == KnRecordKind.cooperative) 'tax_code': ?_opt(taxCode),
+        if (!household) 'address': ?_opt(address),
+        (household ? 'holder' : 'representative'): person,
+        if (household) 'parent_ref': ?_opt(parentRef),
+        if (kind == KnRecordKind.cooperative) 'htx_ref': ?_opt(htxRef),
+      },
     );
   }
 
-  Future<KnCommandResult> createHousehold(
-    String coopRef, {
-    required String fullName,
-    required String phone,
+  /// Sửa hồ sơ [existing] (bản chi tiết từ máy chủ): máy chủ THAY toàn bộ
+  /// trường nhập được (trường vắng = xóa), nên thân gửi đủ giá trị hiện có,
+  /// đè bởi tham số. Người đại diện/chủ hộ chỉ gửi khi nhập mới. Khóa lạc
+  /// quan `base_version` = `existing['version']` (409 nếu đã có bản mới).
+  Future<KnCommandResult> updateRecord(
+    Map<String, Object?> existing, {
+    String? name,
     String? areaHa,
-  }) => run(
-    ApiActionKind.knHouseholdCreate,
-    target: coopRef,
-    body: {
-      'full_name': fullName.trim(),
-      'phone': phone.trim(),
-      if (areaHa != null && areaHa.trim().isNotEmpty)
-        'cultivated_area_ha': areaHa.trim().replaceAll(',', '.'),
-    },
-  );
+    String? taxCode,
+    String? address,
+    String? personName,
+    String? personPhone,
+    String? htxRef,
+  }) {
+    final ref = existing['ref'] as String?;
+    final version = existing['version'];
+    final kind = existing['kind'] as String?;
+    if (ref == null || version is! int || kind == null) {
+      throw KnCommandError('validation_failed', 'Tải lại hồ sơ rồi sửa.');
+    }
+    String? cur(String k) => existing[k] as String?;
+    final household = kind == KnRecordKind.household;
+    final area = _area(areaHa ?? cur('area_ha'));
+    final person = _person(personName, personPhone);
+    return run(
+      ApiActionKind.knRecordUpdate,
+      target: ref,
+      body: {
+        'kind': kind,
+        'commune_code': cur('commune_code'),
+        if (!household) 'name': ?_opt(name ?? cur('name')),
+        if (area.isNotEmpty) 'area_ha': area,
+        if (kind == KnRecordKind.cooperative)
+          'tax_code': ?_opt(taxCode ?? cur('tax_code')),
+        if (!household) 'address': ?_opt(address ?? cur('address')),
+        (household ? 'holder' : 'representative'): ?person,
+        if (household) 'parent_ref': ?cur('parent_ref'),
+        if (kind == KnRecordKind.cooperative)
+          'htx_ref': ?_opt(htxRef ?? cur('htx_ref')),
+        'base_version': version,
+      },
+    );
+  }
 
-  Future<KnCommandResult> updateHousehold(
-    String ref, {
-    required String areaHa,
-    String? reason,
-  }) => run(
-    ApiActionKind.knHouseholdUpdate,
-    target: ref,
-    body: {
-      'cultivated_area_ha': areaHa.trim().replaceAll(',', '.'),
-      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
-    },
-  );
+  /// Vô hiệu hóa (không xóa) hoặc kích hoạt lại hồ sơ [existing]; lý do
+  /// 10–1000 ký tự, kiểm trên máy trước khi xếp hàng.
+  Future<KnCommandResult> setRecordStatus(
+    Map<String, Object?> existing, {
+    required bool deactivate,
+    required String reason,
+  }) {
+    final ref = existing['ref'] as String?;
+    final version = existing['version'];
+    if (ref == null || version is! int) {
+      throw KnCommandError('validation_failed', 'Tải lại hồ sơ rồi thử lại.');
+    }
+    final r = reason.trim();
+    final n = r.runes.length;
+    if (n < kReasonMin || n > kReasonMax) {
+      throw KnCommandError(
+        'validation_failed',
+        'Lý do cần $kReasonMin–$kReasonMax ký tự.',
+      );
+    }
+    return run(
+      deactivate
+          ? ApiActionKind.knRecordDeactivate
+          : ApiActionKind.knRecordReactivate,
+      target: ref,
+      body: {'reason': r, 'base_version': version},
+    );
+  }
 
   // ------------------------------------------------- Máy móc HTX (03.04)
 

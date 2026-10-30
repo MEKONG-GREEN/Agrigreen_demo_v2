@@ -63,7 +63,8 @@ export const DEFAULT_ROUTE: Record<KnRole, string> = {
 
 export const CONTEXT_DEFAULT_ROUTES: Partial<Record<KnMenuProfile, Partial<Record<KnRole, string>>>> = {
   "ke_hoach_tai_chinh": {
-    "kn_tinh": "/kn/khtc/ky-bao-cao"
+    "kn_tinh": "/kn/khtc/ky-bao-cao",
+    "kn_tw": "/kn/khtc/bao-cao-da-xuat"
   },
   "trong_trot": {
     "kn_tinh": "/kn/bao-cao-khtc"
@@ -1335,8 +1336,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tw.khtc.bao_cao_tinh",
             "label": "Báo cáo Tỉnh (KHTC)",
             "route": "/kn/khtc/bao-cao-da-xuat",
-            "icon": "report",
-            "soon": true
+            "icon": "report"
           }
         ]
       }
@@ -2230,6 +2230,12 @@ const ADMIN_SYSTEM: Group = {
       "label": "Mẫu văn bản & lịch sử xuất",
       "route": "/kn/quan-tri/mau-van-ban",
       "icon": "report"
+    },
+    {
+      "key": "admin.qt.nhat_ky_he_thong",
+      "label": "Nhật ký hệ thống",
+      "route": "/kn/quan-tri/nhat-ky-he-thong",
+      "icon": "shield"
     }
   ]
 };

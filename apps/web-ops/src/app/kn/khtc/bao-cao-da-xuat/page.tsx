@@ -1,2 +1,2 @@
-import { KhtcReportsScreen } from "@/kn/khtc/reports/KhtcReportsScreen";
-export default function Page() { return <KhtcReportsScreen mode="history" />; }
+import { KhtcArchiveScreen } from "@/kn/khtc/reports/KhtcArchiveScreen";
+export default function Page() { return <KhtcArchiveScreen />; }

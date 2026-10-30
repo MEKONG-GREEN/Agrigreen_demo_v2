@@ -131,3 +131,13 @@ sau chốt; tuổi nghỉ hưu dùng tham số mẫu Q-070 tại ngày chốt (c
 3. Nhập ngày nghỉ hợp lệ và lý do: Lưu về trang chi tiết, trạng thái/ngày nghỉ cùng ảnh hưởng NS01/NS02 đúng; lịch sử giữ dòng cũ. Hủy về danh sách.
 4. Cấp Xã truy cập trực tiếp route sửa: không có form ghi. Quyền của hồ sơ vẫn được kiểm từ máy chủ.
 5. Phần còn lại của sweep nằm ở #163/#164/#165; không đánh dấu đã nghiệm thu toàn bộ HCTH/KHTC/Báo giá bằng phần này.
+
+## BF-SWEEP-HCTH-REST — phần đầu #163: mục danh mục FN-19
+
+1. Admin mở Danh mục nhân sự (route chính và alias phòng ban), chọn một loại. Bảng có STT; Thêm/Sửa/Lịch sử mở route con, không có dialog. Quay về Danh sách giữ đúng loại danh mục và alias.
+2. Thêm thiếu mã/tên/thứ tự, thiếu thứ hạng trình độ hoặc thiếu trình độ của nhóm chuyên ngành: dấu * và lỗi ngay tại ô; không gọi API ghi. Thử `1e100000`, `1e-100000`, 100000 chữ số, số âm và số rất lớn ở thứ tự/thứ hạng/hệ số phụ cấp, cả blur lẫn Lưu: chặn tại ô.
+3. Giá trị biên đúng: thứ tự 0–100000; thứ hạng nguyên 1–100; phụ cấp để trống hoặc >0 đến 10, hai chữ số thập phân. Nhập `0,30` được gửi theo chuỗi decimal chuẩn. Mã ngạch bỏ khoảng trắng; trùng mã vẫn do máy chủ chặn.
+4. Lưu chuyển tới chi tiết, Sửa không đổi mã/trạng thái ngừng, Log và bảng lịch sử giữ phiên bản cũ; không hiển thị tên người thực hiện giả vì API chưa cung cấp. Giữ nhãn Mẫu và câu hỏi Q-070.
+5. Cấp Tỉnh–HCTH chỉ xem; cấp Xã/phòng khác không được ghi, truy cập trực tiếp route cũng không có form. Quyền chưa tải được không mở form. Thử lại sau lỗi mạng/500 cùng nội dung giữ khóa thao tác; lỗi API có trường hiển thị tại ô.
+6. Vitest `catalog-items.test.tsx`, `hrm.test.tsx`, shared `form.test.tsx`; Playwright `hc-catalog.spec.ts` và hồi quy route FN-08 `hc-nhan-su.spec.ts`. Đây là bằng chứng tự động, chưa thay UAT khách.
+7. Bảng hệ số/quy tắc và sáu màn HCTH còn lại ở #179; phần này không xác nhận tất cả A1–A5 của HCTH đã đạt. Giữ mẫu giấy/FormGrid và M1–M7.
