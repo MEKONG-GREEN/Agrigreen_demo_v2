@@ -376,6 +376,12 @@ const CATALOG_CODE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/;
 /** Cột không phải thuộc tính mục — như catalogImportAliases của máy chủ (masterdata/app/catalog_import.go): ngày áp dụng
  * (valid_from) và cột trạng thái chỉ để đọc của tệp "Xuất danh mục" (#170) không so với attrs, nên tệp xuất nạp lại được. */
 const IMPORT_META = new Set(["catalog", "danh_muc", "code", "ma", "ma_muc", "name", "ten", "ten_muc", "valid_from", "hieu_luc_tu", "ngay_hieu_luc", "trang_thai", "status"]);
+/** Ô của tệp nạp có cùng nội dung với giá trị đã lưu — như csvUnescapeAs của máy chủ: tệp "Xuất danh mục" (toCsv) thêm
+ * dấu nháy trước ô bắt đầu bằng = + - @ tab CR để Excel không chạy công thức, nên "'" + giá trị đó vẫn là cùng nội dung. */
+function sameCell(cell: string, stored: string | undefined): boolean {
+  if (stored === undefined) return false;
+  return cell === stored || (/^[=+\-@\t\r]/.test(stored) && cell === `'${stored}`);
+}
 
 export const htxAdminRoutes: Route[] = [
   {
@@ -421,7 +427,7 @@ export const htxAdminRoutes: Route[] = [
         if (attrs.growth_days !== undefined && !(Number(attrs.growth_days) > 0)) return { row, status: "rejected" as const, catalog, code, reason: "Thời gian sinh trưởng phải lớn hơn 0." };
         const existing = list.find((x) => x.code === code);
         if (existing) {
-          const same = existing.name === name && Object.entries(attrs).every(([k, v]) => existing.attrs[k] === v);
+          const same = sameCell(name, existing.name) && Object.entries(attrs).every(([k, v]) => sameCell(v, existing.attrs[k]));
           return same
             ? { row, status: "skipped" as const, catalog, code, reason: "Đã có mục cùng nội dung" }
             : { row, status: "rejected" as const, catalog, code, reason: "Mã đã có với nội dung khác — sửa từng mục trên màn hình danh mục" };

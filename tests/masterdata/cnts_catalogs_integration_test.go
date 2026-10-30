@@ -241,6 +241,31 @@ func TestBFCNCatalog_IndicatorThresholdsSeedsExport(t *testing.T) {
 	if st, body := reader.get("/v1/masterdata/catalogs/cnts_indicator/DO_TRONG"); st != http.StatusOK || body["attrs"].(map[string]any)["trang_thai"] != nil {
 		t.Fatalf("cột trạng thái không thành thuộc tính: %d %v", st, body)
 	}
+
+	// Review Codex 7e29: nút Xuất (toCsv) thêm dấu nháy trước ô bắt đầu bằng = + - @; nạp lại chính tệp đó vẫn bỏ qua
+	// (kể cả tên 200 ký tự thành 201 ký tự sau dấu nháy), còn ô có nội dung khác vẫn bị từ chối.
+	long := "-" + strings.Repeat("x", 199)
+	for _, it := range []struct{ code, name, desc string }{{"RT_DASH", "- Chỉ tiêu gạch", "- Theo dõi nhiệt độ ao mỗi ngày"},
+		{"RT_AT", "@Chỉ tiêu a", "=1+1"}, {"RT_PLUS", "+ Chỉ tiêu b", "@ghi chú"}, {"RT_LONG", long, "+ đo sáng"}} {
+		if st, body := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_indicator/items", map[string]any{"code": it.code, "name": it.name,
+			"valid_from": "2026-10-01", "attrs": map[string]string{"value_type": "decimal", "unit": "°C", "description": it.desc}}); st != http.StatusCreated {
+			t.Fatalf("tạo %s: %d %v", it.code, st, body)
+		}
+	}
+	csv = "catalog,code,name,valid_from,unit,value_type,threshold_min,threshold_max,diary_metric,description,trang_thai\r\n" +
+		"cnts_indicator,RT_DASH,'- Chỉ tiêu gạch,2026-10-01,°C,decimal,,,,'- Theo dõi nhiệt độ ao mỗi ngày,Đang dùng\r\n" +
+		"cnts_indicator,RT_AT,'@Chỉ tiêu a,2026-10-01,°C,decimal,,,,'=1+1,Đang dùng\r\n" +
+		"cnts_indicator,RT_PLUS,'+ Chỉ tiêu b,2026-10-01,°C,decimal,,,,'@ghi chú,Đang dùng\r\n" +
+		"cnts_indicator,RT_LONG,'" + long + ",2026-10-01,°C,decimal,,,,'+ đo sáng,Đang dùng\r\n"
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte("\xef\xbb\xbf"+csv))
+	if st != http.StatusOK || body["skipped"] != 4.0 || body["created"] != 0.0 || body["rejected"] != 0.0 {
+		t.Fatalf("nạp lại tệp xuất có dấu nháy chống công thức: %d %v", st, body)
+	}
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte("catalog,code,name,unit,value_type,description\n"+
+		"cnts_indicator,RT_DASH,'- Chỉ tiêu gạch,°C,decimal,'- Mô tả khác\n"))
+	if st != http.StatusOK || body["rejected"] != 1.0 || body["skipped"] != 0.0 {
+		t.Fatalf("ô có dấu nháy nhưng nội dung khác vẫn phải bị từ chối: %d %v", st, body)
+	}
 }
 
 // seededFacilities: 4 CSGM mẫu của dữ liệu nền (BF-CN-SLAUGHTER #169) có đủ trường CN-10 và mã xã là xã An Giang còn hiệu lực.

@@ -6919,11 +6919,11 @@ components:
       description: Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic).
       properties:
         id: {type: string, format: uuid}
-        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale, price_reminder, price_alert, price_verify_request, price_verify_reply, price_verify_decision, price_lock_summary, price_board_approved, price_board_reopened, price_proxy_entry]}
+        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale, price_reminder, price_alert, price_verify_request, price_verify_reply, price_verify_decision, price_lock_summary, price_board_approved, price_board_reopened, price_proxy_entry, cnts_knqg_sent, cnts_knqg_reviewed, cnts_knqg_submitted]}
         severity: {type: string, enum: [urgent, normal]}
         title: {type: string, maxLength: 300}
         body: {type: string, maxLength: 2000}
-        deep_link: {type: string, description: "Đường dẫn trong app: /extension/directives/{id}, /documents/{ref}, /extension/tasks/{id}, /sync/conflicts/{id}, /orgs/{ref}"}
+        deep_link: {type: string, description: "Đường dẫn trong app: /extension/directives/{id}, /documents/{ref}, /extension/tasks/{id}, /sync/conflicts/{id}, /orgs/{ref}, /kn/cnts/du-an-mau-bieu?doc={ref} (W11.53b: biểu dự án KNQG)"}
         subject_ref: {type: [string, "null"], format: uuid}
         created_at: {type: string, format: date-time}
         read_at: {type: [string, "null"], format: date-time}

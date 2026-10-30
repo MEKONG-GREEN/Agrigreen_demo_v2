@@ -116,7 +116,10 @@ describe("Kỳ KHTC — mở / trùng / hủy / đóng (mock theo hợp đồng)
     ).toBe("ok");
   });
   it("phát sinh: phải nhập hạn nộp", async () => {
-    const api = client();
+    const response=await mockFetchNoDelay(new Request("http://mock/v1/me/context",{method:"POST",headers:{Authorization:"Bearer mock.kn-admin","Content-Type":"application/json","Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({assignment_id:"asg-admin"})}));
+    expect(response.ok).toBe(true);
+    const selected=await response.json() as {context_id:string};
+    const api=createKhtcPeriodApi(createApiClient({baseUrl:"http://mock",getAccessToken:()=>"mock.kn-admin",getContextId:()=>selected.context_id,fetch:mockFetchNoDelay}));
     expect(
       await code(
         api.open({

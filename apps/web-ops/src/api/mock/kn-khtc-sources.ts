@@ -123,7 +123,8 @@ function asOf(live: Live): Status["as_of"] {
 
 function canRefresh(ctx: Ctx): boolean {
   const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
-  return !kc || (kc.role === "kn_tinh" && kc.department_code === "ke_hoach_tai_chinh");
+  if(kc?.role==="admin"&&!kc.read_only){const period=khtcMockStore().find(p=>p.p.id===ctx.params[0]);if(period?.p.report_type==="adhoc")return true;}
+  return !kc || (kc.role === "kn_tinh" && kc.department_code === "ke_hoach_tai_chinh"&&!kc.read_only);
 }
 
 function status(ctx: Ctx, id: string): Status {

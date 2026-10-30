@@ -5,8 +5,7 @@ import { createAdminApiClient, createApiClient, unwrap } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
 import { CATALOGS } from "@/api/mock/data";
 import { resetCntsVersions } from "@/api/mock/kn-cnts-catalogs";
-import { toCsvText } from "@/lib/csv";
-import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase } from "./CntsCatalogScreen";
+import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase, exportCatalogCsv } from "./CntsCatalogScreen";
 import { CNTS_TABS, cleanAttrs, effectiveThreshold, expectedDate, exportRows, formatDoses, normalizeAttrs, parseDoses, tabOf, templateRows, validateAttrs } from "./schema";
 
 const nav = { path: "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts", params: {} as Record<string, string>, search: "" };
@@ -85,12 +84,21 @@ describe("Xuất danh mục → Nạp lại (#170, review Codex #168)", () => {
     const admin = createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", fetch: mockAdminFetchNoDelay });
     const tab = tabOf("cnts_indicator");
     const at = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
-    await unwrap(
-      admin.POST("/v1/masterdata/catalogs/{catalog}/items", {
-        params: { path: { catalog: "cnts_indicator" } },
-        body: { code: "NHIET_DO_RT", name: "Nhiệt độ ao (xuất-nạp)", valid_from: at, attrs: { value_type: "decimal", unit: "°C", diary_metric: "temp_c", threshold_min: "25", threshold_max: "32" } },
-      } as never),
-    );
+    // Mô tả gạch đầu dòng và tên bắt đầu bằng @ + = - : nút Xuất (toCsv) thêm dấu nháy chống công thức Excel (review 7e29).
+    const created = [
+      { code: "NHIET_DO_RT", name: "Nhiệt độ ao (xuất-nạp)", description: "- Theo dõi nhiệt độ ao mỗi ngày" },
+      { code: "RT_AT", name: "@Chỉ tiêu nạp lại", description: "+ đo buổi sáng" },
+      { code: "RT_EQ", name: "= Chỉ tiêu bằng", description: "=1+1" },
+      { code: "RT_DASH", name: "- Chỉ tiêu gạch", description: "@ghi chú" },
+    ];
+    for (const c of created) {
+      await unwrap(
+        admin.POST("/v1/masterdata/catalogs/{catalog}/items", {
+          params: { path: { catalog: "cnts_indicator" } },
+          body: { code: c.code, name: c.name, valid_from: at, attrs: { value_type: "decimal", unit: "°C", diary_metric: "temp_c", threshold_min: "25", threshold_max: "32", description: c.description } },
+        } as never),
+      );
+    }
     const page = await unwrap(
       admin.GET("/v1/masterdata/catalogs/{catalog}/items", { params: { path: { catalog: "cnts_indicator" }, query: { at, include_inactive: true } } }),
     );
@@ -99,19 +107,25 @@ describe("Xuất danh mục → Nạp lại (#170, review Codex #168)", () => {
     const rows = exportRows(tab, items);
     expect(rows[0]).toEqual(expect.arrayContaining(["valid_from", "trang_thai"]));
     expect(rows.find((r) => r[1] === "NHIET_DO_RT")?.[3]).toBe(at);
+    // Đúng hàm nút "Xuất danh mục" dùng (exportCatalogCsv: BOM, CRLF, dấu nháy chống công thức).
+    const file = exportCatalogCsv(tab, items);
+    expect(file.charCodeAt(0)).toBe(0xfeff);
+    for (const cell of ["'- Theo dõi nhiệt độ ao mỗi ngày", "'@Chỉ tiêu nạp lại", "'+ đo buổi sáng", "'= Chỉ tiêu bằng", "'=1+1", "'- Chỉ tiêu gạch", "'@ghi chú"]) {
+      expect(file).toContain(cell);
+    }
     const res = await unwrap(
       admin.POST("/v1/masterdata/catalog-imports", {
         params: { header: { "Idempotency-Key": "rt-170" } },
-        body: String.fromCharCode(0xfeff) + toCsvText(rows), // như nút Xuất danh mục (toCsv: BOM + CRLF)
+        body: file,
         bodySerializer: (b: unknown) => b as BodyInit,
         headers: { "Content-Type": "text/csv" },
       } as never),
     );
-    expect(items.length).toBeGreaterThanOrEqual(4);
+    expect(items.length).toBeGreaterThanOrEqual(7);
     expect(res).toMatchObject({ total: items.length, skipped: items.length, created: 0, rejected: 0 });
     // Dọn mục vừa tạo khỏi dữ liệu giả lập dùng chung để không ảnh hưởng các test màn hình bên dưới.
     const list = CATALOGS.cnts_indicator;
-    list.splice(list.findIndex((i) => i.code === "NHIET_DO_RT"), 1);
+    for (const c of created) list.splice(list.findIndex((i) => i.code === c.code), 1);
     resetCntsVersions();
   });
 });

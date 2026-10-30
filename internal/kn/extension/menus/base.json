@@ -210,6 +210,17 @@
           "ComingSoon": false,
           "Needs": "",
           "Children": null
+        },
+        {
+          "Key": "admin.qt.nhat_ky_he_thong",
+          "Label": "Nhật ký hệ thống",
+          "Route": "/kn/quan-tri/nhat-ky-he-thong",
+          "Icon": "shield",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
         }
       ]
     },
