@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
@@ -34,15 +35,19 @@ func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 
 // fixtureDeps: cấu hình owner được inject vào accounts.Deps (nil = bridge legacy, như gốc lắp ráp hiện hành).
 type fixtureDeps struct {
-	Roles *accport.RoleCatalog
+	Roles           *accport.RoleCatalog
+	AssignmentRules accport.AssignmentRules
+	Attributes      *accport.AttributeCatalog
 }
 
 type fixture struct {
 	t      *testing.T
 	iss    *authztest.FakeIssuer
-	srv    *httptest.Server
+	srv    *httptest.Server // Admin API (MFA)
+	app    *httptest.Server // Application API (ngữ cảnh phiên X-AG-Context)
 	dir    *accounts.MemoryDirectory
 	tenant uuid.UUID
+	depts  *fakeDepartments
 
 	national, p91, team30292, coop30292, team31120 uuid.UUID
 }
@@ -59,14 +64,26 @@ func newFixture(t *testing.T, d fixtureDeps) *fixture {
 	f.team30292 = pty.add(f.tenant, partyport.OrgExtensionTeam, "30292")
 	f.coop30292 = pty.add(f.tenant, partyport.OrgCooperative, "30292")
 	f.team31120 = pty.add(f.tenant, partyport.OrgExtensionTeam, "31120")
+	f.depts = newFakeDepartments(f)
+	// Phiên chủ KN như gốc lắp ráp (bản tĩnh, không sổ cnts_grant).
+	sessions, err := authz.NewSessionRegistry(extension.SessionProjection())
+	if err != nil {
+		t.Fatal(err)
+	}
 	mod := accounts.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{
-		Directory: f.dir, Scope: pty, Orgs: pty, Roles: d.Roles,
+		Directory: f.dir, Scope: pty, Orgs: pty, Roles: d.Roles, AssignmentRules: d.AssignmentRules, Attributes: d.Attributes,
+		Departments: f.depts, Sessions: sessions,
 	})
-	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
-	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(),
-		idempotency.Middleware(env.Pool(t, migrations.PF, "platform_api"))))
+	ops := env.Pool(t, migrations.PF, "platform_api")
+	log := telemetry.NewLogger("test", io.Discard)
+	eng := httpx.NewEngine(log, 1<<20)
+	mod.RegisterAdmin(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(), mod.Middleware(), idempotency.Middleware(ops)))
 	f.srv = httptest.NewServer(eng)
 	t.Cleanup(f.srv.Close)
+	appEng := httpx.NewEngine(log, 1<<20)
+	mod.RegisterApp(appEng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), mod.Middleware(), idempotency.Middleware(ops)))
+	f.app = httptest.NewServer(appEng)
+	t.Cleanup(f.app.Close)
 	return f
 }
 
@@ -86,6 +103,11 @@ type resp struct {
 
 func (c caller) raw(method, path, idem, ctype string, body []byte) resp {
 	c.f.t.Helper()
+	return c.rawWith(method, path, idem, ctype, body, nil)
+}
+
+func (c caller) rawWith(method, path, idem, ctype string, body []byte, hdr map[string]string) resp {
+	c.f.t.Helper()
 	var rd io.Reader
 	if body != nil {
 		rd = bytes.NewReader(body)
@@ -99,6 +121,9 @@ func (c caller) raw(method, path, idem, ctype string, body []byte) resp {
 		req.Header.Set("Idempotency-Key", idem)
 	}
 	req.Header.Set("Content-Type", ctype)
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		c.f.t.Fatal(err)
@@ -267,7 +292,48 @@ func (p *fakeParty) Scope(ctx context.Context) (authz.Scope, error) {
 	return authz.Scope{Units: []string{o.AdminUnitCode}}, nil
 }
 
+// fakeDepartments thực hiện party/port.Departments: đơn vị = Nút cấp 1/2 (khai trực tiếp), phòng ban theo đơn vị.
+type fakeDepartments struct {
+	unit  map[uuid.UUID]uuid.UUID
+	depts map[uuid.UUID][]partyport.Department
+}
+
+func newFakeDepartments(f *fixture) *fakeDepartments {
+	mk := func(unit uuid.UUID, code, status string) partyport.Department {
+		return partyport.Department{ID: ids.New(), OrgRef: unit, Code: code, Name: "Phòng " + code, Status: status}
+	}
+	d := &fakeDepartments{unit: map[uuid.UUID]uuid.UUID{f.national: f.national, f.p91: f.p91, f.team30292: f.p91},
+		depts: map[uuid.UUID][]partyport.Department{
+			f.p91: {mk(f.p91, "trong_trot", partyport.DeptActive), mk(f.p91, "chan_nuoi", partyport.DeptNotOpen),
+				mk(f.p91, "bao_ve_thuc_vat", partyport.DeptActive)},
+			f.national: {mk(f.national, "trong_trot", partyport.DeptActive)},
+		}}
+	return d
+}
+
+func (d *fakeDepartments) DepartmentUnit(_ context.Context, org uuid.UUID) (uuid.UUID, error) {
+	u, ok := d.unit[org]
+	if !ok {
+		return uuid.Nil, partyport.ErrOrgNotFound
+	}
+	return u, nil
+}
+
+func (d *fakeDepartments) UnitDepartments(_ context.Context, unit uuid.UUID) ([]partyport.Department, error) {
+	return slices.Clone(d.depts[unit]), nil
+}
+
+func (d *fakeDepartments) DepartmentByCode(_ context.Context, unit uuid.UUID, code string) (partyport.Department, error) {
+	for _, x := range d.depts[unit] {
+		if x.Code == code && !x.Retired {
+			return x, nil
+		}
+	}
+	return partyport.Department{}, partyport.ErrDepartmentNotFound
+}
+
 var (
+	_ partyport.Departments   = (*fakeDepartments)(nil)
 	_ partyport.Orgs          = (*fakeParty)(nil)
 	_ partyport.OrgCodes      = (*fakeParty)(nil)
 	_ partyport.ScopeResolver = (*fakeParty)(nil)
