@@ -198,10 +198,11 @@ func WordTemplate(template string) doctpl.Template {
 
 // WordTemplates là mẫu Word của Mẫu 1–5 (đăng ký vào pf/export ở gốc lắp ráp).
 func WordTemplates() []doctpl.Template {
-	out := make([]doctpl.Template, 0, 5)
+	out := make([]doctpl.Template, 0, 7)
 	for _, m := range []string{"mau_1", "mau_2", "mau_3", "mau_4", "mau_5", "adhoc"} {
 		out = append(out, WordTemplate(m))
 	}
+	out = append(out, FixedWordTemplate())
 	return out
 }
 

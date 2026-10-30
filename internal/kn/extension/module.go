@@ -97,10 +97,11 @@ type Module struct {
 	// W11.64: bộ đọc nguồn module của Kỳ KHTC (extension/khtcsource, module_khtcsource.go).
 	khtcSrc *khtcSourceService
 	// W11.63: phiếu Báo cáo cho KHTC (extension/khtcform, module_khtc.go).
-	khtcForms   *khtcFormService
-	khtcReports *khtcReportService
-	khtcExt     *khtcExternalService // W11.67: số liệu nguồn ngoài (extension/khtcext, module_khtcext.go)
-	objects     objstore.Store
+	khtcForms     *khtcFormService
+	khtcReports   *khtcReportService
+	khtcTemplates *khtcTemplateService // W11.65: five fixed report authoring/publication ledgers.
+	khtcExt       *khtcExternalService // W11.67: số liệu nguồn ngoài (extension/khtcext, module_khtcext.go)
+	objects       objstore.Store
 	// W11.43 (D4 CN3): quy tắc liên biểu + 12 cảnh báo CNTS, vòng đời cảnh báo, nhắc nộp theo biểu (module_cntsalert.go).
 	alert *alertapp.Service
 	// W11.46 (D4 CN6): lịch trực KSGM BM-03, lịch tiêm phòng BM-07 (extension/cntscal).
@@ -218,6 +219,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerKHTCPeriods(rg) // W11.62
 	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
 	m.registerKHTCReports(rg)                          // W11.66
+	m.registerKHTCTemplates(rg)                        // W11.65
 	m.registerKHTCSources(rg)                          // W11.64
 	m.registerKHTCExternal(rg)                         // W11.67
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
