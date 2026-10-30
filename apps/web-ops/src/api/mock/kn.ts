@@ -2230,6 +2230,12 @@ const ADMIN_SYSTEM: Group = {
       "label": "Mẫu văn bản & lịch sử xuất",
       "route": "/kn/quan-tri/mau-van-ban",
       "icon": "report"
+    },
+    {
+      "key": "admin.qt.nhat_ky_he_thong",
+      "label": "Nhật ký hệ thống",
+      "route": "/kn/quan-tri/nhat-ky-he-thong",
+      "icon": "shield"
     }
   ]
 };
