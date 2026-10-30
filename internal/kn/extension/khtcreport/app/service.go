@@ -72,6 +72,12 @@ func (s *Service) reader(ctx context.Context) (caller, error) {
 	return caller{principal: p, kn: k}, nil
 }
 func writer(c caller, p pstore.Period) error {
+	if p.Type == period.TypeAdhoc && c.kn.Role == port.SessionRoleAdmin && !c.kn.ReadOnly() {
+		if !c.principal.MFA {
+			return problem.MFARequired
+		}
+		return nil
+	}
 	if c.kn.Role != port.SessionRoleProvince || c.kn.Department != party.DeptKeHoachTaiChinh || c.kn.ReadOnly() {
 		return problem.Forbidden
 	}
@@ -121,6 +127,8 @@ func classify(err error) error {
 			return ErrCancelling
 		case "khtc_report_export_draft":
 			return ErrVersion
+		case "khtc_adhoc_request_pending":
+			return ErrProvisional.WithDetail("Còn yêu cầu bổ sung chưa hoàn tất")
 		case "khtc_report_final_export":
 			return ErrProvisional
 		}
@@ -274,6 +282,12 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 		if p, term, e = loadPeriod(ctx, tx, id); e != nil {
 			return e
 		}
+		if p.Type == period.TypeAdhoc && c.kn.Role == port.SessionRoleAdmin && !c.principal.MFA {
+			return problem.MFARequired
+		}
+		if p.Type == period.TypeAdhoc && (c.kn.Role == port.SessionRoleNational || c.kn.ReadOnly()) {
+			return problem.Forbidden
+		}
 		if draft, e = store.LatestDraft(ctx, tx, id); e != nil {
 			return e
 		}
@@ -317,7 +331,7 @@ func (s *Service) changed(ctx context.Context, c caller, p pstore.Period, data d
 	if current.InputHash != data.InputHash {
 		return true, ""
 	}
-	if s.Sources != nil {
+	if s.Sources != nil && (p.Type != "adhoc" || data.Sources != nil) {
 		state, e := s.Sources.Status(ctx, p.ID)
 		if e != nil {
 			return false, "Không kiểm tra được nguồn module"

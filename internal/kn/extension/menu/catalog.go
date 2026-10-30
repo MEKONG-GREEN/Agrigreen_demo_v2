@@ -19,7 +19,7 @@ import (
 
 // Version là phiên bản bảng menu (client lưu đệm theo phiên bản). Đổi menu = đổi nguồn JSON VÀ tăng
 // phiên bản ở đây cùng bản compatibility (party domain.MenuVersion) cho tới khi #53 gỡ cầu nối.
-const Version = "kn.menu/v7"
+const Version = "kn.menu/v9"
 
 // tableNames là các bảng mà bộ sinh chấp nhận (scripts/gen-module-menus.mjs compileMenus).
 var tableNames = []string{"trongTrotMenus", "genericMenus", "adminDeptItems", "AdminOverview", "AdminSystem", "defaultRoutes",

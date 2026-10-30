@@ -12,8 +12,10 @@ import 'package:sqflite_common/sqlite_api.dart';
 ///   đã đọc, xác nhận chỉ đạo, lưu/bỏ lưu tài liệu), phát lại khi có mạng.
 /// - `consent_local` (v2): sổ đồng ý ghi trên máy (chỉ mã tham chiếu hộ).
 /// - `tile_pack`, `map_tile` (v2): gói bản đồ ngoại tuyến (nằm trong SQLCipher).
+/// - v4: không đổi cấu trúc; bỏ các lệnh `api_action` ghi HTX nền tảng còn chờ
+///   (`RetiredActionKind`, KNSPLIT-2-KN-RECORDS #161 — KN không ghi HTX).
 abstract final class Schema {
-  static const version = 3;
+  static const version = 4;
 
   static Future<void> create(Database db) async {
     final b = db.batch();
@@ -192,6 +194,19 @@ CREATE TABLE map_tile (
       final b = db.batch();
       _createV3Tables(b);
       await b.commit(noResult: true);
+    }
+    if (from < 4) {
+      // Lệnh ghi HTX/nông hộ nền tảng của bản cũ (`/v1/kn/cooperatives…`)
+      // không phát lại nữa: đánh dấu thất bại `retired` (dọn sau 48 giờ).
+      await db.rawUpdate(
+        "UPDATE api_action SET status = 'failed', last_error = 'retired', "
+        'done_at = ? '
+        "WHERE status = 'pending' AND kind IN ("
+        "'kn_cooperative_create','kn_cooperative_update',"
+        "'kn_cooperative_deactivate','kn_household_create',"
+        "'kn_household_update')",
+        [DateTime.now().millisecondsSinceEpoch],
+      );
     }
   }
 }
