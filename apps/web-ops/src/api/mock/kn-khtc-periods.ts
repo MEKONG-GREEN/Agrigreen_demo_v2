@@ -181,6 +181,8 @@ export function planOf(b: Input): Plan | { field: string; reason: string } {
 
 // --- trạng thái ---
 export interface Stored {
+ adhocTenant?:string;
+ adhocOwner?:string;
  reportFinal?: boolean;
   p: Period;
   submitted: Record<
@@ -458,15 +460,22 @@ export const khtcPeriodRoutes: Route[] = [
   {
     method: "POST",
     pattern: /^\/v1\/extension\/khtc\/periods\/preview$/,
-    handler: (ctx) => writer(ctx) ?? draftOf(ctx.body as Input),
+    handler: (ctx) => {
+ const k=knContext(ctx.request.headers.get("X-AG-Context")??"");
+ if((ctx.body as Input)?.report_type==="adhoc"&&k?.role==="admin"&&!k.read_only)return draftOf(ctx.body as Input);
+ return writer(ctx)??draftOf(ctx.body as Input);
+},
   },
   {
     method: "POST",
     pattern: /^\/v1\/extension\/khtc\/periods$/,
     handler: (ctx) => {
-      const deny = writer(ctx);
-      if (deny) return deny;
-      const b = ctx.body as Input;
+      const b=ctx.body as Input;
+      const selected=knContext(ctx.request.headers.get("X-AG-Context")??"");
+      if(b?.report_type==="adhoc"){
+       if(!selected || selected.read_only || !(selected.role==="admin" || selected.role==="kn_tinh"&&selected.department_code==="ke_hoach_tai_chinh"))return problem(403,"forbidden","Chọn phiên KHTC có quyền soạn");
+      }else{const deny=writer(ctx);if(deny)return deny;}
+
       const plan = planOf(b);
       if ("field" in plan) return validation([plan]);
       if (plan.dueRequired && !b.due_at)
@@ -500,6 +509,7 @@ export const khtcPeriodRoutes: Route[] = [
         submitted: {},
         terminal: "",
       };
+      if(b.report_type==="adhoc"){s.adhocTenant=ctx.persona.me.tenant_id;s.adhocOwner=ctx.persona.me.actor_ref;}
       STORE.push(s);
       return json(project(s), 201);
     },

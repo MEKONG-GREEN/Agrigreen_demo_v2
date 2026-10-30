@@ -852,6 +852,9 @@ export const cntsDiaryRoutes: Route[] = [
       if (size > 576 * 1024)
         return problem(422, "extension.cnts_diary_photo_invalid", "Ảnh không hợp lệ", { errors: [{ field: "file", reason: "quá 500 KB" }] });
       const ref = field("id") || uuidv7();
+      // Như máy chủ (cntsdiary/app/photos.go): id ảnh đã lưu thì không lưu lại (bấm lại đúng ảnh đã được phát lại theo khóa).
+      if (PHOTOS.has(ref))
+        return problem(422, "extension.cnts_diary_photo_invalid", "Ảnh không hợp lệ", { errors: [{ field: "id", reason: "mã ảnh đã dùng" }] });
       const p: S["CNTSDiaryPhoto"] = {
         file_ref: ref,
         household_ref: hh,

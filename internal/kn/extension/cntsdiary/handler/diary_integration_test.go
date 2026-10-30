@@ -108,6 +108,7 @@ type files struct {
 	byRef    map[uuid.UUID]evport.File
 	blobs    map[uuid.UUID][]byte
 	purposes []string
+	attaches int // số lần Attach thật (phát lại Idempotency-Key không được gọi lại — #172)
 }
 
 func (f *files) Attach(ctx context.Context, in evport.AttachInput) (evport.File, bool, error) {
@@ -127,6 +128,7 @@ func (f *files) Attach(ctx context.Context, in evport.AttachInput) (evport.File,
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.byRef[ref], f.blobs[ref] = file, append([]byte(nil), in.Blob...)
+	f.attaches++
 	return file, true, nil
 }
 
@@ -293,6 +295,27 @@ func (u user) upload(household, kind string, content []byte) resp {
 	r, _ := http.NewRequest(http.MethodPost, u.f.srv.URL+base+"diary-photos", &buf)
 	r.Header.Set("Content-Type", w.FormDataContentType())
 	return u.send(r, key())
+}
+
+// photoBody dựng thân multipart TẤT ĐỊNH như web (#172: boundary cố định, id + captured_at do client giữ khi bấm lại).
+func photoBody(household, kind, id string, content []byte) ([]byte, string) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	_ = w.SetBoundary("----AgFormBoundary172photo")
+	_ = w.WriteField("household_ref", household)
+	_ = w.WriteField("kind", kind)
+	_ = w.WriteField("id", id)
+	_ = w.WriteField("captured_at", t0.Add(-time.Hour).Format(time.RFC3339))
+	fw, _ := w.CreateFormFile("file", "anh.jpg")
+	_, _ = fw.Write(content)
+	_ = w.Close()
+	return buf.Bytes(), w.FormDataContentType()
+}
+
+func (u user) uploadRaw(k, ctype string, body []byte) resp {
+	r, _ := http.NewRequest(http.MethodPost, u.f.srv.URL+base+"diary-photos", bytes.NewReader(body))
+	r.Header.Set("Content-Type", ctype)
+	return u.send(r, k)
 }
 
 func key() string                            { return "k-" + ids.New().String() }
@@ -558,6 +581,40 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	f.files.mu.Unlock()
 	if len(blob) == 0 || bytes.Contains(blob, []byte("IHDR")) {
 		t.Fatal("kho tệp phải giữ bản mã, không giữ ảnh rõ")
+	}
+	// #172: mất phản hồi sau khi đã lưu → web gửi lại đúng thân multipart (cùng id, cùng boundary) với cùng khóa → máy chủ
+	// phát lại ảnh đã lưu, không mã hóa/lưu lần hai; cùng khóa mà khác ảnh → idempotency_key_reused.
+	pid := ids.New().String()
+	pb, pct := photoBody(hCa, "weighing", pid, pngBytes)
+	pk := key()
+	p1 := officer.uploadRaw(pk, pct, pb)
+	want(t, p1, 201, "", "tải ảnh (multipart tất định)")
+	f.files.mu.Lock()
+	before := f.files.attaches
+	f.files.mu.Unlock()
+	p2 := officer.uploadRaw(pk, pct, pb)
+	if want(t, p2, 201, "", "bấm lại sau mất phản hồi"); str(p2.body, "file_ref") != pid || !bytes.Equal(p2.raw, p1.raw) {
+		t.Fatalf("phải phát lại đúng ảnh đã lưu: %s / %s", p1.raw, p2.raw)
+	}
+	f.files.mu.Lock()
+	after := f.files.attaches
+	f.files.mu.Unlock()
+	if after != before {
+		t.Fatalf("phát lại không được lưu ảnh lần hai: %d → %d", before, after)
+	}
+	ob, oct := photoBody(hCa, "weighing", pid, append(bytes.Clone(pngBytes), 0))
+	want(t, officer.uploadRaw(pk, oct, ob), 422, "idempotency_key_reused", "cùng khóa, khác ảnh")
+	// Review #172: khác ảnh + khóa mới nhưng dùng lại id ảnh đã lưu (cùng hộ) → 422 "mã ảnh đã dùng", không còn 409
+	// "chủ hộ chưa có khóa", và không mã hóa/lưu gì thêm.
+	reused := officer.uploadRaw(key(), oct, ob)
+	if want(t, reused, 422, "extension.cnts_diary_photo_invalid", "khóa mới, id ảnh đã dùng"); !bytes.Contains(reused.raw, []byte("mã ảnh đã dùng")) {
+		t.Fatalf("id ảnh đã dùng phải báo ở trường id: %s", reused.raw)
+	}
+	f.files.mu.Lock()
+	reAttach := f.files.attaches
+	f.files.mu.Unlock()
+	if reAttach != after {
+		t.Fatalf("id ảnh đã dùng không được Attach: %d → %d", after, reAttach)
 	}
 	want(t, officer.post(base+"diary-entries", merge(fish, map[string]any{"photo_refs": []string{ids.New().String()},
 		"metrics": merge(fish["metrics"].(map[string]any), map[string]any{"action_note": "Thay 30% nước"})})), 422,

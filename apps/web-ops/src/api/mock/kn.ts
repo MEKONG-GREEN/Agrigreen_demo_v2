@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v7";
+export const MENU_VERSION = "kn.menu/v9";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -1267,6 +1267,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/khtc/mau-bao-cao",
             "icon": "table",
             "soon": true
+          },
+          {
+            "key": "tinh.khtc.phat_sinh",
+            "label": "Báo cáo phát sinh",
+            "route": "/kn/khtc/bao-cao-phat-sinh",
+            "icon": "report"
           }
         ]
       },
@@ -1920,6 +1926,12 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Báo cáo KHTC",
       "route": "/kn/phong-ban/{department}/bao-cao-khtc",
       "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_phat_sinh",
+      "label": "Báo cáo phát sinh",
+      "route": "/kn/khtc/bao-cao-phat-sinh",
+      "icon": "report"
     }
   ],
   "thong_tin_truyen_thong": [
@@ -2228,6 +2240,12 @@ const ADMIN_SYSTEM: Group = {
       "label": "Mẫu văn bản & lịch sử xuất",
       "route": "/kn/quan-tri/mau-van-ban",
       "icon": "report"
+    },
+    {
+      "key": "admin.qt.nhat_ky_he_thong",
+      "label": "Nhật ký hệ thống",
+      "route": "/kn/quan-tri/nhat-ky-he-thong",
+      "icon": "shield"
     }
   ]
 };

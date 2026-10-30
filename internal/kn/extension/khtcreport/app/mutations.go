@@ -20,9 +20,10 @@ import (
 )
 
 type SaveInput struct {
-	BaseVersion int64              `json:"base_version"`
-	Admin       map[string]*string `json:"admin"`
-	Texts       map[string]string  `json:"texts"`
+	Adhoc       *domain.AdhocSelection `json:"adhoc,omitempty"`
+	BaseVersion int64                  `json:"base_version"`
+	Admin       map[string]*string     `json:"admin"`
+	Texts       map[string]string      `json:"texts"`
 }
 type ExportInput struct {
 	BaseVersion            int64         `json:"base_version"`
@@ -75,7 +76,7 @@ func (s *Service) Save(ctx context.Context, id uuid.UUID, in SaveInput, idem str
 	if err != nil {
 		return Detail{}, err
 	}
-	edits := domain.Edits{Admin: in.Admin, Texts: in.Texts}
+	edits := domain.Edits{Admin: in.Admin, Texts: in.Texts, Adhoc: in.Adhoc}
 	if err = edits.Validate(domain.Template(p.Type)); err != nil {
 		return Detail{}, ErrInvalid.WithCause(err)
 	}
@@ -251,6 +252,9 @@ func (s *Service) Export(ctx context.Context, id uuid.UUID, in ExportInput, idem
 		if draft == nil || !sameVersion(draft, in.BaseVersion) {
 			return ErrVersion.WithDetail("Lưu bản soạn hiện tại trước khi xuất")
 		}
+		if e := sameSupplementSnapshot(ctx, tx, id, draft.Content.Data); e != nil {
+			return e
+		}
 		provisional := len(draft.Content.Data.Provisional) > 0
 		if provisional && !in.AcknowledgeProvisional {
 			return ErrProvisional
@@ -355,8 +359,13 @@ func (s *Service) Finalize(ctx context.Context, id, exportID uuid.UUID, idem str
 		if e != nil {
 			return e
 		}
-		if x.Content.Data.Sources == nil || snapshot == nil || x.Content.Data.Sources.ID != snapshot.ID {
-			return ErrChanged
+		if e := sameSupplementSnapshot(ctx, tx, id, x.Content.Data); e != nil {
+			return e
+		}
+		if x.Content.Data.Template != "adhoc" || x.Content.Data.Sources != nil {
+			if x.Content.Data.Sources == nil || snapshot == nil || x.Content.Data.Sources.ID != snapshot.ID {
+				return ErrChanged
+			}
 		}
 		return store.InsertFinal(ctx, tx, c.principal.TenantID, store.Final{ID: ids.New(), PeriodID: id, ExportID: exportID, ActorRef: c.principal.ActorRef, At: s.now()}, "khtc:report:final:"+id.String()+":"+idem)
 	})

@@ -5,6 +5,8 @@
 // - Diện tích tính từ hình vẽ, không nhập (máy chủ tính lại trên hình; số ở web chỉ để xem trước).
 // - Chồng lấn thửa khác: máy chủ chặn (409 geo.plot_overlap, #113) — web báo rõ và không lưu phần nào sau đó.
 // Hình, tên, chủ hộ, HTX ở pf/cooperative (/v1/kn/plots); cây trồng ở hồ sơ KN riêng (/v1/kn/plot-profiles, #119).
+// #162 mục 1: ô HTX chọn theo hồ sơ KN riêng (HtxRecordPicker, giá trị = htx_ref); thửa cũ tham chiếu HTX chưa có hồ sơ KN
+// liên kết vẫn hiện, ghi rõ "chưa liên kết hồ sơ KN". Ghi thửa vẫn qua /v1/kn/plots (mục 3 chờ PO).
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -19,6 +21,7 @@ import { boundsOf, m2ToHa, polygonAreaM2, polygonGeometry, validatePolygon, type
 import type { KnPlot, KnPlotDetail, KnPlotUpdate, PlotShapes } from "../api";
 import { LoadState, num, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { GapNotice, useCommuneFilter } from "./DataScreens";
+import { HtxRecordPicker } from "./HtxRecordPicker";
 import { PlotDrawPanel, PlotEditorMap } from "./PlotMap";
 
 /** Khoảng diện tích máy chủ nhận cho thửa (geo.area_out_of_range: 0,001 – 1.000 ha). */
@@ -184,7 +187,6 @@ export function PlotCreateScreen() {
   const [coords, setCoords] = useState<LngLat[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof PlotForm | "geometry", string>>>({});
   const shapes = useLoad(form.commune_code ? () => collectApi.plotShapes(form.commune_code).catch(() => null) : null, [form.commune_code]);
-  const coops = useLoad(form.commune_code ? () => collectApi.cooperatives({ commune: form.commune_code }) : null, [form.commune_code]);
   const context = useMemo(() => contextOf(shapes.data), [shapes.data]);
   const server = act.problem ? fieldErrorMap(act.problem) : {};
   const set = (k: keyof PlotForm) => (v: string) => setForm((x) => ({ ...x, [k]: v }));
@@ -241,7 +243,11 @@ export function PlotCreateScreen() {
         <TextField label="Tên thửa" required value={form.lot_name} onChange={set("lot_name")} error={err("lot_name")} maxLength={200} />
         <TextField label="Chủ hộ" required value={form.farmer_name} onChange={set("farmer_name")} error={err("farmer_name")} maxLength={200} hint="Lưu ở kho định danh, hiển thị che." />
         <SelectField label="Cây trồng" required value={form.crop_code} onChange={set("crop_code")} error={err("crop_code")} options={crops} />
-        <SelectField label="HTX" value={form.cooperative_ref} onChange={set("cooperative_ref")} error={err("cooperative_ref")} placeholder="Không thuộc HTX" options={(coops.data?.items ?? []).map((c) => ({ value: c.ref, label: c.name }))} />
+        {form.commune_code ? (
+          <HtxRecordPicker value={form.cooperative_ref} onChange={set("cooperative_ref")} commune={form.commune_code} error={err("cooperative_ref")} placeholder="Không thuộc HTX" />
+        ) : (
+          <SelectField label="HTX" value="" onChange={() => undefined} disabled placeholder="Chọn Xã/phường trước" options={[]} />
+        )}
         <AreaReadout ha={coords.length >= 3 ? num(ha.toFixed(4), 4) : ""} note="Tính từ hình vẽ, không nhập. Máy chủ tính lại khi lưu." />
         <TextField label="Ghi chú" multiline value={form.note} onChange={set("note")} error={err("note")} maxLength={1000} hint={<PiiHint text={form.note} />} />
       </div>
@@ -275,7 +281,6 @@ export function PlotEditScreen() {
   }, [id]);
   const commune = s.data?.plot.commune_code ?? "";
   const shapes = useLoad(commune ? () => collectApi.plotShapes(commune).catch(() => null) : null, [commune]);
-  const coops = useLoad(commune ? () => collectApi.cooperatives({ commune }) : null, [commune]);
   const name = useCommuneNames(commune ? [commune] : []);
   const [form, setForm] = useState<PlotForm | null>(null);
   const [redraw, setRedraw] = useState(false);
@@ -354,7 +359,7 @@ export function PlotEditScreen() {
                 hint={plot.farmer?.label ? `Hiện tại: ${plot.farmer.label}. Để trống = giữ nguyên; nhập họ tên để đổi chủ hộ.` : "Bắt buộc nhập (thửa chưa có chủ hộ)."}
               />
               <SelectField label="Cây trồng" required disabled={locked} value={f.crop_code} onChange={set("crop_code")} error={err("crop_code")} options={crops} />
-              <SelectField label="HTX" disabled={locked} value={f.cooperative_ref} onChange={set("cooperative_ref")} error={err("cooperative_ref")} placeholder="Không thuộc HTX" options={(coops.data?.items ?? []).map((c) => ({ value: c.ref, label: c.name }))} />
+              <HtxRecordPicker value={f.cooperative_ref} onChange={set("cooperative_ref")} commune={plot.commune_code} disabled={locked} error={err("cooperative_ref")} placeholder="Không thuộc HTX" />
               <AreaReadout ha={ha} note={redraw ? "Tính từ hình đang vẽ lại, không nhập." : "Tính từ hình đã lưu, không nhập."} />
               <TextField label="Ghi chú" multiline disabled={locked} value={f.note} onChange={set("note")} error={err("note")} maxLength={1000} hint={<PiiHint text={f.note} />} />
             </div>
