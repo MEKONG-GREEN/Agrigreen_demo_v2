@@ -137,3 +137,13 @@ items/points/tickets/reports/surveys tiếp ở #182. Đây là đối chiếu/k
 | BG-FN-AD-04.04 | Route xem/sửa kỳ, thêm/xem ngoại lệ; lỗi từng ô; DataTable/STT; log lịch từ history. API ngoại lệ chưa trả actor/time/history nên Log nói rõ giới hạn | `calendar-config.test.tsx`, `calendar-form.test.ts`, `price-config.spec.ts`, `TestPriceCalendarHTTP_W1174` |
 | BG-FN-AD-04.05 | Route xem/sửa nhắc, giữ thứ tự giờ/biến mẫu/ngày hiệu lực; gửi thử cấu hình đã lưu; lịch sử gửi dùng DataTable | Các test UI/E2E trên và test nhắc hiện hành |
 | BG-FN-AD-04.06 | Route mặc định/nhóm/mặt hàng; định danh bất biến khi sửa; NumberField/validateForm và guard trước Decimal; Log actor/thời điểm/cũ→mới; xóa có xác nhận, không xóa mặc định | `TestConfigDecimalBounds`, hostile HTTP trong `TestPriceCalendarHTTP_W1174`, UI/E2E trên |
+
+## BG-ITEM-PROPOSAL (#37) — chứng cứ đường vào đề xuất, 30/10/2026
+
+Lát này bổ sung chứng cứ cho BG-UR-XA-06 và BG-FN-AD-04.03 AC-05 trên lõi W11.73/W11.74 hiện hành. Không thay trạng thái của các AC khác hay biên bản UAT của PO. Giả định và giới hạn: [BG-ITEM-PROPOSAL](../kn/gia-dinh/BG-ITEM-PROPOSAL.md).
+
+- `TestPriceProposalFlowHTTP` đã đạt hai subcase HTTP/PostgreSQL/race, không SKIP: chỉ QTNV/Admin quyết định, đúng tenant/điểm/người đề xuất, duyệt lặp không thêm mặt hàng, từ chối phải có lý do; mặt hàng gán cho xã đề xuất từ ngày báo giá kế tiếp qua cuối tuần/ngày lễ/ngày bổ sung, danh mục trước hiệu lực giữ nguyên.
+- `proposal-route.test.tsx` đạt 3/3 cùng hồi quy `items.test.tsx` 6/6; `price-proposal-menus.test.mjs` đạt 2/2 và controlled mutation bắt lỗi Sắp có. `kn-menu.contract.test.ts` đạt 34/34 sau khi sinh lại fixture Go; đề xuất ở Điều hành của Tỉnh/Xã, danh mục Tỉnh ở Dữ liệu.
+- `price-item-proposals.spec.ts` đạt 1/1 trên production mock: tạo assignment Tỉnh chỉ có phòng Báo giá qua UI Admin, đăng nhập thật, đi menu Tỉnh/Xã, gửi hai đề xuất, Admin duyệt/từ chối rồi Xã chỉ xem lịch sử của mình. Browser chứng minh đường bấm/consumer; QTNV và ngày hiệu lực lấy từ native test trên.
+
+Checkpoint này chưa READY: cổng trên nguồn kết hợp và phiên bản menu cuối chờ thứ tự #33 → #31 → #19 → #37. Refactor Dialog/DetailPage của ItemsScreen thuộc #182; thông báo kết quả đề xuất chưa được bổ sung.

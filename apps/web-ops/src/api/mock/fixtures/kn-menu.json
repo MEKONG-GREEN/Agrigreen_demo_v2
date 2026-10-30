@@ -2961,6 +2961,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.bao_gia.de_xuat_mat_hang",
+        "label": "Đề xuất mặt hàng",
+        "route": "/kn/bao-gia/de-xuat-mat-hang",
+        "icon": "package",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      },
@@ -3093,9 +3102,7 @@
         "route": "/kn/bao-gia/mat-hang",
         "icon": "package",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -3217,6 +3224,15 @@
         "label": "Yêu cầu xác minh",
         "route": "/kn/bao-gia/xac-minh",
         "icon": "check",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "xa.bao_gia.de_xuat_mat_hang",
+        "label": "Đề xuất mặt hàng",
+        "route": "/kn/bao-gia/de-xuat-mat-hang",
+        "icon": "package",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -4311,8 +4327,6 @@
           "icon": "package",
           "badge_source": null,
           "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
           "children": []
          }
         ]
