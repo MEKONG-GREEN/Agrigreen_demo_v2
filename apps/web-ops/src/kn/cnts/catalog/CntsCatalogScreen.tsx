@@ -50,6 +50,12 @@ const PAGE = 20;
 type TabId = CntsCatalog | "thresholds";
 type Item = CatalogItem & { valid_from?: string };
 
+/** Nội dung tệp của nút "Xuất danh mục": CSV UTF-8 có BOM, CRLF, dấu nháy trước ô bắt đầu bằng = + - @ (chống công thức
+ * Excel). Bộ nạp danh mục coi ô có dấu nháy đó là cùng nội dung với mục đã có, nên tệp nạp lại được (#170). */
+export function exportCatalogCsv(tab: CatalogTab, items: Parameters<typeof exportRows>[1]): string {
+  return toCsv(exportRows(tab, items));
+}
+
 function vnToday(): string {
   return new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
 }
@@ -273,7 +279,7 @@ export function CntsCatalogScreen() {
                 disabled={!rows.data}
                 onClick={() =>
                   rows.data &&
-                  saveBlob(new Blob([toCsv(exportRows(current, rows.data))], { type: "text/csv;charset=utf-8" }), `danh-muc-${current.id}-${at}.csv`)
+                  saveBlob(new Blob([exportCatalogCsv(current, rows.data)], { type: "text/csv;charset=utf-8" }), `danh-muc-${current.id}-${at}.csv`)
                 }
               >
                 <Icon name="download" size={15} />

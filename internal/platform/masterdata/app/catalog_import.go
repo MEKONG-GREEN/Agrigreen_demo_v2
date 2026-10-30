@@ -144,6 +144,12 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				}
 				it.ValidFrom = d
 			}
+			// Ô bị tệp xuất thêm dấu nháy chống công thức được so với mục đã có trước khi chuẩn hóa (độ dài tên/thuộc tính).
+			if prev, err := store.Item(ctx, tx, it.Catalog, it.Code, false); err != nil {
+				return err
+			} else if prev != nil {
+				it = csvFormulaEscapedAs(it, *prev)
+			}
 			norm, err := s.normalizeCatalogItem(s.prepareCatalogIdentity(it))
 			if err != nil {
 				row.Reason = importReason(err)
@@ -204,6 +210,29 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 		return CatalogImportResult{}, err
 	}
 	return res, nil
+}
+
+// csvFormulaEscapedAs: tệp "Xuất danh mục" thêm dấu nháy đơn trước ô bắt đầu bằng = + - @ tab CR để Excel không chạy
+// công thức (#170). Khi so với mục đã có, ô đúng bằng "'" + giá trị đã lưu (giá trị đó bắt đầu bằng ký tự công thức)
+// được coi là chính giá trị đã lưu, nên tệp vừa xuất nạp lại được. Chỉ áp khi mã đã có; dòng tạo mới giữ nguyên ô.
+func csvFormulaEscapedAs(in, cur domain.Item) domain.Item {
+	in.Name = csvUnescapeAs(in.Name, cur.Name)
+	if len(in.Attrs) == 0 {
+		return in
+	}
+	attrs := make(map[string]string, len(in.Attrs))
+	for k, v := range in.Attrs {
+		attrs[k] = csvUnescapeAs(v, cur.Attrs[k])
+	}
+	in.Attrs = attrs
+	return in
+}
+
+func csvUnescapeAs(cell, stored string) string {
+	if stored != "" && strings.ContainsRune("=+-@\t\r", rune(stored[0])) && strings.TrimSpace(cell) == "'"+stored {
+		return stored
+	}
+	return cell
 }
 
 func (r *CatalogImportResult) add(row CatalogImportRow) {
