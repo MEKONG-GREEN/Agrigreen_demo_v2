@@ -123,7 +123,7 @@ var implementedMenu = map[string]bool{"admin.pb.bao_cao_khtc": true, "admin.pb.b
 // chưa có là "Sắp có"; phòng ban seed cũ (menu_profile generic) nhận khuôn riêng theo mã. BF-MENU (#98, kn.menu/v6, R-A6):
 // mục nghiệp vụ nằm trong 3 nhóm Điều hành / Báo cáo / Dữ liệu, không còn nhóm "Nghiệp vụ".
 func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
-	if domain.MenuVersion != "kn.menu/v9" {
+	if domain.MenuVersion != "kn.menu/v10" {
 		t.Fatal(domain.MenuVersion)
 	}
 	keys := func(gs []domain.MenuGroup) []string {

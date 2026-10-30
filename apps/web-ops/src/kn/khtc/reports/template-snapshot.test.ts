@@ -38,6 +38,8 @@ describe("fixed template composer snapshot",()=>{
   expect(await (await reports.download(p.id,x.id)).blob.text()).toBe(download);
   const w=await reports.word(p.id,x.id);expect(w.template).toBe("khtc.fixed");
   const word=await (await reports.downloadWord(p.id,w.id)).blob.text();expect(word).toContain("Lời văn đã ghim");expect(word).not.toContain("revision sau");expect(word).not.toContain("KHUÔN CÂU MỚI");
+  expect.soft(download.match(/Lời văn đã ghim/g)).toHaveLength(1);
+  expect.soft(word.match(/Lời văn đã ghim/g)).toHaveLength(1);
   const next=await periods.open({report_type:"week",year:new Date().getFullYear(),no:36,departments:["trong_trot"]});
   expect((await reports.get(next.id)).content.template_snapshot?.id).toBe(v2.id);
   const month=await periods.open({report_type:"month",year:new Date().getFullYear(),no:10,departments:["trong_trot"]});
