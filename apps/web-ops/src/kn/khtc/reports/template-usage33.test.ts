@@ -1,9 +1,9 @@
 import {expect,it} from "vitest";
 import {createApiClient} from "@/api/client";
-import {mockFetchNoDelay} from "./handler";
-import {findPersona} from "./personas";
-import type {Ctx} from "./http";
-import {khtcTemplateNarrativeUsage,khtcTemplatePreviewContent} from "./kn-khtc-reports";
+import {mockFetchNoDelay} from "@/api/mock/handler";
+import {findPersona} from "@/api/mock/personas";
+import type {Ctx} from "@/api/mock/http";
+import {khtcTemplateNarrativeUsage,khtcTemplatePreviewContent} from "@/api/mock/kn-khtc-reports";
 import {createKhtcPeriodApi} from "@/kn/khtc/periods/api";
 import {createReportApi} from "@/kn/khtc/reports/api";
 

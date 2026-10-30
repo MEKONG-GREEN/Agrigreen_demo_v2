@@ -150,6 +150,14 @@ func (pb Publisher) publishBatch(ctx context.Context, in port.BatchInput, idem s
 	if err := domain.ValidateUnits(in.Units); err != nil {
 		return nil, problem.Validation.WithField("units", err.Error())
 	}
+	// Durable receipts use PostgreSQL timestamptz precision. Normalize only this
+	// optional path, after its authorization fingerprint, without mutating callers.
+	if replay {
+		in.Periods = append([]port.PeriodDef(nil), in.Periods...)
+		for i := range in.Periods {
+			in.Periods[i].DueAt = in.Periods[i].DueAt.Truncate(time.Microsecond)
+		}
+	}
 	kind := unitKindOf(prof, in.UnitKind)
 	parents, err := s.facilityParents(ctx, kind, in.Units, in.UnitParents, in.Periods[0].From)
 	if err != nil {
