@@ -1,0 +1,19 @@
+{
+  "id": "extension-khtc-template",
+  "order": 1650,
+  "tables": {
+    "adminDeptBusiness": {
+      "ke_hoach_tai_chinh": [{
+        "Key": "admin.pb.khtc_muc_luc_mau",
+        "Label": "Mục lục mẫu báo cáo",
+        "Route": "/kn/phong-ban/{department}/muc-luc-mau",
+        "Icon": "report",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": false,
+        "Needs": "",
+        "Children": null
+      }]
+    }
+  }
+}

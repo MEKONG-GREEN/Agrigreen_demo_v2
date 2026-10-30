@@ -96,6 +96,8 @@ func progressOf(v *PeriodView) port.PeriodProgress {
 	for _, u := range v.Units {
 		up := port.UnitProgress{Unit: u.Unit, Status: u.Status, Parent: u.Parent}
 		if u.Submission != nil {
+			id := u.Submission.ID
+			up.LastSubmissionID = &id
 			at := u.Submission.EventTime
 			up.Versions, up.LastSubmittedAt = u.Submission.Version, &at
 		}

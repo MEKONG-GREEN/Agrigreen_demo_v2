@@ -191,11 +191,14 @@ func PlanOf(rule rc.PeriodRule, r Request, loc *time.Location) (Plan, error) {
 		p.DueRequired = true
 	case TypeAdhoc:
 		name := strings.TrimSpace(r.Name)
-		if n := utf8.RuneCountInString(name); n < 3 || n > 150 {
+		if n := utf8.RuneCountInString(name); n < 3 || n > 150 || strings.ContainsRune(name, 0) {
 			return Plan{}, ErrInput{"name", "tên báo cáo 3–150 ký tự"}
 		}
 		if r.From == nil || r.To == nil || r.To.Before(*r.From) {
 			return Plan{}, ErrInput{"to_date", "từ ngày, đến ngày bắt buộc; đến ngày ≥ từ ngày"}
+		}
+		if r.From.Year() < 2000 || r.To.Year() > 2100 {
+			return Plan{}, ErrInput{"to_date", "khoảng ngày trong các năm2000–2100"}
 		}
 		p.From, p.To = rc.Date(r.From.Year(), r.From.Month(), r.From.Day()), rc.Date(r.To.Year(), r.To.Month(), r.To.Day())
 		if p.To.Sub(p.From) > 366*24*time.Hour {

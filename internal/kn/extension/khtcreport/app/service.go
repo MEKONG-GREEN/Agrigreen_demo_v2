@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	source "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/app"
+	templatedomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtctemplate/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	forms "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
@@ -41,6 +42,7 @@ var (
 )
 
 type Service struct {
+	Templates  port.KHTCFixedTemplates
 	DB         tenant.Beginner
 	Clock      clock.Clock
 	Plans      port.KHTCPlans
@@ -72,6 +74,12 @@ func (s *Service) reader(ctx context.Context) (caller, error) {
 	return caller{principal: p, kn: k}, nil
 }
 func writer(c caller, p pstore.Period) error {
+	if p.Type == period.TypeAdhoc && c.kn.Role == port.SessionRoleAdmin && !c.kn.ReadOnly() {
+		if !c.principal.MFA {
+			return problem.MFARequired
+		}
+		return nil
+	}
 	if c.kn.Role != port.SessionRoleProvince || c.kn.Department != party.DeptKeHoachTaiChinh || c.kn.ReadOnly() {
 		return problem.Forbidden
 	}
@@ -121,6 +129,8 @@ func classify(err error) error {
 			return ErrCancelling
 		case "khtc_report_export_draft":
 			return ErrVersion
+		case "khtc_adhoc_request_pending":
+			return ErrProvisional.WithDetail("Còn yêu cầu bổ sung chưa hoàn tất")
 		case "khtc_report_final_export":
 			return ErrProvisional
 		}
@@ -258,6 +268,9 @@ type Detail struct {
 	SourceChanged bool
 	SourceError   string
 	Terminal      string
+	Sections      []domain.Section
+	Document      *templatedomain.Rendered
+	LockedAdmin   []string
 }
 
 func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
@@ -273,6 +286,12 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 		var e error
 		if p, term, e = loadPeriod(ctx, tx, id); e != nil {
 			return e
+		}
+		if p.Type == period.TypeAdhoc && c.kn.Role == port.SessionRoleAdmin && !c.principal.MFA {
+			return problem.MFARequired
+		}
+		if p.Type == period.TypeAdhoc && (c.kn.Role == port.SessionRoleNational || c.kn.ReadOnly()) {
+			return problem.Forbidden
 		}
 		if draft, e = store.LatestDraft(ctx, tx, id); e != nil {
 			return e
@@ -297,11 +316,17 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 		if e != nil {
 			return Detail{}, e
 		}
+		if e = s.pinNewTemplate(ctx, &out.Content, term); e != nil {
+			return Detail{}, e
+		}
 	} else {
 		out.Content = draft.Content
 		out.Version = draft.Version
 		did := draft.ID
 		out.DraftID = &did
+	}
+	if err = decorateFixedDetail(&out); err != nil {
+		return Detail{}, err
 	}
 	changed, reason := s.changed(ctx, c, p, out.Content.Data)
 	out.SourceChanged, out.SourceError = changed, reason
@@ -317,7 +342,7 @@ func (s *Service) changed(ctx context.Context, c caller, p pstore.Period, data d
 	if current.InputHash != data.InputHash {
 		return true, ""
 	}
-	if s.Sources != nil {
+	if s.Sources != nil && (p.Type != "adhoc" || data.Sources != nil) {
 		state, e := s.Sources.Status(ctx, p.ID)
 		if e != nil {
 			return false, "Không kiểm tra được nguồn module"

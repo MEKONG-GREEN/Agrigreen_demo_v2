@@ -72,6 +72,29 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
     expect(menuAllows(tinh, "/kn/nhiem-vu/phat-hanh")).toBe(true);
   });
 
+  it("phiếu/rà soát KHTC dùng đúng mục cha đang mở, không cho phép cả prefix hoặc menu bị tắt", () => {
+    const id = "01963011-1234-7123-8123-123456789abc";
+    const form = "/kn/khtc/phieu/" + id, review = "/kn/khtc/ra-soat/" + id;
+    const only = (href: string, status?: "not_open" | "coming_soon"): MenuTree => ({
+      ...tinh, groups: [{ key: "test", label: "Báo cáo", items: [{ key: "entry", label: "Phiếu", icon: "file", href, status }] }],
+    });
+    const own = only("/kn/bao-cao-khtc"), manager = only("/kn/khtc/ky-bao-cao"), adhoc = only("/kn/khtc/bao-cao-phat-sinh");
+    expect(menuAllows(own, form)).toBe(true);
+    expect(menuAllows(own, review)).toBe(false);
+    for (const tree of [manager, adhoc]) {
+      expect(menuAllows(tree, form)).toBe(true);
+      expect(menuAllows(tree, review)).toBe(true);
+      expect(crumbsFor(tree, review)).toEqual(["Báo cáo", "Phiếu"]);
+    }
+    for (const tree of [tw, only("/kn/bao-cao-khtc", "not_open"), only("/kn/khtc/bao-cao-phat-sinh", "coming_soon")]) {
+      expect(menuAllows(tree, form)).toBe(false);
+      expect(menuAllows(tree, review)).toBe(false);
+    }
+    for (const route of ["/kn/khtc/phieu/other", form + "/sua", "/kn/khtc/ra-soat", "/kn/khtc/quan-tri/" + id]) {
+      expect(menuAllows(adhoc, route)).toBe(false);
+    }
+  });
+
   it("số đếm chỉ cho việc cần xử lý, ẩn khi bằng 0", () => {
     const node = menuLinks(tinh).find((l) => l.node.label === "Trạng thái nộp")!.node;
     expect(badgeOf(node, { counts: { "extension.report_status.not_submitted": 15 } })).toBe(15);

@@ -9,6 +9,7 @@ import { resetKnCollect } from "@/api/mock/kn-collect";
 import { ApiProblem } from "@/api/problem";
 import { createCollectApi } from "@/kn/cycle/api";
 import { MachinesScreen, machineServerErrors, machineYearError, validateMachineLines, vnYear } from "./DataScreens";
+import { knHtxRecord, recordsMock } from "./htxRecordsFixture";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/kn/du-lieu/may-moc",
@@ -25,13 +26,14 @@ vi.mock("@/auth/AuthProvider", () => ({
   }),
 }));
 
-const coop = { ref: "htx-1", code: "HTX01", name: "HTX Mỹ Hòa", commune_code: "91301", active: true };
 const YEAR = vnYear();
 
 beforeEach(() => {
   auth.role = "kn_xa";
   auth.collectApi = {
-    cooperatives: vi.fn().mockResolvedValue({ items: [coop] }),
+    // #162: bộ chọn HTX đọc hồ sơ KN riêng; giá trị = htx_ref (HTX đã công bố mà khai báo máy tham chiếu).
+    records: recordsMock([knHtxRecord("kn-1", "HTX Mỹ Hòa", "htx-1")]),
+    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
     machines: vi.fn().mockResolvedValue({ commune_totals: [] }),
     coopMachines: vi.fn().mockResolvedValue({ cooperative_ref: "htx-1", name: "HTX Mỹ Hòa", lines: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", quantity: 2, note: null }], total: 2 }),
     machineProfile: vi.fn().mockResolvedValue({ cooperative_ref: "htx-1", commune_code: "91301", department_code: "trong_trot", items: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", year_made: 2019 }] }),

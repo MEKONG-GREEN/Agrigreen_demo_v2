@@ -1269,6 +1269,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/khtc/mau-bao-cao",
             "icon": "table",
             "soon": true
+          },
+          {
+            "key": "tinh.khtc.phat_sinh",
+            "label": "Báo cáo phát sinh",
+            "route": "/kn/khtc/bao-cao-phat-sinh",
+            "icon": "report"
           }
         ]
       },
@@ -1919,6 +1925,18 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "key": "admin.pb.khtc_bao_cao",
       "label": "Báo cáo KHTC",
       "route": "/kn/phong-ban/{department}/bao-cao-khtc",
+      "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_phat_sinh",
+      "label": "Báo cáo phát sinh",
+      "route": "/kn/khtc/bao-cao-phat-sinh",
+      "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_muc_luc_mau",
+      "label": "Mục lục mẫu báo cáo",
+      "route": "/kn/phong-ban/{department}/muc-luc-mau",
       "icon": "report"
     }
   ],
