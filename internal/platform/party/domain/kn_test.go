@@ -165,10 +165,24 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			}
 			continue
 		}
-		if code == port.DeptKeHoachTaiChinh { // W11.68: actual adhoc screen has its dedicated KHTC route.
-			last := admin[len(admin)-1]
-			if last.Key != "admin.pb.khtc_phat_sinh" || last.Route != "/kn/khtc/bao-cao-phat-sinh" || last.ComingSoon || !implementedMenu[last.Key] {
-				t.Fatalf("KHTC Admin phát sinh: %+v", last)
+		if code == port.DeptKeHoachTaiChinh { // W11.65/W11.68: kiểm hai mục theo khóa, độc lập vị trí trong menu.
+			for key, route := range map[string]string{
+				"admin.pb.khtc_phat_sinh":   "/kn/khtc/bao-cao-phat-sinh",
+				"admin.pb.khtc_muc_luc_mau": "/kn/phong-ban/" + code + "/muc-luc-mau",
+			} {
+				matches := 0
+				for _, item := range admin {
+					if item.Key != key {
+						continue
+					}
+					matches++
+					if item.Route != route || item.ComingSoon || !implementedMenu[item.Key] {
+						t.Fatalf("KHTC Admin %s: %+v", key, item)
+					}
+				}
+				if matches != 1 {
+					t.Fatalf("KHTC Admin %s: có %d mục, cần đúng một", key, matches)
+				}
 			}
 			continue
 		}
