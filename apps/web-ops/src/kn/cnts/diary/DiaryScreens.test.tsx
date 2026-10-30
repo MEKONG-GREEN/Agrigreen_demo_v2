@@ -6,6 +6,7 @@ import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsDiary } from "@/api/mock/kn-cnts-diary";
 import { resetCntsModel } from "@/api/mock/kn-cnts-model";
 import type * as Common from "@/kn/cycle/common";
+import { addDays, vnDate } from "@/kn/schedule/week";
 import { DiaryScreen } from "./DiaryScreen";
 import { ReviewScreen } from "./ReviewScreen";
 import { GrowthSection } from "./parts";
@@ -68,7 +69,9 @@ it("BF-CN-DIARY #109: đầu sổ, vật tư mục 1, mục 4 nguyên liệu th�
   expect(within(growth).getByText("Tuần 12")).toBeInTheDocument();
   expect(screen.getByRole("table", { name: "Yêu cầu kỹ thuật cần đạt" })).toHaveTextContent("Tỷ lệ sống của gà 4 tuần tuổi");
   // Lần ghi có mục 3, mục 4 và phần 3.
-  const day = new Date(Date.now() - 3 * 86_400_000).toLocaleDateString("sv-SE").split("-").reverse().join("/");
+  // Cùng đồng hồ với dữ liệu giả lập (ngày Việt Nam, kn-cnts-diary.ts), không theo múi giờ máy chạy test: CI chạy UTC,
+  // từ 17:00 UTC ngày VN đã sang hôm sau.
+  const day = addDays(vnDate(Date.now()), -3).split("-").reverse().join("/");
   await user.click(await screen.findByRole("button", { name: day }));
   const mat = await screen.findByRole("table", { name: "Mua nguyên liệu thức ăn chăn nuôi (NC-09)" });
   expect(within(mat).getByText("Tấm gạo")).toBeInTheDocument();

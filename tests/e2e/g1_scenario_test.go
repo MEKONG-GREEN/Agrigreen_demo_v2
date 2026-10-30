@@ -1061,6 +1061,12 @@ func TestRB3ErasureEvidenceUnreadable(t *testing.T) {
 // to_jsonb(dòng) nên RENAME COLUMN đứt chuỗi băm (ADR-0012, migratecheck CheckLedgerColumns), và
 // migration đã áp không sửa (R-24). Miễn đúng cột này, đúng cây partition của survey_form và chỉ
 // khi kiểu là boolean (không thể chứa SĐT). PRICE-SURVEY-PII-GUARD-001 chứng minh không che gì khác.
+//
+// CI-GREEN-DEV (#185): pf_extension.kn_producer.address (KNSPLIT-2-KN-RECORDS #67) là địa chỉ TỔ CHỨC (trụ sở HTX/Tổ hợp
+// tác), cùng loại với địa chỉ công vụ pf_contact.unit. Địa chỉ Nông hộ không được ghi: ràng buộc kn_producer_org_only
+// buộc dòng household có address NULL; họ tên/SĐT người đại diện, chủ hộ ở vault (person_ref). Không đổi tên được: bảng sổ
+// (row_hash băm to_jsonb(dòng), ADR-0012) và migration đã áp (R-24). Miễn đúng cột này, đúng cây partition của kn_producer
+// và CHỈ khi ràng buộc org-only còn chặn address của Nông hộ. KN-PRODUCER-ORG-ADDRESS-GUARD-001 chứng minh không che gì khác.
 const piiColumnQuery = `SELECT table_schema, table_name, column_name FROM information_schema.columns
 	  WHERE (table_schema LIKE 'pf\_%' OR table_schema = 'shared')
 	    AND column_name ~* '(full_?name|phone|national_?id|cccd|address|dia_chi|ho_ten)'
@@ -1069,7 +1075,14 @@ const piiColumnQuery = `SELECT table_schema, table_name, column_name FROM inform
         JOIN pg_class c ON c.oid = p.relid))
       AND NOT (table_schema = 'pf_price' AND column_name = 'has_phone' AND data_type = 'boolean'
        AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_price.survey_form'::regclass) p
-        JOIN pg_class c ON c.oid = p.relid))`
+        JOIN pg_class c ON c.oid = p.relid))
+      AND NOT (table_schema = 'pf_extension' AND column_name = 'address'
+       AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_extension.kn_producer'::regclass) p
+        JOIN pg_class c ON c.oid = p.relid)
+       AND EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid = 'pf_extension.kn_producer'::regclass
+        AND k.conname = 'kn_producer_org_only' AND k.contype = 'c'
+        AND pg_get_constraintdef(k.oid) LIKE '%(kind <> ''household''::text)%'
+        AND pg_get_constraintdef(k.oid) LIKE '%(address IS NULL)%'))`
 
 // ORG-PII-GUARD-001: ngoại lệ công vụ không che cột PII khác hay bảng tên gần giống.
 func TestContactPublicColumnsDoNotHidePII_ORGUI(t *testing.T) {
@@ -1167,5 +1180,78 @@ func TestPriceSurveyHasPhoneFlagDoesNotHidePII(t *testing.T) {
 	}
 	if got := flagged(tx); !got["survey_form.has_phone"] || !got["survey_form_default.has_phone"] {
 		t.Fatalf("has_phone kiểu text phải bị bắt: %v", got)
+	}
+}
+
+// KN-PRODUCER-ORG-ADDRESS-GUARD-001 (#185): ngoại lệ địa chỉ tổ chức của hồ sơ KN không che cột PII khác trên kn_producer,
+// bảng tên gần giống, và mất hiệu lực khi bỏ ràng buộc chặn địa chỉ Nông hộ.
+func TestKNProducerOrgAddressDoesNotHidePII(t *testing.T) {
+	s := harness.New(t)
+	ctx := context.Background()
+	tx, err := s.AdminPF().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	flagged := func() map[string]bool {
+		rows, err := tx.Query(ctx, piiColumnQuery)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		got := map[string]bool{}
+		for rows.Next() {
+			var schema, table, col string
+			if err := rows.Scan(&schema, &table, &col); err != nil {
+				t.Fatal(err)
+			}
+			if schema == "pf_extension" {
+				got[table+"."+col] = true
+			}
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	var parts []string
+	prows, err := tx.Query(ctx, `SELECT c.relname FROM pg_partition_tree('pf_extension.kn_producer'::regclass) p
+	  JOIN pg_class c ON c.oid = p.relid WHERE p.isleaf`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for prows.Next() {
+		var n string
+		if err := prows.Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		parts = append(parts, n)
+	}
+	prows.Close()
+	if len(parts) == 0 {
+		t.Fatal("kn_producer phải có partition để kiểm ngoại lệ lan xuống")
+	}
+	// Ràng buộc org-only còn: address của kn_producer và mọi partition được miễn.
+	for k := range flagged() {
+		if strings.HasPrefix(k, "kn_producer") && strings.HasSuffix(k, ".address") {
+			t.Fatalf("địa chỉ tổ chức của kn_producer không được nhận diện: %s", k)
+		}
+	}
+
+	if _, err = tx.Exec(ctx, `ALTER TABLE pf_extension.kn_producer ADD COLUMN full_name text;
+	  CREATE TABLE pf_extension.kn_producer_probe (address text)`); err != nil {
+		t.Fatal(err)
+	}
+	got := flagged()
+	if !got["kn_producer.full_name"] || !got[parts[0]+".full_name"] || !got["kn_producer_probe.address"] {
+		t.Fatalf("ngoại lệ address đã che dữ liệu cá nhân ngoài phạm vi: %v", got)
+	}
+
+	// Bỏ ràng buộc chặn địa chỉ Nông hộ → address là dữ liệu cá nhân tiềm năng, phải bị bắt lại.
+	if _, err = tx.Exec(ctx, `ALTER TABLE pf_extension.kn_producer DROP CONSTRAINT kn_producer_org_only`); err != nil {
+		t.Fatal(err)
+	}
+	if got := flagged(); !got["kn_producer.address"] || !got[parts[0]+".address"] {
+		t.Fatalf("address không còn ràng buộc org-only phải bị bắt: %v", got)
 	}
 }

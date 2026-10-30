@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"math"
 	"runtime"
 	"strings"
 	"testing"
@@ -63,8 +64,14 @@ func allocBytes(f func()) uint64 {
 }
 
 // Số mũ ngắn do người dùng nhập không được phóng thành bigint trước khi bị từ chối (qua ParseValue, API Validate, Excel CheckRows).
+// Dưới -race, sync.Pool bỏ ngẫu nhiên phần tử khi Put nên máy so khớp regexp trong CheckRows bị cấp phát lại ngẫu nhiên (CI
+// 29/10: dòng lỗi 76384 B so với dòng hợp lệ 39832 B, chỉ ở một giá trị) — khi đó chỉ kiểm từ chối, không so số byte. Bản
+// build thường (go test không -race) vẫn giữ ngân sách byte.
 func TestParseValueRejectsHostileInputWithinBudget(t *testing.T) {
-	const budget = 16 << 10
+	budget := uint64(16 << 10)
+	if raceEnabled {
+		budget = math.MaxUint64 / 2 // chỉ kiểm lỗi; base+budget không tràn
+	}
 	now := time.Date(2026, 10, 28, 0, 0, 0, 0, time.UTC)
 	for _, raw := range []string{"1e100000", "1e-100000", "1e2147483647", "1e-2147483648", strings.Repeat("9", 1<<16)} {
 		if used := allocBytes(func() { _, _ = ParseValue(raw) }); used > budget {
