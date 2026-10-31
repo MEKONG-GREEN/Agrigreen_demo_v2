@@ -159,11 +159,28 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			leaves(g.Items)
 		}
 		admin := domain.AdminDepartmentItems(port.MenuProfileGeneric, code)
-		if code == port.DeptThongTinTruyenThong { // W11.72/BG-ITEM-PROPOSAL: Xã báo giá, Kỳ báo giá và Mặt hàng đều đã mở.
-			if n := len(admin); admin[n-3].ComingSoon || admin[n-2].Route != "/kn/phong-ban/"+code+"/bao-gia-lich" ||
-				admin[n-1].Key != "admin.pb.bao_gia_mat_hang" || admin[n-1].ComingSoon ||
-				admin[n-1].Route != "/kn/bao-gia/mat-hang" || !implementedMenu[admin[n-1].Key] {
-				t.Fatalf("%s: mục Admin Báo giá: %+v", code, admin[n-3:])
+		if code == port.DeptThongTinTruyenThong { // W11.72/BG-ITEM-PROPOSAL: ba mục nghiệp vụ Báo giá đều đã mở, sau các mục chung.
+			if len(admin) < 3 {
+				t.Fatalf("%s: thiếu mục Admin Báo giá: %+v", code, admin)
+			}
+			for key, route := range map[string]string{
+				"admin.pb.bao_gia_xa":       "/kn/bao-gia/xa-bao-gia",
+				"admin.pb.bao_gia_lich":     "/kn/phong-ban/" + code + "/bao-gia-lich",
+				"admin.pb.bao_gia_mat_hang": "/kn/bao-gia/mat-hang",
+			} {
+				matches := 0
+				for _, item := range admin {
+					if item.Key != key {
+						continue
+					}
+					matches++
+					if item.Route != route || item.ComingSoon || !implementedMenu[item.Key] {
+						t.Fatalf("Báo giá Admin %s: %+v", key, item)
+					}
+				}
+				if matches != 1 {
+					t.Fatalf("Báo giá Admin %s: có %d mục, cần đúng một", key, matches)
+				}
 			}
 			continue
 		}
