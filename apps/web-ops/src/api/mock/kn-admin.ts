@@ -1154,18 +1154,19 @@ import { khtcFormRoutes as route27 } from "./kn-khtc-forms";
 import { khtcPeriodRoutes as route28 } from "./kn-khtc-periods";
 import { khtcReportRoutes as route29 } from "./kn-khtc-reports";
 import { khtcSourceRoutes as route30 } from "./kn-khtc-sources";
-import { khtcWordRoutes as route31 } from "./kn-khtc-words";
-import { appRoutes28 as route32 } from "./kn-legacy-extension";
-import { appRoutes29 as route33 } from "./kn-legacy-extension";
-import { priceConfigRoutes as route34 } from "./kn-price";
-import { priceBoardRoutes as route35 } from "./kn-price-boards";
-import { priceItemRoutes as route36 } from "./kn-price-items";
-import { pricePointRoutes as route37 } from "./kn-price-points";
-import { priceReportRoutes as route38 } from "./kn-price-reports";
-import { priceSurveyRoutes as route39 } from "./kn-price-surveys";
-import { priceTicketRoutes as route40 } from "./kn-price-tickets";
-import { reportCycleAppRoutes as route41 } from "./kn-reports/routes";
-import { workScheduleAppRoutes as route42 } from "./kn-schedules";
+import { khtcTemplateRoutes as route31 } from "./kn-khtc-templates";
+import { khtcWordRoutes as route32 } from "./kn-khtc-words";
+import { appRoutes28 as route33 } from "./kn-legacy-extension";
+import { appRoutes29 as route34 } from "./kn-legacy-extension";
+import { priceConfigRoutes as route35 } from "./kn-price";
+import { priceBoardRoutes as route36 } from "./kn-price-boards";
+import { priceItemRoutes as route37 } from "./kn-price-items";
+import { pricePointRoutes as route38 } from "./kn-price-points";
+import { priceReportRoutes as route39 } from "./kn-price-reports";
+import { priceSurveyRoutes as route40 } from "./kn-price-surveys";
+import { priceTicketRoutes as route41 } from "./kn-price-tickets";
+import { reportCycleAppRoutes as route42 } from "./kn-reports/routes";
+import { workScheduleAppRoutes as route43 } from "./kn-schedules";
 
 export function registeredKnRoutes(): RouteRegistration[] {
   return [
@@ -1200,18 +1201,19 @@ export function registeredKnRoutes(): RouteRegistration[] {
   { surface: "app", order: 16, routes: route28 },
   { surface: "app", order: 1000, routes: route29 },
   { surface: "app", order: 19, routes: route30 },
-  { surface: "app", order: 1002, routes: route31 },
-  { surface: "app", order: 28, routes: route32 },
-  { surface: "app", order: 29, routes: route33 },
-  { surface: "app", order: 5, routes: route34 },
-  { surface: "app", order: 26, routes: route35 },
-  { surface: "app", order: 8, routes: route36 },
-  { surface: "app", order: 9, routes: route37 },
-  { surface: "app", order: 27, routes: route38 },
-  { surface: "app", order: 78, routes: route39 },
-  { surface: "app", order: 13, routes: route40 },
-  { surface: "app", order: 6, routes: route41 },
-  { surface: "app", order: 4, routes: route42 },
+  { surface: "app", order: 1065, routes: route31 },
+  { surface: "app", order: 1002, routes: route32 },
+  { surface: "app", order: 28, routes: route33 },
+  { surface: "app", order: 29, routes: route34 },
+  { surface: "app", order: 5, routes: route35 },
+  { surface: "app", order: 26, routes: route36 },
+  { surface: "app", order: 8, routes: route37 },
+  { surface: "app", order: 9, routes: route38 },
+  { surface: "app", order: 27, routes: route39 },
+  { surface: "app", order: 78, routes: route40 },
+  { surface: "app", order: 13, routes: route41 },
+  { surface: "app", order: 6, routes: route42 },
+  { surface: "app", order: 4, routes: route43 },
   ];
 }
 // END GENERATED MOCK ROUTES
