@@ -146,7 +146,7 @@ func (s *Service) writer(ctx context.Context, idem string, national bool) (calle
 		return c, err
 	}
 	switch {
-	case c.k.ViewOnly || (c.k.ReadOnly() && !(national && c.national())):
+	case c.k.ViewOnly || (c.k.ReadOnly() && (!national || !c.national())):
 		return c, ErrReadOnly
 	case c.k.Support != nil && utf8.RuneCountInString(strings.TrimSpace(c.k.Support.Reason)) < 10:
 		return c, ErrSupportReason

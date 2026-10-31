@@ -1061,15 +1061,35 @@ func TestRB3ErasureEvidenceUnreadable(t *testing.T) {
 // to_jsonb(dòng) nên RENAME COLUMN đứt chuỗi băm (ADR-0012, migratecheck CheckLedgerColumns), và
 // migration đã áp không sửa (R-24). Miễn đúng cột này, đúng cây partition của survey_form và chỉ
 // khi kiểu là boolean (không thể chứa SĐT). PRICE-SURVEY-PII-GUARD-001 chứng minh không che gì khác.
+//
+// CI-GREEN-DEV (#185): pf_extension.kn_producer.address (KNSPLIT-2-KN-RECORDS #67) là địa chỉ TỔ CHỨC (trụ sở HTX/Tổ hợp
+// tác), cùng loại với địa chỉ công vụ pf_contact.unit. Địa chỉ Nông hộ không được ghi: ràng buộc kn_producer_org_only
+// buộc dòng household có address NULL; họ tên/SĐT người đại diện, chủ hộ ở vault (person_ref). Không đổi tên được: bảng sổ
+// (row_hash băm to_jsonb(dòng), ADR-0012) và migration đã áp (R-24). Miễn đúng cột này, đúng cây partition của kn_producer
+// và CHỈ khi ràng buộc org-only còn chặn address của Nông hộ. KN-PRODUCER-ORG-ADDRESS-GUARD-001 chứng minh không che gì khác.
+//
+// Mọi ngoại lệ trên khớp bảng theo OID (format('%I.%I', schema, bảng)::regclass so với pg_partition_tree(...).relid),
+// không theo relname: partition ở schema khác trùng tên một bảng ngoài cây không được làm bảng đó được miễn (#185 vòng 3).
 const piiColumnQuery = `SELECT table_schema, table_name, column_name FROM information_schema.columns
 	  WHERE (table_schema LIKE 'pf\_%' OR table_schema = 'shared')
 	    AND column_name ~* '(full_?name|phone|national_?id|cccd|address|dia_chi|ho_ten)'
       AND NOT (table_schema = 'pf_contact' AND column_name IN ('phone', 'address')
-       AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_contact.unit'::regclass) p
-        JOIN pg_class c ON c.oid = p.relid))
+       AND format('%I.%I', table_schema, table_name)::regclass IN (SELECT p.relid FROM pg_partition_tree('pf_contact.unit'::regclass) p))
       AND NOT (table_schema = 'pf_price' AND column_name = 'has_phone' AND data_type = 'boolean'
-       AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_price.survey_form'::regclass) p
-        JOIN pg_class c ON c.oid = p.relid))`
+       AND format('%I.%I', table_schema, table_name)::regclass IN (SELECT p.relid FROM pg_partition_tree('pf_price.survey_form'::regclass) p))
+      AND NOT (table_schema = 'pf_extension' AND column_name = 'address'
+       AND format('%I.%I', table_schema, table_name)::regclass IN (SELECT p.relid FROM pg_partition_tree('pf_extension.kn_producer'::regclass) p
+        WHERE EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid = p.relid AND k.convalidated
+         AND k.conname = 'kn_producer_org_only' AND k.contype = 'c'
+         AND pg_get_constraintdef(k.oid) = '` + knProducerOrgOnlyDef + `'))
+       AND EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid = 'pf_extension.kn_producer'::regclass
+        AND k.convalidated AND k.conname = 'kn_producer_org_only' AND k.contype = 'c'
+        AND pg_get_constraintdef(k.oid) = '` + knProducerOrgOnlyDef + `'))`
+
+// knProducerOrgOnlyDef là dạng chuẩn hóa (pg_get_constraintdef) của ràng buộc kn_producer_org_only trong migration
+// 20261028080436: so khớp CẢ biểu thức, không theo chuỗi con, để CHECK cùng tên bị nới (OR true, bỏ vế address…) hay
+// NOT VALID (convalidated = false, có hậu tố NOT VALID) đều làm mất ngoại lệ. Dấu nháy đơn đã nhân đôi cho literal SQL.
+const knProducerOrgOnlyDef = `CHECK (((kind <> ''household''::text) OR ((tax_code IS NULL) AND (address IS NULL))))`
 
 // ORG-PII-GUARD-001: ngoại lệ công vụ không che cột PII khác hay bảng tên gần giống.
 func TestContactPublicColumnsDoNotHidePII_ORGUI(t *testing.T) {
@@ -1168,4 +1188,145 @@ func TestPriceSurveyHasPhoneFlagDoesNotHidePII(t *testing.T) {
 	if got := flagged(tx); !got["survey_form.has_phone"] || !got["survey_form_default.has_phone"] {
 		t.Fatalf("has_phone kiểu text phải bị bắt: %v", got)
 	}
+}
+
+// KN-PRODUCER-ORG-ADDRESS-GUARD-001 (#185): ngoại lệ địa chỉ tổ chức của hồ sơ KN không che cột PII khác trên kn_producer,
+// bảng tên gần giống, và mất hiệu lực khi bỏ, nới (OR true) hay đặt NOT VALID ràng buộc chặn địa chỉ Nông hộ.
+func TestKNProducerOrgAddressDoesNotHidePII(t *testing.T) {
+	s := harness.New(t)
+	ctx := context.Background()
+	tx, err := s.AdminPF().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	flaggedIn := func(t *testing.T, tx pgx.Tx) map[string]bool {
+		rows, err := tx.Query(ctx, piiColumnQuery)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		got := map[string]bool{}
+		for rows.Next() {
+			var schema, table, col string
+			if err := rows.Scan(&schema, &table, &col); err != nil {
+				t.Fatal(err)
+			}
+			if schema == "pf_extension" {
+				got[table+"."+col] = true
+			}
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	flagged := func() map[string]bool { return flaggedIn(t, tx) }
+	var parts []string
+	prows, err := tx.Query(ctx, `SELECT c.relname FROM pg_partition_tree('pf_extension.kn_producer'::regclass) p
+	  JOIN pg_class c ON c.oid = p.relid WHERE p.isleaf`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for prows.Next() {
+		var n string
+		if err := prows.Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		parts = append(parts, n)
+	}
+	prows.Close()
+	if len(parts) == 0 {
+		t.Fatal("kn_producer phải có partition để kiểm ngoại lệ lan xuống")
+	}
+	// Ràng buộc org-only còn (validated, đúng biểu thức): address của kn_producer và mọi partition được miễn.
+	for k := range flagged() {
+		if strings.HasPrefix(k, "kn_producer") && strings.HasSuffix(k, ".address") {
+			var def string
+			var valid bool
+			_ = tx.QueryRow(ctx, `SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint
+			  WHERE conrelid = 'pf_extension.kn_producer'::regclass AND conname = 'kn_producer_org_only'`).Scan(&def, &valid)
+			t.Fatalf("địa chỉ tổ chức của kn_producer không được nhận diện: %s (ràng buộc hiện tại %q validated=%v)", k, def, valid)
+		}
+	}
+
+	if _, err = tx.Exec(ctx, `ALTER TABLE pf_extension.kn_producer ADD COLUMN full_name text;
+	  CREATE TABLE pf_extension.kn_producer_probe (address text)`); err != nil {
+		t.Fatal(err)
+	}
+	got := flagged()
+	if !got["kn_producer.full_name"] || !got[parts[0]+".full_name"] || !got["kn_producer_probe.address"] {
+		t.Fatalf("ngoại lệ address đã che dữ liệu cá nhân ngoài phạm vi: %v", got)
+	}
+
+	// Bỏ ràng buộc chặn địa chỉ Nông hộ → address là dữ liệu cá nhân tiềm năng, phải bị bắt lại.
+	if _, err = tx.Exec(ctx, `ALTER TABLE pf_extension.kn_producer DROP CONSTRAINT kn_producer_org_only`); err != nil {
+		t.Fatal(err)
+	}
+	if got := flagged(); !got["kn_producer.address"] || !got[parts[0]+".address"] {
+		t.Fatalf("address không còn ràng buộc org-only phải bị bắt: %v", got)
+	}
+	_ = tx.Rollback(ctx)
+
+	// CHECK cùng tên nhưng không còn bảo vệ: nới bằng OR true (vẫn validated), hoặc biểu thức gốc NOT VALID (dữ liệu cũ
+	// chưa được xác nhận). Mỗi ca một giao dịch rollback riêng; cả hai phải làm scanner bắt lại kn_producer.address.
+	org := `kind <> 'household' OR (tax_code IS NULL AND address IS NULL)`
+	for _, c := range []struct{ name, ddl string }{
+		{"or_true", `ALTER TABLE pf_extension.kn_producer DROP CONSTRAINT kn_producer_org_only,
+		  ADD CONSTRAINT kn_producer_org_only CHECK ((` + org + `) OR true)`},
+		{"not_valid", `ALTER TABLE pf_extension.kn_producer DROP CONSTRAINT kn_producer_org_only;
+		  ALTER TABLE pf_extension.kn_producer ADD CONSTRAINT kn_producer_org_only CHECK (` + org + `) NOT VALID`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := context.Background()
+			tx, err := s.AdminPF().Begin(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = tx.Rollback(ctx) }()
+			if _, err := tx.Exec(ctx, c.ddl); err != nil {
+				t.Fatal(err)
+			}
+			if got := flaggedIn(t, tx); !got["kn_producer.address"] || !got[parts[0]+".address"] {
+				t.Fatalf("ràng buộc org-only %s không còn bảo vệ, address phải bị bắt: %v", c.name, got)
+			}
+		})
+	}
+
+	// Ngoại lệ khớp bảng theo OID, không theo tên (#185 vòng 3): partition thật của kn_producer nằm ở schema khác, trùng
+	// tên một bảng pf_extension NGOÀI cây có cột address. Cha và partition đều giữ CHECK đúng, validated; bảng ngoài cây
+	// vẫn phải bị bắt, còn kn_producer và partition gốc vẫn được miễn.
+	t.Run("cross_schema_name_collision", func(t *testing.T) {
+		ctx := context.Background()
+		tx, err := s.AdminPF().Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		if _, err := tx.Exec(ctx, `CREATE SCHEMA kn185_collision_ns;
+		  CREATE TABLE kn185_collision_ns.kn185_collision PARTITION OF pf_extension.kn_producer
+		    FOR VALUES FROM ('2999-01-01') TO ('2999-02-01');
+		  CREATE TABLE pf_extension.kn185_collision (address text)`); err != nil {
+			t.Fatal(err)
+		}
+		var inTree, guarded bool
+		if err := tx.QueryRow(ctx, `SELECT
+		    EXISTS (SELECT 1 FROM pg_partition_tree('pf_extension.kn_producer'::regclass)
+		      WHERE relid = 'kn185_collision_ns.kn185_collision'::regclass),
+		    EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'kn185_collision_ns.kn185_collision'::regclass
+		      AND conname = 'kn_producer_org_only' AND contype = 'c' AND convalidated
+		      AND pg_get_constraintdef(oid) = '`+knProducerOrgOnlyDef+`')`).Scan(&inTree, &guarded); err != nil {
+			t.Fatal(err)
+		}
+		if !inTree || !guarded {
+			t.Fatalf("dựng probe sai: partition khác schema trong cây=%v, có CHECK org-only validated=%v", inTree, guarded)
+		}
+		got := flaggedIn(t, tx)
+		if !got["kn185_collision.address"] {
+			t.Fatalf("bảng pf_extension ngoài cây trùng tên partition khác schema phải bị bắt: %v", got)
+		}
+		if got["kn_producer.address"] || got[parts[0]+".address"] {
+			t.Fatalf("ngoại lệ địa chỉ tổ chức của kn_producer phải còn hiệu lực: %v", got)
+		}
+	})
 }

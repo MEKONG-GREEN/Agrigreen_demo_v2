@@ -164,8 +164,8 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page).toHaveURL(/\/kn\/nhiem-vu\/cong-viec$/);
     await menuNav(page).getByRole("button", { name: /Thu thập dữ liệu/ }).click();
     await menuNav(page).getByRole("link", { name: "Danh sách HTX" }).click();
-    // P6s: danh sách đọc API thật (GET /v1/cooperatives theo xã phụ trách).
-    await expect(page.getByText("Hiển thị 1–3 trên 3")).toBeVisible();
+    // Hồ sơ KN (#67, #102): GET /v1/kn/producer-records theo xã phụ trách, phân trang máy chủ theo con trỏ — không có tổng số.
+    await expect(page.getByText("Hiển thị 1–3", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Đặt lại" }).click();
     await page.getByRole("link", { name: /^Xem HTX/ }).first().click();
     await expect(page).toHaveURL(/\/kn\/du-lieu\/htx\/[0-9a-f-]{36}$/);
