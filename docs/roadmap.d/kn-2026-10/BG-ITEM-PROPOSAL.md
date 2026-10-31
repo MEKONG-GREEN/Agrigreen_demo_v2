@@ -1,12 +1,14 @@
-# BG-ITEM-PROPOSAL — đường vào và nghiệm thu đề xuất mặt hàng (#37)
-
-- [x] Đối chiếu BRD Báo giá v1.3 UR-XA-06, FN-XA-03.01, FN-AD-04.03 AC05 và prototype A. W11.73/W11.74 đã ở dev; tái sử dụng sổ/API/lịch hiện hành.
-- [x] Nguồn menu Price bật danh mục Admin/Tỉnh, thêm Đề xuất riêng Tỉnh/Xã; route mới mở tab đề xuất qua seam tối thiểu. Không refactor form thuộc #182.
-- [x] Menu test tái hiện lỗi 2/2 trước sửa và đạt 2/2 sau sửa; route/quyền Vitest 3/3 và hồi quy ItemsScreen 6/6 đạt.
-- [x] Native HTTP/PostgreSQL/race (2 subcase đạt, không SKIP, cụm tạm đã dọn): own history, tenant/point/QTNV, quyết định lặp, từ chối có lý do, ngày báo giá kế tiếp qua cuối tuần/lễ/bổ sung và lịch sử trước hiệu lực.
-- [x] Browser production mock 1/1: fixture Tỉnh tạo qua Admin UI, đăng nhập thật, menu Tỉnh/Xã → gửi → duyệt/từ chối → lịch sử riêng. Server riêng đã dừng sau kiểm tra.
-- [x] Controlled mutation nguồn menu Price đỏ khi đề xuất bị đánh dấu Sắp có; khôi phục đúng nội dung xanh 2/2. Fixture menu sinh lại từ Go/PostgreSQL/race đạt; hợp đồng menu web đạt 34/34, giữ kỳ vọng các phòng khác.
-- [x] Cổng web checkpoint: full Vitest một worker 119 file/979 test, check:api, TypeScript, full ESLint, build:mock đạt; ESLint hai tệp test chỉnh sau cùng đạt. Chỉ lưu commit local, cổng toàn nguồn kết hợp vẫn chờ bên dưới.
-- [ ] Sau #33 → #31 → #19 đã gộp: lấy dev mới, merge --no-ff, chốt phiên bản menu lớn hơn dev thực tế, kiểm toàn nguồn kết hợp rồi READY cho Claude. Không tự gộp.
-
-Giả định/phạm vi: [BG-ITEM-PROPOSAL](../../kn/gia-dinh/BG-ITEM-PROPOSAL.md). Refactor Dialog → DetailPage/Log giữ ở #182; không thêm notification, ledger, migration hay ghi HTX.
+- [x] BG-ITEM-PROPOSAL — đường vào và nghiệm thu đề xuất mặt hàng (#37).
+- [x] BG-ITEM-PROPOSAL — Đối chiếu BRD Báo giá v1.3 UR-XA-06, FN-XA-03.01, FN-AD-04.03 AC05 và prototype A. W11.73/W11.74 đã ở dev; tái sử dụng sổ/API/lịch hiện hành.
+- [x] BG-ITEM-PROPOSAL — Nguồn menu Price bật danh mục Admin/Tỉnh, thêm Đề xuất riêng Tỉnh/Xã; route mới mở tab đề xuất qua seam tối thiểu. Không refactor form thuộc #182.
+- [x] BG-ITEM-PROPOSAL — Menu test tái hiện lỗi 2/2 trước sửa và đạt 2/2 sau sửa; route/quyền Vitest 3/3 và hồi quy ItemsScreen 6/6 đạt.
+- [x] BG-ITEM-PROPOSAL — Native HTTP/PostgreSQL/race (2 subcase đạt, không SKIP, cụm tạm đã dọn): own history, tenant/point/QTNV, quyết định lặp, từ chối có lý do, ngày báo giá kế tiếp qua cuối tuần/lễ/bổ sung và lịch sử trước hiệu lực.
+- [x] BG-ITEM-PROPOSAL — Browser production mock 1/1: fixture Tỉnh tạo qua Admin UI, đăng nhập thật, menu Tỉnh/Xã → gửi → duyệt/từ chối → lịch sử riêng. Server riêng đã dừng sau kiểm tra.
+- [x] BG-ITEM-PROPOSAL — Controlled mutation nguồn menu Price đỏ khi đề xuất bị đánh dấu Sắp có; khôi phục đúng nội dung xanh 2/2. Fixture menu sinh lại từ Go/PostgreSQL/race đạt; hợp đồng menu web đạt 34/34, giữ kỳ vọng các phòng khác.
+- [x] BG-ITEM-PROPOSAL — Cổng web checkpoint: full Vitest một worker 119 file/979 test, check:api, TypeScript, full ESLint, build:mock đạt; ESLint hai tệp test chỉnh sau cùng đạt. Chỉ lưu commit local, cổng toàn nguồn kết hợp vẫn chờ bên dưới.
+- [x] BG-ITEM-PROPOSAL — Giả định/phạm vi: [BG-ITEM-PROPOSAL](../../kn/gia-dinh/BG-ITEM-PROPOSAL.md). Refactor Dialog → DetailPage/Log giữ ở #182; không thêm notification, ledger, migration hay ghi HTX.
+- [x] BG-ITEM-PROPOSAL — Ngày 31/10 gộp origin/dev 033f356c542e0db152df4e36523a3ef9fc9f1293 bằng merge --no-ff; menu v11 → v12, sinh lại chính thức modgen/gen:api/web fixture và compat snapshot. Không đổi SQL.
+- [x] BG-ITEM-PROPOSAL — Affected-race đầu giữ bằng chứng một assertion Price cũ lỗi; sửa đúng block Price và kiểm lại Party domain 14 test cấp đầu/4 subtest. Kết quả mới nhất theo package đạt 9 package có test, 197 test cấp đầu/154 subtest, 0 lỗi/0 SKIP; 8 package không có file test, không cộng lặp lượt kiểm lại.
+- [x] BG-ITEM-PROPOSAL — Migration gate thật với bộ lọc chính thức đạt 8 test; build/vet/modgen/migratecheck/archlint/knboundary/contract/mfaflag/mod verify/lint mới 0 lỗi đạt. Docscheck đầu lỗi định dạng hai tài liệu #37, sửa theo đúng quy ước và kiểm riêng sau cập nhật cuối.
+- [x] BG-ITEM-PROPOSAL — Fresh full Vitest một worker 137 file/1.060 test đạt; full production-mock Playwright 53 file/160 test đạt, không retry/skip/timeout padding; focused #37 1/1 báo riêng. Menu mutation mới đỏ exit 1 → khôi phục nguyên byte → xanh 2/2.
+- [ ] BG-ITEM-PROPOSAL — Điều phối đọc final SHA/hash/source guard, push thường và READY cho Claude review; chưa tự gửi READY hay tự gộp.
