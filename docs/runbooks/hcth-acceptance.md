@@ -47,3 +47,17 @@ sức chịu tải 500 người. Chưa đủ phép đo thì giữ trạng thái 
 
 Trước READY toàn W11.31: ghép các phụ thuộc thực trên dev, cập nhật đúng ma trận, chạy bộ cổng AUTO-REVIEW
 và kiểm native/race/migration/web liên quan trên SHA cuối; Claude review chéo. Không tự gộp mã Codex.
+
+## Checkpoint API tiến độ — 31/10/2026
+
+Ca `TestHCTHAppraisalCountsByTrustedCaller_W1131` dùng bốn người/hai đơn vị,
+oracle phân công và trạng thái riêng. Sau khi ghép dev có W11.26, chọn ca mới bằng
+`-run '^TestHCTHAppraisalCountsByTrustedCaller_W1131$'` trong lệnh native-race ở trên.
+Mỗi lượt dùng một cụm tạm riêng; lưu log và băm nguồn trước/sau. Phép kiểm mutation
+dùng Go overlay trong thư mục tạm, giữ nguồn production nguyên byte; phải FAIL đúng
+assertion rò số đếm theo caller, rồi chạy lại với bản gốc khớp SHA-256 và thấy GREEN.
+Lỗi tên fixture có chữ số ở lượt đầu được giữ log, sửa dữ liệu tổng hợp, không nới validation.
+
+Chỉ chạy lại consumer cũ khi fixture chung/composition đã đổi; không lặp mọi ca PASS cũ
+chỉ để đếm. Checkpoint này không đổi fixture chung của ca staff/Contact. Cổng đầy đủ theo
+AUTO-REVIEW và phép đo tải triển khai vẫn cần ở SHA cuối khi W11.31 đủ điều kiện READY.

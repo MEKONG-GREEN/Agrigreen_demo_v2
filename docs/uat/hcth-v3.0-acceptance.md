@@ -192,3 +192,34 @@ BRD VII còn yêu cầu thao tác thường <3 giây, dashboard <5 giây với *
 tra cứu/lọc <2 giây và xuất NS01–06/NL02–04 khoảng 500 người <10 giây. 500 lượt nộp/ngày
 và 500 người đồng thời là hai tiêu chí riêng. Không có kết quả đo tải đồng thời HCTH ở đây;
 benchmark dashboard 1.000 hồ sơ/vault giả ở W11.28 không chứng minh yêu cầu đó.
+
+## W11.31 — Đối chiếu bổ sung API, 31/10/2026
+
+Phần này cập nhật trạng thái base, giữ nguyên các ghi chú/checkpoint lịch sử phía trên.
+W11.26 đã gộp dev tại `033f356c542e0db152df4e36523a3ef9fc9f1293`:
+[READY cuối](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/19#issuecomment-6540232038),
+[review Claude](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/19#issuecomment-6541316066),
+[bằng chứng gộp](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/19#issuecomment-6541778006).
+Các bằng chứng cuối ở SHA review đã hoàn tất native/static/web/E2E trên nguồn kết hợp;
+đoạn lịch sử “native retry chưa hoàn tất/bốn consumer FAIL” không phải trạng thái cuối.
+W11.27 cũng đã có API native như phần nghiệm thu W11.27; ghi chú lịch sử “W11.26/W11.27
+chưa có API” không áp dụng cho base này. Không lấy các kết quả kế thừa làm số PASS mới của W11.31.
+
+| AC / luồng | Bằng chứng mới W11.31 | Giới hạn |
+|---|---|---|
+| FN16 AC02/03; FN21 AC04 — trạng thái và số đếm | [Count-step HTTP](../../tests/hc30/appraisal_counts_test.go), oracle bốn người/hai đơn vị cố định; đọc periods.counts và entries theo phiên HCTH, hai lãnh đạo và từng chủ thể qua mở → tự nộp → quản lý → gửi đơn vị → trả/nộp/gửi lại → chốt | Một phần API ở mẫu nhỏ; chưa chứng minh UI tiến độ theo đơn vị/bước, độ trễ hiển thị hoặc đủ roster 494 |
+| FN17 AC01 — KHTNV không căn cứ | Cùng ca HTTP: tự đề xuất KHTNV thiếu căn cứ trả 422; trạng thái và số đếm giữ nguyên | Không suy thành đã kiểm mọi biến thể thao tác/vai |
+| FN17 AC02; FN21 AC03 — phân công/HS-37 | Tập ID nhìn thấy được đối chiếu với bảng actor → hồ sơ cố định sau mỗi bước; lãnh đạo phòng khác không có phiếu ngoài phân công, chủ thể chỉ thấy riêng mình | Chứng minh dữ liệu/phạm vi API; nhãn và bộ lọc UI “cần đánh giá” còn chờ |
+| Tenant/phiên chỉ xem/owner | Tenant khác không có kỳ/phiếu; realm-only, sai owner và chỉ xem không thay quyền phiên KN | Auth, danh mục đơn vị và client vault là biên fixture; không chứng minh đăng nhập hay kho triển khai |
+
+Baseline actual-race: một ca chính + 19 subtest PASS, 0 FAIL/SKIP/race.
+Mutation chỉ qua Go overlay tạm bỏ kiểm caller ở phép đếm làm assertion lãnh đạo Trồng trọt
+FAIL đúng (nhận 4 thay vì 2, lộ số MS06); không sửa byte production.
+Native khôi phục bằng bản nguồn gốc khớp SHA-256 đã PASS đủ một ca chính và 19 subtest;
+0 FAIL, 0 SKIP, 0 DATA RACE. Các cụm tạm của baseline, RED và khôi phục đã được dọn.
+
+Giữ chờ: UI #179, guest/email/OTP và khóa bước #184 (FN21 AC05), xác nhận PO cho FN18 AC02
+quý/năm, Q-069/Q-070/dữ liệu và bố cục chính thức. Không đổi nhận xét PO về nháp quản lý.
+H11 470 MS05 + 24 MS06, NLTX bốn người tháng 7/2026, bản ký → kho tải lại và các phép đo
+NFR/500 lượt ngày hạn là các ca riêng; phần này chưa thực hiện chúng. Không READY toàn W11.31
+hoặc xác nhận toàn HCTH Đạt bằng checkpoint API này.
