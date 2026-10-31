@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v7";
+export const MENU_VERSION = "kn.menu/v10";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -63,7 +63,8 @@ export const DEFAULT_ROUTE: Record<KnRole, string> = {
 
 export const CONTEXT_DEFAULT_ROUTES: Partial<Record<KnMenuProfile, Partial<Record<KnRole, string>>>> = {
   "ke_hoach_tai_chinh": {
-    "kn_tinh": "/kn/khtc/ky-bao-cao"
+    "kn_tinh": "/kn/khtc/ky-bao-cao",
+    "kn_tw": "/kn/khtc/bao-cao-da-xuat"
   },
   "trong_trot": {
     "kn_tinh": "/kn/bao-cao-khtc"
@@ -1268,6 +1269,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/khtc/mau-bao-cao",
             "icon": "table",
             "soon": true
+          },
+          {
+            "key": "tinh.khtc.phat_sinh",
+            "label": "Báo cáo phát sinh",
+            "route": "/kn/khtc/bao-cao-phat-sinh",
+            "icon": "report"
           }
         ]
       },
@@ -1335,8 +1342,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tw.khtc.bao_cao_tinh",
             "label": "Báo cáo Tỉnh (KHTC)",
             "route": "/kn/khtc/bao-cao-da-xuat",
-            "icon": "report",
-            "soon": true
+            "icon": "report"
           }
         ]
       }
@@ -1922,6 +1928,18 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Báo cáo KHTC",
       "route": "/kn/phong-ban/{department}/bao-cao-khtc",
       "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_phat_sinh",
+      "label": "Báo cáo phát sinh",
+      "route": "/kn/khtc/bao-cao-phat-sinh",
+      "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_muc_luc_mau",
+      "label": "Mục lục mẫu báo cáo",
+      "route": "/kn/phong-ban/{department}/muc-luc-mau",
+      "icon": "report"
     }
   ],
   "thong_tin_truyen_thong": [
@@ -2230,6 +2248,12 @@ const ADMIN_SYSTEM: Group = {
       "label": "Mẫu văn bản & lịch sử xuất",
       "route": "/kn/quan-tri/mau-van-ban",
       "icon": "report"
+    },
+    {
+      "key": "admin.qt.nhat_ky_he_thong",
+      "label": "Nhật ký hệ thống",
+      "route": "/kn/quan-tri/nhat-ky-he-thong",
+      "icon": "shield"
     }
   ]
 };

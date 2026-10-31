@@ -10,6 +10,7 @@ import { KhtcPlanScreen } from "./PlanScreen";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/kn/khtc/ke-hoach-nam",
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 

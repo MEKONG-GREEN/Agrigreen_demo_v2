@@ -2,6 +2,7 @@
 // periods/{id}/forms/{dept}/*}: mẫu nạp sẵn 4 phòng, dòng = hạng mục phòng phụ trách (Kế hoạch năm giả lập), cột "Từ Kế
 // hoạch năm", "Lũy kế kỳ trước", khối "Điều chỉnh kỳ trước", 3 quy tắc kiểm tra, nháp máy chủ, tối đa 3 lần gửi, yêu cầu
 // bổ sung / xác nhận. Dùng chung kho kỳ của kn-khtc-periods.ts. Dữ liệu tổng hợp, không phải thật.
+import {activeAdhoc,publicAdhoc,validateMockAdhoc} from "./kn-khtc-adhoc-state";
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { json, problem, type Ctx, type Route } from "./http";
@@ -244,6 +245,7 @@ const PLAN: Record<string, PlanRow[]> = {
 };
 
 interface Sub {
+ actor?:string;
   id: string;
   attempt: number;
   at: string;
@@ -372,6 +374,8 @@ function evaluate(
   c: Content,
   submit: boolean,
 ): { issues: Issue[]; rows: S["KHTCFormRow"][] } {
+  const request=s.p.report_type==="adhoc"?activeAdhoc(s.p.id,dept):undefined;
+  if(request)return {issues:validateMockAdhoc(c,request,submit),rows:[]};
   const t = tmplOf(dept);
   const grid = s.p.report_type === "week" && t.columns.length > 0;
   const issues: Issue[] = [];
@@ -551,9 +555,10 @@ function sheet(
     tabMap.set(r._tab, list);
   }
   const limit = !!s.p.max_submissions && st.attempt >= s.p.max_submissions;
-  const editable =
-    member && ["not_started", "draft", "late", "supplement"].includes(st.state);
+  const request=s.p.report_type==="adhoc"?activeAdhoc(s.p.id,dept):undefined;
+  const editable = member && request?.state!=="intent" && ["not_started", "draft", "late", "supplement"].includes(st.state);
   return {
+    ...(request?{supplement:publicAdhoc(request)}:{}),
     period: {
       id: s.p.id,
       name: s.p.name,
@@ -562,7 +567,7 @@ function sheet(
       from_date: s.p.from_date,
       to_date: s.p.to_date,
       cutoff_date: s.p.cutoff_date,
-      due_at: s.p.due_at,
+      due_at: request?.due_at??s.p.due_at,
       max_submissions: s.p.max_submissions,
       terminal: s.terminal,
     },
@@ -624,7 +629,13 @@ function load(
   const id = ctx.params[0] ?? "";
   const dept = ctx.params[1] ?? "";
   const s = find(id);
-  const who = caller(ctx, dept);
+  let who = caller(ctx, dept);
+  if(s?.p.report_type==="adhoc"){
+   const kc=knContext(ctx.request.headers.get("X-AG-Context")??"");
+   if(!kc||kc.read_only||kc.role==="kn_tw")return problem(403,"forbidden","Không có quyền xem phiếu phát sinh");
+   if(s.adhocTenant!==ctx.persona.me.tenant_id)return problem(404,"extension.khtc_form_not_found","Không có phiếu");
+   if(kc.role==="admin")who={member:false,review:true};
+  }
   if (who instanceof Response) return who;
   if (
     !s ||
@@ -680,7 +691,10 @@ function save(ctx: Ctx, submit: boolean): Response {
       "forms.submission_conflict",
       "Đã có người cập nhật báo cáo — tải bản mới",
     );
+  const request=s.p.report_type==="adhoc"?activeAdhoc(s.p.id,dept):undefined;
+  if(request && (request.state==="intent"||b.sheet?.adhoc_request_id!==request.id)||!request&&b.sheet?.adhoc_request_id)return problem(409,"extension.khtc_adhoc_request_changed","Yêu cầu đã đổi — tải lại phiếu");
   const c: Content = {
+    ...(request?{adhoc_request_id:b.sheet?.adhoc_request_id,adhoc_values:b.sheet?.adhoc_values??{},adhoc_text:b.sheet?.adhoc_text??""}:{}),
     cells: b.sheet?.cells ?? {},
     adjustments: (b.sheet?.adjustments ?? []).map((a) => ({
       ...a,
@@ -690,6 +704,7 @@ function save(ctx: Ctx, submit: boolean): Response {
     texts: b.sheet?.texts ?? {},
   };
   const key = `${s.p.id}:${dept}`;
+  if(request){const errors=validateMockAdhoc(c,request,submit);if(errors.length)return problem(422,"extension.khtc_form_invalid","Câu trả lời bổ sung chưa hợp lệ",{issues:errors});}
   if (!submit) {
     DRAFTS.set(key, {
       content: c,
@@ -713,6 +728,7 @@ function save(ctx: Ctx, submit: boolean): Response {
         },
       );
     subsOf(s, dept).unshift({
+      actor:ctx.persona.me.actor_ref,
       id: uuidv7(),
       attempt: cur.attempt + 1,
       at: new Date().toISOString(),
@@ -721,6 +737,7 @@ function save(ctx: Ctx, submit: boolean): Response {
       content: c,
     });
     DRAFTS.delete(key);
+    if(request)request.state="fulfilled";
   }
   sync(s, dept);
   return json(sheet(s, dept, true, false));
@@ -842,6 +859,7 @@ export const khtcFormRoutes: Route[] = [
           "extension.khtc_form_not_reviewable",
           "Phiếu không ở trạng thái rà soát được",
         );
+      if(s.p.report_type==="adhoc" && last.actor===ctx.persona.me.actor_ref)return problem(403,"self_approval_forbidden","Không tự duyệt phiếu đã gửi");
       last.decision = b.decision as "returned" | "accepted";
       last.note = b.note?.trim() ?? "";
       sync(s, dept);
@@ -854,3 +872,13 @@ export const khtcFormRoutes: Route[] = [
 export function khtcReportInputs(s: Stored, dept: string) {
  return { plan: structuredClone(PLAN[dept] ?? []), submission: structuredClone(subsOf(s, dept)[0] ?? null) };
 }
+
+/** Native mock bridge: enforce existing terminal/confirmed/four-eyes/three-send rules. */
+export function khtcAdhocNativeReturn(s:Stored,dept:string,actor:string):boolean|Response{
+ const last=subsOf(s,dept)[0];
+ if(!last)return false;
+ if(last.attempt>=3 || last.decision==="accepted")return problem(409,"extension.khtc_form_not_reviewable","Phiếu đã xác nhận hoặc đủ3 lần gửi");
+ if(last.actor===actor)return problem(403,"self_approval_forbidden","Không tự trả phiếu đã gửi");
+ last.decision="returned";last.note="Yêu cầu số liệu bổ sung mới";sync(s,dept);return true;
+}
+export function khtcAdhocSubmitted(s:Stored,dept:string){return structuredClone(subsOf(s,dept));}

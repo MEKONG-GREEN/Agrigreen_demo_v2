@@ -164,8 +164,8 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page).toHaveURL(/\/kn\/nhiem-vu\/cong-viec$/);
     await menuNav(page).getByRole("button", { name: /Thu thập dữ liệu/ }).click();
     await menuNav(page).getByRole("link", { name: "Danh sách HTX" }).click();
-    // P6s: danh sách đọc API hồ sơ KN theo xã phụ trách. #67/#102 (KNSPLIT-2-KN-RECORDS, BF-TT-HTX): phân trang của
-    // máy chủ theo con trỏ (10 dòng/trang, không trả tổng số) → kiểm STT, nhãn "Hiển thị 1–3" và nút Trang trước/sau.
+    // Hồ sơ KN (#67, #102): GET /v1/kn/producer-records theo xã phụ trách, phân trang máy chủ theo con trỏ — không có tổng số.
+    // Kiểm thêm STT, nhãn "Hiển thị 1–3" và nút Trang trước/sau (10 dòng/trang).
     const table = page.getByRole("table", { name: "Danh sách HTX" });
     const rows = table.getByRole("row").filter({ has: page.getByRole("cell") });
     await expect(rows).toHaveCount(3);

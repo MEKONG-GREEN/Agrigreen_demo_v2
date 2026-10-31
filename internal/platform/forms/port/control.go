@@ -15,7 +15,9 @@ import (
 
 // UnitProgress là tiến độ thô của một đơn vị trong kỳ (bên gọi tự chiếu trạng thái nghiệp vụ của mình).
 type UnitProgress struct {
-	Unit string
+	// Internal immutable identity; not added to existing JSON responses.
+	LastSubmissionID *uuid.UUID `json:"-"`
+	Unit             string
 	// Status: trạng thái hiển thị của cap/forms (not_submitted, overdue, submitted, accepted, returned; khi kỳ đã chốt
 	// với đơn vị: missed, closed_unadjusted, awaiting_reopen) — hạn nộp tính theo due_at của kỳ native.
 	Status string

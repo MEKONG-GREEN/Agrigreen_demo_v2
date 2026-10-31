@@ -115,6 +115,7 @@ type fix struct {
 	mu     sync.Mutex
 	ctxs   map[uuid.UUID]*authz.KNContext
 	xa     *xaScopes
+	mod    *extension.Module // W11.53b: nối thêm danh bạ người nhận thông báo sau newFix
 }
 
 func newFix(t *testing.T) *fix {
@@ -126,6 +127,7 @@ func newFix(t *testing.T) *fix {
 	mod := extension.New(pool, clk, extension.Deps{Units: units{}})
 	mod.UseCNTSCatalogs(catalogs{})
 	mod.UseXaScopes(f.xa)
+	f.mod = mod
 	mod.UseCNTSModelVault(clienttest.New())
 	st, err := objstore.NewLocal(t.TempDir(), objstore.LocalOptions{})
 	if err != nil {
@@ -422,8 +424,7 @@ func TestCNTSKNQG_W1153(t *testing.T) {
 	want(t, newDoc(chu, "05", nil), 422, "extension.cnts_knqg_invalid", "Mẫu 05 cần điểm")
 	d5 := want(t, newDoc(chu, "05", map[string]any{"site_ref": sA}), 201, "", "lập Mẫu 05 điểm A")
 	r5 := str(d5, "ref")
-	var chiTieu []any
-	chiTieu = d5["content"].(map[string]any)["tables"].(map[string]any)["chi_tieu"].([]any)
+	chiTieu := d5["content"].(map[string]any)["tables"].(map[string]any)["chi_tieu"].([]any)
 	row := func(rows []any, ma string) map[string]any {
 		for _, r := range rows {
 			if m := r.(map[string]any); m["ma"] == ma {

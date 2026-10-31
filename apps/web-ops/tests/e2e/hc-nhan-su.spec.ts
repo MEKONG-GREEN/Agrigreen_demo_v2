@@ -61,7 +61,7 @@ test("hc-hs-tl: Hồ sơ nhân viên → Thông tin làm việc, cập nhật ng
   await expect(page.getByRole("link", { name: "Mở hồ sơ nhân viên" })).toBeVisible();
 
   // Hồ sơ chuyển "Đã nghỉ việc": về danh sách, thẻ "Đang làm việc" giảm 3 → 2.
-  await page.getByRole("link", { name: "Thông tin làm việc", exact: true }).first().click();
+  await page.getByRole("link", { name: "Thông tin làm việc", exact: true }).last().click();
   await expect(page).toHaveURL(/\/kn\/nhan-su\/ho-so\/thong-tin-lam-viec$/);
   await expect(active).toContainText("2");
 });

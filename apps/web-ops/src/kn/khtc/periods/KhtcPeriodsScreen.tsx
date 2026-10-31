@@ -38,12 +38,12 @@ function fromLocal(v: string): string | undefined {
   return v ? new Date(`${v}:00+07:00`).toISOString() : undefined;
 }
 
-export function KhtcPeriodsScreen() {
+export function KhtcPeriodsScreen({adhocOnly=false,onOpened}:{adhocOnly?:boolean;onOpened?:()=>void}={}) {
   const { api, kn } = useAuth();
   const ctx = kn.context;
   const role = ctx?.role ?? null;
   const writer =
-    role === "kn_tinh" && ctx?.department_code === KHTC && !ctx?.read_only;
+    !ctx?.read_only && (role==="kn_tinh"&&ctx?.department_code===KHTC || adhocOnly&&role==="admin");
   const kapi = useMemo(() => (api ? createKhtcPeriodApi(api) : null), [api]);
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
@@ -59,7 +59,7 @@ export function KhtcPeriodsScreen() {
 
   // Popup "Mở kỳ"
   const [opening, setOpening] = useState(false);
-  const [type, setType] = useState<KhtcReportType>("week");
+  const [type, setType] = useState<KhtcReportType>(adhocOnly?"adhoc":"week");
   const [no, setNo] = useState(1);
   const [scope, setScope] = useState<"quarter" | "half" | "nine_months">(
     "quarter",
@@ -108,7 +108,7 @@ export function KhtcPeriodsScreen() {
 
   return (
     <div className="page">
-      <PageHeader title="Kỳ báo cáo & phiếu các phòng">
+      <PageHeader title={adhocOnly?"Mở kỳ phát sinh":"Kỳ báo cáo & phiếu các phòng"}>
         <p className="mute">
           Mở kỳ bằng ô chọn, hệ thống tự điền khoảng thời gian, tên kỳ và hạn
           (tuần báo cáo Thứ Tư – Thứ Ba). Mỗi kỳ, mỗi phòng một phiếu “Báo cáo
@@ -179,7 +179,7 @@ export function KhtcPeriodsScreen() {
         </div>
         <LoadState s={periods}>
           {(ps: KhtcPeriod[]) =>
-            ps.length === 0 ? (
+            ps.filter(p=>!adhocOnly||p.report_type==="adhoc").length === 0 ? (
               <p className="mute">Chưa có kỳ nào trong năm {year}.</p>
             ) : (
               <table className="dt">
@@ -195,7 +195,7 @@ export function KhtcPeriodsScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ps.map((p) => (
+                  {ps.filter(p=>!adhocOnly||p.report_type==="adhoc").map((p) => (
                     <tr
                       key={p.id}
                       className={p.id === selected ? "sel" : undefined}
@@ -241,7 +241,7 @@ export function KhtcPeriodsScreen() {
                   reset();
                 }}
               >
-                {REPORT_TYPES.map((t) => (
+                {REPORT_TYPES.filter(t=>!adhocOnly||t.value==="adhoc").map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
@@ -463,6 +463,7 @@ export function KhtcPeriodsScreen() {
                     setOpening(false);
                     reset();
                     setSelected(p.id);
+                    onOpened?.();
                     periods.reload();
                   }
                 }}
