@@ -45,17 +45,24 @@ test("hc-hs-tl: Hồ sơ nhân viên → Thông tin làm việc, cập nhật ng
   const active = page.getByRole("button", { name: /^Đang làm việc/ });
   await expect(active).toContainText("3");
 
+  // #117 (BF-SWEEP-OTHERS): cập nhật chuyển từ popup sang trang riêng `/[id]/sua`; Lưu xong về trang chi tiết.
   await page.getByRole("link", { name: "Cập nhật VC-00001" }).click();
-  await expect(page).toHaveURL(/\/thong-tin-lam-viec\/[^/]+\/sua$/);
+  await expect(page).toHaveURL(/\/kn\/nhan-su\/ho-so\/thong-tin-lam-viec\/[0-9a-f-]{36}\/sua$/);
+  await expect(page.getByRole("heading", { level: 1, name: /^Cập nhật thông tin làm việc/ })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByLabel("Ngày nghỉ việc").fill("2026-09-30");
   await page.getByLabel("Lý do nghỉ").selectOption("nghi_huu");
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
+
+  await expect(page).toHaveURL(/\/kn\/nhan-su\/ho-so\/thong-tin-lam-viec\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { level: 1, name: /VC-00001/ })).toBeVisible();
   await expect(page.getByText("Có trong tháng 09/2026")).toBeVisible();
   await expect(page.getByText("Không còn từ tháng 10/2026")).toBeVisible();
   await expect(page.getByRole("link", { name: "Mở hồ sơ nhân viên" })).toBeVisible();
+
+  // Hồ sơ chuyển "Đã nghỉ việc": về danh sách, thẻ "Đang làm việc" giảm 3 → 2.
   await page.getByRole("link", { name: "Thông tin làm việc", exact: true }).last().click();
+  await expect(page).toHaveURL(/\/kn\/nhan-su\/ho-so\/thong-tin-lam-viec$/);
   await expect(active).toContainText("2");
 });
 

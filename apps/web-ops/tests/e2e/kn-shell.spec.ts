@@ -165,7 +165,18 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await menuNav(page).getByRole("button", { name: /Thu thập dữ liệu/ }).click();
     await menuNav(page).getByRole("link", { name: "Danh sách HTX" }).click();
     // Hồ sơ KN (#67, #102): GET /v1/kn/producer-records theo xã phụ trách, phân trang máy chủ theo con trỏ — không có tổng số.
-    await expect(page.getByText("Hiển thị 1–3", { exact: true })).toBeVisible();
+    // Kiểm thêm STT, nhãn "Hiển thị 1–3" và nút Trang trước/sau (10 dòng/trang).
+    const table = page.getByRole("table", { name: "Danh sách HTX" });
+    const rows = table.getByRole("row").filter({ has: page.getByRole("cell") });
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(0).getByRole("cell").first()).toHaveText("1");
+    await expect(rows.nth(2).getByRole("cell").first()).toHaveText("3");
+    await expect(rows.first().getByText("Hoạt động", { exact: true })).toBeVisible();
+    const pager = page.getByRole("navigation", { name: "Phân trang" });
+    await expect(page.locator(".pager [aria-live=polite]")).toHaveText("Hiển thị 1–3");
+    await expect(pager.getByRole("button", { name: "Trang 1" })).toHaveAttribute("aria-current", "page");
+    await expect(pager.getByRole("button", { name: "Trang trước" })).toBeDisabled();
+    await expect(pager.getByRole("button", { name: "Trang sau" })).toBeDisabled();
     await page.getByRole("button", { name: "Đặt lại" }).click();
     await page.getByRole("link", { name: /^Xem HTX/ }).first().click();
     await expect(page).toHaveURL(/\/kn\/du-lieu\/htx\/[0-9a-f-]{36}$/);
