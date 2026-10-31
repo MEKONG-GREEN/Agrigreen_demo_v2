@@ -32,9 +32,9 @@ Lỗi PostgreSQL là lỗi hạ tầng; giữ log, đợi/dùng lại đúng quy
 
 | Nhóm | Dữ liệu / hành động | Kết quả cần thu | Trạng thái checkpoint |
 |---|---|---|---|
-| H11 đánh giá | QIII/2026; 470 người MS05, 24 MS06, cán bộ xã theo HS-37 | Đếm và đối chiếu danh sách đúng snapshot, phiếu/đề xuất/tổng hợp/bản ký | Chờ #19 và fixture 494 người; chưa PASS |
-| H11 NLTX | Tháng 7/2026, bốn người theo dữ liệu tổng hợp có oracle riêng | Bậc/hệ số, quyết định và sự kiện bù, tệp đúng | Chưa chạy bộ bốn người |
-| Tải nộp ngày hạn | Khoảng 500 lượt nộp phiếu trong cùng ngày hạn, khóa thao tác riêng/giữ khi retry | Không mất/trùng, tổng theo bước/đơn vị đúng, ghi phân bố thời gian và lỗi | Chờ #19; chưa đo |
+| H11 đánh giá | QIII/2026; 470 người MS05, 24 MS06, cán bộ xã theo HS-37 | Đếm và đối chiếu danh sách đúng snapshot, phiếu/đề xuất/tổng hợp/bản ký | Core #19 đã vào dev; chờ fixture 494 người; chưa PASS |
+| H11 NLTX | Tháng 7/2026, bốn người theo dữ liệu tổng hợp có oracle riêng | Bậc/hệ số, quyết định và sự kiện bù, tệp đúng | API bốn người tổng hợp đã PASS W11.31; dữ liệu thật/quy chế Q-069/Q-070 vẫn chờ |
+| Tải nộp ngày hạn | Khoảng 500 lượt nộp phiếu trong cùng ngày hạn, khóa thao tác riêng/giữ khi retry | Không mất/trùng, tổng theo bước/đơn vị đúng, ghi phân bố thời gian và lỗi | Core #19 đã vào dev; chưa đo |
 | NFR đồng thời | 500 người đồng thời trên môi trường/token được phép; dashboard | Dashboard <5s; ghi cấu hình, latency, throughput, tỷ lệ lỗi và tài nguyên | Chưa đo; không thay bằng 500 goroutine hoặc 500 lượt/ngày |
 | NFR thao tác/tra cứu | Thao tác thường và lọc/tìm với roster 1.000 hồ sơ theo FN07 AC01 | Thao tác <3s, tìm/lọc <2s; nguồn PII/vault và số kết nối được ghi rõ | Chưa đo trên vault thật |
 | NFR xuất | NS01–06/NL02–04 khoảng 500 người, gồm thời gian dựng/tải tệp | <10s, đọc lại dữ liệu/SHA, ghi lỗi và cold/warm runs | Chưa đo đầy đủ các biểu |
@@ -61,3 +61,11 @@ Lỗi tên fixture có chữ số ở lượt đầu được giữ log, sửa d
 Chỉ chạy lại consumer cũ khi fixture chung/composition đã đổi; không lặp mọi ca PASS cũ
 chỉ để đếm. Checkpoint này không đổi fixture chung của ca staff/Contact. Cổng đầy đủ theo
 AUTO-REVIEW và phép đo tải triển khai vẫn cần ở SHA cuối khi W11.31 đủ điều kiện READY.
+
+## Bốn người NLTX tháng 7 tổng hợp
+
+Chọn `-run '^TestHCTHFourJulyNLTXDecisionCompensation_W1131$'` trong lệnh native-race ở trên.
+Ca này dùng `at`/`review_month` hiện có, giữ fixture chung; kiểm bốn người → Mẫu 1 → quyết định
+→ bốn projection → hủy/bù → projection cũ và SHA tệp giữ nguyên. Không cần chạy lại ca
+staff/Contact hoặc count-step chỉ để đếm khi các nguồn/fixture đó không đổi. Bộ dữ liệu và
+Q-069/Q-070 được công bố tại giả định W11.31; không dùng dữ liệu thật, không gửi email/OTP.

@@ -220,6 +220,21 @@ Native khôi phục bằng bản nguồn gốc khớp SHA-256 đã PASS đủ m�
 
 Giữ chờ: UI #179, guest/email/OTP và khóa bước #184 (FN21 AC05), xác nhận PO cho FN18 AC02
 quý/năm, Q-069/Q-070/dữ liệu và bố cục chính thức. Không đổi nhận xét PO về nháp quản lý.
-H11 470 MS05 + 24 MS06, NLTX bốn người tháng 7/2026, bản ký → kho tải lại và các phép đo
+H11 470 MS05 + 24 MS06, bản ký → kho tải lại và các phép đo
 NFR/500 lượt ngày hạn là các ca riêng; phần này chưa thực hiện chúng. Không READY toàn W11.31
 hoặc xác nhận toàn HCTH Đạt bằng checkpoint API này.
+
+### W11.31 — NLTX tháng 7/2026, bốn hồ sơ tổng hợp
+
+| AC / luồng | Bằng chứng mới | Trạng thái / giới hạn |
+|---|---|---|
+| FN09 AC02 — Mẫu số 1 tháng 7 | [HTTP bốn người NLTX](../../tests/hc30/promotion_july_test.go): đúng bốn người đủ điều kiện; đọc XLSX kỳ tháng 7, đủ 20 cột/cột 19 trống, hệ số mới và chênh lệch 0,20/0,33/0,20/0,33 theo oracle cố định | PASS dữ liệu tổng hợp API; bảng hệ số/quy chế và mẫu Sở chính thức vẫn chờ Q-070 |
+| FN10 AC01 — quyết định cho bốn người | Từ đúng file đã xuất, quyết định cập nhật bốn projection bậc/hệ số tại tháng 7; trước tháng 7 giữ bậc cũ; retry giữ cùng quyết định | PASS dữ liệu tổng hợp; không thay xác nhận tệp nguồn Q-069 |
+| FN10 BR03 — hủy là sự kiện bù | Hủy có lý do khôi phục bốn projection; quyết định vẫn có danh tính, đủ bốn người và lịch sử issue/cancel | PASS API/PG; không đọc SQL để tính oracle |
+| FN09 AC04 — lịch sử tệp | Tải trước/sau quyết định và sau hủy giữ nguyên byte/SHA, không drift; tenant khác bị từ chối; chỉ xem không ghi được quyết định | PASS ở biên fixture auth/vault đã công bố; chưa chứng minh kho triển khai |
+
+Một ca chính + bốn subtest đã PASS với actual-race trên PG tạm riêng, 0 FAIL/SKIP/race;
+nguồn Go giữ nguyên băm trong lượt chạy, cụm tạm đã dọn. Quy tắc và bộ bốn người dùng
+giả định công khai ở [W11.31](../kn/gia-dinh/W11.31.md); không phải nghiệm thu dữ liệu HCTH thật.
+Không đếm lại các ca W11.25 kế thừa thành kết quả mới, không đổi FN18 AC02/quyết định PO.
+Roster H11 470/24, bản ký → kho, UI/OTP và các phép đo tải/NFR vẫn chờ; toàn W11.31 chưa READY.
