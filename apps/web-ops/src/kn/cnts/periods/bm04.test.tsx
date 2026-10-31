@@ -8,7 +8,7 @@ import { resetKnAdmin } from "@/api/mock/kn-admin";
 import { resetCntsPeriods } from "@/api/mock/kn-cnts-periods";
 import { createKnAdminApi } from "@/kn/cycle/api";
 import { createCntsPeriodApi, type FormsField, type FormsSubmission, type FormsTask } from "./api";
-import { BM04_CODE, bm04Data, cellText, cellValue, changesBetween, columnGroups, columnTotal, cumulative, editedAfterAccept, isFlow } from "./bm04";
+import { BM04_CODE, bm04Data, cellText, cellValue, changesBetween, columnGroups, columnTotal, cumulative, editedAfterAccept, historyFields, isFlow } from "./bm04";
 import { Bm04ProvinceScreen } from "./Bm04ProvinceScreen";
 
 vi.mock("next/navigation", () => ({
@@ -131,6 +131,16 @@ describe("BM-04 Tỉnh — hàm thuần", () => {
     const ch = changesBetween(FIELDS, sub(1, "accepted", { tiem_ta_heo_cp: "10", tong_dan_heo: "5" }), sub(2, "submitted", { tiem_ta_heo_cp: "12", tong_dan_heo: "5" }));
     expect(ch).toEqual([{ key: "tiem_ta_heo_cp", label: "CN-02 › tiem_ta_heo_cp", old: "10", new: "12" }]);
   });
+
+  it("#175 review: lịch sử dùng đủ trường của kỳ — chỉ đổi ghi chú vẫn có dòng thay đổi cũ → mới", () => {
+    const d = bm04Data([task(1, "A")]);
+    const hf = historyFields(task(1, "A"), d.columns);
+    expect(hf.map((f) => f.key)).toEqual(["tong_dan_heo", "tiem_ta_heo_cp", "hoa_chat_gia_suc", "ghi_chu"]);
+    expect(historyFields(task(1, "A", { fields: [] }), d.columns)).toBe(d.columns);
+    const older = sub(1, "accepted", { tiem_ta_heo_cp: "10", ghi_chu: "cũ" });
+    const newer = sub(2, "submitted", { tiem_ta_heo_cp: "10", ghi_chu: "mới" });
+    expect(changesBetween(hf, older, newer)).toEqual([{ key: "ghi_chu", label: "ghi_chu", old: "cũ", new: "mới" }]);
+  });
 });
 
 async function contextOf(personaId: string, assignmentId: string, dept: string | null) {
@@ -162,9 +172,11 @@ describe("màn Nhập liệu tuần — Cấp Tỉnh", () => {
     const xa = createCntsPeriodApi(apiOf("kn-an", await contextOf("kn-an", "asg-an-xa", "chan_nuoi_thuy_san")));
     const t = (await xa.tasks(BM04_CODE)).find((x) => x.unit === "91301")!;
     const values = Object.fromEntries(t.fields.filter((f) => f.type !== "text").map((f) => [f.key, "1"]));
-    await xa.submit(t.period_id, { unit: "91301", values: { ...values, tiem_ta_heo_cp: "12", ...(note ? { ghi_chu: note } : {}) }, base_version: 0, nil_report: false, explanation: "Mất mạng" });
+    const v1 = { ...values, tiem_ta_heo_cp: "12", ...(note ? { ghi_chu: note } : {}) };
+    await xa.submit(t.period_id, { unit: "91301", values: v1, base_version: 0, nil_report: false, explanation: "Mất mạng" });
     auth.role = "kn_tinh";
     auth.api = apiOf("kn-binh", null);
+    return { xa, periodId: t.period_id, v1 };
   }
 
   beforeEach(() => {
@@ -214,6 +226,26 @@ describe("màn Nhập liệu tuần — Cấp Tỉnh", () => {
     expect(within(rowOf("TỔNG")).getAllByRole("cell")[heads.length]).toHaveTextContent(/^$/);
     await u.selectOptions(screen.getByRole("combobox", { name: "Hiển thị" }), "year");
     expect(within(table).queryByRole("columnheader", { name: "CN-10 Ghi chú" })).not.toBeInTheDocument();
+  });
+
+  it("#175 review (AC-05): lịch sử phiên bản hiện thay đổi chỉ ở CN-10 Ghi chú và lý do đã lưu của từng phiên bản", async () => {
+    const { xa, periodId, v1 } = await setup(undefined, "Heo sốt nhẹ");
+    // Phiên bản 2: số liệu giữ nguyên, chỉ đổi ghi chú, có lý do riêng.
+    await xa.submit(periodId, { unit: "91301", values: { ...v1, ghi_chu: "Đã khỏi, theo dõi thêm" }, base_version: 1, nil_report: false, explanation: "Bổ sung ghi chú" });
+    const u = userEvent.setup();
+    render(<Bm04ProvinceScreen />);
+    const table = await screen.findByRole("table", { name: "Số liệu BM-04 theo xã" });
+    await waitFor(() => expect(within(table).getByText("Mỹ Hòa Hưng")).toBeInTheDocument());
+    await u.click(within(table).getByRole("button", { name: "Chi tiết Mỹ Hòa Hưng" }));
+    const detail = await screen.findByRole("region", { name: "Chi tiết Mỹ Hòa Hưng" });
+    await waitFor(() => expect(within(detail).getByText(/Lịch sử phiên bản gửi \(2\)/)).toBeInTheDocument());
+    const items = within(detail).getAllByRole("listitem").filter((li) => /^Phiên bản \d/.test(li.textContent ?? ""));
+    const v2 = items.find((li) => li.textContent!.startsWith("Phiên bản 2"))!;
+    const ver1 = items.find((li) => li.textContent!.startsWith("Phiên bản 1"))!;
+    expect(within(v2).getByText("CN-10 Ghi chú: Heo sốt nhẹ → Đã khỏi, theo dõi thêm")).toBeInTheDocument();
+    expect(within(v2).queryByText(/Không đổi/)).not.toBeInTheDocument();
+    expect(within(v2).getByText("Lý do: Bổ sung ghi chú")).toBeInTheDocument();
+    expect(within(ver1).getByText("Lý do: Mất mạng")).toBeInTheDocument();
   });
 
   it("người không phụ trách biểu chỉ xem", async () => {

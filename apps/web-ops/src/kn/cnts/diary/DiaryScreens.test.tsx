@@ -70,7 +70,8 @@ it("BF-CN-DIARY #109: đầu sổ, vật tư mục 1, mục 4 nguyên liệu th�
   expect(within(growth).getByText("Tuần 12")).toBeInTheDocument();
   expect(screen.getByRole("table", { name: "Yêu cầu kỹ thuật cần đạt" })).toHaveTextContent("Tỷ lệ sống của gà 4 tuần tuổi");
   // Lần ghi có mục 3, mục 4 và phần 3.
-  // Ngày theo giờ Việt Nam như dữ liệu giả lập (máy chạy CI ở UTC: 17h–24h UTC đã sang ngày mới ở VN).
+  // Cùng đồng hồ với dữ liệu giả lập (ngày Việt Nam, kn-cnts-diary.ts), không theo múi giờ máy chạy test: CI chạy UTC,
+  // từ 17:00 UTC ngày VN đã sang hôm sau.
   const day = addDays(vnDate(Date.now()), -3).split("-").reverse().join("/");
   await user.click(await screen.findByRole("button", { name: day }));
   const mat = await screen.findByRole("table", { name: "Mua nguyên liệu thức ăn chăn nuôi (NC-09)" });

@@ -180,6 +180,15 @@ export function changesBetween(fields: FormsField[], older: FormsSubmission | un
     .filter((c) => c.old !== c.new);
 }
 
+/**
+ * Trường dùng cho lịch sử phiên bản (AC-05): đủ định nghĩa trường của kỳ — số và chữ (gồm CN-10 Ghi chú) theo thứ tự mẫu —
+ * tách khỏi `Bm04Data.fields` (chỉ trường số, dùng cho TỔNG/lũy kế). Kỳ không kèm định nghĩa thì dùng cột của biểu.
+ */
+export function historyFields(task: FormsTask, columns: FormsField[]): FormsField[] {
+  const own = task.fields.filter((f) => isNumeric(f) || f.type === "text");
+  return own.length ? own : columns;
+}
+
 /** Nhóm cột (giữ thứ tự xuất hiện) cho hàng tiêu đề gộp. */
 export function columnGroups(fields: FormsField[]): { group: string; span: number }[] {
   const out: { group: string; span: number }[] = [];

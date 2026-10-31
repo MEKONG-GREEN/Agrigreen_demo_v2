@@ -505,7 +505,8 @@ func (h Handler) submissions(c *gin.Context) {
 	}
 	out := make([]submissionDTO, 0, len(ss))
 	for _, s := range ss {
-		out = append(out, submissionOf(s.Submission, s.Status, s.Review))
+		// #175: lịch sử trả thông tin đã lưu của TỪNG phiên bản (nộp trễ, lý do, ghi chú); bản cũ không có sổ phụ → mặc định.
+		out = append(out, submissionOf(s.Submission, s.Status, s.Review, s.Meta))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": out})
 }

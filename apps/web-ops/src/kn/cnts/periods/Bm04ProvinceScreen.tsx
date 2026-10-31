@@ -24,6 +24,7 @@ import {
   columnTotal,
   cumulative,
   editedAfterAccept,
+  historyFields,
   isFlow,
   isNumeric,
   type Bm04Data,
@@ -297,6 +298,7 @@ function Body({
           task={cur}
           unitName={name(open)}
           fields={data.fields}
+          columns={data.columns}
           capi={capi}
           ownerName={owner?.owner_name ?? null}
           canReview={tinh && !!tracking.data && (owner?.owner_ref ? owner.owner_ref === me : true)}
@@ -314,6 +316,7 @@ function Detail({
   task,
   unitName,
   fields,
+  columns,
   capi,
   ownerName,
   canReview,
@@ -323,6 +326,7 @@ function Detail({
   task: FormsTask;
   unitName: string;
   fields: Bm04Data["fields"];
+  columns: Bm04Data["columns"];
   capi: CntsPeriodApi;
   ownerName: string | null;
   canReview: boolean;
@@ -420,12 +424,13 @@ function Detail({
         <LoadState s={subs}>
           {(list) => {
             const old = [...list].reverse();
+            const hist = historyFields(task, columns); // #175: đủ trường của kỳ (gồm CN-10 Ghi chú), không chỉ trường số
             return (
               <details open>
                 <summary>Lịch sử phiên bản gửi ({old.length})</summary>
                 <ol className="list-plain">
                   {old.map((s, i) => {
-                    const ch = changesBetween(fields, old[i - 1], s);
+                    const ch = changesBetween(hist, old[i - 1], s);
                     return (
                       <li key={s.id}>
                         <strong>Phiên bản {s.version}</strong> · gửi lúc {dt(s.event_time)}
@@ -444,7 +449,7 @@ function Detail({
                               ))}
                             </ul>
                           ) : (
-                            <div className="mute">Không đổi số liệu.</div>
+                            <div className="mute">Không đổi số liệu, ghi chú.</div>
                           )
                         ) : null}
                       </li>
