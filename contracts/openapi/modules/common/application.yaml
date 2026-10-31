@@ -6919,7 +6919,7 @@ components:
       description: Không chứa dữ liệu cá nhân. Cũng là data của entity đồng bộ "notification" (không có topic).
       properties:
         id: {type: string, format: uuid}
-        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale, price_reminder, price_alert, price_verify_request, price_verify_reply, price_verify_decision, price_lock_summary, price_board_approved, price_board_reopened, price_proxy_entry, cnts_knqg_sent, cnts_knqg_reviewed, cnts_knqg_submitted]}
+        kind: {type: string, enum: [directive, alert, document, task_escalated, sync_conflict, org_deactivated, household_registered, household_membership_changed, task_assigned, farm_log_pending, farm_log_reviewed, season_opened, integration_dead_lettered, area_feed_stale, price_reminder, price_alert, price_verify_request, price_verify_reply, price_verify_decision, price_lock_summary, price_board_approved, price_board_reopened, price_proxy_entry, cnts_knqg_sent, cnts_knqg_reviewed, cnts_knqg_submitted, hrm_appraisal, hrm_promotion_due, hrm_plan_reminder]}
         severity: {type: string, enum: [urgent, normal]}
         title: {type: string, maxLength: 300}
         body: {type: string, maxLength: 2000}

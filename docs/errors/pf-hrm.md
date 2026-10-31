@@ -17,3 +17,17 @@ và được phép xem. Tệp khác module, khác loại hoặc tệp cũ không
 để bỏ qua đồng ý của minh chứng MRV/hiện trường.
 
 HRM-DOC-FILE-001: resolver thư mục cung cấp FileAuthorizer. Đường mở tệp chung kiểm lại phiên bản tài liệu hiện hành, đúng thư mục, quyền theo đơn vị/bản thân, trạng thái ẩn và cờ hồ sơ. Thấy thư mục không cấp quyền tất cả tệp. Từ chối trả 403 evidence.subject_forbidden và ghi sổ denied_scope; không trả URL/bản rõ.
+
+### pf/hrm — đánh giá HCTH (W11.26)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 404 | `hrm.appraisal_not_found` | Không có mẫu, đợt, phiếu, phiên bản hoặc lần xuất trong phạm vi tenant/phân công |
+| 409 | `hrm.appraisal_conflict` | Phiên bản đổi; khóa idempotency đã thuộc actor/body/thao tác khác; đã mở kỳ |
+| 422 | `hrm.appraisal_blocked` | Phiếu/đợt chưa đủ đề xuất/căn cứ/bản ký hoặc bước không cho phép |
+| 503 | `hrm.appraisal_guest_unavailable` | Guest OTP W10.18 chưa nối; link khách luôn đóng, tracking #184 |
+| 503 | `hrm.appraisal_unavailable` | Chưa nối kho định danh, năng lực xuất hoặc phụ thuộc đánh giá |
+
+Các lỗi trường nhập dùng `validation_failed` với đường dẫn `errors[].field`. Không phản chiếu JSON thô hay PII vào lỗi.
+`assessment` giao quyền chủ thể/HS37 đóng băng và quyền hiện tại; xuất còn giao quyền `export` và quyền kho định danh.
+MS05/MS06 chặn người chưa gửi hoặc thiếu căn cứ; PHIEU_DIEM là Excel tổng hợp tiến độ riêng và không phải biểu ký.

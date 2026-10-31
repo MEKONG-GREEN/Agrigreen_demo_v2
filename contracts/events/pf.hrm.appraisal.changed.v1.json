@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.hrm.appraisal.changed/v1",
+  "title": "pf.hrm.appraisal.changed — payload",
+  "description": "FN-16/21: phát hành phiếu, nộp/chuyển bước, trả/mở lại hoặc nhắc. Ghi outbox cùng giao dịch sổ appraisal_event; builder HRM tra lãnh đạo tại node_ref ngoài giao dịch inbox. Targets là AccountRef của snapshot server, không do client khai. Không tên, điểm, nhận xét hay địa chỉ liên hệ. Việc gửi kênh do pf/notify xử lý, đóng an toàn khi thiếu cấu hình.",
+  "x-event-type": "pf.hrm.appraisal.changed",
+  "x-schema-version": 1,
+  "x-producer": "pf/hrm",
+  "type": "object",
+  "required": ["notice_id", "period_ref", "node_ref", "year", "quarter", "action", "step", "targets", "units", "center", "due_at", "actor_ref"],
+  "properties": {
+    "notice_id": {"type": "string", "format": "uuid"},
+    "period_ref": {"type": "string", "format": "uuid"},
+    "staff_ref": {"type": "string", "format": "uuid"},
+    "node_ref": {"type": "string", "format": "uuid"},
+    "year": {"type": "integer", "minimum": 2020, "maximum": 2100},
+    "quarter": {"type": "integer", "minimum": 0, "maximum": 4},
+    "action": {"type": "string", "enum": ["open", "self_submit", "proxy_self", "send", "return", "reopen", "remind"]},
+    "step": {"type": "string", "enum": ["self", "manager", "summary"]},
+    "targets": {"type": "array", "maxItems": 500, "items": {"type": "string", "format": "uuid"}},
+    "units": {"type": "array", "maxItems": 5000, "items": {"type": "string", "maxLength": 100}},
+    "center": {"type": "boolean"},
+    "due_at": {"type": "string", "format": "date-time"},
+    "actor_ref": {"type": "string", "format": "uuid"}
+  }
+}
