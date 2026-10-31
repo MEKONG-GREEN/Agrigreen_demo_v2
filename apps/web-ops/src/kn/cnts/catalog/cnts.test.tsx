@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminApiClient, createApiClient, unwrap } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
+import { parseCsv } from "@/api/mock/admin-ops";
 import { CATALOGS } from "@/api/mock/data";
 import { resetCntsVersions } from "@/api/mock/kn-cnts-catalogs";
 import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase, exportCatalogCsv } from "./CntsCatalogScreen";
@@ -127,6 +128,83 @@ describe("Xuất danh mục → Nạp lại (#170, review Codex #168)", () => {
     const list = CATALOGS.cnts_indicator;
     for (const c of created) list.splice(list.findIndex((i) => i.code === c.code), 1);
     resetCntsVersions();
+  });
+
+  const importCsv = (admin: ReturnType<typeof createAdminApiClient>, file: string, key: string) =>
+    unwrap(
+      admin.POST("/v1/masterdata/catalog-imports", {
+        params: { header: { "Idempotency-Key": key } },
+        body: file,
+        bodySerializer: (b: unknown) => b as BodyInit,
+        headers: { "Content-Type": "text/csv" },
+      } as never),
+    ) as Promise<{ total: number; created: number; skipped: number; rejected: number; rows: { code: string; status: string; reason?: string }[] }>;
+
+  it("bộ đọc CSV giả lập đọc bản ghi logic như máy chủ: ô ngoặc kép có xuống dòng, CRLF trong ô → LF, BOM, dòng trống (review Codex 7058)", () => {
+    expect(parseCsv('﻿a,b\r\n"x\ny","1, ""2"""\r\n\r\n  \r\n"p\r\nq",\n')).toEqual([
+      ["a", "b"],
+      ["x\ny", '1, "2"'],
+      ["p\nq", ""],
+    ]);
+  });
+
+  it("mô tả nhiều dòng (LF, CRLF, gạch đầu dòng) của tệp vừa xuất nạp lại nguyên vẹn; nội dung nhiều dòng khác vẫn bị từ chối (review Codex 7058)", async () => {
+    resetCntsVersions();
+    const admin = createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", fetch: mockAdminFetchNoDelay });
+    const tab = tabOf("cnts_indicator");
+    const at = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    const created = [
+      { code: "RT_ML_LF", description: "Dòng 1\nDòng 2" },
+      { code: "RT_ML_CRLF", description: 'Dòng 1\r\nDòng 2, "trích"' },
+      { code: "RT_ML_DASH", description: "- Dòng 1\nDòng 2" },
+    ];
+    try {
+      for (const c of created) {
+        await unwrap(
+          admin.POST("/v1/masterdata/catalogs/{catalog}/items", {
+            params: { path: { catalog: "cnts_indicator" } },
+            body: { code: c.code, name: `Nhiều dòng ${c.code}`, valid_from: at, attrs: { value_type: "decimal", description: c.description } },
+          } as never),
+        );
+      }
+      const page = await unwrap(
+        admin.GET("/v1/masterdata/catalogs/{catalog}/items", { params: { path: { catalog: "cnts_indicator" }, query: { at, include_inactive: true } } }),
+      );
+      const items = page.items as { code: string; name: string; attrs: Record<string, string>; active: boolean; valid_from?: string | null }[];
+      const file = exportCatalogCsv(tab, items);
+      expect(file).toContain('"Dòng 1\nDòng 2"');
+      expect(file).toContain('"Dòng 1\r\nDòng 2, ""trích"""');
+      expect(file).toContain("\"'- Dòng 1\nDòng 2\"");
+      const res = await importCsv(admin, file, "rt-170-multiline");
+      expect(res).toMatchObject({ total: items.length, skipped: items.length, created: 0, rejected: 0 });
+      const other = await importCsv(admin, 'catalog,code,name,value_type,description\r\ncnts_indicator,RT_ML_LF,Nhiều dòng RT_ML_LF,decimal,"Dòng 1\nDòng 3"\r\n', "rt-170-multiline-diff");
+      expect(other).toMatchObject({ total: 1, rejected: 1, skipped: 0 });
+    } finally {
+      const list = CATALOGS.cnts_indicator;
+      for (const c of created) {
+        const i = list.findIndex((x) => x.code === c.code);
+        if (i >= 0) list.splice(i, 1);
+      }
+      resetCntsVersions();
+    }
+  });
+
+  it("Nạp Excel áp cùng ràng buộc ngưỡng chỉ tiêu như thêm/sửa từng mục: số mũ, chuỗi rất dài, quá chữ số, tối thiểu > tối đa bị từ chối (review Codex 7058)", async () => {
+    const admin = createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", fetch: mockAdminFetchNoDelay });
+    const huge = "9".repeat(100_000);
+    const bad: [string, string][] = [["1e100000", "32"], ["25", "1e-100000"], [huge, "32"], ["25", huge], ["32", "25"], ["12345678", ""], ["", "1.23456"], ["-1", "32"]];
+    const head = "catalog,code,name,value_type,unit,threshold_min,threshold_max,diary_metric\r\n";
+    const rows = bad.map(([lo, hi], i) => `cnts_indicator,NGUONG_SAI_${i},Ngưỡng sai ${i},decimal,°C,${lo},${hi},temp_c\r\n`).join("");
+    const ok = "cnts_indicator,NGUONG_DUNG,Ngưỡng đúng,decimal,°C,9999999.9999,9999999.9999,temp_c\r\n";
+    try {
+      const res = await importCsv(admin, head + rows + ok, "rt-170-thresholds");
+      expect(res).toMatchObject({ total: bad.length + 1, rejected: bad.length, created: 1 });
+      for (const r of res.rows.slice(0, bad.length)) expect(r).toMatchObject({ status: "rejected", reason: expect.stringMatching(/^attrs\.threshold_(min|max): /) });
+      expect(CATALOGS.cnts_indicator.some((x) => x.code.startsWith("NGUONG_SAI_"))).toBe(false);
+    } finally {
+      const list = CATALOGS.cnts_indicator;
+      for (let i = list.length - 1; i >= 0; i--) if (list[i]!.code.startsWith("NGUONG_")) list.splice(i, 1);
+    }
   });
 });
 

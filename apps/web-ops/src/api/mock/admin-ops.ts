@@ -12,31 +12,47 @@ import type { MockPersona } from "./personas";
 
 const admin = (p: MockPersona, ...roles: string[]) => hasRole(p, "platform_admin", ...roles);
 
-/** Tách CSV đơn giản (có ngoặc kép). Đủ cho tệp mẫu; backend dùng bộ đọc CSV đầy đủ. */
+/** Tách CSV theo bản ghi logic như encoding/csv của máy chủ (internal/shared/tabular): ô trong ngoặc kép có thể chứa dấu phẩy,
+ * "" và xuống dòng; CRLF trong ô ngoặc kép thành LF (như máy chủ). Bỏ BOM, bỏ dòng trống, cắt khoảng trắng mỗi ô.
+ * Review Codex 7058 (#170): mô tả nhiều dòng của tệp "Xuất danh mục" nạp lại đúng nội dung. */
 export function parseCsv(text: string): string[][] {
+  const src = text.replace(/^﻿/, "");
   const rows: string[][] = [];
-  for (const line of text.replace(/^﻿/, "").split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    const cells: string[] = [];
-    let cur = "";
-    let quoted = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (quoted) {
-        if (ch === '"' && line[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else if (ch === '"') quoted = false;
-        else cur += ch;
-      } else if (ch === '"') quoted = true;
-      else if (ch === ",") {
-        cells.push(cur.trim());
-        cur = "";
-      } else cur += ch;
-    }
+  let cells: string[] = [];
+  let cur = "";
+  let quoted = false;
+  let sawQuote = false;
+  const endCell = () => {
     cells.push(cur.trim());
-    rows.push(cells);
+    cur = "";
+  };
+  const endRow = () => {
+    endCell();
+    if (sawQuote || cells.length > 1 || cells[0] !== "") rows.push(cells);
+    cells = [];
+    sawQuote = false;
+  };
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (quoted) {
+      if (ch === '"' && src[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
+      else if (ch === "\r" && src[i + 1] === "\n") {
+        cur += "\n";
+        i++;
+      } else cur += ch;
+    } else if (ch === '"') {
+      quoted = true;
+      sawQuote = true;
+    } else if (ch === ",") endCell();
+    else if (ch === "\n" || (ch === "\r" && src[i + 1] === "\n")) {
+      if (ch === "\r") i++;
+      endRow();
+    } else cur += ch;
   }
+  if (cur !== "" || cells.length > 0 || sawQuote) endRow();
   return rows;
 }
 

@@ -377,10 +377,20 @@ const CATALOG_CODE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/;
  * (valid_from) và cột trạng thái chỉ để đọc của tệp "Xuất danh mục" (#170) không so với attrs, nên tệp xuất nạp lại được. */
 const IMPORT_META = new Set(["catalog", "danh_muc", "code", "ma", "ma_muc", "name", "ten", "ten_muc", "valid_from", "hieu_luc_tu", "ngay_hieu_luc", "trang_thai", "status"]);
 /** Ô của tệp nạp có cùng nội dung với giá trị đã lưu — như csvUnescapeAs của máy chủ: tệp "Xuất danh mục" (toCsv) thêm
- * dấu nháy trước ô bắt đầu bằng = + - @ tab CR để Excel không chạy công thức, nên "'" + giá trị đó vẫn là cùng nội dung. */
+ * dấu nháy trước ô bắt đầu bằng = + - @ tab CR để Excel không chạy công thức, nên "'" + giá trị đó vẫn là cùng nội dung;
+ * bộ đọc CSV đổi CRLF trong ô ngoặc kép thành LF, nên giá trị đã lưu có CRLF được so ở dạng LF (review Codex 7058). */
 function sameCell(cell: string, stored: string | undefined): boolean {
   if (stored === undefined) return false;
-  return cell === stored || (/^[=+\-@\t\r]/.test(stored) && cell === `'${stored}`);
+  const forms = [stored, stored.replace(/\r\n/g, "\n")];
+  return forms.some((s) => cell === s || (/^[=+\-@\t\r]/.test(s) && cell === `'${s}`));
+}
+
+/** Kiểm thuộc tính theo danh mục cho "Nạp Excel", do module danh mục đăng ký — như CatalogDefinition (Normalize/ValidateAttrs)
+ * mà module KN đăng ký vào masterdata của máy chủ: nạp hàng loạt dùng cùng ràng buộc với thêm/sửa từng mục. */
+type ImportAttrCheck = (attrs: Record<string, string>) => { field: string; reason: string } | null;
+const IMPORT_ATTR_CHECKS = new Map<string, ImportAttrCheck>();
+export function registerCatalogImportCheck(catalog: string, check: ImportAttrCheck): void {
+  IMPORT_ATTR_CHECKS.set(catalog, check);
 }
 
 export const htxAdminRoutes: Route[] = [
@@ -425,6 +435,9 @@ export const htxAdminRoutes: Route[] = [
         if (!CATALOG_CODE.test(code)) return { row, status: "rejected" as const, catalog, code, reason: "Mã không hợp lệ (chữ, số, _ . -; tối đa 40 ký tự)" };
         if (!name) return { row, status: "rejected" as const, catalog, code, reason: "Thiếu tên" };
         if (attrs.growth_days !== undefined && !(Number(attrs.growth_days) > 0)) return { row, status: "rejected" as const, catalog, code, reason: "Thời gian sinh trưởng phải lớn hơn 0." };
+        // Ràng buộc thuộc tính do danh mục đăng ký (vd ngưỡng chỉ tiêu CNTS, review Codex 7058 #170): kiểm trước khi so/tạo như máy chủ.
+        const bad = IMPORT_ATTR_CHECKS.get(catalog)?.(attrs);
+        if (bad) return { row, status: "rejected" as const, catalog, code, reason: `${bad.field}: ${bad.reason}` };
         const existing = list.find((x) => x.code === code);
         if (existing) {
           const same = sameCell(name, existing.name) && Object.entries(attrs).every(([k, v]) => sameCell(v, existing.attrs[k]));

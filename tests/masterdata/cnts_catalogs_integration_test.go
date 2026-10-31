@@ -2,6 +2,7 @@ package masterdata_test
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -265,6 +266,46 @@ func TestBFCNCatalog_IndicatorThresholdsSeedsExport(t *testing.T) {
 		"cnts_indicator,RT_DASH,'- Chỉ tiêu gạch,°C,decimal,'- Mô tả khác\n"))
 	if st != http.StatusOK || body["rejected"] != 1.0 || body["skipped"] != 0.0 {
 		t.Fatalf("ô có dấu nháy nhưng nội dung khác vẫn phải bị từ chối: %d %v", st, body)
+	}
+
+	// Review Codex 7058 [P2-1]: "Nạp Excel" áp cùng ràng buộc ngưỡng như thêm/sửa từng mục — số mũ, chuỗi rất dài, quá phần
+	// nguyên/thập phân, số âm, tối thiểu > tối đa đều bị từ chối theo dòng, không tạo mục nào.
+	huge := strings.Repeat("9", 100000)
+	bad := [][2]string{{"1e100000", "32"}, {"25", "1e-100000"}, {huge, "32"}, {"25", huge}, {"32", "25"}, {"12345678", ""}, {"", "1.23456"}, {"-1", "32"}}
+	csv = "catalog,code,name,value_type,unit,threshold_min,threshold_max,diary_metric\n"
+	for i, b := range bad {
+		csv += fmt.Sprintf("cnts_indicator,NGUONG_SAI_%d,Ngưỡng sai %d,decimal,°C,%s,%s,temp_c\n", i, i, b[0], b[1])
+	}
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte(csv))
+	if st != http.StatusOK || body["rejected"] != float64(len(bad)) || body["created"] != 0.0 {
+		t.Fatalf("nạp ngưỡng sai phải bị từ chối từng dòng: %d %v", st, body["rejected"])
+	}
+	for i, r := range body["rows"].([]any) {
+		if reason, _ := r.(map[string]any)["reason"].(string); !strings.HasPrefix(reason, "attrs.threshold_") {
+			t.Fatalf("dòng %d (%v) phải bị từ chối vì ngưỡng: %q", i, bad[i][0][:min(len(bad[i][0]), 12)], reason)
+		}
+	}
+
+	// Review Codex 7058 [P2-2]: mô tả nhiều dòng (LF, CRLF, kèm ký tự công thức) — tệp xuất (ô ngoặc kép có xuống dòng) nạp
+	// lại được, mô tả nhiều dòng khác nội dung vẫn bị từ chối.
+	for _, it := range []struct{ code, desc string }{{"RT_ML_LF", "Dòng 1\nDòng 2"}, {"RT_ML_CRLF", "Dòng 1\r\nDòng 2, \"trích\""}, {"RT_ML_DASH", "- Dòng 1\nDòng 2"}} {
+		if st, body := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_indicator/items", map[string]any{"code": it.code, "name": "Nhiều dòng " + it.code,
+			"valid_from": "2026-10-01", "attrs": map[string]string{"value_type": "decimal", "description": it.desc}}); st != http.StatusCreated {
+			t.Fatalf("tạo %s: %d %v", it.code, st, body)
+		}
+	}
+	csv = "catalog,code,name,valid_from,unit,value_type,threshold_min,threshold_max,diary_metric,description,trang_thai\r\n" +
+		"cnts_indicator,RT_ML_LF,Nhiều dòng RT_ML_LF,2026-10-01,,decimal,,,,\"Dòng 1\nDòng 2\",Đang dùng\r\n" +
+		"cnts_indicator,RT_ML_CRLF,Nhiều dòng RT_ML_CRLF,2026-10-01,,decimal,,,,\"Dòng 1\r\nDòng 2, \"\"trích\"\"\",Đang dùng\r\n" +
+		"cnts_indicator,RT_ML_DASH,Nhiều dòng RT_ML_DASH,2026-10-01,,decimal,,,,\"'- Dòng 1\nDòng 2\",Đang dùng\r\n"
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte("\xef\xbb\xbf"+csv))
+	if st != http.StatusOK || body["total"] != 3.0 || body["skipped"] != 3.0 || body["rejected"] != 0.0 {
+		t.Fatalf("nạp lại tệp xuất có mô tả nhiều dòng: %d %v", st, body)
+	}
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte("catalog,code,name,value_type,description\r\n"+
+		"cnts_indicator,RT_ML_LF,Nhiều dòng RT_ML_LF,decimal,\"Dòng 1\nDòng 3\"\r\n"))
+	if st != http.StatusOK || body["rejected"] != 1.0 || body["skipped"] != 0.0 {
+		t.Fatalf("mô tả nhiều dòng khác nội dung vẫn phải bị từ chối: %d %v", st, body)
 	}
 }
 

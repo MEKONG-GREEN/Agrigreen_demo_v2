@@ -228,9 +228,17 @@ func csvFormulaEscapedAs(in, cur domain.Item) domain.Item {
 	return in
 }
 
+// csvUnescapeAs cũng coi ô bằng giá trị đã lưu ở dạng CRLF → LF là giá trị đã lưu: encoding/csv đổi CRLF trong ô ngoặc
+// kép thành LF, nên mô tả nhiều dòng (lưu qua API với CRLF) của tệp xuất vẫn nạp lại được (review Codex 7058).
 func csvUnescapeAs(cell, stored string) string {
-	if stored != "" && strings.ContainsRune("=+-@\t\r", rune(stored[0])) && strings.TrimSpace(cell) == "'"+stored {
-		return stored
+	c := strings.TrimSpace(cell)
+	for _, s := range []string{stored, strings.ReplaceAll(stored, "\r\n", "\n")} {
+		if s == "" {
+			continue
+		}
+		if (s != stored && c == s) || (strings.ContainsRune("=+-@\t\r", rune(s[0])) && c == "'"+s) {
+			return stored
+		}
 	}
 	return cell
 }
