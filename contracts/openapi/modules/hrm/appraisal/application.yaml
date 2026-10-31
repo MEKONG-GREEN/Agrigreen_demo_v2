@@ -1,0 +1,507 @@
+paths:
+# @ag-order: 2000
+  /v1/hrm/appraisals/templates/{kind}:
+    parameters:
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [summary, form]}}
+    get:
+      summary: Mẫu/phiếu đánh giá hiện hành, chỉ HCTH/Admin có assessment toàn Trung tâm
+      operationId: hrmAppraisalTemplates
+      tags: [hrm]
+      responses:
+        "200":
+          description: Mẫu theo phiên bản
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalTemplate"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2001
+  /v1/hrm/appraisals/templates/{kind}/{code}:
+    parameters:
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [summary, form]}}
+      - {name: code, in: path, required: true, schema: {type: string, maxLength: 40}}
+    post:
+      summary: Lưu phiên bản mẫu/phiếu; phát hành cần đủ tiêu chí/ngưỡng hoặc tám cột MS05/MS06
+      operationId: hrmAppraisalSaveTemplate
+      tags: [hrm]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status, version]
+              properties:
+                status: {type: string, enum: [draft, published, retired]}
+                version: {type: integer, minimum: 0}
+                form: {$ref: "#/components/schemas/HrmAppraisalForm"}
+                summary: {$ref: "#/components/schemas/HrmAppraisalSummary"}
+      responses:
+        "201": {description: Đã ghi, content: {application/json: {schema: {$ref: "#/components/schemas/HrmAppraisalTemplate"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2002
+  /v1/hrm/appraisals/templates/{kind}/{code}/history:
+    parameters:
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [summary, form]}}
+      - {name: code, in: path, required: true, schema: {type: string}}
+    get:
+      summary: Lịch sử bất biến mẫu/phiếu, cũ trước
+      operationId: hrmAppraisalTemplateHistory
+      tags: [hrm]
+      responses:
+        "200": {description: Lịch sử, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalTemplate"}}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2003
+  /v1/hrm/appraisals/periods:
+    get:
+      summary: Đợt được phép xem; tiến độ và metadata giao với quyền người dùng/bản thân/HS37
+      operationId: hrmAppraisalPeriods
+      tags: [hrm]
+      responses:
+        "200": {description: Các đợt, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalPeriod"}}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Mở đợt, chụp danh sách/chức vụ/HS37/mẫu tại ngày chốt; quý 0 là đánh giá năm độc lập
+      operationId: hrmAppraisalOpenPeriod
+      tags: [hrm]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [year, quarter, cutoff_on, self_due_at, manager_due_at, summary_due_at, forms, summaries, acknowledge_warnings]
+              properties:
+                year: {type: integer, minimum: 2020, maximum: 2100}
+                quarter: {type: integer, minimum: 0, maximum: 4}
+                cutoff_on: {type: string, format: date}
+                self_due_at: {type: string, format: date-time}
+                manager_due_at: {type: string, format: date-time}
+                summary_due_at: {type: string, format: date-time}
+                forms: {type: object, additionalProperties: {type: string, format: uuid}, maxProperties: 3}
+                summaries: {type: object, additionalProperties: {type: string, format: uuid}, maxProperties: 2}
+                excluded: {type: array, maxItems: 5000, items: {type: object, required: [staff_id, reason], properties: {staff_id: {type: string, format: uuid}, reason: {type: string, minLength: 10, maxLength: 2000}}}}
+                acknowledge_warnings: {type: boolean}
+      responses:
+        "201": {description: Đợt đã mở, content: {application/json: {schema: {$ref: "#/components/schemas/HrmAppraisalPeriod"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2004
+  /v1/hrm/appraisals/periods/{period}:
+    parameters: [{name: period, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Gia hạn/khóa bước/gửi đơn vị/nhắc/ký/chốt; chốt năm ghi annual_rating, không suy kết quả năm từ bốn quý
+      operationId: hrmAppraisalChangePeriod
+      tags: [hrm]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action, version]
+              properties:
+                action: {type: string, enum: [extend, lock_self, unlock_self, lock_manager, unlock_manager, send, remind, attach_signed, close]}
+                version: {type: integer, minimum: 1}
+                reason: {type: string, maxLength: 2000}
+                unit: {type: string, maxLength: 100}
+                step: {type: string, enum: [self, manager, summary]}
+                self_due_at: {type: string, format: date-time}
+                manager_due_at: {type: string, format: date-time}
+                summary_due_at: {type: string, format: date-time}
+                signed_documents: {type: object, maxProperties: 2, additionalProperties: {type: string, format: uuid}, description: Mã tài liệu DocDanhGia; UUID zero để gỡ liên kết có lý do}
+                acknowledge_unsigned: {type: boolean}
+      responses:
+        "201": {description: Đã ghi, content: {application/json: {schema: {$ref: "#/components/schemas/HrmAppraisalPeriod"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2005
+  /v1/hrm/appraisals/periods/{period}/entries:
+    parameters: [{name: period, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Phiếu/đề xuất được phép xem, chỉ tóm tắt (không tải câu trả lời), tên đọc kho sau audit ngoài TX
+      operationId: hrmAppraisalEntries
+      tags: [hrm]
+      responses:
+        "200": {description: Danh sách, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalItem"}}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2006
+  /v1/hrm/appraisals/periods/{period}/entries/{staff}:
+    parameters:
+      - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: staff, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Phiếu đóng băng + lịch sử 50 phiên bản mới nhất; xem bản cũ qua route versions
+      operationId: hrmAppraisalEntry
+      tags: [hrm]
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [item, period, form, history, history_more]
+                properties:
+                  item: {$ref: "#/components/schemas/HrmAppraisalItem"}
+                  period: {$ref: "#/components/schemas/HrmAppraisalPeriod"}
+                  form: {$ref: "#/components/schemas/HrmAppraisalTemplate"}
+                  history: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalItem"}}
+                  history_more: {type: boolean}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Tự chấm/nhập thay có scan/quản lý/gửi/trả/kết luận/mở lại một người; khóa bền cùng body/actor
+      operationId: hrmAppraisalChangeEntry
+      tags: [hrm]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/HrmAppraisalEntryChange"}
+      responses:
+        "201": {description: Đã ghi, content: {application/json: {schema: {$ref: "#/components/schemas/HrmAppraisalItem"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2007
+  /v1/hrm/appraisals/periods/{period}/entries/{staff}/history:
+    parameters:
+      - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: staff, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: before, in: query, required: false, schema: {type: string, pattern: '^[0-9]{1,18}$'}}
+    get:
+      summary: Tối đa 50 dòng lịch sử tóm tắt, mới trước
+      operationId: hrmAppraisalEntryHistory
+      tags: [hrm]
+      responses:
+        "200": {description: Lịch sử, content: {application/json: {schema: {type: object, required: [items, more, next_before], properties: {items: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalItem"}}, more: {type: boolean}, next_before: {type: integer}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2008
+  /v1/hrm/appraisals/periods/{period}/entries/{staff}/versions/{version}:
+    parameters:
+      - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: staff, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: version, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Bản phiếu cũ đầy đủ, kiểm quyền trên phân công đóng băng và quyền hiện tại
+      operationId: hrmAppraisalEntryVersion
+      tags: [hrm]
+      responses:
+        "200": {description: Phiên bản, content: {application/json: {schema: {$ref: "#/components/schemas/HrmAppraisalItem"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2009
+  /v1/hrm/appraisals/periods/{period}/entries/{staff}/guest-link:
+    parameters:
+      - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: staff, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Fail-closed tới khi W10.18 guest OTP (#184) có TTL/one-time/rate-limit/tenant-subject binding
+      operationId: hrmAppraisalGuestLink
+      tags: [hrm]
+      responses:
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {description: hrm.appraisal_guest_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 2010
+  /v1/hrm/appraisals/periods/{period}/paper/{kind}:
+    parameters:
+      - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [MS05, MS06]}}
+      - {name: unit, in: query, required: false, schema: {type: string, maxLength: 100}}
+    get:
+      summary: Xem trước tám cột theo mẫu và phiên bản phiếu, quyền assessment giao quyền export
+      operationId: hrmAppraisalPaper
+      tags: [hrm]
+      responses:
+        "200": {description: Biểu chụp tại phiên bản hiện tại, content: {application/json: {schema: {$ref: "#/components/schemas/HrmAppraisalPaper"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2011
+  /v1/hrm/appraisals/periods/{period}/exports:
+    parameters: [{name: period, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Các lần xuất đã lưu, không chứa byte tệp hoặc tên nhân sự
+      operationId: hrmAppraisalExports
+      tags: [hrm]
+      responses:
+        "200": {description: Lịch sử xuất, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalExport"}}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Ghi lần xuất Word hoặc Excel, pin phiên bản mẫu/đợt/phiếu và kiểm quyền HRM trước cap/export
+      operationId: hrmAppraisalExport
+      tags: [hrm]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind, format, version]
+              properties:
+                kind: {type: string, enum: [MS05, MS06, PHIEU_DIEM]}
+                format: {type: string, enum: [xlsx, docx]}
+                version: {type: integer, minimum: 1}
+                unit: {type: string, maxLength: 100}
+      responses:
+        "201": {description: Lần xuất, content: {application/json: {schema: {$ref: "#/components/schemas/HrmAppraisalExport"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 2012
+  /v1/hrm/appraisals/periods/{period}/exports/{export}/file:
+    parameters:
+      - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: export, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      summary: Tải lại đúng lần xuất, kiểm quyền hiện tại và đánh dấu nguồn thay đổi
+      operationId: hrmAppraisalExportFile
+      tags: [hrm]
+      responses:
+        "200":
+          description: Tệp xuất
+          headers:
+            Content-Disposition: {schema: {type: string}}
+            X-Content-SHA256: {schema: {type: string}}
+            X-Data-Drift: {schema: {type: string}}
+          content:
+            application/octet-stream: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 2020
+    HrmAppraisalRating:
+      type: string
+      enum: ["", HTXSNV, HTTNV, HTNV, KHTNV]
+# @ag-order: 2021
+    HrmAppraisalForm:
+      type: object
+      required: [code, name, group, criteria, bands]
+      properties:
+        code: {type: string, pattern: '^[a-z][a-z0-9_]{0,39}$'}
+        name: {type: string, maxLength: 200}
+        group: {type: string, enum: [vien_chuc, lanh_dao, can_bo_xa]}
+        criteria:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [code, group, title, maximum, guide]
+            properties:
+              code: {type: string, maxLength: 40}
+              group: {type: string, maxLength: 200}
+              title: {type: string, maxLength: 500}
+              maximum: {type: string, maxLength: 32, pattern: '^[0-9]{1,7}(\.[0-9]{1,2})?$'}
+              guide: {type: string, maxLength: 2000}
+        questions: {type: array, maxItems: 20, items: {type: string, maxLength: 1000}}
+        bands: {type: array, maxItems: 4, items: {type: object, required: [minimum, rating], properties: {minimum: {type: string, maxLength: 32}, rating: {$ref: "#/components/schemas/HrmAppraisalRating"}}}}
+# @ag-order: 2022
+    HrmAppraisalSummary:
+      type: object
+      required: [code, kind, number, name, title, audience, signature, columns, ratings]
+      properties:
+        code: {type: string, maxLength: 40}
+        kind: {type: string, enum: [MS05, MS06]}
+        number: {type: string, maxLength: 20}
+        name: {type: string, maxLength: 200}
+        title: {type: string, maxLength: 500}
+        audience: {type: string, maxLength: 500}
+        signature: {type: string, maxLength: 1000}
+        columns: {type: array, minItems: 8, maxItems: 8, items: {type: object, required: [key, title], properties: {key: {type: string}, title: {type: string, maxLength: 300}}}}
+        ratings: {type: object, additionalProperties: {type: string, maxLength: 200}}
+# @ag-order: 2023
+    HrmAppraisalTemplate:
+      type: object
+      required: [id, kind, code, version, status, recorded_at, actor_ref]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [summary, form]}
+        code: {type: string}
+        version: {type: integer}
+        status: {type: string, enum: [draft, published, retired]}
+        form: {$ref: "#/components/schemas/HrmAppraisalForm"}
+        summary: {$ref: "#/components/schemas/HrmAppraisalSummary"}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+# @ag-order: 2024
+    HrmAppraisalPeriod:
+      type: object
+      required: [id, version, year, quarter, node_ref, label, cutoff_on, known_at, self_due_at, manager_due_at, summary_due_at, forms, summaries, self_locked, manager_locked, closed, signed_documents, warnings, counts, recorded_at, actor_ref]
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer}
+        year: {type: integer}
+        quarter: {type: integer}
+        node_ref: {type: string, format: uuid}
+        label: {type: string}
+        cutoff_on: {type: string, format: date}
+        known_at: {type: string, format: date-time}
+        self_due_at: {type: string, format: date-time}
+        manager_due_at: {type: string, format: date-time}
+        summary_due_at: {type: string, format: date-time}
+        forms: {type: object, additionalProperties: {$ref: "#/components/schemas/HrmAppraisalTemplate"}}
+        summaries: {type: object, additionalProperties: {$ref: "#/components/schemas/HrmAppraisalTemplate"}}
+        self_locked: {type: boolean}
+        manager_locked: {type: boolean}
+        closed: {type: boolean}
+        signed_documents: {type: object, additionalProperties: {type: string, format: uuid}}
+        warnings: {type: array, items: {type: string}}
+        counts: {type: object, additionalProperties: {type: integer}}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+# @ag-order: 2025
+    HrmAppraisalAnswer:
+      type: object
+      required: [code, points, note]
+      properties:
+        code: {type: string, maxLength: 40}
+        points: {type: string, maxLength: 32}
+        note: {type: string, maxLength: 2000}
+# @ag-order: 2026
+    HrmAppraisalScoring:
+      type: object
+      required: [answers, total, suggested, complete]
+      properties:
+        answers: {type: [array, "null"], items: {$ref: "#/components/schemas/HrmAppraisalAnswer"}}
+        total: {type: string}
+        suggested: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        complete: {type: boolean}
+# @ag-order: 2027
+    HrmAppraisalEntryChange:
+      type: object
+      additionalProperties: false
+      required: [action, version]
+      properties:
+        action: {type: string, enum: [self_draft, self_submit, proxy_self, manager_draft, manager_submit, send, return, official, reopen]}
+        version: {type: integer, minimum: 1}
+        answers: {type: array, maxItems: 200, items: {$ref: "#/components/schemas/HrmAppraisalAnswer"}}
+        self_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        collective_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        official_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        reason: {type: string, maxLength: 2000}
+        personnel_proposal: {type: string, maxLength: 2000}
+        note: {type: string, maxLength: 2000}
+        return_to: {type: string, enum: [self, manager]}
+        proxy_document: {type: string, format: uuid}
+# @ag-order: 2028
+    HrmAppraisalItem:
+      type: object
+      required: [id, period_id, version, actor_ref, recorded_at, action, member, status, self, manager, self_rating, collective_rating, official_rating, closed_rating, reason, personnel_proposal, note, correction_reason, returned_to, reopened, can_self, can_manage, can_center, self_late, manager_late]
+      properties:
+        id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        version: {type: integer}
+        actor_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+        action: {type: string}
+        change_reason: {type: string}
+        name: {type: string, description: Chỉ ghép trong bộ nhớ sau audit, không lưu sổ đánh giá}
+        member:
+          type: object
+          required: [staff_id, subject_ref, account_ref, code, staff_type, group, unit, management_unit, position, position_name, position_order, unit_name, summary_kind]
+          properties:
+            staff_id: {type: string, format: uuid}
+            subject_ref: {type: string, format: uuid}
+            account_ref: {type: [string, "null"], format: uuid}
+            code: {type: string}
+            staff_type: {type: string}
+            group: {type: string}
+            unit: {type: string}
+            management_unit: {type: string}
+            position: {type: string}
+            position_name: {type: string}
+            position_order: {type: integer}
+            unit_name: {type: string}
+            summary_kind: {type: string, enum: [MS05, MS06]}
+            excluded_reason: {type: string}
+        status: {type: string, enum: [not_started, self_submitted, manager_submitted, sent, change_requested, closed]}
+        self: {$ref: "#/components/schemas/HrmAppraisalScoring"}
+        manager: {$ref: "#/components/schemas/HrmAppraisalScoring"}
+        self_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        collective_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        official_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        closed_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        reason: {type: string}
+        personnel_proposal: {type: string}
+        note: {type: string}
+        correction_reason: {type: string}
+        returned_to: {type: string}
+        reopened: {type: boolean}
+        proxy_document: {type: string, format: uuid}
+        self_submitted_at: {type: string, format: date-time}
+        manager_submitted_at: {type: string, format: date-time}
+        can_self: {type: boolean}
+        can_manage: {type: boolean}
+        can_center: {type: boolean}
+        self_late: {type: boolean}
+        manager_late: {type: boolean}
+        quarter_results: {type: array, maxItems: 4, items: {$ref: "#/components/schemas/HrmAppraisalQuarterResult"}, description: Tham chiếu quý đóng băng khi mở đợt năm và giao quyền lịch sử; không suy kết luận năm}
+
+# @ag-order: 2030
+    HrmAppraisalExport:
+      type: object
+      required: [id, period_id, period_version, kind, format, unit, entry_versions, file_name, sha256, size, count, status, actor_ref, recorded_at]
+      properties:
+        score_layout:
+          type: object
+          description: Chỉ PHIEU_DIEM; bố cục/nhãn đóng băng, không có PII
+          required: [version, title, columns, ratings]
+          properties:
+            version: {type: string}
+            title: {type: string}
+            columns: {type: array, maxItems: 10, items: {type: object, required: [key, title], properties: {key: {type: string}, title: {type: string}}}}
+            ratings: {type: object, additionalProperties: {type: string}}
+        id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        period_version: {type: string, format: uuid}
+        kind: {type: string, enum: [MS05, MS06, PHIEU_DIEM]}
+        format: {type: string, enum: [xlsx, docx]}
+        unit: {type: string}
+        entry_versions: {type: array, items: {type: string, format: uuid}}
+        file_name: {type: string}
+        sha256: {type: string}
+        size: {type: integer}
+        count: {type: integer}
+        status: {type: string}
+        word_run: {type: string, format: uuid}
+        actor_ref: {type: string, format: uuid}
+        recorded_at: {type: string, format: date-time}
+# @ag-order: 2031
+    HrmAppraisalPaper:
+      type: object
+      required: [period, template, items]
+      properties:
+        period: {$ref: "#/components/schemas/HrmAppraisalPeriod"}
+        template: {$ref: "#/components/schemas/HrmAppraisalSummary"}
+        items: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalItem"}}
+
+# @ag-order: 2032
+    HrmAppraisalQuarterResult:
+      type: object
+      required: [quarter, period_id, entry_version, version, status, rating]
+      properties:
+        quarter: {type: integer, minimum: 1, maximum: 4}
+        period_id: {type: string, format: uuid}
+        entry_version: {type: string, format: uuid}
+        version: {type: integer}
+        status: {type: string}
+        rating: {$ref: "#/components/schemas/HrmAppraisalRating"}

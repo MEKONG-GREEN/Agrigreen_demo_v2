@@ -1,6 +1,6 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
-import { newIdempotencyKey } from "@/api/idempotency";
+import {createRetryingMutation} from "../adhoc/retry";
 import { parseProblemResponse } from "@/api/problem";
 import { filenameFromDisposition } from "@/lib/files";
 type S = components["schemas"];
@@ -10,15 +10,16 @@ export type ReportSave = S["KHTCReportSave"];
 export type ReportFilter = S["KHTCReportFilter"];
 export type ReportRow = S["KHTCReportRow"];
 export type ReportWord = S["KHTCReportWord"];
-const header = () => ({ "Idempotency-Key": newIdempotencyKey() });
+
 export function createReportApi(api: ApiClient) {
+    const mutate=createRetryingMutation();
     return {
         get: (id: string) => unwrap(api.GET("/v1/extension/khtc/periods/{id}/report", { params: { path: { id } } })),
-        save: (id: string, body: ReportSave) => unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/draft", { params: { path: { id }, header: header() }, body })),
-        refresh: (id: string, version: number) => unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/refresh", { params: { path: { id }, header: header() }, body: { base_version: version } })),
+        save: (id: string, body: ReportSave) => mutate("save:"+id+":"+body.base_version,body,key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/draft",{params:{path:{id},header:{"Idempotency-Key":key}},body}))),
+        refresh: (id:string,version:number)=>{const body={base_version:version};return mutate("refresh:"+id+":"+version,body,key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/refresh",{params:{path:{id},header:{"Idempotency-Key":key}},body})));},
         history: async (id: string) => (await unwrap(api.GET("/v1/extension/khtc/periods/{id}/report/exports", { params: { path: { id } } }))).items,
-        export: (id: string, version: number, acknowledge: boolean, filter: ReportFilter) => unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/exports", { params: { path: { id }, header: header() }, body: { base_version: version, acknowledge_provisional: acknowledge, filter } })),
-        final: (id: string, exportID: string) => unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/exports/{exportID}/final", { params: { path: { id, exportID }, header: header() }, body: {} })),
+        export:(id:string,version:number,acknowledge:boolean,filter:ReportFilter)=>{const body={base_version:version,acknowledge_provisional:acknowledge,filter};return mutate("export:"+id,body,key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/exports",{params:{path:{id},header:{"Idempotency-Key":key}},body})));},
+        final:(id:string,exportID:string)=>mutate("final:"+id,{exportID},key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/exports/{exportID}/final",{params:{path:{id,exportID},header:{"Idempotency-Key":key}},body:{}}))),
         async download(id: string, exportID: string) {
             const res = await api.GET("/v1/extension/khtc/periods/{id}/report/exports/{exportID}/download", { params: { path: { id, exportID } }, parseAs: "blob" });
             if (!res.response.ok || !res.data)
@@ -26,7 +27,7 @@ export function createReportApi(api: ApiClient) {
             return { blob: res.data as unknown as Blob, name: filenameFromDisposition(res.response.headers.get("Content-Disposition"), "bao-cao-khtc.xlsx") };
         },
         /** W10.17: Word (.docx) từ nội dung đóng băng của bản Excel, qua `cap/export` (số {n}/BC-TTKN tự cấp khi ô số trống). */
-        word: (id: string, exportID: string) => unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/exports/{exportID}/word", { params: { path: { id, exportID }, header: header() }, body: {} })),
+        word:(id:string,exportID:string)=>mutate("word:"+id,{exportID},key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/exports/{exportID}/word",{params:{path:{id,exportID},header:{"Idempotency-Key":key}},body:{}}))),
         words: async (id: string) => (await unwrap(api.GET("/v1/extension/khtc/periods/{id}/report/words", { params: { path: { id } } }))).items,
         async downloadWord(id: string, runID: string) {
             const res = await api.GET("/v1/extension/khtc/periods/{id}/report/words/{runID}/download", { params: { path: { id, runID } }, parseAs: "blob" });

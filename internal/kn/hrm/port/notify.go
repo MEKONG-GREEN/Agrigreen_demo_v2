@@ -21,7 +21,8 @@ const (
 	EventPromotionDueDetected = "pf.hrm.promotion_due.detected"
 	// EventPlanReminded: Phòng HCTH/Admin bấm "Nhắc phòng chưa lập" (W11.27, FN-11) — ghi CÙNG giao dịch với sổ
 	// plan_reminder.
-	EventPlanReminded = "pf.hrm.plan.reminded"
+	EventPlanReminded     = "pf.hrm.plan.reminded"
+	EventAppraisalChanged = "pf.hrm.appraisal.changed"
 )
 
 // Loại thông báo (hộp thư pf/notify) do pf/hrm sở hữu.
@@ -30,6 +31,7 @@ const (
 	KindPromotionDue = "hrm_promotion_due"
 	// KindPlanReminder: nhắc lập/gửi kế hoạch nhân lực năm → lãnh đạo các đơn vị chưa gửi (FN-11).
 	KindPlanReminder = "hrm_plan_reminder"
+	KindAppraisal    = "hrm_appraisal"
 )
 
 // Hàng đợi consumer của pf/notify cho sự kiện pf/hrm. Thứ tự là vị trí ổn định trong danh mục đăng ký (1–16 đã dùng).
@@ -70,6 +72,26 @@ type PlanRemindedV1 struct {
 	Units      []string  `json:"units"`
 	DueAt      string    `json:"due_at"`
 	ActorRef   uuid.UUID `json:"actor_ref"`
+}
+
+// AppraisalChangedV1 chỉ có tham chiếu và bước; không điểm, nhận xét, tên hay địa chỉ liên hệ.
+// Targets lấy từ AccountRef của snapshot; Units tra lãnh đạo tại NodeRef qua cổng chỉ đọc ở consumer.
+//
+//ag:event pf.hrm.appraisal.changed v1
+type AppraisalChangedV1 struct {
+	NoticeID  uuid.UUID   `json:"notice_id"`
+	PeriodRef uuid.UUID   `json:"period_ref"`
+	StaffRef  *uuid.UUID  `json:"staff_ref,omitempty"`
+	NodeRef   uuid.UUID   `json:"node_ref"`
+	Year      int         `json:"year"`
+	Quarter   int         `json:"quarter"`
+	Action    string      `json:"action"`
+	Step      string      `json:"step"`
+	Targets   []uuid.UUID `json:"targets"`
+	Units     []string    `json:"units"`
+	Center    bool        `json:"center"`
+	DueAt     string      `json:"due_at"`
+	ActorRef  uuid.UUID   `json:"actor_ref"`
 }
 
 // NotifyDirectory là cổng CHỈ ĐỌC tra người nhận thông báo HCTH, do gốc lắp ráp nối (KN: pf/accounts). Tenant truyền tường

@@ -25,6 +25,8 @@ type Handler struct{ Svc *app.Service }
 // RegisterApp gắn route vào nhóm /v1 (đã có xác thực, ngữ cảnh phiên, Idempotency-Key).
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g := rg.Group("/extension/khtc")
+	g.GET("/adhoc-open-intents", h.openRecoveries)
+	g.POST("/adhoc-open-intents/:id/reconcile", h.reconcileOpen)
 	g.GET("/weeks", h.weeks)
 	g.GET("/form-template", h.template)
 	g.POST("/form-template/install", h.install)
@@ -201,6 +203,9 @@ type formDTO struct {
 	ReviewedAt           *time.Time `json:"reviewed_at"`
 	ReviewNote           string     `json:"review_note"`
 	Late                 bool       `json:"late"`
+	NativeLate           *bool      `json:"native_late,omitempty"`
+	RequestDueAt         *time.Time `json:"request_due_at,omitempty"`
+	RequestState         string     `json:"request_state,omitempty"`
 }
 
 type eventDTO struct {
@@ -258,7 +263,7 @@ func periodOf(d app.Detail) periodDTO {
 		out.Forms = append(out.Forms, formDTO{Department: f.Department, DepartmentName: f.DepartmentName, State: f.View.State,
 			StateLabel: domain.FormLabels[f.View.State], Attempt: f.View.Attempt, LimitReached: f.View.LimitReached,
 			CanRequestSupplement: f.View.CanRequestSupplement, CanConfirm: f.View.CanConfirm, LastSubmittedAt: f.LastSubmittedAt,
-			ReviewedAt: f.ReviewedAt, ReviewNote: f.ReviewNote, Late: f.Late})
+			ReviewedAt: f.ReviewedAt, ReviewNote: f.ReviewNote, Late: f.Late, NativeLate: f.NativeLate, RequestDueAt: f.RequestDueAt, RequestState: f.RequestState})
 	}
 	for _, s := range d.Sources {
 		out.Sources = append(out.Sources, sourceDTO{Department: s.Ref.Department, Source: s.Ref.Source, CalendarID: s.Ref.CalendarID,

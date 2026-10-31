@@ -447,7 +447,7 @@ type checked struct {
 
 // validate kiểm rẻ trước (cú pháp, độ dài, số) rồi tới cổng ngoài giao dịch (đơn vị hành chính, publication HTX).
 func (s *Service) validate(ctx context.Context, c caller, in *Input, create bool) (checked, error) {
-	es := in.Record.Normalize()
+	es := in.Normalize()
 	area, aerr := domain.ParseArea(in.AreaRaw)
 	if aerr != nil {
 		es = append(es, domain.FieldError{Field: "area_ha", Reason: aerr.Error()})
@@ -475,7 +475,7 @@ func (s *Service) validate(ctx context.Context, c caller, in *Input, create bool
 	if len(es) > 0 {
 		return checked{}, fields(es)
 	}
-	in.Record.AreaHa = area
+	in.AreaHa = area
 	if !c.k.Scope.Allows(in.CommuneCode) {
 		return checked{}, ErrOutOfScope.WithDetail("xã ngoài phạm vi phụ trách")
 	}

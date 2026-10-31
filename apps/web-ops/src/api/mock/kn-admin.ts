@@ -1142,29 +1142,32 @@ import { knCollectRoutes as route15 } from "./kn-collect";
 import { contactRoutes as route16 } from "./kn-contact";
 import { deptHomeRoutes as route17 } from "./kn-dept-home";
 import { hrmRoutes as route18 } from "./kn-hrm";
-import { hrmDocRoutes as route19 } from "./kn-hrm-docs";
-import { hrmPlanRoutes as route20 } from "./kn-hrm-plans";
-import { hrmPromotionRoutes as route21 } from "./kn-hrm-promotion";
-import { hrmReportRoutes as route22 } from "./kn-hrm-reports";
-import { hrmStaffRoutes as route23 } from "./kn-hrm-staff";
-import { khtcRoutes as route24 } from "./kn-khtc";
-import { khtcExternalRoutes as route25 } from "./kn-khtc-external";
-import { khtcFormRoutes as route26 } from "./kn-khtc-forms";
-import { khtcPeriodRoutes as route27 } from "./kn-khtc-periods";
-import { khtcReportRoutes as route28 } from "./kn-khtc-reports";
-import { khtcSourceRoutes as route29 } from "./kn-khtc-sources";
-import { khtcWordRoutes as route30 } from "./kn-khtc-words";
-import { appRoutes28 as route31 } from "./kn-legacy-extension";
-import { appRoutes29 as route32 } from "./kn-legacy-extension";
-import { priceConfigRoutes as route33 } from "./kn-price";
-import { priceBoardRoutes as route34 } from "./kn-price-boards";
-import { priceItemRoutes as route35 } from "./kn-price-items";
-import { pricePointRoutes as route36 } from "./kn-price-points";
-import { priceReportRoutes as route37 } from "./kn-price-reports";
-import { priceSurveyRoutes as route38 } from "./kn-price-surveys";
-import { priceTicketRoutes as route39 } from "./kn-price-tickets";
-import { reportCycleAppRoutes as route40 } from "./kn-reports/routes";
-import { workScheduleAppRoutes as route41 } from "./kn-schedules";
+import { hrmAppraisalRoutes as route19 } from "./kn-hrm-appraisal";
+import { hrmDocRoutes as route20 } from "./kn-hrm-docs";
+import { hrmPlanRoutes as route21 } from "./kn-hrm-plans";
+import { hrmPromotionRoutes as route22 } from "./kn-hrm-promotion";
+import { hrmReportRoutes as route23 } from "./kn-hrm-reports";
+import { hrmStaffRoutes as route24 } from "./kn-hrm-staff";
+import { khtcRoutes as route25 } from "./kn-khtc";
+import { khtcAdhocRoutes as route26 } from "./kn-khtc-adhoc";
+import { khtcExternalRoutes as route27 } from "./kn-khtc-external";
+import { khtcFormRoutes as route28 } from "./kn-khtc-forms";
+import { khtcPeriodRoutes as route29 } from "./kn-khtc-periods";
+import { khtcReportRoutes as route30 } from "./kn-khtc-reports";
+import { khtcSourceRoutes as route31 } from "./kn-khtc-sources";
+import { khtcTemplateRoutes as route32 } from "./kn-khtc-templates";
+import { khtcWordRoutes as route33 } from "./kn-khtc-words";
+import { appRoutes28 as route34 } from "./kn-legacy-extension";
+import { appRoutes29 as route35 } from "./kn-legacy-extension";
+import { priceConfigRoutes as route36 } from "./kn-price";
+import { priceBoardRoutes as route37 } from "./kn-price-boards";
+import { priceItemRoutes as route38 } from "./kn-price-items";
+import { pricePointRoutes as route39 } from "./kn-price-points";
+import { priceReportRoutes as route40 } from "./kn-price-reports";
+import { priceSurveyRoutes as route41 } from "./kn-price-surveys";
+import { priceTicketRoutes as route42 } from "./kn-price-tickets";
+import { reportCycleAppRoutes as route43 } from "./kn-reports/routes";
+import { workScheduleAppRoutes as route44 } from "./kn-schedules";
 
 export function registeredKnRoutes(): RouteRegistration[] {
   return [
@@ -1187,29 +1190,32 @@ export function registeredKnRoutes(): RouteRegistration[] {
   { surface: "app", order: 23, routes: route16 },
   { surface: "app", order: 58, routes: route17 },
   { surface: "app", order: 11, routes: route18 },
-  { surface: "app", order: 25, routes: route19 },
-  { surface: "app", order: 60, routes: route20 },
-  { surface: "app", order: 125, routes: route21 },
-  { surface: "app", order: 24, routes: route22 },
-  { surface: "app", order: 22, routes: route23 },
-  { surface: "app", order: 12, routes: route24 },
-  { surface: "app", order: 1003, routes: route25 },
-  { surface: "app", order: 20, routes: route26 },
-  { surface: "app", order: 16, routes: route27 },
-  { surface: "app", order: 1000, routes: route28 },
-  { surface: "app", order: 19, routes: route29 },
-  { surface: "app", order: 1002, routes: route30 },
-  { surface: "app", order: 28, routes: route31 },
-  { surface: "app", order: 29, routes: route32 },
-  { surface: "app", order: 5, routes: route33 },
-  { surface: "app", order: 26, routes: route34 },
-  { surface: "app", order: 8, routes: route35 },
-  { surface: "app", order: 9, routes: route36 },
-  { surface: "app", order: 27, routes: route37 },
-  { surface: "app", order: 78, routes: route38 },
-  { surface: "app", order: 13, routes: route39 },
-  { surface: "app", order: 6, routes: route40 },
-  { surface: "app", order: 4, routes: route41 },
+  { surface: "app", order: 126, routes: route19 },
+  { surface: "app", order: 25, routes: route20 },
+  { surface: "app", order: 60, routes: route21 },
+  { surface: "app", order: 125, routes: route22 },
+  { surface: "app", order: 24, routes: route23 },
+  { surface: "app", order: 22, routes: route24 },
+  { surface: "app", order: 12, routes: route25 },
+  { surface: "app", order: 1004, routes: route26 },
+  { surface: "app", order: 1003, routes: route27 },
+  { surface: "app", order: 20, routes: route28 },
+  { surface: "app", order: 16, routes: route29 },
+  { surface: "app", order: 1000, routes: route30 },
+  { surface: "app", order: 19, routes: route31 },
+  { surface: "app", order: 1065, routes: route32 },
+  { surface: "app", order: 1002, routes: route33 },
+  { surface: "app", order: 28, routes: route34 },
+  { surface: "app", order: 29, routes: route35 },
+  { surface: "app", order: 5, routes: route36 },
+  { surface: "app", order: 26, routes: route37 },
+  { surface: "app", order: 8, routes: route38 },
+  { surface: "app", order: 9, routes: route39 },
+  { surface: "app", order: 27, routes: route40 },
+  { surface: "app", order: 78, routes: route41 },
+  { surface: "app", order: 13, routes: route42 },
+  { surface: "app", order: 6, routes: route43 },
+  { surface: "app", order: 4, routes: route44 },
   ];
 }
 // END GENERATED MOCK ROUTES

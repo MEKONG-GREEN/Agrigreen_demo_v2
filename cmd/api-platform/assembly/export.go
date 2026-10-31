@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export"
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -24,13 +25,14 @@ var KNExportAccess = exportport.AccessFunc(func(ctx context.Context) bool {
 	return p.Has(authz.RolePlatformAdmin)
 })
 
-// wireExport dựng pf/export (`cap/export`) với mẫu của bên dùng và nối vào bên dùng: KHTC Mẫu 1–5 (W10.17). Bên dùng sau
-// (CNTS BM-11, HCTH MS05/06, Mẫu KNQG) thêm TemplateRegistration và gọi Use* tương ứng ở đây.
-func wireExport(unit tenant.Beginner, clk clock.Clock, kn *extension.Module) (*export.Module, error) {
-	ex, err := export.New(unit, clk, export.Deps{Access: KNExportAccess, Templates: []exportport.TemplateRegistration{extension.ExportTemplates()}})
+// wireExport nối KHTC Mẫu 1–5 và HRM MS05/MS06 vào cap/export. Mỗi bên dùng
+// kiểm quyền nghiệp vụ trước khi gọi, không cấp quyền HRM từ màn quản trị mẫu chung.
+func wireExport(unit tenant.Beginner, clk clock.Clock, kn *extension.Module, hr *hrm.Module) (*export.Module, error) {
+	ex, err := export.New(unit, clk, export.Deps{Access: KNExportAccess, Templates: []exportport.TemplateRegistration{extension.ExportTemplates(), hrm.ExportTemplates()}})
 	if err != nil {
 		return nil, err
 	}
 	kn.UseExporter(ex.Exporter())
+	hr.UseExporter(ex.Exporter())
 	return ex, nil
 }

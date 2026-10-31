@@ -53,8 +53,11 @@ func (s *Service) ExportWord(ctx context.Context, id, exportID uuid.UUID, idem s
 	if err != nil {
 		return exportport.Run{}, err
 	}
-	data := WordData(x.Content, x.Filter, x.Version)
-	req := exportport.Request{Template: WordTemplateKey(x.Content.Data.Template), Version: WordTemplateVersion, Subject: WordSubject(id),
+	key, version, data, err := fixedTemplateWord(x.Content.TemplateSnapshot, x.Content, templateTerminal(x.Content), x.Filter, x.Version)
+	if err != nil {
+		return exportport.Run{}, err
+	}
+	req := exportport.Request{Template: key, Version: version, Subject: WordSubject(id),
 		FileName: fmt.Sprintf("bao-cao-khtc-%s-%s-v%d.docx", x.Content.Data.Template, id.String(), x.Version), Data: data,
 		Date: &exportport.DateLine{Var: VarPlaceDate, Place: admin(x.Content, "place")}, IdemKey: idem}
 	if x.Provisional {

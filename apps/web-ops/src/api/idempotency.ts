@@ -246,7 +246,7 @@ async function problemCode(res: Response): Promise<string | null> {
 }
 
 /** Băm byte (SHA-256 khi có Web Crypto; ngoài ngữ cảnh an toàn thì hai làn FNV-1a) — không giải mã nhị phân thành chữ. */
-async function digestHex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+export async function digestHex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   const subtle = typeof crypto !== "undefined" ? crypto.subtle : undefined;
   if (subtle) {
     try {

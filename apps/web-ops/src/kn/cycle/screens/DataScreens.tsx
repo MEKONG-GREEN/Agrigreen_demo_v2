@@ -9,11 +9,12 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { parseNumberInput } from "@/components/form";
 import { DetailLayout } from "@/components/patterns/detail";
-import { DataTable, FilterBar, FilterChip, PageHeader, type Column } from "@/components/patterns/list";
+import { DataTable, FilterBar, FilterChip, PageHeader, StatusPill, type Column } from "@/components/patterns/list";
 import { LoadState, useAction, useCommuneNames, useCycleReadOnly, useLoad } from "../common";
 import { vnDate } from "@/kn/schedule/week";
 import { normalizeNumberInput } from "@/lib/exactDecimal";
-import { HouseholdAddRoute, ProducerCreateRoute, ProducerDetailScreen, ProducerListScreen } from "./ProducerScreens";
+import { HtxRecordPicker, UNLINKED_LABEL } from "./HtxRecordPicker";
+import { HouseholdAddRoute, ProducerCreateRoute, ProducerDetailScreen, ProducerListScreen, loadAllRecords } from "./ProducerScreens";
 
 /** Ghi chú phần còn ở nơi khác (nạp Excel, vẽ bản đồ ngoại tuyến…). */
 export function GapNotice({ what }: { what: string }) {
@@ -132,14 +133,21 @@ function CellInput({ label, value, error, disabled, onChange, onBlur }: { label:
  * TT-10 (#103): HTX bắt buộc chọn trước khi khai báo; mỗi dòng bắt buộc Loại máy, Số lượng > 0, Năm SX (1900 – năm hiện
  * tại). Số lượng lưu ở pf/mechanization (/v1/kn/machine-counts), năm ở hồ sơ KN riêng (/v1/kn/machine-profiles, #119):
  * lưu số lượng trước rồi năm trong cùng một lượt thao tác (bấm lại sau lỗi dùng lại khóa chống gửi trùng).
+ * #162 mục 1: chọn HTX theo hồ sơ KN riêng (/v1/kn/producer-records, phân trang + tìm ở máy chủ), giá trị = htx_ref; HTX đã
+ * khai báo máy được đối chiếu với hồ sơ KN qua htx_ref, chưa có hồ sơ liên kết → "chưa liên kết hồ sơ KN" (vẫn xem/chọn được).
  */
 export function MachinesScreen() {
   const { collectApi } = useAuth();
   const readOnly = useCycleReadOnly();
   const f = useCommuneFilter();
   const act = useAction();
-  const coops = useLoad(() => collectApi.cooperatives({ commune: f.commune || undefined }), [f.commune]);
   const overview = useLoad(() => collectApi.machines(f.commune || undefined), [f.commune, act.note]);
+  // Đối chiếu HTX đã khai báo máy (tham chiếu HTX nền tảng) với hồ sơ KN qua htx_ref — đọc đủ mọi trang của xã đang lọc.
+  const declared = overview.data?.cooperatives ?? [];
+  const links = useLoad(
+    declared.length ? () => loadAllRecords(collectApi, { kind: "cooperative", status: "all", ...(f.commune ? { commune: f.commune } : {}) }).then((rs) => new Map(rs.filter((r) => r.htx_ref).map((r) => [r.htx_ref!, r]))) : null,
+    [f.commune, declared.length],
+  );
   const [ref, setRef] = useState("");
   const cur = useLoad(
     ref
@@ -151,6 +159,7 @@ export function MachinesScreen() {
     [ref, act.note],
   );
   const [lines, setLines] = useState<MachineLine[] | null>(null);
+  const pick = (v: string) => (setRef(v), setLines(null), setErrs({}));
   const rows = lines ?? (cur.data?.lines ?? []).map((l) => ({ machine_type: l.machine_type, quantity: String(l.quantity), year_made: String(cur.data?.years.get(l.machine_type) ?? ""), note: l.note ?? "" }));
   const name = useCommuneNames(overview.data?.commune_totals.map((t) => t.commune_code) ?? []);
   const TYPES = [
@@ -246,8 +255,10 @@ export function MachinesScreen() {
       <PageHeader title="Máy móc HTX" />
       <FilterBar>
         {f.chip}
-        <FilterChip label="HTX" value={ref} onChange={(v) => (setRef(v), setLines(null), setErrs({}))} options={[{ value: "", label: "Chọn HTX" }, ...(coops.data?.items ?? []).map((c) => ({ value: c.ref, label: c.name }))]} />
       </FilterBar>
+      <div className="card sec" style={{ marginBottom: 12 }}>
+        <HtxRecordPicker value={ref} commune={f.commune || undefined} fallbackName={cur.data?.name ?? declared.find((c) => c.cooperative_ref === ref)?.name} onChange={pick} />
+      </div>
       {act.view}
       <DetailLayout
         main={
@@ -275,6 +286,27 @@ export function MachinesScreen() {
           )
         }
         log={
+          <>
+          <aside className="card sec" aria-label="HTX đã khai báo máy">
+            <h2>HTX đã khai báo máy</h2>
+            {declared.length ? (
+              <ul className="list-plain">
+                {declared.map((c) => {
+                  const r = links.data?.get(c.cooperative_ref);
+                  return (
+                    <li key={c.cooperative_ref}>
+                      <button type="button" className="btn btn-o btn-sm" aria-pressed={c.cooperative_ref === ref} onClick={() => pick(c.cooperative_ref)}>
+                        {r ? r.display_name : c.name}
+                      </button>{" "}
+                      · {c.total} máy {r ? null : links.loading ? null : <StatusPill tone="warn">{links.problem || links.data === null ? "chưa đối chiếu được hồ sơ KN" : UNLINKED_LABEL}</StatusPill>}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mute">Chưa có HTX khai báo máy.</p>
+            )}
+          </aside>
           <aside className="card sec" aria-label="Tổng xã theo loại máy">
             <h2>Tổng xã theo loại máy</h2>
             <ul className="list-plain">
@@ -285,6 +317,7 @@ export function MachinesScreen() {
               ))}
             </ul>
           </aside>
+          </>
         }
       />
     </>

@@ -12,7 +12,7 @@ type khtcReportService = reportapp.Service
 
 func (m *Module) khtcReportSvc() *reportapp.Service {
 	if m.khtcReports == nil {
-		m.khtcReports = &reportapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Plans: m.KHTCPlans(), Forms: m.khtcFormSvc().Entry, Sources: m.khtcSourceSvc(), Egress: m.svc.Egress, EgressMode: m.svc.EgressMode}
+		m.khtcReports = &reportapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Plans: m.KHTCPlans(), Forms: m.khtcFormSvc().Entry, Sources: m.khtcSourceSvc(), Egress: m.svc.Egress, EgressMode: m.svc.EgressMode, Templates: m.KHTCFixedTemplates()}
 		periods := m.khtcSvc()
 		if periods.Reports == nil {
 			periods.Reports = m.khtcReports

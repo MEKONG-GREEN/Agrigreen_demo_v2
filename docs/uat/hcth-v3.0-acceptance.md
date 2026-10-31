@@ -141,3 +141,54 @@ sau chốt; tuổi nghỉ hưu dùng tham số mẫu Q-070 tại ngày chốt (c
 5. Cấp Tỉnh–HCTH chỉ xem; cấp Xã/phòng khác không được ghi, truy cập trực tiếp route cũng không có form. Quyền chưa tải được không mở form. Thử lại sau lỗi mạng/500 cùng nội dung giữ khóa thao tác; lỗi API có trường hiển thị tại ô.
 6. Vitest `catalog-items.test.tsx`, `hrm.test.tsx`, shared `form.test.tsx`; Playwright `hc-catalog.spec.ts` và hồi quy route FN-08 `hc-nhan-su.spec.ts`. Đây là bằng chứng tự động, chưa thay UAT khách.
 7. Bảng hệ số/quy tắc và sáu màn HCTH còn lại ở #179; phần này không xác nhận tất cả A1–A5 của HCTH đã đạt. Giữ mẫu giấy/FormGrid và M1–M7.
+
+## W11.26 — Đối chiếu từng AC FN-15–18 và FN-21 (checkpoint 30/10/2026)
+
+Phạm vi phần này là 17 AC của đánh giá HCTH, bổ sung vào cùng ma trận; các mục lịch sử phía trên
+vẫn chỉ xác nhận phạm vi gói tương ứng. Nguồn là BRD HCTH v3.0 ngày 07/10/2026, bản text
+`brd-hanhchinh-v3.md`, các bảng FN-15, FN-16, FN-17, FN-18 và FN-21;
+nguồn/giả định chi tiết tại [W11.26](../kn/gia-dinh/W11.26.md).
+Không dùng trạng thái issue hoặc kiểm web giả lập để kết luận toàn HCTH đã đạt.
+
+Cách đọc bằng chứng: bảy ca HTTP đánh giá dưới đây đã có `--- PASS` trên PostgreSQL tạm với
+`-race` tại `ee2992f427b54f29567e625873086c51a509ec6d`. Toàn lượt affected/consumer vẫn **FAIL**:
+533 PASS, bốn FAIL ở hợp đồng Notification.kind và assertion menu cũ, không SKIP, không DATA RACE.
+Các assertion đã sửa; lint mới = 0, tám cổng Go và pure `-race` năm package đã PASS sau sửa.
+Native retry và cổng trên nguồn kết hợp với dev có W11.68 (#33) **chưa hoàn tất**.
+Web 120 tệp/993 kiểm và Playwright đã PASS; Playwright dùng mock, không chứng minh phát email,
+OTP khách, kho triển khai hoặc tải native. Các trạng thái dưới đây giữ đúng giới hạn này, chưa phải READY.
+
+Các tệp bằng chứng chính:
+
+- [Workflow HTTP](../../internal/kn/hrm/handler/appraisal_workflow_integration_test.go): `TestHRMAppraisalWorkflowHTTP_W1126`, fixture ba người (hai MS05, một MS06), QIII/2026, phiếu sáu tiêu chí × 15 điểm.
+- [Xuất, bản ký, năm và snapshot HTTP](../../internal/kn/hrm/handler/appraisal_export_integration_test.go): `TestHRMAppraisalExportAndAuditHTTP_W1126`, `TestHRMAppraisalAnnualAndRacesHTTP_W1126`, `TestHRMAppraisalProofAndSignedHTTP_W1126`, `TestHRMAppraisalScoreSummaryHTTP_W1126`, `TestHRMAppraisalPositionSnapshotHTTP_W1126`.
+- [Mẫu HTTP](../../internal/kn/hrm/handler/appraisal_integration_test.go): `TestHRMAppraisalTemplatesHTTP_W1126`; [nghiệp vụ](../../internal/kn/hrm/domain/appraisal_test.go), [quyền/trạng thái](../../internal/kn/hrm/domain/appraisal_entry_test.go), [tám cột](../../internal/kn/hrm/domain/appraisal_summary_test.go).
+- [Đích thông báo](../../internal/kn/hrm/module_appraisal_notify_test.go): `TestAppraisalNotificationTargetsAndOwnerDirectory_W1126`; [web](../../apps/web-ops/src/kn/hrm/appraisal.test.tsx); [Playwright](../../apps/web-ops/tests/e2e/hrm-appraisal.spec.ts).
+
+| AC BRD | Tiêu chí cần nghiệm thu | Mã nguồn và bằng chứng thực tế | Trạng thái / phần chưa được chứng minh |
+|---|---|---|---|
+| FN-15 AC-01 | Xem trước MS05 đúng tiêu đề, tám cột, phần ký như biểu Sở | `domain/appraisal_summary.go`, `app/appraisal_export.go`, `app/appraisal_word.go`; `TestAppraisalMS05MS06EightColumns_W1126`; ExportAndAudit HTTP kiểm preview hai người/tám cột, đọc lại Word có kỳ QIII/2026, tên hai người và phần ký; Playwright kiểm preview tám cột | Có bằng chứng mẫu tự động PASS; chờ native cuối và đối chiếu biểu Sở chính thức Q-070. Không suy kiểm cấu trúc thành xác nhận bố cục của khách. |
+| FN-15 AC-02 | Đổi thành Phó Trưởng phòng → thuộc MS06 ở đợt mới | `app/appraisal_period.go` chụp chức vụ tại ngày chốt; PositionSnapshot HTTP đổi chức vụ hiệu lực 01/10/2026, mở QIV/2026 và kiểm MS05 ở đợt cũ, MS06 ở đợt mới | Ca native mẫu PASS; chờ native cuối trên nguồn kết hợp. |
+| FN-16 AC-01 | QIII/2026 có 470 MS05 + 24 MS06; cán bộ xã vào MS05 theo HS-37 | `app/appraisal_period.go`, `domain.AppraisalSummaryCode`; Workflow HTTP kiểm ba người và quyền lãnh đạo với cán bộ xã; PositionSnapshot HTTP kiểm đổi chức vụ | Một phần: đã kiểm quy tắc chia mẫu/snapshot/HS-37 ở mẫu nhỏ; chưa nạp và đối chiếu đủ 494 người H11. |
+| FN-16 AC-02 | Tiến độ đơn vị cập nhật ngay khi phòng nhập | `app/appraisal_entry.go`, `app/appraisal_period_action.go`; Workflow HTTP ghi tự chấm, quản lý, gửi đơn vị rồi đọc lại kết quả | Một phần: ghi/đọc lại API đã kiểm; chưa có assertion riêng cho số tiến độ đơn vị trước/sau mỗi lần nhập và thời gian cập nhật trên UI native. |
+| FN-16 AC-03 | Đúng số người ở từng trạng thái theo đơn vị | `domain/appraisal_entry.go`, `app/appraisal_entry.go`; Workflow HTTP kiểm luồng, quyền đơn vị và chốt/mở lại từng người | Một phần: chưa kiểm đầy đủ bảng đếm theo mọi đơn vị × mọi trạng thái; kiểm số phiếu nhìn thấy không thay bảng tiến độ. |
+| FN-17 AC-01 | KHTNV thiếu tóm tắt căn cứ không lưu được | `domain.ValidateAppraisalProposal`, được luồng đổi phiếu gọi; `TestAppraisalProposalAndSummaryForms_W1126` chặn KHTNV không căn cứ, nhận căn cứ hợp lệ | Validator PASS; cần ca HTTP âm đúng thao tác lưu KHTNV và native cuối. Không lấy ca đơn vị làm bằng chứng HTTP đã chạy. |
+| FN-17 AC-02 | Lãnh đạo Phòng Trồng trọt không thấy viên chức phòng khác | `app/appraisal_period.go`/`app/appraisal_entry.go`, `domain/appraisal_entry.go`; Workflow HTTP: `ld_tt` thấy đúng hai MS05, `ld_cn` không mở được cán bộ xã do Trồng trọt quản lý; self/tenant/TW/chỉ xem bị giới hạn | Có bằng chứng phân quyền API ở fixture ba người PASS; chờ native cuối và ca UAT theo tài khoản thực. |
+| FN-17 AC-03 | Sau gửi, HCTH thấy ngay kết quả phòng tại FN-18 | `app/appraisal_period_action.go` gửi đơn vị; Workflow HTTP gửi Trồng trọt rồi HCTH đọc lại đủ sáu điểm quản lý; ExportAndAudit HTTP đọc preview MS05 sau gửi | Luồng API mẫu PASS; thời gian cập nhật và toàn luồng màn tổng hợp native chưa được đo. |
+| FN-17 AC-04 | Cán bộ xã 82/90 → HS-37 thấy phiếu, DG-04 gợi ý HTXSNV, chấm quản lý và nhập tập thể đề xuất | `domain/appraisal.go`, `domain/appraisal_entry.go`, `app/appraisal_entry.go`; Workflow HTTP: tự nộp 82/90, `self_rating=HTXSNV`, `ld_tt` chấm sáu tiêu chí và đề xuất HTTNV; `TestAppraisalScopeUsesSubjectAndHS37_W1126` | Luồng mẫu theo đơn vị quản lý PASS; dữ liệu là tổng hợp, chưa thay xác nhận người/xã Mỹ Hòa Hưng và native cuối. |
+| FN-18 AC-01 | MS05 đủ người của đợt, tám cột và phần ký | `app/appraisal_export.go`, `app/appraisal_word.go`; ExportAndAudit HTTP kiểm đủ hai MS05 của fixture, XLSX tám cột, Word tám cột/tên/phần ký; không thêm điểm vào mẫu giấy | Ca mẫu PASS; chưa đối chiếu 470 MS05 H11 hoặc bố cục Sở chính thức, còn native cuối. `PHIEU_DIEM` mười cột là bảng nội bộ riêng. |
+| FN-18 AC-02 | Chốt đợt → cột xếp loại ở danh sách nâng bậc hiển thị kết quả quý | `app/appraisal_period_action.go`, `app/appraisal_quarter.go`; Workflow HTTP kiểm chốt quý không tạo `annual_rating`; AnnualAndRaces HTTP kiểm tham chiếu quý được ghim, kết luận năm độc lập và dòng năm bù khi mở lại | **Chưa đạt nguyên văn AC**: AC nói kết quả quý, trong khi FN-18 BR-03/FN-09 dùng kết quả năm. Quyết định hiện hành giữ quý ở lịch sử, chỉ kết luận tập thể của đợt năm ghi `annual_rating`; không suy công thức từ bốn quý. Chờ xác nhận cách hiển thị/cách hiểu AC; ca năm không thay bằng chứng quý ở danh sách nâng bậc. |
+| FN-18 AC-03 | Bản đã ký xem lại được tại Hồ sơ dữ liệu | `app/appraisal_period_action.go` nối port kho tài liệu; ProofAndSigned HTTP upload PDF theo hồ sơ, gắn MS05/MS06 và chốt; `TestHRMDocsHTTP_W1124` kiểm quyền/mở tệp kho ở phạm vi riêng | Một phần: gắn bản ký và chốt đã PASS; cần ca xuyên luồng từ đợt đã chốt quay lại Hồ sơ dữ liệu và tải đúng bản ký. Port evidence/vault của fixture là giả, chưa chứng minh kho triển khai. |
+| FN-21 AC-01 | Sáu tiêu chí, 90 điểm; ngưỡng ≥81 → HTXSNV; tự chấm 82 → HTXSNV | `domain/appraisal.go`; `TestAppraisal82Of90AndRatingBoundaries_W1126` kiểm cả 81/80,99; Workflow HTTP dùng sáu tiêu chí ×15, tự nộp tổng 82 và nhận HTXSNV | Đơn vị và native mẫu PASS; còn native cuối trên nguồn kết hợp. Mức gợi ý không tự trở thành kết luận chính thức. |
+| FN-21 AC-02 | Mở QIV/2026 → mọi cán bộ xã có tài khoản nhận thông báo và thấy ở Đánh giá của tôi | `app/appraisal_notify.go`, `module_appraisal_notify.go`; NotificationTargetsAndOwnerDirectory kiểm payload QIV/2026, AccountRef, loại thông báo, đường dẫn và tenant/node/HS-37; Workflow HTTP kiểm self chỉ thấy phiếu mình | Một phần: kiểm builder/đường dẫn và quyền self, chưa kiểm toàn bộ cán bộ xã QIV/2026 qua outbox/inbox thật hoặc gửi email thật. Playwright mock không bù khoảng trống này. |
+| FN-21 AC-03 | Sau cán bộ xã nộp, lãnh đạo HS-37 thấy trong danh sách cần đánh giá | `app/appraisal_entry.go`, `domain/appraisal_entry.go`; Workflow HTTP tự nộp, quản lý được chấm và đơn vị khác bị chặn; NotificationTargetsAndOwnerDirectory kiểm chọn đúng quản lý | Luồng API mẫu PASS; chưa có assertion native riêng cho bộ lọc danh sách “cần đánh giá” ngay sau nộp; còn native cuối. |
+| FN-21 AC-04 | Tổng hợp đúng số đã/chưa nộp theo đơn vị và bước | `app/appraisal_score_export.go`, `app/appraisal_entry.go`; ScoreSummary HTTP kiểm ba phiếu trước/sau nộp, điểm 82/82, lãnh đạo chỉ xuất hai người được giao và lần xuất cũ giữ tham chiếu | Một phần: kiểm tập người/điểm/phạm vi xuất, chưa kiểm đầy đủ ma trận số đã/chưa nộp theo mọi đơn vị × bước. |
+| FN-21 AC-05 | Khách nhận email/link, OTP đúng chỉ mở phiếu mình; khóa bước làm link hết hạn | Handler `guest-link` hiện trả 503; Workflow HTTP kiểm trạng thái fail-closed. Capability khách theo [#184 W10.18-GUEST-OTP](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/184) | **PENDING #184 / chưa đạt**: chưa có OTP khách qua email và ca hết hạn/nhật ký mở link. TOTP đăng nhập và nhập thay có scan không thay AC này. |
+
+Giới hạn dữ liệu và hiệu năng phải nghiệm thu riêng ở W11.31: D3 H11 yêu cầu QIII/2026 có
+470 MS05 + 24 MS06, bốn người NLTX tháng 7/2026 và khoảng 500 lượt nộp phiếu trong cùng ngày hạn.
+Các ca ba người ở trên chưa chứng minh quy mô H11; phần NLTX/quyết định bốn người cũng chưa được đối chiếu ở checkpoint này.
+BRD VII còn yêu cầu thao tác thường <3 giây, dashboard <5 giây với **500 người dùng đồng thời**,
+tra cứu/lọc <2 giây và xuất NS01–06/NL02–04 khoảng 500 người <10 giây. 500 lượt nộp/ngày
+và 500 người đồng thời là hai tiêu chí riêng. Không có kết quả đo tải đồng thời HCTH ở đây;
+benchmark dashboard 1.000 hồ sơ/vault giả ở W11.28 không chứng minh yêu cầu đó.

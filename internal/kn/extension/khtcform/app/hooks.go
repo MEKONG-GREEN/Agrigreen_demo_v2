@@ -12,6 +12,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcform/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcform/store"
 	pdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
+	pstore "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/store"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -118,6 +119,27 @@ func (v Validator) Validate(ctx context.Context, templateCode string, values map
 		return e
 	}); err != nil || sh == nil || sh.Kind != store.KindSealed {
 		return bad
+	}
+	if err := v.Svc.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		r, e := pstore.ActiveAdhocRequest(ctx, tx, sh.PeriodID, sh.Department)
+		if e != nil {
+			return e
+		}
+		if err := requestToken(r, sh.Content.AdhocRequestID); err != nil {
+			return err
+		}
+		if err := boundsAdhocInput(sh.Content); err != nil {
+			return err
+		}
+		if r != nil && !(domain.Result{Issues: domain.ValidateAdhocAnswer(sh.Content, r.Indicators, true)}).Valid() {
+			return ErrFormInvalid
+		}
+		if r == nil && (len(sh.Content.AdhocValues) > 0 || sh.Content.AdhocText != "") {
+			return ErrAdhocRequestChanged
+		}
+		return nil
+	}); err != nil {
+		return []formsport.Issue{{Field: "adhoc_request_id", Reason: "Yêu cầu bổ sung đã đổi — tải lại phiếu"}}
 	}
 	return nil
 }

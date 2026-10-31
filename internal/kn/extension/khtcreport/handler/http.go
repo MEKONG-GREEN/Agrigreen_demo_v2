@@ -9,6 +9,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
+	templatedomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtctemplate/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -64,21 +65,23 @@ type finalDTO struct {
 	At       time.Time `json:"at"`
 }
 type detailDTO struct {
-	PeriodID      uuid.UUID        `json:"period_id"`
-	DraftID       *uuid.UUID       `json:"draft_id"`
-	Version       int64            `json:"version"`
-	Content       domain.Draft     `json:"content"`
-	Sections      []domain.Section `json:"sections"`
-	Final         *finalDTO        `json:"final"`
-	Editable      bool             `json:"editable"`
-	CanRefresh    bool             `json:"can_refresh"`
-	SourceChanged bool             `json:"source_changed"`
-	SourceError   string           `json:"source_error"`
-	Terminal      string           `json:"terminal"`
+	PeriodID      uuid.UUID                `json:"period_id"`
+	DraftID       *uuid.UUID               `json:"draft_id"`
+	Version       int64                    `json:"version"`
+	Content       domain.Draft             `json:"content"`
+	Sections      []domain.Section         `json:"sections"`
+	Final         *finalDTO                `json:"final"`
+	Editable      bool                     `json:"editable"`
+	CanRefresh    bool                     `json:"can_refresh"`
+	SourceChanged bool                     `json:"source_changed"`
+	SourceError   string                   `json:"source_error"`
+	Terminal      string                   `json:"terminal"`
+	Document      *templatedomain.Rendered `json:"template_document,omitempty"`
+	LockedAdmin   []string                 `json:"locked_admin,omitempty"`
 }
 
 func detailOf(d app.Detail) detailDTO {
-	out := detailDTO{PeriodID: d.PeriodID, DraftID: d.DraftID, Version: d.Version, Content: d.Content, Sections: domain.Sections(d.Content.Data.Template), Editable: d.Editable, CanRefresh: d.CanRefresh, SourceChanged: d.SourceChanged, SourceError: d.SourceError, Terminal: d.Terminal}
+	out := detailDTO{PeriodID: d.PeriodID, DraftID: d.DraftID, Version: d.Version, Content: d.Content, Sections: d.Sections, Document: d.Document, LockedAdmin: d.LockedAdmin, Editable: d.Editable, CanRefresh: d.CanRefresh, SourceChanged: d.SourceChanged, SourceError: d.SourceError, Terminal: d.Terminal}
 	if d.Final != nil {
 		out.Final = &finalDTO{ExportID: d.Final.ExportID, Actor: d.Final.ActorRef, At: d.Final.At}
 	}

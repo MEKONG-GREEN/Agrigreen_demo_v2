@@ -6,6 +6,7 @@
 
 const UUID = "[0-9a-fA-F-]{8,64}";
 const KNQG_FORMS = "/kn/cnts/du-an-mau-bieu";
+const APPRAISALS = "/kn/nhan-su/danh-gia";
 
 type Rule = { re: RegExp; to: (id: string, kind: string | undefined) => string };
 
@@ -42,6 +43,9 @@ const KIND_FALLBACK: Readonly<Record<string, string>> = {
   cnts_knqg_sent: KNQG_FORMS,
   cnts_knqg_reviewed: KNQG_FORMS,
   cnts_knqg_submitted: KNQG_FORMS,
+  hrm_appraisal: APPRAISALS,
+  hrm_promotion_due: "/kn/nhan-su/nang-bac",
+  hrm_plan_reminder: "/kn/nhan-su/ke-hoach-phong",
 };
 
 /** Mã biểu trong `?doc=` phải là UUID đầy đủ (không nhận chuỗi tuỳ ý); sai dạng → mở màn danh sách. */
@@ -59,6 +63,13 @@ export function deepLinkHref(deepLink: string | null | undefined, kind?: string 
   const raw = (deepLink ?? "").trim();
   const path = raw.split(/[?#]/)[0] ?? "";
   if (path === KNQG_FORMS) return knqgHref(raw);
+  if (path.startsWith(`${APPRAISALS}/dot/`)) {
+    const [period, marker, staff, extra] = path.slice(`${APPRAISALS}/dot/`.length).split("/");
+    if (period && STRICT_UUID.test(period)) {
+      if (!marker) return `${APPRAISALS}/dot/${period.toLowerCase()}`;
+      if (marker === "phieu" && staff && STRICT_UUID.test(staff) && extra === undefined) return `${APPRAISALS}/dot/${period.toLowerCase()}/phieu/${staff.toLowerCase()}`;
+    }
+  }
   if (path) {
     for (const r of RULES) {
       const m = r.re.exec(path);

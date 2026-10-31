@@ -3,7 +3,8 @@
 // kiểm thử đơn vị; máy chủ kiểm lại (quy tắc chặn khi gửi, vị trí, cảnh báo).
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
-import { newIdempotencyKey, uuidv7 } from "@/api/idempotency";
+import { digestHex, newIdempotencyKey, uuidv7 } from "@/api/idempotency";
+import { stableMultipart } from "@/api/multipart";
 
 type S = components["schemas"];
 export type Cycle = S["CNTSDiaryCycle"];
@@ -397,6 +398,39 @@ export function currentFix(): Promise<EntrySave["location"] | null> {
   });
 }
 
+/** id ảnh do client sinh (R-11) + thời điểm chụp của MỘT lần tải ảnh — giữ nguyên khi bấm lại cùng ảnh (#172). */
+export interface PhotoDraft {
+  id: string;
+  captured_at: string;
+}
+
+/**
+ * Nhớ id/captured_at theo ảnh đang tải (hộ + loại + kiểu/cỡ + băm NỘI DUNG tệp gốc): chọn lại đúng ảnh đó sau khi mất
+ * phản hồi → cùng id/captured_at → cùng thân multipart → cùng Idempotency-Key → máy chủ phát lại ảnh đã lưu thay vì lưu
+ * bản thứ hai. Tải xong (done) thì quên; hộ/loại/nội dung khác → lần tải mới với id mới. Review #172: chỉ dựa tên/cỡ/thời
+ * điểm sửa thì hai ảnh khác byte trùng các metadata này dùng chung id → máy chủ báo "mã ảnh đã dùng".
+ */
+export function createPhotoDrafts(now: () => Date = () => new Date()) {
+  const pending = new Map<string, PhotoDraft>();
+  const sig = async (household_ref: string, kind: string, f: File) =>
+    [household_ref, kind, f.type, f.size, await digestHex(new Uint8Array(await f.arrayBuffer()))].join("\u0000");
+  return {
+    async draft(household_ref: string, kind: Photo["kind"], file: File): Promise<PhotoDraft> {
+      const k = await sig(household_ref, kind, file);
+      let d = pending.get(k);
+      if (!d) {
+        d = { id: uuidv7(), captured_at: now().toISOString() };
+        pending.set(k, d);
+        if (pending.size > 32) pending.delete(pending.keys().next().value!);
+      }
+      return d;
+    },
+    done(d: PhotoDraft): void {
+      for (const [k, v] of pending) if (v.id === d.id) pending.delete(k);
+    },
+  };
+}
+
 const idem = () => ({ header: { "Idempotency-Key": newIdempotencyKey() } });
 const base = (ref: string, base_version: number) => ({
   params: { path: { ref }, ...idem() },
@@ -492,28 +526,27 @@ export function createCntsDiaryApi(api: ApiClient) {
           body,
         }),
       ),
-    uploadPhoto: (household_ref: string, kind: Photo["kind"], file: Blob): Promise<Photo> =>
-      unwrap(
+    // Thân multipart tất định (src/api/multipart.ts, #172) + id/captured_at của lần tải (PhotoDraft): bấm lại sau mất phản
+    // hồi gửi đúng từng byte cũ → cùng Idempotency-Key, máy chủ phát lại ảnh đã lưu. api.POST phải khởi phát đồng bộ trong
+    // phạm vi phiên thao tác (act.run, hoặc `idem` của act.run khi đứng sau await nén ảnh).
+    uploadPhoto: (household_ref: string, kind: Photo["kind"], file: Blob, draft: PhotoDraft = { id: uuidv7(), captured_at: new Date().toISOString() }): Promise<Photo> => {
+      const part = new File([file], "anh.jpg", { type: file.type, lastModified: 0 });
+      const mp = stableMultipart([
+        ["household_ref", household_ref],
+        ["kind", kind],
+        ["id", draft.id],
+        ["captured_at", draft.captured_at],
+        ["file", part],
+      ]);
+      return unwrap(
         api.POST("/v1/extension/cnts/diary-photos", {
           params: idem(),
-          body: {
-            household_ref,
-            kind,
-            file: file as unknown as string,
-            id: uuidv7(),
-            captured_at: new Date().toISOString(),
-          },
-          bodySerializer: (b: { household_ref: string; kind: string; file: string; id?: string; captured_at?: string }) => {
-            const fd = new FormData();
-            fd.append("household_ref", b.household_ref);
-            fd.append("kind", b.kind);
-            if (b.id) fd.append("id", b.id);
-            if (b.captured_at) fd.append("captured_at", b.captured_at);
-            fd.append("file", b.file as unknown as Blob, "anh.jpg");
-            return fd;
-          },
+          headers: { "Content-Type": mp.contentType },
+          body: { household_ref, kind, file: file as unknown as string, id: draft.id, captured_at: draft.captured_at },
+          bodySerializer: () => mp.body,
         }),
-      ),
+      );
+    },
     /** Ảnh (bản rõ do máy chủ mở) → URL đối tượng để hiển thị; gọi URL.revokeObjectURL khi bỏ. */
     photoUrl: async (ref: string): Promise<string> => {
       const r = await api.GET("/v1/extension/cnts/diary-photos/{ref}/content", {

@@ -35,7 +35,6 @@ vi.mock("@/auth/AuthProvider", () => ({
   }),
 }));
 
-const coop = { ref: "htx-1", code: "HTX01", name: "HTX Mỹ Hòa", commune_code: "91301", active: true, area_ha: "120", household_count: 2, representative: null, updated_at: "2026-10-01T00:00:00Z" };
 // #67: hồ sơ KN riêng (màn HTX / nông hộ ghi qua /v1/kn/producer-records).
 const rec = { ref: "htx-1", kind: "cooperative", kind_label: "HTX", commune_code: "91301", name: "HTX Mỹ Hòa", display_name: "HTX Mỹ Hòa", representative: null, holder: null, parent_ref: null, parent_name: null, parent_kind: null, htx_ref: null, htx_name: null, area_ha: "120", tax_code: null, address: null, member_count: 2, status: "active", status_reason: null, version: 1, can_edit: true, updated_at: "2026-10-01T00:00:00Z", log: [] };
 
@@ -44,7 +43,6 @@ beforeEach(() => {
   for (const k of Object.keys(params)) delete params[k];
   auth.role = "kn_xa";
   auth.collectApi = {
-    cooperatives: vi.fn().mockResolvedValue({ items: [coop] }),
     records: vi.fn().mockResolvedValue({ items: [rec] }),
     record: vi.fn().mockResolvedValue(rec),
     htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
@@ -113,6 +111,8 @@ describe("Dữ liệu xã — Thêm HTX, nông hộ trên trang riêng (R-A2, R-
   });
 
   it("Máy móc: bảng có STT; số lượng phải là số nguyên > 0 (TT-10) trước khi lưu", async () => {
+    // #162: bộ chọn HTX đọc hồ sơ KN; hồ sơ phải liên kết HTX đã công bố (htx_ref) mới chọn được để khai báo máy.
+    auth.collectApi.records = vi.fn().mockResolvedValue({ items: [{ ...rec, htx_ref: "htx-1" }], next_cursor: null });
     const u = userEvent.setup();
     render(<MachinesScreen />);
     await waitFor(() => expect(screen.getByRole("option", { name: "HTX Mỹ Hòa" })).toBeInTheDocument());

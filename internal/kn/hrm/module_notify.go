@@ -35,14 +35,14 @@ var errNoNotifyDirectory = errors.New("hrm: chưa nối danh bạ người nhậ
 
 // NotificationKinds khai loại thông báo pf/hrm sở hữu (token gạch dưới — hợp đồng #48).
 func NotificationKinds() notifyport.KindRegistration {
-	return notifyport.KindRegistration{Kinds: []string{port.KindPromotionDue, port.KindPlanReminder}}
+	return notifyport.KindRegistration{Kinds: []string{port.KindPromotionDue, port.KindPlanReminder, port.KindAppraisal}}
 }
 
 // NotificationConsumers khai hàng đợi pf.notify.hrm cho sự kiện pf/hrm (không mang tenant hay hàm DB).
 func NotificationConsumers() notifyport.ConsumerRegistration {
 	return notifyport.ConsumerRegistration{Definitions: []notifyport.ConsumerDefinition{{
 		Name: port.NotifyConsumerHRM, Order: port.NotifyConsumerHRMOrder,
-		Events: []string{port.EventPromotionDueDetected, port.EventPlanReminded},
+		Events: []string{port.EventPromotionDueDetected, port.EventPlanReminded, port.EventAppraisalChanged},
 	}}}
 }
 
@@ -55,6 +55,9 @@ func NotificationBuilders(acc port.Access, dir port.NotifyDirectory) []notifypor
 		}},
 		{Events: []string{port.EventPlanReminded}, Build: func(ctx context.Context, tid uuid.UUID, event string, payload json.RawMessage, at time.Time) ([]notifyport.NotificationDraft, error) {
 			return planReminderDrafts(ctx, dir, tid, payload, at)
+		}},
+		{Events: []string{port.EventAppraisalChanged}, Build: func(ctx context.Context, tid uuid.UUID, event string, payload json.RawMessage, at time.Time) ([]notifyport.NotificationDraft, error) {
+			return appraisalDrafts(ctx, acc, dir, tid, payload, at)
 		}},
 	}
 }
