@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -1956,7 +1956,9 @@
           "route": "/kn/cnts/so-lieu-xa/nhap-lieu-tuan",
           "icon": "table",
           "badge_source": null,
-          "enabled": true,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
           "children": []
          },
          {
@@ -1974,7 +1976,9 @@
           "route": "/kn/cnts/so-lieu-xa/nhat-ky",
           "icon": "journal",
           "badge_source": null,
-          "enabled": true,
+          "enabled": false,
+          "status": "coming_soon",
+          "status_label": "Sắp có",
           "children": []
          },
          {
@@ -2088,7 +2092,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -2286,7 +2290,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -2387,7 +2391,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -2632,7 +2636,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -2734,7 +2738,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -2862,7 +2866,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -3166,7 +3170,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -3328,7 +3332,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -3420,7 +3424,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -3540,9 +3544,7 @@
         "route": "/kn/nhan-su/danh-gia",
         "icon": "approve",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -3724,7 +3726,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -3772,9 +3774,7 @@
         "route": "/kn/nhan-su/danh-gia-cua-toi",
         "icon": "approve",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        }
       ]
@@ -3852,7 +3852,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   },
@@ -4448,6 +4448,15 @@
           "badge_source": null,
           "enabled": false,
           "children": []
+         },
+         {
+          "key": "admin.pb.hcth_danh_gia",
+          "label": "Đánh giá nhân sự",
+          "route": "/kn/nhan-su/danh-gia",
+          "icon": "approve",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
          }
         ]
        }
@@ -4638,7 +4647,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v10",
+    "menu_version": "kn.menu/v11",
     "org_ref": null
    }
   }
@@ -4681,5 +4690,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v10"
+ "menu_version": "kn.menu/v11"
 }

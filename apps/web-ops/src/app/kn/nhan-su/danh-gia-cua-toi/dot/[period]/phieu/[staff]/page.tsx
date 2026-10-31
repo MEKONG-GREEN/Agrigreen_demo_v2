@@ -1,0 +1,1 @@
+"use client"; import { useParams } from "next/navigation"; import { AppraisalEntryScreen } from "@/kn/hrm/AppraisalEntryScreen"; export default function Page(){const p=useParams<{period:string;staff:string}>(); return <AppraisalEntryScreen period={p.period} staff={p.staff} mine/>;}
