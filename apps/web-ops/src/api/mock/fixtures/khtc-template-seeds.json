@@ -1,0 +1,1682 @@
+[
+  {
+    "definition": {
+      "key": "mau_1",
+      "nodes": [
+        {
+          "id": "A",
+          "parent": "",
+          "order": 10,
+          "title": "KẾT QUẢ ĐẠT ĐƯỢC",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.I",
+          "parent": "A",
+          "order": 10,
+          "title": "Tình hình sản xuất nông, lâm, thủy sản",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.I.1",
+          "parent": "A.I",
+          "order": 10,
+          "title": "Trồng trọt",
+          "repeat": "metric",
+          "department": "trong_trot",
+          "body": "{chi_tieu}: {so_trong_ky} {don_vi}; lũy kế năm {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chi_tieu",
+              "source": "module",
+              "field": "label"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "module",
+              "field": "value"
+            },
+            {
+              "variable": "don_vi",
+              "source": "module",
+              "field": "unit"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.I.2",
+          "parent": "A.I",
+          "order": 20,
+          "title": "Chăn nuôi",
+          "repeat": "metric",
+          "department": "chan_nuoi_thuy_san",
+          "body": "{chi_tieu}: {so_trong_ky} {don_vi}; lũy kế năm {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chi_tieu",
+              "source": "module",
+              "field": "label",
+              "ref": "section:A.I.2"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "module",
+              "field": "value",
+              "ref": "section:A.I.2"
+            },
+            {
+              "variable": "don_vi",
+              "source": "module",
+              "field": "unit",
+              "ref": "section:A.I.2"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date",
+              "ref": "section:A.I.2"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.I.3",
+          "parent": "A.I",
+          "order": 30,
+          "title": "Thủy sản",
+          "repeat": "metric",
+          "department": "chan_nuoi_thuy_san",
+          "body": "{chi_tieu}: {so_trong_ky} {don_vi}; lũy kế năm {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chi_tieu",
+              "source": "module",
+              "field": "label",
+              "ref": "section:A.I.3"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "module",
+              "field": "value",
+              "ref": "section:A.I.3"
+            },
+            {
+              "variable": "don_vi",
+              "source": "module",
+              "field": "unit",
+              "ref": "section:A.I.3"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date",
+              "ref": "section:A.I.3"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.II",
+          "parent": "A",
+          "order": 20,
+          "title": "Kết quả thực hiện công tác khuyến nông",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.II.1",
+          "parent": "A.II",
+          "order": 10,
+          "title": "Chương trình, dự án còn theo dõi năm trước",
+          "repeat": "plan_item",
+          "tab": "previous",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.II.2",
+          "parent": "A.II",
+          "order": 20,
+          "title": "Chương trình triển khai trong năm",
+          "repeat": "plan_item",
+          "tab": "current",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.II.3",
+          "parent": "A.II",
+          "order": 30,
+          "title": "Công tác khác",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.II.3.1",
+          "parent": "A.II.3",
+          "order": 10,
+          "title": "Công tác báo cáo",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "A.II.3.2",
+          "parent": "A.II.3",
+          "order": 20,
+          "title": "Công tác khác",
+          "repeat": "form_bullet",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:A.II.3.2"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.III",
+          "parent": "A",
+          "order": 30,
+          "title": "Thông tin giá cả thị trường",
+          "repeat": "commodity",
+          "body": "{mat_hang}: từ {gia_tu} đến {gia_den} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "mat_hang",
+              "source": "module",
+              "field": "label"
+            },
+            {
+              "variable": "gia_tu",
+              "source": "module",
+              "field": "from_price"
+            },
+            {
+              "variable": "gia_den",
+              "source": "module",
+              "field": "to_price"
+            },
+            {
+              "variable": "don_vi",
+              "source": "module",
+              "field": "unit"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "A.IV",
+          "parent": "A",
+          "order": 40,
+          "title": "Công tác CCHC, tổ chức cán bộ",
+          "repeat": "form_bullet",
+          "department": "hanh_chinh_tong_hop",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:A.IV"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "B",
+          "parent": "",
+          "order": 20,
+          "title": "Đánh giá hạn chế, vướng mắc",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "C",
+          "parent": "",
+          "order": 30,
+          "title": "Nhiệm vụ kỳ tới",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "C.1",
+          "parent": "C",
+          "order": 10,
+          "title": "Nhiệm vụ kỳ tới: Sản xuất NLTS",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "C.2",
+          "parent": "C",
+          "order": 20,
+          "title": "Nhiệm vụ kỳ tới: Công tác khuyến nông",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "C.3",
+          "parent": "C",
+          "order": 30,
+          "title": "Nhiệm vụ kỳ tới: Giá cả",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "C.4",
+          "parent": "C",
+          "order": 40,
+          "title": "Nhiệm vụ kỳ tới: CCHC",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "D",
+          "parent": "",
+          "order": 40,
+          "title": "Đề xuất, kiến nghị",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        }
+      ]
+    },
+    "editable": true,
+    "hash": "dbb977b938989a2fc0e4ed232a04d189ca00d93c813ac915a9ffee39e6bd6ae4",
+    "history": [],
+    "key": "mau_1",
+    "protected_ids": [
+      "A",
+      "A.I",
+      "A.II",
+      "A.III",
+      "A.IV",
+      "B",
+      "C",
+      "C.1",
+      "C.2",
+      "C.3",
+      "C.4",
+      "D"
+    ],
+    "publications": [],
+    "seeded_ids": [
+      "A",
+      "A.I",
+      "A.I.1",
+      "A.I.2",
+      "A.I.3",
+      "A.II",
+      "A.II.1",
+      "A.II.2",
+      "A.II.3",
+      "A.II.3.1",
+      "A.II.3.2",
+      "A.III",
+      "A.IV",
+      "B",
+      "C",
+      "C.1",
+      "C.2",
+      "C.3",
+      "C.4",
+      "D"
+    ],
+    "version": 0,
+    "version_id": null
+  },
+  {
+    "definition": {
+      "key": "mau_2",
+      "nodes": [
+        {
+          "id": "I",
+          "parent": "",
+          "order": 10,
+          "title": "Kết quả thực hiện nhiệm vụ công tác khuyến nông",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.1",
+          "parent": "I",
+          "order": 10,
+          "title": "Chương trình, dự án còn theo dõi năm trước",
+          "repeat": "plan_item",
+          "tab": "previous",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.2",
+          "parent": "I",
+          "order": 20,
+          "title": "Chương trình triển khai trong năm",
+          "repeat": "plan_item",
+          "tab": "current",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3",
+          "parent": "I",
+          "order": 30,
+          "title": "Công tác khác",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3.1",
+          "parent": "I.3",
+          "order": 10,
+          "title": "Công tác báo cáo",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3.2",
+          "parent": "I.3",
+          "order": 20,
+          "title": "Công tác khác",
+          "repeat": "form_bullet",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:I.3.2"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II",
+          "parent": "",
+          "order": 20,
+          "title": "Công tác tổ chức cán bộ, cải cách hành chính",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II.1",
+          "parent": "II",
+          "order": 10,
+          "title": "Công tác cán bộ",
+          "repeat": "form_bullet",
+          "department": "hanh_chinh_tong_hop",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:II.1"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II.2",
+          "parent": "II",
+          "order": 20,
+          "title": "Công tác cải cách hành chính",
+          "repeat": "form_bullet",
+          "department": "hanh_chinh_tong_hop",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:II.2"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "III",
+          "parent": "",
+          "order": 30,
+          "title": "Đánh giá kết quả thực hiện",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "III.1",
+          "parent": "III",
+          "order": 10,
+          "title": "Thuận lợi",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "III.2",
+          "parent": "III",
+          "order": 20,
+          "title": "Khó khăn",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "III.3",
+          "parent": "III",
+          "order": 30,
+          "title": "Nguyên nhân",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "IV",
+          "parent": "",
+          "order": 40,
+          "title": "Phương hướng, nhiệm vụ kỳ tới",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "V",
+          "parent": "",
+          "order": 50,
+          "title": "Đề xuất và kiến nghị",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        }
+      ]
+    },
+    "editable": true,
+    "hash": "358c547eb9a4524b6c0ba6cb6de6996a40050553a5b4a40bee50afa28586aa01",
+    "history": [],
+    "key": "mau_2",
+    "protected_ids": [
+      "I",
+      "I.1",
+      "I.2",
+      "I.3",
+      "II",
+      "II.1",
+      "II.2",
+      "III",
+      "III.1",
+      "III.2",
+      "III.3",
+      "IV",
+      "V"
+    ],
+    "publications": [],
+    "seeded_ids": [
+      "I",
+      "I.1",
+      "I.2",
+      "I.3",
+      "I.3.1",
+      "I.3.2",
+      "II",
+      "II.1",
+      "II.2",
+      "III",
+      "III.1",
+      "III.2",
+      "III.3",
+      "IV",
+      "V"
+    ],
+    "version": 0,
+    "version_id": null
+  },
+  {
+    "definition": {
+      "key": "mau_3",
+      "nodes": [
+        {
+          "id": "I",
+          "parent": "",
+          "order": 10,
+          "title": "Kết quả thực hiện nhiệm vụ công tác khuyến nông",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.1",
+          "parent": "I",
+          "order": 10,
+          "title": "Chương trình, dự án còn theo dõi năm trước",
+          "repeat": "plan_item",
+          "tab": "previous",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.2",
+          "parent": "I",
+          "order": 20,
+          "title": "Chương trình triển khai trong năm",
+          "repeat": "plan_item",
+          "tab": "current",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3",
+          "parent": "I",
+          "order": 30,
+          "title": "Công tác khác",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3.1",
+          "parent": "I.3",
+          "order": 10,
+          "title": "Công tác báo cáo",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3.2",
+          "parent": "I.3",
+          "order": 20,
+          "title": "Công tác khác",
+          "repeat": "form_bullet",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:I.3.2"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II",
+          "parent": "",
+          "order": 20,
+          "title": "Công tác tổ chức cán bộ, cải cách hành chính",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II.1",
+          "parent": "II",
+          "order": 10,
+          "title": "Công tác cán bộ",
+          "repeat": "form_bullet",
+          "department": "hanh_chinh_tong_hop",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:II.1"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II.2",
+          "parent": "II",
+          "order": 20,
+          "title": "Công tác cải cách hành chính",
+          "repeat": "form_bullet",
+          "department": "hanh_chinh_tong_hop",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:II.2"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "III",
+          "parent": "",
+          "order": 30,
+          "title": "Đánh giá kết quả thực hiện",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "III.1",
+          "parent": "III",
+          "order": 10,
+          "title": "Thuận lợi",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "III.2",
+          "parent": "III",
+          "order": 20,
+          "title": "Khó khăn",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "III.3",
+          "parent": "III",
+          "order": 30,
+          "title": "Nguyên nhân",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "IV",
+          "parent": "",
+          "order": 40,
+          "title": "Phương hướng, nhiệm vụ kỳ tới",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "V",
+          "parent": "",
+          "order": 50,
+          "title": "Đề xuất và kiến nghị",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        }
+      ]
+    },
+    "editable": true,
+    "hash": "ee110d8cb98537e04384457fd92c04d1a4ed017efbca002393618dafcb2a1b25",
+    "history": [],
+    "key": "mau_3",
+    "protected_ids": [
+      "I",
+      "I.1",
+      "I.2",
+      "I.3",
+      "II",
+      "II.1",
+      "II.2",
+      "III",
+      "III.1",
+      "III.2",
+      "III.3",
+      "IV",
+      "V"
+    ],
+    "publications": [],
+    "seeded_ids": [
+      "I",
+      "I.1",
+      "I.2",
+      "I.3",
+      "I.3.1",
+      "I.3.2",
+      "II",
+      "II.1",
+      "II.2",
+      "III",
+      "III.1",
+      "III.2",
+      "III.3",
+      "IV",
+      "V"
+    ],
+    "version": 0,
+    "version_id": null
+  },
+  {
+    "definition": {
+      "key": "mau_4",
+      "nodes": [
+        {
+          "id": "I",
+          "parent": "",
+          "order": 10,
+          "title": "Kết quả thực hiện nhiệm vụ công tác khuyến nông",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.1",
+          "parent": "I",
+          "order": 10,
+          "title": "Chương trình, dự án còn theo dõi năm trước",
+          "repeat": "plan_item",
+          "tab": "previous",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.2",
+          "parent": "I",
+          "order": 20,
+          "title": "Chương trình triển khai trong năm",
+          "repeat": "plan_item",
+          "tab": "current",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3",
+          "parent": "I",
+          "order": 30,
+          "title": "Công tác khác",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3.1",
+          "parent": "I.3",
+          "order": 10,
+          "title": "Công tác báo cáo",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "I.3.2",
+          "parent": "I.3",
+          "order": 20,
+          "title": "Công tác khác",
+          "repeat": "form_bullet",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:I.3.2"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II",
+          "parent": "",
+          "order": 20,
+          "title": "Công tác tổ chức cán bộ, cải cách hành chính",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II.1",
+          "parent": "II",
+          "order": 10,
+          "title": "Công tác cán bộ",
+          "repeat": "form_bullet",
+          "department": "hanh_chinh_tong_hop",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:II.1"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "II.2",
+          "parent": "II",
+          "order": 20,
+          "title": "Công tác cải cách hành chính",
+          "repeat": "form_bullet",
+          "department": "hanh_chinh_tong_hop",
+          "body": "{phong}: {noi_dung}",
+          "bindings": [
+            {
+              "variable": "phong",
+              "source": "form",
+              "field": "department"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "form",
+              "field": "content",
+              "ref": "section:II.2"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "III",
+          "parent": "",
+          "order": 30,
+          "title": "Đánh giá kết quả thực hiện",
+          "repeat": "none",
+          "body": "",
+          "bindings": [],
+          "text_slot": false,
+          "locked_admin": []
+        },
+        {
+          "id": "III.1",
+          "parent": "III",
+          "order": 10,
+          "title": "Thuận lợi",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "III.2",
+          "parent": "III",
+          "order": 20,
+          "title": "Khó khăn",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "III.3",
+          "parent": "III",
+          "order": 30,
+          "title": "Nguyên nhân",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "IV",
+          "parent": "",
+          "order": 40,
+          "title": "Phương hướng, nhiệm vụ kỳ tới",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "V",
+          "parent": "",
+          "order": 50,
+          "title": "Đề xuất và kiến nghị",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        }
+      ]
+    },
+    "editable": true,
+    "hash": "854ccc597d8b946cc6da965115f06efd45e985a85127fef2af46acbe68f1da3c",
+    "history": [],
+    "key": "mau_4",
+    "protected_ids": [
+      "I",
+      "I.1",
+      "I.2",
+      "I.3",
+      "II",
+      "II.1",
+      "II.2",
+      "III",
+      "III.1",
+      "III.2",
+      "III.3",
+      "IV",
+      "V"
+    ],
+    "publications": [],
+    "seeded_ids": [
+      "I",
+      "I.1",
+      "I.2",
+      "I.3",
+      "I.3.1",
+      "I.3.2",
+      "II",
+      "II.1",
+      "II.2",
+      "III",
+      "III.1",
+      "III.2",
+      "III.3",
+      "IV",
+      "V"
+    ],
+    "version": 0,
+    "version_id": null
+  },
+  {
+    "definition": {
+      "key": "mau_5",
+      "nodes": [
+        {
+          "id": "I",
+          "parent": "",
+          "order": 10,
+          "title": "Tiến độ thực hiện các chương trình",
+          "repeat": "plan_item",
+          "tab": "all",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "II",
+          "parent": "",
+          "order": 20,
+          "title": "Kế hoạch thực hiện kỳ tới",
+          "repeat": "none",
+          "body": "{loi_van}",
+          "bindings": [
+            {
+              "variable": "loi_van",
+              "source": "text",
+              "field": "narrative"
+            }
+          ],
+          "text_slot": true,
+          "locked_admin": []
+        },
+        {
+          "id": "phu_luc",
+          "parent": "",
+          "order": 30,
+          "title": "Tiến độ thực hiện chương trình khuyến nông",
+          "repeat": "plan_item",
+          "tab": "all",
+          "preamble": "- Chương trình {chuong_trinh}",
+          "body": "+ {ten_hang_muc}: trong kỳ thực hiện {so_trong_ky} {don_vi} (nội dung: {noi_dung}). Lũy kế {luy_ke} {don_vi}.",
+          "bindings": [
+            {
+              "variable": "chuong_trinh",
+              "source": "plan",
+              "field": "program_name"
+            },
+            {
+              "variable": "ten_hang_muc",
+              "source": "plan",
+              "field": "item_name"
+            },
+            {
+              "variable": "don_vi",
+              "source": "plan",
+              "field": "unit"
+            },
+            {
+              "variable": "so_trong_ky",
+              "source": "auto",
+              "field": "value"
+            },
+            {
+              "variable": "noi_dung",
+              "source": "auto",
+              "field": "content"
+            },
+            {
+              "variable": "luy_ke",
+              "source": "calculated",
+              "field": "year_to_date"
+            }
+          ],
+          "text_slot": false,
+          "locked_admin": []
+        }
+      ]
+    },
+    "editable": true,
+    "hash": "780b39739c85c255af631bf15603fe33c57e72a604f14c4de15f36fee2722869",
+    "history": [],
+    "key": "mau_5",
+    "protected_ids": [
+      "I",
+      "II",
+      "phu_luc"
+    ],
+    "publications": [],
+    "seeded_ids": [
+      "I",
+      "II",
+      "phu_luc"
+    ],
+    "version": 0,
+    "version_id": null
+  }
+]

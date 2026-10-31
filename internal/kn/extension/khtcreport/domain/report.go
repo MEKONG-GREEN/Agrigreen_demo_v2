@@ -308,6 +308,9 @@ type Draft struct {
 	Data  Data                  `json:"data"`
 	Admin map[string]AdminField `json:"admin"`
 	Texts map[string]string     `json:"texts"`
+	// Optional for historical payloads: nil retains the original fixed renderer.
+	TemplateSnapshot *port.KHTCTemplateSnapshot `json:"template_snapshot,omitempty"`
+	TemplateTerminal *string                    `json:"template_terminal,omitempty"`
 }
 
 func Edit(d Draft, in Edits, actor uuid.UUID, at time.Time) (Draft, error) {
@@ -361,6 +364,19 @@ func Edit(d Draft, in Edits, actor uuid.UUID, at time.Time) (Draft, error) {
 
 func Refresh(d Draft, data Data, defaults map[string]string) Draft {
 	out := Draft{Data: data, Adhoc: d.Adhoc.Clone(), Admin: map[string]AdminField{}, Texts: map[string]string{}}
+	if d.TemplateSnapshot != nil {
+		copy := *d.TemplateSnapshot
+		copy.Definition = append(json.RawMessage(nil), copy.Definition...)
+		if copy.LegacyUntil != nil {
+			until := *copy.LegacyUntil
+			copy.LegacyUntil = &until
+		}
+		out.TemplateSnapshot = &copy
+	}
+	if d.TemplateTerminal != nil {
+		term := *d.TemplateTerminal
+		out.TemplateTerminal = &term
+	}
 	for key, value := range d.Texts {
 		out.Texts[key] = value
 	}

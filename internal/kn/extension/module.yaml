@@ -32,6 +32,7 @@ provides:
     - HTXConfirmationHistory
     - HTXConfirmations
     - HTXData
+    - KHTCFixedTemplates
     - KHTCMetricNames
     - KHTCOperationSource
     - KHTCPlanDepartments
@@ -41,6 +42,7 @@ provides:
     - KHTCReportStates
     - KHTCSourceCrosswalk
     - KHTCSources
+    - KHTCTemplateContextReader
     - OrganizationData
     - PlotDirectory
     - PlotStatistics
