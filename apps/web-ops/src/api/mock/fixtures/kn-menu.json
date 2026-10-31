@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -2092,7 +2092,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -2290,7 +2290,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -2391,7 +2391,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -2548,6 +2548,15 @@
         "status": "coming_soon",
         "status_label": "Sắp có",
         "children": []
+       },
+       {
+        "key": "tinh.khtc.phat_sinh",
+        "label": "Báo cáo phát sinh",
+        "route": "/kn/khtc/bao-cao-phat-sinh",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      },
@@ -2627,7 +2636,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -2729,7 +2738,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -2857,7 +2866,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -3161,7 +3170,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -3323,7 +3332,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -3415,7 +3424,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -3719,7 +3728,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -3847,7 +3856,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   },
@@ -4197,6 +4206,24 @@
           "key": "admin.pb.khtc_bao_cao",
           "label": "Báo cáo KHTC",
           "route": "/kn/phong-ban/ke_hoach_tai_chinh/bao-cao-khtc",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.khtc_phat_sinh",
+          "label": "Báo cáo phát sinh",
+          "route": "/kn/khtc/bao-cao-phat-sinh",
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.khtc_muc_luc_mau",
+          "label": "Mục lục mẫu báo cáo",
+          "route": "/kn/phong-ban/ke_hoach_tai_chinh/muc-luc-mau",
           "icon": "report",
           "badge_source": null,
           "enabled": false,
@@ -4615,7 +4642,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v7",
+    "menu_version": "kn.menu/v10",
     "org_ref": null
    }
   }
@@ -4658,5 +4685,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v7"
+ "menu_version": "kn.menu/v10"
 }

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +31,9 @@ type FormRow struct {
 	ReviewedAt      *time.Time
 	ReviewNote      string
 	Late            bool
+	NativeLate      *bool
+	RequestDueAt    *time.Time
+	RequestState    string
 }
 
 // SourceRow là một dòng bảng "Nguồn module".
@@ -85,7 +89,7 @@ func deadlinesOf(p store.Period, evs []store.Event) (time.Time, time.Time) {
 }
 
 // project dựng Detail từ sổ + tiến độ kỳ native + trạng thái nguồn.
-func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []store.Event, srcs []store.Source, names map[string]string) Detail {
+func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []store.Event, srcs []store.Source, names map[string]string, requests map[string]*store.AdhocRequest) Detail {
 	now := s.now()
 	d := Detail{Period: p, Events: evs}
 	d.DueAt, d.ExportDueAt = deadlinesOf(p, evs)
@@ -112,10 +116,15 @@ func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []s
 			row.View = domain.FormView{State: domain.FormUnknown}
 		default:
 			n, hasDraft := drafts[dept]
-			row.View = domain.FormStateOf(domain.FormFacts{Versions: u.Versions, Decision: u.Decision, Overdue: d.Overdue, Terminal: term,
+			overdue := d.Overdue
+			if request := requests[dept]; request != nil {
+				overdue = now.After(request.DueAt)
+			}
+			row.View = domain.FormStateOf(domain.FormFacts{Versions: u.Versions, Decision: u.Decision, Overdue: overdue, Terminal: term,
 				Max: p.MaxSubmissions, Draft: hasDraft && n == u.Versions})
 			row.LastSubmittedAt, row.ReviewedAt, row.ReviewNote, row.Late = u.LastSubmittedAt, u.ReviewedAt, u.ReviewNote, u.Late
 		}
+		projectAdhocRequest(&row, requests[dept], u, term)
 		if u.Versions > 0 {
 			f.AnySent = true
 		}
@@ -198,8 +207,15 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 	if err != nil {
 		return Detail{}, err
 	}
+	if p.Type == domain.TypeAdhoc && !adhocReader(c) {
+		return Detail{}, problem.Forbidden
+	}
+	requests, err := s.activeRequests(ctx, c, p)
+	if err != nil {
+		return Detail{}, err
+	}
 	names, _, _ := s.unitDepartments(ctx, c.k)
-	return s.project(ctx, c, p, evs, srcs, names), nil
+	return s.project(ctx, c, p, evs, srcs, names, requests), nil
 }
 
 // List liệt kê kỳ (năm kế hoạch year, 0 = mọi năm), mới trước, kèm trạng thái và tiến độ nộp.
@@ -215,7 +231,7 @@ func (s *Service) List(ctx context.Context, year, limit int) ([]Detail, error) {
 	var evs map[uuid.UUID][]store.Event
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		if ps, e = store.Periods(ctx, tx, year, limit); e != nil {
+		if ps, e = store.PeriodsForReader(ctx, tx, year, limit, adhocReader(c)); e != nil {
 			return e
 		}
 		idl := make([]uuid.UUID, 0, len(ps))
@@ -231,7 +247,11 @@ func (s *Service) List(ctx context.Context, year, limit int) ([]Detail, error) {
 	names, _, _ := s.unitDepartments(ctx, c.k)
 	out := make([]Detail, 0, len(ps))
 	for _, p := range ps {
-		d := s.project(ctx, c, p, evs[p.ID], nil, names)
+		requests, err := s.activeRequests(ctx, c, p)
+		if err != nil {
+			return nil, err
+		}
+		d := s.project(ctx, c, p, evs[p.ID], nil, names, requests)
 		d.Sources = nil
 		out = append(out, d)
 	}
@@ -261,7 +281,7 @@ func eventIdem(idem, action string, id uuid.UUID) string {
 // "Nộp trễ" của lần gửi, Trễ hạn, hạn trên thiết bị theo hạn mới), rồi ghi sự kiện ở sổ KHTC; ghi sổ KHTC lỗi → trả hạn
 // native về hạn cũ (bù như "Mở kỳ").
 func (s *Service) ChangeDeadline(ctx context.Context, id uuid.UUID, in DeadlineInput, idem string) (Detail, error) {
-	c, err := s.writer(ctx)
+	c, err := s.periodWriter(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
@@ -292,13 +312,34 @@ func (s *Service) ChangeDeadline(ctx context.Context, id uuid.UUID, in DeadlineI
 	if e.Reason != nil {
 		reason = *e.Reason
 	}
-	if err := s.Control.ChangeDue(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, in.DueAt, reason, eventIdem(idem, "forms-due", id)); err != nil {
+	nativeKey := eventIdem(idem, "forms-due", id)
+	nativeCtx := ctx
+	if d.Period.Type == domain.TypeAdhoc {
+		hash, e := formsport.OperationHash(struct {
+			Due    time.Time
+			Reason string
+		}{in.DueAt.UTC(), strings.TrimSpace(reason)})
+		if e != nil {
+			return Detail{}, e
+		}
+		nativeCtx = BindAdhocOperation(ctx, s.DB, c.k, id, formsport.Operation{Action: formsport.OperationChangeDue, Profile: domain.ProfileKHTC, PeriodID: d.Period.FormsPeriodRef, PayloadHash: hash, IdemKey: nativeKey})
+	}
+	if err := s.Control.ChangeDue(nativeCtx, domain.ProfileKHTC, d.Period.FormsPeriodRef, in.DueAt, reason, nativeKey); err != nil {
 		return Detail{}, err
 	}
 	if err := s.appendEvent(ctx, c, e, eventIdem(idem, "deadline", id)); err != nil {
 		// Bù: trả hạn kỳ native về hạn hiệu lực cũ (best effort — lỗi bù không che lỗi gốc).
-		_ = s.Control.ChangeDue(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, d.DueAt, "Hoàn tác: ghi sổ KHTC không thành công",
-			eventIdem(idem, "forms-due-undo", id))
+		undoReason := "Hoàn tác: ghi sổ KHTC không thành công"
+		undoKey := eventIdem(idem, "forms-due-undo", id)
+		undoCtx := ctx
+		if d.Period.Type == domain.TypeAdhoc {
+			hash, _ := formsport.OperationHash(struct {
+				Due    time.Time
+				Reason string
+			}{d.DueAt.UTC(), undoReason})
+			undoCtx = BindAdhocOperation(ctx, s.DB, c.k, id, formsport.Operation{Action: formsport.OperationChangeDue, Profile: domain.ProfileKHTC, PeriodID: d.Period.FormsPeriodRef, PayloadHash: hash, IdemKey: undoKey})
+		}
+		_ = s.Control.ChangeDue(undoCtx, domain.ProfileKHTC, d.Period.FormsPeriodRef, d.DueAt, undoReason, undoKey)
 		return Detail{}, err
 	}
 	return s.Get(ctx, id)
@@ -309,7 +350,7 @@ func ptrTime(t time.Time) *time.Time { return &t }
 // Close "Đóng kỳ" (BR-DL-15): chốt kỳ native (phiếu chưa gửi → Không gửi, đã gửi/yêu cầu bổ sung → Đã khóa, ảnh chụp đóng
 // băng) rồi ghi sự kiện đóng. Gọi lại sau lỗi giữa chừng: kỳ native đã chốt → chỉ ghi sự kiện.
 func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) (Detail, error) {
-	c, err := s.writer(ctx)
+	c, err := s.periodWriter(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
@@ -337,7 +378,12 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) 
 			return Detail{}, ErrCancelling
 		}
 	}
-	if err := s.Control.ClosePeriod(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, eventIdem(idem, "forms-close", id)); err != nil &&
+	nativeKey := eventIdem(idem, "forms-close", id)
+	nativeCtx := ctx
+	if d.Period.Type == domain.TypeAdhoc {
+		nativeCtx = BindAdhocOperation(ctx, s.DB, c.k, id, formsport.Operation{Action: formsport.OperationClose, Profile: domain.ProfileKHTC, PeriodID: d.Period.FormsPeriodRef, IdemKey: nativeKey})
+	}
+	if err := s.Control.ClosePeriod(nativeCtx, domain.ProfileKHTC, d.Period.FormsPeriodRef, nativeKey); err != nil &&
 		!errors.Is(err, formsport.ErrPeriodClosed) {
 		return Detail{}, err
 	}
@@ -362,7 +408,7 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) 
 // Bản cuối/đóng kỳ trong lúc còn hạn), hủy kỳ native ở cap/forms NGOÀI giao dịch, rồi ghi sự kiện hủy + bỏ ý định trong
 // giao dịch ngắn thứ hai. cap/forms lỗi → bỏ ý định, không ghi gì ở sổ KHTC.
 func (s *Service) Cancel(ctx context.Context, id uuid.UUID, reason, idem string) (Detail, error) {
-	c, err := s.writer(ctx)
+	c, err := s.periodWriter(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
@@ -415,7 +461,7 @@ func (s *Service) Cancel(ctx context.Context, id uuid.UUID, reason, idem string)
 		}
 		return cause
 	}
-	if err := s.Control.CancelPeriod(cctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, why, eventIdem(idem, "forms-cancel", id)); err != nil &&
+	if err := s.Control.CancelPeriod(cancelNativeContext(cctx, s.DB, c.k, d.Period, why, eventIdem(idem, "forms-cancel", id)), domain.ProfileKHTC, d.Period.FormsPeriodRef, why, eventIdem(idem, "forms-cancel", id)); err != nil &&
 		!errors.Is(err, formsport.ErrPeriodCancelled) {
 		if ctx.Err() == nil && cctx.Err() != nil {
 			err = ErrDependency.WithDetail("hủy kỳ ở cap/forms chậm quá hạn giữ kỳ — thử lại").WithCause(err)
