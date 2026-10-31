@@ -5,6 +5,7 @@
 // Báo cáo cho KHTC (mã phòng trong URL). Hai góc nhìn: "Phiếu kỳ này" (mặc định lọc Cần xử lý, hạn gần nhất trước) và
 // "Phiếu đã gửi". Bộ lọc Loại báo cáo, Trạng thái; nhãn đếm; dải yêu cầu bổ sung; nút Nhập / Tiếp tục / Sửa, gửi lại / Xem
 // mở màn phiếu của W11.63 (entry_route).
+import {AdhocInbox} from "../adhoc/AdhocInbox";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -28,11 +29,10 @@ const TABS: { view: DeptFormsView; label: string; href: string }[] = [
   { view: "sent", label: "Phiếu đã gửi", href: "/kn/bao-cao-khtc/da-gui" },
 ];
 
-export function DepartmentFormsScreen({
-  view: initial,
-}: {
-  view: DeptFormsView;
-}) {
+export function DepartmentFormsScreen({view}:{view:DeptFormsView}) {
+ const {kn}=useAuth();return <DepartmentFormsBody key={JSON.stringify(kn.context)} view={view}/>;
+}
+function DepartmentFormsBody({view:initial}:{view:DeptFormsView}) {
   const { api, kn } = useAuth();
   const params = useParams<{ dept?: string }>();
   const adminDept = params?.dept;
@@ -64,6 +64,7 @@ export function DepartmentFormsScreen({
             : ""}
         </p>
       </PageHeader>
+      {view==="current" && !adminDept && <AdhocInbox/>}
       <nav className="row" aria-label="Báo cáo cho KHTC">
         {TABS.map((t) =>
           adminDept ? (

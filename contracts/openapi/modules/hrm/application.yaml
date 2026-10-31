@@ -1549,6 +1549,7 @@ components:
         audit.view: {$ref: "#/components/schemas/HrmScope"}
         docs.view: {$ref: "#/components/schemas/HrmScope"}    # W11.24 kho tài liệu
         docs.manage: {$ref: "#/components/schemas/HrmScope"}  # W11.24
+        assessment: {$ref: "#/components/schemas/HrmScope"}  # W11.26, vẫn giao với phân công HS37/bản thân
 # @ag-order: 884
     HrmMyAccess:
       type: object

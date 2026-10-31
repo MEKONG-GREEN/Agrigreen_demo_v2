@@ -13,6 +13,7 @@ import 'package:agrigreen_mobile/application/auth_flow.dart';
 import 'package:agrigreen_mobile/core/clock.dart';
 import 'package:agrigreen_mobile/core/config.dart';
 import 'package:agrigreen_mobile/core/ids.dart';
+import 'package:agrigreen_mobile/data/actions/action_queue.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
 import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
 import 'package:agrigreen_mobile/data/secure/secure_store.dart';
@@ -429,15 +430,18 @@ void main() {
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     final env = (await tester.runAsync(_Env.create))!;
-    env.kn.extraGets['/v1/kn/cooperatives'] = {
+    env.kn.extraGets['/v1/kn/producer-records'] = {
       'items': [
         {
           'ref': 'c1',
+          'kind': 'cooperative',
           'name': 'HTX Mỹ Hòa',
+          'display_name': 'HTX Mỹ Hòa',
           'commune_code': xaA,
           'area_ha': '12.5',
-          'household_count': 4,
-          'active': true,
+          'member_count': 4,
+          'status': 'active',
+          'version': 1,
           'representative': {
             'label': 'Nguyễn V. A',
             'masked_phone': '0912•••123',
@@ -475,9 +479,131 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('Xã B').last);
     await settle(tester);
+    // #161: hồ sơ KN cần người đại diện — thiếu thì chặn trên máy.
+    ScaffoldMessenger.of(
+      tester.element(find.byKey(const ValueKey('kn-coop-f-save'))),
+    ).clearSnackBars();
+    await settle(tester);
     await tester.tap(find.byKey(const ValueKey('kn-coop-f-save')));
     await settle(tester);
-    expect(env.server.actionCalls.single.$1, '/v1/kn/cooperatives');
+    expect(find.text('Nhập người đại diện và SĐT.'), findsOneWidget);
+    expect(env.server.actionCalls, isEmpty);
+    await tester.enterText(
+      find.byKey(const ValueKey('kn-coop-f-rep')),
+      'Nguyễn Văn A',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('kn-coop-f-phone')),
+      '0912345123',
+    );
+    await tester.tap(find.byKey(const ValueKey('kn-coop-f-save')));
+    await settle(tester);
+    expect(env.server.actionCalls.single.$1, '/v1/kn/producer-records');
     await _finish(tester, env);
   });
+
+  testWidgets(
+    '#161 chi tiết hồ sơ HTX: nông hộ theo parent_ref, vô hiệu hóa / thêm nông hộ qua /v1/kn/producer-records',
+    (tester) async {
+      tester.view.physicalSize = const Size(720, 1600);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      final env = (await tester.runAsync(_Env.create))!;
+      env.kn.extraGets['/v1/kn/producer-records/c1'] = {
+        'ref': 'c1',
+        'kind': 'cooperative',
+        'name': 'HTX Mỹ Hòa',
+        'display_name': 'HTX Mỹ Hòa',
+        'commune_code': xaA,
+        'area_ha': '12.5',
+        'status': 'active',
+        'version': 3,
+        'can_edit': true,
+        'htx_ref': null,
+        'representative': {
+          'label': 'Nguyễn V. A',
+          'masked_phone': '0912•••123',
+        },
+        'log': const [],
+      };
+      env.kn.extraGets['/v1/kn/producer-records'] = {
+        'items': [
+          {
+            'ref': 'hh-1',
+            'kind': 'household',
+            'display_name': 'Trần T. B',
+            'commune_code': xaA,
+            'parent_ref': 'c1',
+            'area_ha': '1.5',
+            'status': 'active',
+            'version': 1,
+            'holder': {'label': 'Trần T. B', 'masked_phone': '0911•••333'},
+          },
+        ],
+        'next_cursor': null,
+      };
+      await tester.pumpWidget(
+        _app(
+          env,
+          AppState(
+            const AuthView(AuthStage.unlocked),
+            services: env.s,
+            kn: KnContextState(KnContextStage.ready, context: _ctx()),
+          ),
+          home: const KnCooperativeDetailScreen(ref: 'c1'),
+        ),
+      );
+      await settle(tester);
+      await waitForWidget(tester, find.text('Trần T. B'));
+      expect(
+        find.textContaining('HTX đã công bố: chưa liên kết'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('0911•••333'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('kn-coop-deactivate')));
+      await settle(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('kn-reason')),
+        'HTX giải thể theo QĐ 12',
+      );
+      await settle(tester);
+      await tester.tap(find.byKey(const ValueKey('kn-reason-ok')));
+      await settle(tester);
+      expect(
+        env.server.actionCalls.last.$1,
+        '/v1/kn/producer-records/c1/deactivate',
+      );
+
+      await tester.tap(find.byKey(const ValueKey('kn-hh-add')));
+      await settle(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('kn-hh-name')),
+        'Trần Thị B',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('kn-hh-phone')),
+        '0911222333',
+      );
+      await tester.enterText(find.byKey(const ValueKey('kn-hh-area')), '2,5');
+      await tester.tap(find.byKey(const ValueKey('kn-hh-save')));
+      await settle(tester);
+      expect(env.server.actionCalls.last.$1, '/v1/kn/producer-records');
+      final created = (await tester.runAsync(
+        () => env.s.actions.ofKind(ApiActionKind.knRecordCreate),
+      ))!;
+      expect(created.single.body, {
+        'kind': 'household',
+        'commune_code': xaA,
+        'area_ha': '2.5',
+        'holder': {'full_name': 'Trần Thị B', 'phone': '0911222333'},
+        'parent_ref': 'c1',
+      });
+      expect(
+        env.server.actionCalls.map((c) => c.$1),
+        everyElement(startsWith('/v1/kn/producer-records')),
+      );
+      await _finish(tester, env);
+    },
+  );
 }

@@ -37,6 +37,9 @@ type ActorResolver func(context.Context, authz.Principal, Profile) (ResolvedActo
 
 // Profile là cấu hình của MỘT bên dùng (ứng dụng) — tương đương mục cap/forms của app.yaml.
 type Profile struct {
+	// AuthorizeOperation is an optional application-owned exception for one verified
+	// invocation. Nil preserves the ordinary level policy. Never serialized.
+	AuthorizeOperation OperationAuthorizer `json:"-"`
 	// ResolveActor lets an application own session and target restrictions. Never serialized.
 	ResolveActor ActorResolver `json:"-"`
 

@@ -33,9 +33,17 @@ func (s *Service) submitted(ctx context.Context, c caller, p ps.Period) ([]domai
 	var events map[uuid.UUID][]ps.Event
 	if err := s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		var e error
-		periods, e = ps.Periods(ctx, tx, p.Year, 10000)
-		if e != nil {
-			return e
+		for year := p.From.Year(); year <= p.Year; year++ {
+			var rows []ps.Period
+			if p.Type == pd.TypeAdhoc {
+				rows, e = ps.AdhocReportPeriods(ctx, tx, year, p.ID, pd.QuantityEnd(p.Type, p.To, p.Cutoff))
+			} else {
+				rows, e = ps.Periods(ctx, tx, year, 10000)
+			}
+			if e != nil {
+				return e
+			}
+			periods = append(periods, rows...)
 		}
 		ids := make([]uuid.UUID, 0, len(periods))
 		for _, period := range periods {
@@ -201,11 +209,45 @@ func (s *Service) capture(ctx context.Context, c caller, p ps.Period) (domain.Da
 			}
 		}
 	}
+	if p.Type == pd.TypeAdhoc {
+		if err := boundedMetrics(metrics); err != nil {
+			return domain.Data{}, nil, err
+		}
+	}
+	if p.Type == pd.TypeAdhoc {
+		if err := boundedPlan(plan); err != nil {
+			return domain.Data{}, nil, err
+		}
+	}
 	metrics = domain.WithYields(metrics)
+	var requests []domain.Supplement
+	if p.Type == pd.TypeAdhoc {
+		var extra []domain.SourceMetric
+		requests, extra, err = s.supplementInputs(ctx, c, p, sheets)
+		if err != nil {
+			return domain.Data{}, nil, err
+		}
+		metrics = append(metrics, extra...)
+		prior, err := s.priorYearInputs(ctx, p, sheets)
+		if err != nil {
+			return domain.Data{}, nil, err
+		}
+		metrics = append(metrics, prior...)
+	}
 	sort.Slice(metrics, func(i, j int) bool { return metrics[i].Key < metrics[j].Key })
 	data, err := domain.Compose(domain.Period{ID: p.ID, No: p.No, Scope: p.Scope, Type: p.Type, Year: p.Year, Name: p.Name, From: p.From, To: p.To, Cutoff: p.Cutoff, Departments: append([]string{}, p.Departments...)}, plan, sheets, snapshot, metrics, s.now())
 	if err != nil {
 		return domain.Data{}, nil, err
+	}
+	if len(requests) > 0 {
+		data.Supplements = requests
+		data.InputHash, err = domain.Hash(struct {
+			Base     string
+			Requests []domain.Supplement
+		}{data.InputHash, requests})
+		if err != nil {
+			return domain.Data{}, nil, err
+		}
 	}
 	// W11.67: ô Nhập ngoài — giá trị hiệu lực của kỳ ở Số liệu nguồn ngoài (cùng module, cùng giao dịch tenant).
 	var external []extapp.ReportFigure

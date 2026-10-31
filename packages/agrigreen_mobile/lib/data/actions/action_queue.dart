@@ -55,20 +55,22 @@ enum ApiActionKind implements ActionKind {
   /// lịch công tác tuần. Thân giữ nguyên giữa các lần phát lại.
   workScheduleSave('work_schedule_save'),
 
-  /// KN v7.7 P7 (FN-XA-03.03): `POST /v1/kn/cooperatives` — thêm HTX.
-  knCooperativeCreate('kn_cooperative_create'),
+  /// FN-XA-03.03, KNSPLIT-2-KN-RECORDS (#67, #161): `POST
+  /// /v1/kn/producer-records {kind, commune_code, …}` — thêm hồ sơ KN riêng
+  /// HTX / Nông hộ / Tổ hợp tác (sổ `pf_extension.kn_producer`). KN không
+  /// tạo/sửa HTX nền tảng: lệnh ghi `/v1/kn/cooperatives…` cũ đã bỏ khỏi app
+  /// (xem [RetiredActionKind]).
+  knRecordCreate('kn_record_create'),
 
-  /// `PUT /v1/kn/cooperatives/{ref}` — sửa HTX (sự kiện bù trên sổ).
-  knCooperativeUpdate('kn_cooperative_update', method: 'PUT'),
+  /// `POST /v1/kn/producer-records/{ref} {…, base_version}` — sửa hồ sơ (thay
+  /// toàn bộ trường nhập được, khóa lạc quan theo phiên bản).
+  knRecordUpdate('kn_record_update'),
 
-  /// `POST /v1/kn/cooperatives/{ref}/deactivate {reason}`.
-  knCooperativeDeactivate('kn_cooperative_deactivate'),
+  /// `POST /v1/kn/producer-records/{ref}/deactivate {reason, base_version}`.
+  knRecordDeactivate('kn_record_deactivate'),
 
-  /// `POST /v1/kn/cooperatives/{ref}/households` — thêm nông hộ.
-  knHouseholdCreate('kn_household_create'),
-
-  /// `PUT /v1/kn/households/{ref}` — sửa diện tích canh tác.
-  knHouseholdUpdate('kn_household_update', method: 'PUT'),
+  /// `POST /v1/kn/producer-records/{ref}/reactivate {reason, base_version}`.
+  knRecordReactivate('kn_record_reactivate'),
 
   /// FN-XA-03.04: `PUT /v1/kn/machine-counts/{ref}` — thay toàn
   /// bộ khai báo số lượng máy của HTX.
@@ -102,17 +104,50 @@ enum ApiActionKind implements ActionKind {
     ApiActionKind.libraryUnsave => '/v1/documents/$target/unsave',
     ApiActionKind.farmLogReview => '/v1/cropcycle/farm-logs/$target/reviews',
     ApiActionKind.workScheduleSave => '/v1/extension/work-schedules',
-    ApiActionKind.knCooperativeCreate => '/v1/kn/cooperatives',
-    ApiActionKind.knCooperativeUpdate => '/v1/kn/cooperatives/$target',
-    ApiActionKind.knCooperativeDeactivate =>
-      '/v1/kn/cooperatives/$target/deactivate',
-    ApiActionKind.knHouseholdCreate => '/v1/kn/cooperatives/$target/households',
-    ApiActionKind.knHouseholdUpdate => '/v1/kn/households/$target',
+    ApiActionKind.knRecordCreate => '/v1/kn/producer-records',
+    ApiActionKind.knRecordUpdate => '/v1/kn/producer-records/$target',
+    ApiActionKind.knRecordDeactivate =>
+      '/v1/kn/producer-records/$target/deactivate',
+    ApiActionKind.knRecordReactivate =>
+      '/v1/kn/producer-records/$target/reactivate',
     ApiActionKind.knMachineCountsSave => '/v1/kn/machine-counts/$target',
     ApiActionKind.knMaterialsCreate => '/v1/kn/materials',
     ApiActionKind.knMaterialCorrect => '/v1/kn/materials/$target/correct',
     ApiActionKind.knPlotUpdate => '/v1/kn/plots/$target',
   };
+}
+
+/// Lệnh đã bỏ khỏi app nhưng có thể còn trong `api_action` của máy cài bản
+/// cũ: các lệnh ghi HTX / nông hộ nền tảng qua `/v1/kn/cooperatives…`
+/// (KNSPLIT-2-KN-RECORDS #161 — KN không ghi dữ liệu HTX). Chỉ để đọc được
+/// dòng cũ (lớp phủ, dọn 48 giờ); không xếp hàng mới, không bao giờ phát lại:
+/// migration cục bộ v4 đánh dấu dòng còn chờ là `failed` (`retired`) và
+/// [ActionQueue.pending] bỏ qua chúng.
+final class RetiredActionKind implements ActionKind {
+  const RetiredActionKind._(this.code);
+
+  @override
+  final String code;
+
+  @override
+  String get method => 'POST';
+
+  @override
+  String pathFor(String? target) =>
+      throw StateError('api_action: lệnh "$code" đã bỏ, không phát lại');
+
+  /// Mã lỗi ghi vào `last_error` khi bỏ lệnh cũ.
+  static const retiredCode = 'retired';
+
+  static const values = [
+    RetiredActionKind._('kn_cooperative_create'),
+    RetiredActionKind._('kn_cooperative_update'),
+    RetiredActionKind._('kn_cooperative_deactivate'),
+    RetiredActionKind._('kn_household_create'),
+    RetiredActionKind._('kn_household_update'),
+  ];
+
+  static final codes = {for (final k in values) k.code};
 }
 
 enum ApiActionStatus { pending, done, failed }
@@ -187,7 +222,11 @@ class ActionQueue {
 
   static Map<String, ActionKind> _registry(Iterable<ActionKind> extra) {
     final m = <String, ActionKind>{};
-    for (final k in [...ApiActionKind.values, ...extra]) {
+    for (final k in [
+      ...ApiActionKind.values,
+      ...RetiredActionKind.values,
+      ...extra,
+    ]) {
       final prev = m[k.code];
       if (prev != null && !identical(prev, k)) {
         throw ArgumentError.value(k.code, 'extraKinds', 'trùng mã loại lệnh');
@@ -220,7 +259,7 @@ class ActionQueue {
     String? target,
     Map<String, Object?>? body,
   }) {
-    if (!identical(_kinds[kind.code], kind)) {
+    if (kind is RetiredActionKind || !identical(_kinds[kind.code], kind)) {
       return Future.error(
         ArgumentError.value(
           kind.code,
@@ -262,7 +301,10 @@ class ActionQueue {
       where: "status = 'pending'",
       orderBy: 'seq',
     );
-    return rows.map(_fromRow).toList();
+    return [
+      for (final a in rows.map(_fromRow))
+        if (a.kind is! RetiredActionKind) a,
+    ];
   }
 
   /// Lệnh chưa thất bại (chờ hoặc đã xong) — dùng làm lớp phủ trạng thái cục bộ.

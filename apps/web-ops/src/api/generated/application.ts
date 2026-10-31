@@ -9674,6 +9674,267 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/hrm/appraisals/templates/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "summary" | "form";
+            };
+            cookie?: never;
+        };
+        /** Mẫu/phiếu đánh giá hiện hành, chỉ HCTH/Admin có assessment toàn Trung tâm */
+        get: operations["hrmAppraisalTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/templates/{kind}/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "summary" | "form";
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lưu phiên bản mẫu/phiếu; phát hành cần đủ tiêu chí/ngưỡng hoặc tám cột MS05/MS06 */
+        post: operations["hrmAppraisalSaveTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/templates/{kind}/{code}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "summary" | "form";
+                code: string;
+            };
+            cookie?: never;
+        };
+        /** Lịch sử bất biến mẫu/phiếu, cũ trước */
+        get: operations["hrmAppraisalTemplateHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đợt được phép xem; tiến độ và metadata giao với quyền người dùng/bản thân/HS37 */
+        get: operations["hrmAppraisalPeriods"];
+        put?: never;
+        /** Mở đợt, chụp danh sách/chức vụ/HS37/mẫu tại ngày chốt; quý 0 là đánh giá năm độc lập */
+        post: operations["hrmAppraisalOpenPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gia hạn/khóa bước/gửi đơn vị/nhắc/ký/chốt; chốt năm ghi annual_rating, không suy kết quả năm từ bốn quý */
+        post: operations["hrmAppraisalChangePeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        /** Phiếu/đề xuất được phép xem, chỉ tóm tắt (không tải câu trả lời), tên đọc kho sau audit ngoài TX */
+        get: operations["hrmAppraisalEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/entries/{staff}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                staff: string;
+            };
+            cookie?: never;
+        };
+        /** Phiếu đóng băng + lịch sử 50 phiên bản mới nhất; xem bản cũ qua route versions */
+        get: operations["hrmAppraisalEntry"];
+        put?: never;
+        /** Tự chấm/nhập thay có scan/quản lý/gửi/trả/kết luận/mở lại một người; khóa bền cùng body/actor */
+        post: operations["hrmAppraisalChangeEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/entries/{staff}/history": {
+        parameters: {
+            query?: {
+                before?: string;
+            };
+            header?: never;
+            path: {
+                period: string;
+                staff: string;
+            };
+            cookie?: never;
+        };
+        /** Tối đa 50 dòng lịch sử tóm tắt, mới trước */
+        get: operations["hrmAppraisalEntryHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/entries/{staff}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                staff: string;
+                version: string;
+            };
+            cookie?: never;
+        };
+        /** Bản phiếu cũ đầy đủ, kiểm quyền trên phân công đóng băng và quyền hiện tại */
+        get: operations["hrmAppraisalEntryVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/entries/{staff}/guest-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                staff: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fail-closed tới khi W10.18 guest OTP (#184) có TTL/one-time/rate-limit/tenant-subject binding */
+        post: operations["hrmAppraisalGuestLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/paper/{kind}": {
+        parameters: {
+            query?: {
+                unit?: string;
+            };
+            header?: never;
+            path: {
+                period: string;
+                kind: "MS05" | "MS06";
+            };
+            cookie?: never;
+        };
+        /** Xem trước tám cột theo mẫu và phiên bản phiếu, quyền assessment giao quyền export */
+        get: operations["hrmAppraisalPaper"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        /** Các lần xuất đã lưu, không chứa byte tệp hoặc tên nhân sự */
+        get: operations["hrmAppraisalExports"];
+        put?: never;
+        /** Ghi lần xuất Word hoặc Excel, pin phiên bản mẫu/đợt/phiếu và kiểm quyền HRM trước cap/export */
+        post: operations["hrmAppraisalExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/exports/{export}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                export: string;
+            };
+            cookie?: never;
+        };
+        /** Tải lại đúng lần xuất, kiểm quyền hiện tại và đánh dấu nguồn thay đổi */
+        get: operations["hrmAppraisalExportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report": {
         parameters: {
             query?: never;
@@ -9822,6 +10083,92 @@ export interface paths {
         get: operations["extensionKhtcReportWordDownload"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/adhoc-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Yêu cầu bổ sung của kỳ phát sinh */
+        get: operations["extensionKhtcAdhocRequestList"];
+        put?: never;
+        /** Phát hành yêu cầu trên phiếu native đã giao; giữ bốn mắt và trần3 */
+        post: operations["extensionKhtcAdhocRequestCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/adhoc-requests/{requestID}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đối chiếu tác động native sau timeout; không mở lại kỳ */
+        post: operations["extensionKhtcAdhocRequestReconcile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/adhoc-requests/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chỉ yêu cầu hiện hành của phòng đang chọn; lọc phạm vi trước LIMIT */
+        get: operations["extensionKhtcAdhocInbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/adhoc-open-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ý định dang dở của chính actor và canonical scope; không trả khóa native */
+        get: operations["extensionKhtcAdhocOpenRecoveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/adhoc-open-intents/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đối chiếu cùng đợt; tiếp nhận append-only khi phiên cũ hết hạn */
+        post: operations["extensionKhtcAdhocOpenReconcile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11268,6 +11615,108 @@ export interface paths {
         get: operations["extensionCntsDiaryPhotoContent"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Năm mẫu báo cáo cố định dành cho Admin */
+        get: operations["extensionKhtcTemplateCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/templates/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mục lục và lịch sử phiên bản mẫu */
+        get: operations["extensionKhtcTemplateDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/templates/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lưu phiên bản nháp bất biến */
+        post: operations["extensionKhtcTemplateSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/templates/{key}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Khôi phục phiên bản cũ thành bản nháp mới */
+        post: operations["extensionKhtcTemplateRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/templates/{key}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phát hành phiên bản theo ngày bắt đầu kỳ */
+        post: operations["extensionKhtcTemplatePublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/templates/{key}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xem trước từ snapshot dữ liệu kỳ thật; tình huống mô phỏng có nhãn */
+        post: operations["extensionKhtcTemplatePreview"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14838,7 +15287,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale" | "price_reminder" | "price_alert" | "price_verify_request" | "price_verify_reply" | "price_verify_decision" | "price_lock_summary" | "price_board_approved" | "price_board_reopened" | "price_proxy_entry" | "cnts_knqg_sent" | "cnts_knqg_reviewed" | "cnts_knqg_submitted";
+            kind: "directive" | "alert" | "document" | "task_escalated" | "sync_conflict" | "org_deactivated" | "household_registered" | "household_membership_changed" | "task_assigned" | "farm_log_pending" | "farm_log_reviewed" | "season_opened" | "integration_dead_lettered" | "area_feed_stale" | "price_reminder" | "price_alert" | "price_verify_request" | "price_verify_reply" | "price_verify_decision" | "price_lock_summary" | "price_board_approved" | "price_board_reopened" | "price_proxy_entry" | "cnts_knqg_sent" | "cnts_knqg_reviewed" | "cnts_knqg_submitted" | "hrm_appraisal" | "hrm_promotion_due" | "hrm_plan_reminder";
             /** @enum {string} */
             severity: "urgent" | "normal";
             title: string;
@@ -17759,6 +18208,7 @@ export interface components {
             "audit.view"?: components["schemas"]["HrmScope"];
             "docs.view"?: components["schemas"]["HrmScope"];
             "docs.manage"?: components["schemas"]["HrmScope"];
+            assessment?: components["schemas"]["HrmScope"];
         };
         HrmMyAccess: {
             /** @description false = hồ sơ chưa bật (AG_HRM_RECORDS, Q-005) */
@@ -21242,6 +21692,10 @@ export interface components {
             /** Format: date-time */
             reviewed_at: string | null;
             review_note: string;
+            native_late?: boolean;
+            /** Format: date-time */
+            request_due_at?: string;
+            request_state?: string;
             late: boolean;
         };
         /** @description Một phiếu KHTC của phòng trong một kỳ (W11.11, FN-PN-03.01) */
@@ -21438,6 +21892,15 @@ export interface components {
             reason: string;
         };
         KHTCFormContent: {
+            /**
+             * Format: uuid
+             * @description Mã yêu cầu người nhập đã đọc; không tự gắn vào nội dung cũ
+             */
+            adhoc_request_id?: string;
+            adhoc_values?: {
+                [key: string]: string;
+            };
+            adhoc_text?: string;
             cells: {
                 [key: string]: components["schemas"]["KHTCFormCell"];
             };
@@ -21491,6 +21954,7 @@ export interface components {
             rows: components["schemas"]["KHTCFormRow"][];
         };
         KHTCFormSheet: {
+            supplement?: components["schemas"]["KHTCAdhocRequest"];
             period: {
                 /** Format: uuid */
                 id: string;
@@ -21557,6 +22021,7 @@ export interface components {
                 /** Format: date-time */
                 submitted_at: string;
                 late: boolean;
+                native_late?: boolean;
                 decision: string;
                 review_note: string;
                 /** Format: date-time */
@@ -22127,6 +22592,303 @@ export interface components {
                 recorded_at: string;
             }[];
         };
+        /** @enum {string} */
+        HrmAppraisalRating: "" | "HTXSNV" | "HTTNV" | "HTNV" | "KHTNV";
+        HrmAppraisalForm: {
+            code: string;
+            name: string;
+            /** @enum {string} */
+            group: "vien_chuc" | "lanh_dao" | "can_bo_xa";
+            criteria: {
+                code: string;
+                group: string;
+                title: string;
+                maximum: string;
+                guide: string;
+            }[];
+            questions?: string[];
+            bands: {
+                minimum: string;
+                rating: components["schemas"]["HrmAppraisalRating"];
+            }[];
+        };
+        HrmAppraisalSummary: {
+            code: string;
+            /** @enum {string} */
+            kind: "MS05" | "MS06";
+            number: string;
+            name: string;
+            title: string;
+            audience: string;
+            signature: string;
+            columns: {
+                key: string;
+                title: string;
+            }[];
+            ratings: {
+                [key: string]: string;
+            };
+        };
+        HrmAppraisalTemplate: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "summary" | "form";
+            code: string;
+            version: number;
+            /** @enum {string} */
+            status: "draft" | "published" | "retired";
+            form?: components["schemas"]["HrmAppraisalForm"];
+            summary?: components["schemas"]["HrmAppraisalSummary"];
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        HrmAppraisalPeriod: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            year: number;
+            quarter: number;
+            /** Format: uuid */
+            node_ref: string;
+            label: string;
+            /** Format: date */
+            cutoff_on: string;
+            /** Format: date-time */
+            known_at: string;
+            /** Format: date-time */
+            self_due_at: string;
+            /** Format: date-time */
+            manager_due_at: string;
+            /** Format: date-time */
+            summary_due_at: string;
+            forms: {
+                [key: string]: components["schemas"]["HrmAppraisalTemplate"];
+            };
+            summaries: {
+                [key: string]: components["schemas"]["HrmAppraisalTemplate"];
+            };
+            self_locked: boolean;
+            manager_locked: boolean;
+            closed: boolean;
+            signed_documents: {
+                [key: string]: string;
+            };
+            warnings: string[];
+            counts: {
+                [key: string]: number;
+            };
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        HrmAppraisalAnswer: {
+            code: string;
+            points: string;
+            note: string;
+        };
+        HrmAppraisalScoring: {
+            answers: components["schemas"]["HrmAppraisalAnswer"][] | null;
+            total: string;
+            suggested: components["schemas"]["HrmAppraisalRating"];
+            complete: boolean;
+        };
+        HrmAppraisalEntryChange: {
+            /** @enum {string} */
+            action: "self_draft" | "self_submit" | "proxy_self" | "manager_draft" | "manager_submit" | "send" | "return" | "official" | "reopen";
+            version: number;
+            answers?: components["schemas"]["HrmAppraisalAnswer"][];
+            self_rating?: components["schemas"]["HrmAppraisalRating"];
+            collective_rating?: components["schemas"]["HrmAppraisalRating"];
+            official_rating?: components["schemas"]["HrmAppraisalRating"];
+            reason?: string;
+            personnel_proposal?: string;
+            note?: string;
+            /** @enum {string} */
+            return_to?: "self" | "manager";
+            /** Format: uuid */
+            proxy_document?: string;
+        };
+        HrmAppraisalItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            version: number;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+            action: string;
+            change_reason?: string;
+            /** @description Chỉ ghép trong bộ nhớ sau audit */
+            name?: string;
+            member: {
+                /** Format: uuid */
+                staff_id: string;
+                /** Format: uuid */
+                subject_ref: string;
+                /** Format: uuid */
+                account_ref: string | null;
+                code: string;
+                staff_type: string;
+                group: string;
+                unit: string;
+                management_unit: string;
+                position: string;
+                position_name: string;
+                position_order: number;
+                unit_name: string;
+                /** @enum {string} */
+                summary_kind: "MS05" | "MS06";
+                excluded_reason?: string;
+            };
+            /** @enum {string} */
+            status: "not_started" | "self_submitted" | "manager_submitted" | "sent" | "change_requested" | "closed";
+            self: components["schemas"]["HrmAppraisalScoring"];
+            manager: components["schemas"]["HrmAppraisalScoring"];
+            self_rating: components["schemas"]["HrmAppraisalRating"];
+            collective_rating: components["schemas"]["HrmAppraisalRating"];
+            official_rating: components["schemas"]["HrmAppraisalRating"];
+            closed_rating: components["schemas"]["HrmAppraisalRating"];
+            reason: string;
+            personnel_proposal: string;
+            note: string;
+            correction_reason: string;
+            returned_to: string;
+            reopened: boolean;
+            /** Format: uuid */
+            proxy_document?: string;
+            /** Format: date-time */
+            self_submitted_at?: string;
+            /** Format: date-time */
+            manager_submitted_at?: string;
+            can_self: boolean;
+            can_manage: boolean;
+            can_center: boolean;
+            self_late: boolean;
+            manager_late: boolean;
+            /** @description Tham chiếu quý đóng băng khi mở đợt năm và giao quyền lịch sử; không suy kết luận năm */
+            quarter_results?: components["schemas"]["HrmAppraisalQuarterResult"][];
+        };
+        HrmAppraisalExport: {
+            /** @description Chỉ PHIEU_DIEM; bố cục/nhãn đóng băng, không có PII */
+            score_layout?: {
+                version: string;
+                title: string;
+                columns: {
+                    key: string;
+                    title: string;
+                }[];
+                ratings: {
+                    [key: string]: string;
+                };
+            };
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            period_version: string;
+            /** @enum {string} */
+            kind: "MS05" | "MS06" | "PHIEU_DIEM";
+            /** @enum {string} */
+            format: "xlsx" | "docx";
+            unit: string;
+            entry_versions: string[];
+            file_name: string;
+            sha256: string;
+            size: number;
+            count: number;
+            status: string;
+            /** Format: uuid */
+            word_run?: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            recorded_at: string;
+        };
+        HrmAppraisalPaper: {
+            period: components["schemas"]["HrmAppraisalPeriod"];
+            template: components["schemas"]["HrmAppraisalSummary"];
+            items: components["schemas"]["HrmAppraisalItem"][];
+        };
+        HrmAppraisalQuarterResult: {
+            quarter: number;
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            entry_version: string;
+            version: number;
+            status: string;
+            rating: components["schemas"]["HrmAppraisalRating"];
+        };
+        KHTCReportSupplement: {
+            /** Format: uuid */
+            id: string;
+            department: string;
+            instruction: string;
+            /** @enum {string} */
+            state: "intent" | "issued" | "fulfilled" | "cancelled" | "failed";
+            /** Format: date-time */
+            due_at: string;
+            /** Format: uuid */
+            native_submission_ref: string | null;
+            return_applied: boolean | null;
+        };
+        KHTCAdhocIndicator: {
+            code: string;
+            name: string;
+            unit: string;
+        };
+        KHTCAdhocRequestInput: {
+            department: string;
+            instruction: string;
+            /** Format: date-time */
+            due_at: string;
+            indicators: components["schemas"]["KHTCAdhocIndicator"][];
+        };
+        KHTCAdhocRequest: {
+            department: string;
+            instruction: string;
+            /** Format: date-time */
+            due_at: string;
+            indicators: components["schemas"]["KHTCAdhocIndicator"][];
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            period_id: string;
+            /** @enum {string} */
+            state: "intent" | "issued" | "fulfilled" | "cancelled" | "failed";
+            overdue: boolean;
+            return_applied: boolean | null;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCAdhocOpenRecovery: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            departments: string[];
+            generation: number;
+            requires_adoption: boolean;
+            can_adopt: boolean;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            lease_expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+        };
         KHTCArchiveRow: {
             /** Format: uuid */
             id: string;
@@ -22154,7 +22916,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            type: "week" | "month" | "quarter" | "year" | "program";
+            type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
             year: number;
             name: string;
             /** Format: date-time */
@@ -22211,6 +22973,7 @@ export interface components {
                 closed: boolean;
                 figures_hash: string | null;
             }[];
+            text?: string;
         };
         KHTCReportSourceValue: {
             Cumulative: string | null;
@@ -22290,7 +23053,7 @@ export interface components {
         KHTCReportData: {
             period: components["schemas"]["KHTCReportPeriod"];
             /** @enum {string} */
-            template: "mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5";
+            template: "mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5" | "adhoc";
             plan: components["schemas"]["KHTCReportPlan"];
             sources: components["schemas"]["KHTCReportSourceRef"] | null;
             metrics: components["schemas"]["KHTCReportSourceMetric"][];
@@ -22307,6 +23070,7 @@ export interface components {
             input_hash: string;
             /** Format: date-time */
             captured_at: string;
+            supplements?: components["schemas"]["KHTCReportSupplement"][];
         };
         KHTCReportAdminField: {
             system: string;
@@ -22325,6 +23089,9 @@ export interface components {
             texts: {
                 [key: string]: string;
             };
+            adhoc?: components["schemas"]["KHTCReportAdhocSelection"];
+            template_snapshot?: components["schemas"]["KHTCFixedTemplateSnapshot"];
+            readonly template_terminal?: string;
         };
         KHTCReportSection: {
             key: string;
@@ -22353,6 +23120,8 @@ export interface components {
             source_changed: boolean;
             source_error: string;
             terminal: string;
+            template_document?: components["schemas"]["KHTCTemplateRendered"];
+            readonly locked_admin?: string[];
         };
         KHTCReportSave: {
             base_version: number;
@@ -22362,6 +23131,7 @@ export interface components {
             texts?: {
                 [key: string]: string;
             };
+            adhoc?: components["schemas"]["KHTCReportAdhocSelection"];
         };
         KHTCReportRefresh: {
             base_version: number;
@@ -22398,6 +23168,10 @@ export interface components {
         };
         KHTCReportExportList: {
             items: components["schemas"]["KHTCReportExport"][];
+        };
+        KHTCReportAdhocSelection: {
+            rows: string[];
+            metrics: string[];
         };
         KHTCReportWord: {
             /** Format: uuid */
@@ -24819,6 +25593,204 @@ export interface components {
             actor_ref: string;
             /** Format: date-time */
             at: string;
+        };
+        /** @enum {string} */
+        KHTCTemplateKey: "mau_1" | "mau_2" | "mau_3" | "mau_4" | "mau_5";
+        KHTCTemplateBinding: {
+            variable: string;
+            /** @enum {string} */
+            source: "plan" | "auto" | "form" | "module" | "calculated" | "admin" | "text";
+            field: string;
+            ref?: string;
+        };
+        KHTCTemplateNode: {
+            id: string;
+            parent: string;
+            order: number;
+            title: string;
+            /** @enum {string} */
+            repeat: "none" | "plan_item" | "program" | "metric" | "commodity" | "form_bullet";
+            /** @enum {string} */
+            tab?: "" | "all" | "previous" | "current";
+            department?: string;
+            preamble?: string;
+            body: string;
+            bindings: components["schemas"]["KHTCTemplateBinding"][];
+            text_slot: boolean;
+            locked_admin: string[];
+        };
+        KHTCTemplateDefinition: {
+            key: components["schemas"]["KHTCTemplateKey"];
+            nodes: components["schemas"]["KHTCTemplateNode"][];
+        };
+        KHTCTemplateVersion: {
+            /** Format: uuid */
+            id: string;
+            key: components["schemas"]["KHTCTemplateKey"];
+            version: number;
+            /** @enum {string} */
+            action: "save" | "restore";
+            definition: components["schemas"]["KHTCTemplateDefinition"];
+            hash: string;
+            /** Format: uuid */
+            restored_from?: string;
+            /** Format: uuid */
+            actor: string;
+            /** Format: date-time */
+            at: string;
+            actor_display: string;
+            rule: string;
+        };
+        KHTCTemplatePublication: {
+            /** Format: uuid */
+            id: string;
+            key: components["schemas"]["KHTCTemplateKey"];
+            sequence: number;
+            /** Format: uuid */
+            version_id: string;
+            version: number;
+            hash: string;
+            /** Format: date-time */
+            applies_from: string;
+            /** Format: uuid */
+            actor: string;
+            /** Format: date-time */
+            at: string;
+            actor_display: string;
+        };
+        KHTCTemplateDetail: {
+            key: components["schemas"]["KHTCTemplateKey"];
+            /** Format: uuid */
+            version_id: string | null;
+            version: number;
+            definition: components["schemas"]["KHTCTemplateDefinition"];
+            hash: string;
+            history: components["schemas"]["KHTCTemplateVersion"][];
+            publications: components["schemas"]["KHTCTemplatePublication"][];
+            editable: boolean;
+            protected_ids: string[];
+            seeded_ids: string[];
+        };
+        KHTCTemplateCatalog: {
+            items: components["schemas"]["KHTCTemplateDetail"][];
+        };
+        KHTCTemplateSave: {
+            base_version: number;
+            definition: components["schemas"]["KHTCTemplateDefinition"];
+            acknowledge_text_loss?: boolean;
+        };
+        KHTCTemplateRestore: {
+            base_version: number;
+            /** Format: uuid */
+            version_id: string;
+            acknowledge_text_loss?: boolean;
+        };
+        KHTCTemplatePublish: {
+            base_version: number;
+            /** Format: uuid */
+            version_id: string;
+            /** Format: date */
+            applies_from: string;
+        };
+        KHTCTemplatePreviewInput: {
+            /** Format: uuid */
+            period_id?: string;
+            /** Format: uuid */
+            version_id?: string | null;
+            definition?: components["schemas"]["KHTCTemplateDefinition"] | null;
+            /** @enum {string} */
+            scenario?: "actual" | "normal" | "no_send" | "unclosed" | "no_activity" | "provisional";
+        };
+        KHTCTemplateSourceRow: {
+            ref: string;
+            parent_ref?: string;
+            program_ref?: string;
+            department?: string;
+            status?: string;
+            values: {
+                [key: string]: string;
+            };
+        };
+        KHTCTemplateContext: {
+            /** Format: uuid */
+            period_id: string;
+            period_name: string;
+            period_type: string;
+            /** Format: date-time */
+            period_start: string;
+            /** Format: uuid */
+            plan_version_id: string;
+            values: {
+                [key: string]: string;
+            };
+            lists: {
+                [key: string]: components["schemas"]["KHTCTemplateSourceRow"][];
+            };
+            texts: {
+                [key: string]: string;
+            };
+            provisional: string[];
+            input_hash: string;
+        };
+        KHTCTemplateToken: {
+            text: string;
+            variable?: string;
+            source?: string;
+            field?: string;
+            locked: boolean;
+        };
+        KHTCTemplateRenderedRow: {
+            ref: string;
+            preamble?: string;
+            status?: string;
+            tokens: components["schemas"]["KHTCTemplateToken"][];
+            preamble_tokens?: components["schemas"]["KHTCTemplateToken"][];
+        };
+        KHTCTemplateRenderedNode: {
+            id: string;
+            parent: string;
+            number: string;
+            title: string;
+            depth: number;
+            processing: string;
+            protected: boolean;
+            seeded: boolean;
+            text_slot: boolean;
+            rows: components["schemas"]["KHTCTemplateRenderedRow"][];
+        };
+        KHTCTemplateRendered: {
+            key: components["schemas"]["KHTCTemplateKey"];
+            nodes: components["schemas"]["KHTCTemplateRenderedNode"][];
+            input_hash: string;
+            provisional: string[];
+        };
+        KHTCTemplatePreview: {
+            context: components["schemas"]["KHTCTemplateContext"];
+            document: components["schemas"]["KHTCTemplateRendered"];
+            definition_hash: string;
+            scenario: string;
+        };
+        /** @description Nguồn mẫu đã ghim trong revision; không chọn lại phiên bản mới khi đọc hoặc xuất lịch sử. */
+        KHTCFixedTemplateSnapshot: {
+            /** @enum {string} */
+            mode: "legacy" | "published";
+            rule: string;
+            /** Format: uuid */
+            id: string;
+            key: components["schemas"]["KHTCTemplateKey"];
+            version: number;
+            hash: string;
+            readonly definition: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            applicable_from: string;
+            /** Format: date-time */
+            legacy_until?: string;
+            word_key: string;
+            word_version: number;
+            word_hash: string;
+            excel_rule: string;
         };
     };
     responses: {
@@ -45014,6 +45986,505 @@ export interface operations {
             422: components["responses"]["Problem"];
         };
     };
+    hrmAppraisalTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "summary" | "form";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mẫu theo phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAppraisalTemplate"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalSaveTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                kind: "summary" | "form";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "draft" | "published" | "retired";
+                    version: number;
+                    form?: components["schemas"]["HrmAppraisalForm"];
+                    summary?: components["schemas"]["HrmAppraisalSummary"];
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmAppraisalTemplate"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalTemplateHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "summary" | "form";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAppraisalTemplate"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalPeriods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Các đợt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAppraisalPeriod"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalOpenPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    year: number;
+                    quarter: number;
+                    /** Format: date */
+                    cutoff_on: string;
+                    /** Format: date-time */
+                    self_due_at: string;
+                    /** Format: date-time */
+                    manager_due_at: string;
+                    /** Format: date-time */
+                    summary_due_at: string;
+                    forms: {
+                        [key: string]: string;
+                    };
+                    summaries: {
+                        [key: string]: string;
+                    };
+                    excluded?: {
+                        /** Format: uuid */
+                        staff_id: string;
+                        reason: string;
+                    }[];
+                    acknowledge_warnings: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Đợt đã mở */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmAppraisalPeriod"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalChangePeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "extend" | "lock_self" | "unlock_self" | "lock_manager" | "unlock_manager" | "send" | "remind" | "attach_signed" | "close";
+                    version: number;
+                    reason?: string;
+                    unit?: string;
+                    /** @enum {string} */
+                    step?: "self" | "manager" | "summary";
+                    /** Format: date-time */
+                    self_due_at?: string;
+                    /** Format: date-time */
+                    manager_due_at?: string;
+                    /** Format: date-time */
+                    summary_due_at?: string;
+                    /** @description Mã tài liệu DocDanhGia; UUID zero để gỡ liên kết có lý do */
+                    signed_documents?: {
+                        [key: string]: string;
+                    };
+                    acknowledge_unsigned?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmAppraisalPeriod"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalEntries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAppraisalItem"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                staff: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chi tiết */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        item: components["schemas"]["HrmAppraisalItem"];
+                        period: components["schemas"]["HrmAppraisalPeriod"];
+                        form: components["schemas"]["HrmAppraisalTemplate"];
+                        history: components["schemas"]["HrmAppraisalItem"][];
+                        history_more: boolean;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalChangeEntry: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period: string;
+                staff: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HrmAppraisalEntryChange"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmAppraisalItem"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalEntryHistory: {
+        parameters: {
+            query?: {
+                before?: string;
+            };
+            header?: never;
+            path: {
+                period: string;
+                staff: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAppraisalItem"][];
+                        more: boolean;
+                        next_before: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalEntryVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                staff: string;
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmAppraisalItem"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalGuestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                staff: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description hrm.appraisal_guest_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalPaper: {
+        parameters: {
+            query?: {
+                unit?: string;
+            };
+            header?: never;
+            path: {
+                period: string;
+                kind: "MS05" | "MS06";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Biểu chụp tại phiên bản hiện tại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmAppraisalPaper"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalExports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lịch sử xuất */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAppraisalExport"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalExport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "MS05" | "MS06" | "PHIEU_DIEM";
+                    /** @enum {string} */
+                    format: "xlsx" | "docx";
+                    version: number;
+                    unit?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Lần xuất */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HrmAppraisalExport"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalExportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                export: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp xuất */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    "X-Content-SHA256"?: string;
+                    "X-Data-Drift"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
     extensionKhtcReportGet: {
         parameters: {
             query?: never;
@@ -45329,6 +46800,210 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocRequestList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCAdhocRequest"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocRequestCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCAdhocRequestInput"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCAdhocRequest"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocRequestReconcile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                requestID: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCAdhocRequest"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocInbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCAdhocRequest"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocOpenRecoveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KHTCAdhocOpenRecovery"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcAdhocOpenReconcile: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_generation: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPeriod"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            428: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };
@@ -49057,6 +50732,202 @@ export interface operations {
             /** @description extension.cnts_diary_photo_invalid */
             422: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcTemplateCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCTemplateCatalog"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcTemplateDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: components["schemas"]["KHTCTemplateKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCTemplateDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcTemplateSave: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: components["schemas"]["KHTCTemplateKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCTemplateSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCTemplateVersion"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcTemplateRestore: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: components["schemas"]["KHTCTemplateKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCTemplateRestore"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCTemplateVersion"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcTemplatePublish: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: components["schemas"]["KHTCTemplateKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCTemplatePublish"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCTemplatePublication"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcTemplatePreview: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                key: components["schemas"]["KHTCTemplateKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KHTCTemplatePreviewInput"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCTemplatePreview"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };

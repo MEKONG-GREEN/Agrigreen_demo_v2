@@ -30,6 +30,9 @@ async function propose(page: Page, name: string) {
 
 test("BG-ITEM-PROPOSAL: menu Tỉnh/Xã → đề xuất → Admin duyệt/từ chối → lịch sử riêng của Xã", async ({ page }) => {
   test.setTimeout(180_000);
+  const journeyNow = new Date();
+  console.info(`BG-ITEM-PROPOSAL clock=${journeyNow.toISOString()} timezone=Asia/Ho_Chi_Minh`);
+  await page.clock.setFixedTime(journeyNow);
   await page.goto("/login");
   await login(page, "admin.mekong@mekonggreen.vn");
   await sidebar(page).getByRole("link", { name: "Phòng ban", exact: true }).click();

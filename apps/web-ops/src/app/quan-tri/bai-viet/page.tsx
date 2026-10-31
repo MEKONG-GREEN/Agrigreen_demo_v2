@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
 import { usePagedList } from "@/api/pagination";
+import { useIdempotentAction } from "@/api/useIdempotentAction";
+import { saveArticleDraft } from "@/admin/articleDraft";
 import type { ApiProblem } from "@/api/problem";
 import type { ContentAdminDocument, ContentCategory, ContentVersion } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
@@ -26,11 +28,6 @@ interface Draft {
   body: string;
 }
 
-async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
-  const d = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 function todayLabel(): string {
   return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date());
 }
@@ -42,6 +39,7 @@ function todayLabel(): string {
  */
 function Editor({ onSaved }: { onSaved: () => void }) {
   const { adminApi } = useAuth();
+  const idem = useIdempotentAction();
   const [d, setD] = useState<Draft>({ title: "", category: "", summary: "", body: "" });
   const [cover, setCover] = useState<File | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -89,43 +87,13 @@ function Editor({ onSaved }: { onSaved: () => void }) {
     setBusy(true);
     setProblem(null);
     setNotice(null);
+    // #172: một lần bấm Lưu nháp = một lượt thao tác; lỗi giữa chừng (mất phản hồi) giữ khóa → bấm lại cùng nội dung/ảnh
+    // được máy chủ phát lại từng bước đã ghi (không tạo tài liệu/ảnh/phiên bản thứ hai).
+    const turn = idem.begin();
     try {
       const input = { title: d.title.trim(), summary: d.summary.trim(), body: d.body, body_format: "markdown" as const, category: d.category || undefined };
-      let ref = doc?.ref ?? null;
-      let version: ContentVersion;
-      if (!ref) {
-        const r = await unwrap(
-          adminApi.POST("/v1/documents", { params: { header: { "Idempotency-Key": newIdempotencyKey() } }, body: { ...input, kind: "news", audience: { level: "national" } } }),
-        );
-        ref = r.document.ref;
-        version = r.version;
-      } else {
-        const r = await unwrap(adminApi.POST("/v1/documents/{ref}/versions", { params: { path: { ref }, header: { "Idempotency-Key": newIdempotencyKey() } }, body: input }));
-        version = r.version;
-      }
-      if (cover) {
-        const bytes = await cover.arrayBuffer();
-        const sha = await sha256Hex(bytes);
-        const att = await unwrap(
-          adminApi.POST("/v1/documents/{ref}/attachments", {
-            params: { path: { ref }, header: { "Idempotency-Key": newIdempotencyKey() } },
-            body: { file: cover as unknown as string, sha256: sha },
-            bodySerializer: (b: { file: string; sha256: string }) => {
-              const fd = new FormData();
-              fd.append("file", b.file as unknown as Blob, cover.name);
-              fd.append("sha256", b.sha256);
-              return fd;
-            },
-          }),
-        );
-        const r = await unwrap(
-          adminApi.POST("/v1/documents/{ref}/versions", {
-            params: { path: { ref }, header: { "Idempotency-Key": newIdempotencyKey() } },
-            body: { ...input, attachments: [{ id: att.id, role: "cover" }] },
-          }),
-        );
-        version = r.version;
-      }
+      const { ref, version } = await saveArticleDraft(adminApi, turn, { ref: doc?.ref ?? null, input, cover });
+      turn.complete();
       setDoc({ ref, version, status: "draft" });
       setDirty(false);
       setNotice(`Đã lưu nháp phiên bản ${version.version_no}.`);

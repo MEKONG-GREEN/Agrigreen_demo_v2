@@ -4,6 +4,7 @@
 // (FN-TI-02.04, Hình 11): thanh tab chương trình; lưới theo mẫu với hàng chữ cái cột và dòng loại cột; ô nhập viền xanh,
 // ô cố định/Từ Kế hoạch năm nền xám, Lũy kế kỳ trước xám nhạt, ô tự tính xanh nhạt, vượt ngưỡng đỏ nhạt; khối "Điều chỉnh
 // kỳ trước"; mục lời văn; kết quả kiểm tra (3 quy tắc); lịch sử gửi.
+import { AdhocAnswer } from "../adhoc/AdhocAnswer";
 import { useMemo, useState } from "react";
 import { StatusPill } from "@/components/patterns/list";
 import { dt, num } from "@/kn/cycle/common";
@@ -88,6 +89,7 @@ export function KhtcFormView({
     return c.dtype === "number" && v ? num(v, 6) : v;
   };
 
+  if(form.supplement) return <AdhocAnswer form={form} content={content} onChange={onChange}/>;
   return (
     <div className="khtc-form">
       {form.grid ? (

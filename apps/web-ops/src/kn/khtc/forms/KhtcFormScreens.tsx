@@ -61,6 +61,10 @@ function FormHead({ f }: { f: KhtcFormSheet }) {
 }
 
 export function KhtcFormEntryScreen() {
+ const {kn}=useAuth();
+ return <FormEntry key={JSON.stringify(kn.context)}/>;
+}
+function FormEntry() {
   const { api } = useAuth();
   const { periodId } = useParams<{ periodId: string }>();
   const dept = useDept();
@@ -124,7 +128,7 @@ export function KhtcFormEntryScreen() {
                         </button>
                         <button
                           className="btn btn-primary"
-                          disabled={act.busy}
+                          disabled={act.busy || !!f.supplement && c.adhoc_request_id!==f.supplement.id}
                           onClick={async () =>
                             apply(
                               await act.run(

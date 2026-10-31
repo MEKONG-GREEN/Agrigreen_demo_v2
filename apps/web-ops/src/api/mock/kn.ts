@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v7";
+export const MENU_VERSION = "kn.menu/v12";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -1269,6 +1269,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/khtc/mau-bao-cao",
             "icon": "table",
             "soon": true
+          },
+          {
+            "key": "tinh.khtc.phat_sinh",
+            "label": "Báo cáo phát sinh",
+            "route": "/kn/khtc/bao-cao-phat-sinh",
+            "icon": "report"
           }
         ]
       },
@@ -1738,8 +1744,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.hcth.danh_gia",
             "label": "Đánh giá",
             "route": "/kn/nhan-su/danh-gia",
-            "icon": "approve",
-            "soon": true
+            "icon": "approve"
           }
         ]
       },
@@ -1829,8 +1834,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "xa.hcth.danh_gia",
             "label": "Đánh giá của tôi",
             "route": "/kn/nhan-su/danh-gia-cua-toi",
-            "icon": "approve",
-            "soon": true
+            "icon": "approve"
           }
         ]
       },
@@ -1933,6 +1937,18 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Báo cáo KHTC",
       "route": "/kn/phong-ban/{department}/bao-cao-khtc",
       "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_phat_sinh",
+      "label": "Báo cáo phát sinh",
+      "route": "/kn/khtc/bao-cao-phat-sinh",
+      "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_muc_luc_mau",
+      "label": "Mục lục mẫu báo cáo",
+      "route": "/kn/phong-ban/{department}/muc-luc-mau",
+      "icon": "report"
     }
   ],
   "thong_tin_truyen_thong": [
@@ -1973,6 +1989,12 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Thư mục tài liệu",
       "route": "/kn/phong-ban/{department}/thu-muc-tai-lieu",
       "icon": "library"
+    },
+    {
+      "key": "admin.pb.hcth_danh_gia",
+      "label": "Đánh giá nhân sự",
+      "route": "/kn/nhan-su/danh-gia",
+      "icon": "approve"
     }
   ]
 };

@@ -83,7 +83,7 @@ func recipients(ds []notifyport.NotificationDraft) []uuid.UUID {
 func TestNotificationRegistrations_NotifyHCTH(t *testing.T) {
 	kindShape := regexp.MustCompile(`^[a-z][a-z_]{0,39}$`)
 	kinds := NotificationKinds().Kinds
-	if !slices.Equal(kinds, []string{port.KindPromotionDue, port.KindPlanReminder}) {
+	if !slices.Equal(kinds, []string{port.KindPromotionDue, port.KindPlanReminder, port.KindAppraisal}) {
 		t.Fatalf("kinds: %v", kinds)
 	}
 	for _, k := range kinds {
@@ -96,7 +96,7 @@ func TestNotificationRegistrations_NotifyHCTH(t *testing.T) {
 		t.Fatalf("consumer: %+v", defs)
 	}
 	events := defs[0].Events
-	if !slices.Equal(events, []string{port.EventPromotionDueDetected, port.EventPlanReminded}) {
+	if !slices.Equal(events, []string{port.EventPromotionDueDetected, port.EventPlanReminded, port.EventAppraisalChanged}) {
 		t.Fatalf("events: %v", events)
 	}
 	for _, e := range events {

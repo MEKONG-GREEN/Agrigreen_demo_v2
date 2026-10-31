@@ -67,10 +67,11 @@ func upper(s string) string { return strings.ToUpper(norm.NFC.String(strings.Tri
 // ParseBM03 tìm dòng tiêu đề cột (ô đầu "STT" và có cột "VIÊN CHỨC") trong headerScanRows dòng đầu, đọc tháng ở tiêu đề
 // và các dòng viên chức tới dòng "TC"/"TỔNG CỘNG". ok = false: không phải bố cục BM-03. Lỗi chỉ khi vượt giới hạn.
 func ParseBM03(rows [][]string) (ImportSheet, bool, error) {
-	at, cols := -1, bm03Cols{}
+	// hdr giữ chính dòng tiêu đề tìm được, không đánh chỉ số lại rows[at] sau vòng lặp.
+	at, cols, hdr := -1, bm03Cols{}, []string(nil)
 	for i := 0; i < len(rows) && i < headerScanRows; i++ {
 		if c, ok := headerCols(rows[i]); ok {
-			at, cols = i, c
+			at, cols, hdr = i, c, rows[i]
 			break
 		}
 	}
@@ -98,7 +99,6 @@ func ParseBM03(rows [][]string) (ImportSheet, bool, error) {
 			}
 		}
 	}
-	hdr := rows[at]
 	for d := 1; d <= 31; d++ {
 		j := cols.day + d - 1
 		if j >= len(hdr) || j >= MaxImportCols || strings.TrimSpace(hdr[j]) == "" {

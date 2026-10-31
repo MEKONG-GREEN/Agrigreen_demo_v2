@@ -55,9 +55,12 @@ type Adjustment struct {
 
 // Sheet là nội dung bảng số liệu (nháp hoặc niêm phong).
 type Sheet struct {
-	Cells       map[string]CellInput `json:"cells"`
-	Adjustments []Adjustment         `json:"adjustments"`
-	Texts       map[string]string    `json:"texts"`
+	AdhocValues    map[string]string    `json:"adhoc_values,omitempty"`
+	AdhocText      string               `json:"adhoc_text,omitempty"`
+	AdhocRequestID string               `json:"adhoc_request_id,omitempty"`
+	Cells          map[string]CellInput `json:"cells"`
+	Adjustments    []Adjustment         `json:"adjustments"`
+	Texts          map[string]string    `json:"texts"`
 }
 
 // Giới hạn kích thước.
@@ -71,7 +74,14 @@ const (
 
 // Normalize cắt khoảng trắng, bỏ dòng trống, bảo đảm map/mảng không nil (để băm ổn định).
 func (s Sheet) Normalize() Sheet {
-	out := Sheet{Cells: map[string]CellInput{}, Adjustments: []Adjustment{}, Texts: map[string]string{}}
+	out := Sheet{AdhocRequestID: strings.ToLower(strings.TrimSpace(s.AdhocRequestID)), Cells: map[string]CellInput{}, Adjustments: []Adjustment{}, Texts: map[string]string{}}
+	out.AdhocText = strings.TrimSpace(s.AdhocText)
+	if len(s.AdhocValues) > 0 {
+		out.AdhocValues = map[string]string{}
+		for k, v := range s.AdhocValues {
+			out.AdhocValues[strings.TrimSpace(k)] = strings.TrimSpace(v)
+		}
+	}
 	for k, c := range s.Cells {
 		c = CellInput{Done: strings.TrimSpace(c.Done), Status: strings.TrimSpace(c.Status), Content: strings.TrimSpace(c.Content),
 			People: strings.TrimSpace(c.People), Budget: strings.TrimSpace(c.Budget)}

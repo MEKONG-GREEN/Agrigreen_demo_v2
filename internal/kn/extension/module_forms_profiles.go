@@ -52,8 +52,9 @@ func FormProfiles() []formsport.Profile {
 	// hủy kỳ; Cấp Tỉnh các phòng khác nộp phiếu của phòng mình. Tối đa 3 lần gửi, lần 3 tự khóa (FN-TI-02.03 — Q-081 đề
 	// xuất "tối đa 3, tham số"). KHTC không mở lại kỳ đã đóng: route mở lại vẫn có nhưng màn KHTC (W11.62) không dùng.
 	planning := formsport.Profile{
-		Name:      "kn_khtc",
-		Hierarchy: []string{"TINH", "PHONG"},
+		AuthorizeOperation: extport.AuthorizeKHTCOperation,
+		Name:               "kn_khtc",
+		Hierarchy:          []string{"TINH", "PHONG"},
 		Roles: map[string]string{
 			extport.SessionRoleProvince + "@" + partyport.DeptKeHoachTaiChinh: "TINH",
 			extport.SessionRoleProvince:                                       "PHONG",

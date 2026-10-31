@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetPriceItems } from "@/api/mock/kn-price-items";
@@ -26,7 +26,13 @@ async function asRole(role: "kn_tinh" | "kn_xa") {
   auth.api = createApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${persona}`, getContextId: () => context.context_id, fetch: mockFetchNoDelay });
 }
 
-beforeEach(() => resetPriceItems());
+const journeyNow = new Date();
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(journeyNow);
+  resetPriceItems();
+});
+afterEach(() => vi.useRealTimers());
 
 it("route Đề xuất mở ngay danh sách cho Cấp Tỉnh, vẫn dùng màn và quyền hiện hành", async () => {
   await asRole("kn_tinh");

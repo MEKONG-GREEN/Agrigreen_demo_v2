@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -75,7 +76,7 @@ func TestParseBM03NotLayout(t *testing.T) {
 	for i := 0; i <= MaxImportRows; i++ {
 		rows = append(rows, []string{"", "Lò mổ Hòa Bình", "", "Trần Văn Một", "", "N"})
 	}
-	if _, _, err := ParseBM03(rows); err != ErrTooManyRows {
+	if _, _, err := ParseBM03(rows); !errors.Is(err, ErrTooManyRows) {
 		t.Fatalf("quá số dòng: %v", err)
 	}
 }

@@ -76,8 +76,6 @@ type bm11Who struct {
 	recipient string // nơi nhận của người gọi (bgd | hcth | khtc), rỗng nếu không phải phòng nhận
 }
 
-func (w bm11Who) admin() bool { return w.a.k.Role == knport.SessionRoleAdmin }
-
 // writer: Cấp Tỉnh CNTS, không chế độ chỉ xem.
 func (w bm11Who) writer() bool {
 	return w.a.k.Role == knport.SessionRoleProvince && w.a.k.Department == domain.DeptChanNuoiThuySan && !w.a.k.ReadOnly()

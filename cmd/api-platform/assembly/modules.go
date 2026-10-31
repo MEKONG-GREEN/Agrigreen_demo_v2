@@ -354,7 +354,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	ct.UseStaff(KNContactStaff{Dir: hr.Directory()}, KNContactLabels{Units: acc.InternalUnits(), AdminUnits: knUnits})
 	kn.UseContactNames(ct.Names())
 	// W10.17: cap/export — Word KHTC Mẫu 1–5 (mẫu có phiên bản, lần xuất có băm, số văn bản {n}/BC-TTKN).
-	exp, err := wireExport(unit, clk, kn)
+	exp, err := wireExport(unit, clk, kn, hr)
 	if err != nil {
 		return Modules{}, pools, err
 	}

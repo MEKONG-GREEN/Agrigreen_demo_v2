@@ -84,6 +84,8 @@ type InboxRow struct {
 	// SupplementNote: nội dung yêu cầu bổ sung mới nhất (chỉ khi phiếu đang "Yêu cầu bổ sung").
 	SupplementNote string
 	Late           bool
+	NativeLate     *bool
+	RequestState   string
 }
 
 // InboxCounts là nhãn đếm trên đầu danh sách.
@@ -185,7 +187,14 @@ func (s *Service) DepartmentForms(ctx context.Context, q InboxQuery) (Inbox, err
 	now := s.now()
 	admin := c.k.Role == extport.SessionRoleAdmin
 	for _, p := range ps {
-		row, ok := s.inboxRow(ctx, p, evs[p.ID], dept, now, in.ReadOnly, admin)
+		if p.Type == domain.TypeAdhoc && (in.ReadOnly || admin && !c.p.MFA) {
+			continue
+		}
+		requests, e := s.activeRequests(ctx, c, p)
+		if e != nil {
+			return Inbox{}, e
+		}
+		row, ok := s.inboxRow(ctx, p, evs[p.ID], dept, now, in.ReadOnly, admin, requests[dept])
 		if !ok {
 			continue
 		}
@@ -232,13 +241,17 @@ func (s *Service) DepartmentForms(ctx context.Context, q InboxQuery) (Inbox, err
 }
 
 // inboxRow chiếu phiếu của phòng dept trong kỳ p. false: kỳ đã hủy (phiếu bị gỡ) hoặc người gọi không đọc được phiếu.
-func (s *Service) inboxRow(ctx context.Context, p store.Period, evs []store.Event, dept string, now time.Time, readOnly, admin bool) (InboxRow, bool) {
+func (s *Service) inboxRow(ctx context.Context, p store.Period, evs []store.Event, dept string, now time.Time, readOnly, admin bool, request *store.AdhocRequest) (InboxRow, bool) {
 	term := terminalOf(evs)
 	if term == domain.PeriodCancelled {
 		return InboxRow{}, false
 	}
 	row := InboxRow{Period: p}
 	row.DueAt, _ = deadlinesOf(p, evs)
+	if request != nil {
+		row.DueAt = request.DueAt
+		row.RequestState = request.State
+	}
 	overdue := now.After(row.DueAt)
 	prog, err := s.Control.Progress(ctx, domain.ProfileKHTC, p.FormsPeriodRef)
 	if err != nil {
@@ -263,6 +276,14 @@ func (s *Service) inboxRow(ctx context.Context, p store.Period, evs []store.Even
 	if row.Form.State == domain.FormSupplement {
 		row.SupplementNote = u.ReviewNote
 	}
+	if request != nil {
+		row.SupplementNote = request.Instruction
+		projected := FormRow{View: row.Form, Late: row.Late}
+		projectAdhocRequest(&projected, request, u, term)
+		row.Form = projected.View
+		row.Late = projected.Late
+		row.NativeLate = projected.NativeLate
+	}
 	// Trạng thái kỳ phía phòng: chỉ cần biết kỳ còn nhận phiếu hay đã đóng (đủ dữ liệu/nguồn là việc của KHTC).
 	row.PeriodState = domain.PeriodOpened
 	switch {
@@ -272,6 +293,10 @@ func (s *Service) inboxRow(ctx context.Context, p store.Period, evs []store.Even
 		row.PeriodState = domain.PeriodLate
 	}
 	row.Action, row.NeedsAction = actionOf(row.Form.State, readOnly)
+	if request != nil && request.State == "intent" {
+		row.Action = ActionView
+		row.NeedsAction = false
+	}
 	row.EntryRoute = EntryRoute(p.ID, dept, admin)
 	return row, true
 }
