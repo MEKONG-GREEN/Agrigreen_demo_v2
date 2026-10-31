@@ -1067,19 +1067,19 @@ func TestRB3ErasureEvidenceUnreadable(t *testing.T) {
 // buộc dòng household có address NULL; họ tên/SĐT người đại diện, chủ hộ ở vault (person_ref). Không đổi tên được: bảng sổ
 // (row_hash băm to_jsonb(dòng), ADR-0012) và migration đã áp (R-24). Miễn đúng cột này, đúng cây partition của kn_producer
 // và CHỈ khi ràng buộc org-only còn chặn address của Nông hộ. KN-PRODUCER-ORG-ADDRESS-GUARD-001 chứng minh không che gì khác.
+//
+// Mọi ngoại lệ trên khớp bảng theo OID (format('%I.%I', schema, bảng)::regclass so với pg_partition_tree(...).relid),
+// không theo relname: partition ở schema khác trùng tên một bảng ngoài cây không được làm bảng đó được miễn (#185 vòng 3).
 const piiColumnQuery = `SELECT table_schema, table_name, column_name FROM information_schema.columns
 	  WHERE (table_schema LIKE 'pf\_%' OR table_schema = 'shared')
 	    AND column_name ~* '(full_?name|phone|national_?id|cccd|address|dia_chi|ho_ten)'
       AND NOT (table_schema = 'pf_contact' AND column_name IN ('phone', 'address')
-       AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_contact.unit'::regclass) p
-        JOIN pg_class c ON c.oid = p.relid))
+       AND format('%I.%I', table_schema, table_name)::regclass IN (SELECT p.relid FROM pg_partition_tree('pf_contact.unit'::regclass) p))
       AND NOT (table_schema = 'pf_price' AND column_name = 'has_phone' AND data_type = 'boolean'
-       AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_price.survey_form'::regclass) p
-        JOIN pg_class c ON c.oid = p.relid))
+       AND format('%I.%I', table_schema, table_name)::regclass IN (SELECT p.relid FROM pg_partition_tree('pf_price.survey_form'::regclass) p))
       AND NOT (table_schema = 'pf_extension' AND column_name = 'address'
-       AND table_name IN (SELECT c.relname FROM pg_partition_tree('pf_extension.kn_producer'::regclass) p
-        JOIN pg_class c ON c.oid = p.relid
-        WHERE EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid = c.oid AND k.convalidated
+       AND format('%I.%I', table_schema, table_name)::regclass IN (SELECT p.relid FROM pg_partition_tree('pf_extension.kn_producer'::regclass) p
+        WHERE EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid = p.relid AND k.convalidated
          AND k.conname = 'kn_producer_org_only' AND k.contype = 'c'
          AND pg_get_constraintdef(k.oid) = '` + knProducerOrgOnlyDef + `'))
        AND EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conrelid = 'pf_extension.kn_producer'::regclass
@@ -1292,4 +1292,41 @@ func TestKNProducerOrgAddressDoesNotHidePII(t *testing.T) {
 			}
 		})
 	}
+
+	// Ngoại lệ khớp bảng theo OID, không theo tên (#185 vòng 3): partition thật của kn_producer nằm ở schema khác, trùng
+	// tên một bảng pf_extension NGOÀI cây có cột address. Cha và partition đều giữ CHECK đúng, validated; bảng ngoài cây
+	// vẫn phải bị bắt, còn kn_producer và partition gốc vẫn được miễn.
+	t.Run("cross_schema_name_collision", func(t *testing.T) {
+		ctx := context.Background()
+		tx, err := s.AdminPF().Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		if _, err := tx.Exec(ctx, `CREATE SCHEMA kn185_collision_ns;
+		  CREATE TABLE kn185_collision_ns.kn185_collision PARTITION OF pf_extension.kn_producer
+		    FOR VALUES FROM ('2999-01-01') TO ('2999-02-01');
+		  CREATE TABLE pf_extension.kn185_collision (address text)`); err != nil {
+			t.Fatal(err)
+		}
+		var inTree, guarded bool
+		if err := tx.QueryRow(ctx, `SELECT
+		    EXISTS (SELECT 1 FROM pg_partition_tree('pf_extension.kn_producer'::regclass)
+		      WHERE relid = 'kn185_collision_ns.kn185_collision'::regclass),
+		    EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'kn185_collision_ns.kn185_collision'::regclass
+		      AND conname = 'kn_producer_org_only' AND contype = 'c' AND convalidated
+		      AND pg_get_constraintdef(oid) = '`+knProducerOrgOnlyDef+`')`).Scan(&inTree, &guarded); err != nil {
+			t.Fatal(err)
+		}
+		if !inTree || !guarded {
+			t.Fatalf("dựng probe sai: partition khác schema trong cây=%v, có CHECK org-only validated=%v", inTree, guarded)
+		}
+		got := flaggedIn(t, tx)
+		if !got["kn185_collision.address"] {
+			t.Fatalf("bảng pf_extension ngoài cây trùng tên partition khác schema phải bị bắt: %v", got)
+		}
+		if got["kn_producer.address"] || got[parts[0]+".address"] {
+			t.Fatalf("ngoại lệ địa chỉ tổ chức của kn_producer phải còn hiệu lực: %v", got)
+		}
+	})
 }
