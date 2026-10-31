@@ -159,8 +159,10 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			leaves(g.Items)
 		}
 		admin := domain.AdminDepartmentItems(port.MenuProfileGeneric, code)
-		if code == port.DeptThongTinTruyenThong { // W11.72: Xã báo giá, Kỳ báo giá & giờ khóa đã mở; Mặt hàng Sắp có
-			if n := len(admin); admin[n-3].ComingSoon || admin[n-2].Route != "/kn/phong-ban/"+code+"/bao-gia-lich" || !admin[n-1].ComingSoon {
+		if code == port.DeptThongTinTruyenThong { // W11.72/BG-ITEM-PROPOSAL: Xã báo giá, Kỳ báo giá và Mặt hàng đều đã mở.
+			if n := len(admin); admin[n-3].ComingSoon || admin[n-2].Route != "/kn/phong-ban/"+code+"/bao-gia-lich" ||
+				admin[n-1].Key != "admin.pb.bao_gia_mat_hang" || admin[n-1].ComingSoon ||
+				admin[n-1].Route != "/kn/bao-gia/mat-hang" || !implementedMenu[admin[n-1].Key] {
 				t.Fatalf("%s: mục Admin Báo giá: %+v", code, admin[n-3:])
 			}
 			continue
