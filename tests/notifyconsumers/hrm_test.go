@@ -34,10 +34,28 @@ func TestAssemblyAddsHRMConsumerKindsBuilders_NotifyHCTH(t *testing.T) {
 	if len(got) != len(legacy)+2 || !reflect.DeepEqual(got[:len(legacy)], legacy) {
 		t.Fatalf("danh mục consumer cũ bị đổi:\n%v", got)
 	}
+	wantHRMEvents := []string{hrmport.EventPromotionDueDetected, hrmport.EventPlanReminded, hrmport.EventAppraisalChanged}
 	last := got[len(legacy)]
 	if last.Name != hrmport.NotifyConsumerHRM || last.Order != hrmport.NotifyConsumerHRMOrder ||
-		!slices.Equal(last.Events, []string{hrmport.EventPromotionDueDetected, hrmport.EventPlanReminded}) {
+		!slices.Equal(last.Events, wantHRMEvents) {
 		t.Fatalf("consumer HRM: %+v", last)
+	}
+	var hrmBuilders []port.EventBuilderRegistration
+	for _, registration := range deps.Builders {
+		if slices.ContainsFunc(registration.Events, func(event string) bool {
+			return slices.Contains(wantHRMEvents, event)
+		}) {
+			hrmBuilders = append(hrmBuilders, registration)
+		}
+	}
+	if len(hrmBuilders) != 3 {
+		t.Fatalf("HRM phải có đúng 3 builder, có %d", len(hrmBuilders))
+	}
+	for i, event := range wantHRMEvents {
+		registration := hrmBuilders[i]
+		if !slices.Equal(registration.Events, []string{event}) || registration.Build == nil || registration.Plan != nil {
+			t.Fatalf("builder HRM %d: events=%v Build=%t Plan=%t", i, registration.Events, registration.Build != nil, registration.Plan != nil)
+		}
 	}
 	var kinds []string
 	for _, r := range assembly.NotificationKinds() {
