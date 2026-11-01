@@ -59,12 +59,13 @@ func (s *Service) VaccinationMatrix(ctx context.Context, q MatrixQuery) (Matrix,
 	if q.From != nil && q.To != nil && q.To.Before(*q.From) {
 		return Matrix{}, problem422("received_to", "không trước received_from")
 	}
+	// Lứa đã hủy bị loại TRONG truy vấn, trước giới hạn MaxMatrixRows — lọc sau giới hạn để nhiều lịch hủy mới hơn chiếm hết
+	// chỗ, bảng mất lứa còn hiệu lực và truncated sai (Codex #168 tại bac5631d).
 	views, truncated, err := s.listBatches(ctx, c, BatchQuery{Commune: q.Commune, ModelType: q.ModelType, Project: q.Project, Site: q.Site,
-		From: q.From, To: q.To, Limit: domain.MaxMatrixRows})
+		From: q.From, To: q.To, Limit: domain.MaxMatrixRows, ExcludeCancelled: true})
 	if err != nil {
 		return Matrix{}, err
 	}
-	views = slices.DeleteFunc(views, func(v BatchView) bool { return v.Event == domain.BatchCancelled })
 	slices.SortStableFunc(views, func(a, b BatchView) int {
 		if a.CommuneCode != b.CommuneCode {
 			return strings.Compare(a.CommuneCode, b.CommuneCode)

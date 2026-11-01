@@ -282,9 +282,12 @@ type BatchFilter struct {
 	Households      []uuid.UUID
 	Project, Site   *uuid.UUID // dự án / điểm của hộ mô hình (bản hiện hành của sổ W11.47)
 	Status          string     // trạng thái suy diễn tại Today (domain.StatusOf); rỗng = mọi
-	Today           time.Time
-	After           *BatchCursor // phân trang khóa: lứa đứng sau con trỏ theo thứ tự trả về
-	Limit           int
+	// ExcludeCancelled bỏ lứa đã hủy (bảng/Excel BM-07) — áp trong truy vấn trước LIMIT để lịch hủy không chiếm chỗ lứa còn
+	// hiệu lực (Codex #168 tại bac5631d).
+	ExcludeCancelled bool
+	Today            time.Time
+	After            *BatchCursor // phân trang khóa: lứa đứng sau con trỏ theo thứ tự trả về
+	Limit            int
 }
 
 // BatchCursor là vị trí của một lứa theo thứ tự ListBatches (ngày nhận giống giảm dần, mã lứa tăng dần).
@@ -339,8 +342,10 @@ func ListBatches(ctx context.Context, tx pgx.Tx, f BatchFilter) ([]Batch, error)
 	      WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(b.doses) d WHERE d->>'actual' IS NULL) THEN '`+domain.StatusDone+`'
 	      ELSE '`+domain.StatusOpen+`' END)
 	    AND ($15::date IS NULL OR b.received_date < $15::date OR (b.received_date = $15::date AND b.batch_ref > $16::uuid))
+	    AND (NOT $17 OR b.event <> '`+domain.BatchCancelled+`')
 	  ORDER BY received_date DESC, batch_ref LIMIT $7`, f.All, communes, f.Commune, f.Household, date(f.From), date(f.To), f.Limit,
-		f.ModelType, f.LimitHouseholds, households, f.Project, f.Site, f.Status, f.Today.Format(time.DateOnly), afterDate, afterRef)
+		f.ModelType, f.LimitHouseholds, households, f.Project, f.Site, f.Status, f.Today.Format(time.DateOnly), afterDate, afterRef,
+		f.ExcludeCancelled)
 	if err != nil {
 		return nil, err
 	}

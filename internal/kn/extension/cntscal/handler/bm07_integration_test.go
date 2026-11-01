@@ -337,6 +337,67 @@ func TestBM07_FiltersAndAlertsBeyondCap(t *testing.T) {
 	}
 }
 
+// Codex #168 [P2] (CHANGES tại bac5631d): 500 lứa GA_TP cùng xã đã HỦY, nhận giống mới hơn — bảng BM-07 và tệp Excel vẫn có
+// lứa còn hiệu lực (điều kiện chưa hủy áp trong truy vấn trước giới hạn 500), truncated tính trên tập chưa hủy (trước đây:
+// rows: [], truncated: true). Danh sách lịch hủy (lọc status=cancelled) vẫn liệt kê đủ.
+func TestBM07_CancelledBeforeLimit(t *testing.T) {
+	f := newFix(t)
+	ctx := context.Background()
+	chu, officer := f.user(tinh("chu_nhiem")), f.user(xa("30001"))
+	href, _ := bm07Household(t, f, chu, officer)
+	b := want(t, chu.post(cb+"vaccination-batches", map[string]any{"household_ref": href, "received_date": "2027-09-01", "age_at_receipt": 1}),
+		201, "", "lứa còn hiệu lực")
+	bref := str(b, "ref")
+	tx, err := f.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	received := time.Date(2027, 10, 12, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < caldomain.MaxMatrixRows; i++ {
+		id := ids.New()
+		x := calstore.Batch{Meta: calstore.Meta{ID: ids.New(), EventTime: t0, ActorRef: chu.ref, IdemKey: "cancel-" + id.String()}, Ref: id,
+			Event: caldomain.BatchCancelled, CommuneCode: "30001", ModelType: "GA_TP", Schedule: "QT_GA",
+			ScheduleValidFrom: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), Locality: "Lứa đã hủy", Received: received, AgeAtReceipt: 1,
+			StatusReason: "Hủy thử", Doses: caldomain.GenerateDoses([]caldomain.PlanDose{{Vaccine: "VX_ND_F", Shot: 1, AgeDays: 3}}, received, 1)}
+		if err := calstore.InsertBatch(ctx, tx, f.tenant, &x); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	mx := want(t, chu.get(cb+"vaccination-matrix?model_type_code=GA_TP"), 200, "", "bảng sau 500 lứa hủy")
+	if rows := list(mx, "rows"); len(rows) != 1 || str(rows[0].(map[string]any), "ref") != bref || mx["truncated"] != false {
+		t.Errorf("bảng BM-07 sau 500 lứa hủy mới hơn: %d hàng, truncated=%v (muốn 1 hàng, false)", len(rows), mx["truncated"])
+	}
+	x := chu.get(cb + "vaccination-matrix/xlsx?model_type_code=GA_TP")
+	if x.status != http.StatusOK {
+		t.Fatalf("xuất Excel: %d %.200s", x.status, x.raw)
+	}
+	xf, err := excelize.OpenReader(bytes.NewReader(x.raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = xf.Close() }()
+	sh := xf.GetSheetName(0)
+	cell := func(ref string) string {
+		v, err := xf.GetCellValue(sh, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	if cell("A4") != "1" || cell("E4") != "01/09/2027" || cell("A5") != "" || !strings.Contains(cell("A6"), "· 1 hộ ·") || cell("A7") != "" {
+		t.Errorf("Excel BM-07 sau 500 lứa hủy: A4=%q E4=%q A5=%q A6=%q A7=%q", cell("A4"), cell("E4"), cell("A5"), cell("A6"), cell("A7"))
+	}
+	// Tab lịch hủy vẫn liệt kê lứa hủy.
+	if l := list(want(t, chu.get(cb+"vaccination-batches?status=cancelled&model_type_code=GA_TP&limit=500"), 200, "", "danh sách lịch hủy"),
+		"items"); len(l) != caldomain.MaxMatrixRows {
+		t.Fatalf("danh sách lịch hủy: %d, muốn %d", len(l), caldomain.MaxMatrixRows)
+	}
+}
+
 // vaccineAlerts đếm cảnh báo mũi quá hạn của lứa bref có tiêu đề chứa like, theo điều kiện trạng thái cond.
 func (f *fix) vaccineAlerts(bref, like, cond string) int {
 	f.t.Helper()

@@ -90,6 +90,9 @@ type BatchQuery struct {
 	Status    string     // open | overdue | done | cancelled | "" (mọi)
 	From, To  *time.Time
 	Limit     int
+	// ExcludeCancelled: bỏ lứa đã hủy trong truy vấn, trước giới hạn số lứa (bảng/Excel BM-07). Danh sách lứa (tab lịch hủy)
+	// không đặt cờ này.
+	ExcludeCancelled bool
 }
 
 // ListBatches liệt kê lứa trong phạm vi (bản hiện hành, trạng thái suy diễn).
@@ -120,7 +123,7 @@ func (s *Service) listBatches(ctx context.Context, c caller, q BatchQuery) ([]Ba
 	// dưới giữ làm phòng thủ, cùng điều kiện.
 	f := store.BatchFilter{All: c.admin() || c.k.Scope.All, Communes: c.k.Scope.Units, Commune: strings.TrimSpace(q.Commune),
 		Household: q.Household, ModelType: strings.TrimSpace(q.ModelType), From: q.From, To: q.To, Project: q.Project, Site: q.Site,
-		Status: q.Status, Today: s.today(), Limit: q.Limit}
+		Status: q.Status, ExcludeCancelled: q.ExcludeCancelled, Today: s.today(), Limit: q.Limit}
 	if c.k.Role == knport.SessionRoleCommune && (len(c.k.Facilities) > 0 || len(c.k.Households) > 0) {
 		f.LimitHouseholds, f.Households = true, c.k.Households
 	}
@@ -148,7 +151,7 @@ func (s *Service) listBatches(ctx context.Context, c caller, q BatchQuery) ([]Ba
 			continue
 		}
 		v := s.view(c, b)
-		if q.Status != "" && v.Status != q.Status {
+		if (q.Status != "" && v.Status != q.Status) || (q.ExcludeCancelled && b.Event == domain.BatchCancelled) {
 			continue
 		}
 		if b.HouseholdRef != nil {
