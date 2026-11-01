@@ -514,3 +514,74 @@ func TestBM07_ManualCloseNotReraised(t *testing.T) {
 		t.Fatalf("cảnh báo theo ngày dự kiến mới: %d", n)
 	}
 }
+
+// Codex #168 [P2] (CHANGES tại 48e9258e): 2.000 cảnh báo mở CŨ HƠN vẫn quá hạn từng chiếm trọn cửa sổ cố định của bước tự đóng —
+// cảnh báo mới hơn của lịch đã hủy và của mũi đã tiêm không bao giờ được xét (vẫn mở 2 + 2, muốn 0). Bước tự đóng đi hết các
+// trang theo con trỏ (raised_at, alert_ref); 2.000 cảnh báo cũ còn quá hạn vẫn mở (không đóng nhầm), job lặp không sinh trùng.
+func TestBM07_ResolvedAlertsBeyondOpenWindow(t *testing.T) {
+	f := newFix(t)
+	ctx := context.Background()
+	chu := f.user(tinh("chu_nhiem"))
+	tx, err := f.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	received := time.Date(2027, 10, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < 2000; i++ {
+		id := ids.New()
+		x := calstore.Batch{Meta: calstore.Meta{ID: ids.New(), EventTime: t0, ActorRef: chu.ref, IdemKey: "open-cap-" + id.String()}, Ref: id,
+			Event: caldomain.BatchCreated, CommuneCode: "30001", ModelType: "GA_TP", Schedule: "QT_GA",
+			ScheduleValidFrom: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC), Locality: "Lứa cũ còn quá hạn", Received: received, AgeAtReceipt: 1,
+			Doses: caldomain.GenerateDoses([]caldomain.PlanDose{{Vaccine: "VX_ND_F", Shot: 1, AgeDays: 3}}, received, 1)}
+		if err := calstore.InsertBatch(ctx, tx, f.tenant, &x); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	oldOpen := `SELECT count(*) FROM pf_extension.cnts_alert_current WHERE tenant_id = $1 AND kind = 'vaccine_overdue' AND status <> 'closed'
+	    AND title LIKE '%Lứa cũ còn quá hạn%'`
+	for i := 0; i < 4; i++ { // giới hạn 500 cảnh báo mới mỗi lượt
+		if n := f.jobVaccines(t0.Add(time.Duration(i) * 5 * time.Minute)); n != 500 {
+			t.Fatalf("lượt %d gieo cảnh báo cũ: %d, muốn 500", i, n)
+		}
+	}
+	if n := f.count(oldOpen, f.tenant); n != 2000 {
+		t.Fatalf("cảnh báo cũ đang mở: %d, muốn 2000", n)
+	}
+	lua := func(name string) string {
+		return str(want(t, chu.post(cb+"vaccination-batches", map[string]any{"commune_code": "30001", "model_type_code": "GA_TP", "locality": name,
+			"received_date": "2027-10-01", "age_at_receipt": 1}), 201, "", name), "ref")
+	}
+	cancelled, vaccinated := lua("Lứa sẽ hủy"), lua("Lứa sẽ tiêm")
+	if n := f.jobVaccines(t0.Add(25 * time.Minute)); n != 4 { // mỗi lứa: ND_F L1 dự kiến 03/10, Gumboro L1 dự kiến 07/10
+		t.Fatalf("cảnh báo của hai lứa mới: %d, muốn 4", n)
+	}
+	want(t, chu.post(cb+"vaccination-batches/"+cancelled+"/cancel", map[string]any{"base_version": 1, "reason": "Hủy lứa theo xác nhận của cán bộ"}),
+		200, "", "hủy lịch")
+	want(t, chu.post(cb+"vaccination-batches/"+vaccinated+"/doses", map[string]any{"base_version": 1, "doses": []map[string]any{
+		{"vaccine_code": "VX_ND_F", "shot": 1, "actual_date": "2027-10-04"}, {"vaccine_code": "VX_GUMBORO", "shot": 1, "actual_date": "2027-10-08"}}}),
+		200, "", "ghi ngày tiêm thực tế")
+	if n := f.jobVaccines(t0.Add(30 * time.Minute)); n != 0 {
+		t.Fatalf("job sau hủy/tiêm sinh cảnh báo mới: %d", n)
+	}
+	for _, ref := range []string{cancelled, vaccinated} {
+		if n := f.vaccineAlerts(ref, "", "status <> 'closed'"); n != 0 {
+			t.Errorf("RESOLVED ALERT STARVED: lứa %s còn mở %d cảnh báo đã hết vi phạm, muốn 0", ref, n)
+		}
+		if n := f.vaccineAlerts(ref, "", "status = 'closed' AND auto_closed"); n != 2 {
+			t.Errorf("lứa %s: tự đóng %d, muốn 2", ref, n)
+		}
+	}
+	if n := f.count(oldOpen, f.tenant); n != 2000 {
+		t.Fatalf("cảnh báo cũ còn quá hạn bị đóng nhầm: còn mở %d, muốn 2000", n)
+	}
+	if n := f.jobVaccines(t0.Add(35 * time.Minute)); n != 0 {
+		t.Fatalf("job lặp sinh trùng: %d", n)
+	}
+	if n := f.count(oldOpen, f.tenant); n != 2000 {
+		t.Fatalf("cảnh báo cũ sau job lặp: %d, muốn 2000", n)
+	}
+}

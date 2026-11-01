@@ -32,7 +32,7 @@ import (
 const (
 	vaccineBatchPage  = 2000 // lứa đọc mỗi trang (đọc HẾT các trang — Codex #168)
 	vaccineRaiseLimit = 500  // cảnh báo mới
-	vaccineOpenLimit  = 2000 // cảnh báo đang mở xét tự đóng
+	vaccineOpenPage   = 500  // cảnh báo đang mở xét tự đóng mỗi trang (một giao dịch ngắn; đi HẾT các trang — Codex #168)
 	vaccineMaxGen     = 50   // số lần sinh lại tối đa của một mũi × ngày dự kiến (phòng thủ vòng lặp)
 )
 
@@ -66,10 +66,11 @@ func vnDay(t time.Time) time.Time {
 func (s *Service) VaccineOverdue(ctx context.Context, tid uuid.UUID, now time.Time) (int, error) {
 	n := 0
 	today := vnDay(now)
-	ctx = txdeps.With(ctx) // tỉnh của xã, cán bộ xã nhận cảnh báo đọc ngoài giao dịch (P0-POOL-KN-2)
+	ctx = txdeps.With(ctx)       // tỉnh của xã, cán bộ xã nhận cảnh báo đọc ngoài giao dịch (P0-POOL-KN-2)
+	overdue := map[string]bool{} // khóa chống trùng còn vi phạm
 	err := s.tx(ctx, tid, func(tx pgx.Tx) error {
-		n = 0                        // thân giao dịch có thể chạy lại (txdeps)
-		overdue := map[string]bool{} // khóa chống trùng còn vi phạm
+		n = 0 // thân giao dịch có thể chạy lại (txdeps)
+		clear(overdue)
 		var after *calstore.BatchCursor
 		for page := true; page; {
 			batches, err := calstore.ListBatches(ctx, tx, calstore.BatchFilter{All: true, Communes: []string{}, After: after,
@@ -84,32 +85,64 @@ func (s *Service) VaccineOverdue(ctx context.Context, tid uuid.UUID, now time.Ti
 				return err
 			}
 		}
-		open, err := store.OpenByKind(ctx, tx, domain.KindVaccineOverdue, vaccineOpenLimit)
-		if err != nil {
-			return err
-		}
-		for i := range open {
-			a := &open[i]
-			if overdue[a.DedupKey] || !strings.Contains(a.DedupKey, ":dose:") {
-				continue
-			}
-			// Phòng thủ: xác minh lại lịch nguồn trước khi tự đóng — mũi còn quá hạn thì không đóng.
-			if still, err := stillOverdue(ctx, tx, a.SourceRef, a.DedupKey, today); err != nil || still {
-				if err != nil {
-					return err
-				}
-				continue
-			}
-			if err := s.closeResolved(ctx, tx, tid, a.DedupKey, now); err != nil {
-				return err
-			}
-		}
 		return nil
 	})
 	if dup(err) {
 		return 0, nil
 	}
-	return n, err
+	if err != nil {
+		return n, err
+	}
+	if err := s.closeVaccineResolved(ctx, tid, today, now, overdue); err != nil && !dup(err) {
+		return n, err
+	}
+	return n, nil
+}
+
+// closeVaccineResolved tự đóng cảnh báo mũi tiêm đã hết vi phạm (đã tiêm, dời ngày dự kiến, lịch hủy), xét TOÀN BỘ cảnh báo
+// đang mở của loại theo con trỏ ổn định (raised_at, alert_ref) — mỗi trang một giao dịch ngắn riêng (Codex #168: trước đây
+// một cửa sổ cố định 2.000 cảnh báo mở cũ nhất, khi chúng còn quá hạn thì cảnh báo mới hơn đã hết vi phạm không bao giờ được
+// xét). Hữu hạn: con trỏ tăng nghiêm ngặt trên tập hữu hạn; tập mở xấp xỉ tập mũi đang quá hạn mà lượt quét lứa phía trên đã
+// đọc hết, nên một lượt tỉ lệ với lượt quét lứa. overdue (khóa còn vi phạm ở lượt quét lứa) chỉ để bỏ qua nhanh; cảnh báo
+// khác vẫn xác minh lại lịch nguồn trong giao dịch của trang trước khi đóng — mũi còn quá hạn thì không đóng.
+func (s *Service) closeVaccineResolved(ctx context.Context, tid uuid.UUID, today, now time.Time, overdue map[string]bool) error {
+	var after *store.OpenCursor
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var next *store.OpenCursor
+		err := s.tx(ctx, tid, func(tx pgx.Tx) error {
+			next = nil // thân giao dịch có thể chạy lại (txdeps)
+			open, err := store.OpenByKind(ctx, tx, domain.KindVaccineOverdue, after, vaccineOpenPage)
+			if err != nil {
+				return err
+			}
+			if len(open) == vaccineOpenPage {
+				next = store.OpenCursorOf(open[len(open)-1])
+			}
+			for i := range open {
+				a := &open[i]
+				if overdue[a.DedupKey] || !strings.Contains(a.DedupKey, ":dose:") {
+					continue
+				}
+				if still, err := stillOverdue(ctx, tx, a.SourceRef, a.DedupKey, today); err != nil || still {
+					if err != nil {
+						return err
+					}
+					continue
+				}
+				if err := s.closeResolved(ctx, tx, tid, a.DedupKey, now); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil || next == nil {
+			return err
+		}
+		after = next
+	}
 }
 
 // vaccineKey là khóa chống trùng cảnh báo lần sinh gen của mũi d trong lứa b.

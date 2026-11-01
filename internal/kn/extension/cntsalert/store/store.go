@@ -232,10 +232,28 @@ func OpenBySubject(ctx context.Context, tx pgx.Tx, subject string, kinds []strin
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Alert, error) { return scanAlert(r) })
 }
 
-// OpenByKind trả tối đa limit cảnh báo chưa đóng của loại kind (cũ trước) — tự đóng khi nguồn hết vi phạm (BF-CN-VACC).
-func OpenByKind(ctx context.Context, tx pgx.Tx, kind string, limit int) ([]Alert, error) {
+// OpenCursor là vị trí ổn định (raised_at, alert_ref) của cảnh báo cuối một trang OpenByKind — trang sau bắt đầu sau nó.
+type OpenCursor struct {
+	RaisedAt time.Time
+	Ref      uuid.UUID
+}
+
+// OpenCursorOf trả con trỏ đứng tại cảnh báo a.
+func OpenCursorOf(a Alert) *OpenCursor { return &OpenCursor{RaisedAt: a.RaisedAt, Ref: a.Ref} }
+
+// OpenByKind trả một trang tối đa limit cảnh báo chưa đóng của loại kind theo (raised_at, alert_ref) tăng dần, sau con trỏ
+// after (nil = từ đầu) — tự đóng khi nguồn hết vi phạm (BF-CN-VACC). Người gọi đi HẾT các trang (Codex #168: cửa sổ cố định
+// 2.000 cảnh báo cũ nhất bỏ đói cảnh báo mới hơn đã hết vi phạm).
+func OpenByKind(ctx context.Context, tx pgx.Tx, kind string, after *OpenCursor, limit int) ([]Alert, error) {
+	var at *time.Time
+	var ref *uuid.UUID
+	if after != nil {
+		t := after.RaisedAt.UTC()
+		at, ref = &t, &after.Ref
+	}
 	rows, err := tx.Query(ctx, `SELECT `+alertCols+` FROM pf_extension.cnts_alert_current
-	   WHERE kind = $1 AND status <> 'closed' ORDER BY raised_at, alert_ref LIMIT $2`, kind, limit)
+	   WHERE kind = $1 AND status <> 'closed' AND ($2::timestamptz IS NULL OR (raised_at, alert_ref) > ($2::timestamptz, $3::uuid))
+	   ORDER BY raised_at, alert_ref LIMIT $4`, kind, at, ref, limit)
 	if err != nil {
 		return nil, err
 	}
