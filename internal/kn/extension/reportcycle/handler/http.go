@@ -27,6 +27,7 @@ type Handler struct{ Svc *app.Service }
 // RegisterApp gắn route vào nhóm /v1 (đã có xác thực, ngữ cảnh phiên, Idempotency-Key).
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g := rg.Group("/extension")
+	h.registerCNTSDesign(g)
 	g.GET("/report-forms", h.reportForms)
 	g.POST("/report-batches/preview", h.preview)
 	httpx.AllowBody(g, http.MethodPost, "/report-batches/provincial-import", app.MaxProvincialImportBytes+1024)

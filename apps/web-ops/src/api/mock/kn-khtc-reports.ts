@@ -1,3 +1,4 @@
+import { zipStored } from "./kn-khtc-archive-zip";
 // GIẢ LẬP W11.66. Reads the same period, submitted-form and source stores as the other KHTC screens.
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
@@ -153,7 +154,7 @@ export function khtcTemplatePreviewContent(ctx: Ctx, periodId: string): Content 
  const period=templatePeriod(ctx,periodId);
  return period ? structuredClone(load(ctx,period,true).detail.content) : null;
 }
-export const khtcReportRoutes: Route[] = [{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
+export const khtcReportRoutes: Route[] = [{method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/exports\/([^/]+)\/preview$/,handler:archivePreview},{method:"POST",pattern:/^\/v1\/extension\/khtc\/exported-reports\/zip$/,handler:archiveZIP},{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
 function handle(ctx: Ctx): Response {
     const [id, op, exportID, action] = ctx.params;
     const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
@@ -306,4 +307,33 @@ export function khtcDashboardCapture(ctx: Ctx, period: Stored) {
 /** Immutable export metadata only; caller applies tenant/period scope. */
 export function khtcDashboardExports(periodID: string) {
  return structuredClone((STORE.get(periodID)?.exports??[]).map(x=>x.meta));
+}
+function archiveCanRead(ctx: Ctx): boolean {
+ const kc=knContext(ctx.request.headers.get("X-AG-Context")??"");
+ return !!kc && (kc.role==="admin" || kc.department_code===KHTC && (kc.role==="kn_tinh" || kc.role==="kn_tw"));
+}
+function archivePreview(ctx: Ctx): Response {
+ if(!archiveCanRead(ctx))return problem(403,"forbidden","Không có quyền");
+ const [period,id]=ctx.params;
+ if(!templatePeriod(ctx,period!))return code("not_found","Không có bản xuất",404);
+ const x=STORE.get(period!)?.exports.find(x=>x.meta.id===id);
+ if(!x)return code("not_found","Không có bản xuất",404);
+ const content=structuredClone(x.content);
+ const document=renderKhtcMockFixed(content,x.meta.filter); content.data.rows=filterRows(content.data.rows,x.meta.filter);
+ return json({export_id:x.meta.id,version:x.meta.version,content,template_document:document},200,{"Cache-Control":"no-store"});
+}
+function archiveZIP(ctx: Ctx): Response {
+ if(!archiveCanRead(ctx))return problem(403,"forbidden","Không có quyền");
+ const items=(ctx.body as {items?:{period_id:string;export_id:string}[]})?.items;
+ if(!Array.isArray(items)||items.length<1||items.length>10||new Set(items.map(x=>x?.export_id)).size!==items.length)return code("invalid","Chọn 1 đến 10 bản xuất khác nhau",422);
+ const files:{name:string;data:Uint8Array}[]=[];let size=0;
+ for(const item of items){
+  if(!templatePeriod(ctx,item.period_id))return code("not_found","Không có bản xuất",404);
+  const x=STORE.get(item.period_id)?.exports.find(x=>x.meta.id===item.export_id);
+  if(!x)return code("not_found","Không có bản xuất",404);
+  const data=new TextEncoder().encode(x.body);size+=data.length;
+  if(size>20*1024*1024)return code("invalid","Tổng dung lượng vượt 20 MiB",422);
+  files.push({name:`bao-cao-${x.meta.id}-v${x.meta.version}.xlsx`,data});
+ }
+ return new Response(zipStored(files) as Uint8Array<ArrayBuffer>,{headers:{"Content-Type":"application/zip","Content-Disposition":'attachment; filename="bao-cao-khtc.zip"',"Cache-Control":"no-store"}});
 }

@@ -13,4 +13,3 @@
 - Mock dùng cùng kho phiếu/nguồn/capture báo cáo; bộ dữ liệu giả lập cũ không có cây chương trình đầy đủ nên mỗi dòng minh họa được trình bày như một chương trình. Không dùng mock làm bằng chứng phép tính cây thật; kiểm Go/DB bảo vệ phần đó.
 
 Không migration mới, không ghi HTX, không tăng baseline. Các file menu/mock/OpenAPI sinh lại từ registry. Không lưu hay thay đổi bản xuất khi đọc dashboard.
-

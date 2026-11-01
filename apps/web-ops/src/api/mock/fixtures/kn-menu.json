@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -1725,9 +1725,7 @@
           "route": "/kn/cnts/thiet-ke-bieu-mau",
           "icon": "table",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
@@ -2088,7 +2086,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -2286,7 +2284,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -2387,7 +2385,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -2632,7 +2630,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -2734,7 +2732,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -2862,7 +2860,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -3173,7 +3171,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -3344,7 +3342,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -3436,7 +3434,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -3738,7 +3736,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -3864,7 +3862,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   },
@@ -4094,6 +4092,15 @@
           "key": "admin.pb.cnts_bieu_ky",
           "label": "Biểu kỳ Cấp Xã",
           "route": "/kn/phong-ban/chan_nuoi_thuy_san/bieu-ky-cnts",
+          "icon": "table",
+          "badge_source": null,
+          "enabled": false,
+          "children": []
+         },
+         {
+          "key": "admin.pb.cnts_form_design",
+          "label": "Thiết kế biểu mẫu",
+          "route": "/kn/cnts/thiet-ke-bieu-mau",
           "icon": "table",
           "badge_source": null,
           "enabled": false,
@@ -4657,7 +4664,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v12",
+    "menu_version": "kn.menu/v13",
     "org_ref": null
    }
   }
@@ -4700,5 +4707,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v12"
+ "menu_version": "kn.menu/v13"
 }
