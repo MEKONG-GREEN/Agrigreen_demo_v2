@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
-import { mockFetchNoDelay } from "@/api/mock/handler";
+import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
+import { createKnAdminApi } from "@/kn/cycle/api";
 import { resetKnAdmin } from "@/api/mock/kn-admin";
 import { previewDesignRows } from "@/api/mock/kn-cnts-design";
 import { DESIGN_HEADERS, createDesignApi, designFileError } from "./api";
 async function context(persona: string, assignment: string, department: string | null) {
-  const r = await mockFetchNoDelay(new Request("http://mock/v1/me/context", { method: "POST", headers: { Authorization: `Bearer mock.${persona}`, "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ assignment_id: assignment, department_code: department }) })); return (await r.json()).context_id as string;
+  const r = await mockFetchNoDelay(new Request("http://mock/v1/me/context", { method: "POST", headers: { Authorization: `Bearer mock.${persona}`, "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ assignment_id: assignment, department_code: department }) })); if (!r.ok) throw new Error(`Context failed: ${r.status}`); return (await r.json()).context_id as string;
 }
 describe("FN07 phần xem/kiểm cấu trúc", () => {
   beforeEach(() => resetKnAdmin());
@@ -21,12 +22,15 @@ describe("FN07 phần xem/kiểm cấu trúc", () => {
   });
   it("Admin xem cấu trúc, kiểm CSV không ghi; phiên Xã không được xem", async () => {
     const admin = await context("kn-admin", "asg-admin", null);
+    const controls = createKnAdminApi({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-admin", getContextId: () => admin, fetch: mockAdminFetchNoDelay });
+    const department = (await controls.departments()).items.find(x => x.code === "chan_nuoi_thuy_san")!;
+    await controls.departmentStatus(department.id, "active");
     const make = (persona: string, ctx: string) => createDesignApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${persona}`, getContextId: () => ctx, fetch: mockFetchNoDelay }));
     const api = make("kn-admin", admin); const before = await api.list(); expect(before).toHaveLength(5);
     const raw = new TextEncoder().encode(DESIGN_HEADERS.join(",") + "\na,Số con,integer,true,con,Đàn,true,\n");
     expect((await api.preview(raw)).valid).toBe(true); expect(await api.list()).toEqual(before);
     const bad = new TextEncoder().encode("bad,header\na,b\n"); const result = await api.preview(bad); expect(result.valid).toBe(false); expect(result.fields).toEqual([]);
-    // Cấp Xã bị chặn cả khi gọi đường dẫn trực tiếp; phiên phòng chưa mở bị middleware từ chối cũng là fail-closed.
-    const xa = await context("kn-an", "asg-an-xa", "chan_nuoi_thuy_san"); await expect(make("kn-an", xa).list()).rejects.toThrow();
+    // Phiên Xã CNTS thật được chọn thành công: 403 phải do quyền thiết kế, không phải phòng chưa mở/thiếu phiên.
+    const xa = await context("kn-an", "asg-an-xa", "chan_nuoi_thuy_san"); await expect(make("kn-an", xa).list()).rejects.toMatchObject({ problem: { status: 403 } }); await expect(make("kn-an", xa).preview(raw)).rejects.toMatchObject({ problem: { status: 403 } });
   });
 });
