@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -2092,7 +2092,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -2290,7 +2290,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -2391,7 +2391,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -2636,7 +2636,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -2738,7 +2738,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -2866,7 +2866,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -2967,6 +2967,15 @@
         "label": "Cấu hình báo giá",
         "route": "/kn/bao-gia/cau-hinh",
         "icon": "param",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.bao_gia.de_xuat_mat_hang",
+        "label": "Đề xuất mặt hàng",
+        "route": "/kn/bao-gia/de-xuat-mat-hang",
+        "icon": "package",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -3102,9 +3111,7 @@
         "route": "/kn/bao-gia/mat-hang",
         "icon": "package",
         "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
+        "enabled": true,
         "children": []
        },
        {
@@ -3170,7 +3177,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -3226,6 +3233,15 @@
         "label": "Yêu cầu xác minh",
         "route": "/kn/bao-gia/xac-minh",
         "icon": "check",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "xa.bao_gia.de_xuat_mat_hang",
+        "label": "Đề xuất mặt hàng",
+        "route": "/kn/bao-gia/de-xuat-mat-hang",
+        "icon": "package",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -3332,7 +3348,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -3424,7 +3440,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -3726,7 +3742,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -3852,7 +3868,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   },
@@ -4334,8 +4350,6 @@
           "icon": "package",
           "badge_source": null,
           "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
           "children": []
          }
         ]
@@ -4647,7 +4661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v11",
+    "menu_version": "kn.menu/v12",
     "org_ref": null
    }
   }
@@ -4690,5 +4704,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v11"
+ "menu_version": "kn.menu/v12"
 }

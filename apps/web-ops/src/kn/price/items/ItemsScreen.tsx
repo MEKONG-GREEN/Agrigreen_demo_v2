@@ -46,11 +46,13 @@ export function usePriceItemApi(): PriceItemApi {
   return useMemo(() => createPriceItemApi(api), [api]);
 }
 
-export function ItemsScreen() {
+export function ItemsScreen({ initialTab }: { initialTab?: "proposals" }) {
   const { kn } = useAuth();
   const pa = usePriceItemApi();
   const role = kn.context?.role;
-  const [tab, setTab] = useState<Tab>(role === "kn_xa" ? "proposals" : "items");
+  const [tab, setTab] = useState<Tab>(
+    role === "kn_xa" || initialTab === "proposals" ? "proposals" : "items",
+  );
   const [at, setAt] = useState(vnToday());
   const [nonce, setNonce] = useState(0);
   const bump = () => setNonce((n) => n + 1);
@@ -76,7 +78,7 @@ export function ItemsScreen() {
         ];
   return (
     <>
-      <PageHeader title="Mặt hàng theo thời kỳ">
+      <PageHeader title={initialTab === "proposals" ? "Đề xuất mặt hàng" : "Mặt hàng theo thời kỳ"}>
         Phòng Thông tin – Truyền thông là chủ danh mục. Mọi thay đổi áp dụng từ
         ngày báo giá kế tiếp, không ảnh hưởng phiếu đã có.
       </PageHeader>

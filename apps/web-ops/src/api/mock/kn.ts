@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v11";
+export const MENU_VERSION = "kn.menu/v12";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -1410,6 +1410,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "label": "Cấu hình báo giá",
             "route": "/kn/bao-gia/cau-hinh",
             "icon": "param"
+          },
+          {
+            "key": "tinh.bao_gia.de_xuat_mat_hang",
+            "label": "Đề xuất mặt hàng",
+            "route": "/kn/bao-gia/de-xuat-mat-hang",
+            "icon": "package"
           }
         ]
       },
@@ -1477,8 +1483,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.bao_gia.mat_hang",
             "label": "Mặt hàng",
             "route": "/kn/bao-gia/mat-hang",
-            "icon": "package",
-            "soon": true
+            "icon": "package"
           },
           {
             "key": "tinh.van_ban",
@@ -1587,6 +1592,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "label": "Yêu cầu xác minh",
             "route": "/kn/bao-gia/xac-minh",
             "icon": "check"
+          },
+          {
+            "key": "xa.bao_gia.de_xuat_mat_hang",
+            "label": "Đề xuất mặt hàng",
+            "route": "/kn/bao-gia/de-xuat-mat-hang",
+            "icon": "package"
           }
         ]
       },
@@ -1957,8 +1968,7 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "key": "admin.pb.bao_gia_mat_hang",
       "label": "Mặt hàng",
       "route": "/kn/bao-gia/mat-hang",
-      "icon": "package",
-      "soon": true
+      "icon": "package"
     }
   ],
   "hanh_chinh_tong_hop": [
