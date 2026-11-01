@@ -37,6 +37,7 @@ func TestParseCNTSDesign(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := append([]string(nil), valid...)
+			r[0] = "b" // isolate the changed field: no duplicate-key failure masks validation
 			r[tc.col] = tc.value
 			out := parse([][]string{valid, r})
 			if out.Valid || len(out.Fields) != 0 || len(out.Issues) == 0 || out.Issues[0].Line != 3 {
