@@ -22,7 +22,8 @@ function saveFile(file: {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function KhtcReportsScreen({ mode = "editor", adhoc = false }: {
+export function KhtcReportsScreen({ mode = "editor", adhoc = false, initialPeriod = "" }: {
+    initialPeriod?: string;
     adhoc?: boolean;
     mode?: "editor" | "progress" | "history";
 }) {
@@ -31,7 +32,7 @@ export function KhtcReportsScreen({ mode = "editor", adhoc = false }: {
     const periods = useMemo(() => api ? createKhtcPeriodApi(api) : null, [api]);
     const [year, setYear] = useState(new Date().getFullYear());
     const [kind, setKind] = useState("");
-    const [selected, setSelected] = useState("");
+    const [selected, setSelected] = useState(initialPeriod);
     const list = useLoad(periods ? () => periods.list(year) : null, [periods, year]);
     const detail = useLoad(reports && selected ? () => reports.get(selected) : null, [reports, selected]);
     return <>

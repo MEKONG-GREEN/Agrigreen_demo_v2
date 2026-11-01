@@ -28,4 +28,5 @@ func (m *Module) UseKHTCCancelLease(d time.Duration) { m.khtcReportSvc().CancelL
 
 func (m *Module) registerKHTCReports(rg *gin.RouterGroup) {
 	reporthandler.Handler{Svc: m.khtcReportSvc()}.RegisterApp(rg)
+	reporthandler.Handler{Svc: m.khtcReportSvc()}.RegisterDashboard(rg, m.khtcSvc())
 }

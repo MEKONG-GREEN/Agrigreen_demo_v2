@@ -298,3 +298,12 @@ function decorateFixedReport(detail:Detail):void {
  const definition=detail.content.template_snapshot!.definition as unknown as Definition;
  detail.locked_admin=[...new Set(definition.nodes.flatMap(n=>n.locked_admin))].sort();
 }
+
+/** W11.69 dashboard: capture live inputs without loading/mutating a draft. */
+export function khtcDashboardCapture(ctx: Ctx, period: Stored) {
+ return structuredClone(capture(ctx,period,false).data);
+}
+/** Immutable export metadata only; caller applies tenant/period scope. */
+export function khtcDashboardExports(periodID: string) {
+ return structuredClone((STORE.get(periodID)?.exports??[]).map(x=>x.meta));
+}

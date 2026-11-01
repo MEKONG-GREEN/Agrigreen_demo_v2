@@ -1167,9 +1167,9 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
         "label": "Điều hành",
         "items": [
           {
-            "key": "tinh.trang_chu",
+            "key": "tinh.khtc.trang_chu",
             "label": "Trang chủ phòng",
-            "route": "/kn/trang-chu",
+            "route": "/kn/khtc/trang-chu",
             "icon": "dashboard"
           },
           {

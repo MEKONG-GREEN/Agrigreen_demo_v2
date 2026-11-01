@@ -205,7 +205,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual([["Dự án KNQG", ["Dự án tại An Giang", "Mẫu biểu, nghiệm thu năm (07)"]]]);
     // W11.54: Trang chủ phòng đầu Điều hành Cấp Tỉnh mọi phòng; Quy trình, văn bản (/kn/van-ban) cuối Dữ liệu; Cấp Xã/TW không có Trang chủ phòng.
     for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
-      expect(leaves(`kn_tinh/${code}`)[0]).toBe("dieu_hanh:tinh.trang_chu");
+      expect(leaves(`kn_tinh/${code}`)[0]).toBe(code === "ke_hoach_tai_chinh" ? "dieu_hanh:tinh.khtc.trang_chu" : "dieu_hanh:tinh.trang_chu");
       expect(leaves(`kn_xa/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
       expect(leaves(`kn_tw/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
     }

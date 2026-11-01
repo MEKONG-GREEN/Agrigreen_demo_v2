@@ -1233,9 +1233,9 @@
             "Label": "Điều hành",
             "Items": [
               {
-                "Key": "tinh.trang_chu",
+                "Key": "tinh.khtc.trang_chu",
                 "Label": "Trang chủ phòng",
-                "Route": "/kn/trang-chu",
+                "Route": "/kn/khtc/trang-chu",
                 "Icon": "dashboard",
                 "BadgeSource": "",
                 "Requires": null,

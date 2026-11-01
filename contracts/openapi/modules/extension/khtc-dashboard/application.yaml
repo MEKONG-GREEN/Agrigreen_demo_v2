@@ -1,0 +1,92 @@
+paths:
+# @ag-order: 20150
+  /v1/extension/khtc/dashboard:
+    get:
+      summary: "Trang chủ tổng hợp KHTC chỉ đọc; tiến độ dùng capture Mẫu 5 mới nhất trong quý, trạng thái phiếu và nguồn đọc lại mỗi lần"
+      operationId: extensionKhtcDashboard
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: quarter, in: query, schema: {type: integer, minimum: 1, maximum: 4}}
+        - {name: department, in: query, schema: {type: string, maxLength: 64}}
+        - {name: field, in: query, schema: {type: string, maxLength: 64}}
+      responses:
+        "200":
+          description: Số liệu live; progress_period=null khi chưa có kỳ Mẫu 5 phù hợp. Không sửa bản soạn hoặc bản đã xuất.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCDashboard'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+components:
+  schemas:
+# @ag-order: 20150
+    KHTCDashboard:
+      type: object
+      required: [year, quarter, department, field, counts, progress, progress_period, reports, status, as_of, can_act]
+      properties:
+        year: {type: integer}
+        quarter: {type: integer}
+        department: {type: string}
+        field: {type: string}
+        as_of: {type: string, format: date-time}
+        can_act: {type: boolean}
+        counts:
+          type: object
+          required: [exported, open, sent, forms, achieved, items, slow]
+          properties:
+            exported: {type: integer}
+            open: {type: integer}
+            sent: {type: integer}
+            forms: {type: integer}
+            achieved: {type: integer}
+            items: {type: integer}
+            slow: {type: integer}
+        progress:
+          type: object
+          required: [items, achieved, slow, missing, programs, rows]
+          properties:
+            items: {type: integer}
+            achieved: {type: integer}
+            slow: {type: integer}
+            missing: {type: integer}
+            rows: {type: array, items: {$ref: '#/components/schemas/KHTCReportRow'}}
+            programs:
+              type: array
+              items:
+                type: object
+                required: [ref, name, items, known, percent]
+                properties:
+                  ref: {type: string, format: uuid}
+                  name: {type: string}
+                  items: {type: integer}
+                  known: {type: integer}
+                  percent: {type: string, nullable: true}
+        progress_period: {allOf: [{$ref: '#/components/schemas/KHTCDashboardPeriod'}], nullable: true}
+        reports: {type: array, items: {$ref: '#/components/schemas/KHTCDashboardPeriod'}}
+        status:
+          type: array
+          items:
+            type: object
+            required: [period_id, period_name, department, name, kind, state, at]
+            properties:
+              period_id: {type: string, format: uuid}
+              period_name: {type: string}
+              department: {type: string}
+              name: {type: string}
+              kind: {type: string, enum: [form, source]}
+              state: {type: string}
+              at: {type: string, format: date-time, nullable: true}
+# @ag-order: 20151
+    KHTCDashboardPeriod:
+      type: object
+      required: [id, name, type, state, cutoff, exported_at]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        type: {type: string}
+        state: {type: string}
+        cutoff: {type: string, format: date}
+        exported_at: {type: string, format: date-time, nullable: true}

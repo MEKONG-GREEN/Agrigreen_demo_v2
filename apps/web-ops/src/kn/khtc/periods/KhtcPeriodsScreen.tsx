@@ -38,7 +38,7 @@ function fromLocal(v: string): string | undefined {
   return v ? new Date(`${v}:00+07:00`).toISOString() : undefined;
 }
 
-export function KhtcPeriodsScreen({adhocOnly=false,onOpened}:{adhocOnly?:boolean;onOpened?:()=>void}={}) {
+export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:{adhocOnly?:boolean;onOpened?:()=>void;initialPeriod?:string|null}={}) {
   const { api, kn } = useAuth();
   const ctx = kn.context;
   const role = ctx?.role ?? null;
@@ -50,7 +50,7 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened}:{adhocOnly?:boolean
   const periods = useLoad(kapi ? () => kapi.list(year) : null, [kapi, year]);
   const template = useLoad(kapi ? () => kapi.template() : null, [kapi]);
   const weeks = useLoad(kapi ? () => kapi.weeks(year) : null, [kapi, year]);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialPeriod);
   const detail = useLoad(kapi && selected ? () => kapi.get(selected) : null, [
     kapi,
     selected,

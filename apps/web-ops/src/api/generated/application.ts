@@ -10655,6 +10655,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Trang chủ tổng hợp KHTC chỉ đọc; tiến độ dùng capture Mẫu 5 mới nhất trong quý, trạng thái phiếu và nguồn đọc lại mỗi lần */
+        get: operations["extensionKhtcDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/kn/machine-profiles/{cooperative_ref}": {
         parameters: {
             query?: never;
@@ -22911,6 +22928,64 @@ export interface components {
             items: components["schemas"]["KHTCArchiveRow"][];
             has_more: boolean;
             offset: number;
+        };
+        KHTCDashboard: {
+            year: number;
+            quarter: number;
+            department: string;
+            field: string;
+            /** Format: date-time */
+            as_of: string;
+            can_act: boolean;
+            counts: {
+                exported: number;
+                open: number;
+                sent: number;
+                forms: number;
+                achieved: number;
+                items: number;
+                slow: number;
+            };
+            progress: {
+                items: number;
+                achieved: number;
+                slow: number;
+                missing: number;
+                rows: components["schemas"]["KHTCReportRow"][];
+                programs: {
+                    /** Format: uuid */
+                    ref: string;
+                    name: string;
+                    items: number;
+                    known: number;
+                    percent: string | null;
+                }[];
+            };
+            progress_period: components["schemas"]["KHTCDashboardPeriod"] | null;
+            reports: components["schemas"]["KHTCDashboardPeriod"][];
+            status: {
+                /** Format: uuid */
+                period_id: string;
+                period_name: string;
+                department: string;
+                name: string;
+                /** @enum {string} */
+                kind: "form" | "source";
+                state: string;
+                /** Format: date-time */
+                at: string | null;
+            }[];
+        };
+        KHTCDashboardPeriod: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            type: string;
+            state: string;
+            /** Format: date */
+            cutoff: string;
+            /** Format: date-time */
+            exported_at: string | null;
         };
         KHTCReportPeriod: {
             /** Format: uuid */
@@ -48052,6 +48127,35 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcDashboard: {
+        parameters: {
+            query?: {
+                year?: number;
+                quarter?: number;
+                department?: string;
+                field?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số liệu live; progress_period=null khi chưa có kỳ Mẫu 5 phù hợp. Không sửa bản soạn hoặc bản đã xuất. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCDashboard"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
