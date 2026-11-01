@@ -7,6 +7,7 @@ import { LoadState, dt, useAction, useLoad } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
 import { REPORT_TYPES } from "../periods/api";
 import { createArchiveApi, type ArchiveQuery, type ArchiveRow } from "./archive-api";
+import { CompiledTemplateDocument } from "../templates/CompiledTemplateDocument";
 import { createReportApi } from "./api";
 
 const PAGE = 20;
@@ -20,9 +21,14 @@ export function KhtcArchiveScreen() {
   const [search, setSearch] = useState("");
   const rows = useLoad(archive ? () => archive.list(filter) : null, [archive, filter]);
   const action = useAction();
+  const [selected, setSelected] = useState<ArchiveRow[]>([]);
+  const [preview, setPreview] = useState<ArchiveRow | null>(null);
+  const snapshot = useLoad(archive && preview ? () => archive.preview(preview.period_id, preview.id) : null, [archive, preview]);
   const update = (patch: Partial<ArchiveQuery>) => setFilter(f => ({ ...f, ...patch, offset: 0 }));
   const offset = filter.offset ?? 0;
   const columns: Column<ArchiveRow>[] = [
+    { key: "select", header: "Chọn", cell: r => <input type="checkbox" aria-label={`Chọn ${r.period_name} v${r.version}`} checked={selected.some(x => x.id === r.id)} disabled={!selected.some(x => x.id === r.id) && selected.length >= 10} onChange={e => setSelected(xs => e.target.checked ? [...xs, r] : xs.filter(x => x.id !== r.id))} /> },
+    { key: "preview", header: "Xem", cell: r => <button type="button" className="btn btn-o btn-sm" onClick={() => setPreview(r)} aria-label={`Xem ${r.period_name} v${r.version}`}>Xem trước</button> },
     { key: "kind", header: "Loại báo cáo", cell: r => REPORT_TYPES.find(t => t.value === r.report_type)?.label ?? r.report_type },
     { key: "period", header: "Kỳ / Nội dung", cell: r => r.period_name },
     { key: "number", header: "Số văn bản", cell: r => r.document_no || "—" },
@@ -43,7 +49,9 @@ export function KhtcArchiveScreen() {
       <label><input type="checkbox" checked={filter.versions ?? false} onChange={e => update({ versions: e.target.checked })} /> Mọi phiên bản</label>
       <button type="button" className="btn btn-o" onClick={rows.reload}>Làm mới</button>
     </form>
+    <div className="row"><span>Đã chọn {selected.length}/10 bản Excel · tối đa 20 MiB</span><button type="button" className="btn" disabled={!archive || !selected.length || action.busy} onClick={() => { if (archive) void action.run(async () => { const file = await archive.zip(selected.map(r => ({period_id: r.period_id, export_id: r.id}))); saveBlob(file.blob, file.name); return true; }, "Đã tải ZIP các bản Excel đã xuất."); }}>Tải ZIP Excel</button><button type="button" className="btn btn-o" disabled={!selected.length} onClick={() => setSelected([])}>Bỏ chọn</button></div>
     {action.view}
+    {preview && <section className="card sec" aria-label="Bản xuất đã lưu"><h2>{preview.period_name} · v{preview.version}</h2><button type="button" className="btn btn-o" onClick={() => setPreview(null)}>Đóng xem trước</button><LoadState s={snapshot}>{data => <>{data.template_document ? <CompiledTemplateDocument document={data.template_document} /> : <><h3>Nội dung bản xuất</h3>{Object.entries(data.content.texts).map(([key, text]) => <p key={key}>{text}</p>)}<table><caption>Số liệu bản xuất</caption><thead><tr><th>Hạng mục</th><th>Trong kỳ</th><th>Lũy kế</th></tr></thead><tbody>{data.content.data.rows.map(r => <tr key={r.ref}><td>{r.name}</td><td>{r.in_period}</td><td>{r.year_to_date}</td></tr>)}</tbody></table></>}</>}</LoadState></section>}
     <LoadState s={rows}>{data => <>
       <DataTable caption="Báo cáo đã xuất" columns={columns} rows={data.items} rowKey={r => r.id} page={Math.floor(offset / PAGE) + 1} pageSize={PAGE} />
       <nav className="row" aria-label="Phân trang báo cáo">

@@ -324,6 +324,17 @@
           "Children": null
         },
         {
+          "Key": "admin.pb.cnts_form_design",
+          "Label": "Thiết kế biểu mẫu",
+          "Route": "/kn/cnts/thiet-ke-bieu-mau",
+          "Icon": "table",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
           "Key": "admin.pb.cnts_lich_truc",
           "Label": "Lịch trực KSGM",
           "Route": "/kn/phong-ban/{department}/lich-truc",
@@ -608,7 +619,7 @@
                     "Icon": "table",
                     "BadgeSource": "",
                     "Requires": null,
-                    "ComingSoon": true,
+                    "ComingSoon": false,
                     "Needs": "",
                     "Children": null
                   },

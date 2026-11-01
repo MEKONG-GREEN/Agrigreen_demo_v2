@@ -163,7 +163,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       "Trang chủ phòng", // W11.54: trang chủ phòng (FN-17); "Trang chủ" theo hình giữ Dashboard
       "Trang chủ",
       "Cảnh báo",
-      ["Biểu mẫu", ["Thiết kế biểu mẫu*", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
+      ["Biểu mẫu", ["Thiết kế biểu mẫu", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
       ["Lịch", ["Lịch trực KSGM", "Lịch tiêm phòng", "Lịch công tác cán bộ xã", "Lịch công tác phòng"]],
       ["Chiến dịch điều tra", ["Quản lý chiến dịch", "Tạo chiến dịch*"]],
     ]);

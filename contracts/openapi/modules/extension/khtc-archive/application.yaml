@@ -22,6 +22,62 @@ paths:
         "403": {$ref: '#/components/responses/Problem'}
         "422": {$ref: '#/components/responses/Problem'}
         "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/periods/{id}/report/exports/{exportID}/preview:
+    get:
+      summary: Xem nội dung từ bản xuất bất biến, không đọc bản soạn
+      operationId: extensionKhtcArchivePreview
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung và mẫu đã ghim của đúng bản xuất
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchivePreview'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/exported-reports/zip:
+    post:
+      summary: Tải tối đa 10 bản Excel đã xuất, tổng byte gốc tối đa 20 MiB
+      operationId: extensionKhtcArchiveZIP
+      tags: [extension]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [period_id, export_id]
+                    properties:
+                      period_id: {type: string, format: uuid}
+                      export_id: {type: string, format: uuid}
+      responses:
+        "200":
+          description: ZIP chứa nguyên byte Excel đã lưu
+          content:
+            application/zip:
+              schema: {type: string, format: binary}
+        "400": {$ref: '#/components/responses/Problem'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "413": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
 components:
   schemas:
 # @ag-order: 20100
@@ -47,3 +103,14 @@ components:
         items: {type: array, items: {$ref: '#/components/schemas/KHTCArchiveRow'}}
         has_more: {type: boolean}
         offset: {type: integer}
+
+# @ag-order: 20102
+    KHTCArchivePreview:
+      type: object
+      additionalProperties: false
+      required: [export_id, version, content]
+      properties:
+        export_id: {type: string, format: uuid}
+        version: {type: integer, format: int64}
+        content: {$ref: '#/components/schemas/KHTCReportContent'}
+        template_document: {$ref: '#/components/schemas/KHTCTemplateRendered'}
