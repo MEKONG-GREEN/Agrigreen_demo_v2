@@ -19,10 +19,14 @@ vi.mock("next/navigation", () => ({
 }));
 
 const auth = { roles: ["masterdata_admin"] as string[], persona: "setter" };
+// Review #170: thay phản hồi GET /v1/masterdata/params/value để kiểm 404 (chưa có tham số) vs 403/503/lỗi mạng.
+const paramValue: { respond: ((req: Request) => Promise<Response>) | null } = { respond: null };
+const apiFetch = (req: Request) =>
+  paramValue.respond && new URL(req.url).pathname === "/v1/masterdata/params/value" ? paramValue.respond(req) : mockFetchNoDelay(req);
 vi.mock("@/auth/AuthProvider", () => ({
   useAuth: () => ({
     principal: { roles: auth.roles },
-    api: createApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${auth.persona}`, fetch: mockFetchNoDelay }),
+    api: createApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${auth.persona}`, fetch: apiFetch }),
     adminApi: createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${auth.persona}`, fetch: mockAdminFetchNoDelay }),
   }),
 }));
@@ -217,6 +221,7 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     nav.search = "";
     auth.roles = ["masterdata_admin"];
     auth.persona = "setter";
+    paramValue.respond = null;
   });
 
   it("danh sách không còn pop-up: Thêm, Xem, Sửa là liên kết tới trang riêng; mở đúng tab theo ?tab=", async () => {
@@ -429,6 +434,53 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     expect(within(table).getByText("32 °C")).toBeTruthy();
     expect(within(table).getByText("cnts.indicator_max:NHIET_DO_AO")).toBeTruthy();
     expect(within(table).getAllByText("Ngưỡng mặc định của danh mục").length).toBeGreaterThanOrEqual(2);
+  });
+
+  describe("review #170 (11e2171d): ngưỡng danh mục chỉ thay thế khi API báo chưa có tham số", () => {
+    const problemResponse = (status: number, code: string) => () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ type: "about:blank", title: "", status, code, detail: "review #170" }), {
+          status,
+          headers: { "Content-Type": "application/problem+json" },
+        }),
+      );
+    const openThresholds = async () => {
+      const user = userEvent.setup();
+      render(<CntsCatalogScreen />);
+      expect(await screen.findByText("Heo")).toBeTruthy();
+      await user.click(screen.getByRole("tab", { name: "Ngưỡng mặc định" }));
+      return screen.getByRole("region", { name: "Ngưỡng theo chỉ tiêu theo dõi" });
+    };
+
+    it("404 masterdata.param_not_found: dùng ngưỡng mặc định của danh mục, ghi rõ nguồn", async () => {
+      paramValue.respond = problemResponse(404, "masterdata.param_not_found");
+      const region = await openThresholds();
+      const table = await within(region).findByRole("table", { name: "Ngưỡng theo chỉ tiêu theo dõi" });
+      expect(within(table).getAllByText("Ngưỡng mặc định của danh mục").length).toBeGreaterThan(0);
+      expect(within(region).queryByRole("alert")).toBeNull();
+      expect(within(region).queryByText(/Không xác định được ngưỡng/)).toBeNull();
+    });
+
+    it.each([
+      ["503 extension.dependency_unavailable", problemResponse(503, "extension.dependency_unavailable"), "extension.dependency_unavailable"],
+      ["403 forbidden", problemResponse(403, "forbidden"), "forbidden"],
+      ["404 không phải param_not_found", problemResponse(404, "not_found"), "not_found"],
+      ["lỗi mạng", () => Promise.reject(new TypeError("Failed to fetch")), "network_error"],
+    ] as const)("%s: không trình bày ngưỡng danh mục như ngưỡng hiệu lực, hiện lỗi + Thử lại", async (_name, respond, code) => {
+      paramValue.respond = respond;
+      const region = await openThresholds();
+      const alert = await within(region).findByRole("alert");
+      expect(within(alert).getByText(code)).toBeTruthy();
+      expect(within(region).getByText("Không xác định được ngưỡng hiệu lực theo chỉ tiêu.")).toBeTruthy();
+      expect(within(region).queryByRole("table")).toBeNull();
+      expect(within(region).queryByText("Ngưỡng mặc định của danh mục")).toBeNull();
+      // Thử lại khi API hồi phục (404 xác nhận chưa có tham số) → mới hiện ngưỡng danh mục.
+      paramValue.respond = problemResponse(404, "masterdata.param_not_found");
+      await userEvent.setup().click(within(alert).getByRole("button", { name: "Thử lại" }));
+      const table = await within(region).findByRole("table", { name: "Ngưỡng theo chỉ tiêu theo dõi" });
+      expect(within(table).getAllByText("Ngưỡng mặc định của danh mục").length).toBeGreaterThan(0);
+      expect(within(region).queryByText(/Không xác định được ngưỡng/)).toBeNull();
+    });
   });
 
   it("gốc route danh mục cho cả Phòng CNTS và Admin › Phòng ban", () => {
