@@ -1,0 +1,1 @@
+- [x] ARCHIVE-KHTC · W11.69-ARCHIVE-FULL (#167, phần đầu): preview immutable snapshot và ZIP Excel có giới hạn; Word/phạm vi phòng/lọc kỳ-lĩnh vực còn #190.

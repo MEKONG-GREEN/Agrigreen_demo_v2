@@ -10226,6 +10226,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xem nội dung từ bản xuất bất biến, không đọc bản soạn */
+        get: operations["extensionKhtcArchivePreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/exported-reports/zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tải tối đa 10 bản Excel đã xuất, tổng byte gốc tối đa 20 MiB */
+        post: operations["extensionKhtcArchiveZIP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/external/indicators": {
         parameters: {
             query?: never;
@@ -22911,6 +22945,14 @@ export interface components {
             items: components["schemas"]["KHTCArchiveRow"][];
             has_more: boolean;
             offset: number;
+        };
+        KHTCArchivePreview: {
+            /** Format: uuid */
+            export_id: string;
+            /** Format: int64 */
+            version: number;
+            content: components["schemas"]["KHTCReportContent"];
+            template_document?: components["schemas"]["KHTCTemplateRendered"];
         };
         KHTCReportPeriod: {
             /** Format: uuid */
@@ -47093,6 +47135,71 @@ export interface operations {
             };
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcArchivePreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                exportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung và mẫu đã ghim của đúng bản xuất */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCArchivePreview"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcArchiveZIP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    items: {
+                        /** Format: uuid */
+                        period_id: string;
+                        /** Format: uuid */
+                        export_id: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description ZIP chứa nguyên byte Excel đã lưu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
