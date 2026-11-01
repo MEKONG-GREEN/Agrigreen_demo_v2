@@ -9,7 +9,7 @@ Khôi phục #54 từ `origin/dev` tại `857934416860007cfb2e1b886f682dea27c3ec
 | Năng lực | Shared contract / nơi dùng | Đăng ký do KN sở hữu |
 |---|---|---|
 | Dựng nguồn và nhãn/cột | `reports/port` SourceBuilderRegistration, CatalogRegistration; `reports/app/source_builder.go`, `catalog.go` | `extension.ReportBuilders`, `extension.ReportCatalog` |
-| Chính sách vai, phiên, dispatch | `reports/port` Policy, SessionResolver; `reports/app/policy_registry.go`, `session.go` | `extension.ReportPolicy`, `extension.ReportSessionResolver` |
+| Chính sách vai, phiên, dispatch | `reports/port` Policy, SessionResolver; `reports/app/policy_registry.go`, `forms.go` và `dispatch.go` | `extension.ReportPolicy`, `extension.ReportSessionResolver` |
 | Mẫu lưới có sẵn | `reports/port` FormSeedRegistration; engine lưới và renderer dùng chung | `extension.ReportFormSeeds` |
 | Kỳ, kết quả tổng hợp, lịch sử gửi | `reports/port/consolidations.go`; dispatch qua cổng | `kn.Consolidations()` và `rep.DispatchHistory()` tại assembly |
 | Lịch xuất và job | Native scheduler, DLP, outbox và immutable job snapshot; policy nguồn kiểm quyền hiện hành | Owner có thể đăng ký SourceJobPolicy, không suy quyền từ realm hoặc bộ lọc client |
