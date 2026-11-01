@@ -24,7 +24,7 @@ export function KhtcDashboardScreen() {
    <label>Năm<select aria-label="Năm" value={filter.year} onChange={e => update({ year: Number(e.target.value) })}>{YEARS.map(y => <option key={y}>{y}</option>)}</select></label>
    <label>Quý<select aria-label="Quý" value={filter.quarter} onChange={e => update({ quarter: Number(e.target.value) })}>{[1, 2, 3, 4].map(q => <option key={q} value={q}>Quý {q}</option>)}</select></label>
    <label>Phòng<select aria-label="Phòng" value={filter.department ?? ""} onChange={e => update({ department: e.target.value })}><option value="">Tất cả</option>{Object.entries(DEPT_LABEL).map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></label>
-   <LoadState s={fields}>{f => <label>Lĩnh vực<select aria-label="Lĩnh vực" value={filter.field ?? ""} onChange={e => update({ field: e.target.value })}><option value="">Tất cả</option>{f.items.filter(x => x.active).map(x => <option key={x.code} value={x.code}>{x.name}</option>)}</select></label>}</LoadState>
+   <LoadState s={fields}>{f => <label>Lĩnh vực (tiến độ chương trình)<select aria-label="Lĩnh vực" value={filter.field ?? ""} onChange={e => update({ field: e.target.value })}><option value="">Tất cả</option>{f.items.filter(x => x.active).map(x => <option key={x.code} value={x.code}>{x.name}</option>)}</select></label>}</LoadState>
    <button type="button" className="btn btn-o" onClick={data.reload} disabled={data.loading}>Làm mới</button>
   </form>
   <LoadState s={data}>{d => <>
