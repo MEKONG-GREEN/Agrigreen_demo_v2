@@ -9,6 +9,7 @@ package handler_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -107,6 +108,7 @@ type files struct {
 	byRef    map[uuid.UUID]evport.File
 	blobs    map[uuid.UUID][]byte
 	purposes []string
+	attaches int // số lần Attach thật (phát lại Idempotency-Key không được gọi lại — #172)
 }
 
 func (f *files) Attach(ctx context.Context, in evport.AttachInput) (evport.File, bool, error) {
@@ -126,6 +128,7 @@ func (f *files) Attach(ctx context.Context, in evport.AttachInput) (evport.File,
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.byRef[ref], f.blobs[ref] = file, append([]byte(nil), in.Blob...)
+	f.attaches++
 	return file, true, nil
 }
 
@@ -292,6 +295,27 @@ func (u user) upload(household, kind string, content []byte) resp {
 	r, _ := http.NewRequest(http.MethodPost, u.f.srv.URL+base+"diary-photos", &buf)
 	r.Header.Set("Content-Type", w.FormDataContentType())
 	return u.send(r, key())
+}
+
+// photoBody dựng thân multipart TẤT ĐỊNH như web (#172: boundary cố định, id + captured_at do client giữ khi bấm lại).
+func photoBody(household, kind, id string, content []byte) ([]byte, string) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	_ = w.SetBoundary("----AgFormBoundary172photo")
+	_ = w.WriteField("household_ref", household)
+	_ = w.WriteField("kind", kind)
+	_ = w.WriteField("id", id)
+	_ = w.WriteField("captured_at", t0.Add(-time.Hour).Format(time.RFC3339))
+	fw, _ := w.CreateFormFile("file", "anh.jpg")
+	_, _ = fw.Write(content)
+	_ = w.Close()
+	return buf.Bytes(), w.FormDataContentType()
+}
+
+func (u user) uploadRaw(k, ctype string, body []byte) resp {
+	r, _ := http.NewRequest(http.MethodPost, u.f.srv.URL+base+"diary-photos", bytes.NewReader(body))
+	r.Header.Set("Content-Type", ctype)
+	return u.send(r, k)
 }
 
 func key() string                            { return "k-" + ids.New().String() }
@@ -473,6 +497,7 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	if l := list(want(t, chu.get(base+"diary-entries?flagged=true&cycle_ref="+cref), 200, "", "lọc có cảnh báo"), "items"); len(l) != 1 {
 		t.Fatalf("lọc lần ghi có cảnh báo: %v", l)
 	}
+	diaryProvinceList(t, viewer, other, offlineID, e2ref)
 	want(t, viewer.post(base+"diary-entries/"+e2ref+"/verify", map[string]any{"base_version": 1}), 403, "", "viên chức không xác thực")
 	want(t, officer.post(base+"diary-entries/"+e2ref+"/verify", map[string]any{"base_version": 1}), 403, "", "người ghi không xác thực")
 	want(t, chu.post(base+"diary-entries/"+e2ref+"/return", map[string]any{"base_version": 1, "reason": ""}), 422, "", "thiếu lý do")
@@ -556,6 +581,40 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	f.files.mu.Unlock()
 	if len(blob) == 0 || bytes.Contains(blob, []byte("IHDR")) {
 		t.Fatal("kho tệp phải giữ bản mã, không giữ ảnh rõ")
+	}
+	// #172: mất phản hồi sau khi đã lưu → web gửi lại đúng thân multipart (cùng id, cùng boundary) với cùng khóa → máy chủ
+	// phát lại ảnh đã lưu, không mã hóa/lưu lần hai; cùng khóa mà khác ảnh → idempotency_key_reused.
+	pid := ids.New().String()
+	pb, pct := photoBody(hCa, "weighing", pid, pngBytes)
+	pk := key()
+	p1 := officer.uploadRaw(pk, pct, pb)
+	want(t, p1, 201, "", "tải ảnh (multipart tất định)")
+	f.files.mu.Lock()
+	before := f.files.attaches
+	f.files.mu.Unlock()
+	p2 := officer.uploadRaw(pk, pct, pb)
+	if want(t, p2, 201, "", "bấm lại sau mất phản hồi"); str(p2.body, "file_ref") != pid || !bytes.Equal(p2.raw, p1.raw) {
+		t.Fatalf("phải phát lại đúng ảnh đã lưu: %s / %s", p1.raw, p2.raw)
+	}
+	f.files.mu.Lock()
+	after := f.files.attaches
+	f.files.mu.Unlock()
+	if after != before {
+		t.Fatalf("phát lại không được lưu ảnh lần hai: %d → %d", before, after)
+	}
+	ob, oct := photoBody(hCa, "weighing", pid, append(bytes.Clone(pngBytes), 0))
+	want(t, officer.uploadRaw(pk, oct, ob), 422, "idempotency_key_reused", "cùng khóa, khác ảnh")
+	// Review #172: khác ảnh + khóa mới nhưng dùng lại id ảnh đã lưu (cùng hộ) → 422 "mã ảnh đã dùng", không còn 409
+	// "chủ hộ chưa có khóa", và không mã hóa/lưu gì thêm.
+	reused := officer.uploadRaw(key(), oct, ob)
+	if want(t, reused, 422, "extension.cnts_diary_photo_invalid", "khóa mới, id ảnh đã dùng"); !bytes.Contains(reused.raw, []byte("mã ảnh đã dùng")) {
+		t.Fatalf("id ảnh đã dùng phải báo ở trường id: %s", reused.raw)
+	}
+	f.files.mu.Lock()
+	reAttach := f.files.attaches
+	f.files.mu.Unlock()
+	if reAttach != after {
+		t.Fatalf("id ảnh đã dùng không được Attach: %d → %d", after, reAttach)
 	}
 	want(t, officer.post(base+"diary-entries", merge(fish, map[string]any{"photo_refs": []string{ids.New().String()},
 		"metrics": merge(fish["metrics"].(map[string]any), map[string]any{"action_note": "Thay 30% nước"})})), 422,
@@ -707,5 +766,56 @@ func TestCNTSDiary_BFCNDiaryPaperFields(t *testing.T) {
 	d = want(t, officer.get(base+"diary-cycles/"+cref), 200, "", "gợi ý hạch toán")
 	if fc := str(obj(d, "suggest"), "feed_cost"); fc != "384000" { // 25×12.000 + 10,5×8.000
 		t.Fatalf("NC-09 mục 3 + mục 4 cộng vào gợi ý chi thức ăn: %s", fc)
+	}
+}
+
+// diaryProvinceList: BF-CN-XA-DATA (#175) — màn Tỉnh "Số liệu cấp xã › Nhật ký sản xuất": lọc xã, mẫu, khoảng ngày ở máy
+// chủ; trang theo con trỏ (khóa entry_date, captured_at, entry_ref giảm dần); xã ngoài phạm vi → rỗng; tham số sai → 422.
+func diaryProvinceList(t *testing.T, viewer, outsider user, e1, e2 string) {
+	t.Helper()
+	p1 := want(t, viewer.get(base+"diary-entries?limit=1"), 200, "", "trang 1")
+	l1 := list(p1, "items")
+	if len(l1) != 1 || str(l1[0].(map[string]any), "ref") != e2 || str(p1, "next_cursor") == "" {
+		t.Fatalf("trang 1 (mới trước, còn trang sau): %v", p1)
+	}
+	p2 := want(t, viewer.get(base+"diary-entries?limit=1&cursor="+str(p1, "next_cursor")), 200, "", "trang 2")
+	l2 := list(p2, "items")
+	if len(l2) != 1 || str(l2[0].(map[string]any), "ref") != e1 || p2["next_cursor"] != nil {
+		t.Fatalf("trang 2 (hết): %v", p2)
+	}
+	if all := want(t, viewer.get(base+"diary-entries"), 200, "", "không limit"); len(list(all, "items")) != 2 || all["next_cursor"] != nil {
+		t.Fatalf("không limit: %v", all)
+	}
+	for q, n := range map[string]int{
+		"commune=30001":                             2,
+		"commune=30002":                             0,
+		"commune=30001&form=BM-19":                  0,
+		"form=BM-08&from=2027-10-12&to=2027-10-12":  1,
+		"from=2027-10-13":                           0,
+		"to=2027-10-11":                             1,
+		"commune=30001&status=submitted&form=BM-08": 2,
+		"commune=30001&status=verified":             0,
+	} {
+		if l := list(want(t, viewer.get(base+"diary-entries?"+q), 200, "", q), "items"); len(l) != n {
+			t.Fatalf("%s: %d lần ghi, muốn %d", q, len(l), n)
+		}
+	}
+	if l := list(want(t, outsider.get(base+"diary-entries?commune=30001"), 200, "", "xã ngoài phạm vi"), "items"); len(l) != 0 {
+		t.Fatalf("xã ngoài phạm vi phải rỗng: %v", l)
+	}
+	// #175 review [P2]: phân trang SAU khi lọc phạm vi — tài khoản xã 30002 không thấy lần ghi nào của xã 30001 thì không
+	// được nhận con trỏ (con trỏ cũ mang ngày ghi, captured_at, UUID của lần ghi ngoài phạm vi).
+	for _, q := range []string{"limit=1", "limit=2", ""} {
+		p := want(t, outsider.get(base+"diary-entries?"+q), 200, "", "ngoài phạm vi "+q)
+		if len(list(p, "items")) != 0 || p["next_cursor"] != nil {
+			t.Fatalf("ngoài phạm vi (%q) phải rỗng và không con trỏ: %v", q, p)
+		}
+	}
+	// Con trỏ chỉ mang khóa của dòng cuối ĐÃ TRẢ cho người gọi.
+	if raw, err := base64.RawURLEncoding.DecodeString(str(p1, "next_cursor")); err != nil || !strings.HasSuffix(string(raw), "|"+e2) {
+		t.Fatalf("con trỏ trang 1 phải là khóa của %s: %q %v", e2, raw, err)
+	}
+	for _, q := range []string{"form=BM-99", "limit=0", "limit=201", "limit=x", "cursor=YWJj", "cursor=!!!", "from=2027-10-12&to=2027-10-11", "from=12/10/2027"} {
+		want(t, viewer.get(base+"diary-entries?"+q), 422, "", "tham số sai: "+q)
 	}
 }

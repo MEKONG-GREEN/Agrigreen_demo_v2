@@ -108,7 +108,7 @@ func TestDefaultRouteSelection(t *testing.T) {
 		{partyport.AudienceTinh, "ke_hoach_tai_chinh", "", nil, "/kn/khtc/ky-bao-cao"},
 		{partyport.AudienceTinh, "trong_trot", partyport.MenuProfileTrongTrot, nil, "/kn/bao-cao-khtc"},
 		{partyport.AudienceTinh, "phong_moi", partyport.MenuProfileGeneric, nil, "/kn/dashboard"},
-		{partyport.AudienceTW, "ke_hoach_tai_chinh", partyport.MenuProfileKeHoachTaiChinh, nil, "/kn/dashboard"},
+		{partyport.AudienceTW, "ke_hoach_tai_chinh", partyport.MenuProfileKeHoachTaiChinh, nil, "/kn/khtc/bao-cao-da-xuat"},
 		// BF-MENU (#98): menu CNTS Cấp Xã không có "Công việc cần làm" của Trồng trọt → mục bật đầu tiên "Việc cần làm".
 		{partyport.AudienceXa, "chan_nuoi_thuy_san", partyport.MenuProfileGeneric, nil, "/kn/cnts/bao-cao-ky"},
 		{partyport.AudienceTinh, "thong_tin_truyen_thong", partyport.MenuProfileThongTinTuyenTruyen, map[string]bool{"pf/extension": true}, "/kn/bao-gia/tien-do"},

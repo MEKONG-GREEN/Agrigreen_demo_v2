@@ -93,13 +93,16 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     render(<CntsCatalogItemFormScreen />);
     expect(screen.getByRole("heading", { level: 1, name: /Thêm cơ sở giết mổ/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Hủy" })).toHaveAttribute("href", "/kn/cnts/danh-muc?tab=cnts_slaughter_facility");
-    await screen.findByLabelText(/Mã xã\/phường\/đặc khu/);
+    const xa = await screen.findByLabelText(/^Xã\/phường\/đặc khu/);
+    expect(xa.tagName).toBe("SELECT"); // chọn từ danh mục ĐVHC, không gõ mã (#169)
     await user.click(screen.getByRole("button", { name: "Lưu" }));
     expect(screen.getAllByRole("alert").filter((a) => a.textContent === "Bắt buộc nhập.").length).toBeGreaterThanOrEqual(4); // Mã, Tên, Xã, Loại cơ sở
     expect(push).not.toHaveBeenCalled();
     await user.type(screen.getByLabelText(/^Mã \*$/), "CS_MOI");
     await user.type(screen.getByLabelText(/^Tên \*$/), "Cơ sở mới");
-    await user.type(screen.getByLabelText(/Mã xã\/phường\/đặc khu/), "30292");
+    await user.selectOptions(await screen.findByLabelText(/Tỉnh\/thành phố của xã/), "91");
+    await waitFor(() => expect(within(screen.getByLabelText(/^Xã\/phường\/đặc khu/)).getByRole("option", { name: "Xã Bình Thạnh (91101)" })).toBeTruthy());
+    await user.selectOptions(screen.getByLabelText(/^Xã\/phường\/đặc khu/), "91101");
     await user.selectOptions(screen.getByLabelText(/Loại cơ sở/), "nho_le");
     await user.type(screen.getByLabelText(/Mã số khắc mộc dấu gia súc \(GS\)/), "91.589.05.1");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
@@ -108,6 +111,36 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     await user.type(screen.getByLabelText(/Mã số khắc mộc dấu gia súc \(GS\)/), "91.600.01");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/kn/cnts/danh-muc?tab=cnts_slaughter_facility"));
+  });
+
+  it("CSGM (#169): danh sách có cột riêng Xã (tên), Mã xã, Loại, mộc dấu GS/GC, Loài, Địa chỉ và lọc theo xã", async () => {
+    nav.search = "tab=cnts_slaughter_facility";
+    const user = userEvent.setup();
+    render(<CntsCatalogScreen />);
+    expect(await screen.findByText("Cơ sở giết mổ tập trung mẫu số 2 (giả lập)")).toBeTruthy();
+    for (const h of ["Xã", "Mã xã", "Loại", "Mộc dấu GS", "Mộc dấu GC", "Loài", "Địa chỉ", "Trạng thái"]) expect(screen.getByRole("columnheader", { name: h })).toBeTruthy();
+    const row = screen.getByText("Cơ sở giết mổ tập trung mẫu số 2 (giả lập)").closest("tr")!;
+    expect(await within(row).findByText("Xã Bình Thạnh")).toBeTruthy();
+    expect(within(row).getByText("91101")).toBeTruthy();
+    expect(within(row).getByText("91.900.21")).toBeTruthy();
+    expect(within(row).getByText("91.900.22")).toBeTruthy();
+    expect(within(row).getByText("Ấp Mẫu 2")).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText("Lọc theo xã"), "91102");
+    expect(screen.queryByText("Cơ sở giết mổ tập trung mẫu số 2 (giả lập)")).toBeNull();
+    expect(screen.getByText("Cơ sở giết mổ nhỏ lẻ mẫu số 3 (giả lập)")).toBeTruthy();
+  });
+
+  it("CSGM (#169): trang chi tiết hiện tên và mã xã; máy chủ (mock) từ chối mã xã không có trong ĐVHC", async () => {
+    nav.path = "/kn/cnts/danh-muc/cnts_slaughter_facility/CSGM_MAU_03";
+    nav.params = { type: "cnts_slaughter_facility", code: "CSGM_MAU_03" };
+    render(<CntsCatalogItemScreen />);
+    expect(await screen.findByText("Xã An Phước (91102)")).toBeTruthy();
+    const r = await admin().POST("/v1/masterdata/catalogs/{catalog}/items", {
+      params: { path: { catalog: "cnts_slaughter_facility" }, header: { "Idempotency-Key": "csgm-xa-la" } },
+      body: { code: "CS_XA_LA", name: "Cơ sở xã lạ", attrs: { commune_code: "99999", facility_kind: "nho_le" } },
+    });
+    expect(r.response.status).toBe(422);
+    expect((r.error as { code?: string }).code).toBe("masterdata.cnts_commune_invalid");
   });
 
   it("Vật nuôi: Thứ tự cột âm / thập phân / quá 999 bị chặn (R-A1), không gọi API", async () => {

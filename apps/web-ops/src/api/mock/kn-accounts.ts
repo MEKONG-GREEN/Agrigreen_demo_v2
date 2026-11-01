@@ -136,6 +136,17 @@ export const KN_ACCOUNTS: MockKnAccount[] = [
     identifiers: ["hung.tq@angiang.gov.vn", "0912345606"],
     assignments: [a("asg-hung-tinh", "kn_tinh", { mgmt_level: "Trưởng phòng", departments: dept("hanh_chinh_tong_hop") })],
   },
+  {
+    // W11.53b: tài khoản thử phòng Chăn nuôi – Thủy sản (Cấp Tỉnh Trưởng phòng + Cấp TW) cho luồng mẫu biểu dự án KNQG
+    // (tests/e2e/kn-cnts-knqg.spec.ts). Phòng CNTS mặc định "Chưa mở": Admin bật trước. Dữ liệu tổng hợp, không phải người thật.
+    id: "kn-cnts",
+    displayName: "Cán bộ CNTS (thử)",
+    identifiers: ["cnts.thu@demo.agrigreen.test", "0900000607"],
+    assignments: [
+      a("asg-cnts-tinh", "kn_tinh", { mgmt_level: "Trưởng phòng", departments: dept("chan_nuoi_thuy_san") }),
+      a("asg-cnts-tw", "kn_tw", { departments: dept("chan_nuoi_thuy_san") }),
+    ],
+  },
 ];
 
 export function findKnAccount(id: string | null | undefined): MockKnAccount | undefined {

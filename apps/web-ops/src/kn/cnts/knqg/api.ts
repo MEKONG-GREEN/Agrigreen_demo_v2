@@ -16,6 +16,27 @@ export type DocDetail = S["CNTSKNQGDocDetail"];
 export type Content = S["CNTSKNQGContent"];
 export type Create = S["CNTSKNQGCreate"];
 export type WordRun = S["CNTSKNQGWordRun"];
+export type Photo = S["CNTSKNQGPhoto"];
+export type PhotoList = S["CNTSKNQGPhotoList"];
+
+/** Giới hạn ảnh thực địa Mẫu 03 (W11.53b — máy chủ kiểm lại cả chữ ký đầu tệp). */
+export const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+export const PHOTO_CAPTION_MAX = 300;
+
+/** Lỗi chọn ảnh thực địa (null = hợp lệ): chỉ JPG/PNG, 1 byte – 5 MB, chú thích ≤ 300 ký tự. */
+export function photoError(file: File | null, caption = ""): string | null {
+  if (!file) return "Chọn ảnh (JPG, PNG ≤ 5 MB).";
+  if (!/\.(jpe?g|png)$/i.test(file.name)) return "Chỉ nhận ảnh .jpg, .jpeg, .png.";
+  if (file.size <= 0 || file.size > PHOTO_MAX_BYTES) return "Ảnh tối đa 5 MB.";
+  if ([...caption.trim()].length > PHOTO_CAPTION_MAX) return "Chú thích tối đa 300 ký tự.";
+  return null;
+}
+
+/** Mã biểu mở thẳng từ đường dẫn thông báo (?doc=<uuid>); không hợp lệ → null. */
+export function docFromSearch(search: string): string | null {
+  const v = new URLSearchParams(search).get("doc");
+  return v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v.toLowerCase() : null;
+}
 export type Action = Doc["actions"][number];
 export type Row = Record<string, string>;
 
@@ -178,6 +199,27 @@ export function createKnqgApi(api: ApiClient) {
       if (!res.response.ok || !res.data) throw await parseProblemResponse(res.response);
       return res.data as Blob;
     },
+    // W11.53b: ảnh thực địa Mẫu 03 — thân multipart tất định như ký (bấm lại sau mất phản hồi → cùng khóa, máy chủ phát lại).
+    photos: (ref: string): Promise<PhotoList> => unwrap(api.GET("/v1/extension/cnts/knqg-docs/{ref}/photos", { params: { path: { ref } } })),
+    addPhoto: (ref: string, file: File, caption = ""): Promise<PhotoList> => {
+      const parts: [string, string | File][] = caption.trim() ? [["caption", caption.trim()], ["file", file]] : [["file", file]];
+      const mp = stableMultipart(parts);
+      return unwrap(
+        api.POST("/v1/extension/cnts/knqg-docs/{ref}/photos", {
+          params: { path: { ref }, ...idem() },
+          headers: { "Content-Type": mp.contentType },
+          body: { file: file as unknown as string, ...(caption.trim() ? { caption: caption.trim() } : {}) },
+          bodySerializer: () => mp.body,
+        }),
+      );
+    },
+    async photo(ref: string, photo: string): Promise<Blob> {
+      const res = await api.GET("/v1/extension/cnts/knqg-docs/{ref}/photos/{photo}", { params: { path: { ref, photo } }, parseAs: "blob" });
+      if (!res.response.ok || !res.data) throw await parseProblemResponse(res.response);
+      return res.data as Blob;
+    },
+    removePhoto: (ref: string, photo: string): Promise<PhotoList> =>
+      unwrap(api.POST("/v1/extension/cnts/knqg-docs/{ref}/photos/{photo}/remove", { params: { path: { ref, photo }, ...idem() } })),
     exportWord: (ref: string): Promise<WordRun> => unwrap(api.POST("/v1/extension/cnts/knqg-docs/{ref}/word", { params: { path: { ref }, ...idem() } })),
     words: async (ref: string): Promise<WordRun[]> =>
       (await unwrap(api.GET("/v1/extension/cnts/knqg-docs/{ref}/words", { params: { path: { ref } } }))).items,

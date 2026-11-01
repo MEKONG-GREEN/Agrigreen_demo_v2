@@ -8,6 +8,7 @@ package app
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"slices"
 	"strings"
@@ -109,19 +110,54 @@ func refOf(t store.Template) (port.TemplateRef, error) {
 
 // PublishBatch thực hiện port.Publisher: mọi kỳ của lô cùng biểu, cùng đơn vị nhận, trong MỘT giao dịch.
 func (pb Publisher) PublishBatch(ctx context.Context, in port.BatchInput, idem string) ([]port.PublishedPeriod, error) {
+	return pb.publishBatch(ctx, in, idem, false)
+}
+func (pb Publisher) PublishBatchOnce(ctx context.Context, in port.BatchInput, idem string) ([]port.PublishedPeriod, error) {
+	if idem == "" {
+		return nil, problem.IdempotencyRequired
+	}
+	return pb.publishBatch(ctx, in, idem, true)
+}
+func (pb Publisher) publishBatch(ctx context.Context, in port.BatchInput, idem string, replay bool) ([]port.PublishedPeriod, error) {
 	s := pb.Svc
 	prof, a, err := s.resolve(ctx, in.Profile)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.need(prof.PublishBy, "phát hành kỳ"); err != nil {
-		return nil, err
+	publicationLevel := a.level
+	publicationSource := ""
+	if a.level != prof.PublishBy {
+		// Bound raw collections before computing the optional invocation fingerprint.
+		if len(in.Periods) > MaxBatchPeriods || len(in.Units) > 2000 {
+			return nil, problem.Validation.WithDetail("Lô kỳ quá lớn")
+		}
+		hash, err := port.OperationHash(in)
+		if err != nil {
+			return nil, err
+		}
+		grant, err := needOperation(ctx, prof, a, prof.PublishBy, "phát hành kỳ", port.Operation{Action: port.OperationPublishBatch, Profile: in.Profile, PayloadHash: hash, IdemKey: idem})
+		if err != nil {
+			return nil, err
+		}
+		if !grant.Allowed {
+			return nil, problem.Forbidden
+		}
+		// This is the task's configured publication level, never an actor role alias.
+		publicationLevel, publicationSource = prof.PublishBy, grant.Source
 	}
 	if len(in.Periods) == 0 || len(in.Periods) > MaxBatchPeriods {
 		return nil, problem.Validation.WithField("periods", "1–366 kỳ mỗi lô")
 	}
 	if err := domain.ValidateUnits(in.Units); err != nil {
 		return nil, problem.Validation.WithField("units", err.Error())
+	}
+	// Durable receipts use PostgreSQL timestamptz precision. Normalize only this
+	// optional path, after its authorization fingerprint, without mutating callers.
+	if replay {
+		in.Periods = append([]port.PeriodDef(nil), in.Periods...)
+		for i := range in.Periods {
+			in.Periods[i].DueAt = in.Periods[i].DueAt.Truncate(time.Microsecond)
+		}
 	}
 	kind := unitKindOf(prof, in.UnitKind)
 	parents, err := s.facilityParents(ctx, kind, in.Units, in.UnitParents, in.Periods[0].From)
@@ -145,9 +181,30 @@ func (pb Publisher) PublishBatch(ctx context.Context, in port.BatchInput, idem s
 			return nil, problem.Forbidden.WithDetail("đơn vị " + u + " ngoài phạm vi người phát hành")
 		}
 	}
+	storageKey := idem
+	if replay {
+		digest, e := port.OperationHash(idem)
+		if e != nil {
+			return nil, e
+		}
+		storageKey = "forms:publish_once:" + digest
+	}
 	now := s.Clock.Now().UTC()
 	var out []port.PublishedPeriod
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
+		if replay {
+			if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('forms:publish_once:'||$1::uuid::text||':'||$2,0))", a.tenant, idem); err != nil {
+				return err
+			}
+			receipts, exists, err := batchReceipts(ctx, tx, a, in, specs, storageKey)
+			if err != nil {
+				return err
+			}
+			if exists {
+				out = receipts
+				return nil
+			}
+		}
 		t, err := store.TemplateByID(ctx, tx, in.TemplateID)
 		if err != nil {
 			return err
@@ -164,19 +221,22 @@ func (pb Publisher) PublishBatch(ctx context.Context, in port.BatchInput, idem s
 				key = pd.From.Format(time.DateOnly)
 			}
 			p := store.Period{ID: ids.New(), TemplateID: t.ID, Label: strings.TrimSpace(pd.Label), DueAt: pd.DueAt, Units: in.Units,
-				PublisherLevel: a.level, ActorRef: a.ref, EventTime: now}
+				PublisherLevel: publicationLevel, ActorRef: a.ref, EventTime: now}
 			if a.node != uuid.Nil {
 				owner := a.node
 				p.OwnerRef = &owner
 			}
-			if err := store.InsertPeriod(ctx, tx, a.tenant, &p, idemOr(idem, "period:"+key)); err != nil {
+			if err := store.InsertPeriod(ctx, tx, a.tenant, &p, idemOr(storageKey, "period:"+key)); err != nil {
 				return err
 			}
-			if err := store.InsertSpec(ctx, tx, a.tenant, p.ID, specs[i], a.ref, now, idemOr(idem, "spec:"+key)); err != nil {
+			if err := store.InsertSpec(ctx, tx, a.tenant, p.ID, specs[i], a.ref, now, idemOr(storageKey, "spec:"+key)); err != nil {
 				return err
 			}
 			ev := domain.Event{ID: ids.New(), Action: "published", Mode: port.ModeManual, Actor: a.ref, At: now}
-			if err := store.InsertEvent(ctx, tx, a.tenant, p.ID, p.Profile, &ev, idemOr(idem, "published:"+key)); err != nil {
+			if publicationSource != "" {
+				ev.Reason = "Nguồn cấp quyền: " + publicationSource
+			}
+			if err := store.InsertEvent(ctx, tx, a.tenant, p.ID, p.Profile, &ev, idemOr(storageKey, "published:"+key)); err != nil {
 				return err
 			}
 			out = append(out, port.PublishedPeriod{ID: p.ID, Key: pd.Key, Label: p.Label, DueAt: p.DueAt})
@@ -241,7 +301,60 @@ func (s *Service) Previous(ctx context.Context, profile string, periodID uuid.UU
 type TaskFilter struct {
 	Code     string     // mã biểu (rỗng = mọi biểu)
 	From, To *time.Time // khoảng ngày của kỳ (đặc tả)
-	Limit    int        // số kỳ tối đa (mặc định 60, trần 200)
+	// Limit: số kỳ tối đa (mặc định 60, trần 200) — đếm SAU khi lọc phạm vi người gọi (kỳ có ít nhất một công việc).
+	Limit int
+	// Cursor: con trỏ trang sau (TaskPage.NextCursor của trang trước; rỗng = từ kỳ mới nhất).
+	Cursor string
+}
+
+// TaskPage là một trang công việc; NextCursor rỗng = hết. Con trỏ chỉ dựng từ kỳ đã trả cho người gọi.
+type TaskPage struct {
+	Items      []Task
+	NextCursor string
+}
+
+const maxTaskPeriods = 200
+
+// taskScanBatch là số kỳ đọc mỗi lô khi lọc phạm vi (biến để test buộc nhiều lô).
+var taskScanBatch = 200
+
+var errTaskCursor = problem.Validation.WithField("cursor", "con trỏ trang không hợp lệ")
+
+func encodeTaskCursor(k store.PeriodKey) string {
+	from := "-"
+	if k.From != nil {
+		from = k.From.UTC().Format(time.DateOnly)
+	}
+	return base64.RawURLEncoding.EncodeToString([]byte(from + "|" + k.ID.String()))
+}
+
+func decodeTaskCursor(s string) (*store.PeriodKey, error) {
+	if s == "" {
+		return nil, nil
+	}
+	if len(s) > 100 {
+		return nil, errTaskCursor
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return nil, errTaskCursor
+	}
+	from, id, ok := strings.Cut(string(raw), "|")
+	if !ok {
+		return nil, errTaskCursor
+	}
+	k := store.PeriodKey{}
+	if k.ID, err = uuid.Parse(id); err != nil {
+		return nil, errTaskCursor
+	}
+	if from != "-" {
+		d, err := time.Parse(time.DateOnly, from)
+		if err != nil {
+			return nil, errTaskCursor
+		}
+		k.From = &d
+	}
+	return &k, nil
 }
 
 // Task là một công việc: một đơn vị trong phạm vi của một kỳ.
@@ -256,44 +369,77 @@ type Task struct {
 // Tasks liệt kê công việc (kỳ × đơn vị trong phạm vi người gọi) của profile, kỳ mới trước — màn "Công việc cần làm"
 // (CNTS FN-08) và theo dõi nộp của Cấp Tỉnh. Kỳ đã hủy bỏ qua.
 func (s *Service) Tasks(ctx context.Context, profile string, f TaskFilter) ([]Task, error) {
+	p, err := s.TasksPage(ctx, profile, f)
+	return p.Items, err
+}
+
+// TasksPage như Tasks kèm con trỏ trang sau. BF-CN-XA-DATA (#175): giới hạn số kỳ áp SAU khi lọc biểu, trạng thái hủy
+// và phạm vi người gọi — kỳ ngoài phạm vi không chiếm chỗ của kỳ trong phạm vi (đọc theo lô cho tới khi đủ limit + 1 kỳ
+// có công việc hoặc hết kỳ); con trỏ là khóa của kỳ cuối ĐÃ TRẢ, không bao giờ của kỳ bị loại.
+func (s *Service) TasksPage(ctx context.Context, profile string, f TaskFilter) (TaskPage, error) {
 	_, a, err := s.resolve(ctx, profile)
 	if err != nil {
-		return nil, err
+		return TaskPage{}, err
 	}
-	if f.Limit <= 0 || f.Limit > 200 {
+	if f.Limit <= 0 || f.Limit > maxTaskPeriods {
 		f.Limit = 60
 	}
+	after, err := decodeTaskCursor(f.Cursor)
+	if err != nil {
+		return TaskPage{}, err
+	}
 	now := s.Clock.Now().UTC()
-	var out []Task
+	var out TaskPage
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
-		ps, err := store.PeriodsFiltered(ctx, tx, profile, f.Code, f.From, f.To, f.Limit)
-		if err != nil {
-			return err
-		}
-		for _, p := range ps {
-			v, err := load(ctx, tx, p.ID, now)
+		kept := 0
+		var lastKept store.PeriodKey
+		for {
+			ps, err := store.PeriodsFilteredAfter(ctx, tx, profile, f.Code, f.From, f.To, after, taskScanBatch)
 			if err != nil {
 				return err
 			}
-			if v == nil || !a.allowsTemplate(v.Period.TemplateCode) || v.State.Status == domain.PeriodCancelled {
-				continue
-			}
-			a.filterTargets(v)
-			full := a.scope.All || a.owns(v.Period)
-			var tpl *store.Template
-			for _, u := range v.Units {
-				if (!full || a.targetFilter != nil) && !a.allowsUnit(v.Spec, v.Period.Units, u.Unit) {
+			for _, p := range ps {
+				v, err := load(ctx, tx, p.ID, now)
+				if err != nil {
+					return err
+				}
+				if v == nil { // sổ kỳ chỉ ghi thêm: kỳ vừa đọc phải còn (khóa lô sau cần ngày đầu của nó)
+					return port.ErrPeriodNotFound
+				}
+				after = &store.PeriodKey{ID: p.ID, From: v.Spec.From}
+				if !a.allowsTemplate(v.Period.TemplateCode) || v.State.Status == domain.PeriodCancelled {
 					continue
 				}
-				if tpl == nil {
-					if tpl, err = store.TemplateByID(ctx, tx, v.Period.TemplateID); err != nil {
-						return err
+				a.filterTargets(v)
+				full := a.scope.All || a.owns(v.Period)
+				var tasks []Task
+				var tpl *store.Template
+				for _, u := range v.Units {
+					if (!full || a.targetFilter != nil) && !a.allowsUnit(v.Spec, v.Period.Units, u.Unit) {
+						continue
 					}
+					if tpl == nil {
+						if tpl, err = store.TemplateByID(ctx, tx, v.Period.TemplateID); err != nil {
+							return err
+						}
+					}
+					tasks = append(tasks, Task{Period: v.Period, Spec: v.Spec, State: v.State, Unit: u, Template: tpl})
 				}
-				out = append(out, Task{Period: v.Period, Spec: v.Spec, State: v.State, Unit: u, Template: tpl})
+				if len(tasks) == 0 {
+					continue
+				}
+				if kept == f.Limit { // còn kỳ trong phạm vi sau trang này
+					out.NextCursor = encodeTaskCursor(lastKept)
+					return nil
+				}
+				kept++
+				lastKept = *after
+				out.Items = append(out.Items, tasks...)
+			}
+			if len(ps) < taskScanBatch {
+				return nil
 			}
 		}
-		return nil
 	})
 	return out, err
 }

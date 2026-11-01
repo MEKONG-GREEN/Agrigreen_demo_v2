@@ -13,7 +13,7 @@ import { resetCntsKnqg } from "@/api/mock/kn-cnts-knqg";
 import { resetCntsModel } from "@/api/mock/kn-cnts-model";
 import { createKnAdminApi } from "@/kn/cycle/api";
 import { createCntsModelApi } from "@/kn/cnts/model/api";
-import { createKnqgApi } from "./api";
+import { createKnqgApi, docFromSearch, photoError, PHOTO_MAX_BYTES } from "./api";
 
 async function contextOf(personaId: string, assignmentId: string, dept: string | null) {
   const r = await mockFetchNoDelay(
@@ -166,5 +166,46 @@ describe("stableMultipart", () => {
     expect(await f.text()).toBe("%PDF-1.4\r\n--x\r\n");
     const c = stableMultipart([["meta", '{"base_version":4}'], ["file", file]]);
     expect(c.contentType).not.toBe(a.contentType);
+  });
+});
+
+// W11.53b (#158): ảnh thực địa Mẫu 03 (UR-TINH-21) và đường dẫn thông báo mở thẳng biểu.
+describe("ảnh thực địa Mẫu 03", () => {
+  it("thêm (có chú thích) → xem → gỡ; Mẫu khác không nhận ảnh; đã trình ký thì khóa", async () => {
+    const k = createKnqgApi(adminApi);
+    const project = (await createCntsModelApi(adminApi).projects()).items.find((p) => p.kind === "knqg")!;
+    const d3 = await k.create({ form: "03", project_ref: project.ref });
+    expect((await k.photos(d3.ref)).items).toHaveLength(0);
+    const png = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], "chuong.png", { type: "image/png" });
+    const l = await k.addPhoto(d3.ref, png, "Chuồng nuôi điểm A");
+    expect(l.can_edit).toBe(true);
+    expect(l.items).toHaveLength(1);
+    expect(l.items[0]).toMatchObject({ name: "chuong.png", content_type: "image/png", caption: "Chuồng nuôi điểm A" });
+    expect((await k.photo(d3.ref, l.items[0]!.ref)).size).toBeGreaterThan(0);
+    await expect(k.addPhoto(d3.ref, new File(["x"], "a.gif"))).rejects.toMatchObject({ code: "extension.cnts_knqg_photo_invalid" });
+    expect((await k.removePhoto(d3.ref, l.items[0]!.ref)).items).toHaveLength(0);
+    await expect(k.removePhoto(d3.ref, l.items[0]!.ref)).rejects.toMatchObject({ code: "extension.cnts_knqg_photo_not_found" });
+    const d4 = await k.create({ form: "04", project_ref: project.ref });
+    await expect(k.addPhoto(d4.ref, png)).rejects.toMatchObject({ code: "extension.cnts_knqg_photo_invalid" });
+    const e3 = await k.update(d3.ref, d3.version, { ...d3.content, fields: { ...d3.content.fields, can_cu: "Kế hoạch 2027", thuc_dia: "Đủ điểm" } });
+    const w3 = await k.act(d3.ref, "request_sign", e3.version);
+    expect(w3.status).toBe("awaiting_sign");
+    await expect(k.addPhoto(d3.ref, png)).rejects.toMatchObject({ code: "extension.cnts_knqg_locked" });
+    expect((await k.photos(d3.ref)).can_edit).toBe(false);
+  });
+
+  it("kiểm ảnh phía trình duyệt: kiểu, cỡ, chú thích", () => {
+    expect(photoError(null)).toMatch(/Chọn ảnh/);
+    expect(photoError(new File(["x"], "a.gif"))).toMatch(/jpg/);
+    expect(photoError(new File([], "a.png"))).toMatch(/5 MB/);
+    expect(photoError(new File([new Uint8Array(PHOTO_MAX_BYTES + 1)], "a.jpg"))).toMatch(/5 MB/);
+    expect(photoError(new File(["x"], "a.JPEG"), "a".repeat(301))).toMatch(/300/);
+    expect(photoError(new File(["x"], "a.JPEG"), "Chuồng nuôi")).toBeNull();
+  });
+
+  it("đường dẫn thông báo ?doc= chỉ nhận UUID", () => {
+    expect(docFromSearch("?doc=0192F0A0-1234-7abc-8def-0123456789AB")).toBe("0192f0a0-1234-7abc-8def-0123456789ab");
+    expect(docFromSearch("?doc=../../x")).toBeNull();
+    expect(docFromSearch("")).toBeNull();
   });
 });

@@ -19,7 +19,7 @@ func TestW1106_MenuViewComingSoonAndAlias(t *testing.T) {
 		t.Fatal(err)
 	}
 	// BF-MENU (#98, kn.menu/v6): mục nghiệp vụ HCTH nằm trong nhóm Điều hành (Đánh giá), không còn nhóm "Nghiệp vụ".
-	if v.Version != "kn.menu/v7" || len(v.Groups) < 2 || v.Groups[0].Key != "dieu_hanh" || v.Groups[1].Key != domain.GroupBaoCao {
+	if v.Version != domain.MenuVersion || len(v.Groups) < 2 || v.Groups[0].Key != "dieu_hanh" || v.Groups[1].Key != domain.GroupBaoCao {
 		t.Fatalf("menu HCTH: %+v", v.Groups)
 	}
 	var it MenuItemView
@@ -28,8 +28,8 @@ func TestW1106_MenuViewComingSoonAndAlias(t *testing.T) {
 			it = item
 		}
 	}
-	if it.Enabled || it.Status != domain.ItemComingSoon || it.StatusLabel != "Sắp có" {
-		t.Fatalf("mục Sắp có: %+v", it)
+	if !it.Enabled || it.Status != "" || it.StatusLabel != "" || it.Route != "/kn/nhan-su/danh-gia" {
+		t.Fatalf("mục Đánh giá HCTH đã mở: %+v", it)
 	}
 	// W11.23: Contact (pf/contact) đã mở — mục thường của nhóm "Dùng chung".
 	if last := v.Groups[len(v.Groups)-1]; last.Key != domain.GroupDungChung || !last.Items[0].Enabled || last.Items[0].Status != "" {

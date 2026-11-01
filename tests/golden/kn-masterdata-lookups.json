@@ -182,7 +182,69 @@
     "ItemNotFound": false
   },
   "list/2026-08-31": {
-    "Value": [],
+    "Value": [
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 1, Phường Châu Đốc",
+          "commune_code": "30316",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5901",
+          "species": "BO,GA,HEO,TRAU,VIT",
+          "stamp_codes_gc": "91.900.02",
+          "stamp_codes_gs": "91.900.01"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_01",
+        "Name": "Cơ sở giết mổ tập trung mẫu 01 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 2, Phường Rạch Giá",
+          "commune_code": "30742",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5902",
+          "species": "BO,HEO,TRAU",
+          "stamp_codes_gs": "91.900.11,91.900.12"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_02",
+        "Name": "Cơ sở giết mổ tập trung mẫu 02 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 3, Xã Chợ Mới",
+          "commune_code": "30628",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "nho_le",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5903",
+          "species": "HEO",
+          "stamp_codes_gs": "91.900.21"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_03",
+        "Name": "Cơ sở giết mổ nhỏ lẻ mẫu 03 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 4, Xã Châu Phú",
+          "commune_code": "30463",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "nho_le",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5904",
+          "species": "GA,VIT",
+          "stamp_codes_gc": "91.900.31"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_04",
+        "Name": "Cơ sở giết mổ gia cầm nhỏ lẻ mẫu 04 (dữ liệu mẫu)"
+      }
+    ],
     "Error": "",
     "NotEffective": false,
     "FacilityNotFound": false,
@@ -202,6 +264,67 @@
         "Catalog": "cnts_slaughter_facility",
         "Code": "CSA",
         "Name": "Cơ sở CSA"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 1, Phường Châu Đốc",
+          "commune_code": "30316",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5901",
+          "species": "BO,GA,HEO,TRAU,VIT",
+          "stamp_codes_gc": "91.900.02",
+          "stamp_codes_gs": "91.900.01"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_01",
+        "Name": "Cơ sở giết mổ tập trung mẫu 01 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 2, Phường Rạch Giá",
+          "commune_code": "30742",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5902",
+          "species": "BO,HEO,TRAU",
+          "stamp_codes_gs": "91.900.11,91.900.12"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_02",
+        "Name": "Cơ sở giết mổ tập trung mẫu 02 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 3, Xã Chợ Mới",
+          "commune_code": "30628",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "nho_le",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5903",
+          "species": "HEO",
+          "stamp_codes_gs": "91.900.21"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_03",
+        "Name": "Cơ sở giết mổ nhỏ lẻ mẫu 03 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 4, Xã Châu Phú",
+          "commune_code": "30463",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "nho_le",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5904",
+          "species": "GA,VIT",
+          "stamp_codes_gc": "91.900.31"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_04",
+        "Name": "Cơ sở giết mổ gia cầm nhỏ lẻ mẫu 04 (dữ liệu mẫu)"
       }
     ],
     "Error": "",
@@ -224,6 +347,67 @@
         "Catalog": "cnts_slaughter_facility",
         "Code": "CSA",
         "Name": "Cơ sở CSA"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 1, Phường Châu Đốc",
+          "commune_code": "30316",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5901",
+          "species": "BO,GA,HEO,TRAU,VIT",
+          "stamp_codes_gc": "91.900.02",
+          "stamp_codes_gs": "91.900.01"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_01",
+        "Name": "Cơ sở giết mổ tập trung mẫu 01 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 2, Phường Rạch Giá",
+          "commune_code": "30742",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "tap_trung",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5902",
+          "species": "BO,HEO,TRAU",
+          "stamp_codes_gs": "91.900.11,91.900.12"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_02",
+        "Name": "Cơ sở giết mổ tập trung mẫu 02 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 3, Xã Chợ Mới",
+          "commune_code": "30628",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "nho_le",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5903",
+          "species": "HEO",
+          "stamp_codes_gs": "91.900.21"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_03",
+        "Name": "Cơ sở giết mổ nhỏ lẻ mẫu 03 (dữ liệu mẫu)"
+      },
+      {
+        "Active": true,
+        "Attrs": {
+          "address": "Khu vực mẫu 4, Xã Châu Phú",
+          "commune_code": "30463",
+          "description": "Dữ liệu mẫu để demo (BF-CN-SLAUGHTER), không phải cơ sở thật",
+          "facility_kind": "nho_le",
+          "facility_ref": "0190f1c4-7d3e-7000-8000-0000000c5904",
+          "species": "GA,VIT",
+          "stamp_codes_gc": "91.900.31"
+        },
+        "Catalog": "cnts_slaughter_facility",
+        "Code": "CSGM_MAU_04",
+        "Name": "Cơ sở giết mổ gia cầm nhỏ lẻ mẫu 04 (dữ liệu mẫu)"
       }
     ],
     "Error": "",

@@ -3,6 +3,7 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { stableMultipart } from "@/api/multipart";
 import { parseProblemResponse } from "@/api/problem";
 import { filenameFromDisposition } from "@/lib/files";
 
@@ -162,34 +163,41 @@ export function createDeptHomeApi(api: ApiClient, department?: string) {
       ),
     list: (q: DocQuery): Promise<DeptDocList> => unwrap(api.GET("/v1/extension/dept-docs", { params: { query: clean({ ...dq, ...q }) } })),
     get: (ref: string): Promise<DeptDoc> => unwrap(api.GET("/v1/extension/dept-docs/{ref}", { params: { path: { ref }, query: dq } })),
-    create: (meta: DeptDocInput, file: File): Promise<DeptDoc> =>
-      unwrap(
+    // Thân multipart tất định (src/api/multipart.ts, #172): bấm lại sau mất phản hồi trong cùng useAction gửi đúng từng
+    // byte cũ → cùng Idempotency-Key, máy chủ phát lại văn bản đã tạo thay vì tạo bản thứ hai. Lời gọi api.POST phải
+    // khởi phát đồng bộ trong act.run để bắt được phiên thao tác.
+    create: (meta: DeptDocInput, file: File): Promise<DeptDoc> => {
+      const m = JSON.stringify(meta);
+      const mp = stableMultipart([
+        ["meta", m],
+        ["file", file],
+      ]);
+      return unwrap(
         api.POST("/v1/extension/dept-docs", {
           params: { query: dq, header: header() },
-          body: { meta: JSON.stringify(meta), file: file as unknown as string },
-          bodySerializer: (b: { meta: string; file: string }) => {
-            const fd = new FormData();
-            fd.append("meta", b.meta);
-            fd.append("file", b.file as unknown as Blob, file.name);
-            return fd;
-          },
+          headers: { "Content-Type": mp.contentType },
+          body: { meta: m, file: file as unknown as string },
+          bodySerializer: () => mp.body,
         }),
-      ),
+      );
+    },
     update: (ref: string, meta: DeptDocInput): Promise<DeptDoc> =>
       unwrap(api.POST("/v1/extension/dept-docs/{ref}/update", { params: { path: { ref }, query: dq, header: header() }, body: meta })),
-    replaceFile: (ref: string, file: File, base: number): Promise<DeptDoc> =>
-      unwrap(
+    // Như create: cùng tệp + cùng base_version → cùng thân → máy chủ phát lại, không ghi phiên bản tệp thứ hai (#172).
+    replaceFile: (ref: string, file: File, base: number): Promise<DeptDoc> => {
+      const mp = stableMultipart([
+        ["base_version", String(base)],
+        ["file", file],
+      ]);
+      return unwrap(
         api.POST("/v1/extension/dept-docs/{ref}/file", {
           params: { path: { ref }, query: dq, header: header() },
+          headers: { "Content-Type": mp.contentType },
           body: { file: file as unknown as string, base_version: String(base) },
-          bodySerializer: (b: { file: string; base_version: string }) => {
-            const fd = new FormData();
-            fd.append("base_version", b.base_version);
-            fd.append("file", b.file as unknown as Blob, file.name);
-            return fd;
-          },
+          bodySerializer: () => mp.body,
         }),
-      ),
+      );
+    },
     hide: (ref: string, hidden: boolean, reason: string, base: number): Promise<DeptDoc> =>
       unwrap(
         hidden

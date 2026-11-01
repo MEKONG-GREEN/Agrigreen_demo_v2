@@ -694,6 +694,9 @@ func (s *Service) SetRating(ctx context.Context, id uuid.UUID, in RatingInput, i
 		if _, e := s.editable(ctx, tx, c, id, domain.PermEdit); e != nil {
 			return e
 		}
+		if e := store.LockRating(ctx, tx, c.tenant, id); e != nil {
+			return e
+		}
 		rows, e := store.Ratings(ctx, tx, id)
 		if e != nil {
 			return e

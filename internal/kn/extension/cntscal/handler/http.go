@@ -5,6 +5,7 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,6 +29,9 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g := rg.Group("/extension/cnts")
 	g.GET("/duty-rosters/:month", h.getRoster)
 	g.POST("/duty-rosters/:month", h.saveRoster)
+	httpx.AllowBody(g, http.MethodPost, "/duty-rosters/:month/import", app.MaxRosterImportBytes+1024)
+	g.POST("/duty-rosters/:month/import", h.importRoster)
+	g.GET("/duty-rosters/:month/export.xlsx", h.exportRoster)
 	g.GET("/my-duties", h.myDuties)
 	g.GET("/vaccination-batches", h.listBatches)
 	g.POST("/vaccination-batches", h.createBatch)
@@ -93,7 +97,7 @@ func cellsOut(cs []domain.Cell) []gin.H {
 func rosterOut(v app.RosterView) gin.H {
 	facs := make([]gin.H, 0, len(v.Facilities))
 	for _, f := range v.Facilities {
-		facs = append(facs, gin.H{"ref": f.Ref, "code": f.Code, "name": f.Name, "commune_code": f.CommuneCode, "kind": optStr(f.Kind)})
+		facs = append(facs, gin.H{"ref": f.Ref, "code": f.Code, "name": f.Name, "commune_code": f.CommuneCode, "kind": optStr(f.Kind), "address": optStr(f.Address)})
 	}
 	offs := make([]gin.H, 0, len(v.Officers))
 	for _, o := range v.Officers {
@@ -101,23 +105,9 @@ func rosterOut(v app.RosterView) gin.H {
 		for _, f := range o.Scope.Facilities {
 			fr = append(fr, f.String())
 		}
-		offs = append(offs, gin.H{"ref": o.Ref, "display": nameOf(v.Names, o.Ref), "commune_codes": o.Communes, "facility_refs": fr})
+		offs = append(offs, gin.H{"ref": o.Ref, "display": nameOf(v.Names, o.Ref), "commune_codes": o.Communes, "facility_refs": fr, "phone_masked": optStr(o.PhoneMasked)})
 	}
-	warns := make([]gin.H, 0, len(v.Warnings))
-	for _, w := range v.Warnings {
-		var f, o any
-		if w.Facility != uuid.Nil {
-			f = w.Facility
-		}
-		if w.Officer != uuid.Nil {
-			o = w.Officer
-		}
-		days := w.Days
-		if days == nil {
-			days = []int{}
-		}
-		warns = append(warns, gin.H{"code": w.Code, "message": w.Message, "facility_ref": f, "officer_ref": o, "days": days})
-	}
+	warns := warningsOut(v.Warnings)
 	vers := make([]gin.H, 0, len(v.Versions))
 	for _, x := range v.Versions {
 		vers = append(vers, gin.H{"version": x.Version, "source": x.Source, "cell_count": x.CellCount, "note": optStr(x.Note),
@@ -134,7 +124,57 @@ func rosterOut(v app.RosterView) gin.H {
 	return gin.H{"month": domain.MonthKey(v.Month), "province_code": optStr(v.Province), "legacy": v.Legacy, "days_in_month": domain.DaysIn(v.Month), "version": v.Version,
 		"source": optStr(v.Source), "note": optStr(v.Note), "cells": cellsOut(v.Cells), "facilities": facs, "officers": offs,
 		"warnings": warns, "updated_at": optTS(v.UpdatedAt), "updated_by": by, "versions": vers, "can_edit": v.CanEdit,
-		"notified_officer_refs": notified}
+		"notified_officer_refs": notified, "can_view_phone": v.CanViewPhone}
+}
+
+func warningsOut(ws []domain.Warning) []gin.H {
+	out := make([]gin.H, 0, len(ws))
+	for _, w := range ws {
+		var f, o any
+		if w.Facility != uuid.Nil {
+			f = w.Facility
+		}
+		if w.Officer != uuid.Nil {
+			o = w.Officer
+		}
+		days := w.Days
+		if days == nil {
+			days = []int{}
+		}
+		out = append(out, gin.H{"code": w.Code, "message": w.Message, "facility_ref": f, "officer_ref": o, "days": days})
+	}
+	return out
+}
+
+// importRoster: thân request là tệp .xlsx (không multipart), tối đa 4 MB. Chỉ đọc, không ghi.
+func (h Handler) importRoster(c *gin.Context) {
+	r, err := h.Svc.ImportRoster(c.Request.Context(), c.Param("month"), c.Query("province_code"), io.LimitReader(c.Request.Body, app.MaxRosterImportBytes+1))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	issues := make([]gin.H, 0, len(r.Issues))
+	for _, x := range r.Issues {
+		var line any
+		if x.Line > 0 {
+			line = x.Line
+		}
+		issues = append(issues, gin.H{"line": line, "field": x.Field, "message": x.Message})
+	}
+	c.JSON(http.StatusOK, gin.H{"month": domain.MonthKey(r.Month), "province_code": optStr(r.Province), "sheet": r.Sheet, "basis": optStr(r.Basis),
+		"row_count": r.RowCount, "cells": cellsOut(r.Cells), "issues": issues, "warnings": warningsOut(r.Warnings)})
+}
+
+// exportRoster: bản đã lưu của tháng thành .xlsx đúng mẫu BM-03.
+func (h Handler) exportRoster(c *gin.Context) {
+	data, name, err := h.Svc.ExportRoster(c.Request.Context(), c.Param("month"), c.Query("province_code"), c.Query("basis"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="`+name+`"`)
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 
 func (h Handler) getRoster(c *gin.Context) {

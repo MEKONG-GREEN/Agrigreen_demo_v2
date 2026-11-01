@@ -84,6 +84,12 @@ func (s *Service) reader(ctx context.Context) (caller, error) {
 
 // canRefresh: Cấp Tỉnh Phòng KHTC, không chỉ xem, là người phụ trách kỳ (người mở kỳ — ⚑3 mặc định).
 func canRefresh(c caller, p pstore.Period) error {
+	if p.Type == "adhoc" && c.k.Role == port.SessionRoleAdmin && !c.k.ReadOnly() {
+		if !c.p.MFA {
+			return problem.MFARequired
+		}
+		return nil
+	}
 	if c.k.Role != port.SessionRoleProvince || c.k.Department != partyport.DeptKeHoachTaiChinh || c.k.ReadOnly() {
 		return errNotKHTCWriter
 	}
@@ -268,6 +274,11 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 	if err != nil {
 		return Status{}, ErrDependency.WithDetail("đọc số liệu nguồn lỗi").WithCause(err)
 	}
+	if p.Type == pdomain.TypeAdhoc {
+		if err := validateAdhocSources(ps); err != nil {
+			return Status{}, err
+		}
+	}
 	planVer, keys, _, err := s.planKeys(ctx, p)
 	if err != nil {
 		return Status{}, err
@@ -288,6 +299,11 @@ func (s *Service) Refresh(ctx context.Context, id uuid.UUID, idem string) (Statu
 		return e
 	}); err != nil {
 		return Status{}, err
+	}
+	if p.Type == pdomain.TypeAdhoc {
+		if err := validateAdhocFrozen(frozen); err != nil {
+			return Status{}, err
+		}
 	}
 	names := make([]string, 0, len(keys))
 	for k := range keys {

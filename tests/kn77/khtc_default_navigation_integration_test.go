@@ -56,7 +56,7 @@ func TestKH_FN_CH_00_01_DefaultRouteKHTC(t *testing.T) {
 	}
 	planningContext := assertRoute(assignments[authz.KNTinh], planning, "/kn/khtc/ky-bao-cao")
 	assertRoute(assignments[authz.KNTinh], technical, "/kn/bao-cao-khtc")
-	assertRoute(assignments[authz.KNTW], planning, "/kn/dashboard")
+	assertRoute(assignments[authz.KNTW], planning, "/kn/khtc/bao-cao-da-xuat")
 	assertRoute(assignments[authz.KNXa], technical, "/kn/nhiem-vu/cong-viec")
 	// Leadership is still read-only after navigation, including a department outside the assignment.
 	leader, leaderAssignments := s.createKN("Lãnh đạo chỉ xem", "nav-lanhdao@vi-du.vn", "0912000702", asgKN(authz.KNTinh, s.p91, []string{technical}, "pho_giam_doc"))

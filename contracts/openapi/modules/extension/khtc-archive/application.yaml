@@ -1,0 +1,49 @@
+paths:
+# @ag-order: 20100
+  /v1/extension/khtc/exported-reports:
+    get:
+      summary: "Kho metadata báo cáo KHTC đã xuất, chỉ đọc trong tenant phiên hiện tại"
+      operationId: extensionKhtcExportedReports
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: kind, in: query, schema: {type: string, enum: ['', week, month, quarter, year, program, adhoc]}}
+        - {name: q, in: query, schema: {type: string, maxLength: 200}}
+        - {name: versions, in: query, schema: {type: boolean, default: false}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        "200":
+          description: Bản cuối của mỗi kỳ, hoặc bản xuất mới nhất nếu chưa có Bản cuối; versions=true hiện mọi phiên bản. Không có bản soạn.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchive'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+components:
+  schemas:
+# @ag-order: 20100
+    KHTCArchiveRow:
+      type: object
+      required: [id, period_id, period_name, report_type, document_no, version, final, provisional, actor_ref, at]
+      properties:
+        id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        period_name: {type: string}
+        report_type: {type: string, enum: [week, month, quarter, year, program, adhoc]}
+        document_no: {type: string}
+        version: {type: integer, format: int64}
+        final: {type: boolean}
+        provisional: {type: boolean}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+# @ag-order: 20101
+    KHTCArchive:
+      type: object
+      required: [items, has_more, offset]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/KHTCArchiveRow'}}
+        has_more: {type: boolean}
+        offset: {type: integer}

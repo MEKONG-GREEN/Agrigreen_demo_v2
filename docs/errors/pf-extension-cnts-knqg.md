@@ -18,3 +18,5 @@ nguyên.
 | 409 | `extension.cnts_knqg_needs_signed_05` | Gửi Mẫu 07 khi còn điểm (chưa đóng) chưa có Mẫu 05 Đã ký, kể cả điểm có bản điều chỉnh chưa ký (FN-19 AC-03, quy tắc liên biểu 10) — `detail` liệt kê điểm |
 | 422 | `extension.cnts_knqg_scan_invalid` | Bản scan rỗng, quá 10 MB, không phải PDF/JPG/PNG (kiểm đuôi và chữ ký đầu tệp) |
 | 404 | `extension.cnts_knqg_scan_not_found` | Biểu (hoặc phiên bản yêu cầu) chưa có bản scan đã ký |
+| 422 | `extension.cnts_knqg_photo_invalid` | Ảnh thực địa (W11.53b) rỗng, quá 5 MB, không phải JPG/PNG (kiểm đuôi và chữ ký đầu tệp), chú thích quá 300 ký tự hoặc có số điện thoại/CCCD, đã đủ 20 ảnh, hoặc biểu không phải Mẫu 03 |
+| 404 | `extension.cnts_knqg_photo_not_found` | Ảnh không thuộc báo cáo hoặc đã gỡ |

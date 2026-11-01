@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.agrigreen.vn/events/pf.extension.cnts_knqg.changed/v1",
+  "title": "pf.extension.cnts_knqg.changed — payload",
+  "description": "Mẫu biểu dự án khuyến nông quốc gia (W11.53b, BRD CNTS v3.7 FN-19 AC-02, UR-QG-01) đổi trạng thái cần người khác xử lý: gửi Mẫu 07 (send → Cấp TW phòng Chăn nuôi – Thủy sản), Cấp TW xác nhận/trả lại Mẫu 07 (confirm/return → chủ nhiệm dự án), trình Mẫu 01 (submit → lãnh đạo phòng Cấp Tỉnh). Ghi cùng giao dịch với dòng sổ pf_extension.cnts_knqg_doc (doc_id). Người nhận do pf/extension tra NGOÀI giao dịch (pf/accounts) và ghi trong recipient_refs; không có người nhận thì không phát. Consumer pf.notify.cnts_knqg chỉ dựng nội dung. Không dữ liệu cá nhân; ý kiến trả lại không đi kèm.",
+  "x-event-type": "pf.extension.cnts_knqg.changed",
+  "x-schema-version": 1,
+  "x-producer": "pf/extension",
+  "type": "object",
+  "required": ["doc_id", "doc_ref", "project_ref", "project_code", "project_name", "province_code", "form", "period", "action", "status",
+    "recipient_refs", "actor_ref", "department", "event_time"],
+  "properties": {
+    "doc_id":         { "type": "string", "format": "uuid", "description": "Dòng sổ (phiên bản) vừa ghi" },
+    "doc_ref":        { "type": "string", "format": "uuid", "description": "Định danh bền của biên bản/báo cáo" },
+    "project_ref":    { "type": "string", "format": "uuid" },
+    "project_code":   { "type": "string", "maxLength": 100 },
+    "project_name":   { "type": "string", "maxLength": 500 },
+    "province_code":  { "type": "string" },
+    "form":           { "type": "string", "enum": ["01", "07"] },
+    "period":         { "type": "string", "description": "YYYY-MM (Mẫu 01) | YYYY (Mẫu 07)" },
+    "action":         { "type": "string", "enum": ["send", "confirm", "return", "submit"] },
+    "status":         { "type": "string", "enum": ["submitted", "sent", "confirmed", "returned"] },
+    "recipient_refs": { "type": "array", "minItems": 1, "maxItems": 200, "items": { "type": "string", "format": "uuid" } },
+    "actor_ref":      { "type": "string", "format": "uuid" },
+    "department":     { "type": "string", "enum": ["chan_nuoi_thuy_san"] },
+    "event_time":     { "type": "string", "format": "date-time" }
+  }
+}

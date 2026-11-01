@@ -8,15 +8,19 @@ import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
 import { resetKnAdmin } from "@/api/mock/kn-admin";
 import { resetCntsKnqg } from "@/api/mock/kn-cnts-knqg";
 import { resetCntsModel } from "@/api/mock/kn-cnts-model";
+import { createCntsModelApi } from "@/kn/cnts/model/api";
 import { createKnAdminApi } from "@/kn/cycle/api";
+import { deepLinkHref } from "@/lib/deepLink";
 import { KnqgScreen } from "./KnqgScreen";
-import { contentErrors, contentForSave, createErrors, emptyRow, periodLabel, type Spec } from "./api";
+import { contentErrors, contentForSave, createErrors, createKnqgApi, emptyRow, periodLabel, type Spec } from "./api";
 
+// W11.53b: tham số URL đổi được giữa các lần vẽ (bấm thông báo khi đang ở chính màn này).
+const nav = vi.hoisted(() => ({ search: "", replace: [] as string[] }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/kn/cnts/du-an-mau-bieu",
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: (u: string) => nav.replace.push(u) }),
   useParams: () => ({}),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(nav.search),
 }));
 
 const auth: { api: ApiClient | null; role: string } = { api: null, role: "admin" };
@@ -51,6 +55,8 @@ beforeEach(async () => {
 
   auth.api = adminApi;
   auth.role = "admin";
+  nav.search = "";
+  nav.replace = [];
 });
 
 describe("hàm thuần mẫu biểu KNQG", () => {
@@ -102,5 +108,31 @@ describe("màn Mẫu biểu dự án KNQG", () => {
     const ed2 = screen.getByRole("region", { name: /Mẫu 01\/TĐ-DA/ });
     await user.click(within(ed2).getByRole("button", { name: "Trình duyệt" }));
     await waitFor(() => expect(within(screen.getByRole("region", { name: /Mẫu 01\/TĐ-DA/ })).getAllByText("Chờ duyệt").length).toBeGreaterThan(0));
+  });
+});
+
+describe("W11.53b: thông báo → bộ định tuyến → mở đúng biểu", () => {
+  it("deep_link của thông báo mở thẳng biểu, kể cả khi đang ở chính màn này; đóng biểu thì bỏ ?doc=", async () => {
+    const k = createKnqgApi(adminApi);
+    const project = (await createCntsModelApi(adminApi).projects()).items.find((p) => p.kind === "knqg")!;
+    const d7 = await k.create({ form: "07", project_ref: project.ref, period: "2027" });
+    const d1 = await k.create({ form: "01", project_ref: project.ref, period: "2027-10" });
+    // Chuông/hộp thư dùng deepLinkHref để ra URL đích; màn đọc ?doc= từ URL đó.
+    const href7 = deepLinkHref(`/kn/cnts/du-an-mau-bieu?doc=${d7.ref}`, "cnts_knqg_sent")!;
+    expect(href7).toBe(`/kn/cnts/du-an-mau-bieu?doc=${d7.ref}`);
+    nav.search = href7.split("?")[1]!;
+    const { rerender } = render(<KnqgScreen />);
+    expect(await screen.findByRole("region", { name: /Mẫu 07\/NTKQ-DA/ })).toBeTruthy();
+    // Đang ở màn này, bấm thông báo của biểu khác → URL đổi → mở biểu mới.
+    const href1 = deepLinkHref(`/kn/cnts/du-an-mau-bieu?doc=${d1.ref}`, "cnts_knqg_submitted")!;
+    nav.search = href1.split("?")[1]!;
+    rerender(<KnqgScreen />);
+    expect(await screen.findByRole("region", { name: /Mẫu 01\/TĐ-DA/ })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: /Mẫu 07\/NTKQ-DA/ })).toBeNull();
+    // Đóng biểu đang mở theo liên kết → bỏ ?doc= để bấm lại cùng thông báo vẫn mở được.
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Mẫu 01 — Tiến độ tháng", expanded: true }));
+    expect(nav.replace).toEqual(["/kn/cnts/du-an-mau-bieu"]);
+    expect(screen.queryByRole("region", { name: /Mẫu 01\/TĐ-DA/ })).toBeNull();
   });
 });

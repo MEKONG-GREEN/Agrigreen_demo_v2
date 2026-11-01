@@ -13,7 +13,8 @@ export type Persona =
   | "admin-no-mfa"
   | "api-admin"
   | "api-approver"
-  | "metering-viewer";
+  | "metering-viewer"
+  | "kn-admin";
 
 const MOCK_KEY = "ag.mock.persona";
 

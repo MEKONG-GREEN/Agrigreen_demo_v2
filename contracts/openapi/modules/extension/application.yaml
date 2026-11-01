@@ -819,6 +819,54 @@ paths:
         "403": {description: "forbidden | extension.read_only", $ref: "#/components/responses/Problem"}
         "409": {description: extension.cnts_roster_version_conflict, $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed | extension.cnts_roster_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 296
+  /v1/extension/cnts/duty-rosters/{month}/import:
+    post:
+      summary: "BF-CN-DUTY: Nạp Excel đúng mẫu \"Lịch trực ksgm\" (BM-03) — đọc tệp, ghép cơ sở/viên chức, trả ô + lỗi theo dòng + cảnh báo; KHÔNG ghi"
+      description: |
+        Thân request là tệp .xlsx (không multipart), tối đa 4 MB, 2000 dòng viên chức. Lấy sheet hiển thị có tiêu đề "THÁNG M/YYYY"
+        đúng tháng (không sheet nào ghi tháng thì nhận sheet BM-03 duy nhất); dòng tiêu đề cột STT | TÊN CƠ SỞ GIẾT MỔ | ĐỊA CHỈ |
+        VIÊN CHỨC TRỰC KSGM | ĐT viên chức | ngày 1…31; tên/địa chỉ của dòng đầu khối áp cho các dòng sau (ô gộp); dừng ở dòng "TC".
+        Cơ sở khớp theo mã, tên hoặc "tên (mã)" trong các cơ sở hoạt động của tỉnh; viên chức theo SĐT rồi tên (bỏ ghi chú
+        trong ngoặc cuối tên). Ô N, Đ/D, NĐ/ND; ký hiệu khác hoặc ngày ngoài tháng → lỗi ô. Web xem trước rồi lưu bằng POST
+        /duty-rosters/{month} với source=excel. Cán bộ tổng hợp Cấp Tỉnh, Admin.
+      operationId: extensionCntsImportDutyRoster
+      tags: [extension]
+      parameters:
+        - {name: month, in: path, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: province_code, in: query, schema: {type: string}, description: "Tỉnh suy từ phạm vi phiên; Admin chọn tỉnh"}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+      responses:
+        "200":
+          description: Kết quả đọc tệp (chưa lưu)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDutyRosterImport"}
+        "403": {description: "forbidden | extension.read_only | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_roster_import_invalid", $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 296
+  /v1/extension/cnts/duty-rosters/{month}/export.xlsx:
+    get:
+      summary: "BF-CN-DUTY: Xuất bản đã lưu của tháng thành .xlsx đúng mẫu BM-03 (tiêu đề tháng, dòng căn cứ, ghi chú ca, gộp ô theo cơ sở)"
+      description: Cột ĐT viên chức chỉ có số với người lập lịch (cán bộ tổng hợp Cấp Tỉnh, Admin). Tệp nạp lại được, ra cùng lịch.
+      operationId: extensionCntsExportDutyRoster
+      tags: [extension]
+      parameters:
+        - {name: month, in: path, required: true, schema: {type: string, pattern: "^[0-9]{4}-[0-9]{2}$"}}
+        - {name: province_code, in: query, schema: {type: string}}
+        - {name: basis, in: query, schema: {type: string, maxLength: 300}, description: "Dòng căn cứ (vd \"theo thông báo số …\"); rỗng → mẫu chờ điền; không chứa SĐT/CCCD"}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
 # @ag-order: 297
   /v1/extension/cnts/my-duties:
     get:
@@ -1697,7 +1745,7 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
         "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
-  # --- pf/extension: bộ đọc nguồn module của Kỳ KHTC (W11.64 — BRD KHTC v2.2 BR-DL-02…04; ADR-0053 §8). "Cập nhật số liệu" chụp
+  # --- pf/extension: bộ đọc nguồn module của Kỳ KHTC (W11.64 — BRD KHTC v2.2 BR-DL-02…04; ADR-0053 `8). "Cập nhật số liệu" chụp
   # bất biến port KHTCSources (chỉ cán bộ KHTC phụ trách kỳ — người mở kỳ, ⚑3); "Nguồn đã thay đổi" so figures_hash (không so
   # status_hash), chỉ cảnh báo. Số thập phân là chuỗi.
 # @ag-order: 345
@@ -2154,22 +2202,24 @@ components:
 # @ag-order: 650
     CNTSDutyFacility:
       type: object
-      required: [ref, code, name, commune_code, kind]
+      required: [ref, code, name, commune_code, kind, address]
       properties:
         ref: {type: string, format: uuid}
         code: {type: string}
         name: {type: string}
         commune_code: {type: string}
         kind: {type: [string, "null"]}
+        address: {type: [string, "null"], description: "Địa chỉ ở danh mục (cột Địa chỉ BM-03); null → web hiện tên xã"}
 # @ag-order: 651
     CNTSDutyOfficer:
       type: object
-      required: [ref, display, commune_codes, facility_refs]
+      required: [ref, display, commune_codes, facility_refs, phone_masked]
       properties:
         ref: {type: string, format: uuid}
         display: {type: [string, "null"]}
         commune_codes: {type: array, items: {type: string}}
         facility_refs: {type: array, items: {type: string, format: uuid}, description: "Giới hạn cơ sở (rỗng = cả xã phụ trách)"}
+        phone_masked: {type: [string, "null"], description: "SĐT đã che (4 số đầu · 3 số cuối), chỉ khi can_view_phone và viên chức có ô trong lưới"}
 # @ag-order: 652
     CNTSDutyWarning:
       type: object
@@ -2195,7 +2245,7 @@ components:
 # @ag-order: 654
     CNTSDutyRoster:
       type: object
-      required: [province_code, legacy, month, days_in_month, version, source, note, cells, facilities, officers, warnings, updated_at, updated_by, versions, can_edit, notified_officer_refs]
+      required: [province_code, legacy, month, days_in_month, version, source, note, cells, facilities, officers, warnings, updated_at, updated_by, versions, can_edit, notified_officer_refs, can_view_phone]
       properties:
         province_code: {type: [string, "null"], description: "Tỉnh của luồng lịch; null với lịch chung cũ"}
         legacy: {type: boolean, description: "Lịch chung cũ chỉ Admin đọc, không sửa"}
@@ -2213,6 +2263,29 @@ components:
         versions: {type: array, items: {$ref: "#/components/schemas/CNTSDutyVersion"}}
         can_edit: {type: boolean}
         notified_officer_refs: {type: array, items: {type: string, format: uuid}, description: "Viên chức có ca thay đổi ở lần lưu này"}
+        can_view_phone: {type: boolean, description: "Người gọi xem được cột ĐT viên chức (người lập lịch)"}
+# @ag-order: 654
+    CNTSDutyRosterImport:
+      type: object
+      required: [month, province_code, sheet, basis, row_count, cells, issues, warnings]
+      properties:
+        month: {type: string}
+        province_code: {type: [string, "null"]}
+        sheet: {type: string, description: Tên sheet đã đọc}
+        basis: {type: [string, "null"], description: Dòng căn cứ đọc được ở tiêu đề}
+        row_count: {type: integer, description: Số dòng viên chức đã đọc}
+        cells: {type: array, items: {$ref: "#/components/schemas/CNTSDutyCell"}, description: "Ô ghép được (đã chuẩn hóa, sắp)"}
+        issues:
+          type: array
+          description: "Lỗi theo dòng/ô (dòng lỗi cơ sở/viên chức bị bỏ cả dòng; ô ký hiệu lạ bị bỏ ô). Không lặp lại SĐT"
+          items:
+            type: object
+            required: [line, field, message]
+            properties:
+              line: {type: [integer, "null"], description: Số dòng trong tệp}
+              field: {type: string, description: "facility | officer | row | day:<n>"}
+              message: {type: string}
+        warnings: {type: array, items: {$ref: "#/components/schemas/CNTSDutyWarning"}, description: Cảnh báo như khi lưu lưới}
 # @ag-order: 655
     CNTSMyDuty:
       type: object
@@ -3576,6 +3649,9 @@ components:
         last_submitted_at: {type: [string, "null"], format: date-time}
         reviewed_at: {type: [string, "null"], format: date-time}
         review_note: {type: string}
+        native_late: {type: boolean}
+        request_due_at: {type: string, format: date-time}
+        request_state: {type: string}
         late: {type: boolean}
 # @ag-order: 1095
     KHTCDepartmentForm:
@@ -3749,6 +3825,9 @@ components:
       type: object
       required: [cells, adjustments, texts]
       properties:
+        adhoc_request_id: {type: string, format: uuid, description: "Mã yêu cầu người nhập đã đọc; không tự gắn vào nội dung cũ"}
+        adhoc_values: {type: object, maxProperties: 20, additionalProperties: {type: string, maxLength: 23}}
+        adhoc_text: {type: string, maxLength: 8000}
         cells: {type: object, additionalProperties: {$ref: "#/components/schemas/KHTCFormCell"}}
         adjustments: {type: array, items: {$ref: "#/components/schemas/KHTCFormAdjustment"}}
         texts: {type: object, additionalProperties: {type: string}}
@@ -3805,6 +3884,7 @@ components:
         can_review, editable, overdue, request_note, template, grid, plan_missing, plan, tabs, content, content_source, draft_at, valid,
         issues, adj_periods, submissions]
       properties:
+        supplement: {$ref: "#/components/schemas/KHTCAdhocRequest"}
         period:
           type: object
           required: [id, name, report_type, year, from_date, to_date, cutoff_date, due_at, max_submissions, terminal]
@@ -3870,6 +3950,7 @@ components:
               attempt: {type: integer}
               submitted_at: {type: string, format: date-time}
               late: {type: boolean}
+              native_late: {type: boolean}
               decision: {type: string}
               review_note: {type: string}
               reviewed_at: {type: [string, "null"], format: date-time}

@@ -10,6 +10,7 @@ import { ApiProblem } from "@/api/problem";
 import { createCollectApi } from "@/kn/cycle/api";
 import type { LngLat } from "@/kn/cycle/plotGeometry";
 import { PlotCreateScreen, PlotEditScreen, PlotsScreen, drawnAreaHa, outerRing, plotDraftError, plotUpdateBody } from "./PlotScreens";
+import { knHtxRecord, recordsMock } from "./htxRecordsFixture";
 
 const push = vi.fn();
 const params: Record<string, string> = {};
@@ -68,7 +69,8 @@ beforeEach(() => {
     plotProfile: vi.fn().mockResolvedValue({ plot_ref: "plot-1", status: "active", crop_code: "LUA", crop_name: "Lúa" }),
     plotLog: vi.fn().mockResolvedValue({ items: [] }),
     plotShapes: vi.fn().mockResolvedValue({ type: "FeatureCollection", features: [] }),
-    cooperatives: vi.fn().mockResolvedValue({ items: [{ ref: "htx-1", name: "HTX Mỹ Hòa" }] }),
+    records: recordsMock([knHtxRecord("kn-1", "HTX Mỹ Hòa", "htx-1")]),
+    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
     crops: vi.fn().mockResolvedValue(CROPS),
     createPlot: vi.fn().mockResolvedValue({ ...plot, ref: "plot-new" }),
     updatePlot: vi.fn().mockResolvedValue(plot),

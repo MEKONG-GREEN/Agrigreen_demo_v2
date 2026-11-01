@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/xuri/excelize/v2"
 
 	platformasm "github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
@@ -70,8 +71,16 @@ const aggDept = partyport.DeptChanNuoiThuySan
 
 // newAggFx dựng pf/forms + pf/extension thật; wire (tùy chọn) nối thêm cổng cho gói khác (W11.50 chiến dịch điều tra).
 func newAggFx(t *testing.T, facs facilityDir, wire ...func(*forms.Module, *extension.Module)) *aggFx {
+	return newAggFxPool(t, nil, facs, wire...)
+}
+
+// newAggFxPool như newAggFx trên pool app_platform cho trước (nil → pool kiểm thử mặc định) — pf/forms và pf/extension dùng
+// CHUNG pool như gốc lắp ráp (BF-CNTS-CAMPAIGN-POOL #156: pool nhỏ).
+func newAggFxPool(t *testing.T, pool *pgxpool.Pool, facs facilityDir, wire ...func(*forms.Module, *extension.Module)) *aggFx {
 	env := pgtest.Get(t)
-	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
+	if pool == nil {
+		pool = env.Pool(t, migrations.PF, dbadmin.AppPlatform)
+	}
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	adm := env.AdminPool(t, migrations.PF)
 	// 10:00 Thứ Tư 07/10/2026 giờ VN: tuần CNTS 40 (29/09–05/10) đã kết thúc, hạn 12:00 06/10 đã qua (gửi trễ có giải trình).

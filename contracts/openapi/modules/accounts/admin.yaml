@@ -591,6 +591,39 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
         "409": {description: accounts.support_session_ended, $ref: "#/components/responses/Problem"}
 # @ag-order: 129
+  /v1/accounts/audit:
+    get:
+      summary: "Nhật ký hệ thống (#70 cổng truy vấn, #73 KN): chỉ phiên Admin KN có MFA; mỗi trang (kể cả rỗng) ghi bền một lượt xem trước khi trả"
+      description: |
+        Đọc các sổ có chủ đã đăng ký (account_event của pf/accounts và các sổ KN: lượt xem nhật ký, hồ sơ KN, kỳ/duyệt báo cáo,
+        kỳ KHTC, cấp quyền CNTS) theo recorded_at trong [from, to), tối đa 93 ngày, mới nhất trước. Mọi trang phải gửi lại cùng
+        bộ lọc và limit; cursor ràng buộc băm bộ lọc, người đọc, tenant. Không nhận tenant. Kết quả chỉ có UUID, mã, thời điểm và
+        trường mã/ref/boolean trong danh sách cho phép của nguồn — không lý do, nội dung, payload hay tên người.
+        Lỗi: 401/403 (không phải Admin KN, đang hỗ trợ, thiếu MFA, tenant lệch — lần bị chủ KN từ chối cũng được ghi sổ),
+        422 bộ lọc/cursor sai, 503 accounts.dependency_unavailable khi chưa cấu hình nguồn/bộ ghi hoặc ghi lượt xem lỗi.
+      operationId: accountsAudit
+      tags: [accounts]
+      parameters:
+        - {name: from, in: query, required: true, schema: {type: string, format: date-time}, description: "RFC3339, gồm"}
+        - {name: to, in: query, required: true, schema: {type: string, format: date-time}, description: "RFC3339, không gồm; to - from ≤ 93 ngày"}
+        - {name: actor_ref, in: query, schema: {type: string, format: uuid}, description: "Người thao tác"}
+        - {name: department, in: query, schema: {type: string}, description: "Mã phòng ban (nguồn không lưu phòng ban không khớp)"}
+        - {name: module, in: query, schema: {type: string}, description: "Mã module nguồn: accounts, kn.audit, kn.records, kn.report, kn.khtc, kn.cnts"}
+        - {name: action, in: query, schema: {type: string}, description: "Mã sự việc đầy đủ, ví dụ account.locked, period.reopened"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {name: cursor, in: query, schema: {type: string, maxLength: 2048}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AuditPage"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "428": {description: "accounts.context_required — chưa chọn ngữ cảnh phiên KN", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+# @ag-order: 129
   /v1/accounts/support-log:
     get:
       summary: "Nhật ký hỗ trợ (không xóa): thời điểm, Admin, thay cho ai, chức năng, nội dung, lý do — mới nhất trước"
@@ -811,6 +844,48 @@ components:
         recorded_at: {type: string, format: date-time}
         changes: {type: array, items: {$ref: "#/components/schemas/KNFieldChange"}, description: "profile_updated: chỉ tên trường, old/new = null (RB-3)"}
         reason: {type: [string, "null"]}
+# @ag-order: 336
+    AuditPage:
+      type: object
+      required: [items, sources, as_of, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/AuditItem"}}
+        sources: {type: array, items: {type: string}, description: "Các nguồn thực sự tham gia trang (độ phủ — không phải toàn hệ thống)"}
+        as_of: {type: string, format: date-time, description: "Mốc thời gian cố định qua các trang"}
+        next_cursor: {type: [string, "null"]}
+# @ag-order: 336
+    AuditItem:
+      type: object
+      required: [source, module, event_ref, entity_ref, actor_ref, occurred_at, recorded_at, action, outcome, changes]
+      properties:
+        source: {type: string}
+        module: {type: string}
+        event_ref: {type: string, format: uuid}
+        entity_ref: {type: string, format: uuid}
+        actor_ref: {type: string, format: uuid}
+        occurred_at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        department: {type: string}
+        action: {type: string}
+        outcome: {type: string, enum: [unknown, succeeded, denied, failed]}
+        changes: {type: array, items: {$ref: "#/components/schemas/AuditChange"}}
+# @ag-order: 336
+    AuditChange:
+      type: object
+      required: [field]
+      properties:
+        field: {type: string}
+        before: {$ref: "#/components/schemas/AuditValue"}
+        after: {$ref: "#/components/schemas/AuditValue"}
+# @ag-order: 336
+    AuditValue:
+      type: object
+      required: [kind]
+      properties:
+        kind: {type: string, enum: [boolean, ref, codes]}
+        boolean: {type: boolean}
+        ref: {type: string, format: uuid}
+        codes: {type: array, items: {type: string}}
 # @ag-order: 336
     KNSupportLogEntry:
       type: object

@@ -713,8 +713,16 @@ func (s *Service) Submissions(ctx context.Context, profile string, periodID uuid
 		if err != nil {
 			return err
 		}
+		metas, err := store.MetaOf(ctx, tx, sids)
+		if err != nil {
+			return err
+		}
 		for _, sb := range subs {
 			sv := SubmissionView{Submission: sb}
+			if m, ok := metas[sb.ID]; ok {
+				copy := m
+				sv.Meta = &copy
+			}
 			if r, ok := revs[sb.ID]; ok {
 				r := r
 				sv.Review = &r
@@ -735,7 +743,11 @@ func (s *Service) Review(ctx context.Context, profile string, submissionID uuid.
 	if err != nil {
 		return SubmissionView{}, err
 	}
-	if err := a.need(prof.Reviewer(), "rà soát bài nộp"); err != nil {
+	op, err := s.reviewOperation(ctx, prof, a, submissionID, decision, strings.TrimSpace(note), idem)
+	if err != nil {
+		return SubmissionView{}, err
+	}
+	if _, err = needOperation(ctx, prof, a, prof.Reviewer(), "rà soát bài nộp", op); err != nil {
 		return SubmissionView{}, err
 	}
 	note = strings.TrimSpace(note)
@@ -752,6 +764,35 @@ func (s *Service) Review(ctx context.Context, profile string, submissionID uuid.
 		return SubmissionView{}, problem.Validation.WithField("note", "tối đa 1000 ký tự")
 	}
 	now := s.Clock.Now().UTC()
+	if g := s.ReviewGuards[profile]; g != nil {
+		// BF-CN-XA-DATA (#175): quy tắc rà soát của bên dùng (CNTS: chỉ người phụ trách biểu). Đọc kỳ của bài nộp và kiểm
+		// phạm vi như dưới (ngoài phạm vi → 404 như cũ, không lộ qua lỗi của guard), rồi gọi guard NGOÀI giao dịch.
+		var period uuid.UUID
+		var code string
+		if err := s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
+			sb, err := store.SubmissionByID(ctx, tx, submissionID)
+			if err != nil {
+				return err
+			}
+			if sb == nil {
+				return port.ErrSubmissionMissing
+			}
+			v, err := load(ctx, tx, sb.PeriodID, now)
+			if err != nil {
+				return err
+			}
+			if v == nil || v.Period.Profile != profile || !a.allowsTemplate(v.Period.TemplateCode) || !a.allowsUnit(v.Spec, v.Period.Units, sb.Unit) {
+				return port.ErrSubmissionMissing
+			}
+			period, code = sb.PeriodID, v.Period.TemplateCode
+			return nil
+		}); err != nil {
+			return SubmissionView{}, classify(err)
+		}
+		if err := g.AllowReview(ctx, period, code); err != nil {
+			return SubmissionView{}, err
+		}
+	}
 	var out SubmissionView
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
 		sb, err := store.SubmissionByID(ctx, tx, submissionID)
@@ -827,6 +868,14 @@ func (s *Service) Close(ctx context.Context, profile string, periodID uuid.UUID,
 	if err != nil {
 		return PeriodView{}, err
 	}
+	grant := false
+	if a.level != prof.CloseBy {
+		authorization, callErr := operationAllowed(ctx, prof, port.Operation{Action: port.OperationClose, Profile: profile, PeriodID: periodID, PayloadHash: "", IdemKey: idem})
+		if callErr != nil {
+			return PeriodView{}, callErr
+		}
+		grant = authorization.Allowed
+	}
 	now := s.Clock.Now().UTC()
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
 		if err := store.Lock(ctx, tx, periodID); err != nil {
@@ -839,7 +888,7 @@ func (s *Service) Close(ctx context.Context, profile string, periodID uuid.UUID,
 		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
-		if !a.canClose(prof.CloseBy, v.Period, v.Spec, nil) {
+		if !a.canControlGranted(prof.CloseBy, v.Period, v.Spec, grant) {
 			return problem.Forbidden.WithDetail("chốt kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
 		if v.State.Status == domain.PeriodCancelled {
@@ -963,6 +1012,18 @@ func (s *Service) Cancel(ctx context.Context, profile string, periodID uuid.UUID
 	if !ok {
 		return PeriodView{}, problem.Validation.WithField("reason", "bắt buộc, 10–500 ký tự")
 	}
+	hash, hashErr := port.OperationHash(struct{ Reason string }{why})
+	if hashErr != nil {
+		return PeriodView{}, hashErr
+	}
+	grant := false
+	if a.level != prof.CloseBy {
+		authorization, callErr := operationAllowed(ctx, prof, port.Operation{Action: port.OperationCancel, Profile: profile, PeriodID: periodID, PayloadHash: hash, IdemKey: idem})
+		if callErr != nil {
+			return PeriodView{}, callErr
+		}
+		grant = authorization.Allowed
+	}
 	now := s.Clock.Now().UTC()
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
 		if err := store.Lock(ctx, tx, periodID); err != nil {
@@ -975,7 +1036,7 @@ func (s *Service) Cancel(ctx context.Context, profile string, periodID uuid.UUID
 		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
-		if !a.canClose(prof.CloseBy, v.Period, v.Spec, nil) {
+		if !a.canControlGranted(prof.CloseBy, v.Period, v.Spec, grant) {
 			return problem.Forbidden.WithDetail("hủy kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
 		switch v.State.Status {

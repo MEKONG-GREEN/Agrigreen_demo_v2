@@ -140,10 +140,71 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 	communes, lookupErr := cnts.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
 	contract.check("communes", communes, lookupErr)
 
+	// BF-CN-SLAUGHTER #169: dữ liệu nền có 4 CSGM mẫu, mỗi cơ sở thuộc một xã có trong danh mục ĐVHC của tenant.
+	seededFacilities(t, admin)
+	// Xã không có trong ĐVHC bị từ chối cả khi nạp tệp (FN-01 AC-02): dòng đó bị loại kèm lý do, dòng hợp lệ vẫn tạo.
+	csv := "catalog,code,name,valid_from,commune_code,facility_kind\n" +
+		"cnts_slaughter_facility,CS_NHAP_OK,Cơ sở nhập hợp lệ,2026-10-01,30316,nho_le\n" +
+		"cnts_slaughter_facility,CS_NHAP_LA,Cơ sở xã lạ,2026-10-01,99999,nho_le\n"
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte(csv))
+	rows, _ := body["rows"].([]any)
+	if st != http.StatusOK || body["created"] != 1.0 || body["rejected"] != 1.0 || len(rows) != 2 ||
+		rows[1].(map[string]any)["code"] != "CS_NHAP_LA" || rows[1].(map[string]any)["reason"] != "Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng" {
+		t.Fatalf("nạp tệp có xã lạ: %d %v", st, body)
+	}
+	if st, _ := reader.get("/v1/masterdata/catalogs/cnts_slaughter_facility/CS_NHAP_LA"); st != http.StatusNotFound {
+		t.Fatalf("dòng xã lạ không được tạo: %d", st)
+	}
+	if st, body := reader.get("/v1/masterdata/catalogs/cnts_slaughter_facility/CS_NHAP_OK"); st != http.StatusOK || body["attrs"].(map[string]any)["commune_code"] != "30316" {
+		t.Fatalf("dòng xã hợp lệ được tạo: %d %v", st, body)
+	}
+	// Mã tỉnh (không phải cấp xã) và xã đã hết hiệu lực tại ngày áp dụng cũng bị từ chối.
+	for _, tc := range []struct{ commune, from string }{{"91", "2026-10-01"}, {"30289", "2026-10-01"}, {"30289", "2025-07-01"}} {
+		st, body := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_slaughter_facility/items", map[string]any{
+			"code": "CS_SAI_XA", "name": "Cơ sở sai xã", "valid_from": tc.from,
+			"attrs": map[string]string{"commune_code": tc.commune, "facility_kind": "nho_le"}})
+		constraintIssue(t, st, body, http.StatusUnprocessableEntity, "masterdata.cnts_commune_invalid",
+			"Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng", "attrs.commune_code", tc.commune)
+	}
+
 	// valid_from chỉ nhận ở danh mục CNTS.
 	if st, _ := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/material/items", map[string]any{
 		"code": "VT_X", "name": "Vật tư X", "attrs": map[string]string{"unit": "kg"}, "valid_from": "2026-10-01",
 	}); st != http.StatusUnprocessableEntity {
 		t.Fatalf("valid_from ở danh mục không theo hiệu lực: %d", st)
+	}
+}
+
+// seededFacilities: 4 CSGM mẫu của dữ liệu nền (BF-CN-SLAUGHTER #169) có đủ trường CN-10 và mã xã là xã An Giang còn hiệu lực.
+func seededFacilities(t *testing.T, admin caller) {
+	t.Helper()
+	want := map[string]string{"CSGM_MAU_01": "30316", "CSGM_MAU_02": "30742", "CSGM_MAU_03": "30628", "CSGM_MAU_04": "30463"}
+	st, body := admin.adm(http.MethodGet, "/v1/masterdata/catalogs/cnts_slaughter_facility/items?at=2026-10-28", nil)
+	items, _ := body["items"].([]any)
+	if st != http.StatusOK {
+		t.Fatalf("danh sách CSGM: %d %v", st, body)
+	}
+	seen := 0
+	for _, raw := range items {
+		it := raw.(map[string]any)
+		commune, ok := want[it["code"].(string)]
+		if !ok {
+			continue
+		}
+		seen++
+		attrs := it["attrs"].(map[string]any)
+		if attrs["commune_code"] != commune || attrs["facility_kind"] == nil || attrs["species"] == nil || attrs["address"] == nil || attrs["facility_ref"] == nil {
+			t.Fatalf("CSGM mẫu thiếu trường: %v", it)
+		}
+		if attrs["stamp_codes_gs"] == nil && attrs["stamp_codes_gc"] == nil {
+			t.Fatalf("CSGM mẫu không có mộc dấu: %v", it)
+		}
+		st, unit := admin.get("/v1/masterdata/admin-units/" + commune)
+		if st != http.StatusOK || unit["level"] != "commune" || unit["parent_code"] != "91" {
+			t.Fatalf("xã của CSGM mẫu %s: %d %v", commune, st, unit)
+		}
+	}
+	if seen != len(want) {
+		t.Fatalf("dữ liệu nền phải có %d CSGM mẫu, thấy %d", len(want), seen)
 	}
 }

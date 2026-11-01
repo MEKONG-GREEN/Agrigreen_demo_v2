@@ -1,9 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { deepLinkHref } from "./deepLink";
+import { KIND_LABEL } from "@/notify/notify";
 
 const ID = "01927b3e-0ff1-7000-8000-00000000abcd";
 
 describe("deepLinkHref — liên kết thông báo sang trang web", () => {
+  it("W11.26: chỉ nhận UUID đợt đầy đủ, bỏ query/hash và có đích HRM dự phòng", () => {
+    const base = "/kn/nhan-su/danh-gia";
+    expect(deepLinkHref(`${base}/dot/${ID.toUpperCase()}?x=1#y`, "hrm_appraisal")).toBe(`${base}/dot/${ID}`);
+    for (const path of [`${base}/dot/abc`, `${base}/dot/${ID}/../x`, `${base}/dot/${ID}x`, `https://evil.example${base}/dot/${ID}`]) {
+      expect(deepLinkHref(path, "hrm_appraisal")).toBe(base);
+      expect(deepLinkHref(path)).toBeNull();
+    }
+    expect(deepLinkHref(null, "hrm_appraisal")).toBe(base);
+    expect(deepLinkHref(`${base}/dot/${ID}/phieu/${ID.toUpperCase()}`, "hrm_appraisal")).toBe(`${base}/dot/${ID}/phieu/${ID}`);
+    expect(deepLinkHref(`${base}/dot/${ID}/phieu/${ID}/extra`, "hrm_appraisal")).toBe(base);
+    expect(deepLinkHref(`${base}/dot/${ID}/phieu/invalid`, "hrm_appraisal")).toBe(base);
+
+    expect(deepLinkHref(null, "hrm_promotion_due")).toBe("/kn/nhan-su/nang-bac");
+    expect(deepLinkHref(null, "hrm_plan_reminder")).toBe("/kn/nhan-su/ke-hoach-phong");
+    expect(KIND_LABEL.hrm_appraisal).toBe("Đánh giá viên chức");
+    expect(KIND_LABEL.hrm_promotion_due).toBe("Nhắc xét nâng bậc lương");
+    expect(KIND_LABEL.hrm_plan_reminder).toBe("Nhắc kế hoạch phòng");
+  });
+
   it("các loại có sẵn: chỉ đạo, tài liệu, nhiệm vụ leo thang, xung đột, tổ chức", () => {
     expect(deepLinkHref(`/extension/directives/${ID}`, "directive")).toBe(`/chi-dao?id=${ID}`);
     expect(deepLinkHref(`/documents/${ID}`, "document")).toBe(`/thu-vien?doc=${ID}`);
@@ -54,6 +74,19 @@ describe("deepLinkHref — liên kết thông báo sang trang web", () => {
     expect(deepLinkHref("/unknown/path", "season_opened")).toBe("/htx/mua-vu");
     expect(deepLinkHref(undefined, "household_registered")).toBe("/htx");
     expect(deepLinkHref("/x", "household_membership_changed")).toBe("/htx");
+  });
+
+  it("W11.53b: thông báo biểu dự án KNQG (gửi/xác nhận-trả lại/trình) → màn Mẫu biểu mở đúng biểu", () => {
+    const doc = "0192f0a0-1234-7abc-8def-0123456789ab";
+    for (const kind of ["cnts_knqg_sent", "cnts_knqg_reviewed", "cnts_knqg_submitted"]) {
+      expect(deepLinkHref(`/kn/cnts/du-an-mau-bieu?doc=${doc}`, kind)).toBe(`/kn/cnts/du-an-mau-bieu?doc=${doc}`);
+      expect(deepLinkHref(`/kn/cnts/du-an-mau-bieu?doc=${doc.toUpperCase()}#x`, kind)).toBe(`/kn/cnts/du-an-mau-bieu?doc=${doc}`);
+      // mã sai dạng/chèn thêm → chỉ mở màn danh sách, không mang chuỗi tuỳ ý sang URL
+      expect(deepLinkHref("/kn/cnts/du-an-mau-bieu?doc=../../admin", kind)).toBe("/kn/cnts/du-an-mau-bieu");
+      expect(deepLinkHref(`/kn/cnts/du-an-mau-bieu?doc=${doc}x`, kind)).toBe("/kn/cnts/du-an-mau-bieu");
+      expect(deepLinkHref(null, kind)).toBe("/kn/cnts/du-an-mau-bieu");
+    }
+    expect(deepLinkHref(`/kn/cnts/du-an-mau-bieu/../../x?doc=${doc}`, "cnts_knqg_sent")).toBe("/kn/cnts/du-an-mau-bieu");
   });
 
   it("kind lạ và đường dẫn lạ → null (chỉ mở hộp thư)", () => {

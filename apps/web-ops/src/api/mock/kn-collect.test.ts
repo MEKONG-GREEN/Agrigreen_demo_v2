@@ -78,7 +78,8 @@ describe("thu thập dữ liệu Cấp Xã giả lập (P7)", () => {
   });
   it("FN-XA-03.04 / 03.06: khai báo máy (nguyên, không trùng loại, tổng xã = Σ HTX); vật tư + tổng hợp theo xã", async () => {
     const xa = await clientFor("kn-an", "asg-an-xa");
-    const coop = (await xa.cooperatives({ commune: "91301" })).items[0]!;
+    // #162: HTX chọn theo hồ sơ KN riêng; khai báo máy tham chiếu HTX đã công bố liên kết (htx_ref).
+    const coop = { ref: (await xa.records({ kind: "cooperative", commune: "91301" })).items[0]!.htx_ref! };
     expect(await code(xa.putMachines(coop.ref, [{ machine_type: "may_cay", quantity: 1.5 }]))).toBe("422 mechanization.machine_quantity_invalid");
     expect(await code(xa.putMachines(coop.ref, [{ machine_type: "may_cay", quantity: 1 }, { machine_type: "may_cay", quantity: 2 }]))).toBe("422 mechanization.machine_type_duplicate");
     expect((await xa.putMachines(coop.ref, [{ machine_type: "may_cay", quantity: 3 }])).total).toBe(3);
@@ -135,7 +136,7 @@ describe("thu thập Cấp Xã theo ngày VN", () => {
   it("Thứ Hai 00:30 VN: vật tư ghi hôm nay hợp lệ, ngày mai bị chặn", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-10-25T17:30:00Z") });
     const xa = await clientFor("kn-an", "asg-an-xa");
-    const coop = (await xa.cooperatives({ commune: "91301" })).items[0]!;
+    const coop = (await xa.records({ kind: "cooperative", commune: "91301" })).items[0]!;
     // #67: nông hộ là hồ sơ KN riêng (không còn since_date của HTX); phần ngày VN còn lại là vật tư.
     expect(coop.ref).toBeTruthy();
     const line = [{ material_code: "phan_ure", quantity: "1" }];

@@ -2,10 +2,15 @@
 
 // Lịch trực KSGM BM-03 (W11.46, BRD CNTS v3.7 UR-TINH-10, FN-15, UR-XA-03):
 // - Cấp Tỉnh (cán bộ tổng hợp), Admin: lưới tháng cơ sở × viên chức × ngày, bấm ô đổi ca N → Đ → NĐ → trống, sao chép
-//   tháng trước, lưu thành phiên bản mới (khóa lạc quan), cảnh báo không chặn, xuất CSV theo mẫu "Lịch trực ksgm".
+//   tháng trước, lưu thành phiên bản mới (khóa lạc quan), cảnh báo không chặn.
+// - BF-CN-DUTY (#171, CN-14): cột Địa chỉ, ĐT viên chức (SĐT che, chỉ người lập lịch); tô ngày cơ sở chưa có người trực;
+//   cảnh báo "chưa cấp quyền" có liên kết sang Cấp quyền; nạp Excel đúng mẫu "Lịch trực ksgm" (xem trước kèm lỗi theo
+//   dòng, áp vào lưới rồi Lưu với source=excel); xuất .xlsx đúng mẫu (tiêu đề tháng, dòng căn cứ, ghi chú ca).
 // - Cấp Xã: "Lịch trực của tôi" — ca của mình trong tháng và người trực cùng.
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useRef, useState } from "react";
 import { unwrap } from "@/api/client";
+import { readUpload, saveBlob } from "@/lib/files";
 import { collectPages } from "@/api/pagination";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { useAuth } from "@/auth/AuthProvider";
@@ -18,16 +23,36 @@ import {
   createCntsCalApi,
   currentMonth,
   fromGrid,
+  grantHref,
+  importFileError,
+  issueText,
   nextShift,
-  rosterCsv,
   rowsOf,
   shiftMonth,
   toGrid,
+  uncoveredDays,
   weekdayLabel,
   type CntsCalApi,
   type DutyRoster,
+  type DutyRosterImport,
   type Shift,
 } from "./api";
+
+const BASIS_KEY = "kn.cnts.duty.basis";
+function loadBasis(): string {
+  try {
+    return localStorage.getItem(BASIS_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+function storeBasis(v: string) {
+  try {
+    localStorage.setItem(BASIS_KEY, v);
+  } catch {
+    // trình duyệt chặn lưu trữ: chỉ mất phần ghi nhớ
+  }
+}
 
 export function DutyRosterScreen() {
   const { api, kn } = useAuth();
@@ -110,10 +135,14 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
   const [grid, setGrid] = useState<Map<string, Shift>>(() => toGrid(roster.cells));
   const [extra, setExtra] = useState<[string, string][]>([]);
   const [dirty, setDirty] = useState(false);
-  const [source, setSource] = useState<"grid" | "copy">("grid");
+  const [source, setSource] = useState<"grid" | "copy" | "excel">("grid");
   const [note, setNote] = useState("");
   const [addF, setAddF] = useState("");
   const [addO, setAddO] = useState("");
+  const [basis, setBasis] = useState(loadBasis);
+  const [preview, setPreview] = useState<DutyRosterImport | null>(null);
+  const [fileErr, setFileErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const act = useAction();
   const editable = roster.can_edit && !readOnly;
   const communeName = useCommuneNames(roster.facilities.map((f) => f.commune_code));
@@ -121,13 +150,16 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
   const rows = rowsOf(fromGrid(grid, roster.days_in_month), extra).sort(
     (a, b) => roster.facilities.findIndex((f) => f.ref === a[0]) - roster.facilities.findIndex((f) => f.ref === b[0]),
   );
-  const fname = (ref: string) => roster.facilities.find((f) => f.ref === ref)?.name ?? ref.slice(0, 8);
+  const fac = (ref: string) => roster.facilities.find((f) => f.ref === ref);
+  const fname = (ref: string) => fac(ref)?.name ?? ref.slice(0, 8);
+  const faddr = (ref: string) => fac(ref)?.address || communeName(fac(ref)?.commune_code ?? "");
   const oname = (ref: string) => roster.officers.find((o) => o.ref === ref)?.display ?? ref.slice(0, 8);
+  const ophone = (ref: string) => roster.officers.find((o) => o.ref === ref)?.phone_masked ?? "";
   const warnDays = new Map<string, Set<number>>();
-  for (const w of roster.warnings) {
-    const k = w.code === "double_shift" ? `o:${w.officer_ref}` : w.code === "facility_uncovered" ? `f:${w.facility_ref}` : "";
-    if (k) warnDays.set(k, new Set(w.days));
-  }
+  for (const w of roster.warnings) if (w.code === "double_shift") warnDays.set(`o:${w.officer_ref}`, new Set(w.days));
+  const uncovered = uncoveredDays(grid, [...new Set(rows.map(([f]) => f))], roster.days_in_month);
+  const phoneCol = roster.can_view_phone;
+  const infoCols = phoneCol ? 4 : 3;
 
   const toggle = (f: string, o: string, d: number) => {
     if (!editable) return;
@@ -158,13 +190,31 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
       onSaved();
     }
   };
-  const exportCsv = () => {
-    const blob = new Blob(["﻿" + rosterCsv(roster, grid, rows)], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `lich-truc-ksgm-${roster.month}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+  const exportXlsx = async () => {
+    storeBasis(basis);
+    const r = await act.run(() => capi.exportRoster(roster.month, roster.province_code ?? "legacy", basis));
+    if (r) saveBlob(r.blob, r.name);
+  };
+  const pickFile = async (f: File | undefined) => {
+    setFileErr(null);
+    setPreview(null);
+    if (!f) return;
+    const up = await readUpload(f);
+    const err = importFileError(up);
+    if (err) {
+      setFileErr(err);
+      return;
+    }
+    const r = await act.run(() => capi.importRoster(roster.month, up, roster.province_code ?? undefined));
+    if (r) setPreview(r);
+  };
+  const applyImport = (p: DutyRosterImport) => {
+    setGrid(toGrid(p.cells));
+    setExtra([]);
+    setSource("excel");
+    setDirty(true);
+    setPreview(null);
+    act.setNote(`Đã áp dụng ${p.cells.length} ô từ tệp Excel (sheet "${p.sheet}")${p.issues.length ? `, bỏ ${p.issues.length} lỗi` : ""} — kiểm tra rồi bấm Lưu.`);
   };
 
   return (
@@ -182,16 +232,45 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
               <button className="btn btn-sm" onClick={copyPrevious} disabled={act.busy}>
                 Sao chép tháng trước
               </button>
+              <button className="btn btn-sm" onClick={() => fileRef.current?.click()} disabled={act.busy}>
+                Nạp Excel
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                hidden
+                aria-label="Tệp Excel lịch trực"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => {
+                  void pickFile(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
               <input aria-label="Ghi chú lần lưu" placeholder="Ghi chú (tùy chọn)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} />
               <button className="btn btn-primary btn-sm" onClick={save} disabled={act.busy || !dirty}>
                 Lưu
               </button>
             </>
           ) : null}
-          <button className="btn btn-sm" onClick={exportCsv}>
-            Xuất CSV
+        </div>
+        <div className="row">
+          <input
+            aria-label="Dòng căn cứ (xuất Excel)"
+            placeholder="Dòng căn cứ, vd: theo thông báo số …/SNNMT ngày …"
+            value={basis}
+            onChange={(e) => setBasis(e.target.value)}
+            maxLength={300}
+            style={{ flex: 1, minWidth: 0 }}
+          />
+          <button className="btn btn-sm" onClick={exportXlsx} disabled={act.busy || dirty} title={dirty ? "Lưu thay đổi trước khi xuất" : "Xuất bản đã lưu theo mẫu Lịch trực KSGM"}>
+            Xuất Excel
           </button>
         </div>
+        {fileErr ? (
+          <p className="err" role="alert">
+            {fileErr}
+          </p>
+        ) : null}
         {roster.warnings.length ? (
           <ul aria-label="Cảnh báo" className="mute">
             {roster.warnings.map((w, i) => (
@@ -200,11 +279,19 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
                 {w.facility_ref ? ` — ${fname(w.facility_ref)}` : ""}
                 {w.officer_ref ? ` — ${oname(w.officer_ref)}` : ""}
                 {w.days.length && w.days.length <= 10 ? ` (ngày ${w.days.join(", ")})` : ""}
+                {w.code === "officer_not_granted" && w.officer_ref && w.facility_ref ? (
+                  <>
+                    {" "}
+                    <Link href={grantHref(w.officer_ref, w.facility_ref, fac(w.facility_ref)?.commune_code)}>Cấp quyền</Link>
+                  </>
+                ) : null}
               </li>
             ))}
           </ul>
         ) : null}
       </section>
+
+      {preview ? <ImportPreview p={preview} fname={fname} oname={oname} onApply={() => applyImport(preview)} onCancel={() => setPreview(null)} /> : null}
 
       {/* Lưới ca trực kiểu bảng tính (bấm ô đổi ca) — giữ nguyên như lưới nhập Excel, không đổi sang DataTable. */}
       <section className="card sec" aria-label="Lưới lịch trực">
@@ -213,7 +300,9 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
             <thead>
               <tr>
                 <th>Cơ sở</th>
+                <th>Địa chỉ</th>
                 <th>Viên chức</th>
+                {phoneCol ? <th>ĐT</th> : null}
                 {days.map((d) => (
                   <th key={d} title={weekdayLabel(roster.month, d)}>
                     {d}
@@ -224,25 +313,32 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={days.length + 2} className="mute">
+                  <td colSpan={days.length + infoCols} className="mute">
                     Chưa có viên chức nào trong lưới — thêm cặp cơ sở, viên chức bên dưới.
                   </td>
                 </tr>
               ) : null}
               {rows.map(([f, o]) => (
                 <tr key={`${f}|${o}`}>
-                  <td title={communeName(roster.facilities.find((x) => x.ref === f)?.commune_code ?? "")}>{fname(f)}</td>
+                  <td>{fname(f)}</td>
+                  <td>{faddr(f)}</td>
                   <td>{oname(o)}</td>
+                  {phoneCol ? <td>{ophone(o) || "—"}</td> : null}
                   {days.map((d) => {
                     const v = grid.get(cellKey(f, o, d));
                     const warn = warnDays.get(`o:${o}`)?.has(d);
+                    const empty = uncovered.get(f)?.has(d);
                     return (
-                      <td key={d} style={{ padding: 0, textAlign: "center", background: warn ? "var(--warn-bg, #fff3cd)" : undefined }}>
+                      <td
+                        key={d}
+                        data-uncovered={empty ? "true" : undefined}
+                        style={{ padding: 0, textAlign: "center", background: warn ? "var(--warn-bg, #fff3cd)" : empty ? "var(--bad-bg, #fde2e1)" : undefined }}
+                      >
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
-                          aria-label={`${fname(f)} ${oname(o)} ngày ${d}: ${v ? SHIFT_LABEL[v] : "nghỉ"}`}
-                          title={v ? SHIFT_TITLE[v] : "Nghỉ"}
+                          aria-label={`${fname(f)} ${oname(o)} ngày ${d}: ${v ? SHIFT_LABEL[v] : "nghỉ"}${empty ? " (cơ sở chưa có người trực)" : ""}`}
+                          title={v ? SHIFT_TITLE[v] : empty ? "Nghỉ — cơ sở chưa có ai trực ngày này" : "Nghỉ"}
                           onClick={() => toggle(f, o, d)}
                           disabled={!editable}
                         >
@@ -295,7 +391,7 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
             {roster.versions.map((v) => (
               <li key={v.version}>
                 Phiên bản {v.version} · {dt(v.at)} · {v.actor_display ?? v.actor_ref.slice(0, 8)} · {v.cell_count} ô
-                {v.source === "copy" ? " · sao chép tháng trước" : ""}
+                {v.source === "copy" ? " · sao chép tháng trước" : v.source === "excel" ? " · nạp Excel" : ""}
                 {v.note ? ` · ${v.note}` : ""}
               </li>
             ))}
@@ -303,5 +399,67 @@ function RosterEditor({ capi, roster, readOnly, onSaved }: { capi: CntsCalApi; r
         </section>
       ) : null}
     </>
+  );
+}
+
+const MAX_ISSUES_SHOWN = 50;
+
+/** Xem trước tệp nạp: số dòng/ô đọc được, lỗi theo dòng, cảnh báo như khi lưu; áp vào lưới (chưa lưu). */
+function ImportPreview({
+  p,
+  fname,
+  oname,
+  onApply,
+  onCancel,
+}: {
+  p: DutyRosterImport;
+  fname: (ref: string) => string;
+  oname: (ref: string) => string;
+  onApply: () => void;
+  onCancel: () => void;
+}) {
+  const rest = p.issues.length - MAX_ISSUES_SHOWN;
+  return (
+    <section className="card sec" aria-label="Xem trước tệp nạp">
+      <h2>Xem trước tệp nạp</h2>
+      <p>
+        Sheet &quot;{p.sheet}&quot;: {p.row_count} dòng viên chức, {p.cells.length} ô ca trực ghép được.
+        {p.basis ? ` Căn cứ trong tệp: ${p.basis}` : ""}
+      </p>
+      {p.issues.length ? (
+        <>
+          <p className="err" role="alert">
+            {p.issues.length} lỗi — dòng không khớp cơ sở hoặc viên chức bị bỏ cả dòng, ô ký hiệu lạ bị bỏ ô. Sửa tệp rồi nạp lại, hoặc áp dụng phần hợp lệ.
+          </p>
+          <ul aria-label="Lỗi theo dòng">
+            {p.issues.slice(0, MAX_ISSUES_SHOWN).map((i, k) => (
+              <li key={k}>{issueText(i)}</li>
+            ))}
+            {rest > 0 ? <li>… và {rest} lỗi khác</li> : null}
+          </ul>
+        </>
+      ) : (
+        <p>Không có lỗi.</p>
+      )}
+      {p.warnings.length ? (
+        <ul aria-label="Cảnh báo của tệp nạp" className="mute">
+          {p.warnings.map((w, i) => (
+            <li key={i}>
+              <StatusPill tone="warn">Cảnh báo</StatusPill> {w.message}
+              {w.facility_ref ? ` — ${fname(w.facility_ref)}` : ""}
+              {w.officer_ref ? ` — ${oname(w.officer_ref)}` : ""}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="row">
+        <button className="btn btn-primary btn-sm" onClick={onApply} disabled={!p.cells.length}>
+          {p.issues.length ? `Áp dụng ${p.cells.length} ô hợp lệ vào lưới` : "Áp dụng vào lưới"}
+        </button>
+        <button className="btn btn-sm" onClick={onCancel}>
+          Hủy bỏ
+        </button>
+      </div>
+    </section>
   );
 }

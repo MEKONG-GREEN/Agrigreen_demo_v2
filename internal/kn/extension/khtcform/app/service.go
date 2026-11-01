@@ -14,6 +14,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -106,6 +107,7 @@ func (s *Service) caller(ctx context.Context, dept string) (caller, error) {
 
 // Submission là một lần gửi (lịch sử gửi).
 type Submission struct {
+	NativeLate  *bool
 	ID          uuid.UUID
 	Attempt     int64
 	SubmittedAt time.Time
@@ -118,6 +120,7 @@ type Submission struct {
 
 // Form là phiếu của một phòng trong một kỳ KHTC (màn nhập FN-PN-03.02 và màn rà soát FN-TI-02.04).
 type Form struct {
+	Supplement     *AdhocRequestView
 	Period         pstore.Period
 	DueAt          time.Time
 	Terminal       string // "" | closed | cancelled
@@ -209,8 +212,22 @@ func (s *Service) load(ctx context.Context, c caller, id uuid.UUID, dept string)
 	if err != nil {
 		return Form{}, err
 	}
+	if p.Type == pdomain.TypeAdhoc {
+		if c.k.Role == extport.SessionRoleAdmin && !c.p.MFA {
+			return Form{}, problem.MFARequired
+		}
+		if c.k.Role == extport.SessionRoleNational || c.k.ReadOnly() {
+			return Form{}, errNotDept
+		}
+		if c.k.Role == extport.SessionRoleAdmin {
+			c.review = true
+		}
+	}
 	f := Form{Period: p, DueAt: dueOf(p, evs), Terminal: terminalOf(evs), Department: dept, DepartmentName: DeptName(dept),
 		Template: domain.TemplateFor(dept), Grid: p.Type == pdomain.TypeWeek}
+	if err := s.attachAdhocRequest(ctx, c, &f); err != nil {
+		return Form{}, err
+	}
 	now := s.now()
 	f.Overdue = now.After(f.DueAt)
 	if f.Terminal == pdomain.PeriodCancelled && c.member {
@@ -263,6 +280,13 @@ func (s *Service) load(ctx context.Context, c caller, id uuid.UUID, dept string)
 		f.View.State == pdomain.FormSupplement
 	f.Editable = c.writer && editableState
 	f.CanReview = c.review && (f.View.CanConfirm || f.View.CanRequestSupplement)
+	if f.Supplement != nil {
+		f.RequestNote = f.Supplement.Instruction
+		if f.Supplement.State == "intent" {
+			f.Editable = false
+			f.CanReview = false
+		}
+	}
 	switch {
 	case draft != nil && (c.member || last == nil):
 		f.Content, f.ContentSource, f.DraftAt = draft.Content.Normalize(), "draft", &draft.EventTime
@@ -274,11 +298,17 @@ func (s *Service) load(ctx context.Context, c caller, id uuid.UUID, dept string)
 	if err := s.fillGrid(ctx, c, &f); err != nil {
 		return Form{}, err
 	}
+	if err := s.attachAdhocSubmissionDeadlines(ctx, c, &f); err != nil {
+		return Form{}, err
+	}
 	f.Result = s.evaluate(f, f.Content, true)
 	return f, nil
 }
 
 func (s *Service) evaluate(f Form, sh domain.Sheet, submit bool) domain.Result {
+	if f.Supplement != nil {
+		return domain.Result{Rows: map[uuid.UUID]domain.RowResult{}, Issues: domain.ValidateAdhocAnswer(sh, f.Supplement.Indicators, submit)}
+	}
 	adj := map[uuid.UUID]domain.AdjPeriod{}
 	for _, a := range f.AdjPeriods {
 		adj[a.ID] = a
@@ -479,6 +509,9 @@ func (s *Service) editable(ctx context.Context, id uuid.UUID, dept string) (call
 	if err != nil {
 		return c, Form{}, err
 	}
+	if c.k.Role == extport.SessionRoleAdmin && f.Period.Type != pdomain.TypeAdhoc {
+		return c, Form{}, errNotWriter
+	}
 	if !f.Editable {
 		msg := "phiếu \"" + pdomain.FormLabels[f.View.State] + "\""
 		switch f.View.State {
@@ -515,9 +548,23 @@ func (s *Service) record(ctx context.Context, c caller, f Form, sh domain.Sheet,
 	var out *store.Sheet
 	err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		prev, err := store.ByIdem(ctx, tx, idem)
-		if err != nil || prev != nil {
-			out = prev
+		if err != nil {
 			return err
+		}
+		if prev != nil {
+			_, hash, e := sh.Hash()
+			if e != nil {
+				return e
+			}
+			_, oldHash, e := prev.Content.Hash()
+			if e != nil {
+				return e
+			}
+			if prev.ActorRef != c.p.ActorRef || prev.PeriodID != f.Period.ID || prev.Department != f.Department || prev.Kind != kind || prev.BaseAttempt != int(f.View.Attempt) || string(hash) != string(oldHash) {
+				return ErrAdhocRequestConflict
+			}
+			out = prev
+			return nil
 		}
 		if err := store.Insert(ctx, tx, c.p.TenantID, &row, idem); err != nil {
 			return err
@@ -525,7 +572,7 @@ func (s *Service) record(ctx context.Context, c caller, f Form, sh domain.Sheet,
 		out = &row
 		return nil
 	})
-	return out, err
+	return out, adhocError(err)
 }
 
 func idemOr(idem string) string {
@@ -537,6 +584,9 @@ func idemOr(idem string) string {
 
 // SaveDraft "Lưu nháp" (không giới hạn, không kiểm bắt buộc — vẫn trả kết quả kiểm tra để báo tại ô).
 func (s *Service) SaveDraft(ctx context.Context, id uuid.UUID, dept string, in SaveInput, idem string) (Form, error) {
+	if err := boundsAdhocInput(in.Sheet); err != nil {
+		return Form{}, err
+	}
 	c, f, err := s.editable(ctx, id, dept)
 	if err != nil {
 		return Form{}, err
@@ -545,6 +595,9 @@ func (s *Service) SaveDraft(ctx context.Context, id uuid.UUID, dept string, in S
 		return Form{}, formsport.ErrVersionConflict.WithDetail("phiếu đã được gửi ở nơi khác — tải lại phiếu")
 	}
 	sh := withPeriodNames(in.Sheet.Normalize(), f.AdjPeriods)
+	if err := s.validateRequestToken(ctx, c, f, sh, false); err != nil {
+		return Form{}, err
+	}
 	if len(sh.Cells) > domain.MaxCells || len(sh.Adjustments) > domain.MaxAdjustments {
 		return Form{}, problem.Validation.WithDetail("bảng quá lớn")
 	}
@@ -564,6 +617,8 @@ func invalid(res domain.Result) error {
 		list = append(list, i)
 		field := "sheet"
 		switch {
+		case strings.HasPrefix(i.Section, "adhoc_"):
+			field = i.Section
 		case i.Section != "":
 			field = "texts." + i.Section
 		case i.Adjustment >= 0:
@@ -582,6 +637,12 @@ func (s *Service) Submit(ctx context.Context, id uuid.UUID, dept string, in Save
 	if idem == "" {
 		return Form{}, problem.IdempotencyRequired
 	}
+	if err := boundsAdhocInput(in.Sheet); err != nil {
+		return Form{}, err
+	}
+	if f, ok, err := s.replayAdhocSubmit(ctx, id, dept, in, idem); err != nil || ok {
+		return f, err
+	}
 	c, f, err := s.editable(ctx, id, dept)
 	if err != nil {
 		return Form{}, err
@@ -590,6 +651,9 @@ func (s *Service) Submit(ctx context.Context, id uuid.UUID, dept string, in Save
 		return Form{}, formsport.ErrVersionConflict.WithDetail("phiếu đã được gửi ở nơi khác — tải lại phiếu")
 	}
 	sh := withPeriodNames(in.Sheet.Normalize(), f.AdjPeriods)
+	if err := s.validateRequestToken(ctx, c, f, sh, true); err != nil {
+		return Form{}, err
+	}
 	if res := s.evaluate(f, sh, true); !res.Valid() {
 		return Form{}, invalid(res)
 	}
@@ -602,12 +666,18 @@ func (s *Service) Submit(ctx context.Context, id uuid.UUID, dept string, in Save
 	var pb *problem.Problem
 	if errors.As(err, &pb) && pb.Code == formsport.ErrInvalidValues.Code {
 		for _, fe := range pb.Errors {
+			if fe.Field == "adhoc_request_id" {
+				return Form{}, ErrAdhocRequestChanged.WithCause(err)
+			}
 			if fe.Field == domain.FieldSheet {
 				return Form{}, ErrOldTemplate.WithCause(err)
 			}
 		}
 	}
 	if err != nil {
+		return Form{}, err
+	}
+	if err := s.completeAdhocRequest(ctx, c, f, sealed.ID, sealed.Content); err != nil {
 		return Form{}, err
 	}
 	return s.load(ctx, c, id, dept)
@@ -630,12 +700,12 @@ func (s *Service) Review(ctx context.Context, id uuid.UUID, dept, decision, note
 	if err != nil {
 		return Form{}, err
 	}
-	if !c.review {
-		return Form{}, errNotKHTC
-	}
 	f, err := s.load(ctx, c, id, dept)
 	if err != nil {
 		return Form{}, err
+	}
+	if !c.review && (c.k.Role != extport.SessionRoleAdmin || c.k.ReadOnly() || f.Period.Type != pdomain.TypeAdhoc) {
+		return Form{}, errNotKHTC
 	}
 	switch decision {
 	case DecisionReturned:
@@ -652,7 +722,12 @@ func (s *Service) Review(ctx context.Context, id uuid.UUID, dept, decision, note
 	if len(f.Submissions) == 0 {
 		return Form{}, ErrNotReviewable
 	}
-	if _, err := s.Entry.Review(ctx, pdomain.ProfileKHTC, f.Submissions[0].ID, decision, note, "khtc:form:review:"+idemOr(idem)); err != nil {
+	if c.k.Role == extport.SessionRoleAdmin && !c.p.MFA {
+		return Form{}, problem.MFARequired
+	}
+	nativeKey := "khtc:form:review:" + idemOr(idem)
+	nativeCtx := s.adhocReviewContext(ctx, c, f.Period, f.Submissions[0].ID, decision, note, nativeKey)
+	if _, err := s.Entry.Review(nativeCtx, pdomain.ProfileKHTC, f.Submissions[0].ID, decision, note, nativeKey); err != nil {
 		return Form{}, err
 	}
 	return s.load(ctx, c, id, dept)

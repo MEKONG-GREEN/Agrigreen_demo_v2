@@ -33,6 +33,7 @@ type FacilityView struct {
 	Name        string
 	CommuneCode string
 	Kind        string
+	Address     string // địa chỉ ghi ở danh mục (cột "Địa chỉ" BM-03)
 }
 
 // OfficerView là viên chức Cấp Xã CNTS (gợi ý cho lưới).
@@ -40,6 +41,8 @@ type OfficerView struct {
 	Ref      uuid.UUID
 	Communes []string
 	Scope    accport.XaScope
+	// PhoneMasked: SĐT đã che (4 số đầu · 3 số cuối) — chỉ với người lập lịch, chỉ viên chức có ô trong lưới.
+	PhoneMasked string
 }
 
 // RosterView là lịch trực của tháng cho API.
@@ -62,6 +65,10 @@ type RosterView struct {
 	// Notified: viên chức có ca thay đổi ở lần lưu này (thông báo).
 	Notified []uuid.UUID
 	Replayed bool
+	// CanViewPhone: người gọi được xem cột "ĐT viên chức" (người lập lịch: cán bộ tổng hợp Cấp Tỉnh, Admin).
+	CanViewPhone bool
+	// phones: SĐT đầy đủ của viên chức có ô (chỉ dùng trong gói để xuất BM-03; handler không đọc được).
+	phones map[uuid.UUID]string
 }
 
 // facilities trả cơ sở hoạt động trong tháng (đang dùng ngày đầu hoặc ngày cuối tháng).
@@ -80,7 +87,7 @@ func (s *Service) facilities(ctx context.Context, c caller, m time.Time) ([]Faci
 			}
 			if f.Active && allowed && !seen[f.Ref] {
 				seen[f.Ref] = true
-				out = append(out, FacilityView{Ref: f.Ref, Code: f.Code, Name: f.Name, CommuneCode: f.CommuneCode, Kind: f.Kind})
+				out = append(out, FacilityView{Ref: f.Ref, Code: f.Code, Name: f.Name, CommuneCode: f.CommuneCode, Kind: f.Kind, Address: strings.TrimSpace(f.Address)})
 			}
 		}
 	}
@@ -238,6 +245,16 @@ func (s *Service) decorateRoster(ctx context.Context, c caller, v *RosterView) e
 	}
 	v.Officers = offs
 	v.Warnings = domain.RosterWarnings(v.Month, v.Cells, facilitiesOf(v.Facilities), grantOf(idx))
+	if c.canPlanRoster() && s.Contacts != nil {
+		inGrid := make([]uuid.UUID, 0, len(v.Cells))
+		for _, x := range v.Cells {
+			inGrid = append(inGrid, x.Officer)
+		}
+		v.CanViewPhone, v.phones = true, s.phonesOf(ctx, c, uniq(inGrid))
+		for i := range v.Officers {
+			v.Officers[i].PhoneMasked = domain.MaskPhone(v.phones[v.Officers[i].Ref])
+		}
+	}
 	refs := []uuid.UUID{}
 	for _, o := range offs {
 		refs = append(refs, o.Ref)

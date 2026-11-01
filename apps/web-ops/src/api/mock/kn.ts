@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v7";
+export const MENU_VERSION = "kn.menu/v12";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -63,7 +63,8 @@ export const DEFAULT_ROUTE: Record<KnRole, string> = {
 
 export const CONTEXT_DEFAULT_ROUTES: Partial<Record<KnMenuProfile, Partial<Record<KnRole, string>>>> = {
   "ke_hoach_tai_chinh": {
-    "kn_tinh": "/kn/khtc/ky-bao-cao"
+    "kn_tinh": "/kn/khtc/ky-bao-cao",
+    "kn_tw": "/kn/khtc/bao-cao-da-xuat"
   },
   "trong_trot": {
     "kn_tinh": "/kn/bao-cao-khtc"
@@ -916,8 +917,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.so_lieu_xa.nhap_lieu_tuan",
                 "label": "Nhập liệu tuần",
                 "route": "/kn/cnts/so-lieu-xa/nhap-lieu-tuan",
-                "icon": "table",
-                "soon": true
+                "icon": "table"
               },
               {
                 "key": "tinh.cnts.so_lieu_xa.khai_thac_thuy_san",
@@ -929,8 +929,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.so_lieu_xa.nhat_ky",
                 "label": "Nhật ký sản xuất",
                 "route": "/kn/cnts/so-lieu-xa/nhat-ky",
-                "icon": "journal",
-                "soon": true
+                "icon": "journal"
               },
               {
                 "key": "tinh.cnts.so_lieu_xa.lich_tiem",
@@ -1268,6 +1267,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/khtc/mau-bao-cao",
             "icon": "table",
             "soon": true
+          },
+          {
+            "key": "tinh.khtc.phat_sinh",
+            "label": "Báo cáo phát sinh",
+            "route": "/kn/khtc/bao-cao-phat-sinh",
+            "icon": "report"
           }
         ]
       },
@@ -1335,8 +1340,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tw.khtc.bao_cao_tinh",
             "label": "Báo cáo Tỉnh (KHTC)",
             "route": "/kn/khtc/bao-cao-da-xuat",
-            "icon": "report",
-            "soon": true
+            "icon": "report"
           }
         ]
       }
@@ -1404,6 +1408,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "label": "Cấu hình báo giá",
             "route": "/kn/bao-gia/cau-hinh",
             "icon": "param"
+          },
+          {
+            "key": "tinh.bao_gia.de_xuat_mat_hang",
+            "label": "Đề xuất mặt hàng",
+            "route": "/kn/bao-gia/de-xuat-mat-hang",
+            "icon": "package"
           }
         ]
       },
@@ -1471,8 +1481,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.bao_gia.mat_hang",
             "label": "Mặt hàng",
             "route": "/kn/bao-gia/mat-hang",
-            "icon": "package",
-            "soon": true
+            "icon": "package"
           },
           {
             "key": "tinh.van_ban",
@@ -1581,6 +1590,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "label": "Yêu cầu xác minh",
             "route": "/kn/bao-gia/xac-minh",
             "icon": "check"
+          },
+          {
+            "key": "xa.bao_gia.de_xuat_mat_hang",
+            "label": "Đề xuất mặt hàng",
+            "route": "/kn/bao-gia/de-xuat-mat-hang",
+            "icon": "package"
           }
         ]
       },
@@ -1727,8 +1742,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "tinh.hcth.danh_gia",
             "label": "Đánh giá",
             "route": "/kn/nhan-su/danh-gia",
-            "icon": "approve",
-            "soon": true
+            "icon": "approve"
           }
         ]
       },
@@ -1818,8 +1832,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "xa.hcth.danh_gia",
             "label": "Đánh giá của tôi",
             "route": "/kn/nhan-su/danh-gia-cua-toi",
-            "icon": "approve",
-            "soon": true
+            "icon": "approve"
           }
         ]
       },
@@ -1922,6 +1935,18 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Báo cáo KHTC",
       "route": "/kn/phong-ban/{department}/bao-cao-khtc",
       "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_phat_sinh",
+      "label": "Báo cáo phát sinh",
+      "route": "/kn/khtc/bao-cao-phat-sinh",
+      "icon": "report"
+    },
+    {
+      "key": "admin.pb.khtc_muc_luc_mau",
+      "label": "Mục lục mẫu báo cáo",
+      "route": "/kn/phong-ban/{department}/muc-luc-mau",
+      "icon": "report"
     }
   ],
   "thong_tin_truyen_thong": [
@@ -1941,8 +1966,7 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "key": "admin.pb.bao_gia_mat_hang",
       "label": "Mặt hàng",
       "route": "/kn/bao-gia/mat-hang",
-      "icon": "package",
-      "soon": true
+      "icon": "package"
     }
   ],
   "hanh_chinh_tong_hop": [
@@ -1963,6 +1987,12 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Thư mục tài liệu",
       "route": "/kn/phong-ban/{department}/thu-muc-tai-lieu",
       "icon": "library"
+    },
+    {
+      "key": "admin.pb.hcth_danh_gia",
+      "label": "Đánh giá nhân sự",
+      "route": "/kn/nhan-su/danh-gia",
+      "icon": "approve"
     }
   ]
 };
@@ -2230,6 +2260,12 @@ const ADMIN_SYSTEM: Group = {
       "label": "Mẫu văn bản & lịch sử xuất",
       "route": "/kn/quan-tri/mau-van-ban",
       "icon": "report"
+    },
+    {
+      "key": "admin.qt.nhat_ky_he_thong",
+      "label": "Nhật ký hệ thống",
+      "route": "/kn/quan-tri/nhat-ky-he-thong",
+      "icon": "shield"
     }
   ]
 };

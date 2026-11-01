@@ -32,7 +32,9 @@ provides:
     - HTXConfirmationHistory
     - HTXConfirmations
     - HTXData
+    - KHTCFixedTemplates
     - KHTCMetricNames
+    - KHTCOperationSource
     - KHTCPlanDepartments
     - KHTCPlanVersions
     - KHTCPlans
@@ -40,6 +42,7 @@ provides:
     - KHTCReportStates
     - KHTCSourceCrosswalk
     - KHTCSources
+    - KHTCTemplateContextReader
     - OrganizationData
     - PlotDirectory
     - PlotStatistics
@@ -49,6 +52,7 @@ provides:
     - pf.extension.cnts_alert.changed/v1
     - pf.extension.cnts_duty.changed/v1
     - pf.extension.cnts_form.reminded/v1
+    - pf.extension.cnts_knqg.changed/v1
     - pf.extension.consolidation.completed/v1
     - pf.extension.directive.issued/v1
     - pf.extension.outbreak.reported/v1

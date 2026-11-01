@@ -37,6 +37,9 @@ type ActorResolver func(context.Context, authz.Principal, Profile) (ResolvedActo
 
 // Profile là cấu hình của MỘT bên dùng (ứng dụng) — tương đương mục cap/forms của app.yaml.
 type Profile struct {
+	// AuthorizeOperation is an optional application-owned exception for one verified
+	// invocation. Nil preserves the ordinary level policy. Never serialized.
+	AuthorizeOperation OperationAuthorizer `json:"-"`
 	// ResolveActor lets an application own session and target restrictions. Never serialized.
 	ResolveActor ActorResolver `json:"-"`
 
@@ -247,6 +250,13 @@ type Issue struct {
 // Chạy sau kiểm kiểu của biểu; trả lỗi chặn (rỗng = qua). Gốc lắp ráp nối theo profile.
 type Validator interface {
 	Validate(ctx context.Context, templateCode string, values map[string]string) []Issue
+}
+
+// ReviewGuard kiểm thêm quyền rà soát bài nộp theo quy tắc của bên dùng (vd CNTS FN-09: kỳ đã chỉ định người phụ trách
+// biểu thì chỉ người đó xác thực / yêu cầu điều chỉnh). cap/forms gọi SAU khi đã kiểm cấp, phạm vi, biểu của người gọi và
+// NGOÀI giao dịch của module (bên dùng tự đọc sổ của mình); trả lỗi = chặn. Gốc lắp ráp nối theo profile.
+type ReviewGuard interface {
+	AllowReview(ctx context.Context, periodID uuid.UUID, templateCode string) error
 }
 
 // TemplateDef là định nghĩa biểu do module nghiệp vụ cài (Fields là JSON mảng trường — khớp domain.Field).

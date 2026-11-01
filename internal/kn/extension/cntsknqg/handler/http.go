@@ -42,6 +42,12 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	httpx.AllowBody(g, http.MethodPost, "/knqg-docs/:ref/signed", maxUpload)
 	g.POST("/knqg-docs/:ref/signed", h.sign)
 	g.GET("/knqg-docs/:ref/signed", h.scan)
+	// W11.53b: ảnh thực địa Mẫu 03 (multipart: file — JPG/PNG ≤ 5 MB, caption tùy chọn).
+	g.GET("/knqg-docs/:ref/photos", h.photos)
+	httpx.AllowBody(g, http.MethodPost, "/knqg-docs/:ref/photos", maxPhotoUpload)
+	g.POST("/knqg-docs/:ref/photos", h.addPhoto)
+	g.GET("/knqg-docs/:ref/photos/:photo", h.photo)
+	g.POST("/knqg-docs/:ref/photos/:photo/remove", h.removePhoto)
 	g.POST("/knqg-docs/:ref/word", h.exportWord)
 	g.GET("/knqg-docs/:ref/words", h.wordHistory)
 	g.GET("/knqg-docs/:ref/words/:run/download", h.wordDownload)
