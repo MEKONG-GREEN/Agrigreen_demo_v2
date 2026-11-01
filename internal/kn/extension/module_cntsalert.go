@@ -60,8 +60,8 @@ func (m *Module) CNTSAlertJobs(tenants alertapp.TenantLister, log *slog.Logger) 
 				if err != nil {
 					outcome = "error"
 				}
-				log.Info("cảnh báo CNTS: quá hạn xử lý, nhắc nộp, trễ liên tiếp", "event", "job."+JobCNTSAlert, "overdue", r.Overdue,
-					"reminders", r.Reminders, "streaks", r.Streaks, "outcome", outcome)
+				log.Info("cảnh báo CNTS: quá hạn xử lý, nhắc nộp, trễ liên tiếp, mũi tiêm quá hạn", "event", "job."+JobCNTSAlert, "overdue", r.Overdue,
+					"reminders", r.Reminders, "streaks", r.Streaks, "vaccines", r.Vaccines, "outcome", outcome)
 			}
 			return err
 		},

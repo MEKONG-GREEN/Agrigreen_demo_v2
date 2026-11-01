@@ -31,6 +31,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // Mã lỗi (docs/errors/pf-extension-cnts-schedules.md).
@@ -65,6 +66,9 @@ type Service struct {
 	Officers accport.XaScopes
 	// Names (tùy chọn): tên cán bộ.
 	Names func() partyport.ActorNames
+	// Vault (tùy chọn, BF-CN-VACC #168): nhãn chủ hộ mô hình đã che bớt (kho định danh) cho danh sách lứa, bảng và tệp
+	// BM-07. nil → không có nhãn chủ hộ.
+	Vault client.Client
 	// Contacts (tùy chọn, BF-CN-DUTY): SĐT công vụ của viên chức (pf/accounts) đọc lúc dựng lưới, nạp/xuất BM-03; không
 	// lưu, không ghi log. Lưới chỉ trả SĐT đã che; tệp xuất chỉ có SĐT đầy đủ với người lập lịch. nil → không có cột ĐT.
 	Contacts accport.StaffContacts

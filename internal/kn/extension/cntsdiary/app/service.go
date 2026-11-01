@@ -25,6 +25,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	alertapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/app"
+	caldomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/store"
 	mdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/domain"
@@ -91,10 +92,18 @@ type Alerts interface {
 	LogVerdict(ctx context.Context, tx pgx.Tx, tid uuid.UUID, a alertapp.LogAlert) error
 }
 
+// Vaccinations là cổng ghi ngày tiêm NC-11 sang lịch tiêm BM-07 (extension/cntscal — quy tắc liên biểu số 7, BF-CN-VACC
+// #168), trong giao dịch ghi của nhật ký.
+type Vaccinations interface {
+	RecordFromDiary(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r caldomain.DiaryRecord) error
+}
+
 // Service là use case nhật ký nuôi CNTS.
 type Service struct {
-	DB    tenant.Beginner // pool vai extension_app (db.ForModule)
-	Clock clock.Clock
+	// Vaccinations (tùy chọn): NC-11 → lịch tiêm của lứa có vaccination_batch_ref. nil → không đồng bộ.
+	Vaccinations Vaccinations
+	DB           tenant.Beginner // pool vai extension_app (db.ForModule)
+	Clock        clock.Clock
 	// Units: tỉnh của xã (cảnh báo). nil → ghi trả 503.
 	Units partyport.AdminUnits
 	// Params (tùy chọn): ngưỡng; thiếu → mặc định trong mã.
@@ -283,6 +292,7 @@ type evalEnv struct {
 	modelType, commune, province string
 	th                           domain.Thresholds
 	maxDist, maxAcc              decimal.Decimal
+	vnames                       map[string]string // BF-CN-VACC: mã → tên vaccine cho NC-11 → lịch tiêm
 }
 
 // errEnvStale: loại mô hình của điểm hoặc xã đổi giữa lúc nạp evalEnv và giao dịch ghi.
@@ -308,6 +318,7 @@ func (s *Service) loadEnv(ctx context.Context, modelType, commune string) (evalE
 		return e, err
 	}
 	e.province = s.provinceOf(ctx, commune)
+	e.vnames = s.vaccineNames(ctx)
 	return e, nil
 }
 

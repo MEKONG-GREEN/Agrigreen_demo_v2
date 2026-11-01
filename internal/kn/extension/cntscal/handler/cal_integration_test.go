@@ -39,6 +39,8 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -159,6 +161,8 @@ type fix struct {
 	mu     sync.Mutex
 	ctxs   map[uuid.UUID]*authz.KNContext
 	xa     *xaScopes
+	vault  *clienttest.Fake
+	mod    *extension.Module
 	phones *staffPhones
 }
 
@@ -179,7 +183,7 @@ func (p *staffPhones) PhoneOf(_ context.Context, _ uuid.UUID, actor uuid.UUID) (
 
 func newFix(t *testing.T, multi ...bool) *fix {
 	env := pgtest.Get(t)
-	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, phones: &staffPhones{m: map[uuid.UUID]string{}}}
+	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, vault: clienttest.New(), phones: &staffPhones{m: map[uuid.UUID]string{}}}
 	f.pool = env.AdminPool(t, migrations.PF)
 	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}, Orgs: provinceOrgs{}})
 	mod.UseContacts(f.phones)
@@ -188,6 +192,8 @@ func newFix(t *testing.T, multi ...bool) *fix {
 		mod.UseXaScopes(f.xa)
 	}
 	mod.UseKNContext(knResolver{}, nil)
+	mod.UseCNTSModelVault(f.vault) // BF-CN-VACC: hộ mô hình, nhãn chủ hộ
+	f.mod = mod
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 4<<20)
 	mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.knMiddleware(), idempotency.Middleware(ops)))
@@ -236,7 +242,7 @@ type user struct {
 
 func (f *fix) user(kc authz.KNContext) user {
 	sub := ids.New()
-	tok := f.iss.Sign(f.t, authztest.Token{Subject: sub, TenantID: f.tenant, Roles: []string{"kn_user"}, MFA: true, TTL: 2 * time.Hour})
+	tok := f.iss.Sign(f.t, authztest.Token{Subject: sub, TenantID: f.tenant, Roles: []string{"kn_user", client.RoleRegistrar, client.RoleDisplay}, MFA: true, TTL: 2 * time.Hour})
 	kc.ID, kc.OrgRef = ids.New(), ids.New()
 	f.mu.Lock()
 	f.ctxs[kc.ID] = &kc

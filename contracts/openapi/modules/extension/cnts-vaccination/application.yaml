@@ -1,0 +1,94 @@
+paths:
+# @ag-order: 301
+  /v1/extension/cnts/vaccination-matrix:
+    get:
+      summary: "Bảng lịch tiêm BM-07 của một loại mô hình (BF-CN-VACC #168): hàng = hộ/lứa (xã, chủ hộ che bớt, CB theo dõi MH, ngày nhận giống), cột = vaccine × lần (ngày dự kiến, ngày thực tế, quá hạn)"
+      operationId: extensionCntsVaccinationMatrix
+      tags: [extension]
+      parameters:
+        - {name: model_type_code, in: query, required: true, schema: {type: string, maxLength: 64}}
+        - {name: project_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: site_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: commune_code, in: query, required: false, schema: {type: string}}
+        - {name: received_from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: received_to, in: query, required: false, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Bảng
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSVaccinationMatrix"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | extension.cnts_vaccination_invalid", $ref: "#/components/responses/Problem"}
+# @ag-order: 301
+  /v1/extension/cnts/vaccination-matrix/xlsx:
+    get:
+      summary: "Xuất Excel bảng BM-07 đúng bố cục sheet của tệp mẫu (FN-15 luồng phụ) — chủ hộ chỉ hiện nhãn che bớt"
+      operationId: extensionCntsVaccinationMatrixXlsx
+      tags: [extension]
+      parameters:
+        - {name: model_type_code, in: query, required: true, schema: {type: string, maxLength: 64}}
+        - {name: project_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: site_ref, in: query, required: false, schema: {type: string, format: uuid}}
+        - {name: commune_code, in: query, required: false, schema: {type: string}}
+        - {name: received_from, in: query, required: false, schema: {type: string, format: date}}
+        - {name: received_to, in: query, required: false, schema: {type: string, format: date}}
+      responses:
+        "200":
+          description: Tệp Excel
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+components:
+  schemas:
+# @ag-order: 662
+    CNTSVaccinationModel:
+      type: object
+      description: "Hộ mô hình (FN-10, W11.47) của lứa: điểm, dự án, cán bộ theo dõi điểm (CB theo dõi MH)"
+      required: [household_ref, owner_label, site_ref, site_name, project_ref, project_code, project_name, officer_ref, officer_display, active]
+      properties:
+        household_ref: {type: string, format: uuid}
+        owner_label: {type: [string, "null"], description: "Nhãn chủ hộ đã che bớt (kho định danh)"}
+        site_ref: {type: string, format: uuid}
+        site_name: {type: string}
+        project_ref: {type: string, format: uuid}
+        project_code: {type: string}
+        project_name: {type: string}
+        officer_ref: {type: [string, "null"], format: uuid}
+        officer_display: {type: [string, "null"]}
+        active: {type: boolean, description: "Hộ còn tham gia, điểm và dự án chưa kết thúc"}
+# @ag-order: 662
+    CNTSVaccinationMatrixColumn:
+      type: object
+      required: [vaccine_code, vaccine_name, shot, age_days]
+      properties:
+        vaccine_code: {type: string}
+        vaccine_name: {type: [string, "null"]}
+        shot: {type: integer}
+        age_days: {type: integer}
+# @ag-order: 662
+    CNTSVaccinationMatrixRow:
+      allOf:
+        - $ref: "#/components/schemas/CNTSVaccinationBatch"
+        - type: object
+          required: [cells, household_text, commune_name]
+          properties:
+            cells:
+              type: array
+              description: "Theo thứ tự cột; null = lứa không có mũi này"
+              items: {oneOf: [{$ref: "#/components/schemas/CNTSVaccinationDose"}, {type: "null"}]}
+            household_text: {type: [string, "null"], description: "Nhãn chủ hộ che bớt, hoặc địa bàn khi lứa không gắn hộ"}
+            commune_name: {type: [string, "null"]}
+# @ag-order: 662
+    CNTSVaccinationMatrix:
+      type: object
+      required: [model_type_code, model_type_name, columns, rows, truncated, max_rows]
+      properties:
+        model_type_code: {type: string}
+        model_type_name: {type: [string, "null"]}
+        columns: {type: array, items: {$ref: "#/components/schemas/CNTSVaccinationMatrixColumn"}}
+        rows: {type: array, items: {$ref: "#/components/schemas/CNTSVaccinationMatrixRow"}}
+        truncated: {type: boolean, description: "Quá max_rows lứa — thu hẹp bộ lọc"}
+        max_rows: {type: integer}
