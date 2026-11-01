@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v12";
+export const MENU_VERSION = "kn.menu/v13";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -791,8 +791,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.bieu_mau.thiet_ke",
                 "label": "Thiết kế biểu mẫu",
                 "route": "/kn/cnts/thiet-ke-bieu-mau",
-                "icon": "table",
-                "soon": true
+                "icon": "table"
               },
               {
                 "key": "tinh.cnts.bieu_mau.phat_hanh",
@@ -1902,6 +1901,12 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "key": "admin.pb.cnts_bieu_ky",
       "label": "Biểu kỳ Cấp Xã",
       "route": "/kn/phong-ban/{department}/bieu-ky-cnts",
+      "icon": "table"
+    },
+    {
+      "key": "admin.pb.cnts_form_design",
+      "label": "Thiết kế biểu mẫu",
+      "route": "/kn/cnts/thiet-ke-bieu-mau",
       "icon": "table"
     },
     {

@@ -537,3 +537,6 @@ export const cntsPeriodRoutes: Route[] = [
     },
   },
 ];
+
+// BF-CN-FORM-DESIGN: cùng dữ liệu/phiên bản với màn Phát hành, không cài hay ghi biểu.
+export function cntsDesignMockForms(): Form[] { return FORMS.map(viewForm); }

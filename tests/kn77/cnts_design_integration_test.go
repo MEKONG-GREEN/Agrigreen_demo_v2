@@ -3,8 +3,7 @@ package kn77_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/app"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
+
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tabular"
@@ -33,7 +32,7 @@ func TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN(t *testing.T) {
 	f := newAggFx(t, facilityDir{})
 	const path = "/v1/extension/cnts/form-designs"
 	var list struct {
-		Items []app.CNTSDesignView `json:"items"`
+		Items []designView `json:"items"`
 	}
 	c, b := f.call(http.MethodGet, path, authz.KNTinh, nil)
 	f.ok(c, b, &list)
@@ -83,12 +82,12 @@ func TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN(t *testing.T) {
 	}
 	before := len(f.admin.query("SELECT id FROM pf_forms.template"))
 	var excel bytes.Buffer
-	if err := tabular.WriteXLSX(&excel, "Cau truc", domain.DesignHeaders, [][]string{{"so_con", "Số con", "integer", "true", "con", "Tổng đàn", "true", ""}}); err != nil {
+	if err := tabular.WriteXLSX(&excel, "Cau truc", designHeaders, [][]string{{"so_con", "Số con", "integer", "true", "con", "Tổng đàn", "true", ""}}); err != nil {
 		t.Fatal(err)
 	}
 	c, b = designRaw(f, http.MethodPost, path+"/import-preview", authz.KNTinh, aggDept, excel.Bytes())
 	f.ok(c, b, nil)
-	var result domain.DesignImport
+	var result designImport
 	if json.Unmarshal(b, &result) != nil || !result.Valid || len(result.Fields) != 1 {
 		t.Fatalf("xlsx: %s", b)
 	}
@@ -115,4 +114,24 @@ func TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN(t *testing.T) {
 	if before != after {
 		t.Fatalf("preview wrote templates: %d -> %d", before, after)
 	}
+}
+
+// HTTP DTOs are local: external integration tests only import module roots/ports.
+var designHeaders = []string{"key", "label", "type", "required", "unit", "group", "non_negative", "options"}
+
+type designField struct {
+	Key string `json:"key"`
+}
+type designView struct {
+	Code       string        `json:"code"`
+	TemplateID *string       `json:"template_id"`
+	Version    *int64        `json:"version"`
+	Fields     []designField `json:"fields"`
+}
+type designImport struct {
+	Valid  bool          `json:"valid"`
+	Fields []designField `json:"fields"`
+	Issues []struct {
+		Line int `json:"line"`
+	} `json:"issues"`
 }

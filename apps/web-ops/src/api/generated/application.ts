@@ -11791,6 +11791,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/form-designs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS; chỉ Cấp Tỉnh CNTS và Admin */
+        get: operations["extCntsFormDesigns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/knqg-specs": {
         parameters: {
             query?: never;
@@ -11802,6 +11819,23 @@ export interface paths {
         get: operations["extensionCntsKnqgSpecs"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/form-designs/import-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kiểm cấu trúc Excel/CSV để xem trước, không lưu phiên bản hay thay đổi kỳ */
+        post: operations["extCntsFormDesignImportPreview"];
         delete?: never;
         options?: never;
         head?: never;
@@ -22825,6 +22859,26 @@ export interface components {
             version: number;
             status: string;
             rating: components["schemas"]["HrmAppraisalRating"];
+        };
+        CNTSDesignView: {
+            code: string;
+            bm: string;
+            title: string;
+            period_type: string;
+            due: string;
+            /** Format: uuid */
+            template_id: string | null;
+            version: number | null;
+            fields: components["schemas"]["FormsField"][];
+        };
+        CNTSDesignImport: {
+            fields: components["schemas"]["FormsField"][];
+            valid: boolean;
+            issues: {
+                line: number;
+                field: string;
+                message: string;
+            }[];
         };
         KHTCReportSupplement: {
             /** Format: uuid */
@@ -51079,6 +51133,30 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
+    extCntsFormDesigns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Danh sách cấu trúc; chưa cài thì version/template_id null và cấu trúc chuẩn chỉ tham khảo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSDesignView"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsKnqgSpecs: {
         parameters: {
             query?: never;
@@ -51100,6 +51178,32 @@ export interface operations {
                 };
             };
             403: components["responses"]["Problem"];
+        };
+    };
+    extCntsFormDesignImportPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Lỗi theo dòng; có lỗi thì fields rỗng. Không ghi kể cả valid=true */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDesignImport"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     extensionCntsKnqgList: {

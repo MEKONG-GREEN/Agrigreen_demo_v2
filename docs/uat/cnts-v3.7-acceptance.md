@@ -172,3 +172,12 @@ Nguồn và giới hạn: [giả định W11.45](../kn/gia-dinh/W11.45.md) (Q-04
 | ★ Xuất Word theo bố cục bản giấy (tuần A–D, tháng/quý/năm I–III), số `{n}/BC-CNTS` chỉ cho bản đã gửi, xuất lại dùng lại số | `TestCNTSBM11_W1145`, `TestBM11WordTemplates` | G1 |
 | Màn "Báo cáo định kỳ" (Cấp Tỉnh CNTS) và "Báo cáo đến" (HCTH, KHTC); menu | Vitest `bm11.test.tsx`, `kn-menu.contract.test.ts`; `TestWebMenuFixture` | G1 |
 | Email công vụ, thông báo cho phòng nhận, phụ lục kinh phí của báo cáo tháng, cấu hình nơi nhận theo loại trên màn riêng | — | Chưa làm |
+## FN-07 — phần xem/kiểm cấu trúc (#174)
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| Cấp Tỉnh CNTS/Admin xem cấu trúc đúng phiên bản đã cài; chưa cài hiện tham khảo, Xã/TW/phòng khác 403 | `TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN` (PG thật), `design.test.ts`, `CntsDesignScreen.test.tsx` | Phần đầu |
+| Kiểm XLSX/CSV theo dòng/header/type/cờ/giới hạn; có lỗi trả fields rỗng, công thức bị từ chối, kể cả tệp hợp lệ không ghi template | Test PG trên + `TestParseCNTSDesign` (1e±100000, 100k chữ số, trùng mã/choice/500 dòng); E2E `kn-cnts-design.spec.ts` | Phần đầu |
+| Menu mở màn thật, xem trước theo schema, file lỗi không có thao tác Lưu giả | Component/Vitest/E2E trên, menu golden | Phần đầu |
+
+Chưa nghiệm thu toàn bộ FN-07/AC-03: sửa/sao chép/lưu version, khóa KNQG qua mọi API, chọn phiên bản khi phát hành, nhật ký động/GPS/ảnh, biểu điều tra cho chiến dịch. Còn #191/#192 (child của #174). Không đổi hàng FN-07 thành Đủ vì chỉ có phần xem/kiểm tệp.
