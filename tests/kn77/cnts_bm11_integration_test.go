@@ -340,7 +340,7 @@ func TestCNTSBM11_W1145(t *testing.T) {
 			}()
 		}
 		wg.Wait()
-		if !((codes[0] == http.StatusCreated) != (codes[1] == http.StatusCreated)) {
+		if (codes[0] == http.StatusCreated) == (codes[1] == http.StatusCreated) {
 			t.Fatalf("tạo đồng thời: %d %s / %d %s", codes[0], bodies[0], codes[1], bodies[1])
 		}
 		var m bm11Resp

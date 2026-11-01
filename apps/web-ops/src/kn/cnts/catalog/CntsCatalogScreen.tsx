@@ -10,7 +10,7 @@ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigat
 import { useState, type ChangeEvent } from "react";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
-import { fieldErrorMap } from "@/api/problem";
+import { ApiProblem, fieldErrorMap } from "@/api/problem";
 import type { CatalogItem, CatalogName } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
@@ -834,7 +834,10 @@ interface IndicatorThresholdRow {
 
 /** Ngưỡng theo chỉ tiêu (BF-CN-CATALOG #170): SINH TỪ danh mục chỉ tiêu theo dõi tại ngày đang xem — mỗi chỉ tiêu một dòng tối
  * thiểu, một dòng tối đa. Giá trị hiệu lực: tham số đã duyệt cnts.indicator_min/max:<mã> nếu có, không thì ngưỡng mặc định của
- * danh mục (Admin sửa ở form chỉ tiêu). Chỉ tiêu mới có ngưỡng hiện ngay. */
+ * danh mục (Admin sửa ở form chỉ tiêu). Chỉ tiêu mới có ngưỡng hiện ngay.
+ * Review #170 (11e2171d): chỉ coi là "chưa có tham số" khi API xác nhận 404 masterdata.param_not_found; lỗi khác (403, 503
+ * extension.dependency_unavailable, mạng…) ném ra để cả bảng hiện lỗi tải + Thử lại — không trình bày ngưỡng danh mục như
+ * ngưỡng hiệu lực khi có thể đang có tham số đã duyệt ghi đè. */
 function useIndicatorThresholds(at: string) {
   const { api } = useAuth();
   const ca = useCatalogApi();
@@ -843,7 +846,10 @@ function useIndicatorThresholds(at: string) {
     const param = (key: string) =>
       unwrap(api.GET("/v1/masterdata/params/value", { params: { query: { key, at } } }))
         .then((v) => ({ value: v.value ?? v.text ?? "", from: v.effective_from ?? "", doc: v.source_doc ?? "" }))
-        .catch(() => null);
+        .catch((e: unknown) => {
+          if (e instanceof ApiProblem && e.status === 404 && e.code === "masterdata.param_not_found") return null;
+          throw e;
+        });
     const rows = await Promise.all(
       indicators.flatMap((i) =>
         (["min", "max"] as const).map(async (bound): Promise<IndicatorThresholdRow> => {
@@ -895,29 +901,36 @@ function Thresholds({ at }: { at: string }) {
           ) : null}
         </span>
       </div>
-      <LoadState s={ind}>
-        {(rows) => (
-          <DataTable
-            caption="Ngưỡng theo chỉ tiêu theo dõi"
-            columns={[
-              { key: "name", header: "Chỉ tiêu", cell: (r) => `${r.name} (${r.code})` },
-              { key: "bound", header: "Ngưỡng", cell: (r) => (r.bound === "min" ? "Tối thiểu" : "Tối đa") },
-              { key: "value", header: "Giá trị", cell: (r) => (r.value ? <b>{`${r.value} ${r.unit}`.trim()}</b> : <span className="mute">Chưa đặt</span>) },
-              { key: "source", header: "Nguồn", cell: (r) => <span className="small">{SOURCE[r.source]}</span> },
-              { key: "key", header: "Khóa tham số", cell: (r) => <code className="small">{r.key}</code> },
-              { key: "from", header: "Hiệu lực từ", cell: (r) => dmy(r.from) },
-              { key: "doc", header: "Căn cứ", cell: (r) => <span className="small">{r.doc}</span> },
-            ]}
-            rows={rows}
-            rowKey={(r) => r.key}
-            page={1}
-            pageSize={rows.length || 1}
-            total={rows.length}
-            onPage={() => undefined}
-            empty="Danh mục chưa có chỉ tiêu theo dõi đang dùng."
-          />
-        )}
-      </LoadState>
+      <section aria-label="Ngưỡng theo chỉ tiêu theo dõi">
+        {ind.problem ? (
+          <p className="small" style={{ marginBottom: 8 }}>
+            <b>Không xác định được ngưỡng hiệu lực theo chỉ tiêu.</b> Chưa tra được tham số đã duyệt nên không lấy ngưỡng trong danh mục thay thế.
+          </p>
+        ) : null}
+        <LoadState s={ind}>
+          {(rows) => (
+            <DataTable
+              caption="Ngưỡng theo chỉ tiêu theo dõi"
+              columns={[
+                { key: "name", header: "Chỉ tiêu", cell: (r) => `${r.name} (${r.code})` },
+                { key: "bound", header: "Ngưỡng", cell: (r) => (r.bound === "min" ? "Tối thiểu" : "Tối đa") },
+                { key: "value", header: "Giá trị", cell: (r) => (r.value ? <b>{`${r.value} ${r.unit}`.trim()}</b> : <span className="mute">Chưa đặt</span>) },
+                { key: "source", header: "Nguồn", cell: (r) => <span className="small">{SOURCE[r.source]}</span> },
+                { key: "key", header: "Khóa tham số", cell: (r) => <code className="small">{r.key}</code> },
+                { key: "from", header: "Hiệu lực từ", cell: (r) => dmy(r.from) },
+                { key: "doc", header: "Căn cứ", cell: (r) => <span className="small">{r.doc}</span> },
+              ]}
+              rows={rows}
+              rowKey={(r) => r.key}
+              page={1}
+              pageSize={rows.length || 1}
+              total={rows.length}
+              onPage={() => undefined}
+              empty="Danh mục chưa có chỉ tiêu theo dõi đang dùng."
+            />
+          )}
+        </LoadState>
+      </section>
       <h3 style={{ marginTop: 16 }}>Tham số cảnh báo khác</h3>
       <LoadState s={s}>
         {(rows) => (

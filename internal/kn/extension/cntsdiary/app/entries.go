@@ -11,6 +11,7 @@ package app
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"slices"
 	"strings"
@@ -742,12 +743,58 @@ type EntryQuery struct {
 	Status    string
 	Review    bool // hàng chờ rà soát: đã gửi, thuộc dự án người gọi rà soát được
 	Flagged   bool // chỉ lần ghi có cảnh báo (vị trí, chỉ số)
+	// BF-CN-XA-DATA (#175) — màn Tỉnh "Số liệu cấp xã › Nhật ký sản xuất":
+	Commune  string     // mã xã (ngoài phạm vi người gọi → danh sách rỗng)
+	Form     string     // BM-08 | BM-09 | BM-19
+	From, To *time.Time // khoảng ngày ghi (bản hiện hành)
+	Limit    int        // số dòng đọc một trang (0 = tối đa store.MaxEntryList)
+	Cursor   string     // con trỏ trang sau (NextCursor của trang trước)
 }
+
+// MaxEntryPage là số dòng tối đa một trang khi người gọi truyền limit.
+const MaxEntryPage = 200
+
+// entryScanBatch là số dòng đọc mỗi lô khi lọc phạm vi trước khi phân trang.
+const entryScanBatch = 200
 
 // EntryList là danh sách lần ghi.
 type EntryList struct {
 	Items []EntryView
 	Names map[uuid.UUID]string
+	// NextCursor: còn dòng người gọi thấy được sau trang này (rỗng = hết); khóa của dòng cuối đã trả.
+	NextCursor string
+}
+
+var errCursor = problem.Validation.WithField("cursor", "con trỏ trang không hợp lệ")
+
+// EncodeEntryCursor mã hóa khóa thứ tự của dòng cuối trang (chuỗi mờ cho máy khách).
+func EncodeEntryCursor(k store.EntryCursor) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(k.EntryDate.Format(time.DateOnly) + "|" + k.CapturedAt.UTC().Format(time.RFC3339Nano) + "|" + k.Ref.String()))
+}
+
+// DecodeEntryCursor giải con trỏ trang.
+func DecodeEntryCursor(s string) (*store.EntryCursor, error) {
+	if s == "" {
+		return nil, nil
+	}
+	if len(s) > 200 {
+		return nil, errCursor
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return nil, errCursor
+	}
+	parts := strings.Split(string(raw), "|")
+	if len(parts) != 3 {
+		return nil, errCursor
+	}
+	d, err1 := time.Parse(time.DateOnly, parts[0])
+	at, err2 := time.Parse(time.RFC3339Nano, parts[1])
+	ref, err3 := uuid.Parse(parts[2])
+	if err1 != nil || err2 != nil || err3 != nil {
+		return nil, errCursor
+	}
+	return &store.EntryCursor{EntryDate: d, CapturedAt: at, Ref: ref}, nil
 }
 
 // ListEntries liệt kê lần ghi trong phạm vi.
@@ -756,9 +803,14 @@ func (s *Service) ListEntries(ctx context.Context, q EntryQuery) (EntryList, err
 	if err != nil {
 		return EntryList{}, err
 	}
-	f := store.EntryFilter{Cycle: q.Cycle, Household: q.Household, Project: q.Project}
+	f := store.EntryFilter{Cycle: q.Cycle, Household: q.Household, Project: q.Project, Commune: strings.TrimSpace(q.Commune),
+		Form: q.Form, From: q.From, To: q.To}
 	switch q.Status {
 	case "":
+		// Nháp chỉ người ghi (Cấp Xã) và Admin thấy (visibleEntry): người gọi khác lọc luôn ở SQL để trang đủ dòng.
+		if !c.commune() && !c.admin() {
+			f.Statuses = []string{domain.StatusSubmitted, domain.StatusReturned, domain.StatusVerified}
+		}
 	case domain.StatusDraft, domain.StatusSubmitted, domain.StatusReturned, domain.StatusVerified:
 		f.Statuses = []string{q.Status}
 	default:
@@ -767,42 +819,75 @@ func (s *Service) ListEntries(ctx context.Context, q EntryQuery) (EntryList, err
 	if q.Review {
 		f.Statuses = []string{domain.StatusSubmitted}
 	}
+	if q.Form != "" && !slices.Contains(domain.Forms, q.Form) {
+		return EntryList{}, problem.Validation.WithField("form", "BM-08, BM-09 hoặc BM-19")
+	}
+	if q.From != nil && q.To != nil && q.To.Before(*q.From) {
+		return EntryList{}, problem.Validation.WithField("to", "không trước from")
+	}
+	if q.Limit < 0 || q.Limit > MaxEntryPage {
+		return EntryList{}, problem.Validation.WithField("limit", "1–200")
+	}
+	if f.After, err = DecodeEntryCursor(q.Cursor); err != nil {
+		return EntryList{}, err
+	}
+	page := q.Limit
+	if page == 0 {
+		page = store.MaxEntryList
+	}
 	out := EntryList{Items: []EntryView{}}
+	if f.Commune != "" && !c.sees(f.Commune) {
+		return out, nil
+	}
 	refs := []uuid.UUID{}
+	// #175 review: phân trang SAU khi áp phạm vi/quyền — đọc theo lô cho tới khi có page+1 dòng người gọi được thấy (hoặc
+	// hết dòng); con trỏ là khóa của dòng cuối ĐÃ TRẢ, không bao giờ của lần ghi bị loại (không lộ ngày/UUID ngoài phạm vi).
+	f.Limit = max(page+1, entryScanBatch)
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
-		es, err := store.ListEntries(ctx, tx, f)
-		if err != nil {
-			return err
-		}
 		hcs, cys := map[uuid.UUID]*hctx{}, map[uuid.UUID]*store.Cycle{}
-		for _, e := range es {
-			hc, ok := hcs[e.HouseholdRef]
-			if !ok {
-				if hc, err = s.loadHousehold(ctx, tx, c, e.HouseholdRef); err != nil {
-					return err
+		var last store.Entry
+		for {
+			es, err := store.ListEntries(ctx, tx, f)
+			if err != nil {
+				return err
+			}
+			for _, e := range es {
+				f.After = &store.EntryCursor{EntryDate: e.EntryDate, CapturedAt: e.CapturedAt, Ref: e.Ref}
+				hc, ok := hcs[e.HouseholdRef]
+				if !ok {
+					if hc, err = s.loadHousehold(ctx, tx, c, e.HouseholdRef); err != nil {
+						return err
+					}
+					hcs[e.HouseholdRef] = hc
 				}
-				hcs[e.HouseholdRef] = hc
-			}
-			if hc == nil || !c.visibleEntry(hc, e) {
-				continue
-			}
-			if q.Review && !c.reviewer(hc.p) {
-				continue
-			}
-			if q.Flagged && !slices.ContainsFunc(e.Checks, func(x domain.Check) bool { return x.Level == domain.LevelWarn }) {
-				continue
-			}
-			cy, ok := cys[e.CycleRef]
-			if !ok {
-				if cy, err = store.LatestCycle(ctx, tx, e.CycleRef); err != nil {
-					return err
+				if hc == nil || !c.visibleEntry(hc, e) {
+					continue
 				}
-				cys[e.CycleRef] = cy
+				if q.Review && !c.reviewer(hc.p) {
+					continue
+				}
+				if q.Flagged && !slices.ContainsFunc(e.Checks, func(x domain.Check) bool { return x.Level == domain.LevelWarn }) {
+					continue
+				}
+				if len(out.Items) == page { // còn dòng thấy được sau trang này
+					out.NextCursor = EncodeEntryCursor(store.EntryCursor{EntryDate: last.EntryDate, CapturedAt: last.CapturedAt, Ref: last.Ref})
+					return nil
+				}
+				cy, ok := cys[e.CycleRef]
+				if !ok {
+					if cy, err = store.LatestCycle(ctx, tx, e.CycleRef); err != nil {
+						return err
+					}
+					cys[e.CycleRef] = cy
+				}
+				out.Items = append(out.Items, s.entryView(c, hc, cy, e))
+				refs = append(refs, e.AuthorRef)
+				last = e
 			}
-			out.Items = append(out.Items, s.entryView(c, hc, cy, e))
-			refs = append(refs, e.AuthorRef)
+			if len(es) < f.Limit {
+				return nil
+			}
 		}
-		return nil
 	})
 	if err != nil {
 		return EntryList{}, err

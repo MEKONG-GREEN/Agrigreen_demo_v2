@@ -18,7 +18,6 @@ var knownContractGap = []string{
 	"cnts_alert", "cnts_alert_assigned", "cnts_alert_overdue", "cnts_duty_changed", "cnts_form_reminder",
 	"report_adjustment_requested", "report_period_reopened", "report_reminder", "report_task_assigned", "report_task_due",
 	"work_schedule_due", "work_schedule_reviewed", "work_schedule_submitted",
-	"hrm_promotion_due", "hrm_plan_reminder",
 }
 
 func notificationKindEnum(t *testing.T) []string {

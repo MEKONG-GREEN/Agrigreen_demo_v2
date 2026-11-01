@@ -58,6 +58,7 @@ func newGrantFx(t *testing.T, facs facilityDir) *grantFx {
 	}
 	kn := extension.New(pool, clk, extension.Deps{Orgs: provinceOrgs{}})
 	kn.UseFormsPublisher(fm.Publisher())
+	fm.UseReviewGuard(platformasm.KNCNTSProfile.Name, kn.CNTSReviewGuard()) // như assembly (#175: chỉ người phụ trách biểu rà soát)
 	registry, err := authz.NewSessionRegistry(kn.SessionProjection())
 	if err != nil {
 		t.Fatal(err)

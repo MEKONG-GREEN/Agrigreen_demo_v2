@@ -43,6 +43,9 @@ export const KIND_LABEL: Record<Notification["kind"], string> = {
   cnts_knqg_sent: "Biểu KNQG chờ Cấp TW xác nhận",
   cnts_knqg_reviewed: "Kết quả xác nhận biểu KNQG",
   cnts_knqg_submitted: "Biểu KNQG chờ duyệt",
+  hrm_appraisal: "Đánh giá viên chức",
+  hrm_promotion_due: "Nhắc xét nâng bậc lương",
+  hrm_plan_reminder: "Nhắc kế hoạch phòng",
 };
 
 export function unreadCount(api: ApiClient): Promise<number> {

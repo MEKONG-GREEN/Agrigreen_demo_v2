@@ -259,7 +259,7 @@ func (s *Service) view(c caller, pc *pctx, d store.Doc, communes map[string]stri
 		if !c.may(pc.p, d.Form, a) {
 			continue
 		}
-		if c.national() && !(d.Form == domain.Form07 && (a == domain.ActConfirm || a == domain.ActReturn)) {
+		if c.national() && (d.Form != domain.Form07 || (a != domain.ActConfirm && a != domain.ActReturn)) {
 			continue
 		}
 		if !open && a != domain.ActConfirm && a != domain.ActReturn {
@@ -713,7 +713,7 @@ func (s *Service) transition(ctx context.Context, in ActInput, scan *store.Scan)
 		return s.replay(ctx, prev.Ref)
 	}
 	spec, _ := domain.Lookup(cur.Form)
-	if c.national() && !(cur.Form == domain.Form07 && (in.Action == domain.ActConfirm || in.Action == domain.ActReturn)) {
+	if c.national() && (cur.Form != domain.Form07 || (in.Action != domain.ActConfirm && in.Action != domain.ActReturn)) {
 		return DocView{}, ErrReadOnly.WithDetail("Cấp TW chỉ xác nhận hoặc trả lại Mẫu 07 đã gửi")
 	}
 	step, ok := domain.Transition(spec.Lifecycle, cur.Status, in.Action)

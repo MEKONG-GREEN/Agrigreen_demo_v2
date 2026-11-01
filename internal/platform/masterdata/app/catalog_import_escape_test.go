@@ -25,6 +25,12 @@ func TestCSVFormulaEscapedAs(t *testing.T) {
 		{"'- khác", "- a", "'- khác"}, // nội dung khác vẫn khác
 		{"'-", "", "'-"},              // mục chưa có thuộc tính
 		{strings.Repeat("x", 3), "-", strings.Repeat("x", 3)},
+		// Review Codex 7058: encoding/csv đổi CRLF trong ô ngoặc kép thành LF.
+		{"dòng 1\ndòng 2", "dòng 1\r\ndòng 2", "dòng 1\r\ndòng 2"},
+		{"'- dòng 1\ndòng 2", "- dòng 1\r\ndòng 2", "- dòng 1\r\ndòng 2"},
+		{"dòng 1\ndòng 2", "dòng 1\ndòng 2", "dòng 1\ndòng 2"},
+		{"dòng 1\ndòng 3", "dòng 1\r\ndòng 2", "dòng 1\ndòng 3"},
+		{"dòng 1\rdòng 2", "dòng 1\r\ndòng 2", "dòng 1\rdòng 2"},
 	} {
 		if g := csvUnescapeAs(c.cell, c.stored); g != c.want {
 			t.Errorf("csvUnescapeAs(%q, %q) = %q, muốn %q", c.cell, c.stored, g, c.want)
