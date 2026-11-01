@@ -336,3 +336,120 @@ func TestBM07_FiltersAndAlertsBeyondCap(t *testing.T) {
 		t.Fatalf("lứa ở trang sau phải sinh cảnh báo: %+v %v", r, err)
 	}
 }
+
+// vaccineAlerts đếm cảnh báo mũi quá hạn của lứa bref có tiêu đề chứa like, theo điều kiện trạng thái cond.
+func (f *fix) vaccineAlerts(bref, like, cond string) int {
+	f.t.Helper()
+	return f.count(`SELECT count(*) FROM pf_extension.cnts_alert_current WHERE tenant_id = $1 AND kind = 'vaccine_overdue' AND source_ref = $2
+	    AND title LIKE '%' || $3 || '%' AND `+cond, f.tenant, bref, like)
+}
+
+// jobVaccines chạy job tại at, trả số cảnh báo mũi tiêm mới.
+func (f *fix) jobVaccines(at time.Time) int {
+	f.t.Helper()
+	r, err := f.mod.CNTSAlertJobRun(context.Background(), f.tenant, at)
+	if err != nil {
+		f.t.Fatalf("job %s: %v", at, err)
+	}
+	return r.Vaccines
+}
+
+// Codex #168 [P2] (CHANGES tại d2e966a6): Tỉnh dời ngày dự kiến → hệ thống tự đóng cảnh báo; tới ngày dự kiến mới mà chưa tiêm,
+// mũi phải có lại cảnh báo đang mở (trước đây: khóa lứa × vaccine × lần đã có nên bỏ qua vĩnh viễn — ND_F mở 0, muốn 1). Job chạy
+// lặp cùng ngày/nhiều ngày không sinh trùng; dời về lại ngày cũ (khóa cũ đã tự đóng) vẫn có cảnh báo mở.
+func TestBM07_RescheduledOverdueReraised(t *testing.T) {
+	f := newFix(t)
+	chu, officer := f.user(tinh("chu_nhiem")), f.user(xa("30001"))
+	href, _ := bm07Household(t, f, chu, officer)
+	b := want(t, chu.post(cb+"vaccination-batches", map[string]any{"household_ref": href, "received_date": "2027-10-01", "age_at_receipt": 1}),
+		201, "", "lịch của hộ")
+	bref := str(b, "ref")
+	if n := f.jobVaccines(t0); n != 2 { // ND_F L1 dự kiến 03/10, Gumboro L1 dự kiến 07/10
+		t.Fatalf("job 13/10: %d cảnh báo, muốn 2", n)
+	}
+	want(t, chu.post(cb+"vaccination-batches/"+bref+"/doses", map[string]any{"base_version": 1, "doses": []map[string]any{
+		{"vaccine_code": "VX_ND_F", "shot": 1, "expected_date": "2027-10-20"}, {"vaccine_code": "VX_GUMBORO", "shot": 1, "expected_date": "2027-10-20"}}}),
+		200, "", "Tỉnh dời hai mũi sang 20/10")
+	if n := f.jobVaccines(t0.Add(5 * time.Minute)); n != 0 {
+		t.Fatalf("dời sang ngày chưa tới không sinh cảnh báo: %d", n)
+	}
+	if n := f.vaccineAlerts(bref, "", "status = 'closed' AND auto_closed"); n != 2 {
+		t.Fatalf("dời ngày → tự đóng: %d, muốn 2", n)
+	}
+	day21 := t0.AddDate(0, 0, 8) // 21/10/2027: quá ngày dự kiến mới 20/10, chưa tiêm
+	if n := f.jobVaccines(day21); n != 2 {
+		t.Fatalf("job 21/10 phải sinh lại 2 cảnh báo (ND_F, Gumboro L1 dự kiến 20/10): %d", n)
+	}
+	if n := f.vaccineAlerts(bref, "VX_ND_F lần 1 · dự kiến 20/10/2027", "status <> 'closed'"); n != 1 {
+		t.Fatalf("ND_F dự kiến 20/10 chưa tiêm, đang mở %d, muốn 1", n)
+	}
+	if n := f.vaccineAlerts(bref, "VX_ND_F", "status = 'closed' AND auto_closed"); n != 1 {
+		t.Fatalf("cảnh báo cũ (dự kiến 03/10) giữ nguyên trạng thái tự đóng và lịch sử: %d", n)
+	}
+	// Chạy lặp cùng ngày và nhiều ngày sau: không trùng.
+	for _, at := range []time.Time{day21.Add(5 * time.Minute), day21.Add(10 * time.Minute), day21.AddDate(0, 0, 1), day21.AddDate(0, 0, 3)} {
+		if n := f.jobVaccines(at); n != 0 {
+			t.Fatalf("job lặp %s sinh trùng: %d", at, n)
+		}
+	}
+	if n := f.vaccineAlerts(bref, "VX_ND_F", "status <> 'closed'"); n != 1 {
+		t.Fatalf("ND_F đang mở sau job lặp: %d, muốn 1", n)
+	}
+	// Dời ND_F về lại 03/10 (khóa ngày 03/10 đã do hệ thống tự đóng): đóng cảnh báo 20/10, mở cảnh báo mới cho 03/10.
+	want(t, chu.post(cb+"vaccination-batches/"+bref+"/doses", map[string]any{"base_version": 2, "doses": []map[string]any{
+		{"vaccine_code": "VX_ND_F", "shot": 1, "expected_date": "2027-10-03"}}}), 200, "", "Tỉnh dời ND_F về 03/10")
+	last := day21.AddDate(0, 0, 3).Add(5 * time.Minute)
+	if n := f.jobVaccines(last); n != 1 {
+		t.Fatalf("dời về ngày cũ đã tự đóng phải sinh lại: %d", n)
+	}
+	if n := f.vaccineAlerts(bref, "VX_ND_F lần 1 · dự kiến 03/10/2027", "status <> 'closed'"); n != 1 {
+		t.Fatalf("ND_F dự kiến 03/10 đang mở: %d, muốn 1", n)
+	}
+	if n := f.vaccineAlerts(bref, "VX_ND_F", "status <> 'closed'"); n != 1 {
+		t.Fatalf("ND_F chỉ một cảnh báo mở: %d", n)
+	}
+	if n := f.jobVaccines(last.Add(5 * time.Minute)); n != 0 {
+		t.Fatalf("job lặp sau khi sinh lại: %d", n)
+	}
+}
+
+// Đóng tay (người được giao/Cấp Tỉnh) không bị job mở lại cho CÙNG ngày dự kiến — kể cả chạy nhiều ngày; dời sang ngày dự
+// kiến khác rồi lại quá hạn thì là vi phạm mới, có cảnh báo mới (giả định BF-CN-VACC, câu hỏi PO trong #168).
+func TestBM07_ManualCloseNotReraised(t *testing.T) {
+	f := newFix(t)
+	ctx := context.Background()
+	chu, officer := f.user(tinh("chu_nhiem")), f.user(xa("30001"))
+	href, _ := bm07Household(t, f, chu, officer)
+	b := want(t, chu.post(cb+"vaccination-batches", map[string]any{"household_ref": href, "received_date": "2027-10-01", "age_at_receipt": 1}),
+		201, "", "lịch của hộ")
+	bref := str(b, "ref")
+	if n := f.jobVaccines(t0); n != 2 {
+		t.Fatalf("job 13/10: %d", n)
+	}
+	var aref string
+	if err := f.pool.QueryRow(ctx, `SELECT alert_ref::text FROM pf_extension.cnts_alert_current WHERE tenant_id = $1 AND source_ref = $2
+	    AND title LIKE '%VX_ND_F%'`, f.tenant, bref).Scan(&aref); err != nil {
+		t.Fatal(err)
+	}
+	want(t, chu.post(cb+"alerts/"+aref+"/close", map[string]any{"result": "Đã gọi hộ: tiêm bù ngày 14/10, sổ giấy đã ghi"}), 200, "", "đóng tay")
+	for _, at := range []time.Time{t0.Add(5 * time.Minute), t0.AddDate(0, 0, 1), t0.AddDate(0, 0, 5)} {
+		if n := f.jobVaccines(at); n != 0 {
+			t.Fatalf("job %s mở lại cảnh báo đóng tay: %d", at, n)
+		}
+	}
+	if n := f.vaccineAlerts(bref, "VX_ND_F", "status <> 'closed'"); n != 0 {
+		t.Fatalf("cảnh báo đóng tay bị mở lại: %d", n)
+	}
+	if n := f.vaccineAlerts(bref, "VX_ND_F", "status = 'closed' AND NOT auto_closed"); n != 1 {
+		t.Fatalf("cảnh báo đóng tay giữ nguyên: %d", n)
+	}
+	// Dời sang ngày dự kiến khác rồi lại quá hạn → cảnh báo mới gắn ngày mới.
+	want(t, chu.post(cb+"vaccination-batches/"+bref+"/doses", map[string]any{"base_version": 1, "doses": []map[string]any{
+		{"vaccine_code": "VX_ND_F", "shot": 1, "expected_date": "2027-10-20"}}}), 200, "", "Tỉnh dời ND_F sang 20/10")
+	if n := f.jobVaccines(t0.AddDate(0, 0, 8)); n != 1 {
+		t.Fatalf("ND_F dự kiến 20/10 quá hạn: %d cảnh báo mới, muốn 1", n)
+	}
+	if n := f.vaccineAlerts(bref, "VX_ND_F lần 1 · dự kiến 20/10/2027", "status <> 'closed'"); n != 1 {
+		t.Fatalf("cảnh báo theo ngày dự kiến mới: %d", n)
+	}
+}

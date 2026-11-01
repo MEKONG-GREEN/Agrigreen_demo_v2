@@ -4,12 +4,15 @@ package app
 // (extension/cntscal, chỉ đọc) — mũi quá ngày dự kiến chưa có ngày tiêm thực tế sinh cảnh báo "Mũi tiêm quá hạn" (mức Cần
 // chú ý, cấu hình xử lý của loại như các cảnh báo khác) cho cán bộ theo dõi điểm của hộ mô hình; lứa theo địa bàn (không gắn
 // hộ) → cán bộ xã phụ trách xã. Sinh cảnh báo phát pf.extension.cnts_alert.changed → pf/notify báo người nhận. Mỗi mũi một
-// cảnh báo (chống trùng theo lứa × vaccine × lần); ghi ngày thực tế, dời ngày dự kiến hoặc hủy lịch → tự đóng.
+// cảnh báo (chống trùng theo lứa × vaccine × lần × ngày dự kiến); ghi ngày thực tế, dời ngày dự kiến hoặc hủy lịch → tự đóng.
+// Dời sang ngày mới rồi lại quá hạn → cảnh báo mới gắn ngày mới; cảnh báo do hệ thống tự đóng không chặn sinh lại, cảnh báo
+// người dùng đóng tay thì không mở lại cho cùng ngày dự kiến (Codex #168, docs/kn/gia-dinh/BF-CN-VACC.md).
 // Nông hộ (người nhận thứ hai của dòng 11) chưa có tài khoản KN liên kết hộ mô hình — chờ W11.55 (GĐ2).
 
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,10 +33,27 @@ const (
 	vaccineBatchPage  = 2000 // lứa đọc mỗi trang (đọc HẾT các trang — Codex #168)
 	vaccineRaiseLimit = 500  // cảnh báo mới
 	vaccineOpenLimit  = 2000 // cảnh báo đang mở xét tự đóng
+	vaccineMaxGen     = 50   // số lần sinh lại tối đa của một mũi × ngày dự kiến (phòng thủ vòng lặp)
 )
 
-func doseScope(batch uuid.UUID, d caldomain.Dose) string {
-	return "dose:" + batch.String() + ":" + d.Key()
+// doseScope là phạm vi chống trùng của mũi d trong lứa batch: lứa × vaccine × lần × NGÀY DỰ KIẾN hiện hành (Codex #168 —
+// dời ngày dự kiến là vi phạm mới). gen > 0: lần sinh lại sau khi cảnh báo trước của cùng ngày dự kiến do hệ thống tự đóng.
+func doseScope(batch uuid.UUID, d caldomain.Dose, gen int) string {
+	s := "dose:" + batch.String() + ":" + d.Key() + ":" + d.Expected.Format(time.DateOnly)
+	if gen > 0 {
+		s += ":r" + strconv.Itoa(gen+1)
+	}
+	return s
+}
+
+// doseBase bỏ hậu tố lần sinh lại ":rN" của khóa (khóa gốc kết thúc bằng ngày YYYY-MM-DD nên không nhầm).
+func doseBase(key string) string {
+	if i := strings.LastIndex(key, ":r"); i > 0 {
+		if _, err := strconv.Atoi(key[i+2:]); err == nil {
+			return key[:i]
+		}
+	}
+	return key
 }
 
 // vnDay là ngày lịch Việt Nam của t, dạng UTC 00:00 (như cntscal).
@@ -92,16 +112,39 @@ func (s *Service) VaccineOverdue(ctx context.Context, tid uuid.UUID, now time.Ti
 	return n, err
 }
 
-// vaccineKey là khóa chống trùng cảnh báo của mũi d trong lứa b.
-func vaccineKey(b calstore.Batch, d caldomain.Dose) (key, subject, kind string) {
+// vaccineKey là khóa chống trùng cảnh báo lần sinh gen của mũi d trong lứa b.
+func vaccineKey(b calstore.Batch, d caldomain.Dose, gen int) (key, subject, kind string) {
 	subject, kind = b.CommuneCode, "commune"
 	if b.HouseholdRef != nil {
 		subject, kind = b.HouseholdRef.String(), "household"
 	}
-	return domain.DedupKey(domain.KindVaccineOverdue, subject, doseScope(b.Ref, d)), subject, kind
+	return domain.DedupKey(domain.KindVaccineOverdue, subject, doseScope(b.Ref, d, gen)), subject, kind
 }
 
-// stillOverdue: lịch nguồn src (bản hiện hành) còn mũi quá hạn mang khóa key.
+// vaccineSlot tìm lần sinh của cảnh báo mũi d (ngày dự kiến hiện hành) đang quá hạn:
+//   - cảnh báo chưa đóng → (gen, false): giữ, không sinh thêm (job chạy lặp không trùng);
+//   - chưa có → (gen, true): sinh mới;
+//   - người dùng đóng tay → (-1, false): KHÔNG mở lại cho cùng ngày dự kiến;
+//   - hệ thống tự đóng (đã tiêm rồi bỏ ngày thực tế, dời đi rồi dời về) → xét lần sinh kế; cảnh báo cũ giữ nguyên lịch sử.
+func vaccineSlot(ctx context.Context, tx pgx.Tx, b calstore.Batch, d caldomain.Dose) (int, bool, error) {
+	for gen := 0; gen < vaccineMaxGen; gen++ {
+		key, _, _ := vaccineKey(b, d, gen)
+		cur, err := store.ByDedup(ctx, tx, key)
+		switch {
+		case err != nil:
+			return 0, false, err
+		case cur == nil:
+			return gen, true, nil
+		case cur.Status != domain.StatusClosed:
+			return gen, false, nil
+		case !cur.AutoClosed:
+			return -1, false, nil
+		}
+	}
+	return -1, false, nil
+}
+
+// stillOverdue: lịch nguồn src (bản hiện hành) còn mũi quá hạn mang khóa key (bỏ qua lần sinh).
 func stillOverdue(ctx context.Context, tx pgx.Tx, src *uuid.UUID, key string, today time.Time) (bool, error) {
 	if src == nil {
 		return false, nil
@@ -110,8 +153,9 @@ func stillOverdue(ctx context.Context, tx pgx.Tx, src *uuid.UUID, key string, to
 	if err != nil || b == nil || b.Event == caldomain.BatchCancelled {
 		return false, err
 	}
+	base := doseBase(key)
 	for _, d := range b.Doses {
-		if k, _, _ := vaccineKey(*b, d); k == key && domain.VaccineOverdue(d.Expected, d.Actual, today) {
+		if k, _, _ := vaccineKey(*b, d, 0); k == base && domain.VaccineOverdue(d.Expected, d.Actual, today) {
 			return true, nil
 		}
 	}
@@ -129,15 +173,17 @@ func (s *Service) vaccinePage(ctx context.Context, tx pgx.Tx, tid uuid.UUID, bat
 			if !domain.VaccineOverdue(d.Expected, d.Actual, today) {
 				continue
 			}
-			key, subject, kind := vaccineKey(b, d)
-			overdue[key] = true
-			if *n >= vaccineRaiseLimit {
-				continue
-			}
-			if cur, err := store.ByDedup(ctx, tx, key); err != nil {
+			gen, fresh, err := vaccineSlot(ctx, tx, b, d)
+			if err != nil {
 				return err
-			} else if cur != nil {
-				continue // đã có (kể cả đã đóng tay) — mỗi mũi một cảnh báo
+			}
+			if gen < 0 {
+				continue // người dùng đã đóng tay cảnh báo của mũi × ngày dự kiến này
+			}
+			key, subject, kind := vaccineKey(b, d, gen)
+			overdue[key] = true
+			if !fresh || *n >= vaccineRaiseLimit {
+				continue
 			}
 			recips, site, err := s.vaccineRecipients(ctx, tx, tid, b, now)
 			if err != nil {
@@ -153,7 +199,7 @@ func (s *Service) vaccinePage(ctx context.Context, tx pgx.Tx, tid uuid.UUID, bat
 				title += " · " + where
 			}
 			_, created, err := s.raise(ctx, tx, tid, Raise{Kind: domain.KindVaccineOverdue, Subject: subject, SubjectKind: kind,
-				Scope: doseScope(b.Ref, d), CommuneCode: b.CommuneCode, ProvinceCode: s.provinceOf(ctx, b.CommuneCode, now), TemplateCode: "BM-07",
+				Scope: doseScope(b.Ref, d, gen), CommuneCode: b.CommuneCode, ProvinceCode: s.provinceOf(ctx, b.CommuneCode, now), TemplateCode: "BM-07",
 				SourceRef: &src, Title: title, Recipients: recips, At: now,
 				Extra: map[string]any{"batch_ref": b.Ref.String(), "vaccine_code": d.Vaccine, "shot": d.Shot,
 					"expected_date": d.Expected.Format(time.DateOnly), "summary": "Quá ngày tiêm dự kiến chưa có ngày tiêm thực tế"}})
