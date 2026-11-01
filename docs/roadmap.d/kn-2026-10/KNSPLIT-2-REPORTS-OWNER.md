@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-REPORTS-OWNER: kiểm kê owner registries hiện hành và fixture #81; docs-only, kết quả PostgreSQL/CI đúng SHA tại issue #54; không tuyên bố KNSPLIT-4b/G1 hoàn tất.
