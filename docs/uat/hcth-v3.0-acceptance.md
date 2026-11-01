@@ -192,3 +192,20 @@ BRD VII còn yêu cầu thao tác thường <3 giây, dashboard <5 giây với *
 tra cứu/lọc <2 giây và xuất NS01–06/NL02–04 khoảng 500 người <10 giây. 500 lượt nộp/ngày
 và 500 người đồng thời là hai tiêu chí riêng. Không có kết quả đo tải đồng thời HCTH ở đây;
 benchmark dashboard 1.000 hồ sơ/vault giả ở W11.28 không chứng minh yêu cầu đó.
+
+## W11.31 — Quy mô cohort và nộp phiếu trong ngày (phần đầu H11)
+
+Nguồn và giới hạn: [W11.31](../kn/gia-dinh/W11.31.md). Các dòng này bổ sung bằng chứng cho H11;
+không đổi trạng thái các AC còn pending hoặc cần PO ở các mục trước.
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| FN-16 AC-01: QIII/2026 có 470 MS05+24 MS06, gồm cán bộ xã theo đơn vị quản lý; mỗi người đúng một phiếu | `tests/hc30: TestHCTHQuarterCohort_W1131` | HTTP HRM+PostgreSQL thật; identity/phiên giả |
+| Lãnh đạo Trồng trọt thấy đúng 470 người được giao, đơn vị khác không thấy; self chỉ một người, tenant khác 404 | Cùng test cohort | HS-37/phạm vi snapshot |
+| Danh sách đợt đóng băng: thêm hồ sơ sau mở không thêm vào cohort; retry mở không tạo đợt mới | Cùng test cohort | Snapshot tại ngày chốt |
+| Tự nộp 82/90→HTXSNV; 500 lượt ở 494 người gồm 6 retry cùng khóa không tạo thêm phiên bản; tiến độ 494 đã tự nộp,470/24 không đổi | Cùng test cohort | Phiên bản và số đếm sau ghi |
+| 500 người khác nhau nộp trong cùng ngày hạn, mỗi phiếu phiên bản 2 và đủ tổng/số theo mẫu sau nộp | `tests/hc30: TestHCTH500DailySubmitters_W1131` | 500 request tuần tự qua HTTP, cùng ngày cố định |
+
+Tải500 người **đồng thời**, NLTX tháng 7/2026 bốn người và UAT toàn phòng còn ở
+[#188 W11.31-FINAL](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/188).
+Không suy diễn tải tuần tự thành chứng nhận SLA <3s/<5s của hệ thống triển khai.
