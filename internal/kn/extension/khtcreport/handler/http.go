@@ -22,6 +22,7 @@ type Handler struct{ Svc *app.Service }
 
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/extension/khtc/exported-reports", h.archive)
+	rg.POST("/extension/khtc/exported-reports/zip", h.archiveZIP)
 	g := rg.Group("/extension/khtc/periods/:id/report")
 	g.GET("", h.get)
 	g.POST("/draft", h.save)
@@ -29,6 +30,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/exports", h.history)
 	g.POST("/exports", h.export)
 	g.GET("/exports/:exportID/download", h.download)
+	g.GET("/exports/:exportID/preview", h.previewExport)
 	g.POST("/exports/:exportID/final", h.finalize)
 	// W10.17: Word (.docx) qua pf/export, dựng từ nội dung đóng băng của một bản Excel.
 	g.POST("/exports/:exportID/word", h.exportWord)

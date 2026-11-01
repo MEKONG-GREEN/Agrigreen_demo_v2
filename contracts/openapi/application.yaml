@@ -14174,6 +14174,62 @@ paths:
         "403": {$ref: '#/components/responses/Problem'}
         "422": {$ref: '#/components/responses/Problem'}
         "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/periods/{id}/report/exports/{exportID}/preview:
+    get:
+      summary: Xem nội dung từ bản xuất bất biến, không đọc bản soạn
+      operationId: extensionKhtcArchivePreview
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung và mẫu đã ghim của đúng bản xuất
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchivePreview'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/exported-reports/zip:
+    post:
+      summary: Tải tối đa 10 bản Excel đã xuất, tổng byte gốc tối đa 20 MiB
+      operationId: extensionKhtcArchiveZIP
+      tags: [extension]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [period_id, export_id]
+                    properties:
+                      period_id: {type: string, format: uuid}
+                      export_id: {type: string, format: uuid}
+      responses:
+        "200":
+          description: ZIP chứa nguyên byte Excel đã lưu
+          content:
+            application/zip:
+              schema: {type: string, format: binary}
+        "400": {$ref: '#/components/responses/Problem'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "413": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
   /v1/extension/khtc/external/indicators:
     get:
       summary: "Danh mục chỉ tiêu nguồn ngoài (FN-TI-02.11)"
@@ -26650,6 +26706,16 @@ components:
         items: {type: array, items: {$ref: '#/components/schemas/KHTCArchiveRow'}}
         has_more: {type: boolean}
         offset: {type: integer}
+
+    KHTCArchivePreview:
+      type: object
+      additionalProperties: false
+      required: [export_id, version, content]
+      properties:
+        export_id: {type: string, format: uuid}
+        version: {type: integer, format: int64}
+        content: {$ref: '#/components/schemas/KHTCReportContent'}
+        template_document: {$ref: '#/components/schemas/KHTCTemplateRendered'}
     KHTCReportPeriod: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"type":{"type":"string","enum":["week","month","quarter","year","program","adhoc"]},"year":{"type":"integer"},"name":{"type":"string"},"from":{"type":"string","format":"date-time"},"to":{"type":"string","format":"date-time"},"cutoff":{"type":"string","format":"date-time"},"departments":{"type":"array","items":{"type":"string"}},"no":{"type":["integer","null"]},"scope":{"type":["string","null"]}},"required":["id","type","year","name","from","to","cutoff","departments","no","scope"],"additionalProperties":false}
     KHTCReportPlan: {"type":"object","properties":{"VersionID":{"type":"string","format":"uuid"},"Year":{"type":"integer"},"Version":{"type":"integer"},"DecisionNo":{"type":"string"},"Entries":{"type":["array","null"],"items":{"type":"object","additionalProperties":true}}},"required":["VersionID","Year","Version","DecisionNo","Entries"],"additionalProperties":true}
     KHTCReportSourceRef: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"plan_version_id":{"type":["string","null"],"format":"uuid"},"figures_hash":{"type":"string"},"status_hash":{"type":"string"},"closed":{"type":"boolean"},"at":{"type":"string","format":"date-time"}},"required":["id","version","plan_version_id","figures_hash","status_hash","closed","at"],"additionalProperties":false}
