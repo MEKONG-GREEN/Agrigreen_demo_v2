@@ -5,6 +5,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"math/big"
 	"regexp"
 	"sort"
 	"time"
@@ -39,7 +40,7 @@ func SummarizeDashboard(data Data, department, field string, now time.Time) (Das
 		entries[e.Ref] = e
 	}
 	roots := map[uuid.UUID]DashboardProgram{}
-	sums := map[uuid.UUID]decimal.Decimal{}
+	sums := map[uuid.UUID]*big.Rat{}
 	for _, row := range data.Rows {
 		if row.Kind != "item" || row.Tab != "programs" || (department != "" && row.Department != department) {
 			continue
@@ -85,9 +86,12 @@ func SummarizeDashboard(data Data, department, field string, now time.Time) (Das
 		if err != nil {
 			return DashboardProgress{}, ErrInput
 		}
-		percent := total.Mul(decimal.NewFromInt(100)).Div(*entry.PlannedQty)
+		percent := new(big.Rat).Quo(total.Mul(decimal.NewFromInt(100)).Rat(), entry.PlannedQty.Rat())
 		program.Known++
-		sums[root.Ref] = sums[root.Ref].Add(percent)
+		if sums[root.Ref] == nil {
+			sums[root.Ref] = new(big.Rat)
+		}
+		sums[root.Ref].Add(sums[root.Ref], percent)
 		if total.GreaterThanOrEqual(*entry.PlannedQty) {
 			out.Achieved++
 		}
@@ -99,7 +103,8 @@ func SummarizeDashboard(data Data, department, field string, now time.Time) (Das
 	}
 	for id, p := range roots {
 		if p.Known > 0 {
-			v := sums[id].DivRound(decimal.NewFromInt(int64(p.Known)), 2).String()
+			mean := new(big.Rat).Quo(sums[id], big.NewRat(int64(p.Known), 1))
+			v := decimal.NewFromBigInt(mean.Num(), 0).DivRound(decimal.NewFromBigInt(mean.Denom(), 0), 2).String()
 			p.Percent = &v
 		}
 		out.Programs = append(out.Programs, p)

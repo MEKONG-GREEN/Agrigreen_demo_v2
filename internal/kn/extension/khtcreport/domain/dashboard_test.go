@@ -54,3 +54,23 @@ func TestDashboardMissingThresholdAndExactMean(t *testing.T) {
 	}
 
 }
+func TestDashboardRoundsMeanOnlyOnce(t *testing.T) {
+	root := id()
+	data := domain.Data{Period: domain.Period{Year: 2026}, Plan: port.KHTCPlan{Entries: []port.KHTCPlanEntry{{Ref: root, Kind: "program"}}}}
+	for _, planned := range []string{"300", "300", "300", "5000"} {
+		item := id()
+		data.Plan.Entries = append(data.Plan.Entries, port.KHTCPlanEntry{Ref: item, ParentRef: &root, PlannedQty: qty(planned)})
+		data.Rows = append(data.Rows, domain.ProgramRow{Ref: item, ParentRef: &root, Kind: "item", Tab: "programs", YearToDate: "1"})
+	}
+	got, err := domain.SummarizeDashboard(data, "", "", day("2026-10-13"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Programs) == 1 && got.Programs[0].Percent != nil {
+		t.Logf("mean=%s", *got.Programs[0].Percent)
+	}
+	// (1/3+1/3+1/3+0.02)/4 = 0.255%, rounded only at output = 0.26%.
+	if len(got.Programs) != 1 || got.Programs[0].Percent == nil || *got.Programs[0].Percent != "0.26" {
+		t.Fatalf("rounded before mean: %+v", got.Programs)
+	}
+}
