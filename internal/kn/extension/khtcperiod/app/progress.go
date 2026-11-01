@@ -133,23 +133,7 @@ func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []s
 		}
 		d.Forms = append(d.Forms, row)
 	}
-	refs := make([]extport.KHTCSourceRef, 0, len(srcs))
-	for _, sr := range srcs {
-		ref := extport.KHTCSourceRef{Department: sr.Department, Source: sr.Source, CalendarID: sr.CalendarID, CalendarVersion: sr.CalendarVersion,
-			NativeKey: sr.NativeKey}
-		if sr.Label != nil {
-			ref.Label = *sr.Label
-		}
-		refs = append(refs, ref)
-		d.Sources = append(d.Sources, SourceRow{Ref: ref})
-	}
-	if s.Crosswalk != nil && len(refs) > 0 {
-		if states, err := s.Crosswalk.States(ctx, refs); err == nil && len(states) == len(refs) {
-			for i, st := range states {
-				d.Sources[i].Known, d.Sources[i].Closed, d.Sources[i].At = true, st.Closed, st.ClosedAt
-			}
-		}
-	}
+	d.Sources = s.sourceRows(ctx, srcs)
 	f.Sources = len(d.Sources)
 	for _, sr := range d.Sources {
 		if sr.Closed {
@@ -588,4 +572,27 @@ func (s *Service) InstallTemplate(ctx context.Context, idem string) (TemplateSta
 		return TemplateState{}, err
 	}
 	return TemplateState{Code: ref.Code, Version: ref.Version, Title: ref.Title}, nil
+}
+
+func (s *Service) sourceRows(ctx context.Context, srcs []store.Source) []SourceRow {
+	var out []SourceRow
+	refs := make([]extport.KHTCSourceRef, 0, len(srcs))
+	for _, sr := range srcs {
+		ref := extport.KHTCSourceRef{Department: sr.Department, Source: sr.Source, CalendarID: sr.CalendarID, CalendarVersion: sr.CalendarVersion,
+			NativeKey: sr.NativeKey}
+		if sr.Label != nil {
+			ref.Label = *sr.Label
+		}
+		refs = append(refs, ref)
+		out = append(out, SourceRow{Ref: ref})
+	}
+	if s.Crosswalk != nil && len(refs) > 0 {
+		if states, err := s.Crosswalk.States(ctx, refs); err == nil && len(states) == len(refs) {
+			for i, st := range states {
+				out[i].Known, out[i].Closed, out[i].At = true, st.Closed, st.ClosedAt
+			}
+		}
+	}
+
+	return out
 }

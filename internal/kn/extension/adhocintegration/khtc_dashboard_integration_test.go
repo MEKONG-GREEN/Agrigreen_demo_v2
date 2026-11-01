@@ -44,6 +44,10 @@ func TestKHTCDashboardLiveMau5(t *testing.T) {
 	}
 	code, body = f.khtc(http.MethodPost, "/periods/"+week.ID+"/forms/"+dTT+"/review", f.khtcUser, "", map[string]any{"decision": "returned", "note": "Bổ sung số liệu tiến độ"})
 	f.ok(code, body, nil)
+	d = read()
+	if d.Counts.Sent != 1 {
+		t.Fatalf("returned form counted as sent: %+v", d.Counts)
+	}
 	code, body = f.send(week.ID, dTT, "submit", 1, ttSheet(f.item, "35"))
 	f.ok(code, body, nil)
 	d = read()
@@ -69,5 +73,43 @@ func TestKHTCDashboardLiveMau5(t *testing.T) {
 	other.ok(code, body, &isolated)
 	if isolated.Counts.Open != 0 || isolated.ProgressPeriod != nil || len(isolated.Status) != 0 {
 		t.Fatalf("dashboard leaked another tenant: %+v", isolated)
+	}
+}
+
+func TestKHTCDashboardSourceStates(t *testing.T) {
+	f := newKHTCFormFxWith(t, nil)
+	p := f.open(41, dTT, dCNTS)
+	for _, tc := range []struct {
+		name               string
+		closed, unreadable bool
+		want               string
+	}{
+		{"closed", true, false, "closed"}, {"open", false, false, "open"}, {"unavailable", false, true, "unknown"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f.cw.closed, f.cw.unreadable = tc.closed, tc.unreadable
+			var d app.Dashboard
+			code, body := f.khtc(http.MethodGet, "/dashboard?year=2026&quarter=4", f.khtcUser, "", nil)
+			f.ok(code, body, &d)
+			count := 0
+			for _, row := range d.Status {
+				if row.Kind == "source" {
+					count++
+					if row.PeriodID.String() != p.ID || row.Department != dCNTS || row.State != tc.want {
+						t.Fatalf("source state %+v", row)
+					}
+				}
+			}
+			if count != 1 {
+				t.Fatalf("expected one source, got %d: %+v", count, d.Status)
+			}
+			code, body = f.khtc(http.MethodGet, "/dashboard?year=2026&quarter=4&department="+dTT, f.khtcUser, "", nil)
+			f.ok(code, body, &d)
+			for _, row := range d.Status {
+				if row.Kind == "source" {
+					t.Fatalf("source leaked department filter: %+v", row)
+				}
+			}
+		})
 	}
 }

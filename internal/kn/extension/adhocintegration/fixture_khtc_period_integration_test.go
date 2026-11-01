@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -20,7 +21,7 @@ import (
 )
 
 // crosswalk giả của gói PFPUB: một kỳ nguồn CNTS cho mỗi tuần KHTC, trạng thái chốt điều khiển được.
-type crosswalk struct{ closed bool }
+type crosswalk struct{ closed, unreadable bool }
 
 func (c *crosswalk) Sources(_ context.Context, kind, key string, _, _ time.Time, depts []string) ([]extport.KHTCSourceRef, error) {
 	for _, d := range depts {
@@ -33,6 +34,9 @@ func (c *crosswalk) Sources(_ context.Context, kind, key string, _, _ time.Time,
 }
 
 func (c *crosswalk) States(_ context.Context, refs []extport.KHTCSourceRef) ([]extport.KHTCSourceState, error) {
+	if c.unreadable {
+		return nil, errors.New("source unavailable")
+	}
 	out := make([]extport.KHTCSourceState, len(refs))
 	for i := range refs {
 		out[i].Closed = c.closed

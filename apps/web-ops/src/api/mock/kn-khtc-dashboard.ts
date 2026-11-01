@@ -33,7 +33,7 @@ function handle(ctx: Ctx): Response {
                 continue;
             const sub = s.submitted[d.code];
             out.counts.forms++;
-            if (sub)
+            if (sub && sub.decision !== "returned")
                 out.counts.sent++;
             out.status.push({ period_id: p.id, period_name: p.name, department: d.code, name: d.name, kind: "form", state: sub ? (sub.decision === "accepted" ? "confirmed" : sub.decision === "returned" ? "supplement" : "submitted") : "not_started", at: sub?.at ?? null });
         }

@@ -104,6 +104,7 @@ func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.S
 	}
 	end := time.Date(q.Year, time.Month(q.Quarter*3+1), 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, -1)
 	var selected *ps.Period
+	var openPeriods []pa.Detail
 	for _, d := range details {
 		p := d.Period
 		if d.State == pd.PeriodCancelled {
@@ -124,18 +125,30 @@ func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.S
 		if d.State == pd.PeriodClosed || p.From.After(end) || p.To.Before(time.Date(q.Year, time.Month((q.Quarter-1)*3+1), 1, 0, 0, 0, 0, time.UTC)) {
 			continue
 		}
+		openPeriods = append(openPeriods, d)
 		out.Counts.Open++
 		for _, f := range d.Forms {
 			if q.Department != "" && f.Department != q.Department {
 				continue
 			}
 			out.Counts.Forms++
-			if f.LastSubmittedAt != nil {
+			if f.View.CountsAsSent {
 				out.Counts.Sent++
 			}
 			out.Status = append(out.Status, DashboardStatus{PeriodID: p.ID, PeriodName: p.Name, Department: f.Department, Name: f.DepartmentName, Kind: "form", State: f.View.State, At: f.LastSubmittedAt})
 		}
-		for _, r := range d.Sources {
+	}
+	ids := make([]uuid.UUID, 0, len(openPeriods))
+	for _, d := range openPeriods {
+		ids = append(ids, d.Period.ID)
+	}
+	sources, err := periods.SourceStates(ctx, ids)
+	if err != nil {
+		return Dashboard{}, err
+	}
+	for _, d := range openPeriods {
+		p := d.Period
+		for _, r := range sources[d.Period.ID] {
 			if q.Department != "" && r.Ref.Department != q.Department {
 				continue
 			}
