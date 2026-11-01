@@ -16,6 +16,28 @@ function orDevDefault(value: string | undefined, devDefault: string): string {
   return value || (allowsDevDefaults(env) ? devDefault : "");
 }
 
+/**
+ * Issuer Keycloak mặc định khi chạy cục bộ: cổng 8180 của Compose (deploy/compose/docker-compose.yml,
+ * KC_HOSTNAME + AG_OIDC_ISSUER). Cổng 8081 là API nội bộ MKG, không phải Keycloak (#86).
+ */
+export const DEV_OIDC_ISSUER = "http://localhost:8180/realms/agrigreen";
+/** Client công khai mặc định (PKCE S256). Đổi sang client khác (vd kn-web) chỉ qua biến môi trường. */
+export const DEFAULT_OIDC_CLIENT_ID = "agrigreen-web-ops";
+
+/**
+ * Cấu hình OIDC từ biến môi trường đã nhúng. Bản build production thật không có mặc định localhost:
+ * issuer rỗng (next.config.ts đã chặn lúc build nếu thiếu/không https).
+ */
+export function resolveOidcConfig(
+  publicEnv: PublicEnv,
+  values: { issuer?: string; clientId?: string },
+): { issuer: string; clientId: string } {
+  return {
+    issuer: values.issuer || (allowsDevDefaults(publicEnv) ? DEV_OIDC_ISSUER : ""),
+    clientId: values.clientId || DEFAULT_OIDC_CLIENT_ID,
+  };
+}
+
 export const config = {
   /** Bật chế độ dữ liệu giả lập (không gọi backend, không cần Keycloak) — tắt cứng ở bản production thật. */
   mock: isMockEnabled(env),
@@ -26,10 +48,10 @@ export const config = {
    * api-platform mở Admin API ở AG_ADMIN_HTTP_ADDR, mặc định :8082.
    */
   adminApiBaseUrl: orDevDefault(process.env.NEXT_PUBLIC_ADMIN_API_BASE, "http://localhost:8082"),
-  oidc: {
-    issuer: orDevDefault(process.env.NEXT_PUBLIC_OIDC_ISSUER, "http://localhost:8081/realms/agrigreen"),
-    clientId: process.env.NEXT_PUBLIC_OIDC_CLIENT_ID || "agrigreen-web-ops",
-  },
+  oidc: resolveOidcConfig(env, {
+    issuer: process.env.NEXT_PUBLIC_OIDC_ISSUER,
+    clientId: process.env.NEXT_PUBLIC_OIDC_CLIENT_ID,
+  }),
   /** URL style MapLibre (tile trong lãnh thổ, ADR-0007). Rỗng → nền trơn, không gọi tile ngoài. */
   mapStyleUrl: process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "",
   /**
