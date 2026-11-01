@@ -25158,6 +25158,8 @@ export interface components {
         };
         CNTSDiaryEntryList: {
             items: components["schemas"]["CNTSDiaryEntry"][];
+            /** @description Còn dòng trong phạm vi người gọi sau trang này (BF-CN-XA-DATA); khóa của dòng cuối đã trả */
+            next_cursor: string | null;
         };
         CNTSDiaryEntrySave: {
             /** Format: uuid */
@@ -38585,8 +38587,10 @@ export interface operations {
                 from?: string;
                 /** @description Kỳ có ngày đầu ≤ to */
                 to?: string;
-                /** @description Số kỳ tối đa */
+                /** @description Số kỳ tối đa một trang (đếm sau khi lọc phạm vi người gọi) */
                 limit?: number;
+                /** @description next_cursor của trang trước */
+                cursor?: string;
             };
             header?: never;
             path?: never;
@@ -38602,6 +38606,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["FormsTask"][];
+                        /** @description BF-CN-XA-DATA (#175): còn kỳ trong phạm vi sau trang này (null = hết) */
+                        next_cursor?: string | null;
                     };
                 };
             };
@@ -50235,6 +50241,17 @@ export interface operations {
                 status?: "draft" | "submitted" | "returned" | "verified";
                 review?: boolean;
                 flagged?: boolean;
+                /** @description BF-CN-XA-DATA: mã xã (ngoài phạm vi → rỗng) */
+                commune?: string;
+                form?: "BM-08" | "BM-09" | "BM-19";
+                /** @description Ngày ghi từ (bản hiện hành) */
+                from?: string;
+                /** @description Ngày ghi đến */
+                to?: string;
+                /** @description Số dòng đọc một trang (bỏ trống: tối đa 2000) */
+                limit?: number;
+                /** @description next_cursor của trang trước */
+                cursor?: string;
             };
             header?: never;
             path?: never;

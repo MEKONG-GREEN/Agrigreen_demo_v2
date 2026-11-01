@@ -917,8 +917,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.so_lieu_xa.nhap_lieu_tuan",
                 "label": "Nhập liệu tuần",
                 "route": "/kn/cnts/so-lieu-xa/nhap-lieu-tuan",
-                "icon": "table",
-                "soon": true
+                "icon": "table"
               },
               {
                 "key": "tinh.cnts.so_lieu_xa.khai_thac_thuy_san",
@@ -930,8 +929,7 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "key": "tinh.cnts.so_lieu_xa.nhat_ky",
                 "label": "Nhật ký sản xuất",
                 "route": "/kn/cnts/so-lieu-xa/nhat-ky",
-                "icon": "journal",
-                "soon": true
+                "icon": "journal"
               },
               {
                 "key": "tinh.cnts.so_lieu_xa.lich_tiem",

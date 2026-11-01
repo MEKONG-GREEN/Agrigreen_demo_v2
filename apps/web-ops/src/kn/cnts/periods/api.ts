@@ -136,6 +136,28 @@ export function createCntsPeriodApi(api: ApiClient) {
     publish: (body: CntsSeriesInput): Promise<CntsSeries> => unwrap(api.POST("/v1/extension/cnts/period-series", { params: idem(), body })),
     tasks: async (code?: string): Promise<FormsTask[]> =>
       (await unwrap(api.GET("/v1/forms/tasks", { params: { query: { ...query, ...(code ? { code } : {}) } } }))).items,
+    /** MỌI công việc của một biểu trong khoảng ngày (kỳ có ngày cuối ≥ from, ngày đầu ≤ to). #175 review: máy chủ đếm giới
+     *  hạn `limit` kỳ SAU khi lọc phạm vi và trả next_cursor; ở đây đọc hết các trang. Quá `maxPages` trang thì báo lỗi
+     *  thay vì trả thiếu kỳ âm thầm. */
+    tasksIn: async (code: string, from: string, to: string, limit = 200, maxPages = 50): Promise<FormsTask[]> => {
+      const out: FormsTask[] = [];
+      let cursor: string | undefined;
+      for (let i = 0; i < maxPages; i++) {
+        const r = await unwrap(api.GET("/v1/forms/tasks", { params: { query: { ...query, code, from, to, limit, ...(cursor ? { cursor } : {}) } } }));
+        out.push(...r.items);
+        if (!r.next_cursor) return out;
+        cursor = r.next_cursor;
+      }
+      throw new Error("Quá nhiều kỳ trong khoảng đã chọn — chưa đọc đủ, không dựng bảng/lũy kế thiếu kỳ");
+    },
+    /** BF-CN-XA-DATA (FN-09): Cấp Tỉnh xác thực / yêu cầu điều chỉnh (bắt buộc lý do) phiên bản bài nộp cuối. */
+    review: (submissionId: string, decision: "accepted" | "returned", note?: string): Promise<FormsSubmission> =>
+      unwrap(
+        api.POST("/v1/forms/submissions/{id}/review", {
+          params: { path: { id: submissionId }, query, ...idem() },
+          body: { decision, ...(note ? { note } : {}) },
+        }),
+      ),
     period: (id: string): Promise<FormsPeriodView> => unwrap(api.GET("/v1/forms/periods/{id}", { params: { path: { id }, query } })),
     previous: async (periodId: string, unit: string): Promise<FormsPrevious | null> =>
       (await unwrap(api.GET("/v1/forms/periods/{id}/previous", { params: { path: { id: periodId }, query: { ...query, unit } } }))).previous,
