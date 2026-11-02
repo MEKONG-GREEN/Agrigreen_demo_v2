@@ -1,0 +1,1 @@
+- [ ] BF-SWEEP-HCTH-FORMS (#179): FN19 bảng hệ số list/detail/new-version trên route, NumberField giới hạn trước chuẩn hóa, STT và Log; chờ Claude review exact SHA; tham số và các màn HCTH còn lại tách #197.
