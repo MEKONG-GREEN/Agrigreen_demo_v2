@@ -22,6 +22,7 @@ type Handler struct{ Svc *app.Service }
 
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/extension/khtc/exported-reports", h.archive)
+	rg.GET("/extension/khtc/exported-reports/periods", h.archive)
 	rg.POST("/extension/khtc/exported-reports/zip", h.archiveZIP)
 	g := rg.Group("/extension/khtc/periods/:id/report")
 	g.GET("", h.get)

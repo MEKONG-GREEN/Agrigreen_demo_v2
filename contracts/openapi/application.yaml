@@ -14244,6 +14244,7 @@ paths:
       parameters:
         - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
         - {name: kind, in: query, schema: {type: string, enum: ['', week, month, quarter, year, program, adhoc]}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
         - {name: q, in: query, schema: {type: string, maxLength: 200}}
         - {name: versions, in: query, schema: {type: boolean, default: false}}
         - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
@@ -14254,6 +14255,27 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/KHTCArchive'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/exported-reports/periods:
+    get:
+      summary: Chọn kỳ có báo cáo đã xuất trong tenant phiên, có tìm kiếm và phân trang
+      operationId: extensionKhtcArchivePeriods
+      tags: [extension]
+      parameters:
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: kind, in: query, schema: {type: string, enum: ['', week, month, quarter, year, program, adhoc]}}
+        - {name: q, in: query, schema: {type: string, maxLength: 200}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        "200":
+          description: Kỳ có ít nhất một bản xuất, loại kỳ hủy và kỳ chỉ có bản soạn
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchivePeriods'}
         "401": {$ref: '#/components/responses/Problem'}
         "403": {$ref: '#/components/responses/Problem'}
         "422": {$ref: '#/components/responses/Problem'}
@@ -26867,6 +26889,21 @@ components:
         version: {type: integer, format: int64}
         content: {$ref: '#/components/schemas/KHTCReportContent'}
         template_document: {$ref: '#/components/schemas/KHTCTemplateRendered'}
+
+    KHTCArchivePeriod:
+      type: object
+      required: [id, name, report_type]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        report_type: {type: string, enum: [week, month, quarter, year, program, adhoc]}
+    KHTCArchivePeriods:
+      type: object
+      required: [items, has_more, offset]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/KHTCArchivePeriod'}}
+        has_more: {type: boolean}
+        offset: {type: integer}
     KHTCDashboard:
       type: object
       required: [year, quarter, department, field, counts, progress, progress_period, reports, status, as_of, can_act]

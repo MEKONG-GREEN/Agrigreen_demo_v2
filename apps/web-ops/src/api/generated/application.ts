@@ -10294,6 +10294,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/exported-reports/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chọn kỳ có báo cáo đã xuất trong tenant phiên, có tìm kiếm và phân trang */
+        get: operations["extensionKhtcArchivePeriods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/preview": {
         parameters: {
             query?: never;
@@ -23136,6 +23153,18 @@ export interface components {
             version: number;
             content: components["schemas"]["KHTCReportContent"];
             template_document?: components["schemas"]["KHTCTemplateRendered"];
+        };
+        KHTCArchivePeriod: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            report_type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+        };
+        KHTCArchivePeriods: {
+            items: components["schemas"]["KHTCArchivePeriod"][];
+            has_more: boolean;
+            offset: number;
         };
         KHTCDashboard: {
             year: number;
@@ -47476,6 +47505,7 @@ export interface operations {
             query: {
                 year: number;
                 kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+                period_id?: string;
                 q?: string;
                 versions?: boolean;
                 offset?: number;
@@ -47494,6 +47524,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KHTCArchive"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcArchivePeriods: {
+        parameters: {
+            query: {
+                year: number;
+                kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+                q?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kỳ có ít nhất một bản xuất, loại kỳ hủy và kỳ chỉ có bản soạn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCArchivePeriods"];
                 };
             };
             401: components["responses"]["Problem"];

@@ -53,6 +53,10 @@ func (c Control) ReopenPeriod(ctx context.Context, profile string, id uuid.UUID,
 
 // ChangeDue đổi hạn nộp của kỳ (cấp close_by của Nút phát hành; kỳ đang nhận bài).
 func (c Control) ChangeDue(ctx context.Context, profile string, id uuid.UUID, due time.Time, reason, idem string) error {
+	return c.changeDue(ctx, profile, id, due, reason, idem, nil)
+}
+
+func (c Control) changeDue(ctx context.Context, profile string, id uuid.UUID, due time.Time, reason, idem string, expect *controlCAS) error {
 	s := c.Svc
 	prof, a, err := s.resolve(ctx, profile)
 	if err != nil {
@@ -95,13 +99,19 @@ func (c Control) ChangeDue(ctx context.Context, profile string, id uuid.UUID, du
 		if !a.canControlGranted(prof.CloseBy, v.Period, v.Spec, grant) {
 			return problem.Forbidden.WithDetail("đổi hạn nộp cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
+		if err := checkControlRevision(ctx, tx, a.tenant, profile, id, expect); err != nil {
+			return err
+		}
 		switch v.State.Status {
 		case domain.PeriodCancelled:
 			return port.ErrPeriodCancelled
 		case domain.PeriodClosed:
 			return port.ErrPeriodClosed
 		}
-		return store.InsertDue(ctx, tx, a.tenant, id, due, reason, a.ref, now, idemOr(idem, "due"))
+		if err := store.InsertDue(ctx, tx, a.tenant, id, due, reason, a.ref, now, idemOr(idem, "due")); err != nil {
+			return err
+		}
+		return appliedControlRevision(ctx, tx, a.tenant, profile, id, expect)
 	})
 	return classify(err)
 }
