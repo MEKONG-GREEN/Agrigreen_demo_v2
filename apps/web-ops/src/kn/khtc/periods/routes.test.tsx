@@ -42,6 +42,11 @@ describe("Kỳ báo cáo — route UI-KIT", () => {
     expect(nav.push).toHaveBeenCalledWith(`${PERIOD_BASE}/them-moi`);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+  it("pane kỳ nhúng không trùng tên nút chọn bản soạn báo cáo", async () => {
+    render(<><KhtcPeriodsScreen /><button>{period.name}</button></>);
+    await screen.findByRole("button", { name: `Xem kỳ ${period.name}`, exact: true });
+    expect(screen.getAllByRole("button", { name: period.name, exact: true })).toHaveLength(1);
+  });
   it("URL trực tiếp chi tiết có Log từ sự kiện thật và bảng tiến độ STT", async () => {
     nav.path = periodHref(period.id);
     render(<KhtcPeriodWorkspace />);

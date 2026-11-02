@@ -221,7 +221,7 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null,r
           {(ps: KhtcPeriod[]) => <DataTable caption="Danh sách kỳ báo cáo" rows={ps.filter(p => !adhocOnly || p.report_type === "adhoc")} rowKey={p => p.id}
             empty={`Chưa có kỳ nào trong năm ${year}.`} columns={[
               { key: "type", header: "Loại báo cáo", cell: p => REPORT_TYPES.find(t => t.value === p.report_type)?.label ?? p.report_type },
-              { key: "name", header: "Kỳ", cell: p => route ? <Link href={periodHref(p.id)}>{p.name}</Link> : <button className="btn btn-o" onClick={() => setSelected(p.id)}>{p.name}</button> },
+              { key: "name", header: "Kỳ", cell: p => route ? <Link href={periodHref(p.id)}>{p.name}</Link> : <button className="btn btn-o" aria-label={`Xem kỳ ${p.name}`} onClick={() => setSelected(p.id)}>{p.name}</button> },
               { key: "cutoff", header: "Ngày chốt", cell: p => vnDate(p.cutoff_date) },
               { key: "due", header: "Hạn nộp", cell: p => dt(p.due_at) },
               { key: "departments", header: "Phòng tham gia", cell: p => p.departments.length },
