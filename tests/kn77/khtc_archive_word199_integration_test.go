@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -283,7 +284,9 @@ func TestArchive199StoredWordBindingAndMixedZIP(t *testing.T) {
 		}(xid)
 	}
 	first, second := <-results, <-results
-	if !((first == 201 && second == 422) || (first == 422 && second == 201)) {
+	statuses := []int{first, second}
+	slices.Sort(statuses)
+	if statuses[0] != 201 || statuses[1] != 422 {
 		t.Fatalf("concurrent snapshots: %d %d", first, second)
 	}
 	if err = admin.QueryRow(ctx, `SELECT count(*) FROM pf_extension.khtc_word_binding WHERE tenant_id=$1`, f.tid).Scan(&bindings); err != nil || bindings != beforeBindings+1 {
