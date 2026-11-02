@@ -3,11 +3,12 @@ package app
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
+
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/doctpl"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/docx"
 	"github.com/google/uuid"
-	"strings"
 )
 
 // copyWordData detaches the frozen vars, lists and individual rows. Binding
@@ -89,4 +90,12 @@ func verifyWordBinding(req exportport.Request, templateHash string, run exportpo
 		return invalid()
 	}
 	return nil
+}
+
+func archiveBodyMatches(body []byte, expected string) bool {
+	if len(body) == 0 || len(expected) != 64 {
+		return false
+	}
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:]) == expected
 }

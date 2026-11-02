@@ -228,3 +228,14 @@ Bổ sung KH-FN-TI-02.09 (Mẫu5 cutoff sớm,16/10): `TestKH_M5_ProgramUsesCuto
 ## Lát UI Danh mục theo BRD v2.3 — BF-SWEEP-KHTC #164
 
 Bổ sung riêng FN-AD-04.01 theo DOCX v2.3 ngày 08/10/2026, SHA-256 `15859351f90574bf667190b1a12160465ba03f8ca9e408b94c90d285a3502e25`; không đổi phạm vi hoặc kết quả lịch sử của khung v2.2 trên đây. Cả 7 loại có DataTable/STT, route Thêm/Sửa/Chi tiết với DetailPage + Log thật, lỗi bắt buộc/lỗi máy chủ theo trường và kiểm số trước parser. Kiểm thử: `apps/web-ops/src/kn/khtc/catalog.test.tsx`, E2E `kn-khtc-catalog.spec.ts`, backend `TestFN_AD_04_01_Catalog` giữ nguyên API/quyền. Trạng thái UI: chờ Claude review và khách UAT. [Giả định/phạm vi](../kn/gia-dinh/BF-SWEEP-KHTC.md); các màn KHTC còn lại theo #180, không trùng #163 HCTH. Không thay M1–M7, mẫu giấy hoặc FormGrid.
+
+
+## #199 — lát Word đã lưu và ZIP trộn theo BRD KHTC v2.3
+
+Phạm vi: chỉ Word có liên kết tường minh, đã kiểm full input hash của snapshot và số/ngày thực ghi ở Run, template/hash, subject, SHA-256 byte. Chỉ điền placeholder còn trống trên bản sao dữ liệu. Không cấp số/render hay đọc nguồn sống khi tải. Quyền reader/tenant hiện hữu giữ nguyên; không thêm phòng/BGĐ/TW khác tenant.
+
+- UAT: xuất Excel v1 và Word; sửa bản soạn hoặc mẫu sau xuất; từ kho chọn v1 → trang riêng Word đã lưu → metadata và Log dùng actor/time của Run → tải đúng byte và băm ban đầu. Ghép run của snapshot khác, replay sai input, Word cũ chưa liên kết hoặc hash sai đều không trả tệp.
+- Chọn Excel và Word ở các trang rồi tải ZIP: tối đa 10 tệp, cả tổng byte gốc và ZIP tối đa 20 MiB; tên riêng không chứa đường dẫn; byte từng tệp giữ nguyên. Một tệp sai quyền/tenant/hash/liên kết hoặc audit lỗi làm cả yêu cầu thất bại.
+- Audit append-only ghi **lần truy cập/thử tải**, actor/context/time thật và expected_bytes từ metadata, commit trước đọc byte. Không khẳng định đã truyền xong qua mạng. Đổi tenant/selected session trong lúc chờ tải không tạo Blob từ phản hồi phiên cũ.
+- Kiểm thử native: `TestArchive199StoredWordBindingAndMixedZIP`; pure binding có mốc qua 00:00 Việt Nam và vars đã điền/rỗng; UI `archive-word199.test.tsx`, giả lập `archive-mock199.test.ts`, browser `kn-khtc-archive-word199.spec.ts`. Chỉ báo đạt sau log kiểm thực tế.
+- Phần còn lại chính thức ở #205: lọc lĩnh vực từ snapshot/rows theo export_filter, quyền phòng/BGĐ xuyên toàn chuỗi, audit toàn chain còn lại và attestation legacy. **Không coi toàn FN-TW-01.01/W11.69 hoặc toàn UAT đã đạt.** Giả lập trả văn bản có nhãn GIẢ LẬP, không dùng làm bằng chứng DOCX/XLSX thật; native PostgreSQL kiểm exporter thật.

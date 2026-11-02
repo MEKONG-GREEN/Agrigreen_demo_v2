@@ -1,13 +1,9 @@
 package app
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
-	"fmt"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	templatedomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtctemplate/domain"
 	"github.com/google/uuid"
 )
@@ -72,44 +68,4 @@ func ValidateArchiveSelection(in []ArchiveSelection) error {
 		seen[key] = true
 	}
 	return nil
-}
-
-// ArchiveZIP downloads the stored bytes, with the same tenant/session/hash check and
-// access checkpoint as each individual download. It never regenerates a report.
-func (s *Service) ArchiveZIP(ctx context.Context, in []ArchiveSelection) ([]byte, error) {
-	if err := ValidateArchiveSelection(in); err != nil {
-		return nil, err
-	}
-	files := make([]store.Export, 0, len(in))
-	total := 0
-	for _, item := range in {
-		if item.Format == "word" {
-			return nil, ErrDependency.WithDetail("Bộ đọc Word đã liên kết chưa được nối")
-		}
-		x, err := s.Download(ctx, item.PeriodID, item.ExportID)
-		if err != nil {
-			return nil, err
-		}
-		if len(x.Body) > ArchiveMaxBytes-total {
-			return nil, ErrInvalid.WithDetail("Tổng dung lượng vượt 20 MiB; chọn ít tệp hơn")
-		}
-		total += len(x.Body)
-		files = append(files, x)
-	}
-	var b bytes.Buffer
-	z := zip.NewWriter(&b)
-	for _, x := range files {
-		// IDs form a safe unique filename; no user-supplied path can escape the archive.
-		w, err := z.CreateHeader(&zip.FileHeader{Name: fmt.Sprintf("bao-cao-%s-v%d.xlsx", x.ID, x.Version), Method: zip.Store})
-		if err != nil {
-			return nil, err
-		}
-		if _, err = w.Write(x.Body); err != nil {
-			return nil, err
-		}
-	}
-	if err := z.Close(); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
 }
