@@ -3,13 +3,13 @@ import {afterEach,beforeEach,describe,expect,it,vi} from "vitest";
 import {createApiClient,type ApiClient} from "@/api/client";
 import {KhtcArchiveScreen} from "./KhtcArchiveScreen";
 
-const auth:{api:ApiClient|null}={api:null};
-vi.mock("@/auth/AuthProvider",()=>({useAuth:()=>({api:auth.api})}));
+const auth:{api:ApiClient|null;context:Record<string,string>|null}={api:null,context:null};
+vi.mock("@/auth/AuthProvider",()=>({useAuth:()=>({api:auth.api,kn:{context:auth.context}})}));
 const requests:URL[]=[];
 const a="01900000-0000-7000-8000-000000000001", b="01900000-0000-7000-8000-000000000002";
 let denyChoices=false;
 beforeEach(()=>{
- requests.length=0;denyChoices=false;
+ requests.length=0;denyChoices=false;auth.context={tenant_id:"centre-a",context_id:"session-a"};
  vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
  auth.api=createApiClient({baseUrl:"http://mock",getAccessToken:()=>"mock.tw",getContextId:()=>"test",fetch:async(req)=>{
   const u=new URL((req as Request).url);requests.push(u);
@@ -91,4 +91,15 @@ describe("Archive190 complete period picker",()=>{
   expect(within(picker).queryByRole("table")).not.toBeInTheDocument();
   expect(lastList().searchParams.has("period_id")).toBe(false);
  });
+});
+
+it("discards selected period and lookup state when tenant/session changes",async()=>{
+ const view=render(<KhtcArchiveScreen/>);await screen.findByText("12/BC");
+ await chooseDistantPeriod();
+ auth.context={tenant_id:"centre-b",context_id:"session-b"};
+ view.rerender(<KhtcArchiveScreen/>);
+ await waitFor(()=>expect(lastList().searchParams.has("period_id")).toBe(false));
+ expect(screen.getByText("Kỳ: Tất cả")).toBeInTheDocument();
+ expect(screen.queryByText("Kỳ: Báo cáo chuyên đề ngoài trang đầu")).not.toBeInTheDocument();
+ expect(screen.getByRole("button",{name:"Tải ZIP Excel"})).toBeDisabled();
 });

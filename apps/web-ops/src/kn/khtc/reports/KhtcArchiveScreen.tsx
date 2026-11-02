@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ApiClient } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import { DataTable, PageHeader, StatusPill, type Column } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useLoad } from "@/kn/cycle/common";
@@ -16,7 +17,11 @@ const PAGE = 20;
 // Bounded choices: filter inputs never parse free-text numbers or allocate from user-supplied sizes.
 const YEARS = Array.from({ length: 101 }, (_, i) => 2000 + i);
 export function KhtcArchiveScreen() {
-  const { api } = useAuth();
+  const auth = useAuth();
+  // A changed KN tenant/session must discard names, selection, preview and pending lookup state.
+  return <KhtcArchiveBody key={JSON.stringify(auth.kn?.context)} api={auth.api}/>;
+}
+function KhtcArchiveBody({api}: {api: ApiClient | null}) {
   const archive = useMemo(() => api ? createArchiveApi(api) : null, [api]);
   const reports = useMemo(() => api ? createReportApi(api) : null, [api]);
   const [filter, setFilter] = useState<ArchiveQuery>(() => ({ year: new Date(Date.now() + 7 * 3_600_000).getUTCFullYear(), offset: 0, limit: PAGE }));

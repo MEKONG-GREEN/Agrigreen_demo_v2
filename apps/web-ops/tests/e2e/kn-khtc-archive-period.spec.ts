@@ -86,7 +86,22 @@ test("Archive190 chọn tên kỳ đã xuất rồi tải lại đúng bytes Exc
  await page.getByRole("button",{name:"Xuất Excel",exact:true}).click();const excel=await excelWait;
  const file=await excel.path();expect(file).toBeTruthy();const csv=await readFile(file!,"utf8");
  expect(csv).toContain("Số lớp mới browser");expect(csv).toContain("12.5");expect(csv).toContain("Nội dung báo cáo browser đã soạn");
- await sidebar(page).getByRole("link",{name:"Báo cáo đã xuất",exact:true}).click();
+ // Admin has no archive menu; create a real TW/KHTC reader through UI and keep this tab's stored export.
+ await sidebar(page).getByRole("link",{name:"Người dùng",exact:true}).click();
+ await page.getByRole("link",{name:"Tạo tài khoản",exact:true}).click();
+ const main=page.getByRole("main");
+ await expect(main.getByRole("button",{name:"Lưu",exact:true})).toBeEnabled();
+ await main.getByLabel("Họ tên").fill("Bạn đọc kho kỳ 190");
+ await main.getByLabel("Email").fill("archive190@example.test");
+ await main.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912345690");
+ const assignment=main.getByRole("group",{name:"Vai trò và phạm vi"});
+ await assignment.getByRole("combobox",{name:"Vai trò",exact:true}).selectOption("kn_tw");
+ await assignment.getByRole("checkbox",{name:"trong_trot",exact:true}).uncheck();
+ await assignment.getByRole("checkbox",{name:"ke_hoach_tai_chinh",exact:true}).check();
+ await main.getByRole("button",{name:"Lưu",exact:true}).click();
+ await expect(page.getByRole("heading",{level:1,name:"Bạn đọc kho kỳ 190"})).toBeVisible();
+ await logout(page);await login(page,"0912345690");
+ await expect(page).toHaveURL(/\/kn\/khtc\/bao-cao-da-xuat$/);
  await expect(page.getByRole("heading",{level:1,name:"Báo cáo KHTC đã xuất"})).toBeVisible();
  await page.getByLabel("Năm",{exact:true}).selectOption("2026");
  await page.getByLabel("Loại báo cáo",{exact:true}).selectOption("adhoc");

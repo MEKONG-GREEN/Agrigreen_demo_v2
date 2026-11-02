@@ -163,6 +163,14 @@ function handle(ctx: Ctx): Response {
     const s = khtcMockStore().find(x => x.p.id === id);
     if (!s)
         return code("not_found", "Không có báo cáo", 404);
+    // Archive readers download stored bytes directly: never run the draft loader or its writer-only Adhoc guard.
+    if (ctx.request.method === "GET" && action === "download" && kc) {
+        if (!archiveCanRead(ctx)) return problem(403,"forbidden","Không có quyền");
+        if (s.p.report_type === "adhoc" && s.adhocTenant !== ctx.persona.me.tenant_id) return code("not_found","Không có báo cáo",404);
+        const x = STORE.get(s.p.id)?.exports.find(x => x.meta.id === exportID);
+        if (!x) return code("not_found","Không có bản xuất",404);
+        return new Response(x.body,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":`attachment; filename="${x.meta.file_name}"`,"Cache-Control":"no-store"}});
+    }
     if(s.p.report_type==="adhoc" && (!kc || kc.read_only || !(kc.role==="admin" || kc.role==="kn_tinh"&&kc.department_code===KHTC)))return problem(403,"forbidden","Không có quyền xem bản soạn phát sinh");
     if(s.p.report_type==="adhoc" && s.adhocTenant!==ctx.persona.me.tenant_id)return code("not_found","Không có báo cáo",404);
     let value: ReturnType<typeof load>;
