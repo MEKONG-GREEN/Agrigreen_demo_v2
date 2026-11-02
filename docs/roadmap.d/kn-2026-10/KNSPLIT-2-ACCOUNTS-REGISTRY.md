@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-ACCOUNTS-REGISTRY (phần đầu): API nối owner Attributes + AssignmentRules; child #193 giữ role-order và remaining policies; chưa hoàn thành acceptance gốc #52, bằng chứng PG/CI đúng SHA tại issue.
