@@ -149,3 +149,16 @@ Lát này bổ sung chứng cứ cho BG-UR-XA-06 và BG-FN-AD-04.03 AC-05 trên 
 - Migration gate thật theo bộ lọc chính thức đạt 8 test; gói có 0 SQL thay đổi. Các cổng Go/web đã chạy và lịch sử docscheck định dạng được ghi trong giả định và handoff của SHA gửi review. Mọi cụm PostgreSQL và server browser riêng đã dọn.
 
 Nguồn đã gộp origin/dev 033f356c542e0db152df4e36523a3ef9fc9f1293; chứng cứ local chờ điều phối kiểm SHA/hash/source guard rồi gửi Claude review. Refactor Dialog/DetailPage của ItemsScreen thuộc #182; thông báo kết quả đề xuất chưa được bổ sung.
+
+## BF-SWEEP-PRICE-FORMS (#182) — lát Xã báo giá, nhóm vùng và phân công
+
+Bổ sung kỹ thuật cho BG-FN-AD-04.01/02, BRD v1.3; không đổi trạng thái nghiệm thu nghiệp vụ hoặc kết luận UAT toàn phòng từ các hàng lịch sử bên trên.
+
+| Phạm vi lát | Bằng chứng và giới hạn |
+|---|---|
+| Xã báo giá | DataTable/STT, route Thêm/Sửa/Chi tiết, DetailPage/validateForm, lỗi tại ô và required; Log đọc versions có event_time/actor_ref/cũ→mới/lý do, giữ ĐVHC/ngày hiệu lực và API hiện hành |
+| Phân công | Route riêng, chọn cán bộ theo danh bạ được cấp/vai/ngày, giữ lịch sử từ officers; quyền Admin và replay do API kiểm lại; không đổi vị trí chức năng hay diễn giải BRD khác đã ghi |
+| Nhóm vùng | List/route thêm/sửa/chi tiết, lỗi trường và không có form popup; hợp đồng chưa cấp history/actor/time nên hiển thị rõ giới hạn nhật ký, không tạo dữ liệu giả |
+| Quyền/phiên/thử lại | URL sửa/thêm của Tỉnh chỉ xem; mất response sau commit thử lại không tạo xã lần hai; response của phiên Admin cũ không điều hướng sang phiên mới |
+
+Các test `point-detail.test.tsx`, `point-routes.test.ts`, `points.test.tsx`, browser `price-points182.spec.ts` và PG `TestPricePointsHTTP_W1172` được đọc cùng kết quả cụ thể ở markerREADY đúngSHA. Browser dùng API giả lập, không thay kiểm backend/realm/kho triển khai. Không có ô số mới; các trường số ở items/tickets/surveys còn thuộc #198, chưa được suy rộng kết luận. Nhập Excel xã và nhật ký nhóm vùng đầy đủ còn gap; phần items/tickets/reports/surveys theo #198.
