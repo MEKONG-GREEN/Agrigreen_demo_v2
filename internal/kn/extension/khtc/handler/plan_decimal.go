@@ -3,17 +3,16 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"regexp"
 
 	"github.com/shopspring/decimal"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/domain"
 )
 
 // Bound each occurrence at the decoder boundary, including duplicate/case-folded
 // fields. The domain still enforces nonnegative amounts, scale and business caps.
 // Keep ordinary bounded negative values here so the domain retains its 422 errors.
 type planDecimal decimal.Decimal
-
-var planPlainDecimal = regexp.MustCompile(`^-?[0-9]{1,32}(\.[0-9]{1,32})?$`)
 
 func (d *planDecimal) UnmarshalJSON(raw []byte) error {
 	if len(raw) > 512 {
@@ -25,10 +24,7 @@ func (d *planDecimal) UnmarshalJSON(raw []byte) error {
 			return err
 		}
 	}
-	if len(text) > 66 || !planPlainDecimal.MatchString(text) {
-		return errors.New("plan decimal must be a bounded plain decimal")
-	}
-	value, err := decimal.NewFromString(text)
+	value, err := domain.ParseInputDecimal(text)
 	if err != nil {
 		return err
 	}

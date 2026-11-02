@@ -5,7 +5,10 @@
 // "Điều chỉnh theo QĐ" (số, ngày QĐ, ngày hiệu lực bắt buộc) → phiên bản mới; phiên bản cũ xem lại được. "Sao chép từ
 // năm trước", "Xuất Excel", "Nhập từ Excel" (thành bản nháp). Danh sách CT/DA chủ (D20) thêm/ngừng ngay trên màn.
 // Phòng chuyên môn, lãnh đạo chỉ xem.
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { PLAN_BASE, parsePlanRoute, planHref, type PlanRoute } from "./plans/routes";
+import { newVersionHead } from "./plans/version-form";
+import { SaveVersionPage, VersionDetailPage, VersionsPage, planVersionLog } from "./plans/VersionPages";
 import { Dialog } from "@/components/Dialog";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
@@ -43,49 +46,57 @@ function vnYear(): number {
 }
 
 interface Loaded {
+  year: number;
   plan: KhtcPlan | null;
   programs: KhtcProgram[];
   catalog: KhtcCatalogItem[];
 }
 
-export function KhtcPlanScreen() {
+export function KhtcPlanScreen({ route: requestedRoute }: { route?: PlanRoute } = {}) {
   const api = useKhtcApi();
   const rights = useKhtcRights();
-  const [year, setYear] = useState(vnYear());
-  const [version, setVersion] = useState<number | undefined>(undefined);
+  const [localRoute, setLocalRoute] = useState<Omit<PlanRoute, "go">>(() => ({ base: PLAN_BASE, year: vnYear(), view: "list" }));
+  const route: PlanRoute = requestedRoute ?? { ...localRoute, go: href => {
+    const url = new URL(href, "https://local.invalid");
+    const next = parsePlanRoute(url.pathname, url.searchParams, vnYear());
+    if (next) setLocalRoute(next);
+  } };
+  const year = route.year;
+  const setYear = (y: number) => route.go(planHref(route.base, y));
   const s = useLoad<Loaded>(
     async () => {
-      const [plan, programs, catalog] = await Promise.all([api.plan(year, version), api.programs(true), api.catalog()]);
-      return { plan, programs: programs.items, catalog: catalog.items };
+      const [plan, programs, catalog] = await Promise.all([api.plan(year), api.programs(true), api.catalog()]);
+      return { year, plan, programs: programs.items, catalog: catalog.items };
     },
-    [year, version],
+    [api, year],
   );
   return (
     <div>
-      <PageHeader title="Kế hoạch năm các chương trình">
+      {(!route || route.view === "list") ? <><PageHeader title="Kế hoạch năm các chương trình">
         Lập, điều chỉnh kế hoạch năm theo quyết định; gán phòng phụ trách cho từng hạng mục. Phiên bản cũ giữ nguyên, xem lại được.
       </PageHeader>
       <div className="row" style={{ marginBottom: 12 }}>
-        <button type="button" className="btn btn-o btn-sm" onClick={() => (setYear(year - 1), setVersion(undefined))} aria-label="Năm trước">
+        <button type="button" className="btn btn-o btn-sm" onClick={() => setYear(year - 1)} disabled={year <= 2000} aria-label="Năm trước">
           ‹
         </button>
         <strong aria-live="polite">Năm {year}</strong>
-        <button type="button" className="btn btn-o btn-sm" onClick={() => (setYear(year + 1), setVersion(undefined))} aria-label="Năm sau">
+        <button type="button" className="btn btn-o btn-sm" onClick={() => setYear(year + 1)} disabled={year >= 2100} aria-label="Năm sau">
           ›
         </button>
       </div>
       {!rights.plan ? <ReadOnlyNotice>Chỉ xem — Phòng Kế hoạch – Tài chính lập và điều chỉnh kế hoạch năm.</ReadOnlyNotice> : null}
+      </> : null}
       <LoadState s={s}>
-        {(d) => (
+        {(d) => d.year === year ? (
           <Editor
             key={`${year}:${d.plan?.version.version ?? 0}`}
+            route={route}
             year={year}
             data={d}
-            canEdit={rights.plan && (!version || version === d.plan?.latest_version)}
-            onVersion={setVersion}
+            canEdit={rights.plan}
             reload={s.reload}
           />
-        )}
+        ) : <p role="status">Đang tải kế hoạch năm {year}…</p>}
       </LoadState>
     </div>
   );
@@ -94,21 +105,19 @@ export function KhtcPlanScreen() {
 type Dlg =
   | { t: "entry"; entry: KhtcPlanEntry; isNew: boolean }
   | { t: "program" }
-  | { t: "newProgram" }
-  | { t: "save" }
-  | { t: "versions" };
+  | { t: "newProgram" };
 
 function Editor({
   year,
+  route,
   data,
   canEdit,
-  onVersion,
   reload,
 }: {
   year: number;
+  route: PlanRoute;
   data: Loaded;
   canEdit: boolean;
-  onVersion: (v: number | undefined) => void;
   reload: () => void;
 }) {
   const api = useKhtcApi();
@@ -125,6 +134,14 @@ function Editor({
   const units = data.catalog.filter((c) => c.kind === "unit" && c.active);
   const funding = data.catalog.filter((c) => c.kind === "funding_source" && c.active);
   const progByRef = new Map(programs.map((p) => [p.ref, p]));
+  const [saveHead, setSaveHead] = useState(() => newVersionHead(year, !!plan));
+  const epoch = useRef({ active: true });
+  const saving = useRef(false);
+  useEffect(() => {
+    const scope = { active: true }; epoch.current = scope;
+    return () => { scope.active = false; };
+  }, [route?.view]);
+
 
   const change = (next: KhtcPlanEntry[]) => {
     setEntries(next);
@@ -157,6 +174,25 @@ function Editor({
     }
   };
 
+  if (route?.view === "history") return <VersionsPage route={route} />;
+  if (route?.view === "version") return <VersionDetailPage route={route} />;
+  if (route?.view === "save") return <>
+    {act.view}
+    <SaveVersionPage route={route} head={saveHead} onChange={setSaveHead} adjust={!!plan} canEdit={canEdit} dirty={dirty} busy={act.busy} problem={act.problem} log={plan ? planVersionLog([plan.version]) : []}
+      onCancel={() => { setSaveHead(newVersionHead(year, !!plan)); act.resetIdempotency(); route.go(planHref(route.base, year)); }}
+      onSave={async head => {
+        if (!canEdit || !dirty || saving.current) return;
+        saving.current = true;
+        const scope = epoch.current;
+        try {
+          const saved = await act.run(() => api.save(year, toSave(entries, { base_version: plan?.latest_version ?? 0, copied_from_year: copiedFrom, ...head })), p => `Đã lưu phiên bản ${p.version.version}`);
+          if (saved && scope.active) {
+            setDirty(false); setProblems([]); setSaveHead(newVersionHead(year, true)); reload(); route.go(planHref(route.base, year, "version", saved.version.version));
+          }
+        } finally { saving.current = false; }
+      }} />
+  </>;
+
   return (
     <>
       <div className="row" style={{ marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
@@ -169,7 +205,7 @@ function Editor({
               {plan.version.decision_no ? `QĐ ${plan.version.decision_no} ngày ${dmy(plan.version.decision_date)} · ` : ""}hiệu lực từ{" "}
               {dmy(plan.version.effective_from)}
             </span>
-            <button type="button" className="btn btn-o btn-sm" onClick={() => setDlg({ t: "versions" })}>
+            <button type="button" className="btn btn-o btn-sm" onClick={() => route.go(planHref(route.base, year, "history"))}>
               Lịch sử phiên bản
             </button>
             <button type="button" className="btn btn-o btn-sm" disabled={act.busy} onClick={exportXlsx}>
@@ -190,7 +226,7 @@ function Editor({
               Nhập từ Excel
               <input type="file" accept=".xlsx,.csv" className="sr-only" onChange={importXlsx} aria-label="Chọn tệp Excel kế hoạch năm" />
             </label>
-            <button type="button" className="btn btn-p btn-sm" disabled={!dirty || act.busy} onClick={() => setDlg({ t: "save" })}>
+            <button type="button" className="btn btn-p btn-sm" disabled={!dirty || act.busy} onClick={() => route.go(planHref(route.base, year, "save"))}>
               {plan ? "Điều chỉnh theo QĐ" : "Lưu kế hoạch"}
             </button>
             {dirty ? <span className="small mute">Có thay đổi chưa lưu</span> : null}
@@ -343,27 +379,7 @@ function Editor({
           }}
         />
       ) : null}
-      {dlg?.t === "save" ? (
-        <SaveDialog
-          year={year}
-          adjust={!!plan}
-          onClose={() => setDlg(null)}
-          onSave={async (head) => {
-            const r = await act.run(
-              () => api.save(year, toSave(entries, { base_version: plan?.latest_version ?? 0, copied_from_year: copiedFrom, ...head })),
-              (p) => `Đã lưu phiên bản ${p.version.version}`,
-            );
-            setDlg(null);
-            if (r) {
-              setDirty(false);
-              setProblems([]);
-              onVersion(undefined);
-              reload();
-            }
-          }}
-        />
-      ) : null}
-      {dlg?.t === "versions" ? <VersionsDialog year={year} onClose={() => setDlg(null)} onPick={(v) => (setDlg(null), onVersion(v))} /> : null}
+
     </>
   );
 }
@@ -652,102 +668,3 @@ function NewProgramDialog({ kind, onClose, onCreated }: { kind: KhtcProgramKind;
   );
 }
 
-function SaveDialog({
-  year,
-  adjust,
-  onClose,
-  onSave,
-}: {
-  year: number;
-  adjust: boolean;
-  onClose: () => void;
-  onSave: (h: { decision_no?: string; decision_date?: string; effective_from?: string; note?: string }) => void;
-}) {
-  const [no, setNo] = useState("");
-  const [date, setDate] = useState("");
-  const [eff, setEff] = useState(adjust ? "" : `${year}-01-01`);
-  const [note, setNote] = useState("");
-  const missing = adjust && (!no.trim() || !date || !eff);
-  const badEff = !!eff && !eff.startsWith(String(year));
-  return (
-    <Dialog
-      title={adjust ? "Điều chỉnh theo quyết định" : `Lưu kế hoạch năm ${year} (phiên bản 1)`}
-      onClose={onClose}
-      actions={
-        <button
-          type="button"
-          className="btn btn-p btn-sm"
-          disabled={missing || badEff}
-          onClick={() => onSave({ decision_no: no || undefined, decision_date: date || undefined, effective_from: eff || undefined, note: note || undefined })}
-        >
-          Lưu phiên bản
-        </button>
-      }
-    >
-      <div className="field">
-        <label htmlFor="sv-no" className={adjust ? "req" : undefined}>
-          Số quyết định
-        </label>
-        <input id="sv-no" className="input" value={no} onChange={(e) => setNo(e.target.value)} />
-      </div>
-      <div className="grid2">
-        <div className="field">
-          <label htmlFor="sv-date" className={adjust ? "req" : undefined}>
-            Ngày quyết định
-          </label>
-          <input id="sv-date" type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="sv-eff" className={adjust ? "req" : undefined}>
-            Ngày hiệu lực
-          </label>
-          <input id="sv-eff" type="date" className="input" value={eff} onChange={(e) => setEff(e.target.value)} />
-        </div>
-      </div>
-      {badEff ? <p className="small mute">Ngày hiệu lực phải trong năm {year}.</p> : null}
-      <div className="field">
-        <label htmlFor="sv-note">Ghi chú</label>
-        <input id="sv-note" className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-      </div>
-    </Dialog>
-  );
-}
-
-function VersionsDialog({ year, onClose, onPick }: { year: number; onClose: () => void; onPick: (v: number) => void }) {
-  const api = useKhtcApi();
-  const s = useLoad(() => api.versions(year), [year]);
-  return (
-    <Dialog title={`Lịch sử phiên bản — năm ${year}`} onClose={onClose}>
-      <LoadState s={s}>
-        {(d) => (
-          <table className="dt">
-            <thead>
-              <tr>
-                <th scope="col">Phiên bản</th>
-                <th scope="col">Quyết định</th>
-                <th scope="col">Hiệu lực</th>
-                <th scope="col">Số dòng</th>
-                <th scope="col"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...d.items].reverse().map((v) => (
-                <tr key={v.id}>
-                  <td>v{v.version}</td>
-                  <td>{v.decision_no ? `${v.decision_no} (${dmy(v.decision_date)})` : "—"}</td>
-                  <td>{dmy(v.effective_from)}</td>
-                  <td>{v.entries_count}</td>
-                  <td>
-                    <button type="button" className="btn btn-o btn-sm" onClick={() => onPick(v.version)}>
-                      Xem
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </LoadState>
-    </Dialog>
-  );
-}
