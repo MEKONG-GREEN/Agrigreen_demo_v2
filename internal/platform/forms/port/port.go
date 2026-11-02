@@ -221,6 +221,7 @@ var (
 	ErrInvalidValues    = problem.New(http.StatusUnprocessableEntity, "forms.values_invalid", "Số liệu không khớp định nghĩa biểu")
 	ErrInvalidTemplate  = problem.New(http.StatusUnprocessableEntity, "forms.template_invalid", "Định nghĩa biểu không hợp lệ")
 	ErrPeriodCancelled  = problem.New(http.StatusConflict, "forms.period_cancelled", "Kỳ đã hủy — không nộp, chốt hay mở lại được")
+	ErrPeriodConflict   = problem.New(http.StatusConflict, "forms.period_conflict", "Kỳ đã thay đổi — đối soát ý định trước khi thử lại")
 	ErrSubmissionLimit  = problem.New(http.StatusConflict, "forms.submission_limit", "Đơn vị đã gửi đủ số lần tối đa của kỳ")
 	// W11.42 (pf 000149).
 	ErrVersionConflict = problem.New(http.StatusConflict, "forms.submission_conflict",
