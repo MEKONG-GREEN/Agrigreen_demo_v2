@@ -16,6 +16,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -60,7 +61,7 @@ func TestTemplateDefinitionModuleRESTPublisherAndRealCache(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) { c.Request = c.Request.WithContext(currentContext()) })
-	r.Use(mod.Middleware(), idempotency.Middleware(pool))
+	r.Use(mod.Middleware(), idempotency.Middleware(db.ForModule(pool, db.Ops)))
 	mod.RegisterApp(r.Group("/v1"))
 	fields := domain.Fixtures()[0].Fields
 	rawFields, err := json.Marshal(fields)
