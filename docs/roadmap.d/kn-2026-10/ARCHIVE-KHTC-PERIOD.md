@@ -1,0 +1,1 @@
+- [x] ARCHIVE-KHTC-PERIOD (#190 W11.69-ARCHIVE-REST, lát đầu): lọc UUID kỳ và chọn tên kỳ tìm kiếm/phân trang riêng trong kho bản đã xuất; chỉ kỳ có export, loại kỳ hủy, reader/tenant hiện có; không migration/quyền mới. BRD KHTC v2.3 P713–P738; Word/lĩnh vực/quyền/audit còn ở #199 sau #190 vào dev; chưa toàn FN/UAT.

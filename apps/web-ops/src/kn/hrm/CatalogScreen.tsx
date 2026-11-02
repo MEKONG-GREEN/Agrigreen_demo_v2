@@ -7,7 +7,7 @@
 // dụng. Mục "Mẫu" là dữ liệu cài sẵn chưa được Phòng HCTH xác nhận (Q-070).
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
 import {
@@ -19,6 +19,8 @@ import {
 } from "@/components/patterns/list";
 import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
 import { catalogBase, catalogItemPath } from "./catalog-form";
+import { HrmScalesList } from "./ScaleScreens";
+import { scaleListPath, scalePath, scaleToday, validScaleDay } from "./scale-form";
 import {
   createHrmApi,
   dmy,
@@ -37,7 +39,6 @@ import {
   type HrmKind,
   type HrmPromotionRules,
   type HrmRuleKey,
-  type HrmScale,
 } from "./api";
 
 type View =
@@ -65,15 +66,21 @@ function PlaceholderPill({ on }: { on: boolean }) {
   ) : null;
 }
 
-export function HrmCatalogScreen(props: { initialKind?: HrmKind }) {
+export function HrmCatalogScreen(props: { initialKind?: HrmKind; initialScales?: boolean; initialScaleDay?: string }) {
   const { kn } = useAuth();
-  return <CatalogList key={kn?.context?.context_id ?? "unknown"} {...props} />;
+  return <CatalogList key={`${kn?.context?.context_id ?? "unknown"}/${props.initialKind ?? "grade"}/${!!props.initialScales}/${props.initialScaleDay ?? ""}`} {...props} />;
 }
 
-function CatalogList({ initialKind = "grade" }: { initialKind?: HrmKind }) {
+export function HrmCatalogScalesScreen() {
+  const day = useSearchParams().get("at") ?? scaleToday();
+  return validScaleDay(day) ? <HrmCatalogScreen initialScales initialScaleDay={day} /> : <p role="alert">Ngày hiệu lực không hợp lệ.</p>;
+}
+
+function CatalogList({ initialKind = "grade", initialScales = false, initialScaleDay }: { initialKind?: HrmKind; initialScales?: boolean; initialScaleDay?: string }) {
   const ha = useHrmApi();
   const base = catalogBase(usePathname());
-  const [view, setView] = useState<View>({ t: "kind", kind: initialKind });
+  const router = useRouter();
+  const [view, setView] = useState<View>(initialScales ? { t: "scales" } : { t: "kind", kind: initialKind });
   const [nonce, setNonce] = useState(0);
   const bump = () => setNonce((n) => n + 1);
   const status = useLoad(() => ha.status(), [nonce]);
@@ -170,7 +177,7 @@ function CatalogList({ initialKind = "grade" }: { initialKind?: HrmKind }) {
                 {navBtn(
                   "Bảng hệ số theo bậc",
                   view.t === "scales",
-                  () => setView({ t: "scales" }),
+                  () => { setView({ t: "scales" }); router.push(scaleListPath(base, initialScaleDay ?? scaleToday())); },
                   st.scales,
                 )}
                 {(["promotion", "achievement_conversion"] as HrmRuleKey[]).map(
@@ -206,11 +213,12 @@ function CatalogList({ initialKind = "grade" }: { initialKind?: HrmKind }) {
                   />
                 ) : null}
                 {view.t === "scales" ? (
-                  <ScalesPanel
+                  <HrmScalesList
                     ha={ha}
+                    base={base}
                     canManage={st.can_manage}
                     nonce={nonce}
-                    onChanged={bump}
+                    initialDay={initialScaleDay}
                   />
                 ) : null}
                 {view.t === "rule" ? (
@@ -294,7 +302,6 @@ function KindPanel({
   const [all, setAll] = useState(false);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
-  const [grade, setGrade] = useState<string | null>(null);
   const list = useLoad(() => ha.list(kind, all), [kind, all, nonce]);
   const needsRefs = kind === "major" || kind === "major_group";
   const levels = useLoad(needsRefs ? () => ha.list("education_level") : null, [
@@ -339,21 +346,12 @@ function KindPanel({
       header: "Tên",
       cell: (r) =>
         kind === "grade" ? (
-          <button
-            type="button"
-            className="link-all"
-            style={{
-              margin: 0,
-              padding: 0,
-              border: 0,
-              background: "none",
-              cursor: "pointer",
-            }}
-            onClick={() => setGrade(r.code)}
+          <Link
+            href={scalePath(base, r.code, scaleToday())}
             title="Xem bảng hệ số"
           >
             {r.name}
-          </button>
+          </Link>
         ) : (
           r.name
         ),
@@ -460,346 +458,10 @@ function KindPanel({
               onPage={setPage}
               empty="Chưa có mục nào."
             />
-            {kind === "grade" && grade ? (
-              <GradeScaleCard
-                ha={ha}
-                grade={grade}
-                item={d.items.find((x) => x.code === grade)}
-                nonce={0}
-              />
-            ) : null}
           </>
         );
       }}
     </LoadState>
-  );
-}
-
-function CoefTable({ s }: { s: HrmScale }) {
-  return (
-    <div className="tbl-wrap">
-      <table className="dt">
-        <caption className="sr-only">Hệ số theo bậc</caption>
-        <thead>
-          <tr>
-            <th scope="col">Bậc</th>
-            {s.coefficients.map((_, i) => (
-              <th key={i} scope="col">
-                {i + 1}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row">Hệ số</th>
-            {s.coefficients.map((c, i) => (
-              <td key={i}>{vnDecimal(c)}</td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** Bảng hệ số của ngạch đang chọn (Hình 40): bảng hiệu lực hôm nay + các phiên bản theo ngày hiệu lực. */
-function GradeScaleCard({
-  ha,
-  grade,
-  item,
-  nonce,
-}: {
-  ha: HrmApi;
-  grade: string;
-  item?: HrmItem;
-  nonce: number;
-}) {
-  const h = useLoad(() => ha.scaleHistory(grade), [grade, nonce]);
-  const today = vnToday();
-  return (
-    <div className="card" style={{ marginTop: 16, padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>
-        Bảng hệ số — {item?.name ?? grade} ({grade})
-      </h3>
-      <LoadState s={h}>
-        {(d) => {
-          if (!d.versions.length)
-            return <p className="mute">Chưa có bảng hệ số.</p>;
-          const eff = d.versions.filter((v) => v.valid_from <= today);
-          const cur = eff[eff.length - 1];
-          return (
-            <>
-              {cur ? (
-                <>
-                  <p className="small">
-                    Hiệu lực từ {dmy(cur.valid_from)} · {cur.steps} bậc · giữ
-                    bậc {cur.hold_months} tháng{" "}
-                    <PlaceholderPill on={cur.placeholder} />
-                  </p>
-                  <CoefTable s={cur} />
-                </>
-              ) : null}
-              <p className="mute small" style={{ marginTop: 8 }}>
-                Các phiên bản:{" "}
-                {d.versions
-                  .map((v) => `${dmy(v.valid_from)} (v${v.version})`)
-                  .join(" · ")}
-                . Đổi hệ số không làm đổi quyết định nâng bậc đã ban hành.
-              </p>
-            </>
-          );
-        }}
-      </LoadState>
-    </div>
-  );
-}
-
-function ScalesPanel({
-  ha,
-  canManage,
-  nonce,
-  onChanged,
-}: {
-  ha: HrmApi;
-  canManage: boolean;
-  nonce: number;
-  onChanged: () => void;
-}) {
-  const [at, setAt] = useState(vnToday());
-  const [edit, setEdit] = useState<{
-    grade: HrmItem;
-    scale: HrmScale | null;
-  } | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
-  const list = useLoad(() => ha.scales(at), [at, nonce]);
-  return (
-    <>
-      <div className="row" style={{ marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 17 }}>Bảng hệ số theo bậc</h2>
-        <label htmlFor="hr-at">Hiệu lực tại ngày</label>
-        <input
-          id="hr-at"
-          type="date"
-          className="input"
-          style={{ width: 170 }}
-          value={at}
-          onChange={(e) => e.target.value && setAt(e.target.value)}
-        />
-      </div>
-      <LoadState s={list}>
-        {(d) => (
-          <div className="card dt-card">
-            <div className="tbl-wrap">
-              <table className="dt">
-                <caption className="sr-only">Bảng hệ số các ngạch</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Mã ngạch</th>
-                    <th scope="col">Tên ngạch/CDNN</th>
-                    <th scope="col">Nhóm</th>
-                    <th scope="col">Số bậc</th>
-                    <th scope="col">Hệ số bậc 1 → cuối</th>
-                    <th scope="col">Giữ bậc</th>
-                    <th scope="col">Hiệu lực từ</th>
-                    <th scope="col" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {d.grades.map(({ grade, scale }) => (
-                    <tr key={grade.code}>
-                      <td>
-                        <code>{grade.code}</code>
-                      </td>
-                      <td>{grade.name}</td>
-                      <td>{grade.attrs.equiv_group ?? "—"}</td>
-                      <td>{scale?.steps ?? "—"}</td>
-                      <td>
-                        {scale
-                          ? `${vnDecimal(scale.coefficients[0])} → ${vnDecimal(scale.coefficients[scale.coefficients.length - 1])}`
-                          : "Chưa có"}{" "}
-                        <PlaceholderPill on={!!scale?.placeholder} />
-                      </td>
-                      <td>{scale ? `${scale.hold_months} tháng` : "—"}</td>
-                      <td>{scale ? dmy(scale.valid_from) : "—"}</td>
-                      <td>
-                        <div className="row">
-                          <button
-                            type="button"
-                            className="btn btn-o btn-sm"
-                            onClick={() =>
-                              setOpen(open === grade.code ? null : grade.code)
-                            }
-                          >
-                            {open === grade.code ? "Ẩn" : "Xem"}
-                          </button>
-                          {canManage ? (
-                            <button
-                              type="button"
-                              className="btn btn-p btn-sm"
-                              onClick={() => setEdit({ grade, scale })}
-                              aria-label={`Bảng hệ số mới ${grade.code}`}
-                            >
-                              Bảng mới
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </LoadState>
-      {open ? (
-        <GradeScaleCard
-          ha={ha}
-          grade={open}
-          item={list.data?.grades.find((g) => g.grade.code === open)?.grade}
-          nonce={nonce}
-        />
-      ) : null}
-      {edit ? (
-        <ScaleDialog
-          ha={ha}
-          grade={edit.grade}
-          base={edit.scale}
-          onClose={() => setEdit(null)}
-          onSaved={() => (setEdit(null), onChanged())}
-        />
-      ) : null}
-    </>
-  );
-}
-
-function ScaleDialog({
-  ha,
-  grade,
-  base,
-  onClose,
-  onSaved,
-}: {
-  ha: HrmApi;
-  grade: HrmItem;
-  base: HrmScale | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [from, setFrom] = useState(vnToday());
-  const [coefs, setCoefs] = useState<string[]>(
-    base ? base.coefficients.map(vnDecimal) : [""],
-  );
-  const [hold, setHold] = useState(String(base?.hold_months ?? 36));
-  const [note, setNote] = useState("");
-  const act = useAction();
-  const save = () =>
-    void act
-      .run(() =>
-        ha.addScale(grade.code, {
-          valid_from: from,
-          coefficients: coefs.map(normDecimal),
-          hold_months: Number(hold) || 0,
-          ...(note.trim() ? { note: note.trim() } : {}),
-        }),
-      )
-      .then((r) => r && onSaved());
-  return (
-    <Dialog
-      title={`Bảng hệ số mới — ${grade.name} (${grade.code})`}
-      onClose={onClose}
-      actions={
-        <button
-          type="button"
-          className="btn btn-p btn-sm"
-          disabled={act.busy || coefs.some((c) => !c.trim())}
-          onClick={save}
-        >
-          Lưu
-        </button>
-      }
-    >
-      {act.view}
-      <p className="mute small">
-        Bảng mới áp dụng từ ngày hiệu lực; bảng cũ giữ nguyên cho ngày trước đó
-        và cho quyết định đã ban hành.
-      </p>
-      <div className="grid2">
-        <div className="field">
-          <label htmlFor="sc-from" className="req">
-            Ngày hiệu lực
-          </label>
-          <input
-            id="sc-from"
-            type="date"
-            className="input"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="sc-hold" className="req">
-            Thời gian giữ bậc (tháng)
-          </label>
-          <input
-            id="sc-hold"
-            className="input"
-            inputMode="numeric"
-            value={hold}
-            onChange={(e) => setHold(e.target.value.replace(/\D/g, ""))}
-          />
-        </div>
-      </div>
-      <div className="field" style={{ marginTop: 12 }}>
-        <span className="lbl">
-          Hệ số từng bậc (tăng dần, tối đa 2 chữ số thập phân)
-        </span>
-        <div className="row" style={{ flexWrap: "wrap" }}>
-          {coefs.map((c, i) => (
-            <input
-              key={i}
-              aria-label={`Hệ số bậc ${i + 1}`}
-              className="input"
-              style={{ width: 80 }}
-              inputMode="decimal"
-              value={c}
-              onChange={(e) =>
-                setCoefs((xs) =>
-                  xs.map((x, j) => (j === i ? e.target.value : x)),
-                )
-              }
-            />
-          ))}
-          <button
-            type="button"
-            className="btn btn-o btn-sm"
-            disabled={coefs.length >= 20}
-            onClick={() => setCoefs((xs) => [...xs, ""])}
-          >
-            + Bậc
-          </button>
-          <button
-            type="button"
-            className="btn btn-o btn-sm"
-            disabled={coefs.length <= 1}
-            onClick={() => setCoefs((xs) => xs.slice(0, -1))}
-          >
-            − Bậc
-          </button>
-        </div>
-      </div>
-      <div className="field" style={{ marginTop: 12 }}>
-        <label htmlFor="sc-note">Ghi chú (căn cứ)</label>
-        <input
-          id="sc-note"
-          className="input"
-          maxLength={500}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </div>
-    </Dialog>
   );
 }
 

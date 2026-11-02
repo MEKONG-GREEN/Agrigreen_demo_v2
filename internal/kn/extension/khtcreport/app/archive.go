@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"strings"
 	"unicode/utf8"
@@ -11,6 +12,7 @@ import (
 type ArchiveQuery struct {
 	Year          int
 	Kind, Search  string
+	PeriodID      uuid.UUID
 	AllVersions   bool
 	Offset, Limit int
 }
@@ -43,7 +45,7 @@ func (s *Service) Archive(ctx context.Context, q ArchiveQuery) (ArchiveResult, e
 	out := ArchiveResult{Items: []store.ArchiveRow{}, Offset: q.Offset}
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		var e error
-		out.Items, e = store.Archive(ctx, tx, q.Year, q.Kind, strings.TrimSpace(q.Search), q.AllVersions, q.Offset, q.Limit+1)
+		out.Items, e = store.Archive(ctx, tx, q.Year, q.Kind, strings.TrimSpace(q.Search), q.AllVersions, q.Offset, q.Limit+1, q.PeriodID)
 		return e
 	})
 	if err != nil {

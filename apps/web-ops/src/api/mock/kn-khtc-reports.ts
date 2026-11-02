@@ -154,7 +154,7 @@ export function khtcTemplatePreviewContent(ctx: Ctx, periodId: string): Content 
  const period=templatePeriod(ctx,periodId);
  return period ? structuredClone(load(ctx,period,true).detail.content) : null;
 }
-export const khtcReportRoutes: Route[] = [{method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/exports\/([^/]+)\/preview$/,handler:archivePreview},{method:"POST",pattern:/^\/v1\/extension\/khtc\/exported-reports\/zip$/,handler:archiveZIP},{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
+export const khtcReportRoutes: Route[] = [{method:"GET",pattern:/^\/v1\/extension\/khtc\/exported-reports\/periods$/,handler:archivePeriods},{method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/exports\/([^/]+)\/preview$/,handler:archivePreview},{method:"POST",pattern:/^\/v1\/extension\/khtc\/exported-reports\/zip$/,handler:archiveZIP},{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
 function handle(ctx: Ctx): Response {
     const [id, op, exportID, action] = ctx.params;
     const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
@@ -163,6 +163,14 @@ function handle(ctx: Ctx): Response {
     const s = khtcMockStore().find(x => x.p.id === id);
     if (!s)
         return code("not_found", "Không có báo cáo", 404);
+    // Archive readers download stored bytes directly: never run the draft loader or its writer-only Adhoc guard.
+    if (ctx.request.method === "GET" && action === "download" && kc) {
+        if (!archiveCanRead(ctx)) return problem(403,"forbidden","Không có quyền");
+        if (s.p.report_type === "adhoc" && s.adhocTenant !== ctx.persona.me.tenant_id) return code("not_found","Không có báo cáo",404);
+        const x = STORE.get(s.p.id)?.exports.find(x => x.meta.id === exportID);
+        if (!x) return code("not_found","Không có bản xuất",404);
+        return new Response(x.body,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":`attachment; filename="${x.meta.file_name}"`,"Cache-Control":"no-store"}});
+    }
     if(s.p.report_type==="adhoc" && (!kc || kc.read_only || !(kc.role==="admin" || kc.role==="kn_tinh"&&kc.department_code===KHTC)))return problem(403,"forbidden","Không có quyền xem bản soạn phát sinh");
     if(s.p.report_type==="adhoc" && s.adhocTenant!==ctx.persona.me.tenant_id)return code("not_found","Không có báo cáo",404);
     let value: ReturnType<typeof load>;
@@ -267,9 +275,11 @@ function archive(ctx: Ctx): Response {
  const u = new URL(ctx.request.url), y=u.searchParams.get("year")??"", rawOffset=u.searchParams.get("offset")??"0", rawLimit=u.searchParams.get("limit")??"20";
  const kind=u.searchParams.get("kind")??"", q=u.searchParams.get("q")??"", versions=u.searchParams.get("versions")??"false";
  if (!/^\d{4}$/.test(y) || +y<2000 || +y>2100 || !/^\d{1,6}$/.test(rawOffset) || +rawOffset>100000 || !/^\d{1,2}$/.test(rawLimit) || +rawLimit<1 || +rawLimit>50 || q.length>800 || [...q].length>200 || !["","week","month","quarter","year","program","adhoc"].includes(kind) || !["true","false"].includes(versions)) return code("invalid","Bộ lọc không hợp lệ",422);
+ const periodID=u.searchParams.get("period_id")??"";
+ if(periodID && (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(periodID)||periodID==="00000000-0000-0000-0000-000000000000"))return code("invalid","Kỳ không hợp lệ",422);
  const rows:S["KHTCArchiveRow"][]=[];
  for(const p of khtcMockStore()) {
-  if(p.p.year!==+y || p.terminal==="cancelled" || kind && p.p.report_type!==kind) continue;
+  if(periodID && p.p.id.toLowerCase()!==periodID.toLowerCase() || p.p.year!==+y || p.terminal==="cancelled" || kind && p.p.report_type!==kind) continue;
   const stored=STORE.get(p.p.id); if(!stored)continue;
   const chosen=versions==="true" ? stored.exports : [stored.exports.find(x=>x.meta.id===stored.detail.final?.export_id)??stored.exports.at(-1)].filter(x=>x!==undefined);
   for(const x of chosen)if((p.p.name+" "+x.documentNo).toLocaleLowerCase().includes(q.trim().toLocaleLowerCase()))rows.push({id:x.meta.id,period_id:p.p.id,period_name:p.p.name,report_type:p.p.report_type as S["KHTCArchiveRow"]["report_type"],document_no:x.documentNo,version:x.meta.version,final:stored.detail.final?.export_id===x.meta.id,provisional:x.meta.provisional,actor_ref:x.meta.actor_ref,at:x.meta.at});
@@ -336,4 +346,12 @@ function archiveZIP(ctx: Ctx): Response {
   files.push({name:`bao-cao-${x.meta.id}-v${x.meta.version}.xlsx`,data});
  }
  return new Response(zipStored(files) as Uint8Array<ArrayBuffer>,{headers:{"Content-Type":"application/zip","Content-Disposition":'attachment; filename="bao-cao-khtc.zip"',"Cache-Control":"no-store"}});
+}
+
+function archivePeriods(ctx: Ctx): Response {
+ if(!archiveCanRead(ctx))return problem(403,"forbidden","Không có quyền");
+ const u=new URL(ctx.request.url), year=u.searchParams.get("year")??"",kind=u.searchParams.get("kind")??"",q=u.searchParams.get("q")??"", offset=u.searchParams.get("offset")??"0",limit=u.searchParams.get("limit")??"20";
+ if(!/^\d{4}$/.test(year)||+year<2000||+year>2100||!/^\d{1,6}$/.test(offset)||+offset>100000||!/^\d{1,2}$/.test(limit)||+limit<1||+limit>50||q.length>800||[...q].length>200||!["","week","month","quarter","year","program","adhoc"].includes(kind))return code("invalid","Bộ lọc không hợp lệ",422);
+ const items:S["KHTCArchivePeriod"][]=khtcMockStore().filter(p=>p.p.year===+year&&p.terminal!=="cancelled"&&(!kind||p.p.report_type===kind)&&p.p.name.toLocaleLowerCase().includes(q.trim().toLocaleLowerCase())&&(STORE.get(p.p.id)?.exports.length??0)>0).map(p=>({id:p.p.id,name:p.p.name,report_type:p.p.report_type as S["KHTCArchivePeriod"]["report_type"]})).sort((a,b)=>b.id.localeCompare(a.id));
+ return json({items:items.slice(+offset,+offset+(+limit)),has_more:items.length>+offset+(+limit),offset:+offset},200,{"Cache-Control":"no-store"});
 }
