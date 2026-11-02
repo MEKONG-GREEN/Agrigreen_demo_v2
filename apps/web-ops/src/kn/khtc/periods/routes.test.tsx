@@ -44,8 +44,8 @@ describe("Kỳ báo cáo — route UI-KIT", () => {
   });
   it("pane kỳ nhúng không trùng tên nút chọn bản soạn báo cáo", async () => {
     render(<><KhtcPeriodsScreen /><button>{period.name}</button></>);
-    await screen.findByRole("button", { name: `Xem kỳ ${period.name}`, exact: true });
-    expect(screen.getAllByRole("button", { name: period.name, exact: true })).toHaveLength(1);
+    await screen.findByRole("button", { name: `Xem kỳ ${period.name}` });
+    expect(screen.getAllByRole("button", { name: period.name })).toHaveLength(1);
   });
   it("URL trực tiếp chi tiết có Log từ sự kiện thật và bảng tiến độ STT", async () => {
     nav.path = periodHref(period.id);
