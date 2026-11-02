@@ -18,6 +18,8 @@ const ArchiveMaxBytes = 20 << 20
 type ArchiveSelection struct {
 	PeriodID uuid.UUID `json:"period_id"`
 	ExportID uuid.UUID `json:"export_id"`
+	Format   string    `json:"format,omitempty"`
+	RunID    uuid.UUID `json:"run_id,omitempty"`
 }
 
 type ArchivePreview struct {
@@ -43,14 +45,31 @@ func (s *Service) PreviewExport(ctx context.Context, periodID, exportID uuid.UUI
 
 func ValidateArchiveSelection(in []ArchiveSelection) error {
 	if len(in) < 1 || len(in) > ArchiveMaxFiles {
-		return ErrInvalid.WithDetail("Chọn từ 1 đến 10 bản Excel đã xuất")
+		return ErrInvalid.WithDetail("Chọn từ 1 đến 10 tệp đã xuất")
 	}
-	seen := map[uuid.UUID]bool{}
+	seen := map[string]bool{}
 	for _, x := range in {
-		if x.PeriodID == uuid.Nil || x.ExportID == uuid.Nil || seen[x.ExportID] {
-			return ErrInvalid.WithDetail("Bản xuất không hợp lệ hoặc trùng lặp")
+		if x.PeriodID == uuid.Nil || x.ExportID == uuid.Nil {
+			return ErrInvalid.WithDetail("Bản xuất không hợp lệ")
 		}
-		seen[x.ExportID] = true
+		key := "excel:" + x.ExportID.String()
+		switch x.Format {
+		case "", "excel":
+			if x.RunID != uuid.Nil {
+				return ErrInvalid.WithDetail("Excel không nhận mã lần xuất Word")
+			}
+		case "word":
+			if x.RunID == uuid.Nil {
+				return ErrInvalid.WithDetail("Word cần mã lần xuất đã liên kết")
+			}
+			key = "word:" + x.RunID.String()
+		default:
+			return ErrInvalid.WithDetail("Định dạng tệp không hợp lệ")
+		}
+		if seen[key] {
+			return ErrInvalid.WithDetail("Tệp được chọn bị trùng")
+		}
+		seen[key] = true
 	}
 	return nil
 }
@@ -64,6 +83,9 @@ func (s *Service) ArchiveZIP(ctx context.Context, in []ArchiveSelection) ([]byte
 	files := make([]store.Export, 0, len(in))
 	total := 0
 	for _, item := range in {
+		if item.Format == "word" {
+			return nil, ErrDependency.WithDetail("Bộ đọc Word đã liên kết chưa được nối")
+		}
 		x, err := s.Download(ctx, item.PeriodID, item.ExportID)
 		if err != nil {
 			return nil, err
