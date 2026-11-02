@@ -95,7 +95,7 @@ test("Archive199 Word đã lưu và ZIP Word/Excel giữ nguyên byte",async({pa
  await page.getByRole("link",{name:"Tạo tài khoản",exact:true}).click();
  const main=page.getByRole("main");
  await expect(main.getByRole("button",{name:"Lưu",exact:true})).toBeEnabled();
- await main.getByLabel("Họ tên").fill("Bạn đọc kho kỳ 190");
+ await main.getByLabel("Họ tên").fill("Bạn đọc kho kỳ 199");
  await main.getByLabel("Email").fill("archive199@example.test");
  await main.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912345699");
  const assignment=main.getByRole("group",{name:"Vai trò và phạm vi"});
@@ -103,7 +103,7 @@ test("Archive199 Word đã lưu và ZIP Word/Excel giữ nguyên byte",async({pa
  await assignment.getByRole("checkbox",{name:"trong_trot",exact:true}).uncheck();
  await assignment.getByRole("checkbox",{name:"ke_hoach_tai_chinh",exact:true}).check();
  await main.getByRole("button",{name:"Lưu",exact:true}).click();
- await expect(page.getByRole("heading",{level:1,name:"Bạn đọc kho kỳ 190"})).toBeVisible();
+ await expect(page.getByRole("heading",{level:1,name:"Bạn đọc kho kỳ 199"})).toBeVisible();
  await logout(page);await login(page,"0912345699");
  await expect(page).toHaveURL(/\/kn\/khtc\/bao-cao-da-xuat$/);
  await expect(page.getByRole("heading",{level:1,name:"Báo cáo KHTC đã xuất"})).toBeVisible();
@@ -125,7 +125,10 @@ test("Archive199 Word đã lưu và ZIP Word/Excel giữ nguyên byte",async({pa
  await table.getByRole("link",{name:`Word đã lưu ${reportName} v1`,exact:true}).click();
  await expect(page).toHaveURL(/\/kn\/khtc\/bao-cao-da-xuat\/[^/]+\/[^/]+\/word$/);
  await expect(page.getByRole("heading",{level:1,name:"Word đã lưu của bản xuất",exact:true})).toBeVisible();
+ await expect(page.getByRole("button",{name:"Tải Word lần 1",exact:true})).toBeInViewport({ratio:0.9});
  await expect(page.getByRole("complementary",{name:"Log xuất Word"})).toContainText("Xuất Word lần 1");
+ await page.getByRole("button",{name:"Thông tin Word lần 1",exact:true}).click();
+ await expect(page.getByRole("region",{name:"Thông tin Word lần 1"})).toContainText("SHA-256 tệp");
  const boundWait=page.waitForEvent("download");await page.getByRole("button",{name:"Tải Word lần 1",exact:true}).click();
  expect(await readFile((await (await boundWait).path())!)).toEqual(originalWord);
  await page.getByRole("checkbox",{name:"Chọn Word lần 1",exact:true}).check();

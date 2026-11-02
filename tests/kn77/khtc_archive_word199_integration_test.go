@@ -207,6 +207,27 @@ func TestArchive199StoredWordBindingAndMixedZIP(t *testing.T) {
 			t.Fatal("Word SHA drift")
 		}
 	}
+	// Change both live inputs and available templates after storing the ZIP.
+	// An exporter with no KHTC template can still read its own immutable ledger.
+	configured := counter.Exporter
+	noTemplates, templateErr := pfexport.New(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, pfexport.Deps{Access: exportport.AccessFunc(func(context.Context) bool { return false })})
+	if templateErr != nil {
+		t.Fatal(templateErr)
+	}
+	counter.Exporter = noTemplates.Exporter()
+	f.src.set(nil, "archive199-live-source-changed-after-export")
+	exportCalls := counter.exports.Load()
+	c, reloadedWord := f.call(http.MethodGet, p.ID, "/exports/"+x1.ID+"/words/"+w1.ID+"/download", nil)
+	f.ok(c, reloadedWord, nil)
+	if !bytes.Equal(reloadedWord, word) {
+		t.Fatal("Word changed after live source/template registry changed")
+	}
+	c, reloadedZIP := zipRequest(items)
+	f.ok(c, reloadedZIP, nil)
+	counter.Exporter = configured
+	if !bytes.Equal(reloadedZIP, body) || sha256.Sum256(reloadedZIP) != sha256.Sum256(body) || counter.exports.Load() != exportCalls {
+		t.Fatal("ZIP bytes/hash drifted or attempted rendering after provider changes")
+	}
 	if counter.exports.Load() != before+2 {
 		t.Fatal("ZIP invoked renderer/numbering", counter.exports.Load(), before)
 	} // only explicit w2 Export

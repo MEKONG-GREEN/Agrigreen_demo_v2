@@ -35,7 +35,9 @@ describe("#199 saved Word archive",()=>{
  it("uses a separate read-only detail route, actual export log, and bound download",async()=>{
   render(<KhtcArchiveWordScreen/>);await screen.findByText("Báo cáo chuyên đề đã lưu · Excel v3");
   const log=screen.getByRole("complementary",{name:"Log xuất Word"});expect(within(log).getByText("actual-export-actor",{exact:false})).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button",{name:"Thông tin Word lần 2"}));
   expect(screen.getByText("a".repeat(64))).toBeInTheDocument();
+  expect(screen.getByRole("region",{name:"Thông tin Word lần 2"})).toHaveTextContent("321 byte");
   fireEvent.click(screen.getByRole("button",{name:"Tải Word lần 2"}));await waitFor(()=>expect(saveBlob).toHaveBeenCalledOnce());
   expect(vi.mocked(saveBlob).mock.calls[0]?.[1]).toBe("saved.docx");
   expect(requests.at(-1)?.url).toContain(`/exports/${exp}/words/01900000-0000-7000-8000-000000000004/download`);
