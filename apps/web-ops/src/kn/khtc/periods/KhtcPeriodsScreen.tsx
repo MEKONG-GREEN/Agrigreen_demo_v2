@@ -218,17 +218,62 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null,r
           ) : null}
         </div>
         <LoadState s={periods}>
-          {(ps: KhtcPeriod[]) => <DataTable caption="Danh sách kỳ báo cáo" rows={ps.filter(p => !adhocOnly || p.report_type === "adhoc")} rowKey={p => p.id}
+          {(ps: KhtcPeriod[]) => route ? (
+<DataTable caption="Danh sách kỳ báo cáo" rows={ps.filter(p => !adhocOnly || p.report_type === "adhoc")} rowKey={p => p.id}
             empty={`Chưa có kỳ nào trong năm ${year}.`} columns={[
               { key: "type", header: "Loại báo cáo", cell: p => REPORT_TYPES.find(t => t.value === p.report_type)?.label ?? p.report_type },
-              { key: "name", header: "Kỳ", cell: p => route ? <Link href={periodHref(p.id)}>{p.name}</Link> : <button className="btn btn-o" aria-label={`Xem kỳ ${p.name}`} onClick={() => setSelected(p.id)}>{p.name}</button> },
+              { key: "name", header: "Kỳ", cell: p => <Link href={periodHref(p.id)}>{p.name}</Link> },
               { key: "cutoff", header: "Ngày chốt", cell: p => vnDate(p.cutoff_date) },
               { key: "due", header: "Hạn nộp", cell: p => dt(p.due_at) },
               { key: "departments", header: "Phòng tham gia", cell: p => p.departments.length },
               { key: "progress", header: "Tiến độ nộp", cell: p => progressText(p) },
               { key: "state", header: "Trạng thái", cell: p => <StatusPill tone={PERIOD_TONE[p.state]}>{p.state_label}</StatusPill> },
               ...(route ? [{ key: "actions", header: "Thao tác", cell: (p: KhtcPeriod) => <RowActions label={p.name} viewHref={periodHref(p.id)} editHref={writer && p.state !== "closed" && p.state !== "cancelled" ? `${periodHref(p.id)}/sua-han` : undefined} /> }] : []),
-            ]} />}
+            ]} />
+          ) : (
+ps.filter(p=>!adhocOnly||p.report_type==="adhoc").length === 0 ? (
+              <p className="mute">Chưa có kỳ nào trong năm {year}.</p>
+            ) : (
+              <table className="dt">
+                <thead>
+                  <tr>
+                    <th>Loại báo cáo</th>
+                    <th>Kỳ</th>
+                    <th>Ngày chốt</th>
+                    <th>Hạn nộp</th>
+                    <th>Phòng tham gia</th>
+                    <th>Tiến độ nộp</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ps.filter(p=>!adhocOnly||p.report_type==="adhoc").map((p) => (
+                    <tr
+                      key={p.id}
+                      className={p.id === selected ? "sel" : undefined}
+                      onClick={() => setSelected(p.id)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <td>
+                        {REPORT_TYPES.find((t) => t.value === p.report_type)
+                          ?.label ?? p.report_type}
+                      </td>
+                      <td>{p.name}</td>
+                      <td>{vnDate(p.cutoff_date)}</td>
+                      <td>{dt(p.due_at)}</td>
+                      <td>{p.departments.length}</td>
+                      <td>{progressText(p)}</td>
+                      <td>
+                        <StatusPill tone={PERIOD_TONE[p.state]}>
+                          {p.state_label}
+                        </StatusPill>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )
+          )}
         </LoadState>
       </section> : null}
 

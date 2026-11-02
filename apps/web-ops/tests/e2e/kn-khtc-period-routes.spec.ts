@@ -15,6 +15,7 @@ test("BF-SWEEP-KHTC-REST: mở kỳ trên route riêng, giữ nháp qua Back, De
   await sidebar(page).getByRole("link", { name: "Người dùng", exact: true }).click();
   await page.getByRole("link", { name: "Tạo tài khoản", exact: true }).click();
   const main = page.getByRole("main");
+  await expect(main.getByRole("button", { name: "Lưu", exact: true })).toBeEnabled();
   await main.getByLabel("Họ tên").fill("Cán bộ KHTC kiểm thử 180");
   await main.getByLabel("Email").fill("khtc.period180@example.test");
   await main.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912345690");
@@ -22,6 +23,7 @@ test("BF-SWEEP-KHTC-REST: mở kỳ trên route riêng, giữ nháp qua Back, De
   await assignment.getByRole("combobox", { name: "Vai trò", exact: true }).selectOption("kn_tinh");
   await assignment.getByRole("checkbox", { name: "trong_trot", exact: true }).uncheck();
   await assignment.getByRole("checkbox", { name: "ke_hoach_tai_chinh", exact: true }).check();
+  await expect(main.getByLabel("Họ tên")).toHaveValue("Cán bộ KHTC kiểm thử 180");
   await main.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Cán bộ KHTC kiểm thử 180" })).toBeVisible();
   await logout(page);
