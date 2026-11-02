@@ -4868,11 +4868,7 @@ export interface paths {
         /** Danh sách HTX trên các xã phụ trách (FN-XA-03.03) */
         get: operations["knListCooperatives"];
         put?: never;
-        /**
-         * Thêm HTX trong xã phụ trách (Cấp Xã, Admin)
-         * @description Mã HTX tự sinh. Trùng tên (không phân biệt hoa thường) → 409 party.cooperative_name_taken. Người đại diện chỉ vào kho định danh.
-         */
-        post: operations["knCreateCooperative"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4888,49 +4884,8 @@ export interface paths {
         };
         /** Chi tiết HTX (ngoài phạm vi → 404) */
         get: operations["knGetCooperative"];
-        /**
-         * Sửa hồ sơ HTX — sự kiện bù (Log cũ → mới, không PII)
-         * @description Trường vắng = giữ nguyên; area_ha/tax_code/head_office rỗng hoặc null = xóa giá trị. Đổi người đại diện: chủ thể mới trong kho định danh, Log ghi representative_ref cũ → mới. Gửi lại cùng Idempotency-Key → kết quả hiện tại, không ghi thêm. HTX đã vô hiệu hóa → 409 party.org_state_conflict.
-         */
-        put: operations["knUpdateCooperative"];
+        put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/kn/cooperatives/{ref}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Vô hiệu hóa HTX (thay xóa cứng) kèm cảnh báo dữ liệu liên kết
-         * @description Lý do ≥ 20 ký tự (ràng buộc sổ org_event, US-HTXSTATUS-01 AC-3). Phát pf.party.org.deactivated.
-         */
-        post: operations["knDeactivateCooperative"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/kn/cooperatives/{ref}/reactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Kích hoạt lại HTX (lý do ≥ 10 ký tự) */
-        post: operations["knReactivateCooperative"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4947,11 +4902,7 @@ export interface paths {
         /** Nông hộ thành viên của HTX (tab Nông hộ) */
         get: operations["knListHouseholds"];
         put?: never;
-        /**
-         * Thêm nông hộ vào HTX (chủ hộ vào kho định danh)
-         * @description SĐT đã có trong kho → 409 party.household_phone_taken; HTX đã vô hiệu hóa → 409 party.org_state_conflict.
-         */
-        post: operations["knCreateHousehold"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4968,23 +4919,6 @@ export interface paths {
         /** Log HTX: tạo, vô hiệu hóa/kích hoạt lại, sửa hồ sơ (cũ → mới, không PII) */
         get: operations["knCooperativeLog"];
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/kn/households/{ref}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Sửa diện tích canh tác của nông hộ — sự kiện bù */
-        put: operations["knUpdateHousehold"];
         post?: never;
         delete?: never;
         options?: never;
@@ -35785,37 +35719,6 @@ export interface operations {
             428: components["responses"]["Problem"];
         };
     };
-    knCreateCooperative: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KNCooperativeCreate"];
-            };
-        };
-        responses: {
-            /** @description HTX đã tạo */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNCooperative"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            409: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
-        };
-    };
     knGetCooperative: {
         parameters: {
             query?: never;
@@ -35840,108 +35743,6 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
-        };
-    };
-    knUpdateCooperative: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KNCooperativeUpdate"];
-            };
-        };
-        responses: {
-            /** @description HTX sau khi sửa */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNCooperative"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
-            409: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
-        };
-    };
-    knDeactivateCooperative: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KNReason"];
-            };
-        };
-        responses: {
-            /** @description HTX đã vô hiệu hóa */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNCooperativeDeactivated"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
-            409: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
-        };
-    };
-    knReactivateCooperative: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KNReason"];
-            };
-        };
-        responses: {
-            /** @description HTX đã kích hoạt lại */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNCooperative"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
-            409: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
         };
     };
     knListHouseholds: {
@@ -35973,40 +35774,6 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
-    knCreateHousehold: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KNHouseholdCreate"];
-            };
-        };
-        responses: {
-            /** @description Nông hộ đã thêm */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNHousehold"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
-            409: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
-        };
-    };
     knCooperativeLog: {
         parameters: {
             query?: {
@@ -36035,39 +35802,6 @@ export interface operations {
                 };
             };
             404: components["responses"]["Problem"];
-        };
-    };
-    knUpdateHousehold: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KNHouseholdUpdate"];
-            };
-        };
-        responses: {
-            /** @description Nông hộ sau khi sửa */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNHousehold"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
         };
     };
     knHouseholdLog: {

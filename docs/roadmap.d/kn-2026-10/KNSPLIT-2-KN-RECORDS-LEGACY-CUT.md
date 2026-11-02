@@ -1,0 +1,1 @@
+- [x] KNSPLIT-2-KN-RECORDS-LEGACY-CUT: nghỉ sáu thao tác ghi HTX/nông hộ legacy /v1/kn, giữ GET/nativeHTX và producer-records; OpenAPI/mock đồng bộ, route map vắng + exact404/405 theo NoMethod/GET còn lại + consumer regression, knboundary314→305. Không chốt toàn #53/G1. Bằng chứng đúngSHA và Claude review ở #160.
