@@ -43,7 +43,7 @@ func New(b tenant.Beginner, clk clock.Clock, cfg Config, owners map[string]port.
 	if nilDependency(sender) {
 		sender = nil
 	}
-	s := &Service{db: b, clk: clk, cfg: cfg, owners: map[string]port.Owner{}, sender: sender}
+	s := &Service{db: db.ForModule(b, DBModule), clk: clk, cfg: cfg, owners: map[string]port.Owner{}, sender: sender}
 	for key, owner := range owners {
 		if !domain.ValidOwner(key) || nilDependency(owner) {
 			return nil, port.ErrInvalid
