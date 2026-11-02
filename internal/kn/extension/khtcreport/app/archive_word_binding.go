@@ -3,6 +3,7 @@ package app
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"strconv"
 	"strings"
 
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
@@ -70,7 +71,7 @@ func verifyWordBinding(req exportport.Request, templateHash string, run exportpo
 				return invalid()
 			}
 		} else {
-			if !run.DocNumberAuto || strings.TrimSpace(run.DocNumber) == "" {
+			if !run.DocNumberAuto || !validArchiveAutoNumber(run.DocNumber, number.Series) {
 				return invalid()
 			}
 			data.Vars[number.Var] = run.DocNumber
@@ -98,4 +99,20 @@ func archiveBodyMatches(body []byte, expected string) bool {
 	}
 	sum := sha256.Sum256(body)
 	return hex.EncodeToString(sum[:]) == expected
+}
+
+// Numbering's public contract is canonical positive {n}/<Series>, with n stored
+// in PostgreSQL bigint. Bound length and ASCII digits before integer conversion.
+func validArchiveAutoNumber(value, series string) bool {
+	counter, ok := strings.CutSuffix(value, "/"+series)
+	if !ok || len(counter) < 1 || len(counter) > 19 || counter[0] == '0' {
+		return false
+	}
+	for _, digit := range counter {
+		if digit < '0' || digit > '9' {
+			return false
+		}
+	}
+	n, err := strconv.ParseInt(counter, 10, 64)
+	return err == nil && n > 0
 }

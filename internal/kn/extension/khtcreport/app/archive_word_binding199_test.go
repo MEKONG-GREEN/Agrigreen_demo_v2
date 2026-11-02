@@ -111,3 +111,28 @@ func TestArchive199WordInputCopyHasNoAliases(t *testing.T) {
 		t.Fatal("copy aliases frozen Word data")
 	}
 }
+
+func TestArchive199AutoNumberBoundToRequestedSeries(t *testing.T) {
+	for _, number := range []string{"1/OTHER", "0/BC-TTKN", "01/BC-TTKN", "-1/BC-TTKN", "1e100000/BC-TTKN", "1e-100000/BC-TTKN", strings.Repeat("9", 100000) + "/BC-TTKN", "9223372036854775808/BC-TTKN"} {
+		req, run, hash := bindingFixture199(time.Date(2026, 11, 2, 17, 0, 0, 0, time.UTC))
+		run.DocNumber = number
+		filled := copyWordData(req.Data)
+		filled.Vars[VarNumber] = number
+		filled.Vars[VarPlaceDate] = doctpl.PlaceDateLine(req.Date.Place, run.At)
+		run.InputHash = filled.Hash()
+		if err := verifyWordBinding(req, hash, run); err == nil {
+			t.Fatalf("auto number from another series or noncanonical counter accepted (length %d)", len(number))
+		}
+	}
+	for _, number := range []string{"1/BC-TTKN", "9223372036854775807/BC-TTKN"} {
+		req, run, hash := bindingFixture199(time.Date(2026, 11, 2, 17, 0, 0, 0, time.UTC))
+		run.DocNumber = number
+		filled := copyWordData(req.Data)
+		filled.Vars[VarNumber] = number
+		filled.Vars[VarPlaceDate] = doctpl.PlaceDateLine(req.Date.Place, run.At)
+		run.InputHash = filled.Hash()
+		if err := verifyWordBinding(req, hash, run); err != nil {
+			t.Fatal(number, err)
+		}
+	}
+}

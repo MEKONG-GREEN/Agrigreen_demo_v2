@@ -29,9 +29,10 @@ import (
 // Every runtime operation below crosses real owner/exporter HTTP + PostgreSQL.
 // The wrapper counts public port calls; it never implements numbering/rendering.
 type archive199Exporter struct {
-	corruptExport bool
-	last          exportport.Run
-	forced        *exportport.Run
+	seedOtherSeries bool
+	corruptExport   bool
+	last            exportport.Run
+	forced          *exportport.Run
 	exportport.Exporter
 	exports, reads atomic.Int64
 	corrupt        atomic.Bool
@@ -39,6 +40,15 @@ type archive199Exporter struct {
 
 func (e *archive199Exporter) Export(ctx context.Context, req exportport.Request) (exportport.Run, error) {
 	e.exports.Add(1)
+	if e.seedOtherSeries && req.Number != nil {
+		other := req
+		number := *req.Number
+		number.Series = "OTHER"
+		other.Number = &number
+		if _, err := e.Exporter.Export(ctx, other); err != nil {
+			return exportport.Run{}, err
+		}
+	}
 	if e.forced != nil {
 		return *e.forced, nil
 	}
@@ -201,7 +211,7 @@ func TestArchive199StoredWordBindingAndMixedZIP(t *testing.T) {
 		t.Fatal("ZIP invoked renderer/numbering", counter.exports.Load(), before)
 	} // only explicit w2 Export
 	// All batch metadata is checked before any exporter read.
-	invalid := append([]map[string]any{}, items...)
+	invalid := []map[string]any{items[0]}
 	invalid = append(invalid, map[string]any{"period_id": p.ID, "export_id": x2.ID, "format": "word", "run_id": w1.ID})
 	reads := counter.reads.Load()
 	c, b = zipRequest(invalid)
@@ -310,4 +320,46 @@ func installArchive199Exporter(t *testing.T, f *reportFx) *archive199Exporter {
 	wrapped := &archive199Exporter{Exporter: ex.Exporter()}
 	f.ext.UseExporter(wrapped)
 	return wrapped
+}
+
+// Seed the actual public exporter with OTHER, then replay that stored result under
+// BC-TTKN at the same subject/idem. A complete filled hash alone is insufficient.
+func TestArchive199AutoNumberReplayRealExporter(t *testing.T) {
+	f := newReportFx(t)
+	counter := installArchive199Exporter(t, f)
+	p := f.open(41, dTT, dTTTT)
+	initial := f.refresh(p.ID, 0)
+	f.submit(p.ID, "10")
+	d := f.refresh(p.ID, initial.Version)
+	c, b := f.call(http.MethodPost, p.ID, "/draft", map[string]any{"base_version": d.Version, "admin": map[string]any{"document_no": "", "report_date": ""}})
+	f.ok(c, b, &d)
+	x := f.export(p.ID, d.Version, false)
+	counter.seedOtherSeries = true
+	c, b = f.do(http.MethodPost, reportPath(p.ID)+"/exports/"+x.ID+"/word", authz.KNTinh, khtcDept, f.khtcUser, "archive199-real-other-series", map[string]any{})
+	counter.seedOtherSeries = false
+	if c != 503 {
+		t.Fatalf("cached auto number from another series bound: %d %s", c, b)
+	}
+	if counter.last.DocNumber != "1/OTHER" || !counter.last.DocNumberAuto {
+		t.Fatalf("counterexample not a real OTHER number: %+v", counter.last)
+	}
+	var history struct {
+		Items []wordRun `json:"items"`
+	}
+	c, b = f.call(http.MethodGet, p.ID, "/words", nil)
+	f.ok(c, b, &history)
+	if len(history.Items) != 1 || history.Items[0].DocNumber != "1/OTHER" {
+		t.Fatal("unexpected render/allocation during attestation", history)
+	}
+	var bound int
+	admin := pgtest.Get(t).AdminPool(t, migrations.PF)
+	if err := admin.QueryRow(context.Background(), `SELECT count(*) FROM pf_extension.khtc_word_binding WHERE tenant_id=$1 AND export_id=$2`, f.tid, x.ID).Scan(&bound); err != nil || bound != 0 {
+		t.Fatal("wrong-series binding appended", bound, err)
+	}
+	var list archive199Words
+	c, b = f.call(http.MethodGet, p.ID, "/exports/"+x.ID+"/words", nil)
+	f.ok(c, b, &list)
+	if len(list.Items) != 0 {
+		t.Fatal("wrong-series run appeared in archive", list)
+	}
 }
