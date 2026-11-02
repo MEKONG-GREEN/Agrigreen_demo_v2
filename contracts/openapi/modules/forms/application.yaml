@@ -386,6 +386,49 @@ paths:
   # --- pf/extension Kỳ KHTC (W11.62 — BRD KHTC v2.2 FN-TI-02.03, D4 KH2): mở kỳ bằng ô chọn (tên kỳ, khoảng thời gian, hạn tự
   # điền), một phiếu mỗi phòng = kỳ native cap/forms profile kn_khtc (nộp, yêu cầu bổ sung/xác nhận ở /v1/forms), gắn kỳ nguồn
   # (calendar_id, calendar_version, native_key), tiến độ phiếu + nguồn, sửa hạn, đóng kỳ, hủy kỳ. Cấp Tỉnh Phòng KHTC ghi. ---
+# @ag-order: 935
+  /v1/forms/template-versions:
+    get:
+      summary: Lịch sử phiên bản bất biến theo profile và mã biểu trong phạm vi đọc
+      operationId: formsTemplateVersions
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: code, in: query, required: true, schema: {type: string, maxLength: 64}}
+        - {name: before_version, in: query, schema: {type: integer, format: int64, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Mới trước; dùng version cuối làm before_version trang kế tiếp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTemplate"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 936
+  /v1/forms/template-versions/{version}:
+    get:
+      summary: Chọn đúng phiên bản bất biến theo profile và mã biểu trong phạm vi đọc
+      operationId: formsTemplateVersion
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: code, in: query, required: true, schema: {type: string, maxLength: 64}}
+        - {name: version, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      responses:
+        "200":
+          description: Phiên bản chính xác; gắn id này khi phát hành kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsTemplate"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
 components:
   parameters:
 # @ag-order: 489

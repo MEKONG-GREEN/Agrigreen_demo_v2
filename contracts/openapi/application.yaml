@@ -13225,6 +13225,47 @@ paths:
   # hệ ngoài tỉnh do Cấp Tỉnh – HCTH, Admin nhập. LỌC TRƯỜNG Ở API theo vai (BR-03): field_set "basic" (Cấp TW, Cấp Xã) — mỗi dòng
   # CHỈ có id, full_name, birth_year, phone, không xem chi tiết, không ghi; "full" (Cấp Tỉnh, Admin) — thêm title, unit, level,
   # email. Phản hồi chứa dữ liệu cá nhân: Cache-Control no-store. Ngữ cảnh KN: header X-AG-Context. ---
+  /v1/forms/template-versions:
+    get:
+      summary: Lịch sử phiên bản bất biến theo profile và mã biểu trong phạm vi đọc
+      operationId: formsTemplateVersions
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: code, in: query, required: true, schema: {type: string, maxLength: 64}}
+        - {name: before_version, in: query, schema: {type: integer, format: int64, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Mới trước; dùng version cuối làm before_version trang kế tiếp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTemplate"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/forms/template-versions/{version}:
+    get:
+      summary: Chọn đúng phiên bản bất biến theo profile và mã biểu trong phạm vi đọc
+      operationId: formsTemplateVersion
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: code, in: query, required: true, schema: {type: string, maxLength: 64}}
+        - {name: version, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      responses:
+        "200":
+          description: Phiên bản chính xác; gắn id này khi phát hành kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsTemplate"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /v1/hrm/promotion:
     get:
       summary: Danh sách nâng bậc (FN-09 B1, B2) — kỳ NLTX/TNVK/NLTH có ngày đến kỳ ≤ ngày xét + window tháng (kể cả quá hạn) và kỳ đã có quyết định trong 3 tháng gần đây; khối chỉ số, chỉ tiêu NLTH, người thiếu ngạch/bậc, lần tính gần nhất của job. Cấp Tỉnh – HCTH, Admin

@@ -41,8 +41,12 @@ type Service struct {
 	Validators map[string]port.Validator
 	// ReviewGuards: kiểm quyền rà soát thêm của bên dùng theo profile (gọi ngoài giao dịch, trước khi ghi).
 	ReviewGuards map[string]port.ReviewGuard
-	profiles     map[string]port.Profile
-	order        []string
+	// DefinitionPolicies are registered before serving; owner callbacks run outside TX.
+	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
+	// RequiredDefinitionPolicies denies missing policies instead of falling back to DefineBy.
+	RequiredDefinitionPolicies map[string]bool
+	profiles                   map[string]port.Profile
+	order                      []string
 }
 
 var _ port.Freezer = (*Service)(nil)

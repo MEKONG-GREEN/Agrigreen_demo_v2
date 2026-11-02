@@ -9433,6 +9433,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/forms/template-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử phiên bản bất biến theo profile và mã biểu trong phạm vi đọc */
+        get: operations["formsTemplateVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/forms/template-versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chọn đúng phiên bản bất biến theo profile và mã biểu trong phạm vi đọc */
+        get: operations["formsTemplateVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/hrm/promotion": {
         parameters: {
             query?: never;
@@ -45675,6 +45709,66 @@ export interface operations {
             /** @description hrm.plan_not_closed */
             409: components["responses"]["Problem"];
             /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsTemplateVersions: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+                code: string;
+                before_version?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mới trước; dùng version cuối làm before_version trang kế tiếp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FormsTemplate"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    formsTemplateVersion: {
+        parameters: {
+            query: {
+                /** @description Bên dùng của cap/forms (cấu hình gốc lắp ráp; KN = kn) */
+                profile: components["parameters"]["FormsProfile"];
+                code: string;
+            };
+            header?: never;
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản chính xác; gắn id này khi phát hành kỳ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormsTemplate"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
         };
     };

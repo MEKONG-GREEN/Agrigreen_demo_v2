@@ -33,6 +33,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/forms/templates", h.define)
 	rg.POST("/forms/templates/fixtures", h.fixtures)
 	rg.GET("/forms/templates/:id", h.template)
+	rg.GET("/forms/template-versions", h.templateVersions)
+	rg.GET("/forms/template-versions/:version", h.templateVersion)
 	rg.GET("/forms/periods", h.periods)
 	rg.POST("/forms/periods", h.publish)
 	rg.GET("/forms/periods/:id", h.period)
