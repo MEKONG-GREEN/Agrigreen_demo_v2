@@ -250,32 +250,6 @@ func (f *fakeCoopProfiles) profile(tid, ref uuid.UUID) (partyport.CoopProfile, b
 	return p, ok
 }
 
-// eventCount trả số dòng sổ hồ sơ KN của tenant (kèm điều kiện tùy chọn).
-func (f *fakeCoopProfiles) eventCount(tid uuid.UUID, keep func(partyport.CoopProfileEvent) bool) int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	n := 0
-	for _, e := range f.events[tid] {
-		if keep == nil || keep(e) {
-			n++
-		}
-	}
-	return n
-}
-
-// supportCount đếm lần sửa ghi ở chế độ hỗ trợ thay actor (on_behalf_of, có lý do hỗ trợ).
-func (f *fakeCoopProfiles) supportCount(tid, actor uuid.UUID) int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	n := 0
-	for _, c := range f.changes[tid] {
-		if c.OnBehalfOf != nil && *c.OnBehalfOf == actor && c.SupportReason != nil {
-			n++
-		}
-	}
-	return n
-}
-
 func (f *fakeCoopProfiles) Profiles(ctx context.Context, refs []uuid.UUID) (map[uuid.UUID]partyport.CoopProfile, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

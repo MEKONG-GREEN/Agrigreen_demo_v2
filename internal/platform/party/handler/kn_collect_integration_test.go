@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 
@@ -157,37 +156,8 @@ func (kf *knFix) countWhere(tid uuid.UUID, q string, args ...any) int {
 	return n
 }
 
-func noPhone(t *testing.T, r kresp, phones ...string) {
-	t.Helper()
-	for _, p := range phones {
-		if strings.Contains(r.raw, p) {
-			t.Fatalf("phản hồi lộ SĐT đầy đủ %s: %s", p, r.raw)
-		}
-	}
-}
-
-func logChange(t *testing.T, r kresp, event, field string) (old, nw any) {
-	t.Helper()
-	for _, it := range items(r.resp) {
-		if it["event"] != event {
-			continue
-		}
-		if o, n, ok := changeOf(it, field); ok {
-			return o, n
-		}
-	}
-	t.Fatalf("Log không có %s.%s: %s", event, field, r.raw)
-	return nil, nil
-}
-
-type fakeMachineCounts struct{ n int }
-
-func (f fakeMachineCounts) CoopMachineTotal(context.Context, uuid.UUID) (int, error) { return f.n, nil }
-
-// FN-XA-03.03: danh sách/chi tiết HTX theo phạm vi ngữ cảnh phiên (Cấp Xã chỉ xã phụ trách, Cấp Tỉnh trong
-// tỉnh, Cấp Quốc gia toàn quốc, chỉ xem); thêm HTX (gọi lặp cùng Idempotency-Key → cùng HTX, một dòng sổ); trùng
-// tên → 409; sửa = sự kiện bù có Log cũ → mới, không PII; SĐT người đại diện luôn che; cách ly tenant.
-func TestFN_XA_03_03_CooperativeScopeCreateUpdateLog(t *testing.T) {
+// Read-only legacy compatibility: scope, historical log and tenant isolation stay valid after #160.
+func TestFN_XA_03_03_CooperativeReadScope(t *testing.T) {
 	kf := newKNFix(t)
 	tr := kf.tr
 	xa := kf.user(kf.tenant, authz.KNXa, []string{"30001"}, nil)
@@ -220,141 +190,38 @@ func TestFN_XA_03_03_CooperativeScopeCreateUpdateLog(t *testing.T) {
 	wantCode(t, noCtx.call(kf.srv.URL, http.MethodGet, "/v1/kn/cooperatives", "", "application/json", nil), http.StatusPreconditionRequired,
 		"accounts.context_required", "thiếu X-AG-Context")
 
-	body := map[string]any{"name": "HTX Mới Xã A", "commune_code": "30001", "area_ha": "50.25", "tax_code": "0312345678",
-		"head_office": "Ấp 1, xã A", "representative": map[string]any{"full_name": "Trần Văn Bình", "phone": "0912345678"}}
-	// Chỉ xem: Cấp Tỉnh, Cấp Quốc gia.
-	wantCode(t, tinh.do(http.MethodPost, "/v1/kn/cooperatives", "", body).resp, http.StatusForbidden, "party.read_only", "Cấp Tỉnh thêm HTX")
-	wantCode(t, tw.do(http.MethodPost, "/v1/kn/cooperatives", "", body).resp, http.StatusForbidden, "party.read_only", "Cấp Quốc gia thêm HTX")
-	other := map[string]any{"name": "HTX Xã B", "commune_code": "30002"}
-	wantCode(t, xa.do(http.MethodPost, "/v1/kn/cooperatives", "", other).resp, http.StatusForbidden, "party.out_of_scope", "thêm HTX xã khác")
-
-	// Gọi lặp cùng khóa → cùng HTX, một dòng sổ.
-	k := key()
-	r1 := xa.do(http.MethodPost, "/v1/kn/cooperatives", k, body)
-	wantStatus(t, r1.resp, http.StatusCreated, "thêm HTX")
-	r2 := xa.do(http.MethodPost, "/v1/kn/cooperatives", k, body)
-	if str(r2.body, "ref") != str(r1.body, "ref") || r2.hdr.Get("Idempotent-Replayed") == "" {
-		t.Fatalf("gọi lặp: %s / %s", r1.raw, r2.raw)
-	}
-	ref := str(r1.body, "ref")
-	if n := kf.countWhere(kf.tenant, "SELECT count(*) FROM pf_party.org_event WHERE org_ref = $1", uuid.MustParse(ref)); n != 1 {
-		t.Fatalf("sổ org_event sau gọi lặp: %d", n)
-	}
-	if !strings.HasPrefix(str(r1.body, "code"), "HTX") || str(r1.body, "representative", "label") == "" ||
-		!strings.HasSuffix(str(r1.body, "representative", "masked_phone"), "678") {
-		t.Fatalf("HTX mới: %s", r1.raw)
-	}
-	noPhone(t, r1, "0912345678")
-	wantCode(t, xa.do(http.MethodPost, "/v1/kn/cooperatives", "", map[string]any{"name": "htx mới xã a", "commune_code": "30001"}).resp,
-		http.StatusConflict, "party.cooperative_name_taken", "trùng tên")
-
-	// Sửa: sự kiện bù, gọi lặp PUT cùng khóa → một dòng sổ.
-	upd := map[string]any{"name": "HTX Mới Xã A (đổi tên)", "area_ha": "60", "reason": "Cập nhật theo biên bản"}
-	pk := key()
-	u1 := xa.do(http.MethodPut, "/v1/kn/cooperatives/"+ref, pk, upd)
-	wantStatus(t, u1.resp, http.StatusOK, "sửa HTX")
-	u2 := xa.do(http.MethodPut, "/v1/kn/cooperatives/"+ref, pk, map[string]any{"area_ha": "70"})
-	wantStatus(t, u2.resp, http.StatusOK, "sửa lặp")
-	if str(u2.body, "area_ha") != "60" || str(u2.body, "name") != "HTX Mới Xã A (đổi tên)" {
-		t.Fatalf("PUT lặp phải trả kết quả lần đầu: %s", u2.raw)
-	}
-	if n := kf.profiles.eventCount(kf.tenant, nil); n != 1 {
-		t.Fatalf("sổ kn_profile_event sau PUT lặp: %d", n)
-	}
-	// Đổi người đại diện: sổ chỉ ghi representative_ref.
-	u3 := xa.do(http.MethodPut, "/v1/kn/cooperatives/"+ref, key(), map[string]any{"representative": map[string]any{"full_name": "Lê Thị Cúc", "phone": "0987654321"}})
-	wantStatus(t, u3.resp, http.StatusOK, "đổi người đại diện")
-	noPhone(t, u3, "0987654321")
-	// Không thay đổi → không ghi sổ.
-	wantStatus(t, xa.do(http.MethodPut, "/v1/kn/cooperatives/"+ref, key(), map[string]any{"area_ha": "60"}).resp, http.StatusOK, "không đổi")
-	if n := kf.profiles.eventCount(kf.tenant, nil); n != 2 {
-		t.Fatalf("sổ sau PUT không đổi: %d", n)
-	}
-	wantCode(t, xa.do(http.MethodPut, "/v1/kn/cooperatives/"+ref, key(), map[string]any{"area_ha": "-1"}).resp, http.StatusUnprocessableEntity,
-		"validation_failed", "diện tích âm")
-	wantCode(t, tw.do(http.MethodPut, "/v1/kn/cooperatives/"+ref, key(), upd).resp, http.StatusForbidden, "party.read_only", "Cấp Quốc gia sửa")
-	wantCode(t, xa.do(http.MethodPut, "/v1/kn/cooperatives/"+tr.c2.String(), key(), upd).resp, http.StatusNotFound, "party.org_not_found", "sửa HTX xã khác")
-
-	lg := xa.get("/v1/kn/cooperatives/" + ref + "/log")
-	wantStatus(t, lg.resp, http.StatusOK, "Log HTX")
-	if o, n := logChange(t, lg, "updated", "area_ha"); o != "50.25" || n != "60" {
-		t.Fatalf("Log diện tích: %v → %v", o, n)
-	}
-	if o, n := logChange(t, lg, "updated", "name"); o != "HTX Mới Xã A" || n != "HTX Mới Xã A (đổi tên)" {
-		t.Fatalf("Log tên: %v → %v", o, n)
-	}
-	if o, n := logChange(t, lg, "updated", "representative_ref"); o == nil || n == nil || o == n {
-		t.Fatalf("Log người đại diện: %v → %v", o, n)
-	}
-	if _, n := logChange(t, lg, "created", "name"); n != "HTX Mới Xã A" {
-		t.Fatalf("Log tạo: %v", n)
-	}
-	noPhone(t, lg, "0912345678", "0987654321")
-	if strings.Contains(lg.raw, "Trần Văn Bình") || strings.Contains(lg.raw, "Lê Thị Cúc") {
-		t.Fatalf("Log lộ họ tên: %s", lg.raw)
-	}
-	if items(lg.resp)[1]["reason"] != "Cập nhật theo biên bản" {
-		t.Fatalf("lý do sửa: %s", lg.raw)
-	}
-
-	// Cách ly tenant.
+	// Read-only compatibility: data was provisioned by the native fixture, never by KN.
+	got := xa.get("/v1/kn/cooperatives/" + tr.c1.String())
+	wantStatus(t, got.resp, http.StatusOK, "chi tiết HTX có sẵn")
+	wantStatus(t, xa.get("/v1/kn/cooperatives/"+tr.c1.String()+"/log").resp, http.StatusOK, "Log lịch sử vẫn đọc")
 	otherTenant := kf.user(ids.New(), authz.KNXa, []string{"30001"}, nil)
-	wantCode(t, otherTenant.get("/v1/kn/cooperatives/"+ref).resp, http.StatusNotFound, "party.org_not_found", "tenant khác")
-	if got := items(otherTenant.get("/v1/kn/cooperatives").resp); len(got) != 0 {
-		t.Fatalf("tenant khác thấy HTX: %v", got)
-	}
+	wantCode(t, otherTenant.get("/v1/kn/cooperatives/"+tr.c1.String()).resp, http.StatusNotFound, "party.org_not_found", "tenant khác")
 }
 
-// FN-XA-03.03: vô hiệu hóa thay xóa cứng, kèm cảnh báo dữ liệu liên kết (hộ — pf/cooperative, máy); HTX đã vô
-// hiệu hóa không sửa được; kích hoạt lại; chế độ hỗ trợ Admin bắt buộc lý do, lưu on_behalf_of. Nông hộ của màn:
-// cooperative/member/handler (W3.3).
-func TestFN_XA_03_03_DeactivateSupport(t *testing.T) {
+func TestKNLegacyCooperativeWritesAbsent(t *testing.T) {
 	kf := newKNFix(t)
-	c1 := kf.tr.c1.String()
-	xa := kf.user(kf.tenant, authz.KNXa, []string{"30001"}, nil)
-	tw := kf.user(kf.tenant, authz.KNTW, nil, nil)
-	kf.mod.UseMachineCounts(fakeMachineCounts{n: 3})
-	kf.profiles.setHouseholds(kf.tr.c1, 1)
-
-	// Vô hiệu hóa thay xóa cứng.
-	if r := xa.do(http.MethodDelete, "/v1/kn/cooperatives/"+c1, "", nil); r.status != http.StatusNotFound && r.status != http.StatusMethodNotAllowed {
-		t.Fatalf("không có xóa cứng: %d", r.status)
+	ref := kf.tr.c1.String()
+	before := kf.countWhere(kf.tenant, "SELECT count(*) FROM pf_party.org_event")
+	for _, role := range []string{authz.KNXa, authz.KNTinh, authz.KNTW, authz.KNAdmin} {
+		u := kf.user(kf.tenant, role, []string{"30001"}, nil)
+		for _, route := range []struct {
+			method, path string
+			status       int
+			code         string
+		}{
+			{http.MethodPost, "/v1/kn/cooperatives", http.StatusMethodNotAllowed, "method_not_allowed"},
+			{http.MethodPut, "/v1/kn/cooperatives/" + ref, http.StatusMethodNotAllowed, "method_not_allowed"},
+			{http.MethodPost, "/v1/kn/cooperatives/" + ref + "/deactivate", http.StatusNotFound, "not_found"},
+			{http.MethodPost, "/v1/kn/cooperatives/" + ref + "/reactivate", http.StatusNotFound, "not_found"},
+		} {
+			t.Run(role+route.method+route.path, func(t *testing.T) {
+				res := u.do(route.method, route.path, key(), map[string]any{"name": "Không được tạo", "commune_code": "30001", "reason": "Không được đổi dữ liệu HTX"})
+				wantCode(t, res.resp, route.status, route.code, "route ghi KN legacy không đăng ký")
+			})
+		}
 	}
-	wantCode(t, xa.do(http.MethodPost, "/v1/kn/cooperatives/"+c1+"/deactivate", "", map[string]any{"reason": "ngắn"}).resp,
-		http.StatusUnprocessableEntity, "validation_failed", "lý do ngắn")
-	wantCode(t, tw.do(http.MethodPost, "/v1/kn/cooperatives/"+c1+"/deactivate", "", map[string]any{"reason": "HTX giải thể theo quyết định của UBND xã"}).resp,
-		http.StatusForbidden, "party.read_only", "TW vô hiệu hóa")
-	d := xa.do(http.MethodPost, "/v1/kn/cooperatives/"+c1+"/deactivate", "", map[string]any{"reason": "HTX giải thể theo quyết định của UBND xã"})
-	wantStatus(t, d.resp, http.StatusOK, "vô hiệu hóa")
-	w := d.body["warnings"].(map[string]any)
-	if w["households"].(float64) != 1 || w["machines"].(float64) != 3 || w["plots"] != nil {
-		t.Fatalf("cảnh báo: %s", d.raw)
+	if after := kf.countWhere(kf.tenant, "SELECT count(*) FROM pf_party.org_event"); after != before {
+		t.Fatalf("KN legacy đổi sổ HTX: %d -> %d", before, after)
 	}
-	if d.body["cooperative"].(map[string]any)["active"] != false {
-		t.Fatalf("HTX còn hoạt động: %s", d.raw)
-	}
-	if got := refs(xa.get("/v1/kn/cooperatives").resp, "ref"); len(got) != 0 {
-		t.Fatalf("mặc định chỉ HTX đang hoạt động: %v", got)
-	}
-	if got := refs(xa.get("/v1/kn/cooperatives?status=inactive").resp, "ref"); !slices.Equal(got, []string{c1}) {
-		t.Fatalf("lọc ngừng hoạt động: %v", got)
-	}
-	wantCode(t, xa.do(http.MethodPut, "/v1/kn/cooperatives/"+c1, key(), map[string]any{"area_ha": "1"}).resp, http.StatusConflict,
-		"party.org_state_conflict", "sửa HTX đã vô hiệu hóa")
-	wantStatus(t, xa.do(http.MethodPost, "/v1/kn/cooperatives/"+c1+"/reactivate", "", map[string]any{"reason": "UBND xã hủy quyết định"}).resp,
-		http.StatusOK, "kích hoạt lại")
-	lg := xa.get("/v1/kn/cooperatives/" + c1 + "/log")
-	if o, n := logChange(t, lg, "deactivated", "active"); o != "true" || n != "false" {
-		t.Fatalf("Log vô hiệu hóa: %s", lg.raw)
-	}
-
-	// Chế độ hỗ trợ Admin.
-	sup := kf.user(kf.tenant, authz.KNXa, []string{"30001"}, &authz.KNSupport{SessionID: ids.New(), OnBehalfOf: xa.actor})
-	wantCode(t, sup.do(http.MethodPut, "/v1/kn/cooperatives/"+c1, key(), map[string]any{"area_ha": "130"}).resp, http.StatusUnprocessableEntity,
-		"party.support_reason_required", "hỗ trợ thiếu lý do")
-	sup.reason = "Hỗ trợ cán bộ xã nhập số liệu"
-	wantStatus(t, sup.do(http.MethodPut, "/v1/kn/cooperatives/"+c1, key(), map[string]any{"area_ha": "130"}).resp, http.StatusOK, "hỗ trợ sửa")
-	if n := kf.profiles.supportCount(kf.tenant, xa.actor); n != 1 {
-		t.Fatalf("on_behalf_of: %d", n)
-	}
+	wantStatus(t, kf.user(kf.tenant, authz.KNXa, []string{"30001"}, nil).get("/v1/kn/cooperatives/"+ref).resp, http.StatusOK, "đọc sau các lệnh nghỉ")
 }

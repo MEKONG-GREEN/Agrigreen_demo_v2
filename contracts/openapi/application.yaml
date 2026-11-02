@@ -6860,28 +6860,6 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "428": {$ref: "#/components/responses/Problem"}
-    post:
-      tags: [party]
-      summary: "Thêm HTX trong xã phụ trách (Cấp Xã, Admin)"
-      description: "Mã HTX tự sinh. Trùng tên (không phân biệt hoa thường) → 409 party.cooperative_name_taken. Người đại diện chỉ vào kho định danh."
-      operationId: knCreateCooperative
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/KNCooperativeCreate"}
-      responses:
-        "201":
-          description: HTX đã tạo
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNCooperative"}
-        "403": {$ref: "#/components/responses/Problem"}
-        "409": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
   /v1/kn/cooperatives/{ref}:
     get:
       tags: [party]
@@ -6897,82 +6875,6 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNCooperative"}
         "404": {$ref: "#/components/responses/Problem"}
-    put:
-      tags: [party]
-      summary: "Sửa hồ sơ HTX — sự kiện bù (Log cũ → mới, không PII)"
-      description: >-
-        Trường vắng = giữ nguyên; area_ha/tax_code/head_office rỗng hoặc null = xóa giá trị. Đổi người đại diện: chủ thể mới
-        trong kho định danh, Log ghi representative_ref cũ → mới. Gửi lại cùng Idempotency-Key → kết quả hiện tại, không ghi thêm.
-        HTX đã vô hiệu hóa → 409 party.org_state_conflict.
-      operationId: knUpdateCooperative
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/KNCooperativeUpdate"}
-      responses:
-        "200":
-          description: HTX sau khi sửa
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNCooperative"}
-        "403": {$ref: "#/components/responses/Problem"}
-        "404": {$ref: "#/components/responses/Problem"}
-        "409": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
-  /v1/kn/cooperatives/{ref}/deactivate:
-    post:
-      tags: [party]
-      summary: "Vô hiệu hóa HTX (thay xóa cứng) kèm cảnh báo dữ liệu liên kết"
-      description: "Lý do ≥ 20 ký tự (ràng buộc sổ org_event, US-HTXSTATUS-01 AC-3). Phát pf.party.org.deactivated."
-      operationId: knDeactivateCooperative
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/KNReason"}
-      responses:
-        "200":
-          description: HTX đã vô hiệu hóa
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNCooperativeDeactivated"}
-        "403": {$ref: "#/components/responses/Problem"}
-        "404": {$ref: "#/components/responses/Problem"}
-        "409": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
-  /v1/kn/cooperatives/{ref}/reactivate:
-    post:
-      tags: [party]
-      summary: "Kích hoạt lại HTX (lý do ≥ 10 ký tự)"
-      operationId: knReactivateCooperative
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/KNReason"}
-      responses:
-        "200":
-          description: HTX đã kích hoạt lại
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNCooperative"}
-        "403": {$ref: "#/components/responses/Problem"}
-        "404": {$ref: "#/components/responses/Problem"}
-        "409": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
   /v1/kn/cooperatives/{ref}/households:
     get:
       tags: [party]
@@ -6990,30 +6892,6 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNHouseholdList"}
         "404": {$ref: "#/components/responses/Problem"}
-    post:
-      tags: [party]
-      summary: "Thêm nông hộ vào HTX (chủ hộ vào kho định danh)"
-      description: "SĐT đã có trong kho → 409 party.household_phone_taken; HTX đã vô hiệu hóa → 409 party.org_state_conflict."
-      operationId: knCreateHousehold
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/KNHouseholdCreate"}
-      responses:
-        "201":
-          description: Nông hộ đã thêm
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNHousehold"}
-        "403": {$ref: "#/components/responses/Problem"}
-        "404": {$ref: "#/components/responses/Problem"}
-        "409": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
   /v1/kn/cooperatives/{ref}/log:
     get:
       tags: [party]
@@ -7031,29 +6909,6 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNLogPage"}
         "404": {$ref: "#/components/responses/Problem"}
-  /v1/kn/households/{ref}:
-    put:
-      tags: [party]
-      summary: "Sửa diện tích canh tác của nông hộ — sự kiện bù"
-      operationId: knUpdateHousehold
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: {$ref: "#/components/schemas/KNHouseholdUpdate"}
-      responses:
-        "200":
-          description: Nông hộ sau khi sửa
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNHousehold"}
-        "403": {$ref: "#/components/responses/Problem"}
-        "404": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
   /v1/kn/households/{ref}/log:
     get:
       tags: [party]
