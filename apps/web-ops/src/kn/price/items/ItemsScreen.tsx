@@ -663,7 +663,7 @@ function GroupsTab({ pa, at, steward, nonce, onChanged }: {
     if (result) { setRemoveCode(null); onChanged(); }
   };
   return <>
-    {act.view}
+    {!removeCode && act.view}
     {steward && <div className="row" style={{ marginBottom: 12 }}><Link className="btn btn-p btn-sm" href={itemHref("nhom-hang/them-moi", filters)}>Thêm nhóm hàng</Link></div>}
     <LoadState s={s}>{(data) => <DataTable caption="Nhóm hàng" columns={[
       { key: "code", header: "Mã", cell: (group) => group.code },
@@ -677,6 +677,7 @@ function GroupsTab({ pa, at, steward, nonce, onChanged }: {
       </span> },
     ]} rows={data.groups} rowKey={(group) => group.code} page={1} pageSize={data.groups.length || 1} total={data.groups.length} />}</LoadState>
     {removeCode && <Dialog title={`Xóa nhóm ${removeCode}`} onClose={() => setRemoveCode(null)} actions={<button type="button" className="btn btn-d" disabled={act.busy} onClick={remove}>Xác nhận xóa</button>}>
+      {act.view}
       <p>Chỉ xóa được nhóm không còn mặt hàng. Lịch sử các ngày trước vẫn giữ nguyên.</p>
     </Dialog>}
   </>;

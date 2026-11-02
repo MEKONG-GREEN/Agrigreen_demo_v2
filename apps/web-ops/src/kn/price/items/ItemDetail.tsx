@@ -102,7 +102,7 @@ function ItemForm({ pa, catalog, filters: f, detail, showLog, create = false, re
   const [local, setLocal] = useState<FieldErrors>({});
   const locked = !create && detail?.has_price === true;
   const errors = itemFieldErrors(action.problem, local);
-  const set = (key: keyof ItemFields) => (value: string) => setFields((old) => ({ ...old, [key]: value }));
+  const set = (key: keyof ItemFields) => (value: string) => setFields((old) => ({ ...old, [key]: key === "replaces_code" ? value.trim().toUpperCase() : value }));
   const save = async () => {
     const checked = validateItemFields(fields, catalog, create, locked ? detail : undefined);
     setLocal(checked.errors);
@@ -129,7 +129,7 @@ function ItemForm({ pa, catalog, filters: f, detail, showLog, create = false, re
       <TextField label="Quy cách" maxLength={100} value={fields.spec} onChange={set("spec")} error={errors.spec} disabled={locked || action.busy} />
       <TextField label="Nơi bán" maxLength={200} value={fields.sale_place} onChange={set("sale_place")} error={errors.sale_place} disabled={action.busy} />
       <SelectField label="Loại" required value={fields.kind} onChange={set("kind")} options={[{ value: "basic", label: "Cơ bản — mọi xã" }, { value: "local", label: "Địa phương — gán theo xã" }]} error={errors.kind} disabled={locked || action.busy} />
-      <ItemDateField label="Hiệu lực từ" value={fields.valid_from} onChange={set("valid_from")} error={errors.valid_from} disabled={action.busy} hint="Để trống: ngày báo giá kế tiếp; máy chủ kiểm ngày và danh mục có hiệu lực." />
+      <ItemDateField label="Hiệu lực từ" value={fields.valid_from} onChange={set("valid_from")} error={errors.valid_from} disabled={action.busy} hint="Để trống: ngày báo giá kế tiếp." />
       {create && <>
         <ItemDateField label="Hiệu lực đến" value={fields.valid_to} onChange={set("valid_to")} error={errors.valid_to} disabled={action.busy} />
         <TextField label="Thay thế cho (mã)" value={fields.replaces_code} onChange={set("replaces_code")} error={errors.replaces_code} maxLength={7} disabled={replace || action.busy} />

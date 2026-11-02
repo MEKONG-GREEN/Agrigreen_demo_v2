@@ -189,6 +189,25 @@ describe("Price198 item/group routes", () => {
     expect(renamed.name).toBe("Lúa và gạo"); expect(renamed.version).toBe(old.version + 1);
     expect(renamed.sort_order).toBe(old.sort_order);
   });
+  it("delete confirmation keeps a server conflict visible inside the dialog", async () => {
+    const { fetch, pa } = await setupClient();
+    const group = await pa.createGroup({ name: "Nhóm để thử xóa198" });
+    nav.query = `at=${group.valid_from}&tab=groups`;
+    render(<ItemsScreen />);
+    const table = await screen.findByRole("table", { name: "Nhóm hàng" });
+    const row = within(table).getByRole("row", { name: /Nhóm để thử xóa198/ });
+    await userEvent.click(within(row).getByRole("button", { name: "Xóa" }));
+    const dialog = screen.getByRole("dialog", { name: `Xóa nhóm ${group.code}` });
+    fetch.mockImplementation(async (...args: Parameters<typeof mockFetchNoDelay>) => {
+      const request = args[0] as Request;
+      if (request.method === "POST" && new URL(request.url).pathname === `/v1/price/groups/${group.code}/retire`)
+        return new Response(JSON.stringify({ type: "about:blank", status: 409, title: "Nhóm còn mặt hàng", code: "price.group_in_use", detail: "Có mặt hàng vừa được thêm vào nhóm." }), { status: 409, headers: { "Content-Type": "application/problem+json" } });
+      return mockFetchNoDelay(...args);
+    });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Xác nhận xóa" }));
+    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: `Xóa nhóm ${group.code}` })).toBeInTheDocument();
+  });
   it("context switch during a write discards old response/navigation and old editor values", async () => {
     const old = await setupClient();
     const view = render(<PriceItemDetailScreen route={{ kind: "item-new" }} />); await fillItem();
