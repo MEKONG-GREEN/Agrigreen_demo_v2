@@ -31,6 +31,10 @@ test("KHTC194: điều chỉnh theo QĐ trên route riêng, giữ nháp và xem 
   await number.fill("QĐ194");
   await page.getByRole("textbox", { name: /Ngày quyết định/ }).fill("2030-06-01");
   await page.getByRole("textbox", { name: /Ngày hiệu lực/ }).fill("2030-07-01");
+  await expect(number).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("textbox", { name: /Ngày quyết định/ })).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("textbox", { name: /Ngày hiệu lực/ })).not.toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("Bắt buộc nhập.", { exact: true })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("save-version194.png"), fullPage: true });
   await page.getByRole("main").getByRole("link", { name: "Kế hoạch năm", exact: true }).click();
   await expect(page.getByRole("row").filter({ hasText: "Hạng mục kế hoạch194" })).toBeVisible();

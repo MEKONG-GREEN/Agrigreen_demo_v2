@@ -74,6 +74,27 @@ describe("kế hoạch194 — phiên bản qua route",()=>{
     const api=createKhtcApi(auth.api!);expect((await api.versions(2030)).items).toHaveLength(2);
     expect((await api.plan(2030,1))!.entries.some(e=>e.name==="Hạng mục điều chỉnh194")).toBe(false);
   });
+  it("sửa trường sau submit lỗi cập nhật riêng lỗi hiện hành và không ghi trước Lưu",async()=>{
+    const view=render(<PlanWorkspace/>);await dirtyPlan();navigate(view,planHref(PLAN_BASE,2030,"save"));
+    fireEvent.click(await screen.findByRole("button",{name:"Lưu phiên bản"}));
+    const decision=screen.getByRole("textbox",{name:/Số quyết định/});
+    const date=screen.getByRole("textbox",{name:/Ngày quyết định/});
+    const effective=screen.getByRole("textbox",{name:/Ngày hiệu lực/});
+    expect(decision).toHaveAttribute("aria-invalid","true");
+    expect(date).toHaveAttribute("aria-invalid","true");
+    expect(effective).toHaveAttribute("aria-invalid","true");
+    fireEvent.change(decision,{target:{value:"QĐ194"}});
+    expect(decision).not.toHaveAttribute("aria-invalid","true");
+    expect(date).toHaveAttribute("aria-invalid","true");
+    expect(effective).toHaveAttribute("aria-invalid","true");
+    fireEvent.change(date,{target:{value:"2030-02-30"}});
+    expect(date).toHaveAttribute("aria-invalid","true");
+    expect(screen.getByText("Nhập ngày YYYY-MM-DD hợp lệ.")).toBeInTheDocument();
+    fillDecision();
+    for(const field of [decision,date,effective])expect(field).not.toHaveAttribute("aria-invalid","true");
+    expect(screen.queryByText("Bắt buộc nhập.")).not.toBeInTheDocument();
+    expect(writes).toHaveLength(0);
+  });
   it("phiên bản URL chỉ đọc đúng bản; không tồn tại không rơi về bản mới nhất",async()=>{
     nav.path=`${PLAN_BASE}/phien-ban/1`;const view=render(<PlanWorkspace/>);
     await screen.findByRole("heading",{name:"Kế hoạch năm 2030 — phiên bản 1"});

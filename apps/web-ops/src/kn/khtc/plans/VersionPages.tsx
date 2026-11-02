@@ -21,6 +21,18 @@ export function SaveVersionPage({ route, head, onChange, adjust, canEdit, dirty,
   const [errors, setErrors] = useState<Record<string, string>>({});
   const id = useId();
   const server = problem ? fieldErrorMap(problem) : {};
+  const changeField = (field: keyof VersionHead, value: string) => {
+    const next = { ...head, [field]: value };
+    onChange(next);
+    setErrors(previous => {
+      if (!previous[field]) return previous;
+      const updated = { ...previous };
+      const message = validateVersionHead(route.year, adjust, next).errors[field];
+      if (message) updated[field] = message;
+      else delete updated[field];
+      return updated;
+    });
+  };
   const save = async () => {
     if (!canEdit || !dirty || busy) return;
     const checked = validateVersionHead(route.year, adjust, head);
@@ -33,10 +45,10 @@ export function SaveVersionPage({ route, head, onChange, adjust, canEdit, dirty,
       <p className="mute">Chỉ lưu khi bấm Lưu phiên bản. Bản nháp trong trang chưa thay đổi phiên bản đã lưu.</p>
       {!dirty ? <p role="status">Chưa có thay đổi chưa lưu trong bản nháp của năm này.</p> : null}
       <form id={id} noValidate onSubmit={e => { e.preventDefault(); void save(); }}>
-        <TextField label="Số quyết định" value={head.decision_no} onChange={v => onChange({ ...head, decision_no: v })} required={adjust} maxLength={100} error={errors.decision_no || server.decision_no} disabled={busy} />
-        <TextField label="Ngày quyết định" value={head.decision_date} onChange={v => onChange({ ...head, decision_date: v })} required={adjust} maxLength={10} placeholder="YYYY-MM-DD" error={errors.decision_date || server.decision_date} disabled={busy} />
-        <TextField label="Ngày hiệu lực" value={head.effective_from} onChange={v => onChange({ ...head, effective_from: v })} required={adjust} maxLength={10} placeholder="YYYY-MM-DD" error={errors.effective_from || server.effective_from} disabled={busy} />
-        <TextField label="Ghi chú" value={head.note} onChange={v => onChange({ ...head, note: v })} multiline maxLength={1000} error={errors.note || server.note} disabled={busy} />
+        <TextField label="Số quyết định" value={head.decision_no} onChange={v => changeField("decision_no", v)} required={adjust} maxLength={100} error={errors.decision_no || server.decision_no} disabled={busy} />
+        <TextField label="Ngày quyết định" value={head.decision_date} onChange={v => changeField("decision_date", v)} required={adjust} maxLength={10} placeholder="YYYY-MM-DD" error={errors.decision_date || server.decision_date} disabled={busy} />
+        <TextField label="Ngày hiệu lực" value={head.effective_from} onChange={v => changeField("effective_from", v)} required={adjust} maxLength={10} placeholder="YYYY-MM-DD" error={errors.effective_from || server.effective_from} disabled={busy} />
+        <TextField label="Ghi chú" value={head.note} onChange={v => changeField("note", v)} multiline maxLength={1000} error={errors.note || server.note} disabled={busy} />
       </form>
     </>}
   </DetailPage>;
