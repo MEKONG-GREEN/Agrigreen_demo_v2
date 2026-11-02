@@ -98,6 +98,9 @@ func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 // Control là cổng điều khiển kỳ native (tiến độ, chốt, hủy) cho module nghiệp vụ (W11.62 — KN Kỳ KHTC).
 func (m *Module) Control() port.PeriodControl { return app.Control{Svc: m.svc} }
 
+// ConditionalControl adds native compare-and-swap without changing legacy callers.
+func (m *Module) ConditionalControl() port.ConditionalPeriodControl { return app.Control{Svc: m.svc} }
+
 // SystemProgress provides a read-only server-side reader for trusted tenant jobs.
 // User requests continue to use Control and its existing authorization checks.
 func (m *Module) SystemProgress() port.SystemProgressReader { return app.SystemReader{Svc: m.svc} }
