@@ -142,10 +142,7 @@ describe("màn Danh mục nhân sự", () => {
     render(<HrmCatalogScreen />);
     expect(await screen.findByText(/dữ liệu mẫu/)).toBeInTheDocument();
     expect(await screen.findByText("01.002")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Chuyên viên chính/ }));
-    expect(
-      await screen.findByText(/Bảng hệ số — Chuyên viên chính/),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Chuyên viên chính/ })).toHaveAttribute("href", expect.stringContaining("/he-so/01.002?at="));
     await user.click(screen.getByRole("button", { name: /^Chức vụ/ }));
     expect(await screen.findByRole("link", { name: "Thêm" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/them-moi");
     expect(screen.getByRole("link", { name: "Sửa vien_chuc" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/muc/vien_chuc/sua");
