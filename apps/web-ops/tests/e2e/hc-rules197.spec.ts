@@ -49,6 +49,7 @@ test("hc-rules197: tham số qua route riêng, thêm phiên bản và giữ bả
 test("hc-rules197-alias: quy đổi qua alias phòng, hủy không ghi",async({page})=>{
  await page.clock.setFixedTime(new Date("2026-10-12T03:00:00Z"));
  await loginAs(page,"kn-admin","/kn/phong-ban/hanh_chinh_tong_hop/danh-muc-nhan-su/quy-tac/achievement_conversion?at=2026-10-12");
+ const aliasHistoryLength=await page.evaluate(()=>window.history.length);
  // A fresh tab starts with HCTH closed. Enable it through Admin and use browser
  // history within this tab, retaining the actual department state and context.
  await sidebar(page).getByRole("link",{name:"Phòng ban",exact:true}).click();
@@ -59,7 +60,10 @@ test("hc-rules197-alias: quy đổi qua alias phòng, hủy không ghi",async({p
  await page.getByLabel(/^Lý do hỗ trợ/).fill("Kiểm tra alias tham số FN19");
  await page.getByRole("button",{name:"Vào menu Cấp Tỉnh",exact:true}).click();
  await page.getByRole("button",{name:"Thoát chế độ hỗ trợ",exact:true}).click();
- for(let i=0;i<8&&!new URL(page.url()).pathname.includes("/danh-muc-nhan-su/quy-tac/");i++)await page.goBack();
+ await expect(page.getByRole("button",{name:"Thoát chế độ hỗ trợ",exact:true})).toHaveCount(0);
+ await expect(sidebar(page).getByRole("button",{name:"Phòng Hành chính - Tổng hợp",exact:true})).toBeVisible();
+ const delta=aliasHistoryLength-await page.evaluate(()=>window.history.length);
+ expect(delta).toBeLessThan(0);await page.evaluate((steps)=>window.history.go(steps),delta);
  await expect(page).toHaveURL(/\/phong-ban\/hanh_chinh_tong_hop\/danh-muc-nhan-su\/quy-tac\/achievement_conversion\?/);
  const history=page.getByRole("table",{name:"Lịch sử tham số",exact:true});await expect(history.getByRole("row")).toHaveCount(2);
  await page.getByRole("link",{name:"Phiên bản mới",exact:true}).click();await expect(page).toHaveURL(/phong-ban\/hanh_chinh_tong_hop\/danh-muc-nhan-su\/quy-tac\/achievement_conversion\/them-moi\?/);

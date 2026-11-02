@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import type { MenuTree } from "@/kn/contract";
-import { MAIN_KINDS, FIXED_KINDS } from "@/kn/hrm/api";
-import { crumbsFor, findActive, menuAllows } from "./menu";
+import { MAIN_KINDS, FIXED_KINDS } from "./api";
+import { crumbsFor, findActive, menuAllows } from "../../shell/menu";
 const alias="/kn/phong-ban/hanh_chinh_tong_hop/danh-muc-nhan-su";
 const canonical="/kn/nhan-su/danh-muc";
 const tree=():MenuTree=>({version:"197",role:"admin",department_code:null,groups:[{key:"hcth",label:"HCTH",items:[{key:"catalog",label:"Danh mục",icon:"catalog",href:canonical,status:"active"}]}]});

@@ -2,8 +2,13 @@ package handler
 
 import (
 	"encoding/json"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
+	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -13,6 +18,21 @@ import (
 func TestHRMRule197PercentWireBounds(t *testing.T) {
 	f := newRecFixture(t, true)
 	f.call("admin", http.MethodPost, "/v1/hrm/defaults", nil, http.StatusCreated)
+	// recFixture's basic router intentionally omits idempotency middleware. Use
+	// the real middleware and a distinct operation key for each boundary write.
+	router := gin.New()
+	sequence := 0
+	router.Use(func(c *gin.Context) {
+		if p, ok := f.who[c.GetHeader("X-Test-As")]; ok {
+			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
+		}
+		if c.Request.Method == http.MethodPost {
+			sequence++
+			c.Request.Header.Set(idempotency.Header, "rule-197-"+strconv.Itoa(sequence))
+		}
+	}, idempotency.Middleware(f.env.Pool(t, migrations.PF, "platform_api")))
+	Handler{Svc: f.svc}.RegisterApp(router.Group("/v1"))
+	f.r = router
 	const path = "/v1/hrm/rules/promotion"
 	count := func() int { return len(f.call("hcth", http.MethodGet, path, nil, http.StatusOK)["versions"].([]any)) }
 	before := count()
