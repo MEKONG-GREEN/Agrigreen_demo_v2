@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Every runtime operation below crosses real owner/exporter HTTP + PostgreSQL.
@@ -105,6 +107,22 @@ func TestArchive199StoredWordBindingAndMixedZIP(t *testing.T) {
 	}
 	if err := admin.QueryRow(ctx, `SELECT count(*) FROM pf_extension.khtc_word_binding WHERE tenant_id=$1 AND run_id=$2`, f.tid, w1.ID).Scan(&bindings); err != nil || bindings != 1 {
 		t.Fatal("retry duplicated binding", bindings, err)
+	}
+	// A fresh HTTP key replaying the same stored port result rechecks owner binding.
+	replay := counter.last
+	counter.forced = &replay
+	same := f.word(p.ID, x1.ID, "archive199-link-recheck-after-ttl")
+	counter.forced = nil
+	if same.ID != w1.ID {
+		t.Fatal("link replay changed run")
+	}
+	// The SQL invariant also survives expired ledger idem independently of app checks.
+	duplicateSQL := `INSERT INTO pf_extension.khtc_word_binding (period_id,export_id,run_id,export_input_hash,export_body_hash,word_version,template_key,template_version,template_hash,word_input_hash,body_hash,body_size,file_name,content_type,doc_number,doc_number_auto,word_actor_ref,word_at,id,tenant_id,stream_key,event_time,actor_ref,idem_key,rule_version)
+ SELECT period_id,export_id,run_id,export_input_hash,export_body_hash,word_version,template_key,template_version,template_hash,word_input_hash,body_hash,body_size,file_name,content_type,doc_number,doc_number_auto,word_actor_ref,word_at,$3,tenant_id,stream_key,event_time,actor_ref,'archive199:duplicate:'||$3::uuid::text,rule_version FROM pf_extension.khtc_word_binding WHERE tenant_id=$1 AND run_id=$2`
+	_, duplicateErr := admin.Exec(ctx, duplicateSQL, f.tid, w1.ID, ids.New())
+	var duplicatePG *pgconn.PgError
+	if !errors.As(duplicateErr, &duplicatePG) || duplicatePG.Code != "23505" || duplicatePG.ConstraintName != "khtc_word_binding_once" {
+		t.Fatalf("bind-once SQL bypass after TTL: %v", duplicateErr)
 	}
 	// Alter the live draft: reads must remain byte-identical, without Export calls.
 	c, b := f.call(http.MethodPost, p.ID, "/draft", map[string]any{"base_version": d.Version, "texts": map[string]string{"B": "Nguồn soạn đã đổi sau xuất"}})
@@ -251,6 +269,25 @@ func TestArchive199StoredWordBindingAndMixedZIP(t *testing.T) {
 	f.tid = old
 	if c != 404 {
 		t.Fatalf("cross tenant: %d %s", c, b)
+	}
+	// Concurrent reused HTTP key across two frozen snapshots has one winner only.
+	var beforeBindings int
+	if err = admin.QueryRow(ctx, `SELECT count(*) FROM pf_extension.khtc_word_binding WHERE tenant_id=$1`, f.tid).Scan(&beforeBindings); err != nil {
+		t.Fatal(err)
+	}
+	results := make(chan int, 2)
+	for _, xid := range []string{x1.ID, x2.ID} {
+		go func(exportID string) {
+			status, _ := f.do(http.MethodPost, reportPath(p.ID)+"/exports/"+exportID+"/word", authz.KNTinh, khtcDept, f.khtcUser, "archive199-concurrent-shared-key", map[string]any{})
+			results <- status
+		}(xid)
+	}
+	first, second := <-results, <-results
+	if !((first == 201 && second == 422) || (first == 422 && second == 201)) {
+		t.Fatalf("concurrent snapshots: %d %d", first, second)
+	}
+	if err = admin.QueryRow(ctx, `SELECT count(*) FROM pf_extension.khtc_word_binding WHERE tenant_id=$1`, f.tid).Scan(&bindings); err != nil || bindings != beforeBindings+1 {
+		t.Fatal("concurrency appended wrong/duplicate binding", beforeBindings, bindings, err)
 	}
 	for _, query := range []string{"?limit=1e100000", "?offset=1e-100000", "?limit=" + strings.Repeat("9", 100000), "?limit=0", "?offset=-1"} {
 		c, b = f.call(http.MethodGet, p.ID, "/exports/"+x1.ID+"/words"+query, nil)
