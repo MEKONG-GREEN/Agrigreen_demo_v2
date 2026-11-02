@@ -79,7 +79,10 @@ func buildNotify(ctx context.Context, log *slog.Logger, base string, keep func(*
 	if err != nil {
 		return nil, err
 	}
-	acc := accounts.New(accPool, clk, accounts.Deps{Directory: kc})
+	acc, err := workerAccounts(accPool, clk, accounts.Deps{Directory: kc})
+	if err != nil {
+		return nil, err
+	}
 	farmers := assembly.AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}
 	ownedDesk := knprice.NewNotificationDirectory(acc.RoleHolders(), assembly.PriceProfiles())
 	d.Kinds, d.Digests = assembly.NotificationKinds(), assembly.NotificationDigests()
