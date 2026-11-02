@@ -30,10 +30,7 @@ func (h Handler) TemplateDefinitionAuthorization() gin.HandlerFunc {
 				return
 			}
 			c.Request.Body = io.NopCloser(bytes.NewReader(body))
-			var req struct {
-				defineReq
-				BaseVersion *int64 `json:"base_version"`
-			}
+			var req defineReq
 			if err := json.Unmarshal(body, &req); err != nil {
 				httpx.Fail(c, problem.BadRequest)
 				return

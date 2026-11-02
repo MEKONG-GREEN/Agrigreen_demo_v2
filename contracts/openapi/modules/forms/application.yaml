@@ -37,7 +37,7 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
     post:
-      summary: Định nghĩa phiên bản mới của biểu (vai define_by) — phiên bản cũ và kỳ đã phát hành không đổi
+      summary: Định nghĩa phiên bản qua policy chủ nghiệp vụ hoặc DefineBy legacy; phiên bản và kỳ cũ bất biến
       operationId: formsDefineTemplate
       tags: [forms]
       parameters:
@@ -55,7 +55,8 @@ paths:
               schema: {$ref: "#/components/schemas/FormsTemplate"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
-        "422": {description: forms.template_invalid, $ref: "#/components/responses/Problem"}
+        "409": {description: base_version không còn hiện hành, $ref: "#/components/responses/Problem"}
+        "422": {description: forms.template_invalid hoặc base_version thiếu hoặc idempotency_key_reused, $ref: "#/components/responses/Problem"}
 # @ag-order: 322
   /v1/forms/templates/fixtures:
     post:
@@ -465,6 +466,7 @@ components:
         title: {type: string, minLength: 1, maxLength: 300}
         fields: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
         fixture: {type: boolean, default: false}
+        base_version: {type: integer, format: int64, minimum: 0, description: "Bắt buộc khi profile có definition policy; 0 tạo mã mới, số khác là phiên bản gốc đã đọc. Legacy bỏ trống giữ tương thích."}
 # @ag-order: 854
     FormsTemplate:
       type: object

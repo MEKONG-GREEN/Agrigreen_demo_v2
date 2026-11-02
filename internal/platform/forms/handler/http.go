@@ -318,11 +318,12 @@ func (h Handler) templates(c *gin.Context) {
 }
 
 type defineReq struct {
-	Profile string         `json:"profile"`
-	Code    string         `json:"code"`
-	Title   string         `json:"title"`
-	Fields  []domain.Field `json:"fields"`
-	Fixture bool           `json:"fixture"`
+	Profile     string         `json:"profile"`
+	Code        string         `json:"code"`
+	Title       string         `json:"title"`
+	Fields      []domain.Field `json:"fields"`
+	Fixture     bool           `json:"fixture"`
+	BaseVersion *int64         `json:"base_version"`
 }
 
 func (h Handler) define(c *gin.Context) {
@@ -331,7 +332,7 @@ func (h Handler) define(c *gin.Context) {
 		return
 	}
 	t, err := h.Svc.DefineTemplate(c.Request.Context(), app.TemplateInput{Profile: req.Profile, Code: req.Code, Title: req.Title,
-		Fields: req.Fields, Fixture: req.Fixture}, idemKey(c))
+		Fields: req.Fields, Fixture: req.Fixture, BaseVersion: req.BaseVersion}, idemKey(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return

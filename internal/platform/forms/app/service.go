@@ -59,7 +59,7 @@ func NewService(b tenant.Beginner, clk clock.Clock, approvals wfport.Approvals, 
 	if clk == nil {
 		clk = clock.System{}
 	}
-	s := &Service{DB: b, Clock: clk, Approvals: approvals, profiles: map[string]port.Profile{}}
+	s := &Service{DB: b, Clock: clk, Approvals: approvals, profiles: map[string]port.Profile{}, RequiredDefinitionPolicies: map[string]bool{}}
 	for _, p := range profiles {
 		if err := domain.ValidateProfile(p); err != nil {
 			return nil, err
@@ -68,6 +68,9 @@ func NewService(b tenant.Beginner, clk clock.Clock, approvals wfport.Approvals, 
 			return nil, fmt.Errorf("profile %s khai hai lần", p.Name)
 		}
 		s.profiles[p.Name] = p
+		if p.RequireDefinitionPolicy {
+			s.RequiredDefinitionPolicies[p.Name] = true
+		}
 		s.order = append(s.order, p.Name)
 	}
 	return s, nil
