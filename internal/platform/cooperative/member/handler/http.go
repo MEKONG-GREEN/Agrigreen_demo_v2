@@ -3,7 +3,7 @@
 //
 //	GET  /v1/cooperatives/{ref}/households, POST /v1/households, POST /v1/households/copy,
 //	GET  /v1/households/{ref}/contact, POST /v1/households/{ref}/membership,
-//	GET|POST /v1/kn/cooperatives/{ref}/households, PUT /v1/kn/households/{ref}, GET /v1/kn/households/{ref}/log.
+//	GET /v1/kn/cooperatives/{ref}/households, GET /v1/kn/households/{ref}/log.
 //
 // Admin API: POST /v1/households/import. Các route HTX hướng Nút (/v1/cooperatives, /v1/cooperatives/{ref},
 // /v1/kn/cooperatives*, …) ở lại pf/party.

@@ -1,7 +1,7 @@
 // ============================================================================
 // BACKEND GIẢ LẬP thu thập dữ liệu Cấp Xã KN v7.7 (P7, application.yaml /v1/kn/*): HTX + nông hộ (FN-XA-03.03),
 // máy móc theo HTX (FN-XA-03.04), thửa (FN-XA-03.05, danh sách), vật tư (FN-XA-03.06). Quy tắc như Go P7 ở mức màn web
-// cần: phạm vi theo ngữ cảnh (Cấp Xã: xã phụ trách; Cấp Tỉnh/TW: chỉ xem), SĐT che, vô hiệu hóa thay xóa (lý do ≥ 20),
+// cần: phạm vi theo ngữ cảnh, SĐT che; HTX/nông hộ legacy CHỈ ĐỌC (#160), hồ sơ KN ghi ở kn-collect-records (#67/#161),
 // số máy nguyên 1–1.000.000 (#113), năm SX ở hồ sơ KN riêng 1900–năm hiện tại VN (#119), trùng loại bị chặn,
 // vật tư sửa = bản ghi bù có lý do.
 // ============================================================================
@@ -81,12 +81,6 @@ export const MATERIALS: Record<string, { name: string; unit: string; countable: 
 const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 /** Hôm nay theo lịch VN (now() là chuỗi UTC "Z") — KN-VN-DATE #149. */
 const todayVN = () => vnDate(Date.now());
-const mask = (p: string) => `${p.slice(0, 4)}•••${p.slice(-3)}`;
-const shortName = (full: string) => {
-  const parts = full.trim().split(/\s+/);
-  return parts.length < 2 ? full : `${parts[0]} ${parts.slice(1, -1).map((x) => `${x[0]}.`).join(" ")} ${parts.at(-1)![0]}.`.replace(/\s+/g, " ");
-};
-
 let COOPS: Coop[] = [];
 let HH: Household[] = [];
 let MACH = new Map<string, Line[]>();
@@ -183,36 +177,6 @@ export const knCollectRoutes: Route[] = [
     }),
   },
   {
-    method: "POST",
-    pattern: re("/v1/kn/cooperatives"),
-    handler: wrap(({ body }, c) => {
-      const deny = canWrite(c, "party.read_only");
-      if (deny) return deny;
-      const b = (body ?? {}) as { name?: string; commune_code?: string; area_ha?: string | number | null; representative?: { full_name: string; phone: string } };
-      const name = String(b.name ?? "").trim();
-      if (!name) return fieldErr("name", "bắt buộc");
-      if (!b.commune_code || !inScope(c, b.commune_code)) return problem(403, "party.out_of_scope", "Ngoài phạm vi phụ trách");
-      if (COOPS.some((x) => x.name.toLowerCase() === name.toLowerCase())) return problem(409, "party.cooperative_name_taken", "Tên HTX đã tồn tại");
-      const area = b.area_ha === undefined || b.area_ha === null || b.area_ha === "" ? null : String(b.area_ha);
-      if (area !== null && !/^\d+(\.\d{1,4})?$/.test(area)) return fieldErr("area_ha", "decimal ≥ 0, tối đa 4 chữ số lẻ");
-      const x: Coop = {
-        ref: uuidv7(),
-        code: `HTX-AG-${String(COOPS.length + 1).padStart(3, "0")}`,
-        name,
-        commune_code: b.commune_code,
-        area_ha: area,
-        representative: b.representative ? { label: shortName(b.representative.full_name), masked_phone: mask(b.representative.phone.replace(/\D/g, "")) } : null,
-        active: true,
-        status_reason: null,
-        tax_code: null,
-        head_office: null,
-        updated_at: now(),
-      };
-      COOPS.push(x);
-      return json(coopWire(x), 201);
-    }),
-  },
-  {
     method: "GET",
     pattern: re("/v1/kn/cooperatives/{id}"),
     handler: wrap(({ params }, c) => {
@@ -221,45 +185,11 @@ export const knCollectRoutes: Route[] = [
     }),
   },
   {
-    method: "POST",
-    pattern: re("/v1/kn/cooperatives/{id}/deactivate"),
-    handler: wrap(({ params, body }, c) => {
-      const deny = canWrite(c, "party.read_only");
-      if (deny) return deny;
-      const x = findCoop(c, params[0]);
-      if (!x) return notFound();
-      const r = String((body as { reason?: string } | undefined)?.reason ?? "").trim();
-      if ([...r].length < 20) return fieldErr("reason", "bắt buộc, ít nhất 20 ký tự");
-      if (!x.active) return problem(409, "party.org_state_conflict", "HTX đã vô hiệu hóa");
-      Object.assign(x, { active: false, status_reason: r, updated_at: now() });
-      return json({ cooperative: coopWire(x), warnings: { households: HH.filter((h) => h.coop === x.ref && h.active).length, plots: 0, machines: coopLines(x).total } });
-    }),
-  },
-  {
     method: "GET",
     pattern: re("/v1/kn/cooperatives/{id}/households"),
     handler: wrap(({ params }, c) => {
       const x = findCoop(c, params[0]);
       return x ? json({ items: HH.filter((h) => h.coop === x.ref).map(hhWire), next_cursor: null }) : notFound();
-    }),
-  },
-  {
-    method: "POST",
-    pattern: re("/v1/kn/cooperatives/{id}/households"),
-    handler: wrap(({ params, body }, c) => {
-      const deny = canWrite(c, "party.read_only");
-      if (deny) return deny;
-      const x = findCoop(c, params[0]);
-      if (!x) return notFound();
-      if (!x.active) return problem(409, "party.org_state_conflict", "HTX đã vô hiệu hóa");
-      const b = (body ?? {}) as { holder?: { full_name?: string; phone?: string }; cultivated_area_ha?: string };
-      const phone = String(b.holder?.phone ?? "").replace(/\D/g, "");
-      if (!b.holder?.full_name || !/^0\d{9}$/.test(phone)) return fieldErr("holder", "họ tên và SĐT 10 chữ số bắt buộc");
-      // BF-SWEEP-TT: diện tích canh tác như area_ha của HTX — decimal ≥ 0, tối đa 4 chữ số lẻ (R-A1, máy chủ cũng chặn).
-      if (b.cultivated_area_ha !== undefined && b.cultivated_area_ha !== null && b.cultivated_area_ha !== "" && !/^\d+(\.\d{1,4})?$/.test(String(b.cultivated_area_ha))) return fieldErr("cultivated_area_ha", "decimal ≥ 0, tối đa 4 chữ số lẻ");
-      const h: Household = { ref: uuidv7(), coop: x.ref, holder: { label: shortName(b.holder.full_name), masked_phone: mask(phone) }, cultivated_area_ha: b.cultivated_area_ha ?? null, active: true, since_date: todayVN() };
-      HH.push(h);
-      return json(hhWire(h), 201);
     }),
   },
   {
