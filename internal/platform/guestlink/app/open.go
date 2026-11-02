@@ -27,6 +27,16 @@ func delivered(events []store.Event, id uuid.UUID) bool {
 	}
 	return false
 }
+
+// Once expiry has been observed, an older wall clock cannot revive the code.
+func challengeExpired(events []store.Event, id uuid.UUID) bool {
+	for _, event := range events {
+		if event.Action == "denied" && event.Reason == "challenge_expired" && event.ChallengeID == id {
+			return true
+		}
+	}
+	return false
+}
 func (s *Service) Open(ctx context.Context, token port.Secret, key, rawIP string) (port.Challenge, error) {
 	if !s.available() {
 		return port.Challenge{}, port.ErrUnavailable
@@ -58,8 +68,11 @@ func (s *Service) Open(ctx context.Context, token port.Secret, key, rawIP string
 				selected = e
 				alreadySent = delivered(events, e.ID)
 				latest := challengeFor(events, uuid.Nil)
-				if latest == nil || latest.ID != e.ID || consumed(events, e.ID) || e.Until == nil || !e.Until.After(s.now()) {
+				if latest == nil || latest.ID != e.ID || consumed(events, e.ID) || e.Until == nil {
 					return port.ErrDenied, nil
+				}
+				if challengeExpired(events, e.ID) || !e.Until.After(s.now()) {
+					return port.ErrDenied, s.event(ctx, tx, g, ip, "denied", "challenge_expired", e.ID, uuid.Nil, "", "", nil)
 				}
 				return nil, nil
 			}

@@ -37,7 +37,13 @@ func (s *Service) Verify(ctx context.Context, link port.Secret, id uuid.UUID, co
 	var out port.Session
 	err = s.guestTx(ctx, g, ip, state, func(tx pgx.Tx, events []store.Event) (error, error) {
 		c := challengeFor(events, uuid.Nil)
-		if c == nil || c.ID != id || c.Until == nil || !c.Until.After(s.now()) || !delivered(events, id) || consumed(events, id) {
+		if c == nil || c.ID != id || c.Until == nil {
+			return port.ErrDenied, s.deny(ctx, tx, g, ip, "challenge")
+		}
+		if challengeExpired(events, id) || !c.Until.After(s.now()) {
+			return port.ErrDenied, s.event(ctx, tx, g, ip, "denied", "challenge_expired", id, uuid.Nil, "", "", nil)
+		}
+		if !delivered(events, id) || consumed(events, id) {
 			return port.ErrDenied, s.deny(ctx, tx, g, ip, "challenge")
 		}
 		if count(events, "otp_wrong")+count(events, "verified") >= s.cfg.MaxAttempts {

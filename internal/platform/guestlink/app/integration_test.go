@@ -660,3 +660,37 @@ func TestGuest184NewSessionReplacesPreviousAndConsumedOpenDenies(t *testing.T) {
 		t.Fatal("current session denied", err)
 	}
 }
+
+// An observed expiry is irreversible, including when NTP moves wall time back.
+func TestGuest184ExpiredChallengeNeverRevives(t *testing.T) {
+	for _, observation := range []string{"verify", "open_retry"} {
+		t.Run(observation, func(t *testing.T) {
+			f := newGuestFx(t, func(c *app.Config) { c.OTPTTL = time.Minute })
+			g := f.issue("issue")
+			expired := f.open(g, "first")
+			f.clk.Advance(time.Minute + time.Second)
+			var err error
+			if observation == "verify" {
+				_, err = f.svc.Verify(f.ctx(false), g.Link, expired.ID, f.sender.code(expired.ID), "127.0.0.1")
+			} else {
+				_, err = f.svc.Open(f.ctx(false), g.Link, "first", "127.0.0.1")
+			}
+			if !errors.Is(err, port.ErrDenied) {
+				t.Fatal("expired challenge not denied", err)
+			}
+			f.clk.Advance(-2 * time.Second)
+			if _, err = f.svc.Verify(f.ctx(false), g.Link, expired.ID, f.sender.code(expired.ID), "127.0.0.1"); !errors.Is(err, port.ErrDenied) {
+				t.Fatal("observed expired challenge revived after clock rollback", err)
+			}
+			if _, err = f.svc.Open(f.ctx(false), g.Link, "first", "127.0.0.1"); !errors.Is(err, port.ErrDenied) {
+				t.Fatal("expired challenge retry revived after clock rollback", err)
+			}
+			f.clk.Advance(3 * time.Second)
+			fresh := f.open(g, "fresh")
+			if fresh.ID == expired.ID {
+				t.Fatal("resend reused expired challenge")
+			}
+			f.verify(g, fresh)
+		})
+	}
+}
