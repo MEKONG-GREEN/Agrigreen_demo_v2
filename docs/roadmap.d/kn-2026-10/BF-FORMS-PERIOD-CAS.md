@@ -1,0 +1,1 @@
+- [ ] BF-FORMS-PERIOD-CAS (#159): port CAS native theo hai head sổ thật, atomic guard + applied revision, chờ review chéo/CI đúng SHA; consumer KN tách #201 sau khi #159 gộp, chưa kết luận end-to-end/G1 đạt.

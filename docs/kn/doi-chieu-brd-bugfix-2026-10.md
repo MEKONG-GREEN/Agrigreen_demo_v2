@@ -66,6 +66,8 @@ A1–A5 phải kiểm ở danh sách + tạo/sửa + chi tiết của mọi hàn
 
 Bổ sung 29/10/2026 — #163 phần đầu: luồng 16 loại mục FN-19 chuyển Thêm/Sửa/Chi tiết và lịch sử sang route riêng, dùng DetailPage/LogPanel, lỗi theo trường và số có giới hạn trước tính toán. [Phạm vi và giới hạn](gia-dinh/BF-SWEEP-HCTH-REST.md). Bảng hệ số/quy tắc FN-19 cùng sáu màn HCTH còn lại nằm ở [#179](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/179); chưa đổi trạng thái toàn FN-19 hoặc toàn HCTH thành Đạt, chưa có UAT khách.
 
+Bổ sung 02/11/2026 — #179 phần đầu: bảng hệ số FN-19 có danh sách STT, chi tiết/Log và thêm phiên bản theo ngày hiệu lực trên route riêng; NumberField kiểm tháng/hệ số trước chuẩn hóa. [Phạm vi và giới hạn](gia-dinh/BF-SWEEP-HCTH-FORMS.md). Tham số FN-19 và các màn HCTH còn lại chuyển sang [#197](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/197), giữ trạng thái Lệch và chưa có UAT khách; bảng mới không sửa quyết định đã ban hành.
+
 ## 4. KHTC — 18 chức năng v2.3
 
 | BRD / mục / đoạn gốc | Yêu cầu | Màn | Bằng chứng mã | Trạng thái | Khác biệt / ticket | Khách chấp nhận / UAT | Chặn UAT riêng (đề xuất, chờ PO) |
