@@ -358,27 +358,44 @@ func load(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) (*PeriodV
 // Period đọc kỳ (người gọi phải thấy kỳ: toàn quốc, Nút chủ, hoặc có đơn vị nhận trong phạm vi — đơn vị ngoài phạm
 // vi bị lược khỏi danh sách).
 func (s *Service) Period(ctx context.Context, profile string, id uuid.UUID) (PeriodView, error) {
+	v, _, err := s.periodState(ctx, profile, id, false)
+	return v, err
+}
+
+// periodState shares the exact native read policy. Only a control snapshot takes
+// the period lock, keeping progress and both revision heads one consistent read.
+func (s *Service) periodState(ctx context.Context, profile string, id uuid.UUID, withRevision bool) (PeriodView, port.PeriodRevision, error) {
 	_, a, err := s.resolve(ctx, profile)
 	if err != nil {
-		return PeriodView{}, err
+		return PeriodView{}, port.PeriodRevision{}, err
 	}
+	var revision port.PeriodRevision
 	var v *PeriodView
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
+		if withRevision {
+			if err := store.Lock(ctx, tx, id); err != nil {
+				return err
+			}
+		}
 		var e error
 		v, e = load(ctx, tx, id, s.Clock.Now().UTC())
+		if e == nil && v != nil && withRevision {
+			revision = port.PeriodRevision{TenantID: a.tenant, PeriodID: id, Profile: profile}
+			revision.EventSeq, revision.DueSeq, e = store.ControlHeads(ctx, tx, id)
+		}
 		return e
 	})
 	if err != nil {
-		return PeriodView{}, err
+		return PeriodView{}, port.PeriodRevision{}, err
 	}
 	if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
-		return PeriodView{}, port.ErrPeriodNotFound
+		return PeriodView{}, port.PeriodRevision{}, port.ErrPeriodNotFound
 	}
 	if !a.scope.All && !a.owns(v.Period) && a.targetFilter == nil {
 		v.Units = slices.DeleteFunc(v.Units, func(u UnitView) bool { return !a.allowsUnit(v.Spec, v.Period.Units, u.Unit) })
 	}
 	a.filterTargets(v)
-	return *v, nil
+	return *v, revision, nil
 }
 
 // Periods liệt kê kỳ của profile mà người gọi thấy (tối đa limit, mới trước).
@@ -864,6 +881,10 @@ func (s *Service) Review(ctx context.Context, profile string, submissionID uuid.
 // đơn vị, trạng thái rà soát, số liệu) — băm SHA-256 do DB tính; sự kiện pf.forms.period.closed. Chốt lại sau mở lại
 // sinh ảnh chụp mới, ảnh cũ không đổi.
 func (s *Service) Close(ctx context.Context, profile string, periodID uuid.UUID, idem string) (PeriodView, error) {
+	return s.closeWithRevision(ctx, profile, periodID, idem, nil)
+}
+
+func (s *Service) closeWithRevision(ctx context.Context, profile string, periodID uuid.UUID, idem string, expect *controlCAS) (PeriodView, error) {
 	prof, a, err := s.resolve(ctx, profile)
 	if err != nil {
 		return PeriodView{}, err
@@ -891,6 +912,9 @@ func (s *Service) Close(ctx context.Context, profile string, periodID uuid.UUID,
 		if !a.canControlGranted(prof.CloseBy, v.Period, v.Spec, grant) {
 			return problem.Forbidden.WithDetail("chốt kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
+		if err := checkControlRevision(ctx, tx, a.tenant, profile, periodID, expect); err != nil {
+			return err
+		}
 		if v.State.Status == domain.PeriodCancelled {
 			return port.ErrPeriodCancelled
 		}
@@ -913,11 +937,17 @@ func (s *Service) Close(ctx context.Context, profile string, periodID uuid.UUID,
 		if err := store.InsertSnapshot(ctx, tx, a.tenant, &snap); err != nil {
 			return err
 		}
-		return enqueueClosed(ctx, tx, a.tenant, periodID, profile, "native", port.ModeManual, snap.ID, snap.No, snap.Hash, a.ref, now)
+		if err := enqueueClosed(ctx, tx, a.tenant, periodID, profile, "native", port.ModeManual, snap.ID, snap.No, snap.Hash, a.ref, now); err != nil {
+			return err
+		}
+		return appliedControlRevision(ctx, tx, a.tenant, profile, periodID, expect)
 	})
 	if err != nil {
 		return PeriodView{}, classify(err)
 	}
+	if expect != nil {
+		return PeriodView{}, nil
+	} // CAS returns its own TX's heads, never a fresh read.
 	return s.Period(ctx, profile, periodID)
 }
 
@@ -954,6 +984,10 @@ type ReopenInput struct {
 
 // Reopen mở lại kỳ đã chốt — sự kiện mới (lý do bắt buộc), ảnh chụp đã chốt không đổi. Profile NoReopen → 403.
 func (s *Service) Reopen(ctx context.Context, profile string, periodID uuid.UUID, in ReopenInput, idem string) (PeriodView, error) {
+	return s.reopenWithRevision(ctx, profile, periodID, in, idem, nil)
+}
+
+func (s *Service) reopenWithRevision(ctx context.Context, profile string, periodID uuid.UUID, in ReopenInput, idem string, expect *controlCAS) (PeriodView, error) {
 	prof, a, err := s.resolve(ctx, profile)
 	if err != nil {
 		return PeriodView{}, err
@@ -980,6 +1014,9 @@ func (s *Service) Reopen(ctx context.Context, profile string, periodID uuid.UUID
 		if !a.canClose(prof.CloseBy, v.Period, v.Spec, in.Units) {
 			return problem.Forbidden.WithDetail("mở lại kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
+		if err := checkControlRevision(ctx, tx, a.tenant, profile, periodID, expect); err != nil {
+			return err
+		}
 		if v.State.Status == domain.PeriodCancelled {
 			return port.ErrPeriodCancelled
 		}
@@ -992,10 +1029,16 @@ func (s *Service) Reopen(ctx context.Context, profile string, periodID uuid.UUID
 			}
 		}
 		ev := domain.Event{ID: ids.New(), Action: "reopened", Mode: port.ModeManual, Units: in.Units, Reason: why, Actor: a.ref, At: now}
-		return store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "reopened"))
+		if err := store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "reopened")); err != nil {
+			return err
+		}
+		return appliedControlRevision(ctx, tx, a.tenant, profile, periodID, expect)
 	})
 	if err != nil {
 		return PeriodView{}, classify(err)
+	}
+	if expect != nil {
+		return PeriodView{}, nil
 	}
 	return s.Period(ctx, profile, periodID)
 }
@@ -1004,6 +1047,10 @@ func (s *Service) Reopen(ctx context.Context, profile string, periodID uuid.UUID
 // thái cuối — không nộp, rà soát, chốt hay mở lại; số liệu đã gửi giữ trong sổ nhưng không vào ảnh chụp (kỳ hủy không
 // có ảnh chụp mới). Kỳ đã chốt không hủy được (mở lại trước — khớp trg_transition).
 func (s *Service) Cancel(ctx context.Context, profile string, periodID uuid.UUID, reason, idem string) (PeriodView, error) {
+	return s.cancelWithRevision(ctx, profile, periodID, reason, idem, nil)
+}
+
+func (s *Service) cancelWithRevision(ctx context.Context, profile string, periodID uuid.UUID, reason, idem string, expect *controlCAS) (PeriodView, error) {
 	prof, a, err := s.resolve(ctx, profile)
 	if err != nil {
 		return PeriodView{}, err
@@ -1039,6 +1086,9 @@ func (s *Service) Cancel(ctx context.Context, profile string, periodID uuid.UUID
 		if !a.canControlGranted(prof.CloseBy, v.Period, v.Spec, grant) {
 			return problem.Forbidden.WithDetail("hủy kỳ cần cấp " + prof.CloseBy + " của Nút phát hành")
 		}
+		if err := checkControlRevision(ctx, tx, a.tenant, profile, periodID, expect); err != nil {
+			return err
+		}
 		switch v.State.Status {
 		case domain.PeriodCancelled:
 			return port.ErrPeriodCancelled
@@ -1046,10 +1096,16 @@ func (s *Service) Cancel(ctx context.Context, profile string, periodID uuid.UUID
 			return port.ErrPeriodClosed
 		}
 		ev := domain.Event{ID: ids.New(), Action: port.ActionCancelled, Mode: port.ModeManual, Reason: why, Actor: a.ref, At: now}
-		return store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "cancelled"))
+		if err := store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "cancelled")); err != nil {
+			return err
+		}
+		return appliedControlRevision(ctx, tx, a.tenant, profile, periodID, expect)
 	})
 	if err != nil {
 		return PeriodView{}, classify(err)
+	}
+	if expect != nil {
+		return PeriodView{}, nil
 	}
 	return s.Period(ctx, profile, periodID)
 }

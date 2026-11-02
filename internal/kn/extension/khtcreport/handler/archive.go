@@ -4,12 +4,23 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func (h Handler) archive(c *gin.Context) {
 	q := app.ArchiveQuery{Kind: c.Query("kind"), Search: c.Query("q"), Limit: 20}
+	if raw := c.Query("period_id"); raw != "" {
+		// No alternate UUID representations or nil sentinel are accepted from clients.
+		id, err := uuid.Parse(raw)
+		if err != nil || id == uuid.Nil || len(raw) != 36 {
+			httpx.Fail(c, app.ErrInvalid)
+			return
+		}
+		q.PeriodID = id
+	}
 	// Check bounded plain integer syntax before conversion, never exponent notation.
 	parse := func(key string, fallback int) (int, bool) {
 		raw := c.Query(key)
@@ -46,6 +57,16 @@ func (h Handler) archive(c *gin.Context) {
 		q.AllVersions = true
 	default:
 		httpx.Fail(c, app.ErrInvalid)
+		return
+	}
+	if strings.HasSuffix(c.FullPath(), "/exported-reports/periods") {
+		out, err := h.Svc.ArchivePeriods(c.Request.Context(), q)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		c.Header("Cache-Control", "no-store")
+		c.JSON(http.StatusOK, out)
 		return
 	}
 	out, err := h.Svc.Archive(c.Request.Context(), q)
