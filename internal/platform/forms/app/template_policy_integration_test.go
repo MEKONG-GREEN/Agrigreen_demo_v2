@@ -188,3 +188,67 @@ func TestTemplateDefinitionKeepsPublishedSchemaAndSubmissions(t *testing.T) {
 	_, err = f.svc.Submit(xa, "fx", newPeriod.Period.ID, "U1", map[string]string{"original": "new schema", "new_required": "7"}, "new-valid")
 	f.must(err, "new selected schema")
 }
+
+func TestTemplateDefinitionOwnerPolicyRoleDepartmentAndTenant(t *testing.T) {
+	f := newFx(t)
+	node, owner := ids.New(), ids.New()
+	admin := f.as(f.tid, ids.New(), "admin", node)
+	locked := TemplateInput{Profile: "fx", Code: "LOCKED-191", Title: "Readable locked schema", Fields: domain.Fixtures()[0].Fields}
+	original, err := f.svc.DefineTemplate(admin, locked, "locked-seed-before-policy")
+	f.must(err, "seed existing locked schema")
+	f.svc.RequiredDefinitionPolicies = map[string]bool{"fx": true}
+	f.svc.DefinitionPolicies = map[string]port.TemplateDefinitionPolicy{"fx": func(_ context.Context, r port.TemplateDefinitionRequest) (port.TemplateDefinitionDecision, error) {
+		allowed := r.Principal.TenantID == f.tid && r.Proposed.Code != "LOCKED-191" &&
+			((r.Actor.Role == "tinh" && r.Actor.Department == "owner_department") ||
+				(r.Actor.Role == "program_owner" && r.Proposed.Code == "DIARY-A-191" && r.Principal.ActorRef == owner))
+		return port.TemplateDefinitionDecision{Allowed: allowed}, nil
+	}}
+	base := int64(0)
+	for _, tc := range []struct {
+		name, role, department, code string
+		foreign, wrongOwner, allow   bool
+	}{
+		{name: "province own department", role: "tinh", department: "owner_department", code: "PROVINCE-191", allow: true},
+		{name: "wrong department", role: "tinh", department: "other_department", code: "DENIED-DEPT-191"},
+		{name: "support role", role: "support", department: "owner_department", code: "DENIED-SUPPORT-191"},
+		{name: "legacy admin cannot bypass policy", role: "admin", department: "owner_department", code: "DENIED-ADMIN-191"},
+		{name: "wrong tenant", role: "tinh", department: "owner_department", code: "DENIED-TENANT-191", foreign: true},
+		{name: "program owner own diary", role: "program_owner", code: "DIARY-A-191", allow: true},
+		{name: "different program owner", role: "program_owner", code: "DIARY-A-191", wrongOwner: true},
+		{name: "owner other diary", role: "program_owner", code: "DIARY-B-191"},
+		{name: "locked structure", role: "tinh", department: "owner_department", code: "LOCKED-191"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tid, actor := f.tid, owner
+			if tc.foreign {
+				tid = ids.New()
+			}
+			if tc.wrongOwner {
+				actor = ids.New()
+			}
+			ctx := fixtureContext(f.ctx, authz.Principal{ActorRef: actor, TenantID: tid}, port.ResolvedActor{Role: tc.role, Department: tc.department, Node: node, Scope: authz.Scope{All: true}})
+			in := locked
+			in.Code = tc.code
+			in.Title = tc.name
+			_, err := f.svc.defineTemplateVersion(ctx, in, &base, "role-check-"+tc.code+tc.role+actor.String())
+			if tc.allow {
+				if err != nil {
+					t.Fatalf("allowed owner policy: %v", err)
+				}
+			} else {
+				if !isProblem(err, "forbidden") {
+					t.Fatalf("owner policy wanted forbidden, got %v", err)
+				}
+			}
+		})
+	}
+	reader := fixtureContext(f.ctx, authz.Principal{ActorRef: owner, TenantID: f.tid}, port.ResolvedActor{Role: "tinh", Department: "owner_department", Node: node, Scope: authz.Scope{All: true}})
+	readable, err := f.svc.TemplateVersion(reader, "fx", "LOCKED-191", 1)
+	f.must(err, "locked schema remains readable")
+	if readable.ID != original.ID || !sameTemplateDefinition(readable, original) {
+		t.Fatal("locked schema changed or hidden")
+	}
+	if n := f.scalar(`SELECT count(*) FROM pf_forms.template WHERE tenant_id=$1`, f.tid); n != 3 {
+		t.Fatalf("denied definition wrote rows: total=%d", n)
+	}
+}

@@ -38,6 +38,9 @@ func (s *Service) authorizeTemplateDefinition(ctx context.Context, in TemplateIn
 	if !ok {
 		return definitionAuthorization{}, problem.Unauthenticated
 	}
+	if base != nil && *base < 0 {
+		return definitionAuthorization{}, problem.Validation.WithField("base_version", "phiên bản gốc không được âm")
+	}
 	prof, ok := s.profiles[in.Profile]
 	if !ok {
 		return definitionAuthorization{}, port.ErrProfileNotFound
