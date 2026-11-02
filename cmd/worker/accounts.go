@@ -38,7 +38,11 @@ func accountsOrgStatusConsumer(log *slog.Logger) consumer {
 					err = errors.New("thiếu AG_KC_ADMIN_URL")
 				}
 				if err == nil {
-					h = accounts.New(nil, clock.System{}, accounts.Deps{Directory: dir}).OrgStatusHandler()
+					var acc *accounts.Module
+					acc, err = workerAccounts(nil, clock.System{}, accounts.Deps{Directory: dir})
+					if err == nil {
+						h = acc.OrgStatusHandler()
+					}
 				}
 			})
 			if err != nil {
