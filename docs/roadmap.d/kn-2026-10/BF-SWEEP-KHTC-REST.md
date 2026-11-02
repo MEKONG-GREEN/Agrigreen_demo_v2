@@ -1,0 +1,1 @@
+- [ ] BF-SWEEP-KHTC-REST (#180): lát UI Kỳ báo cáo với route Mở/Chi tiết/Sửa hạn, DetailPage/Log thật, DataTable/STT, kiểm nhập theo trường, nháp theo context trong workspace. Đọc BRD KHTC v2.3 hash đúng; route mới bỏ Hạn xuất. Không coi đạt toàn FN-TI-02.03: lịch/Mẫu5/Sao chép/nhắc và Plan/phiếu/bản soạn/Adhoc còn lại theo #194/#189, giữ API/M1–M7. Chờ Claude review và UAT.

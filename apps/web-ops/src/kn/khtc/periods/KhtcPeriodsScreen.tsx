@@ -1,13 +1,15 @@
 "use client";
 
-// Kỳ báo cáo & phiếu các phòng — Phòng KHTC (W11.62, BRD KHTC v2.2 FN-TI-02.03, Hình 8–10): danh sách kỳ, popup "Mở kỳ"
+// Kỳ báo cáo & phiếu các phòng — BF-SWEEP-KHTC-REST: route riêng cho FN-TI-02.03; giữ API và lịch W11.62.
 // (ô chọn Loại / Năm / Tuần·Tháng·Quý, hệ thống tự điền khoảng thời gian, tên kỳ, hạn; số lần gửi tối đa chỉ đọc), chi
 // tiết kỳ (4 thẻ đếm, tiến độ phiếu các phòng và nguồn module, log), Sửa hạn nộp, Đóng kỳ, Hủy kỳ. Phòng nộp phiếu ở
 // module của phòng (/v1/forms, profile kn_khtc).
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { fieldErrorMap } from "@/api/problem";
+import { periodDateISO, validatePeriodForm } from "./form";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { DataTable, PageHeader, RowActions, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useLoad } from "@/kn/cycle/common";
 import {
   FORM_TONE,
@@ -24,6 +26,19 @@ import {
   type KhtcReportType,
 } from "./api";
 import { KhtcSourcesPanel } from "./KhtcSourcesPanel";
+import { DetailPage, LogPanel, type LogEntry } from "@/components/patterns/detail";
+import type { ReactNode } from "react";
+
+export const PERIOD_BASE = "/kn/khtc/ky-bao-cao";
+export type PeriodRoute = { view: "list" | "new" | "detail" | "deadline"; id?: string; go: (path: string) => void };
+export const periodHref = (id: string) => `${PERIOD_BASE}/ky/${encodeURIComponent(id)}`;
+export function periodLog(p: KhtcPeriod): LogEntry[] {
+  return [{ event: `Mở kỳ và giao ${p.departments.length} phiếu`, actor_display: p.opened_by, at: p.opened_at },
+    ...p.events.map((e) => ({ event: e.action === "deadline_changed" ? `Sửa hạn nộp → ${dt(e.due_at)}` : e.action === "closed" ? e.forced ? "Đóng kỳ (ngoại lệ)" : "Đóng kỳ" : "Hủy kỳ", actor_display: e.actor_ref, at: e.at, reason: e.reason }))];
+}
+function PeriodPage({ title, children, log, back = PERIOD_BASE }: { title: string; children: ReactNode; log?: ReactNode; back?: string }) {
+  return <DetailPage title={title} back={{ href: back, label: "Danh sách kỳ báo cáo" }} log={log}>{children}</DetailPage>;
+}
 
 const KHTC = "ke_hoach_tai_chinh";
 
@@ -35,30 +50,41 @@ function toLocal(iso: string | null | undefined): string {
 }
 /** Ô datetime-local (giờ Việt Nam) → ISO. */
 function fromLocal(v: string): string | undefined {
-  return v ? new Date(`${v}:00+07:00`).toISOString() : undefined;
+  return v ? periodDateISO(v) ?? undefined : undefined;
 }
 
-export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:{adhocOnly?:boolean;onOpened?:()=>void;initialPeriod?:string|null}={}) {
+export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null,route}:{adhocOnly?:boolean;onOpened?:()=>void;initialPeriod?:string|null;route?:PeriodRoute}={}) {
   const { api, kn } = useAuth();
   const ctx = kn.context;
   const role = ctx?.role ?? null;
   const writer =
     !ctx?.read_only && (role==="kn_tinh"&&ctx?.department_code===KHTC || adhocOnly&&role==="admin");
   const kapi = useMemo(() => (api ? createKhtcPeriodApi(api) : null), [api]);
-  const thisYear = new Date().getFullYear();
+  const [thisYear] = useState(() => new Date(Date.now() + 7 * 3_600_000).getUTCFullYear());
   const [year, setYear] = useState(thisYear);
   const periods = useLoad(kapi ? () => kapi.list(year) : null, [kapi, year]);
   const template = useLoad(kapi ? () => kapi.template() : null, [kapi]);
   const weeks = useLoad(kapi ? () => kapi.weeks(year) : null, [kapi, year]);
-  const [selected, setSelected] = useState<string | null>(initialPeriod);
+  const [localSelected, setLocalSelected] = useState<string | null>(initialPeriod);
+  const selected = route ? route.id ?? null : localSelected;
+  const setSelected = (id: string) => route ? route.go(periodHref(id)) : setLocalSelected(id);
   const detail = useLoad(kapi && selected ? () => kapi.get(selected) : null, [
     kapi,
     selected,
+    route?.view,
   ]);
   const act = useAction();
+  const routeEpoch = useRef({ active: true });
+  useEffect(() => {
+    const epoch = { active: true };
+    routeEpoch.current = epoch;
+    return () => { epoch.active = false; };
+  }, [route?.view, route?.id]);
 
-  // Popup "Mở kỳ"
-  const [opening, setOpening] = useState(false);
+  // Nháp mở kỳ được layout giữ trong bộ nhớ giữa các route cùng ngữ cảnh.
+  const [localOpening, setLocalOpening] = useState(false);
+  const opening = route ? route.view === "new" : localOpening;
+  const setOpening = (value: boolean) => route ? route.go(value ? `${PERIOD_BASE}/them-moi` : PERIOD_BASE) : setLocalOpening(value);
   const [type, setType] = useState<KhtcReportType>(adhocOnly?"adhoc":"week");
   const [no, setNo] = useState(1);
   const [scope, setScope] = useState<"quarter" | "half" | "nine_months">(
@@ -74,6 +100,15 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
   const [depts, setDepts] = useState<string[] | null>(null);
   const [draft, setDraft] = useState<KhtcDraft | null>(null);
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const serverErrors = act.problem ? fieldErrorMap(act.problem) : {};
+  const error = (key: string) => errors[key] || serverErrors[({ asOf: "as_of_date", from: "from_date", to: "to_date", cutoff: "cutoff_date", due: "due_at", exportDue: "export_due_at" } as Record<string, string>)[key] ?? key];
+  const fieldError = (key: string) => error(key) ? <span className="err" role="alert">{error(key)}</span> : null;
+  const validate = () => {
+    const next = validatePeriodForm(type, { name, asOf, from, to, cutoff, due, exportDue });
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
   if (!kapi) return null;
   const body = (): KhtcOpenInput => ({
     report_type: type,
@@ -91,10 +126,15 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
   });
   const reset = () => {
     setDraft(null);
+    setErrors({});
     setDepts(null);
     setCutoff("");
     setDue("");
     setExportDue("");
+  };
+  const discard = () => {
+    reset(); setType(adhocOnly ? "adhoc" : "week"); setNo(1); setScope("quarter");
+    setAsOf(""); setName(""); setFrom(""); setTo(""); act.resetIdempotency();
   };
   const reason = (what: string, required = true) => {
     const r = window.prompt(
@@ -108,16 +148,16 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
 
   return (
     <div className="page">
-      <PageHeader title={adhocOnly?"Mở kỳ phát sinh":"Kỳ báo cáo & phiếu các phòng"}>
+      {!route || route.view === "list" ? <PageHeader title={adhocOnly?"Mở kỳ phát sinh":"Kỳ báo cáo & phiếu các phòng"}>
         <p className="mute">
           Mở kỳ bằng ô chọn, hệ thống tự điền khoảng thời gian, tên kỳ và hạn
           (tuần báo cáo Thứ Tư – Thứ Ba). Mỗi kỳ, mỗi phòng một phiếu “Báo cáo
           cho KHTC”.
         </p>
-      </PageHeader>
+      </PageHeader> : null}
       {act.view}
 
-      <section className="card sec">
+      {!route || route.view === "list" ? <section className="card sec">
         <h2>Phiếu cơ sở</h2>
         <LoadState s={template}>
           {(t) => (
@@ -149,9 +189,9 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
             </p>
           )}
         </LoadState>
-      </section>
+      </section> : null}
 
-      <section className="card sec">
+      {!route || route.view === "list" ? <section className="card sec">
         <div className="row">
           <h2>Danh sách kỳ</h2>
           <label>
@@ -178,56 +218,25 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
           ) : null}
         </div>
         <LoadState s={periods}>
-          {(ps: KhtcPeriod[]) =>
-            ps.filter(p=>!adhocOnly||p.report_type==="adhoc").length === 0 ? (
-              <p className="mute">Chưa có kỳ nào trong năm {year}.</p>
-            ) : (
-              <table className="dt">
-                <thead>
-                  <tr>
-                    <th>Loại báo cáo</th>
-                    <th>Kỳ</th>
-                    <th>Ngày chốt</th>
-                    <th>Hạn nộp</th>
-                    <th>Phòng tham gia</th>
-                    <th>Tiến độ nộp</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ps.filter(p=>!adhocOnly||p.report_type==="adhoc").map((p) => (
-                    <tr
-                      key={p.id}
-                      className={p.id === selected ? "sel" : undefined}
-                      onClick={() => setSelected(p.id)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <td>
-                        {REPORT_TYPES.find((t) => t.value === p.report_type)
-                          ?.label ?? p.report_type}
-                      </td>
-                      <td>{p.name}</td>
-                      <td>{vnDate(p.cutoff_date)}</td>
-                      <td>{dt(p.due_at)}</td>
-                      <td>{p.departments.length}</td>
-                      <td>{progressText(p)}</td>
-                      <td>
-                        <StatusPill tone={PERIOD_TONE[p.state]}>
-                          {p.state_label}
-                        </StatusPill>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )
-          }
+          {(ps: KhtcPeriod[]) => <DataTable caption="Danh sách kỳ báo cáo" rows={ps.filter(p => !adhocOnly || p.report_type === "adhoc")} rowKey={p => p.id}
+            empty={`Chưa có kỳ nào trong năm ${year}.`} columns={[
+              { key: "type", header: "Loại báo cáo", cell: p => REPORT_TYPES.find(t => t.value === p.report_type)?.label ?? p.report_type },
+              { key: "name", header: "Kỳ", cell: p => route ? <Link href={periodHref(p.id)}>{p.name}</Link> : <button className="btn btn-o" onClick={() => setSelected(p.id)}>{p.name}</button> },
+              { key: "cutoff", header: "Ngày chốt", cell: p => vnDate(p.cutoff_date) },
+              { key: "due", header: "Hạn nộp", cell: p => dt(p.due_at) },
+              { key: "departments", header: "Phòng tham gia", cell: p => p.departments.length },
+              { key: "progress", header: "Tiến độ nộp", cell: p => progressText(p) },
+              { key: "state", header: "Trạng thái", cell: p => <StatusPill tone={PERIOD_TONE[p.state]}>{p.state_label}</StatusPill> },
+              ...(route ? [{ key: "actions", header: "Thao tác", cell: (p: KhtcPeriod) => <RowActions label={p.name} viewHref={periodHref(p.id)} editHref={writer && p.state !== "closed" && p.state !== "cancelled" ? `${periodHref(p.id)}/sua-han` : undefined} /> }] : []),
+            ]} />}
         </LoadState>
-      </section>
+      </section> : null}
 
       {opening && writer ? (
-        <section className="card sec" aria-label="Mở kỳ">
-          <h2>Mở kỳ</h2>
+        <PeriodPage title="Mở kỳ báo cáo" log={<LogPanel entries={[]} empty="Chưa mở kỳ; chưa có sự kiện." />}>
+          <fieldset disabled={act.busy} style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="sr-only">Thông tin mở kỳ</legend>
+          {route ? <label className="field">Năm <select aria-label="Năm mở kỳ" value={year} onChange={e => { setYear(Number(e.target.value)); reset(); }}>{[thisYear - 1, thisYear, thisYear + 1].map(y => <option key={y} value={y}>{y}</option>)}</select></label> : null}
           <div className="row">
             <label>
               Loại báo cáo{" "}
@@ -289,42 +298,54 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
             ) : null}
             {type === "program" ? (
               <label>
-                Đến ngày{" "}
+                Đến ngày <span className="req" aria-hidden="true">*</span>{" "}
                 <input
                   type="date"
                   aria-label="Đến ngày"
+                  aria-invalid={!!error("asOf") || undefined}
+                  aria-required={true}
                   value={asOf}
                   onChange={(e) => (setAsOf(e.target.value), reset())}
                 />
+                {fieldError("asOf")}
               </label>
             ) : null}
             {type === "adhoc" ? (
               <>
                 <label>
-                  Tên báo cáo{" "}
+                  Tên báo cáo <span className="req" aria-hidden="true">*</span>{" "}
                   <input
                     aria-label="Tên báo cáo"
+                  aria-invalid={!!error("name") || undefined}
+                  aria-required={true}
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => { setName(e.target.value); setDraft(null); }}
                   />
+                {fieldError("name")}
                 </label>
                 <label>
-                  Từ ngày{" "}
+                  Từ ngày <span className="req" aria-hidden="true">*</span>{" "}
                   <input
                     type="date"
                     aria-label="Từ ngày"
+                  aria-invalid={!!error("from") || undefined}
+                  aria-required={true}
                     value={from}
-                    onChange={(e) => setFrom(e.target.value)}
+                    onChange={(e) => { setFrom(e.target.value); setDraft(null); }}
                   />
+                {fieldError("from")}
                 </label>
                 <label>
-                  Đến ngày{" "}
+                  Đến ngày <span className="req" aria-hidden="true">*</span>{" "}
                   <input
                     type="date"
                     aria-label="Đến ngày phát sinh"
+                  aria-invalid={!!error("to") || undefined}
+                  aria-required={true}
                     value={to}
-                    onChange={(e) => setTo(e.target.value)}
+                    onChange={(e) => { setTo(e.target.value); setDraft(null); }}
                   />
+                {fieldError("to")}
                 </label>
               </>
             ) : null}
@@ -335,28 +356,28 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
               <input
                 type="date"
                 aria-label="Ngày chốt"
+                  aria-invalid={!!error("cutoff") || undefined}
                 value={cutoff || draft?.cutoff_date || ""}
                 onChange={(e) => setCutoff(e.target.value)}
               />
+                {fieldError("cutoff")}
             </label>
             <label>
-              Hạn nộp{" "}
+              Hạn nộp {(type === "program" || type === "adhoc") ? <span className="req" aria-hidden="true">*</span> : null}{" "}
               <input
                 type="datetime-local"
                 aria-label="Hạn nộp"
+                  aria-invalid={!!error("due") || undefined}
+                  aria-required={type === "program" || type === "adhoc" || undefined}
                 value={due || toLocal(draft?.due_at)}
                 onChange={(e) => setDue(e.target.value)}
               />
+                {fieldError("due")}
             </label>
-            <label>
+            {!route ? <label>
               Hạn xuất{" "}
-              <input
-                type="datetime-local"
-                aria-label="Hạn xuất"
-                value={exportDue || toLocal(draft?.export_due_at)}
-                onChange={(e) => setExportDue(e.target.value)}
-              />
-            </label>
+              <input type="datetime-local" aria-label="Hạn xuất" value={exportDue || toLocal(draft?.export_due_at)} onChange={(e) => setExportDue(e.target.value)} />
+            </label> : null}
             <label>
               Số lần gửi tối đa{" "}
               <input
@@ -371,17 +392,20 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
             <button
               className="btn"
               disabled={act.busy}
-              onClick={async () =>
-                setDraft((await act.run(() => kapi.preview(body()))) ?? null)
-              }
+              onClick={async () => {
+                if (!validate()) return;
+                const epoch = routeEpoch.current;
+                const preview = await act.run(() => kapi.preview(body()));
+                if (epoch.active) setDraft(preview ?? null);
+              }}
             >
               Xem trước
             </button>
             <button
               className="btn"
-              onClick={() => (setOpening(false), reset())}
+              onClick={() => { discard(); setOpening(false); }}
             >
-              Đóng
+              Hủy
             </button>
           </div>
           {draft ? (
@@ -454,14 +478,16 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
                   (draft.due_required && !due)
                 }
                 onClick={async () => {
+                  if (!writer || !validate()) return;
+                  const epoch = routeEpoch.current;
                   const p = await act.run(
                     () => kapi.open(body()),
                     (r) =>
                       `Đã mở kỳ “${r.name}” và giao ${r.departments.length} phiếu.`,
                   );
-                  if (p) {
+                  if (p && epoch.active) {
                     setOpening(false);
-                    reset();
+                    discard();
                     setSelected(p.id);
                     onOpened?.();
                     periods.reload();
@@ -472,10 +498,12 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
               </button>
             </div>
           ) : null}
-        </section>
+          </fieldset>
+        </PeriodPage>
       ) : null}
+      {opening && !writer ? <PeriodPage title="Mở kỳ báo cáo"><p role="alert">Chỉ xem — Phòng KHTC đang có quyền soạn mới được mở kỳ.</p></PeriodPage> : null}
 
-      {selected ? (
+      {selected && (!route || route.view === "detail") ? (
         <section className="card sec" aria-label="Chi tiết kỳ">
           <LoadState s={detail}>
             {(p: KhtcPeriod) => {
@@ -485,8 +513,9 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
                   periods.reload();
                 }
               };
+              if (p.id !== selected) return null;
               return (
-                <>
+                <PeriodPage title={p.name} log={<LogPanel entries={periodLog(p)} />}>
                   <div className="row">
                     <h2>{p.name}</h2>
                     <StatusPill tone={PERIOD_TONE[p.state]}>
@@ -503,6 +532,7 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
                           p.state === "cancelled"
                         }
                         onClick={async () => {
+                          if (route) { route.go(`${periodHref(p.id)}/sua-han`); return; }
                           const v = window.prompt(
                             "Hạn nộp mới (YYYY-MM-DDTHH:mm, giờ Việt Nam)",
                             toLocal(p.due_at),
@@ -572,103 +602,28 @@ export function KhtcPeriodsScreen({adhocOnly=false,onOpened,initialPeriod=null}:
                   </div>
                   <p className="mute">
                     {vnDate(p.from_date)} – {vnDate(p.to_date)} · Ngày chốt{" "}
-                    {vnDate(p.cutoff_date)} · Hạn nộp {dt(p.due_at)} · Hạn xuất{" "}
-                    {dt(p.export_due_at)} · Tối đa {p.max_submissions} lần gửi
+                    {vnDate(p.cutoff_date)} · Hạn nộp {dt(p.due_at)}{!route ? <> · Hạn xuất {dt(p.export_due_at)}</> : null} · Tối đa {p.max_submissions} lần gửi
                   </p>
                   <h3>Tiến độ nộp phiếu và nguồn module</h3>
-                  <table className="dt">
-                    <thead>
-                      <tr>
-                        <th>Phòng / nguồn</th>
-                        <th>Trạng thái</th>
-                        <th>Lần gửi</th>
-                        <th>Gửi lúc</th>
-                        <th>Ghi chú</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {p.forms.map((f) => (
-                        <tr key={f.department}>
-                          <td>{f.department_name || f.department}</td>
-                          <td>
-                            <StatusPill tone={FORM_TONE[f.state]}>
-                              {f.state_label}
-                            </StatusPill>
-                          </td>
-                          <td>
-                            {f.attempt
-                              ? `${f.attempt}/${p.max_submissions || "∞"}`
-                              : "—"}
-                            {f.limit_reached
-                              ? " (đã khóa yêu cầu bổ sung)"
-                              : ""}
-                          </td>
-                          <td>{dt(f.last_submitted_at)}</td>
-                          <td>{f.review_note}</td>
-                          <td>
-                            {f.attempt ? (
-                              <Link
-                                className="btn"
-                                href={`/kn/khtc/ra-soat/${p.id}?department=${f.department}`}
-                              >
-                                Rà soát
-                              </Link>
-                            ) : null}
-                          </td>
-                        </tr>
-                      ))}
-                      {p.sources.map((s) => (
-                        <tr key={`${s.source}:${s.native_key}`}>
-                          <td>
-                            {s.label || s.source} ({s.department}, kỳ nguồn{" "}
-                            {s.native_key})
-                          </td>
-                          <td>
-                            <StatusPill
-                              tone={
-                                !s.known ? "warn" : s.closed ? "ok" : "info"
-                              }
-                            >
-                              {!s.known
-                                ? "Không đọc được"
-                                : s.closed
-                                  ? "Đã chốt"
-                                  : "Chưa chốt"}
-                            </StatusPill>
-                          </td>
-                          <td>—</td>
-                          <td>{dt(s.closed_at)}</td>
-                          <td>
-                            {s.calendar_id} {s.calendar_version}
-                          </td>
-                          <td />
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <DataTable caption="Tiến độ nộp phiếu và nguồn module" rowKey={row => row.key} rows={[
+                    ...p.forms.map(f => ({ key: `form:${f.department}`, name: f.department_name || f.department,
+                      state: <StatusPill tone={FORM_TONE[f.state]}>{f.state_label}</StatusPill>,
+                      attempt: f.attempt ? `${f.attempt}/${p.max_submissions || "∞"}${f.limit_reached ? " (đã khóa yêu cầu bổ sung)" : ""}` : "—",
+                      at: dt(f.last_submitted_at), note: f.review_note,
+                      action: f.attempt ? <Link className="btn" href={`/kn/khtc/ra-soat/${p.id}?department=${f.department}`}>Rà soát</Link> : null })),
+                    ...p.sources.map(source => ({ key: `source:${source.source}:${source.native_key}`, name: `${source.label || source.source} (${source.department}, kỳ nguồn ${source.native_key})`,
+                      state: <StatusPill tone={!source.known ? "warn" : source.closed ? "ok" : "info"}>{!source.known ? "Không đọc được" : source.closed ? "Đã chốt" : "Chưa chốt"}</StatusPill>,
+                      attempt: "—", at: dt(source.closed_at), note: `${source.calendar_id} ${source.calendar_version}`, action: null })),
+                  ]} columns={[
+                    { key: "name", header: "Phòng / nguồn", cell: r => r.name },
+                    { key: "state", header: "Trạng thái", cell: r => r.state },
+                    { key: "attempt", header: "Lần gửi", cell: r => r.attempt },
+                    { key: "at", header: "Gửi lúc", cell: r => r.at },
+                    { key: "note", header: "Ghi chú", cell: r => r.note },
+                    { key: "action", header: "Thao tác", cell: r => r.action },
+                  ]} />
                   <KhtcSourcesPanel periodId={p.id} />
-                  <h3>Log</h3>
-                  <ul aria-label="Log kỳ">
-                    <li>
-                      {dt(p.opened_at)} — Mở kỳ và giao {p.departments.length}{" "}
-                      phiếu
-                    </li>
-                    {p.events.map((e) => (
-                      <li key={e.id}>
-                        {dt(e.at)} —{" "}
-                        {e.action === "deadline_changed"
-                          ? `Sửa hạn nộp → ${dt(e.due_at)}`
-                          : e.action === "closed"
-                            ? e.forced
-                              ? "Đóng kỳ (ngoại lệ)"
-                              : "Đóng kỳ"
-                            : "Hủy kỳ"}
-                        {e.reason ? `: ${e.reason}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                </>
+                </PeriodPage>
               );
             }}
           </LoadState>
