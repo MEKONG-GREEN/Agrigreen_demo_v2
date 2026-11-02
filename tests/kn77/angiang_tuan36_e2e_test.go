@@ -25,13 +25,17 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports"
 	repport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/reports/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	shareddb "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
@@ -533,7 +537,7 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 	s.wantCode(tw.post("/v1/extension/consolidations", map[string]any{"period_id": s.period}), http.StatusForbidden, "extension.read_only", "TW cập nhật")
 	s.wantCode(agSubmit(tw, t1c1, "submitted", map[string]string{"F": "1"}), http.StatusForbidden, "extension.read_only", "TW gửi")
 	s.wantCode(tw.post("/v1/extension/report-periods/"+s.period+"/close", map[string]any{}), http.StatusForbidden, "extension.read_only", "TW chốt")
-	s.wantCode(tw.post("/v1/kn/cooperatives", map[string]any{"name": "HTX TW", "commune_code": agC1}), http.StatusForbidden, "party.read_only", "TW thêm HTX")
+	s.wantCode(tw.post("/v1/kn/cooperatives", map[string]any{"name": "HTX TW", "commune_code": agC1}), http.StatusMethodNotAllowed, "method_not_allowed", "TW không còn route ghi HTX legacy")
 	s.wantCode(tw.post("/v1/kn/materials", map[string]any{"commune_code": agC1, "recorded_on": "2026-08-31", "lines": []any{map[string]any{"material_code": "PHAN_URE", "quantity": "1"}}}),
 		http.StatusForbidden, "", "TW ghi vật tư")
 
@@ -651,25 +655,21 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 	}
 
 	// ---- 12. Dữ liệu Cấp Xã (P7): HTX, máy móc, thửa, vật tư — phạm vi ----
-	s.step("Cán bộ xã khai HTX, máy móc, thửa, vật tư trong xã phụ trách; ngoài phạm vi bị chặn; vô hiệu hóa HTX ≥ 20 ký tự")
+	s.step("KN chỉ đọc HTX có sẵn; sáu route ghi HTX legacy nghỉ; máy móc, thửa, vật tư giữ kiểm phạm vi")
 	// Ghi người đại diện/nông dân vào kho định danh cần vai realm vault_registrar — A1 (chốt 03/10/2026): pf/accounts cấp
 	// mặc định khi gán vai trò Cán bộ xã (không còn bước Admin cấp tay); kho ghi sổ truy cập theo mục đích.
 	if !slices.Contains(s.realm(an.id), "vault_registrar") {
 		t.Fatal("A1: Cán bộ xã phải có sẵn vai vault_registrar")
 	}
-	repName, repPhone := "Phạm Thị Duyên", agPhone
-	s.pii = append(s.pii, repName, repPhone)
-	coop := s.want(xa1.post("/v1/kn/cooperatives", map[string]any{"name": "HTX Nông nghiệp Mỹ Hòa Hưng", "commune_code": agC1, "area_ha": "85.5",
-		"representative": map[string]any{"full_name": repName, "phone": repPhone}}), http.StatusCreated, "thêm HTX")
+	// A platform Admin provisions a native HTX via the real D2 Neo HTTP flow.
+	// KN only reads the resulting org_ref; producer-record IDs are not HTX IDs.
+	seed := s.want(s.rootA.adm(http.MethodPost, "/v1/htx-anchors", map[string]any{
+		"created_by": "mkg", "new_cooperative": map[string]any{"name": "HTX Nông nghiệp Mỹ Hòa Hưng", "admin_unit_code": agC1, "parent_ref": nodes[agC1], "profile": map[string]any{"area_ha": "85.5"}},
+	}), http.StatusCreated, "Admin MKG lập HTX native qua Neo")
+	cref := str(seed.body, "org_ref")
+	coop := s.want(xa1.get("/v1/kn/cooperatives/"+cref), http.StatusOK, "KN đọc HTX native có sẵn")
 	s.noPII("HTX", coop.raw)
-	cref := str(coop.body, "ref")
-	s.want(xa1.app(http.MethodPut, "/v1/kn/cooperatives/"+cref, map[string]any{"area_ha": "90", "reason": "Cập nhật theo biên bản kiểm tra"}), http.StatusOK, "sửa HTX")
-	if lg := s.want(xa1.get("/v1/kn/cooperatives/"+cref+"/log"), http.StatusOK, "Log HTX"); !strings.Contains(string(lg.raw), `"85.5"`) || !strings.Contains(string(lg.raw), `"90"`) {
-		t.Fatalf("Log HTX cũ → mới: %s", lg.raw)
-	} else {
-		s.noPII("Log HTX", lg.raw)
-	}
-	s.wantCode(xa1.post("/v1/kn/cooperatives", map[string]any{"name": "HTX ngoài xã", "commune_code": agC3}), http.StatusForbidden, "party.out_of_scope", "HTX xã ngoài phạm vi")
+	s.want(xa1.get("/v1/kn/cooperatives/"+cref+"/log"), http.StatusOK, "Log HTX vẫn đọc")
 	s.wantCode(xa2.get("/v1/kn/cooperatives/"+cref), http.StatusNotFound, "party.org_not_found", "Cán bộ xã khác đọc HTX")
 	mc := s.want(xa1.app(http.MethodPut, "/v1/kn/machine-counts/"+cref, map[string]any{"lines": []any{map[string]any{"machine_type": "MLD", "quantity": 2},
 		map[string]any{"machine_type": "MGD", "quantity": 1}}}), http.StatusOK, "khai báo máy")
@@ -699,13 +699,43 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 	if sm := s.want(tinh.get("/v1/kn/materials/summary"), http.StatusOK, "tổng hợp vật tư"); !strings.Contains(string(sm.raw), agC1) {
 		t.Fatalf("Cấp Tỉnh xem tổng hợp vật tư theo xã: %s", sm.raw)
 	}
-	// Quyết định P8 (a): lý do vô hiệu hóa ≥ 20 ký tự ở mọi tầng (= CHECK sổ org_event) → 422, không 500.
-	s.wantCode(xa1.post("/v1/kn/cooperatives/"+cref+"/deactivate", map[string]any{"reason": "HTX giải thể theo Q"}), http.StatusUnprocessableEntity, "validation_failed",
-		"lý do 19 ký tự")
-	dv := s.want(xa1.post("/v1/kn/cooperatives/"+cref+"/deactivate", map[string]any{"reason": "HTX giải thể theo QĐ"}), http.StatusOK, "vô hiệu hóa 20 ký tự")
-	if w := obj(dv.body, "warnings"); num(w, "machines") != 3 || num(w, "plots") != 0 {
-		t.Fatalf("cảnh báo dữ liệu liên kết (3 máy): %s", dv.raw)
+	// Snapshot native HTX state with each module's real DB role, not an admin bypass.
+	htxCounts := func() [3]int64 {
+		var n [3]int64
+		if err := tenant.WithTenantTx(ctx, shareddb.ForModule(s.s.PF(dbadmin.AppPlatform), party.DBModule), s.tid, func(tx pgx.Tx) error { return tx.QueryRow(ctx, "SELECT count(*) FROM pf_party.org_event").Scan(&n[0]) }); err != nil {
+			t.Fatal(err)
+		}
+		if err := tenant.WithTenantTx(ctx, shareddb.ForModule(s.s.PF(dbadmin.AppPlatform), cooperative.DBModule), s.tid, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, "SELECT (SELECT count(*) FROM pf_coop.household),(SELECT count(*) FROM pf_coop.kn_profile_event)").Scan(&n[1], &n[2])
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return n
 	}
+	beforeLegacyWrites := htxCounts()
+	if beforeLegacyWrites[0] == 0 {
+		t.Fatal("native HTX witness missing: org_event must contain fixture data")
+	}
+	// #160: all six legacy writes are absent even for a live, authorized KN context.
+	for _, route := range []struct {
+		method, path string
+		status       int
+		code         string
+	}{
+		{http.MethodPost, "/v1/kn/cooperatives", http.StatusMethodNotAllowed, "method_not_allowed"},
+		{http.MethodPut, "/v1/kn/cooperatives/" + cref, http.StatusMethodNotAllowed, "method_not_allowed"},
+		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/deactivate", http.StatusNotFound, "not_found"},
+		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/reactivate", http.StatusNotFound, "not_found"},
+		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/households", http.StatusMethodNotAllowed, "method_not_allowed"},
+		{http.MethodPut, "/v1/kn/households/" + uuid.NewString(), http.StatusNotFound, "not_found"},
+	} {
+		s.wantCode(xa1.app(route.method, route.path, map[string]any{"reason": "Không được ghi dữ liệu HTX", "name": "Không tạo", "commune_code": agC1}), route.status, route.code, "route ghi KN legacy nghỉ")
+	}
+	if after := htxCounts(); after != beforeLegacyWrites {
+		t.Fatalf("legacy calls changed native HTX state: %v -> %v", beforeLegacyWrites, after)
+	}
+	t.Logf("#160 native HTX org_event/household/profile counts unchanged: %v", beforeLegacyWrites)
+	s.want(xa1.get("/v1/kn/cooperatives/"+cref+"/households"), http.StatusOK, "GET nông hộ vẫn đăng ký")
 
 	// ---- 13. Sổ chỉ ghi thêm, chuỗi băm, cách ly tenant, không PII ----
 	s.step("verify_chain mọi sổ KN, thử UPDATE/DELETE sổ, cách ly tenant, không PII trong log")
@@ -756,7 +786,7 @@ var knLedgers = []string{
 	"pf_extension.work_schedule_event", "pf_extension.work_schedule_item", "pf_extension.material_record", "pf_mechanization.coop_machine_count_event",
 }
 
-// verifyLedgers chạy shared.verify_chain cho mọi luồng của mọi sổ KN của tenant (sổ phải có dữ liệu, trừ hồ sơ tài khoản)
+// verifyLedgers kiểm chuỗi sổ KN đang hoạt động; #160 sổ hồ sơ HTX legacy phải KHÔNG có dòng từ KN.
 // và thử UPDATE/DELETE trên từng sổ có dữ liệu — trigger chỉ ghi thêm phải chặn (RB-1).
 func (s *agScenario) verifyLedgers() {
 	s.t.Helper()
@@ -776,6 +806,12 @@ func (s *agScenario) verifyLedgers() {
 			streams = append(streams, k)
 		}
 		rows.Close()
+		if tbl == "pf_coop.kn_profile_event" {
+			if len(streams) != 0 {
+				s.t.Fatalf("#160 KN must not emit HTX profile events: %d streams", len(streams))
+			}
+			continue
+		}
 		if len(streams) == 0 {
 			if tbl != "pf_accounts.account_profile_change" {
 				s.t.Fatalf("sổ %s không có dữ liệu sau kịch bản", tbl)
