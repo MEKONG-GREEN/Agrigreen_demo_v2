@@ -33,7 +33,7 @@ function ItemData({ route, pa, filters: f, showLog }: { route: ItemRoute; pa: Pr
     const canEdit = permissions.can_edit;
     const steward = permissions.can_steward;
     if (route.kind === "item-new") return canEdit
-      ? <ItemForm pa={pa} catalog={cat} filters={f} showLog={showLog} create />
+      ? <ItemForm pa={pa} catalog={cat} filters={f} showLog={showLog} canReplace={steward} create />
       : <DetailPage title="Thêm mặt hàng" back={back}><ReadOnly /></DetailPage>;
     if (route.kind === "group-new") return steward
       ? <GroupForm pa={pa} filters={f} />
@@ -50,15 +50,15 @@ function ItemData({ route, pa, filters: f, showLog }: { route: ItemRoute; pa: Pr
     return <LoadState s={item}>{(detail) => {
       const active = detail.state !== "retired";
       if (route.mode === "edit" && active && canEdit && (!detail.has_price || steward))
-        return <ItemForm key={detail.version} detail={detail} pa={pa} catalog={cat} filters={f} showLog={showLog} />;
-      if (route.mode === "replace" && active && canEdit)
-        return <ItemForm key={detail.version} detail={detail} pa={pa} catalog={cat} filters={f} showLog={showLog} create replace />;
+        return <ItemForm key={detail.version} detail={detail} pa={pa} catalog={cat} filters={f} showLog={showLog} canReplace={steward} />;
+      if (route.mode === "replace" && active && steward)
+        return <ItemForm key={detail.version} detail={detail} pa={pa} catalog={cat} filters={f} showLog={showLog} canReplace={steward} create replace />;
       if (route.mode === "retire" && active && steward)
         return <RetireForm detail={detail} pa={pa} filters={f} showLog={showLog} />;
       return <DetailPage title={`${detail.code} — ${itemLabel(detail)}`} back={back} log={showLog ? <ItemLog detail={detail} /> : undefined}
         actions={active ? <span className="row">
           {canEdit && (!detail.has_price || steward) && <Link className="btn btn-p" href={itemHref(`${detail.code}/sua`, f)}>Sửa</Link>}
-          {canEdit && <Link className="btn btn-o" href={itemHref(`${detail.code}/thay-the`, f)}>Tạo mặt hàng thay thế</Link>}
+          {steward && <Link className="btn btn-o" href={itemHref(`${detail.code}/thay-the`, f)}>Tạo mặt hàng thay thế</Link>}
           {steward && <Link className="btn btn-d" href={itemHref(`${detail.code}/ngung`, f)}>Ngưng</Link>}
         </span> : undefined}>
         {route.mode !== "view" && <ReadOnly />}<ItemSummary detail={detail} catalog={cat} />
@@ -92,9 +92,9 @@ function useItemAction() {
   return { ...action, run };
 }
 
-function ItemForm({ pa, catalog, filters: f, detail, showLog, create = false, replace = false }: {
+function ItemForm({ pa, catalog, filters: f, detail, showLog, canReplace, create = false, replace = false }: {
   pa: PriceItemApi; catalog: PriceCatalog; filters: ItemFilters; detail?: PriceItemDetail;
-  create?: boolean; replace?: boolean; showLog: boolean;
+  create?: boolean; replace?: boolean; showLog: boolean; canReplace: boolean;
 }) {
   const router = useRouter();
   const action = useItemAction();
@@ -132,7 +132,7 @@ function ItemForm({ pa, catalog, filters: f, detail, showLog, create = false, re
       <ItemDateField label="Hiệu lực từ" value={fields.valid_from} onChange={set("valid_from")} error={errors.valid_from} disabled={action.busy} hint="Để trống: ngày báo giá kế tiếp." />
       {create && <>
         <ItemDateField label="Hiệu lực đến" value={fields.valid_to} onChange={set("valid_to")} error={errors.valid_to} disabled={action.busy} />
-        <TextField label="Thay thế cho (mã)" value={fields.replaces_code} onChange={set("replaces_code")} error={errors.replaces_code} maxLength={7} disabled={replace || action.busy} />
+        {canReplace && <TextField label="Thay thế cho (mã)" value={fields.replaces_code} onChange={set("replaces_code")} error={errors.replaces_code} maxLength={7} disabled={replace || action.busy} />}
         {fields.kind === "local" && <TextField label="Xã áp dụng (mã xã, cách nhau bởi dấu phẩy)" value={fields.points} onChange={set("points")} error={errors.points} disabled={action.busy} />}
       </>}
     </div>

@@ -127,6 +127,30 @@ describe("Price198 item/group routes", () => {
     expect(await screen.findByText(/Không tìm thấy nhóm hàng/)).toBeInTheDocument();
     expect(writes(client.fetch)).toHaveLength(0);
   });
+  it("ordinary Tỉnh can add and edit unpriced items but cannot open replacement controls", async () => {
+    const { fetch } = await setupClient();
+    fetch.mockImplementation(async (...args: Parameters<typeof mockFetchNoDelay>) => {
+      const response = await mockFetchNoDelay(...args);
+      const request = args[0] as Request;
+      if (request.method === "GET" && new URL(request.url).pathname === "/v1/price/items") {
+        const body = await response.json() as Record<string, unknown>;
+        return new Response(JSON.stringify({ ...body, can_edit: true, can_steward: false }), { status: response.status, headers: response.headers });
+      }
+      return response;
+    });
+    const view = render(<PriceItemDetailScreen route={{ kind: "item-new" }} />);
+    await screen.findByRole("textbox", { name: /Tên loại/ });
+    expect(screen.queryByRole("textbox", { name: "Thay thế cho (mã)" })).not.toBeInTheDocument();
+    await fillItem(); await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(nav.push).toHaveBeenCalledWith(expect.stringContaining("MH00009?")));
+    view.rerender(<PriceItemDetailScreen route={{ kind: "item", code: "MH00004", mode: "edit" }} />);
+    expect(await screen.findByRole("button", { name: "Lưu" })).toBeInTheDocument();
+    view.rerender(<PriceItemDetailScreen route={{ kind: "item", code: "MH00001", mode: "replace" }} />);
+    expect(await screen.findByText(/Chỉ xem — ngữ cảnh/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Lưu" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Tạo mặt hàng thay thế" })).not.toBeInTheDocument();
+    expect(writes(fetch)).toHaveLength(1);
+  });
   it("lost ACK retries same key without duplicating a commodity", async () => {
     const { fetch, pa } = await setupClient();
     render(<PriceItemDetailScreen route={{ kind: "item-new" }} />); await fillItem();
