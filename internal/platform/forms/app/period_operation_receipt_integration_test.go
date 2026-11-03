@@ -494,3 +494,66 @@ func TestPeriodOperation212_PermanentAnchorCannotBeMutated(t *testing.T) {
 		t.Fatal("anchor metadata changed")
 	}
 }
+
+func TestPeriodOperation212_MalformedOwnerBindingFailsClosed(t *testing.T) {
+	f, receipts, _, ctx, req := receiptFixture212(t)
+	first, err := receipts.ExecutePeriodOperation(ctx, req)
+	applied212(t, first, err)
+	for _, bad := range []byte{0xff, 0xfe} {
+		f.svc.PeriodOperationPolicies["fx"] = func(context.Context, authz.Principal, port.PeriodOperationRequest) (port.PeriodOperationGrant, error) {
+			return port.PeriodOperationGrant{Allowed: true, Binding: string([]byte{'v', bad})}, nil
+		}
+		got, err := receipts.ReadPeriodOperation(ctx, req)
+		f.want(err, "forbidden", "malformed current authority")
+		unknown212(t, got)
+		got, err = receipts.ExecutePeriodOperation(ctx, req)
+		f.want(err, "forbidden", "malformed replay authority")
+		unknown212(t, got)
+		next := req
+		next.OperationID = ids.New()
+		got, err = receipts.ExecutePeriodOperation(ctx, next)
+		f.want(err, "forbidden", "malformed new operation authority")
+		unknown212(t, got)
+	}
+	if count212(f, "period_due") != 1 || count212(f, "period_operation_key") != 1 || count212(f, "period_operation_receipt") != 1 {
+		t.Fatal("malformed authority read/replayed/wrote receipt")
+	}
+}
+func TestPeriodOperation212_PreEffectStateRejectionHasOwnReceipt(t *testing.T) {
+	for _, action := range []string{port.PeriodOperationChangeDue, port.PeriodOperationClose, port.PeriodOperationReopen, port.PeriodOperationCancel} {
+		t.Run(action, func(t *testing.T) {
+			f, receipts, control, ctx, req := receiptFixture212(t)
+			want := port.ErrPeriodClosed.Code
+			switch action {
+			case port.PeriodOperationChangeDue:
+				f.must(control.CancelPeriod(ctx, "fx", req.PeriodID, "cancel native before due", ids.New().String()), "cancel setup")
+				want = port.ErrPeriodCancelled.Code
+			case port.PeriodOperationClose, port.PeriodOperationCancel:
+				f.must(control.ClosePeriod(ctx, "fx", req.PeriodID, ids.New().String()), "close setup")
+			case port.PeriodOperationReopen:
+				want = port.ErrPeriodNotClosed.Code
+			}
+			current, err := control.ControlSnapshot(ctx, "fx", req.PeriodID)
+			f.must(err, "current precondition")
+			req.Expected = current.Revision
+			req.Action = action
+			if action != port.PeriodOperationChangeDue {
+				req.DueAt = time.Time{}
+			}
+			if action == port.PeriodOperationClose {
+				req.Reason = ""
+			}
+			beforeEvents, beforeDue, beforeSnapshots := count212(f, "period_event"), count212(f, "period_due"), count212(f, "close_snapshot")
+			got, err := receipts.ExecutePeriodOperation(ctx, req)
+			f.must(err, "durable known state rejection")
+			if got.Outcome != port.PeriodOperationRejected || got.RejectionCode != want || got.Applied != (port.PeriodRevision{}) {
+				t.Fatalf("wrong rejected proof: %+v", got)
+			}
+			replay, err := receipts.ReadPeriodOperation(ctx, req)
+			f.must(err, "read rejection")
+			if !reflect.DeepEqual(got, replay) || count212(f, "period_event") != beforeEvents || count212(f, "period_due") != beforeDue || count212(f, "close_snapshot") != beforeSnapshots || count212(f, "period_operation_receipt") != 1 {
+				t.Fatal("pre-effect rejection committed native effects or lost receipt")
+			}
+		})
+	}
+}

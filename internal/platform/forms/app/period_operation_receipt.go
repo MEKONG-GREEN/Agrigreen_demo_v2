@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/store"
@@ -77,7 +78,7 @@ func (c ReceiptControl) prepare(ctx context.Context, in port.PeriodOperationRequ
 	if err != nil {
 		return nil, err
 	}
-	if !permission.Allowed || strings.TrimSpace(permission.Binding) == "" || len(permission.Binding) > 512 || strings.ContainsRune(permission.Binding, 0) {
+	if !permission.Allowed || !utf8.ValidString(permission.Binding) || strings.TrimSpace(permission.Binding) == "" || len(permission.Binding) > 512 || strings.ContainsRune(permission.Binding, 0) {
 		return nil, problem.Forbidden
 	}
 	digest, err := port.PeriodOperationDigest(req)
