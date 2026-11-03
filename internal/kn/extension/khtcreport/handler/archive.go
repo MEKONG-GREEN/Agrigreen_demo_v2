@@ -11,7 +11,7 @@ import (
 )
 
 func (h Handler) archive(c *gin.Context) {
-	q := app.ArchiveQuery{Kind: c.Query("kind"), Search: c.Query("q"), PeriodSearch: c.Query("period_q"), After: c.Query("after"), Limit: 20}
+	q := app.ArchiveQuery{Kind: c.Query("kind"), Search: c.Query("q"), DocumentSearch: c.Query("document_q"), After: c.Query("after"), Limit: 20}
 	field, fieldErr := archiveFieldQuery(c.Request.URL.Query())
 	if fieldErr != nil {
 		httpx.Fail(c, fieldErr)
@@ -19,7 +19,7 @@ func (h Handler) archive(c *gin.Context) {
 	}
 	q.Field = field.Code
 	q.FieldStatus = field.Status
-	for _, key := range []string{"year", "kind", "q", "period_q", "after", "versions", "period_id", "offset", "limit"} {
+	for _, key := range []string{"year", "kind", "q", "document_q", "after", "versions", "period_id", "offset", "limit"} {
 		if len(c.Request.URL.Query()[key]) > 1 {
 			httpx.Fail(c, app.ErrInvalid)
 			return

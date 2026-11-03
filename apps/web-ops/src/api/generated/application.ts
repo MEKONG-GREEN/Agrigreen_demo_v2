@@ -10245,6 +10245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/exported-reports/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chọn kỳ có báo cáo đã xuất trong tenant phiên, có tìm kiếm và phân trang */
+        get: operations["extensionKhtcArchiveFields"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/preview": {
         parameters: {
             query?: never;
@@ -23101,6 +23118,9 @@ export interface components {
             id: string;
             /** Format: uuid */
             period_id: string;
+            field_codes?: string[];
+            /** @enum {string} */
+            field_status?: "complete" | "partial" | "unknown";
             period_name: string;
             /** @enum {string} */
             report_type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
@@ -23171,10 +23191,20 @@ export interface components {
             export_id: string;
             /** Format: int64 */
             export_version: number;
+            field_codes?: string[];
+            /** @enum {string} */
+            field_status?: "complete" | "partial" | "unknown";
             export_name: string;
             items: components["schemas"]["KHTCArchiveWord"][];
             has_more: boolean;
             offset: number;
+        };
+        KHTCArchiveFields: {
+            items: {
+                code: string;
+            }[];
+            has_more: boolean;
+            next_cursor: string;
         };
         KHTCDashboard: {
             year: number;
@@ -46838,7 +46868,10 @@ export interface operations {
     };
     extensionKhtcReportExports: {
         parameters: {
-            query?: never;
+            query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+            };
             header?: never;
             path: {
                 id: string;
@@ -46902,7 +46935,10 @@ export interface operations {
     };
     extensionKhtcReportDownload: {
         parameters: {
-            query?: never;
+            query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+            };
             header?: never;
             path: {
                 id: string;
@@ -47315,6 +47351,8 @@ export interface operations {
     extensionKhtcExportedReports: {
         parameters: {
             query: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
                 year: number;
                 kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
                 period_id?: string;
@@ -47347,11 +47385,15 @@ export interface operations {
     extensionKhtcArchivePeriods: {
         parameters: {
             query: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
                 year: number;
                 kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
                 q?: string;
                 offset?: number;
                 limit?: number;
+                versions?: boolean;
+                document_q?: string;
             };
             header?: never;
             path?: never;
@@ -47374,9 +47416,46 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionKhtcArchiveFields: {
+        parameters: {
+            query: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+                year: number;
+                kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+                q?: string;
+                after?: string;
+                period_id?: string;
+                limit?: number;
+                versions?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kỳ có ít nhất một bản xuất, loại kỳ hủy và kỳ chỉ có bản soạn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCArchiveFields"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionKhtcArchivePreview: {
         parameters: {
-            query?: never;
+            query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+            };
             header?: never;
             path: {
                 id: string;
@@ -47404,6 +47483,8 @@ export interface operations {
     extensionKhtcArchiveWords: {
         parameters: {
             query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
                 offset?: number;
                 limit?: number;
             };
@@ -47434,7 +47515,10 @@ export interface operations {
     };
     extensionKhtcArchiveWordDownload: {
         parameters: {
-            query?: never;
+            query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+            };
             header?: never;
             path: {
                 id: string;
@@ -47472,6 +47556,9 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    field?: string;
+                    /** @enum {string} */
+                    field_status?: "complete" | "partial" | "unknown";
                     items: {
                         /** Format: uuid */
                         period_id: string;

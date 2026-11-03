@@ -19,7 +19,7 @@ func (q ArchiveQuery) fields() domain.ArchiveFieldSelector {
 	return domain.ArchiveFieldSelector{Code: q.Field, Status: q.FieldStatus}
 }
 func (q ArchiveQuery) scanQuery() store.ArchiveScanQuery {
-	return store.ArchiveScanQuery{Year: q.Year, Kind: q.Kind, Search: strings.TrimSpace(q.Search), PeriodSearch: strings.TrimSpace(q.PeriodSearch), Versions: q.AllVersions, PeriodID: q.PeriodID}
+	return store.ArchiveScanQuery{Year: q.Year, Kind: q.Kind, Search: strings.TrimSpace(q.Search), Versions: q.AllVersions, PeriodID: q.PeriodID}
 }
 
 type ArchiveFieldsResult struct {

@@ -6,13 +6,13 @@ import {LoadState, useLoad} from "@/kn/cycle/common";
 import type {createArchiveApi, ArchivePeriod, ArchiveQuery} from "./archive-api";
 import {REPORT_TYPES} from "../periods/api";
 
-type Props = {api: ReturnType<typeof createArchiveApi>; year: number; kind: ArchiveQuery["kind"]; onChoose: (period: ArchivePeriod) => void; onClose: () => void};
+type Props = {api: ReturnType<typeof createArchiveApi>; year: number; kind: ArchiveQuery["kind"]; filter?: ArchiveQuery; onChoose: (period: ArchivePeriod) => void; onClose: () => void};
 const PAGE = 20;
 // Independent pagination: a period is never omitted just because its exports are on another archive page.
-export function ArchivePeriodPicker({api, year, kind, onChoose, onClose}: Props) {
+export function ArchivePeriodPicker({api, year, kind, filter, onChoose, onClose}: Props) {
  const [search,setSearch]=useState("");
  const [query,setQuery]=useState({q:"",offset:0});
- const rows=useLoad(()=>api.periods({year,kind,...query,limit:PAGE}),[api,year,kind,query]);
+ const rows=useLoad(()=>api.periods({...filter,year,kind,document_q:filter?.q,q:query.q,offset:query.offset,limit:PAGE}),[api,year,kind,filter,query]);
  const columns:Column<ArchivePeriod>[]=[
   {key:"kind",header:"Loại báo cáo",cell:p=>REPORT_TYPES.find(t=>t.value===p.report_type)?.label??p.report_type},
   {key:"period",header:"Kỳ",cell:p=>p.name},

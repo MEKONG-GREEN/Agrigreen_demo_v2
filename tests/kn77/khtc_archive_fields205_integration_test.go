@@ -7,6 +7,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -255,6 +256,46 @@ func TestArchive205CompleteChoicesPast10001AndLegacyStates(t *testing.T) {
 			if status != 422 {
 				t.Fatalf("numeric query %s produced%d", key, status)
 			}
+		}
+	}
+}
+
+func TestArchive205PeriodNameDocumentCollisionCompatibility(t *testing.T) {
+	f := newReportFx(t)
+	a := f.open(39, dTT, dTTTT)
+	b := f.open(40, dTT, dTTTT)
+	for _, item := range []struct {
+		p   khtcPeriod
+		doc string
+	}{{a, "205-own-document"}, {b, a.Name}} {
+		d := f.refresh(item.p.ID, 0)
+		status, body := f.call(http.MethodPost, item.p.ID, "/draft", map[string]any{"base_version": d.Version, "admin": map[string]any{"document_no": item.doc}})
+		f.ok(status, body, &d)
+		f.export(item.p.ID, d.Version, true)
+	}
+	for _, check := range []struct {
+		query string
+		want  string
+	}{
+		{"q=" + url.QueryEscape(a.Name), a.ID},
+		{"document_q=" + url.QueryEscape(a.Name), b.ID},
+		{"q=" + url.QueryEscape(a.Name) + "&document_q=" + url.QueryEscape(a.Name), ""},
+		{"q=" + url.QueryEscape(b.Name) + "&document_q=" + url.QueryEscape(a.Name) + "&field_status=unknown", b.ID},
+		{"q=" + url.QueryEscape(b.Name) + "&document_q=" + url.QueryEscape(a.Name) + "&field=trong_trot", ""},
+	} {
+		var got struct {
+			Items []struct {
+				ID string `json:"id"`
+			} `json:"items"`
+		}
+		status, body := f.do(http.MethodGet, "/v1/extension/khtc/exported-reports/periods?year=2026&versions=true&limit=1&"+check.query, authz.KNTinh, khtcDept, f.khtcUser, "", nil)
+		f.ok(status, body, &got)
+		if check.want == "" {
+			if len(got.Items) != 0 {
+				t.Fatal("period-name/document intersection leaked", check.query, got)
+			}
+		} else if len(got.Items) != 1 || got.Items[0].ID != check.want {
+			t.Fatal("period-name q compatibility broken", check.query, got)
 		}
 	}
 }

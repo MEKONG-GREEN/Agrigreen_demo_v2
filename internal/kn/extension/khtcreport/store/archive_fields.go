@@ -1,6 +1,7 @@
 package store
 
 import (
+	"container/heap"
 	"context"
 	"encoding/json"
 	"errors"
@@ -108,25 +109,59 @@ func ArchiveHistoryFiltered(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, 
 	}
 	return out, nil
 }
-func ArchivePeriodChoices(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, field domain.ArchiveFieldSelector, offset, limit int) ([]ArchivePeriod, error) {
-	type candidate struct {
-		period ArchivePeriod
-		at     time.Time
+
+type archivePeriodCandidate struct {
+	period ArchivePeriod
+	at     time.Time
+}
+type archivePeriodHeap []archivePeriodCandidate
+
+func (h archivePeriodHeap) Len() int { return len(h) }
+func (h archivePeriodHeap) Less(i, j int) bool {
+	if !h[i].at.Equal(h[j].at) {
+		return h[i].at.Before(h[j].at)
 	}
-	byID := map[uuid.UUID]candidate{}
+	return h[i].period.ID.String() < h[j].period.ID.String()
+}
+func (h archivePeriodHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *archivePeriodHeap) Push(x any)   { *h = append(*h, x.(archivePeriodCandidate)) }
+func (h *archivePeriodHeap) Pop() any {
+	old := *h
+	x := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return x
+}
+func ArchivePeriodChoices(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, field domain.ArchiveFieldSelector, offset, limit int) ([]ArchivePeriod, error) {
+	// Keep only the ordered page prefix. A discarded older period cannot later
+	// re-enter this improving top-K threshold; duplicates need no unbounded seen set.
+	if offset < 0 || limit < 1 || offset > 100000 || limit > 51 {
+		return nil, errors.New("invalid period page")
+	}
+	capacity := offset + limit
+	kept := map[uuid.UUID]bool{}
+	h := &archivePeriodHeap{}
 	err := walkArchive(ctx, tx, q, func(x ArchiveCandidate) bool {
-		if field.Matches(x.Fields) {
-			byID[x.Row.PeriodID] = candidate{ArchivePeriod{ID: x.Row.PeriodID, Name: x.Row.PeriodName, ReportType: x.Row.ReportType}, x.PeriodAt}
+		if !field.Matches(x.Fields) || kept[x.Row.PeriodID] {
+			return true
+		}
+		c := archivePeriodCandidate{ArchivePeriod{ID: x.Row.PeriodID, Name: x.Row.PeriodName, ReportType: x.Row.ReportType}, x.PeriodAt}
+		if h.Len() < capacity {
+			heap.Push(h, c)
+			kept[c.period.ID] = true
+			return true
+		}
+		oldest := (*h)[0]
+		if c.at.After(oldest.at) || (c.at.Equal(oldest.at) && c.period.ID.String() > oldest.period.ID.String()) {
+			delete(kept, heap.Pop(h).(archivePeriodCandidate).period.ID)
+			heap.Push(h, c)
+			kept[c.period.ID] = true
 		}
 		return true
 	})
 	if err != nil {
 		return nil, err
 	}
-	all := make([]candidate, 0, len(byID))
-	for _, x := range byID {
-		all = append(all, x)
-	}
+	all := *h
 	sort.Slice(all, func(i, j int) bool {
 		if !all[i].at.Equal(all[j].at) {
 			return all[i].at.After(all[j].at)
