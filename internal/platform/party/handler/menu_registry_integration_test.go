@@ -32,9 +32,9 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	root := f.root()
 	tr := f.seedTree(root)
 	for _, unit := range []uuid.UUID{tr.p89, tr.p92} {
-		body := deptBody(unit, "trong_trot")
-		body["status"] = port.DeptActive
-		wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments", body), http.StatusCreated, "seed active department")
+		in := deptInput(unit, "trong_trot")
+		in.Status = port.DeptActive
+		r3(f.mod.DepartmentAdmin().CreateDepartment(root.ctx(), in, key())).must(t) // seed active department (#118: HTTP ở chủ KN)
 	}
 	calls := 0
 	failOwner := false

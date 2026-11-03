@@ -1,8 +1,9 @@
 package handler
 
 // HTTP của KN v7.7 gói P2: phòng ban, khu vực, cây 3 cấp, bảng ảnh hưởng, menu theo cấu hình.
-// Admin API (MFA): /v1/departments*, /v1/regions*, /v1/orgs/{ref}/region|impact|communes/ensure|departments/seed.
-// Application API: GET /v1/departments, /v1/departments/{code}/modules, /v1/menu, /v1/regions, /v1/orgs/tree.
+// Admin API (MFA): /v1/regions*, /v1/orgs/tree, /v1/orgs/{ref}/region|impact|communes/ensure|departments/seed.
+// Application API: GET /v1/departments/{code}/modules, /v1/menu, /v1/regions, /v1/orgs/tree.
+// Danh mục phòng ban (/v1/departments, /v1/departments/{id}*) do chủ KN đăng ký qua port.DepartmentAdmin (#118).
 
 import (
 	"context"
@@ -26,15 +27,9 @@ import (
 // KN gói app.KN cho HTTP.
 type KN struct{ Svc *app.KN }
 
-// RegisterAdmin gắn route Admin API.
+// RegisterAdmin gắn route Admin API. Danh mục phòng ban /v1/departments, /v1/departments/{id}* do chủ KN
+// (internal/kn/extension/departments, qua port.DepartmentAdmin) đăng ký từ KNSPLIT-2 #118.
 func (h KN) RegisterAdmin(rg *gin.RouterGroup) {
-	rg.GET("/departments", h.adminListDepartments)
-	rg.POST("/departments", h.createDepartment)
-	rg.GET("/departments/:id", h.getDepartment)
-	rg.PUT("/departments/:id", h.updateDepartment)
-	rg.POST("/departments/:id/status", h.departmentStatus)
-	rg.POST("/departments/:id/retire", h.retireDepartment)
-	rg.GET("/departments/:id/log", h.departmentLog)
 	rg.GET("/regions", h.listRegions)
 	rg.POST("/regions", h.createRegion)
 	rg.POST("/regions/seed", h.seedRegions)
@@ -51,9 +46,8 @@ func (h KN) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/orgs/:ref/departments/seed", h.seedDepartments)
 }
 
-// RegisterApp gắn route Application API (đọc).
+// RegisterApp gắn route Application API (đọc). GET /v1/departments (bước 2 đăng nhập) do chủ KN đăng ký (#118).
 func (h KN) RegisterApp(rg *gin.RouterGroup) {
-	rg.GET("/departments", h.appListDepartments)
 	rg.GET("/departments/:code/modules", h.modules)
 	rg.GET("/menu", h.menu)
 	rg.GET("/regions", h.listRegions)
@@ -175,144 +169,8 @@ func idemKey(c *gin.Context) string { return idempotency.KeyFromContext(c.Reques
 // Phòng ban
 // ---------------------------------------------------------------------------
 
-func (h KN) listDepartments(c *gin.Context, admin bool) {
-	unit, ok := optRefQuery(c, "org_ref")
-	if !ok {
-		return
-	}
-	vs, resolved, err := h.Svc.ListDepartments(c.Request.Context(), unit, c.Query("include_retired") == "true", admin)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	items := make([]departmentDTO, 0, len(vs))
-	for _, v := range vs {
-		items = append(items, toDepartmentDTO(v.Department, v.Usage))
-	}
-	c.JSON(http.StatusOK, gin.H{"org_ref": resolved.String(), "items": items})
-}
-
-func (h KN) adminListDepartments(c *gin.Context) { h.listDepartments(c, true) }
-func (h KN) appListDepartments(c *gin.Context)   { h.listDepartments(c, false) }
-
-type departmentReq struct {
-	OrgRef      string `json:"org_ref"`
-	Code        string `json:"code"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	SortOrder   int    `json:"sort_order"`
-	Status      string `json:"status"`
-	MenuProfile string `json:"menu_profile"`
-}
-
-func (h KN) createDepartment(c *gin.Context) {
-	var req departmentReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	in := app.DepartmentInput{Code: req.Code, Name: req.Name, Description: req.Description, SortOrder: req.SortOrder, Status: req.Status,
-		MenuProfile: req.MenuProfile}
-	if ref, err := uuid.Parse(req.OrgRef); err == nil {
-		in.OrgRef = ref
-	}
-	d, replayed, err := h.Svc.CreateDepartment(c.Request.Context(), in, idemKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.Header("Location", "/v1/departments/"+d.ID.String())
-	written(c, replayed, toDepartmentDTO(d, nil))
-}
-
-func (h KN) getDepartment(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	v, err := h.Svc.GetDepartment(c.Request.Context(), id)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toDepartmentDTO(v.Department, v.Usage))
-}
-
-func (h KN) updateDepartment(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	var req departmentReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	d, err := h.Svc.UpdateDepartment(c.Request.Context(), id, app.DepartmentInput{Name: req.Name, Description: req.Description,
-		SortOrder: req.SortOrder, MenuProfile: req.MenuProfile})
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toDepartmentDTO(d, nil))
-}
-
-type deptStatusReq struct {
-	Status string `json:"status"`
-	Reason string `json:"reason"`
-}
-
-func (h KN) departmentStatus(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	var req deptStatusReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	res, err := h.Svc.ChangeDepartmentStatus(c.Request.Context(), id, req.Status, req.Reason, idemKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	warnings := res.Warnings
-	if warnings == nil {
-		warnings = []string{}
-	}
-	written(c, res.Replayed, gin.H{"department": toDepartmentDTO(res.Department, res.Usage), "warnings": warnings})
-}
-
 type reasonReq struct {
 	Reason string `json:"reason"`
-}
-
-func (h KN) retireDepartment(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	var req reasonReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	d, replayed, err := h.Svc.RetireDepartment(c.Request.Context(), id, req.Reason, idemKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	written(c, replayed, toDepartmentDTO(d, nil))
-}
-
-func (h KN) departmentLog(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	after, ok := afterSeq(c)
-	if !ok {
-		return
-	}
-	es, err := h.Svc.DepartmentLog(c.Request.Context(), id, after, limitOf(c))
-	writeLog(c, es, err)
 }
 
 func (h KN) seedDepartments(c *gin.Context) {

@@ -30,6 +30,7 @@ provides:
     - ScopedDutyHolders
     - SessionReader
     - StaffContacts
+    - UnitDelegationPolicy
     - UnitManagers
     - XaScopes
   events:

@@ -16,11 +16,13 @@ import (
 )
 
 // CNTSCampaignDeps là port của module khác cho chiến dịch điều tra. Forms, Control bắt buộc; Figures cho bảng kết quả.
-// Control cài thêm cntscampaign/app.Reopener (pf/forms app.Control) thì "Mở lại đợt" dùng được.
+// Conditional (#159 pf/forms Module.ConditionalControl) bắt buộc cho mọi thao tác ghi kỳ native (phát hành, gia hạn, đóng,
+// mở lại, đối soát — #201): thiếu → các thao tác đó trả 503, không quay về lời gọi vô điều kiện của Control.
 type CNTSCampaignDeps struct {
-	Forms   formsport.Publisher
-	Control formsport.PeriodControl
-	Figures formsport.FiguresReader
+	Forms       formsport.Publisher
+	Control     formsport.PeriodControl
+	Conditional formsport.ConditionalPeriodControl
+	Figures     formsport.FiguresReader
 }
 
 // campaignService là use case chiến dịch điều tra (trường Module.campaigns).
@@ -44,7 +46,7 @@ func (m *Module) registerCNTSCampaigns(rg *gin.RouterGroup) {
 // UseCNTSCampaigns nối cap/forms cho chiến dịch điều tra.
 func (m *Module) UseCNTSCampaigns(d CNTSCampaignDeps) {
 	s := m.campaignSvc()
-	s.Forms, s.Control = d.Forms, d.Control
+	s.Forms, s.Control, s.Cond = d.Forms, d.Control, d.Conditional
 	// BF-CN-PUBLISH (#108): cùng cổng tiến độ kỳ native cho nháp của biểu kỳ CNTS và nút Nhắc của màn theo dõi (gốc lắp
 	// ráp chỉ gọi UseCNTSCampaigns — không thêm lời gọi nối mới ngoài làn KN).
 	m.rc.FormsControl = d.Control
