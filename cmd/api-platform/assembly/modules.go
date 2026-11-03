@@ -204,8 +204,9 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	knOrgs := extension.NewPublishedOrganizations(unit)
 	kn := extension.New(unit, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: knOrgs, Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs(),
 		Plots: knHTXData, Coops: knHTXData, Store: store})
-	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
-	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
+	md.UseStaffDirectory(kn.StaffNames())        // G-07: tên người đặt/duyệt tham số
+	pty.UseActorNames(kn.StaffNames())           // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
+	kn.UseDepartmentAdmin(pty.DepartmentAdmin()) // KNSPLIT-2 #118: /v1/departments* do chủ KN đăng ký, dữ liệu ở pf/party
 
 	// PFPUB/D2 (ADR-0053 §8): nhãn "Chưa xác nhận" của dòng HTX trong số đã chốt cho KHTC.
 	kn.UseHTXConfirmations(knHTXData)

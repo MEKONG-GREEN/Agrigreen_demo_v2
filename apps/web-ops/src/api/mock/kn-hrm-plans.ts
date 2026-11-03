@@ -593,8 +593,8 @@ export const hrmPlanRoutes: Route[] = [
       if (!c.center || c.readOnly) return CENTER_ONLY();
       if (p.period.status !== "closed")
         return problem(409, "hrm.plan_not_closed", "Kế hoạch chưa chốt — sửa bằng cách gửi lại, không điều chỉnh");
-      const reason = String((ctx.body as { reason?: string })?.reason ?? "").trim();
-      if (reason.length < 10 || reason.length > 500)
+      const reason = String((ctx.body as { reason?: string })?.reason ?? "").replace(/^\p{White_Space}+|\p{White_Space}+$/gu, "");
+      if (Array.from(reason).length < 10 || Array.from(reason).length > 500)
         return validation([{ field: "reason", reason: "lý do điều chỉnh 10–500 ký tự" }]);
       const v = normInput(ctx.body);
       if (v instanceof Response) return v;

@@ -5206,7 +5206,7 @@ paths:
     get:
       summary: "FN-AD-04.03: phòng ban (module) của một đơn vị kèm số tài khoản/bản ghi (null khi chưa nối nguồn đếm)"
       operationId: knAdminListDepartments
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: org_ref, in: query, schema: {type: string, format: uuid}, description: "Đơn vị (Nút cấp 1/2); vắng = đơn vị của Nút người gọi"}
         - {name: include_retired, in: query, schema: {type: boolean, default: false}}
@@ -5222,7 +5222,7 @@ paths:
       summary: "FN-AD-04.03: khai báo phòng ban cho Nút cấp 1 (TTKNQG) hoặc cấp 2 (TTKN tỉnh); trùng mã trong đơn vị → 409"
       description: Chỉ Admin (platform_admin, registry_admin). Ghi sổ pf_party.department_event (created, ảnh chụp sau).
       operationId: knCreateDepartment
-      tags: [party]
+      tags: [extension]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -5245,7 +5245,7 @@ paths:
     get:
       summary: Một phòng ban kèm số tài khoản/bản ghi
       operationId: knGetDepartment
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
@@ -5259,7 +5259,7 @@ paths:
     put:
       summary: Sửa tên, mô tả, thứ tự, bộ menu (không đổi gì → không ghi sổ; đổi → một dòng Log cũ → mới)
       operationId: knUpdateDepartment
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
       requestBody:
@@ -5289,7 +5289,7 @@ paths:
       summary: "Đổi trạng thái Đang áp dụng / Chưa mở / Ngưng hoạt động — hiệu lực ngay ở bước 2 đăng nhập và menu (UR-KT-02)"
       description: Ngưng (suspended) bắt buộc lý do ≥ 10 ký tự. Ngưng/đóng phòng ban còn tài khoản/dữ liệu → cảnh báo, dữ liệu cũ giữ nguyên.
       operationId: knDepartmentStatus
-      tags: [party]
+      tags: [extension]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -5322,7 +5322,7 @@ paths:
     post:
       summary: "Xóa phòng ban (sự kiện retired, không xóa cứng) — chặn khi có tài khoản/dữ liệu (409) hoặc chưa nối nguồn đếm (503)"
       operationId: knRetireDepartment
-      tags: [party]
+      tags: [extension]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -5349,7 +5349,7 @@ paths:
     get:
       summary: Khung Log của phòng ban — người, thời điểm, cũ → mới, lý do (AC-CHUNG)
       operationId: knDepartmentLog
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
