@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"strings"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -261,72 +261,11 @@ func eventIdem(idem, action string, id uuid.UUID) string {
 	return "khtc:" + action + ":" + id.String() + ":" + idem
 }
 
-// ChangeDeadline "Sửa hạn nộp" — chỉ kỳ chưa đóng/hủy. Đổi hạn của kỳ native cap/forms trước (sổ phụ period_due: cờ
-// "Nộp trễ" của lần gửi, Trễ hạn, hạn trên thiết bị theo hạn mới), rồi ghi sự kiện ở sổ KHTC; ghi sổ KHTC lỗi → trả hạn
-// native về hạn cũ (bù như "Mở kỳ").
+// ChangeDeadline đổi hạn bằng intent bền và native CAS ngoài TX. Undo chỉ dùng
+// applied revision của chính mutation đã được xác nhận; kết quả không rõ giữ
+// unresolved để đối soát, không mặc nhận đã trả hạn cũ.
 func (s *Service) ChangeDeadline(ctx context.Context, id uuid.UUID, in DeadlineInput, idem string) (Detail, error) {
-	c, err := s.periodWriter(ctx, id)
-	if err != nil {
-		return Detail{}, err
-	}
-	d, err := s.Get(ctx, id)
-	if err != nil {
-		return Detail{}, err
-	}
-	if domain.CanChangeDeadline(d.State) != nil {
-		return Detail{}, ErrTerminal
-	}
-	if in.DueAt.IsZero() {
-		return Detail{}, problem.Validation.WithField("due_at", "bắt buộc")
-	}
-	if in.ExportDueAt.IsZero() {
-		in.ExportDueAt = d.ExportDueAt
-		if in.ExportDueAt.Before(in.DueAt) {
-			in.ExportDueAt = in.DueAt
-		}
-	}
-	if err := domain.ValidateDeadlines(d.Period.Cutoff, in.DueAt, in.ExportDueAt, zone()); err != nil {
-		return Detail{}, inputErr(err)
-	}
-	e := store.Event{PeriodID: id, Action: store.ActionDeadline, DueAt: ptrTime(in.DueAt.UTC()), ExportDueAt: ptrTime(in.ExportDueAt.UTC())}
-	if why, ok := domain.ValidReason(in.Reason); ok {
-		e.Reason = &why
-	}
-	reason := ""
-	if e.Reason != nil {
-		reason = *e.Reason
-	}
-	nativeKey := eventIdem(idem, "forms-due", id)
-	nativeCtx := ctx
-	if d.Period.Type == domain.TypeAdhoc {
-		hash, e := formsport.OperationHash(struct {
-			Due    time.Time
-			Reason string
-		}{in.DueAt.UTC(), strings.TrimSpace(reason)})
-		if e != nil {
-			return Detail{}, e
-		}
-		nativeCtx = BindAdhocOperation(ctx, s.DB, c.k, id, formsport.Operation{Action: formsport.OperationChangeDue, Profile: domain.ProfileKHTC, PeriodID: d.Period.FormsPeriodRef, PayloadHash: hash, IdemKey: nativeKey})
-	}
-	if err := s.Control.ChangeDue(nativeCtx, domain.ProfileKHTC, d.Period.FormsPeriodRef, in.DueAt, reason, nativeKey); err != nil {
-		return Detail{}, err
-	}
-	if err := s.appendEvent(ctx, c, e, eventIdem(idem, "deadline", id)); err != nil {
-		// Bù: trả hạn kỳ native về hạn hiệu lực cũ (best effort — lỗi bù không che lỗi gốc).
-		undoReason := "Hoàn tác: ghi sổ KHTC không thành công"
-		undoKey := eventIdem(idem, "forms-due-undo", id)
-		undoCtx := ctx
-		if d.Period.Type == domain.TypeAdhoc {
-			hash, _ := formsport.OperationHash(struct {
-				Due    time.Time
-				Reason string
-			}{d.DueAt.UTC(), undoReason})
-			undoCtx = BindAdhocOperation(ctx, s.DB, c.k, id, formsport.Operation{Action: formsport.OperationChangeDue, Profile: domain.ProfileKHTC, PeriodID: d.Period.FormsPeriodRef, PayloadHash: hash, IdemKey: undoKey})
-		}
-		_ = s.Control.ChangeDue(undoCtx, domain.ProfileKHTC, d.Period.FormsPeriodRef, d.DueAt, undoReason, undoKey)
-		return Detail{}, err
-	}
-	return s.Get(ctx, id)
+	return s.changeDeadlineCAS209(ctx, id, in, idem)
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }
