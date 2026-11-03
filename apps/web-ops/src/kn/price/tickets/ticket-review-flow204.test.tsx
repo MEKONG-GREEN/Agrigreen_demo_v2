@@ -70,4 +70,15 @@ describe("204 route workspace using actual typed client + native mock contract (
   v.rerender(<TicketReviewWorkspace path={correctPath(f.id)} />);await waitFor(()=>expect(screen.getByLabelText("Lý do",{exact:false})).toHaveValue(""));expect(inputs(f.sheet).lo).toHaveValue("");
  });
 
+ it("Admin without MFA cannot Save/POST even when backend can.correct=true",async()=>{
+  const fetcher=vi.fn(mockFetchNoDelay),f=await fixture(fetcher);expect(f.sheet.can.correct).toBe(true);state.role="admin";state.mfa=false;
+  render(<TicketReviewWorkspace path={correctPath(f.id)} />);await screen.findByRole("heading",{name:"Hiệu chỉnh phiếu báo giá"});
+  const save=screen.queryByRole("button",{name:"Lưu"});if(save){fill(f.sheet);fireEvent.click(save);await waitFor(()=>expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST")).toHaveLength(1));}
+  expect(screen.queryByRole("button",{name:"Lưu"})).not.toBeInTheDocument();expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST")).toHaveLength(0);
+ });
+
+ it("reason input permits 500 Unicode runes without a UTF-16 maxlength",async()=>{
+  const f=await fixture();render(<TicketReviewWorkspace path={["phieu",f.id,"xoa"]} />);const reason=await screen.findByLabelText("Lý do",{exact:false});expect(reason).not.toHaveAttribute("maxlength");fireEvent.change(reason,{target:{value:"😀".repeat(500)}});expect(reason).toHaveValue("😀".repeat(500));
+ });
+
 });

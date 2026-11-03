@@ -38,7 +38,7 @@ type review204Env struct {
 func newReview204(t *testing.T, withAlert ...bool) *review204Env {
 	t.Helper()
 	env := pgtest.Get(t)
-	clk := clock.NewFixed(time.Date(2026, 10, 8, 3, 0, 0, 0, time.UTC))
+	clk := clock.NewFixed(time.Date(2026, 10, 5, 3, 0, 0, 0, time.UTC))
 	prof := port.Profile{Session: testOwnerSession, Name: "kn", Department: "thong_tin_truyen_thong", Roles: map[string]string{"kn_tinh": "TINH", "kn_xa": "XA", "kn_tw": "TW"}, ManageBy: []string{"admin"}, StewardDuty: authz.DutyPriceAdmin}
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	svc, err := app.NewService(db.ForModule(pool, app.DBModule), clk, []port.Profile{prof})
@@ -92,6 +92,13 @@ func newReview204(t *testing.T, withAlert ...bool) *review204Env {
 		e.call("admin", "POST", "/v1/price/points/XBG0001/officers", map[string]any{"role": a.role, "officer_ref": a.ref.String(), "valid_from": "2026-10-05"}, "", 201)
 	}
 	e.call("tinh", "POST", "/v1/price/items", map[string]any{"name": "Dưa leo204", "variety": "Loại1", "group_code": "rau_mau", "unit_code": "kg", "kind": "basic", "valid_from": "2026-10-05"}, "", 201)
+	seedDay := e.call("tinh", "GET", "/v1/price/tickets?day=2026-10-05", nil, "", 200)
+	if seedDay["quote"] != true || seedDay["locked"] != false {
+		t.Fatalf("invalid seed calendar before advance: %v", seedDay)
+	}
+	t.Log("seedclock=2026-10-05T03:00:00Z quote=true locked=false; validity seeded before clock advance")
+	// Catalog validity is seeded on its effective day, before advancing the quote clock.
+	clk.Advance(72 * time.Hour) // 08/10 10:00 VN; real history may now refer to 07/10.
 	if len(withAlert) > 0 && withAlert[0] {
 		e.call("tinh", "POST", "/v1/price/tickets/proxy", map[string]any{"point": "XBG0001", "day": "2026-10-07", "version": 0, "submit": true, "reason": "Giá tham chiếu204", "lines": []map[string]any{{"item_code": "MH00001", "min": "100", "max": "100"}}}, "", 201)
 	}
@@ -299,5 +306,35 @@ func TestPriceReview204SharedGuardAndKeep(t *testing.T) {
 		if entry["response"] == "keep" && (entry["proposed_min"] != nil || entry["proposed_max"] != nil) {
 			t.Fatalf("keep retained ignored prices: %v", entry)
 		}
+	}
+}
+
+func TestPriceReview204NativeReasonRunes(t *testing.T) {
+	e := newReview204(t)
+	path := "/v1/price/tickets/" + e.ticket + "/correct"
+	for _, reason := range []string{strings.Repeat("😀", 500), "\uFEFF"} {
+		b := e.correction("2.5", "9000")
+		b["reason"] = reason
+		sh := e.call("tinh", "POST", path, b, "", 201)
+		e.version = sh["ticket"].(map[string]any)["version"]
+		log := e.call("tinh", "GET", "/v1/price/tickets/"+e.ticket+"/log", nil, "", 200)
+		found := false
+		for _, h := range log["ticket"].([]any) {
+			if h.(map[string]any)["reason"] == reason {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("native Unicode reason not preserved")
+		}
+	}
+	before := e.counts()
+	b := e.correction("2.5", "9000")
+	b["reason"] = "\u0085\u0085"
+	e.call("tinh", "POST", path, b, "", 422)
+	b["reason"] = strings.Repeat("😀", 501)
+	e.call("tinh", "POST", path, b, "", 422)
+	if before != e.counts() {
+		t.Fatal("invalid Unicode reason wrote")
 	}
 }

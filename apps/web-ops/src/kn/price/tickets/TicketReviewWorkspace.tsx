@@ -18,6 +18,7 @@ export function TicketReviewWorkspace({ path = [] }: { path?: string[] }) {
   const back = { href: reviewHref(filters), label: "Danh sách kiểm duyệt" };
   if (!allowed) return <DetailPage back={back} title="Phiếu báo giá"><p role="alert">Chọn ngữ cảnh Cấp Tỉnh Phòng Thông tin truyền thông hoặc Admin để xem phiếu và nhật ký.</p></DetailPage>;
   if (route.kind === "invalid") return <DetailPage back={back} title="Không tìm thấy trang phiếu"><p role="alert">Đường dẫn phiếu không hợp lệ.</p></DetailPage>;
+  const readOnly = ctx?.read_only === true || (ctx?.role === "admin" && auth.principal?.mfa !== true);
   const identity = JSON.stringify([clientIdentity(auth.api), auth.status, auth.principal, auth.kn.status, ctx, auth.kn.support, filters, route]);
-  return route.kind === "list" ? <ReviewScreen key={identity} filters={filters} onFilters={f => router.replace(reviewHref(f))} /> : <TicketReviewDetail key={identity} route={route} filters={filters} ta={ta} readOnly={ctx?.read_only === true} />;
+  return route.kind === "list" ? <ReviewScreen key={identity} filters={filters} readOnly={readOnly} onFilters={f => router.replace(reviewHref(f))} /> : <TicketReviewDetail key={identity} route={route} filters={filters} ta={ta} readOnly={readOnly} />;
 }

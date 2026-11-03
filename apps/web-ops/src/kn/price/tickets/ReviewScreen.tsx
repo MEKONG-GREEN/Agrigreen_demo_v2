@@ -29,7 +29,7 @@ import { countDrafts, draftsOf, fillFromRef, SheetEditor, usePriceTicketApi, typ
 
 import { reviewHref, type ReviewFilters } from "./ticket-review-routes";
 
-export function ReviewScreen({ filters, onFilters }: { filters: ReviewFilters; onFilters: (f: ReviewFilters) => void }) {
+export function ReviewScreen({ filters, onFilters, readOnly = false }: { filters: ReviewFilters; onFilters: (f: ReviewFilters) => void; readOnly?: boolean }) {
   const ta = usePriceTicketApi();
   const { day, mine, tab } = filters;
   const setDay = (day: string) => onFilters({ ...filters, day });
@@ -67,7 +67,7 @@ export function ReviewScreen({ filters, onFilters }: { filters: ReviewFilters; o
         </label>
       </div>
       {act.view}
-      <BoardPanel day={day} nonce={nonce} onChanged={bump} />
+      {readOnly ? <p role="note">Chỉ xem — cần quyền ghi trong ngữ cảnh hiện tại và xác thực hai yếu tố khi dùng vai trò Admin.</p> : <BoardPanel day={day} nonce={nonce} onChanged={bump} />}
       <LoadState s={list}>
         {(d) => {
           const n = (v: string) => d.rows.filter((r) => r.view === v).length;
@@ -99,9 +99,9 @@ export function ReviewScreen({ filters, onFilters }: { filters: ReviewFilters; o
         ))}
       </div>
       {tab === "tickets" ? (
-        <LoadState s={list}>{(d) => <TicketRows rows={d.rows} locked={d.locked} href={id => reviewHref(filters, id)} onProxy={point => setOpen({ point, mode: "proxy" })} />}</LoadState>
+        <LoadState s={list}>{(d) => <TicketRows rows={d.rows} locked={d.locked && !readOnly} href={id => reviewHref(filters, id)} onProxy={point => setOpen({ point, mode: "proxy" })} />}</LoadState>
       ) : (
-        <LoadState s={alerts}>{(d) => <AlertRows rows={d.alerts} onChanged={bump} href={id => reviewHref(filters, id, "correct")} />}</LoadState>
+        <LoadState s={alerts}>{(d) => <AlertRows rows={d.alerts} onChanged={bump} readOnly={readOnly} href={id => reviewHref(filters, id, "correct")} />}</LoadState>
       )}
       {open ? (
         <TicketPanel
@@ -158,7 +158,7 @@ function TicketRows({ rows, locked, href, onProxy }: { rows: PriceTicketRow[]; l
   );
 }
 
-function AlertRows({ rows, onChanged, href }: { rows: PriceAlertRow[]; onChanged: () => void; href: (id: string) => string }) {
+function AlertRows({ rows, onChanged, href, readOnly }: { rows: PriceAlertRow[]; onChanged: () => void; href: (id: string) => string; readOnly: boolean }) {
   const ta = usePriceTicketApi();
   const act = useAction();
   const [sel, setSel] = useState<string[]>([]);
@@ -167,8 +167,8 @@ function AlertRows({ rows, onChanged, href }: { rows: PriceAlertRow[]; onChanged
   const [note, setNote] = useState("");
   const [page, setPage] = useState(1);
   const key = (r: PriceAlertRow) => `${r.ticket_id}:${r.item_code}`;
-  const askable = (r: PriceAlertRow) => r.can_act && (r.view === "provisional" || r.view === "pending" || r.view === "responded");
-  const decidable = (r: PriceAlertRow) => r.can_act && (r.view === "pending" || r.view === "responded" || r.view === "overdue");
+  const askable = (r: PriceAlertRow) => !readOnly && r.can_act && (r.view === "provisional" || r.view === "pending" || r.view === "responded");
+  const decidable = (r: PriceAlertRow) => !readOnly && r.can_act && (r.view === "pending" || r.view === "responded" || r.view === "overdue");
   const chosen = rows.filter((r) => sel.includes(key(r)));
   const cols: Column<PriceAlertRow>[] = [
     {
@@ -208,7 +208,7 @@ function AlertRows({ rows, onChanged, href }: { rows: PriceAlertRow[]; onChanged
       header: "",
       cell: (r) => (
         <div className="row" style={{ gap: 4 }}>
-          {r.can_act && !alertResolved(r.view) ? (
+          {!readOnly && r.can_act && !alertResolved(r.view) ? (
             <Link className="btn" href={href(r.ticket_id)}>Hiệu chỉnh</Link>
           ) : null}
           {decidable(r) ? (

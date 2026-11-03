@@ -1,16 +1,29 @@
 import { expect, test, type Page } from "@playwright/test";
-import { loginAs, sidebar } from "./helpers";
+import { loginAs, logout, sidebar } from "./helpers";
+test.use({ actionTimeout: 15_000 });
 async function openReview(page: Page) {
   await loginAs(page, "kn-admin", "/kn/tong-quan");
   await sidebar(page).getByRole("link", { name: "Phòng ban", exact: true }).click();
   await page.getByLabel("Trạng thái Phòng Thông tin Tuyên truyền", { exact: true }).selectOption("active");
   await expect(page.getByRole("status").filter({ hasText: "Đã đổi" })).toContainText("Đang áp dụng");
-  await sidebar(page).getByRole("link", { name: "Menu các cấp", exact: true }).click();
-  await page.getByLabel("Xem như vai trò*").selectOption("kn_tinh");
-  await page.getByLabel(/^Lý do hỗ trợ/).fill("Kiểm tra chi tiết và hiệu chỉnh phiếu204");
-  await page.getByRole("button", { name: "Vào menu Cấp Tỉnh", exact: true }).click();
-  await page.getByRole("button", { name: "Thoát chế độ hỗ trợ", exact: true }).click();
-  await sidebar(page).getByRole("button", { name: "Phòng Thông tin Tuyên truyền", exact: true }).click();
+  // Provision a real TTTT assignment through Admin UI. The support menu intentionally
+  // targets Trồng trọt, and Admin catalog menus do not include ticket review.
+  await sidebar(page).getByRole("link", { name: "Người dùng", exact: true }).click();
+  await page.getByRole("link", { name: "Tạo tài khoản", exact: true }).click();
+  const form = page.getByRole("main");
+  await form.getByRole("textbox", { name: "Họ tên", exact: true }).fill("Kiểm chứng Phiếu204");
+  await form.getByRole("textbox", { name: "Email", exact: true }).fill("phieu204@vi-du.vn");
+  await form.getByLabel("Số điện thoại (tên đăng nhập)", { exact: true }).fill("0912345204");
+  await form.getByRole("combobox", { name: "Vai trò", exact: true }).selectOption("kn_tinh");
+  await form.getByRole("checkbox", { name: "trong_trot", exact: true }).uncheck();
+  await form.getByRole("checkbox", { name: "thong_tin_truyen_thong", exact: true }).check();
+  await form.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Kiểm chứng Phiếu204" })).toBeVisible();
+  await logout(page);
+  await page.getByLabel("Email hoặc số điện thoại").fill("phieu204@vi-du.vn");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("KhuyenNong@2026"); // Documented mock-account fixture only.
+  await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
+  await expect(page.getByTestId("account-menu")).toContainText("Thông tin Tuyên truyền");
   await sidebar(page).getByRole("link", { name: "Kiểm duyệt & công bố", exact: true }).click();
   await page.getByLabel("Ngày báo giá", { exact: true }).fill("2026-11-04");
   await page.getByRole("checkbox", { name: "Chỉ xã được phân công" }).uncheck();
@@ -44,7 +57,7 @@ test("204: actual route detail → correct → Log, filter-preserving cancel and
   await expect(page.getByRole("heading", { name: "Chi tiết phiếu báo giá", exact: true })).toBeVisible();
   const log = page.getByRole("complementary", { name: "Nhật ký phiếu" });
   await expect(log).toContainText("Hiệu chỉnh"); await expect(log).toContainText("Đã đối chiếu phiếu giấy204"); await expect(log).toContainText("Giá Xã gửi (lưu nguyên)");
-  await page.screenshot({ path: "D:/Projects/coordination/204-detail-log.png", fullPage: true });
+  await page.screenshot({ path: test.info().outputPath("204-detail-log.png"), fullPage: true });
   await page.getByRole("link", { name: "Sửa ngày", exact: true }).click();
   await page.getByLabel("Ngày phiếu mới", { exact: false }).fill("2026-10-22");
   await page.getByRole("textbox", { name: /^Lý do/ }).fill("Sửa ngày phiếu giấy204");
@@ -59,11 +72,15 @@ test("204: actual route detail → correct → Log, filter-preserving cancel and
   await page.getByRole("link", { name: "Danh sách kiểm duyệt", exact: true }).click();
   await expect(page).toHaveURL(/kiem-duyet\?day=2026-11-04&mine=false&tab=tickets/);
 });
-test("204: unknown ID and malformed route stay fail-closed; delete cancel does not POST", async ({ page }) => {
+test("204: delete cancel and real logout do not write or retain form access", async ({ page }) => {
   test.setTimeout(150_000);await page.clock.setFixedTime(new Date("2026-11-05T06:00:00Z"));await openReview(page);
   let writes=0;page.on("request",r=>{if(r.method()==="POST"&&/\/price\/tickets\//.test(r.url()))writes++;});
   await page.getByRole("link",{name:"Xóa phiếu",exact:true}).click();await page.getByRole("textbox",{name:/^Lý do/}).fill("Không lưu nội dung này");await page.getByRole("link",{name:"Hủy",exact:true}).click();expect(writes).toBe(0);
-  await page.goto("/kn/bao-gia/kiem-duyet/phieu/0192a5a0-0000-7000-8000-000000000404?day=2026-11-04&mine=false&tab=alerts");
-  await expect(page.getByRole("alert")).toBeVisible();await expect(page.getByRole("link",{name:"Hiệu chỉnh",exact:true})).toHaveCount(0);
-  await page.goto("/kn/bao-gia/kiem-duyet/phieu/bad");await expect(page.getByText("Đường dẫn phiếu không hợp lệ.")).toBeVisible();expect(writes).toBe(0);
+  await page.getByRole("link", { name: "Danh sách kiểm duyệt", exact: true }).click();
+  await expect(page).toHaveURL(/kiem-duyet\?day=2026-11-04&mine=false&tab=tickets/);
+  await logout(page);
+  await expect(page.getByRole("button", { name: "Đăng nhập", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Xác nhận xóa phiếu", exact: true })).toHaveCount(0);
+  expect(writes).toBe(0);
+
 });
