@@ -18,10 +18,6 @@ type ArchiveScanQuery struct {
 	Versions                   bool
 	PeriodID                   uuid.UUID
 }
-type ArchiveCursor struct {
-	At time.Time
-	ID uuid.UUID
-}
 type ArchiveCandidate struct {
 	Row         ArchiveRow
 	Fields      domain.ArchiveFields
@@ -30,15 +26,9 @@ type ArchiveCandidate struct {
 	FilterValid bool
 }
 
-// Keyset batches have no global candidate cutoff. Only immutable owner metadata
-// and frozen JSON are read: never file bytes, live plans or external ports.
-func ArchiveCandidates(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, cursor *ArchiveCursor) ([]ArchiveCandidate, error) {
-	var at *time.Time
-	id := uuid.Nil
-	if cursor != nil {
-		at = &cursor.At
-		id = cursor.ID
-	}
+// Stream every matching immutable snapshot once, without a global cutoff or
+// retaining payloads. Reader authority and RLS remain on the same transaction.
+func walkArchive(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, visit func(ArchiveCandidate) bool) error {
 	rows, err := tx.Query(ctx, `SELECT x.id,x.period_id,p.name,p.report_type,
  COALESCE(x.payload->'admin'->'document_no'->>'override',x.payload->'admin'->'document_no'->>'system',''),
  x.seq,EXISTS(SELECT 1 FROM pf_extension.khtc_report_final f WHERE f.period_id=p.id AND f.export_id=x.id),x.provisional,x.actor_ref,x.event_time,
@@ -51,18 +41,16 @@ func ArchiveCandidates(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, curso
  (SELECT e.id FROM pf_extension.khtc_report_export e WHERE e.period_id=p.id ORDER BY e.seq DESC LIMIT 1)))
  AND ($3='' OR strpos(lower(p.name || ' ' || COALESCE(x.payload->'admin'->'document_no'->>'override',x.payload->'admin'->'document_no'->>'system','')),lower($3))>0)
  AND ($6='' OR strpos(lower(p.name),lower($6))>0)
- AND ($7::timestamptz IS NULL OR (x.event_time,x.id)<($7::timestamptz,$8::uuid))
- ORDER BY x.event_time DESC,x.id DESC LIMIT 64`, q.Year, q.Kind, q.Search, q.Versions, q.PeriodID, q.PeriodSearch, at, id)
+ ORDER BY x.event_time DESC,x.id DESC`, q.Year, q.Kind, q.Search, q.Versions, q.PeriodID, q.PeriodSearch)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
-	out := []ArchiveCandidate{}
 	for rows.Next() {
 		var x ArchiveCandidate
 		var payload, filter []byte
 		if err = rows.Scan(&x.Row.ID, &x.Row.PeriodID, &x.Row.PeriodName, &x.Row.ReportType, &x.Row.DocumentNo, &x.Row.Version, &x.Row.Final, &x.Row.Provisional, &x.Row.ActorRef, &x.Row.At, &x.PeriodAt, &x.Header.DraftID, &x.Header.InputHash, &x.Header.BodyHash, &x.Header.FileName, &payload, &filter); err != nil {
-			return nil, err
+			return err
 		}
 		x.Fields = domain.ProjectArchiveFields(payload, filter)
 		x.Row.FieldCodes = x.Fields.Codes
@@ -74,28 +62,11 @@ func ArchiveCandidates(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, curso
 		x.Header.ActorRef = x.Row.ActorRef
 		x.Header.At = x.Row.At
 		x.FilterValid = json.Unmarshal(filter, &x.Header.Filter) == nil
-		out = append(out, x)
-	}
-	return out, rows.Err()
-}
-func walkArchive(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, visit func(ArchiveCandidate) bool) error {
-	var cursor *ArchiveCursor
-	for {
-		batch, err := ArchiveCandidates(ctx, tx, q, cursor)
-		if err != nil {
-			return err
-		}
-		if len(batch) == 0 {
+		if !visit(x) {
 			return nil
 		}
-		for _, x := range batch {
-			if !visit(x) {
-				return nil
-			}
-		}
-		last := batch[len(batch)-1]
-		cursor = &ArchiveCursor{At: last.Row.At, ID: last.Row.ID}
 	}
+	return rows.Err()
 }
 func ArchiveFiltered(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, field domain.ArchiveFieldSelector, offset, limit int) ([]ArchiveRow, error) {
 	out := []ArchiveRow{}
