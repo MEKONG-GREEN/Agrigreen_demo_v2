@@ -215,7 +215,7 @@ func TestPriceReview204LifecycleAndReplay(t *testing.T) {
 		}
 	}
 	sh := e.call("tinh", "GET", path, nil, "", 200)
-	if sh["ticket"].(map[string]any)["version"] != float64(2) {
+	if fmt.Sprint(sh["ticket"].(map[string]any)["version"]) != "2" {
 		t.Fatalf("version %v", sh)
 	}
 	log := e.call("tinh", "GET", path+"/log", nil, "", 200)

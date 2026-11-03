@@ -17,25 +17,24 @@ import {
   lineInput,
   money,
   pctLabel,
-  priceOf,
   TICKET_VIEW_LABEL,
   TICKET_VIEW_TONE,
   vnTime,
-  vnToday,
   type PriceAlertRow,
   type PriceSheet,
   type PriceTicketRow,
 } from "./api";
 import { BoardPanel } from "./BoardPanel";
-import { countDrafts, draftsOf, fillFromRef, SheetEditor, SheetTable, usePriceTicketApi, type Drafts } from "./SheetLines";
+import { countDrafts, draftsOf, fillFromRef, SheetEditor, usePriceTicketApi, type Drafts } from "./SheetLines";
 
-type Tab = "tickets" | "alerts";
+import { reviewHref, type ReviewFilters } from "./ticket-review-routes";
 
-export function ReviewScreen() {
+export function ReviewScreen({ filters, onFilters }: { filters: ReviewFilters; onFilters: (f: ReviewFilters) => void }) {
   const ta = usePriceTicketApi();
-  const [day, setDay] = useState(vnToday());
-  const [mine, setMine] = useState(true);
-  const [tab, setTab] = useState<Tab>("tickets");
+  const { day, mine, tab } = filters;
+  const setDay = (day: string) => onFilters({ ...filters, day });
+  const setMine = (mine: boolean) => onFilters({ ...filters, mine });
+  const setTab = (tab: ReviewFilters["tab"]) => onFilters({ ...filters, tab });
   const [nonce, setNonce] = useState(0);
   const bump = () => setNonce((n) => n + 1);
   const list = useLoad(() => ta.day({ day, mine }), [day, mine, nonce]);
@@ -100,9 +99,9 @@ export function ReviewScreen() {
         ))}
       </div>
       {tab === "tickets" ? (
-        <LoadState s={list}>{(d) => <TicketRows rows={d.rows} locked={d.locked} onOpen={(point, mode) => setOpen({ point, mode })} />}</LoadState>
+        <LoadState s={list}>{(d) => <TicketRows rows={d.rows} locked={d.locked} href={id => reviewHref(filters, id)} onProxy={point => setOpen({ point, mode: "proxy" })} />}</LoadState>
       ) : (
-        <LoadState s={alerts}>{(d) => <AlertRows rows={d.alerts} onChanged={bump} onOpen={(point) => setOpen({ point, mode: "view" })} />}</LoadState>
+        <LoadState s={alerts}>{(d) => <AlertRows rows={d.alerts} onChanged={bump} href={id => reviewHref(filters, id, "correct")} />}</LoadState>
       )}
       {open ? (
         <TicketPanel
@@ -119,7 +118,7 @@ export function ReviewScreen() {
   );
 }
 
-function TicketRows({ rows, locked, onOpen }: { rows: PriceTicketRow[]; locked: boolean; onOpen: (point: string, mode: "view" | "proxy") => void }) {
+function TicketRows({ rows, locked, href, onProxy }: { rows: PriceTicketRow[]; locked: boolean; href: (id: string) => string; onProxy: (point: string) => void }) {
   const [page, setPage] = useState(1);
   const cols: Column<PriceTicketRow>[] = [
     { key: "pt", header: "Xã báo giá", cell: (r) => `${r.point.name} (${r.point.code})` },
@@ -136,11 +135,9 @@ function TicketRows({ rows, locked, onOpen }: { rows: PriceTicketRow[]; locked: 
       header: "",
       cell: (r) =>
         r.ticket && r.view !== "missed" ? (
-          <button type="button" className="btn" onClick={() => onOpen(r.point.code, "view")}>
-            Xem / sửa
-          </button>
+          <Link className="btn" href={href(r.ticket.id)}>Xem / sửa</Link>
         ) : locked ? (
-          <button type="button" className="btn btn-primary" onClick={() => onOpen(r.point.code, "proxy")}>
+          <button type="button" className="btn btn-primary" onClick={() => onProxy(r.point.code)}>
             Nhập thay
           </button>
         ) : null,
@@ -161,7 +158,7 @@ function TicketRows({ rows, locked, onOpen }: { rows: PriceTicketRow[]; locked: 
   );
 }
 
-function AlertRows({ rows, onChanged, onOpen }: { rows: PriceAlertRow[]; onChanged: () => void; onOpen: (point: string) => void }) {
+function AlertRows({ rows, onChanged, href }: { rows: PriceAlertRow[]; onChanged: () => void; href: (id: string) => string }) {
   const ta = usePriceTicketApi();
   const act = useAction();
   const [sel, setSel] = useState<string[]>([]);
@@ -212,9 +209,7 @@ function AlertRows({ rows, onChanged, onOpen }: { rows: PriceAlertRow[]; onChang
       cell: (r) => (
         <div className="row" style={{ gap: 4 }}>
           {r.can_act && !alertResolved(r.view) ? (
-            <button type="button" className="btn" onClick={() => onOpen(r.point.code)}>
-              Hiệu chỉnh
-            </button>
+            <Link className="btn" href={href(r.ticket_id)}>Hiệu chỉnh</Link>
           ) : null}
           {decidable(r) ? (
             <>
@@ -338,7 +333,7 @@ function TicketPanel({ point, day, proxy, onClose }: { point: string; day: strin
   const sh = useLoad(() => ta.sheet({ point, day }), [point, day]);
   return (
     <Dialog title={proxy ? "Nhập thay báo giá — Nộp muộn" : "Phiếu báo giá"} onClose={onClose}>
-      <LoadState s={sh}>{(d) => (proxy || (!d.ticket && d.can.proxy) ? <ProxyForm initial={d} onDone={onClose} /> : <Review initial={d} onDone={onClose} />)}</LoadState>
+      <LoadState s={sh}>{(d) => <ProxyForm initial={d} onDone={onClose} />}</LoadState>
     </Dialog>
   );
 }
@@ -394,163 +389,3 @@ function ProxyForm({ initial, onDone }: { initial: PriceSheet; onDone: () => voi
   );
 }
 
-function Review({ initial, onDone }: { initial: PriceSheet; onDone: () => void }) {
-  const ta = usePriceTicketApi();
-  const [sheet, setSheet] = useState(initial);
-  const [mode, setMode] = useState<"view" | "correct" | "redate" | "delete" | "log">("view");
-  const [adj, setAdj] = useState<Record<string, { min: string; max: string }>>({});
-  const [reason, setReason] = useState("");
-  const [newDay, setNewDay] = useState("");
-  const act = useAction();
-  const t = sheet.ticket;
-  const tid = t?.id;
-  const log = useLoad(mode === "log" && tid ? () => ta.log(tid) : null, [mode, tid]);
-  if (!t) return <p>Xã chưa có phiếu cho ngày này.</p>;
-  const doCorrect = async () => {
-    const lines = Object.entries(adj)
-      .filter(([, v]) => v.min.trim() && v.max.trim())
-      .map(([item_code, v]) => {
-        const lo = priceOf(v.min);
-        const hi = priceOf(v.max);
-        return { item_code, min: typeof lo === "string" && lo !== "bad" ? lo : v.min, max: typeof hi === "string" && hi !== "bad" ? hi : v.max };
-      });
-    const r = await act.run(() => ta.correct(t.id, { version: t.version, reason, lines }), "Đã lưu hiệu chỉnh.");
-    if (r) {
-      setSheet(r);
-      setAdj({});
-      setReason("");
-      setMode("view");
-    }
-  };
-  const doRedate = async () => {
-    const r = await act.run(() => ta.redate(t.id, { version: t.version, day: newDay, reason }), "Đã sửa ngày phiếu.");
-    if (r) onDone();
-  };
-  const doDelete = async () => {
-    const r = await act.run(() => ta.remove(t.id, { version: t.version, reason }), "Đã xóa phiếu.");
-    if (r) onDone();
-  };
-  return (
-    <>
-      <p>
-        {sheet.point.name} ({sheet.point.code}) · {formatDateVi(sheet.day)} · <StatusPill tone={TICKET_VIEW_TONE[sheet.view]}>{TICKET_VIEW_LABEL[sheet.view]}</StatusPill>
-        {t.source === "proxy" ? ` · Nộp muộn – nhập thay${t.actor_name ? ` bởi ${t.actor_name}` : ""}` : ""} · gửi {vnTime(t.submitted_at)}
-      </p>
-      <div className="row" style={{ marginBottom: 8 }}>
-        {sheet.can.correct ? (
-          <button type="button" className="btn" onClick={() => setMode("correct")}>
-            Hiệu chỉnh
-          </button>
-        ) : null}
-        {sheet.can.redate ? (
-          <button type="button" className="btn" onClick={() => setMode("redate")}>
-            Sửa ngày phiếu
-          </button>
-        ) : null}
-        {sheet.can.delete ? (
-          <button type="button" className="btn" onClick={() => setMode("delete")}>
-            Xóa phiếu
-          </button>
-        ) : null}
-        <button type="button" className="btn" onClick={() => setMode(mode === "log" ? "view" : "log")}>
-          Nhật ký
-        </button>
-        <Link className="btn" href={`/kn/bao-gia/in?ticket=${t.id}`}>
-          In phiếu
-        </Link>
-      </div>
-      {act.view}
-      {mode === "correct" ? (
-        <div className="card" style={{ padding: 10, marginBottom: 8 }}>
-          <p className="muted">Nhập giá mới cho dòng cần hiệu chỉnh — giá cán bộ Xã gửi được giữ để in phiếu, đối chiếu.</p>
-          {sheet.lines
-            .filter((l) => l.min && !l.no_goods)
-            .map((l) => {
-              const v = adj[l.item_code] ?? { min: "", max: "" };
-              const set = (x: Partial<typeof v>) => setAdj({ ...adj, [l.item_code]: { ...v, ...x } });
-              return (
-                <div key={l.item_code} className="row" style={{ marginBottom: 4 }}>
-                  <span style={{ minWidth: 180 }}>
-                    {l.name} <span className="muted">({money(l.min)}–{money(l.max)})</span>
-                  </span>
-                  <input className="input" style={{ width: 120 }} aria-label={`Giá mới thấp nhất ${l.name}`} value={v.min} onChange={(e) => set({ min: e.target.value })} />
-                  <input className="input" style={{ width: 120 }} aria-label={`Giá mới cao nhất ${l.name}`} value={v.max} onChange={(e) => set({ max: e.target.value })} />
-                  {l.alert?.reply?.response === "propose" ? (
-                    <button type="button" className="btn" onClick={() => set({ min: l.alert!.reply!.proposed_min ?? "", max: l.alert!.reply!.proposed_max ?? "" })}>
-                      Dùng giá Xã đề xuất
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
-          <label htmlFor="rv-reason">Lý do (bắt buộc)</label>
-          <input id="rv-reason" className="input" maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
-          <div className="row" style={{ marginTop: 8 }}>
-            <button type="button" className="btn" onClick={() => setMode("view")}>
-              Hủy
-            </button>
-            <button type="button" className="btn btn-primary" disabled={act.busy || !reason.trim()} onClick={() => void doCorrect()}>
-              Lưu thay đổi
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {mode === "redate" || mode === "delete" ? (
-        <div className="card" style={{ padding: 10, marginBottom: 8 }}>
-          {mode === "redate" ? (
-            <>
-              <label htmlFor="rv-day">Ngày phiếu đúng</label>
-              <input id="rv-day" type="date" className="input" style={{ width: 170 }} value={newDay} onChange={(e) => setNewDay(e.target.value)} />
-            </>
-          ) : (
-            <p>Xóa mềm phiếu sai / trùng — phiếu “Đã xóa” không tính vào bảng giá, thống kê.</p>
-          )}
-          <label htmlFor="rv-reason2">Lý do (bắt buộc)</label>
-          <input id="rv-reason2" className="input" maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
-          <div className="row" style={{ marginTop: 8 }}>
-            <button type="button" className="btn" onClick={() => setMode("view")}>
-              Hủy
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={act.busy || !reason.trim() || (mode === "redate" && !newDay)}
-              onClick={() => void (mode === "redate" ? doRedate() : doDelete())}
-            >
-              {mode === "redate" ? "Sửa ngày" : "Xóa phiếu"}
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {mode === "log" ? (
-        <LoadState s={log}>
-          {(lg) => (
-            <ul>
-              {lg.ticket.map((h) => (
-                <li key={`t${h.version}`}>
-                  {vnTime(h.at)} · {h.actor_name ?? h.actor_ref.slice(0, 8)} · {h.op}
-                  {h.reason ? ` — ${h.reason}` : ""}
-                </li>
-              ))}
-              {lg.lines
-                .filter((l) => l.adj_min)
-                .map((l) => (
-                  <li key={`l${l.item_code}${l.version}`}>
-                    {vnTime(l.at)} · {l.actor_name ?? l.actor_ref.slice(0, 8)} · {l.item_code}: {money(l.min)}–{money(l.max)} → {money(l.adj_min)}–{money(l.adj_max)} — {l.adj_reason}
-                  </li>
-                ))}
-              {lg.alerts.map((a) => (
-                <li key={`a${a.item_code}${a.entry.version}`}>
-                  {vnTime(a.entry.at)} · {a.actor_name ?? a.entry.actor_ref.slice(0, 8)} · {a.item_code}: {ALERT_VIEW_LABEL[a.entry.status]}
-                  {a.entry.message ? ` — ${a.entry.message}` : ""}
-                  {a.entry.explanation ? ` — Xã: ${a.entry.explanation}` : ""}
-                </li>
-              ))}
-            </ul>
-          )}
-        </LoadState>
-      ) : null}
-      <SheetTable sheet={sheet} />
-    </>
-  );
-}
