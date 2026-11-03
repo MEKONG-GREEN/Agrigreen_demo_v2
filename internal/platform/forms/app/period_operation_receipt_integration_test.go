@@ -409,9 +409,88 @@ func TestPeriodOperation212_DisabledServiceAndMalformedProfile(t *testing.T) {
 	malformed.Profile = string([]byte{'f', 'x', 0xff})
 	malformed.Expected.Profile = malformed.Profile
 	got, err = receipts.ExecutePeriodOperation(ctx, malformed)
-	f.want(err, "validation_error", "malformed profile")
+	f.want(err, "validation_failed", "malformed profile")
 	unknown212(t, got)
 	if count212(f, "period_operation_key") != 0 || count212(f, "period_due") != 0 {
 		t.Fatal("disabled/malformed capability wrote")
+	}
+}
+
+func TestPeriodOperation212_ProfileTenantIsolationAndConnectionReuse(t *testing.T) {
+	f, receipts, _, ctx, req := receiptFixture212(t)
+	f.svc.DB = db.ForModule(f.env.SizedPool(t, migrations.PF, dbadmin.AppPlatform, 1), DBModule)
+	first, err := receipts.ExecutePeriodOperation(ctx, req)
+	applied212(t, first, err)
+	// Register another known profile with the same trusted policy: resource/profile
+	// checks, rather than missing policy, must conceal the original receipt.
+	otherProfile := f.svc.profiles["fx"]
+	otherProfile.Name = "other"
+	f.svc.profiles["other"] = otherProfile
+	f.svc.PeriodOperationPolicies["other"] = f.svc.PeriodOperationPolicies["fx"]
+	otherReq := req
+	otherReq.Profile = "other"
+	otherReq.Expected.Profile = "other"
+	got, err := receipts.ReadPeriodOperation(ctx, otherReq)
+	f.want(err, port.ErrPeriodNotFound.Code, "cross profile")
+	unknown212(t, got)
+	p, _ := authz.FromContext(ctx)
+	p.TenantID = ids.New()
+	otherReq = req
+	otherReq.Expected.TenantID = p.TenantID
+	otherCtx := authz.WithPrincipal(ctx, p)
+	got, err = receipts.ReadPeriodOperation(otherCtx, otherReq)
+	f.want(err, port.ErrPeriodNotFound.Code, "cross tenant resource")
+	unknown212(t, got)
+	got, err = receipts.ExecutePeriodOperation(otherCtx, otherReq)
+	f.want(err, port.ErrPeriodNotFound.Code, "cross tenant mutation")
+	unknown212(t, got)
+	got, err = receipts.ReadPeriodOperation(ctx, req)
+	f.must(err, "same pooled connection restored tenant")
+	if !reflect.DeepEqual(first, got) || count212(f, "period_operation_receipt") != 1 {
+		t.Fatal("tenant/profile read changed receipt")
+	}
+}
+func TestPeriodOperation212_ReceiptFailureRollsBackCloseSnapshotAndOutbox(t *testing.T) {
+	f, receipts, _, ctx, req := receiptFixture212(t)
+	req.Action = port.PeriodOperationClose
+	req.DueAt = time.Time{}
+	req.Reason = ""
+	beforeOutbox := f.scalar("SELECT count(*) FROM shared.outbox WHERE tenant_id=$1", f.tid)
+	copyService := *f.svc
+	copyService.DB = failReceiptBeginner212{copyService.DB}
+	broken := ReceiptControl{&copyService}
+	got, err := broken.ExecutePeriodOperation(ctx, req)
+	if err == nil {
+		t.Fatal("close receipt failure ignored")
+	}
+	unknown212(t, got)
+	if count212(f, "close_snapshot") != 0 || count212(f, "period_event") != 1 || count212(f, "period_operation_key") != 0 || f.scalar("SELECT count(*) FROM shared.outbox WHERE tenant_id=$1", f.tid) != beforeOutbox {
+		t.Fatal("partial close/snapshot committed")
+	}
+	got, err = receipts.ExecutePeriodOperation(ctx, req)
+	applied212(t, got, err)
+	if count212(f, "close_snapshot") != 1 || count212(f, "period_event") != 2 || count212(f, "period_operation_receipt") != 1 || f.scalar("SELECT count(*) FROM shared.outbox WHERE tenant_id=$1", f.tid) != beforeOutbox+1 {
+		t.Fatal("close operation did not commit atomically once")
+	}
+}
+func TestPeriodOperation212_PermanentAnchorCannotBeMutated(t *testing.T) {
+	f, receipts, _, ctx, req := receiptFixture212(t)
+	got, err := receipts.ExecutePeriodOperation(ctx, req)
+	applied212(t, got, err)
+	admin := f.env.AdminPool(t, migrations.PF)
+	for _, q := range []string{
+		"UPDATE pf_forms.period_operation_key SET request_digest=repeat('0',64) WHERE tenant_id=$1 AND operation_id=$2",
+		"DELETE FROM pf_forms.period_operation_key WHERE tenant_id=$1 AND operation_id=$2",
+	} {
+		_, err := admin.Exec(f.ctx, q, f.tid, req.OperationID)
+		code, constraint := pgCode(err)
+		if code != "23514" || constraint != "period_operation_key_immutable" {
+			t.Fatalf("permanent anchor mutable: code=%s constraint=%s err=%v", code, constraint, err)
+		}
+	}
+	read, err := receipts.ReadPeriodOperation(ctx, req)
+	f.must(err, "anchor unchanged")
+	if !reflect.DeepEqual(got, read) {
+		t.Fatal("anchor metadata changed")
 	}
 }
