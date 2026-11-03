@@ -183,7 +183,7 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 	stopped := false
 	err := db.WithModuleTenantTx(ctx, s.DB, DBModule, tid, func(tx pgx.Tx) error {
 		callErr := fn(tx)
-		if errors.Is(callErr, receiptStop) && op != nil && op.durable && !op.effects {
+		if errors.Is(callErr, errReceiptStop) && op != nil && op.durable && !op.effects {
 			stopped = true
 			return nil // Only replay/rejection, never a partly executed mutation.
 		}
@@ -196,7 +196,7 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 		op.acknowledged = true
 	}
 	if stopped {
-		return receiptStop
+		return errReceiptStop
 	}
 	return nil
 }

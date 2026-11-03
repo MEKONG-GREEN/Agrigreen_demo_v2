@@ -251,7 +251,7 @@ func (tx ackTx212) Commit(ctx context.Context) error {
 			return err
 		}
 	} else {
-		if err := tx.Tx.Rollback(ctx); err != nil {
+		if err := tx.Rollback(ctx); err != nil {
 			return err
 		}
 	}

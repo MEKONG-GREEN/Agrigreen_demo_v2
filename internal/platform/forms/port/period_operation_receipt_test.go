@@ -2,6 +2,8 @@ package port
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -69,7 +71,7 @@ func TestPeriodOperation212RejectsIgnoredOrUnboundedInputs(t *testing.T) {
 }
 
 func TestPeriodOperation212MissingCapabilityIsClosed(t *testing.T) {
-	if _, err := ExecutePeriodOperation(context.Background(), nil, operation212()); err != ErrPeriodOperationUnavailable {
+	if _, err := ExecutePeriodOperation(context.Background(), nil, operation212()); !errors.Is(err, ErrPeriodOperationUnavailable) {
 		t.Fatalf("missing capability: %v", err)
 	}
 }
@@ -79,5 +81,23 @@ func TestPeriodOperationDigest212_RejectsMalformedProfile(t *testing.T) {
 	request.Expected = PeriodRevision{TenantID: uuid.New(), Profile: request.Profile, PeriodID: request.PeriodID, EventSeq: 1}
 	if _, err := PeriodOperationDigest(request); err == nil {
 		t.Fatal("malformed UTF8 profile was silently canonicalized")
+	}
+}
+
+func TestPeriodOperationDigest212_RevisionNumericWireBoundary(t *testing.T) {
+	original, err := json.Marshal(operation212())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []struct{ name, old string }{{"event_seq", "1"}, {"due_seq", "0"}} {
+		for _, token := range []string{"1e100000", "1e-100000", strings.Repeat("9", 100000), "NaN", "Infinity"} {
+			t.Run(field.name+"_"+token[:min(len(token), 12)], func(t *testing.T) {
+				wire := strings.Replace(string(original), `"`+field.name+`":`+field.old, `"`+field.name+`":`+token, 1)
+				var parsed PeriodOperationRequest
+				if err := json.Unmarshal([]byte(wire), &parsed); err == nil {
+					t.Fatal("unbounded/noninteger revision accepted")
+				}
+			})
+		}
 	}
 }

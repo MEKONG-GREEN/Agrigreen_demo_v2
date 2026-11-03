@@ -37,8 +37,8 @@ type periodOperation struct {
 	effects, durable, acknowledged bool
 }
 
-// receiptStop is private and can only finish a proven pre-effect branch.
-var receiptStop = errors.New("forms: receipt replay or durable rejection")
+// errReceiptStop is private and can only finish a proven pre-effect branch.
+var errReceiptStop = errors.New("forms: receipt replay or durable rejection")
 
 func unknownOperation() port.PeriodOperationReceipt {
 	return port.PeriodOperationReceipt{Outcome: port.PeriodOperationUnknown}
@@ -138,7 +138,7 @@ func (c ReceiptControl) ExecutePeriodOperation(ctx context.Context, in port.Peri
 	req := op.request
 	ctx = context.WithValue(ctx, periodOperationContext{}, op)
 	guard := controlCAS{expected: req.Expected, receipt: op}
-	control := Control{Svc: c.Svc}
+	control := Control(c)
 	switch req.Action {
 	case port.PeriodOperationChangeDue:
 		err = control.changeDue(ctx, req.Profile, req.PeriodID, req.DueAt, req.Reason, operationIdem(req), &guard)
@@ -240,7 +240,7 @@ func (op *periodOperation) before(ctx context.Context, tx pgx.Tx) error {
 		op.receipt = *receipt
 	}
 	op.durable = true
-	return receiptStop
+	return errReceiptStop
 }
 func (op *periodOperation) base(outcome string) port.PeriodOperationReceipt {
 	req := op.request
@@ -265,7 +265,7 @@ func rejectControl(ctx context.Context, tx pgx.Tx, guard *controlCAS, cause erro
 		return err
 	}
 	op.receipt, op.durable = receipt, true
-	return receiptStop
+	return errReceiptStop
 }
 func beginControlEffects(guard *controlCAS) {
 	if guard != nil && guard.receipt != nil {
