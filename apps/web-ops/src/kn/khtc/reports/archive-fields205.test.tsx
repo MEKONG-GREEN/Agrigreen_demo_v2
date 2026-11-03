@@ -113,8 +113,8 @@ it("keeps the ZIP key across a lost ACK but starts a fresh action when its field
  fireEvent.click(screen.getByRole("checkbox",{name:"Chọn Kỳ 205 v1"}));const zipButton=screen.getByRole("button",{name:"Tải ZIP Excel"});
  fireEvent.click(zipButton);await waitFor(()=>expect(requests.filter(r=>r.url.pathname.endsWith("/zip"))).toHaveLength(1));await waitFor(()=>expect(zipButton).toBeEnabled());
  fireEvent.click(zipButton);await waitFor(()=>expect(saveBlob).toHaveBeenCalledTimes(1));
- const attempts=requests.filter(r=>r.url.pathname.endsWith("/zip"));expect(attempts[0].key).toBeTruthy();expect(attempts[1].key).toBe(attempts[0].key);expect(attempts[0].body).toEqual(attempts[1].body);expect(attempts[1].body).toMatchObject({field:"trong_trot"});
+ const attempts=requests.filter(r=>r.url.pathname.endsWith("/zip"));const first=attempts[0],retry=attempts[1];if(!first||!retry)throw new Error("Expected both ZIP attempts");expect(first.key).toBeTruthy();expect(retry.key).toBe(first.key);expect(first.body).toEqual(retry.body);expect(retry.body).toMatchObject({field:"trong_trot"});
  fireEvent.click(screen.getByRole("button",{name:"Chọn lĩnh vực"}));fireEvent.click(await screen.findByRole("button",{name:"Chọn lĩnh vực chan_nuoi"}));await waitFor(()=>expect(last("/exported-reports").url.searchParams.get("field")).toBe("chan_nuoi"));
  fireEvent.click(await screen.findByRole("checkbox",{name:"Chọn Kỳ 205 v1"}));fireEvent.click(screen.getByRole("button",{name:"Tải ZIP Excel"}));await waitFor(()=>expect(saveBlob).toHaveBeenCalledTimes(2));
- const fresh=last("/zip");expect(fresh.key).toBeTruthy();expect(fresh.key).not.toBe(attempts[0].key);expect(fresh.body).toMatchObject({field:"chan_nuoi"});
+ const fresh=last("/zip");expect(fresh.key).toBeTruthy();expect(fresh.key).not.toBe(first.key);expect(fresh.body).toMatchObject({field:"chan_nuoi"});
 });
