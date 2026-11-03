@@ -86,21 +86,21 @@ func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.S
 		return Dashboard{}, problem.Validation.WithField("filter", "tối đa 64 ký tự")
 	}
 	out := Dashboard{Year: q.Year, Quarter: q.Quarter, Department: q.Department, Field: q.Field, AsOf: now, Reports: []DashboardPeriod{}, Status: []DashboardStatus{}, Progress: domain.DashboardProgress{Programs: []domain.DashboardProgram{}, Rows: []domain.ProgramRow{}}, CanAct: c.kn.Role == port.SessionRoleProvince && !c.kn.ReadOnly() && c.kn.ProvinceGroup != "lanh_dao_phong" && c.kn.ProvinceGroup != "ban_giam_doc"}
-	// The source list API caps at 100; do not silently return incomplete KPIs.
-	var all []ps.Period
-	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error { var e error; all, e = ps.Periods(ctx, tx, q.Year, 101); return e })
-	if err != nil {
-		return Dashboard{}, err
-	}
-	if len(all) > 100 {
-		return Dashboard{}, ErrInvalid.WithDetail("Năm có hơn 100 kỳ; dashboard chưa thể tổng hợp đầy đủ")
-	}
 	if periods == nil {
 		return Dashboard{}, ErrDependency
 	}
-	details, err := periods.List(ctx, q.Year, 100)
-	if err != nil {
-		return Dashboard{}, err
+	var details []pa.Detail
+	cursor := uuid.Nil
+	for {
+		page, next, e := periods.DashboardPage(ctx, q.Year, q.Quarter, q.Department, cursor)
+		if e != nil {
+			return Dashboard{}, e
+		}
+		details = append(details, page...)
+		if next == uuid.Nil {
+			break
+		}
+		cursor = next
 	}
 	end := time.Date(q.Year, time.Month(q.Quarter*3+1), 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, -1)
 	var selected *ps.Period
@@ -142,9 +142,15 @@ func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.S
 	for _, d := range openPeriods {
 		ids = append(ids, d.Period.ID)
 	}
-	sources, err := periods.SourceStates(ctx, ids)
-	if err != nil {
-		return Dashboard{}, err
+	sources := make(map[uuid.UUID][]pa.SourceRow)
+	for offset := 0; offset < len(ids); offset += 100 {
+		batch, e := periods.SourceStates(ctx, ids[offset:min(offset+100, len(ids))])
+		if e != nil {
+			return Dashboard{}, e
+		}
+		for id, rows := range batch {
+			sources[id] = rows
+		}
 	}
 	for _, d := range openPeriods {
 		p := d.Period

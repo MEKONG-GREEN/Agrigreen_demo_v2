@@ -11,6 +11,7 @@ vi.mock("@/auth/AuthProvider", () => ({
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/kn/bao-gia/de-xuat-mat-hang",
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 

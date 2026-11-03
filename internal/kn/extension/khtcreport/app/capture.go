@@ -38,7 +38,7 @@ func (s *Service) submitted(ctx context.Context, c caller, p ps.Period) ([]domai
 			if p.Type == pd.TypeAdhoc {
 				rows, e = ps.AdhocReportPeriods(ctx, tx, year, p.ID, pd.QuantityEnd(p.Type, p.To, p.Cutoff))
 			} else {
-				rows, e = ps.Periods(ctx, tx, year, 10000)
+				rows, e = ps.ReportInputPeriods(ctx, tx, year, p.ID, pd.QuantityEnd(p.Type, p.To, p.Cutoff), p.Type == pd.TypeProgram)
 			}
 			if e != nil {
 				return e

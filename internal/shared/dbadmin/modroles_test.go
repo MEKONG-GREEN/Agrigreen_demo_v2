@@ -103,8 +103,8 @@ func TestModuleGroupRoles_ADR0028(t *testing.T) {
 	groups := ModuleGroups()
 	// 17 pf có vai cũ + pf/kref + pf/workflow + pf/forms + pf/evidence + pf/cooperative (W3.3) + pf/price (W11.71) + pf/hrm (W11.21)
 	// + 7 mkg có vai cũ + mkg/engine (W8.2, không vai cũ) + vault/identity; pf/extdata không schema.
-	if len(groups) != 35 || len(legacyGroups()) != 25 {
-		t.Errorf("số vai nhóm: %d (muốn 35 — thêm pf/contact W11.23, pf/export W10.17, 25 có vai cũ): %v", len(groups), groups)
+	if len(groups) != 36 || len(legacyGroups()) != 25 {
+		t.Errorf("số vai nhóm: %d (muốn 36 — thêm pf/guestlink W10.18, pf/contact W11.23, pf/export W10.17, 25 có vai cũ): %v", len(groups), groups)
 	}
 	if slices.ContainsFunc(groups, func(g ModuleGroup) bool { return g.Module == "pf/extdata" }) {
 		t.Error("pf/extdata không có schema — không có vai nhóm")
@@ -423,6 +423,7 @@ func TestMigration91MatchesModuleGroups(t *testing.T) {
 
 // laterGroups: module có vai nhóm sinh SAU pf 000092 — migration của chính module cấp k_ref cho r_* của nó.
 var laterGroups = map[string]string{
+	"pf/guestlink":   "pf/20261102151657_pf_guestlink_core.up.sql", // W10.18: generic dormant capability, tự cấp k_ref
 	"pf/workflow":    "pf/000118_pf_workflow.up.sql",
 	"pf/forms":       "pf/000122_pf_forms_grants.up.sql",
 	"pf/evidence":    "pf/000123_pf_evidence.up.sql",
