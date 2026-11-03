@@ -14154,9 +14154,52 @@ paths:
         "403": {$ref: '#/components/responses/Problem'}
         "404": {$ref: '#/components/responses/Problem'}
         "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/periods/{id}/report/exports/{exportID}/words:
+    get:
+      summary: Danh sách Word đã lưu, đã xác minh liên kết với đúng bản xuất Excel
+      operationId: extensionKhtcArchiveWords
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        "200":
+          description: Metadata Word đã lưu; không suy liên kết Word cũ chưa được xác minh
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchiveWords'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/periods/{id}/report/exports/{exportID}/words/{runID}/download:
+    get:
+      summary: Tải nguyên byte Word đã lưu của đúng bản xuất; không dựng lại hoặc cấp số
+      operationId: extensionKhtcArchiveWordDownload
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: runID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: DOCX đã lưu sau kiểm quyền, liên kết, băm và ghi nhận lần truy cập
+          headers:
+            X-Content-SHA256: {schema: {type: string, pattern: '^[a-f0-9]{64}$'}}
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
   /v1/extension/khtc/exported-reports/zip:
     post:
-      summary: Tải tối đa 10 bản Excel đã xuất, tổng byte gốc tối đa 20 MiB
+      summary: Tải tối đa 10 tệp Word và Excel đã lưu, ZIP và tổng byte gốc tối đa 20 MiB
       operationId: extensionKhtcArchiveZIP
       tags: [extension]
       requestBody:
@@ -14179,9 +14222,11 @@ paths:
                     properties:
                       period_id: {type: string, format: uuid}
                       export_id: {type: string, format: uuid}
+                      format: {type: string, enum: [excel, word], default: excel}
+                      run_id: {type: string, format: uuid, description: Bắt buộc khi format là word; Excel không nhận run_id}
       responses:
         "200":
-          description: ZIP chứa nguyên byte Excel đã lưu
+          description: ZIP chứa nguyên byte Word và Excel đã lưu, đóng khi bất kỳ tệp nào không hợp lệ
           content:
             application/zip:
               schema: {type: string, format: binary}
@@ -26759,6 +26804,38 @@ components:
       required: [items, has_more, offset]
       properties:
         items: {type: array, items: {$ref: '#/components/schemas/KHTCArchivePeriod'}}
+        has_more: {type: boolean}
+        offset: {type: integer}
+
+    KHTCArchiveWord:
+      type: object
+      required: [period_id, export_id, run_id, version, template, template_version, template_hash, input_hash, body_hash, size, file_name, content_type, doc_number, doc_number_auto, actor_ref, at]
+      properties:
+        period_id: {type: string, format: uuid}
+        export_id: {type: string, format: uuid}
+        run_id: {type: string, format: uuid}
+        version: {type: integer, format: int64}
+        template: {type: string}
+        template_version: {type: integer}
+        template_hash: {type: string}
+        input_hash: {type: string}
+        body_hash: {type: string}
+        size: {type: integer, format: int64}
+        file_name: {type: string}
+        content_type: {type: string}
+        doc_number: {type: string}
+        doc_number_auto: {type: boolean}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+    KHTCArchiveWords:
+      type: object
+      required: [period_id, export_id, export_version, export_name, items, has_more, offset]
+      properties:
+        period_id: {type: string, format: uuid}
+        export_id: {type: string, format: uuid}
+        export_version: {type: integer, format: int64}
+        export_name: {type: string}
+        items: {type: array, items: {$ref: '#/components/schemas/KHTCArchiveWord'}}
         has_more: {type: boolean}
         offset: {type: integer}
     KHTCDashboard:

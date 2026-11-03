@@ -10262,6 +10262,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/words": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách Word đã lưu, đã xác minh liên kết với đúng bản xuất Excel */
+        get: operations["extensionKhtcArchiveWords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/words/{runID}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải nguyên byte Word đã lưu của đúng bản xuất; không dựng lại hoặc cấp số */
+        get: operations["extensionKhtcArchiveWordDownload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/exported-reports/zip": {
         parameters: {
             query?: never;
@@ -10271,7 +10305,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Tải tối đa 10 bản Excel đã xuất, tổng byte gốc tối đa 20 MiB */
+        /** Tải tối đa 10 tệp Word và Excel đã lưu, ZIP và tổng byte gốc tối đa 20 MiB */
         post: operations["extensionKhtcArchiveZIP"];
         delete?: never;
         options?: never;
@@ -23102,6 +23136,43 @@ export interface components {
         };
         KHTCArchivePeriods: {
             items: components["schemas"]["KHTCArchivePeriod"][];
+            has_more: boolean;
+            offset: number;
+        };
+        KHTCArchiveWord: {
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            export_id: string;
+            /** Format: uuid */
+            run_id: string;
+            /** Format: int64 */
+            version: number;
+            template: string;
+            template_version: number;
+            template_hash: string;
+            input_hash: string;
+            body_hash: string;
+            /** Format: int64 */
+            size: number;
+            file_name: string;
+            content_type: string;
+            doc_number: string;
+            doc_number_auto: boolean;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+        };
+        KHTCArchiveWords: {
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            export_id: string;
+            /** Format: int64 */
+            export_version: number;
+            export_name: string;
+            items: components["schemas"]["KHTCArchiveWord"][];
             has_more: boolean;
             offset: number;
         };
@@ -47330,6 +47401,67 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionKhtcArchiveWords: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+                exportID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Metadata Word đã lưu; không suy liên kết Word cũ chưa được xác minh */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCArchiveWords"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcArchiveWordDownload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                exportID: string;
+                runID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DOCX đã lưu sau kiểm quyền, liên kết, băm và ghi nhận lần truy cập */
+            200: {
+                headers: {
+                    "X-Content-SHA256"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionKhtcArchiveZIP: {
         parameters: {
             query?: never;
@@ -47345,12 +47477,22 @@ export interface operations {
                         period_id: string;
                         /** Format: uuid */
                         export_id: string;
+                        /**
+                         * @default excel
+                         * @enum {string}
+                         */
+                        format?: "excel" | "word";
+                        /**
+                         * Format: uuid
+                         * @description Bắt buộc khi format là word; Excel không nhận run_id
+                         */
+                        run_id?: string;
                     }[];
                 };
             };
         };
         responses: {
-            /** @description ZIP chứa nguyên byte Excel đã lưu */
+            /** @description ZIP chứa nguyên byte Word và Excel đã lưu, đóng khi bất kỳ tệp nào không hợp lệ */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -1,3 +1,4 @@
+import { archiveMockWord } from "./kn-khtc-archive-word-store";
 import { zipStored } from "./kn-khtc-archive-zip";
 // GIẢ LẬP W11.66. Reads the same period, submitted-form and source stores as the other KHTC screens.
 import type { components } from "../generated/application";
@@ -334,18 +335,25 @@ function archivePreview(ctx: Ctx): Response {
 }
 function archiveZIP(ctx: Ctx): Response {
  if(!archiveCanRead(ctx))return problem(403,"forbidden","Không có quyền");
- const items=(ctx.body as {items?:{period_id:string;export_id:string}[]})?.items;
- if(!Array.isArray(items)||items.length<1||items.length>10||new Set(items.map(x=>x?.export_id)).size!==items.length)return code("invalid","Chọn 1 đến 10 bản xuất khác nhau",422);
- const files:{name:string;data:Uint8Array}[]=[];let size=0;
+ const items=(ctx.body as {items?:{period_id:string;export_id:string;format?:string;run_id?:string}[]})?.items;
+ if(!Array.isArray(items)||items.length<1||items.length>10)return code("invalid","Chọn 1 đến 10 tệp",422);
+ const files:{name:string;data:Uint8Array}[]=[], seen=new Set<string>();let size=0;
  for(const item of items){
-  if(!templatePeriod(ctx,item.period_id))return code("not_found","Không có bản xuất",404);
+  if(!item || ![undefined,"excel","word"].includes(item.format) || (item.format==="word" ? !item.run_id : !!item.run_id))return code("invalid","Loại tệp không hợp lệ",422);
+  const key=item.format==="word" ? "word:"+item.run_id : "excel:"+item.export_id;
+  if(seen.has(key))return code("invalid","Không chọn trùng tệp",422);seen.add(key);
+  const p=templatePeriod(ctx,item.period_id);
+  if(!p || p.terminal==="cancelled")return code("not_found","Không có bản xuất",404);
   const x=STORE.get(item.period_id)?.exports.find(x=>x.meta.id===item.export_id);
   if(!x)return code("not_found","Không có bản xuất",404);
-  const data=new TextEncoder().encode(x.body);size+=data.length;
+  const word=item.format==="word" ? archiveMockWord(ctx.persona.me.tenant_id,item.period_id,item.export_id,item.run_id!):undefined;
+  if(item.format==="word" && !word)return code("not_found","Không có Word đã xác minh",404);
+  const data=new TextEncoder().encode(word ? word.body : x.body);size+=data.length;
   if(size>20*1024*1024)return code("invalid","Tổng dung lượng vượt 20 MiB",422);
-  files.push({name:`bao-cao-${x.meta.id}-v${x.meta.version}.xlsx`,data});
+  files.push({name:word ? `bao-cao-${x.meta.id}-word-${word.meta.run_id}-gia-lap.txt` : `bao-cao-${x.meta.id}-v${x.meta.version}.xlsx`,data});
  }
- return new Response(zipStored(files) as Uint8Array<ArrayBuffer>,{headers:{"Content-Type":"application/zip","Content-Disposition":'attachment; filename="bao-cao-khtc.zip"',"Cache-Control":"no-store"}});
+ const body=zipStored(files);if(body.length>20*1024*1024)return code("invalid","ZIP vượt 20 MiB",422);
+ return new Response(body as Uint8Array<ArrayBuffer>,{headers:{"Content-Type":"application/zip","Content-Disposition":'attachment; filename="bao-cao-khtc.zip"',"Cache-Control":"no-store"}});
 }
 
 function archivePeriods(ctx: Ctx): Response {

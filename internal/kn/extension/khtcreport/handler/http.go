@@ -32,6 +32,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.POST("/exports", h.export)
 	g.GET("/exports/:exportID/download", h.download)
 	g.GET("/exports/:exportID/preview", h.previewExport)
+	g.GET("/exports/:exportID/words", h.archiveWords)
+	g.GET("/exports/:exportID/words/:runID/download", h.archiveWordDownload)
 	g.POST("/exports/:exportID/final", h.finalize)
 	// W10.17: Word (.docx) qua pf/export, dựng từ nội dung đóng băng của một bản Excel.
 	g.POST("/exports/:exportID/word", h.exportWord)

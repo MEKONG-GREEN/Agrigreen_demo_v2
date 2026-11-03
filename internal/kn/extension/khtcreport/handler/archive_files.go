@@ -39,5 +39,7 @@ func (h Handler) archiveZIP(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.Header("Content-Disposition", `attachment; filename="bao-cao-khtc.zip"`)
+	c.Header("X-Content-SHA256", archiveZIPHash(body))
+	c.Header("X-Content-Type-Options", "nosniff")
 	c.Data(http.StatusOK, "application/zip", body)
 }
