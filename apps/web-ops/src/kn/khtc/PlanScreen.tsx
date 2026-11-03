@@ -180,7 +180,7 @@ function Editor({
     }
   };
 
-  if (["entry","edit-entry","new-entry"].includes(route.view)) return currentDraft ? <EntryPage key={draftKey} route={route} draft={currentDraft} onChange={draft=>setDrafts(old=>({...old,[draftKey]:draft}))} canEdit={canEdit} catalog={data.catalog} log={plan?planVersionLog([plan.version]):[]} onSave={entry=>{if(!canEdit)return;upsert(entry);closeEntry();}} onCancel={closeEntry}/> : <p role="alert">Không tìm thấy dòng hoặc cấp cha hợp lệ trong cây của năm này.</p>;
+  if (["entry","edit-entry","new-entry"].includes(route.view)) return currentDraft ? <EntryPage key={draftKey} route={route} draft={currentDraft} onChange={draft=>setDrafts(old=>({...old,[draftKey]:draft}))} canEdit={canEdit} catalog={data.catalog} parentName={entries.find(e=>e.ref===currentDraft.entry.parent_ref)?.name} log={plan?planVersionLog([plan.version]):[]} onSave={entry=>{if(!canEdit)return;upsert(entry);closeEntry();}} onCancel={closeEntry}/> : <p role="alert">Không tìm thấy dòng hoặc cấp cha hợp lệ trong cây của năm này.</p>;
   if (route.view==="programs"||route.view==="new-program") return <ProgramPage key={route.view} route={route} programs={programs} used={new Set(entries.filter(e=>e.tab===(route.tab??"programs")&&e.kind==="program").map(e=>e.program_ref??""))} draft={programDraft} onChange={setProgramDraft} canEdit={canEdit} busy={programAct.busy} problem={programAct.problem} log={plan?planVersionLog([plan.version]):[]} onPick={p=>{
     if(!canEdit||!p.active||entries.some(e=>e.tab===route.tab&&e.program_ref===p.ref&&e.kind==="program"))return;
     const tab=route.tab??"programs";const e=blankEntry(tab,"program",null,Math.min(100000,(childrenOf(entries.filter(e=>e.tab===tab),null).length+1)*10));

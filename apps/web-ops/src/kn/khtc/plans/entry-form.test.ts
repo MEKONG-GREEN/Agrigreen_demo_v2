@@ -5,6 +5,13 @@ import { entryHref,newEntryHref,parsePlanRoute,PLAN_BASE,programHref } from "./r
 const parent=blankEntry("programs","program",null,10);
 const item={...blankEntry("programs","item",parent,20),name:"Mục thử",department_code:"trong_trot"};
 describe("206 bounded entry form",()=>{
+  it("checks complete field limits and native rune semantics without rewriting inherited data",()=>{
+    const draft=entryDraft({...item,name:"😀".repeat(1000)});expect(checkEntry(draft,2030).valid).toBe(true);
+    for(const [field,max] of [["name",1000],["code",40],["scale_note",1000],["stop_decision",100],["note",2000]] as const)expect(checkEntry({...draft,entry:{...draft.entry,[field]:"a".repeat(max+1)}},2030).errors).toHaveProperty(field);
+    expect(checkEntry({...draft,entry:{...draft.entry,tracking:"" as typeof item.tracking}},2030).errors).toHaveProperty("tracking");
+    expect(checkEntry({...draft,communes:Array.from({length:501},(_,i)=>String(10000+i)).join(",")},2030).errors).toHaveProperty("communes");
+  });
+
   for(const field of ["sort_order","points_count","planned_qty","budget"] as const){
     for(const [name,raw] of [["largeExponent","1e100000"],["smallExponent","1e-100000"],["longDigits","9".repeat(100000)],["hugeOrdinary","9".repeat(40)],["negative","-1"],["precision","1.00001"]]){
       it(`${field} rejects ${name} before any conversion`,()=>{const checked=checkEntry({...entryDraft(item),[field]:raw},2030);expect(checked.valid).toBe(false);expect(checked.errors).toHaveProperty(field);expect(checked.entry).toBeNull();});

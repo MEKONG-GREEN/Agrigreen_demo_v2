@@ -14,7 +14,7 @@ Nguồn: BRD KHTC v2.3 Product Drive, DOCX SHA256 `15859351f90574bf667190b1a1216
 
 Chưa hoàn tất FN-TI-02.02, KHTC, BRD v2.3, UAT hoặc G1. Còn vòng đời năm Đang lập/Đang áp dụng/Đã kết thúc, nháp server/tự mở điều chỉnh, đối chiếu/Áp dụng/Hủy, chọn CT khi copy, tự sinh mẫu phiếu/tab/dòng, xóa theo số liệu và hướng dẫn Excel raw exponent. Copy/import legacy hiện hữu không trở thành bằng chứng cho vòng đời mới.
 
-Phần non-Plan gồm inbox/forms (giữ FormGrid), report editor, Adhoc/nguồn nhúng và luồng còn lại có child chính thức do điều phối mở trước READY. Không trùng #202 dashboard/live/nhắc phòng, #205 archive policy, #215 tiến độ/kho cho phòng, #216 Excel phiếu, #217 copy kỳ/3lần gửi, #220 menu. CAS/receipt kỳ native theo #209/#211/#212 khi đủ contract thật; gói này không đổi các đường đó.
+Phần năm/serverdraft giữ [#225 BF-SWEEP-KHTC-YEAR-LIFECYCLE](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/225). Phần non-Plan giữ [#226 BF-SWEEP-KHTC-NONPLAN-UI](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/226), gồm inbox/forms (giữ FormGrid), report editor, Adhoc/nguồn nhúng và luồng còn lại đã có child chính thức; không thuộc lát này. Không trùng #202 dashboard/live/nhắc phòng, #205 archive policy, #215 tiến độ/kho cho phòng, #216 Excel phiếu, #217 copy kỳ/3lần gửi, #220 menu. CAS/receipt kỳ native theo #209/#211/#212 khi đủ contract thật; gói này không đổi các đường đó.
 
 ### Kiểm chứng
 

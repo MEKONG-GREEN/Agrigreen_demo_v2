@@ -95,6 +95,7 @@ describe("kế hoạch194 — phiên bản qua route",()=>{
     fireEvent.click(screen.getByRole("button",{name:"Lưu vào nháp"}));expect(screen.getByRole("textbox",{name:/^Tên/})).toHaveAttribute("aria-invalid","true");
     fireEvent.change(screen.getByRole("textbox",{name:/^Tên/}),{target:{value:"Nhóm206"}});fireEvent.click(screen.getByRole("button",{name:"Lưu vào nháp"}));navigate(view,planHref(PLAN_BASE,2030));
     const group=screen.getByRole("row",{name:/Nhóm206/});fireEvent.click(within(group).getByRole("button",{name:"+ Hạng mục"}));navigate(view,nav.push.mock.calls.at(-1)![0] as string);
+    expect(screen.getByText("Nhóm206")).toBeInTheDocument();expect(screen.getByText("Các chương trình",{exact:true})).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox",{name:/^Tên/}),{target:{value:"Mục206"}});fireEvent.click(screen.getByRole("button",{name:"Lưu vào nháp"}));expect(screen.getByRole("combobox",{name:/Phòng phụ trách/})).toHaveAttribute("aria-invalid","true");
     fireEvent.change(screen.getByRole("combobox",{name:/Phòng phụ trách/}),{target:{value:"trong_trot"}});fireEvent.change(screen.getByRole("textbox",{name:"Khối lượng KH"}),{target:{value:"123.0001"}});
     fireEvent.click(screen.getByRole("button",{name:"Lưu vào nháp"}));navigate(view,planHref(PLAN_BASE,2030));expect(await screen.findByRole("row",{name:/Mục206/})).toHaveTextContent("123,0001");expect(writes).toHaveLength(0);

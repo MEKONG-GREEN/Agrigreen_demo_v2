@@ -66,7 +66,7 @@ func TestPlanRoutes206NativeNumericAndReplay(t *testing.T) {
 	if str(first.body["version"], "id") != str(replay.body["version"], "id") {
 		t.Fatal("replay allocated another version")
 	}
-	want(t, writer.post(path, adjustment), http.StatusConflict, "extension.khtc_plan_conflict", "old base remains stale after real confirmed write")
+	want(t, writer.post(path, adjustment), http.StatusConflict, "extension.khtc_plan_version_conflict", "old base remains stale after real confirmed write")
 	want(t, f.user(authz.KNTinh, khtc, true).post(path, adjustment), http.StatusForbidden, "extension.read_only", "readonly cannot apply")
 	want(t, f.user(authz.KNTinh, "trong_trot", false).post(path, adjustment), http.StatusForbidden, "", "other department cannot apply")
 	old := writer.get("/v1/kn/khtc/plans/2027?version=1")
