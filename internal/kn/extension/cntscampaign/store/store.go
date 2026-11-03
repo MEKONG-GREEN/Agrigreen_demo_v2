@@ -189,7 +189,8 @@ func Claim(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, action stri
 	err := tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_campaign_intent (tenant_id, campaign_id, claim_id, action, claim_until, updated_at)
 	  VALUES ($1, $2, $3, $4, now() + $5::interval, now())
 	  ON CONFLICT (tenant_id, campaign_id) DO UPDATE SET claim_id = EXCLUDED.claim_id, action = EXCLUDED.action,
-	    claim_until = EXCLUDED.claim_until, updated_at = now()
+	    claim_until = EXCLUDED.claim_until, updated_at = now(),
+	    rev_period_id = NULL, rev_profile = NULL, rev_event_seq = NULL, rev_due_seq = NULL
 	  WHERE cnts_campaign_intent.claim_until IS NULL OR cnts_campaign_intent.claim_until <= now()
 	  RETURNING true`, tid, id, token, action, strconv.FormatInt(int64(lease/time.Second), 10)+" seconds").Scan(&ok)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -201,7 +202,8 @@ func Claim(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, action stri
 // Release bỏ ý định của token. live → chỉ khi ý định CÒN HẠN (giờ DB). released=false: token không còn giữ ý định (hết hạn /
 // người khác đã nhận) — bên gọi quyết định đó có phải lỗi (ghi kết quả: có; bỏ khi lỗi: không, ý định đã tự hết).
 func Release(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, live bool) (released bool, err error) {
-	q := `UPDATE pf_extension.cnts_campaign_intent SET claim_id = NULL, action = NULL, claim_until = NULL, updated_at = now()
+	q := `UPDATE pf_extension.cnts_campaign_intent SET claim_id = NULL, action = NULL, claim_until = NULL, updated_at = now(),
+	    rev_period_id = NULL, rev_profile = NULL, rev_event_seq = NULL, rev_due_seq = NULL
 	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3`
 	if live {
 		q += ` AND claim_until > now()`
@@ -222,6 +224,34 @@ func Renew(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, lease time.
 		return false, err
 	}
 	return tag.RowsAffected() == 1, nil
+}
+
+// Revision là revision kỳ native (formsport.PeriodRevision) ghi bền trong ý định của token (BF-CNTS-CAMPAIGN-CAS-CONSUMER,
+// #201; pf 20261103152426).
+type Revision struct {
+	PeriodID uuid.UUID
+	Profile  string
+	EventSeq int64
+	DueSeq   int64
+}
+
+// BindRevision ghi revision kỳ native vào ý định của token khi token CÒN GIỮ ý định còn hạn (giờ DB) và trả revision đọc lại
+// từ dòng ý định — giá trị bên gọi truyền vào lời gọi CAS ở cap/forms. ok=false: token không còn giữ ý định (không ghi gì;
+// bên gọi KHÔNG được gọi cap/forms). Gọi trong giao dịch đã giữ Lock.
+func BindRevision(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, r Revision) (Revision, bool, error) {
+	var out Revision
+	err := tx.QueryRow(ctx, `UPDATE pf_extension.cnts_campaign_intent
+	  SET rev_period_id = $4, rev_profile = $5, rev_event_seq = $6, rev_due_seq = $7, updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3 AND claim_until > now()
+	  RETURNING rev_period_id, rev_profile, rev_event_seq, rev_due_seq`, tid, id, token, r.PeriodID, r.Profile, r.EventSeq, r.DueSeq).
+		Scan(&out.PeriodID, &out.Profile, &out.EventSeq, &out.DueSeq)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Revision{}, false, nil
+	}
+	if err != nil {
+		return Revision{}, false, err
+	}
+	return out, true, nil
 }
 
 // MarkStale ghi nhận kỳ native của đợt có thể lệch sổ đợt (review #156 [P2]): một lời gọi cap/forms ghi kỳ native đã trả về

@@ -36,14 +36,19 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
-// campHooks: hook (nếu đặt) bọc lời gọi cap/forms theo tên thao tác (publish, close, due, reopen, progress, cancel).
+// campHooks: hook (nếu đặt) bọc lời gọi cap/forms theo tên thao tác (publish, progress; cổng CAS #201: snapshot, close, due,
+// reopen, cancel). legacy là cổng vô điều kiện của pf/forms — kiểm thử dùng làm "người ghi khác" (ABA) ngoài đường ý định.
 type campHooks struct {
-	mu sync.Mutex
-	fn func(ctx context.Context, op string, next func(context.Context) error) error
+	mu     sync.Mutex
+	fn     func(ctx context.Context, op string, next func(context.Context) error) error
+	legacy formsport.PeriodControl
+	// tamper (nếu đặt) sửa ảnh kỳ native trả về từ ControlSnapshot — kiểm consumer fail closed với revision sai định danh.
+	tamper func(*formsport.PeriodControlSnapshot)
 }
 
 func (h *campHooks) set(fn func(ctx context.Context, op string, next func(context.Context) error) error) {
@@ -60,10 +65,6 @@ func (h *campHooks) run(ctx context.Context, op string, next func(context.Contex
 		return next(ctx)
 	}
 	return fn(ctx, op, next)
-}
-
-type campReopener interface {
-	ReopenPeriod(ctx context.Context, profile string, id uuid.UUID, reason, idem string) error
 }
 
 type campPublisher struct {
@@ -94,31 +95,80 @@ func (c campControl) Progress(ctx context.Context, profile string, id uuid.UUID)
 	return out, err
 }
 
-func (c campControl) ClosePeriod(ctx context.Context, profile string, id uuid.UUID, idem string) error {
-	return c.h.run(ctx, "close", func(ctx context.Context) error { return c.PeriodControl.ClosePeriod(ctx, profile, id, idem) })
+// campCond bọc cổng CAS của pf/forms (#159) — mọi lời gọi ghi kỳ native của đợt (#201).
+type campCond struct {
+	formsport.ConditionalPeriodControl
+	h *campHooks
 }
 
-func (c campControl) CancelPeriod(ctx context.Context, profile string, id uuid.UUID, reason, idem string) error {
-	return c.h.run(ctx, "cancel", func(ctx context.Context) error { return c.PeriodControl.CancelPeriod(ctx, profile, id, reason, idem) })
+func (c campCond) ControlSnapshot(ctx context.Context, profile string, id uuid.UUID) (out formsport.PeriodControlSnapshot, err error) {
+	err = c.h.run(ctx, "snapshot", func(ctx context.Context) error {
+		var e error
+		out, e = c.ConditionalPeriodControl.ControlSnapshot(ctx, profile, id)
+		return e
+	})
+	c.h.mu.Lock()
+	tamper := c.h.tamper
+	c.h.mu.Unlock()
+	if err == nil && tamper != nil {
+		tamper(&out)
+	}
+	return out, err
 }
 
-func (c campControl) ChangeDue(ctx context.Context, profile string, id uuid.UUID, due time.Time, reason, idem string) error {
-	return c.h.run(ctx, "due", func(ctx context.Context) error { return c.PeriodControl.ChangeDue(ctx, profile, id, due, reason, idem) })
+func (c campCond) casRun(ctx context.Context, op string, f func(context.Context) (formsport.PeriodRevision, error)) (out formsport.PeriodRevision, err error) {
+	err = c.h.run(ctx, op, func(ctx context.Context) error {
+		var e error
+		out, e = f(ctx)
+		return e
+	})
+	if err != nil {
+		return formsport.PeriodRevision{}, err
+	}
+	return out, nil
 }
 
-func (c campControl) ReopenPeriod(ctx context.Context, profile string, id uuid.UUID, reason, idem string) error {
-	return c.h.run(ctx, "reopen", func(ctx context.Context) error {
-		return c.PeriodControl.(campReopener).ReopenPeriod(ctx, profile, id, reason, idem)
+func (c campCond) ChangeDueCAS(ctx context.Context, profile string, id uuid.UUID, r formsport.PeriodRevision, due time.Time, reason, idem string) (formsport.PeriodRevision, error) {
+	return c.casRun(ctx, "due", func(ctx context.Context) (formsport.PeriodRevision, error) {
+		return c.ConditionalPeriodControl.ChangeDueCAS(ctx, profile, id, r, due, reason, idem)
+	})
+}
+
+func (c campCond) ClosePeriodCAS(ctx context.Context, profile string, id uuid.UUID, r formsport.PeriodRevision, idem string) (formsport.PeriodRevision, error) {
+	return c.casRun(ctx, "close", func(ctx context.Context) (formsport.PeriodRevision, error) {
+		return c.ConditionalPeriodControl.ClosePeriodCAS(ctx, profile, id, r, idem)
+	})
+}
+
+func (c campCond) CancelPeriodCAS(ctx context.Context, profile string, id uuid.UUID, r formsport.PeriodRevision, reason, idem string) (formsport.PeriodRevision, error) {
+	return c.casRun(ctx, "cancel", func(ctx context.Context) (formsport.PeriodRevision, error) {
+		return c.ConditionalPeriodControl.CancelPeriodCAS(ctx, profile, id, r, reason, idem)
+	})
+}
+
+func (c campCond) ReopenPeriodCAS(ctx context.Context, profile string, id uuid.UUID, r formsport.PeriodRevision, reason, idem string) (formsport.PeriodRevision, error) {
+	return c.casRun(ctx, "reopen", func(ctx context.Context) (formsport.PeriodRevision, error) {
+		return c.ConditionalPeriodControl.ReopenPeriodCAS(ctx, profile, id, r, reason, idem)
 	})
 }
 
 // newCampaignPoolFx dựng pf/forms + pf/extension thật trên pool cho trước (nil → mặc định), cổng cap/forms của đợt bọc hook;
 // lease > 0 → hạn ý định thao tác của đợt.
 func newCampaignPoolFx(t *testing.T, pool *pgxpool.Pool, lease time.Duration) (*aggFx, *campHooks) {
+	return newCampaignPoolFxCond(t, pool, lease, true)
+}
+
+// newCampaignPoolFxCond như newCampaignPoolFx; cas=false → gốc lắp ráp KHÔNG nối cổng CAS (kiểm fail closed).
+func newCampaignPoolFxCond(t *testing.T, pool *pgxpool.Pool, lease time.Duration, cas bool) (*aggFx, *campHooks) {
 	h := &campHooks{}
 	f := newAggFxPool(t, pool, facilityDir{}, func(fm *forms.Module, kn *extension.Module) {
+		h.legacy = fm.Control()
+		var cond formsport.ConditionalPeriodControl
+		if cas {
+			cond = campCond{fm.ConditionalControl(), h}
+		}
 		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: campPublisher{fm.Publisher(), h}, Control: campControl{fm.Control(), h},
-			Figures: fm.Figures()})
+			Conditional: cond, Figures: fm.Figures()})
 		if lease > 0 {
 			kn.UseCNTSCampaignLease(lease)
 		}
@@ -148,14 +198,20 @@ func (f *aggFx) newCampaign(name string) campaignView {
 
 // campaignCallCtx như campaignCall (Cấp Tỉnh CNTS; manager = Lãnh đạo phòng) với ctx của yêu cầu; trả lỗi thay vì Fatal.
 func (f *aggFx) campaignCallCtx(ctx context.Context, method, path string, manager bool, body any) (int, string, error) {
+	return f.campaignCallKey(ctx, method, path, manager, "pool-"+ids.New().String(), body)
+}
+
+// campaignCallKey như campaignCallCtx với Idempotency-Key cho trước (gọi lặp cùng ý định).
+func (f *aggFx) campaignCallKey(ctx context.Context, method, path string, manager bool, key string, body any) (int, string, error) {
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw)).WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 	k := authz.KNContext{Role: authz.KNTinh, Department: aggDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1", "X2"}}, Manager: manager}
 	kj, _ := json.Marshal(k)
 	req.Header.Set("X-Test-KN", string(kj))
-	req.Header.Set("X-Test-Actor", ids.New().String())
-	req.Header.Set(idempotency.Header, "pool-"+ids.New().String())
+	// Cùng Idempotency-Key = cùng người gọi (khóa idempotent gắn người thao tác).
+	req.Header.Set("X-Test-Actor", uuid.NewSHA1(uuid.NameSpaceOID, []byte(key)).String())
+	req.Header.Set(idempotency.Header, key)
 	w := httptest.NewRecorder()
 	f.eng.ServeHTTP(w, req)
 	return w.Code, w.Body.String(), ctx.Err()
@@ -562,13 +618,48 @@ func assertNativeMatchesLedger(t *testing.T, f *aggFx, id, wantState, wantDue st
 	}
 }
 
-// Đúng xen kẽ Codex tái hiện: A gia hạn tới 12/10, mất ý định ngay trước ChangeDue; B gia hạn tới 13/10 xong (200); rồi
-// ChangeDue của A chạy. A → 409; kỳ native phải về 13/10 (kết quả cam kết của B), không phải 12/10.
+// isFormsConflict: lỗi cap/forms là forms.period_conflict (CAS #159 từ chối revision cũ).
+func isFormsConflict(err error) bool {
+	var p *problem.Problem
+	return errors.As(err, &p) && p.Code == formsport.ErrPeriodConflict.Code
+}
+
+// rejectProbe ghi lại kết quả lời gọi ghi native của yêu cầu cũ và trạng thái kỳ native NGAY khi lời gọi trả về — trước mọi
+// bước đánh dấu lệch / đối soát của yêu cầu cũ (mô phỏng yêu cầu cũ chết ngay sau lời gọi).
+type rejectProbe struct {
+	err    error
+	due    string
+	status string
+	dirty  int
+}
+
+func (p *rejectProbe) take(t *testing.T, f *aggFx, id, pid string, err error) {
+	t.Helper()
+	p.err, p.due, p.status, p.dirty = err, f.nativeDue(pid), f.formsPeriodStatus(pid), campIntentSQL(t, f, id, sqlCampDirty)
+}
+
+func (p *rejectProbe) wantRejected(t *testing.T, due, status string) {
+	t.Helper()
+	if !isFormsConflict(p.err) {
+		t.Fatalf("lời gọi native của yêu cầu cũ phải bị CAS từ chối ngay (forms.period_conflict), nhận: %v", p.err)
+	}
+	if p.due != due || p.status != status {
+		t.Fatalf("ngay sau lời gọi bị từ chối (chưa đối soát): kỳ native %s hạn %s, muốn %s hạn %s", p.status, p.due, status, due)
+	}
+	if p.dirty != 0 {
+		t.Fatalf("kết quả không được dựa vào dấu lệch/đối soát: dirty=%d", p.dirty)
+	}
+}
+
+// Đúng xen kẽ Codex tái hiện: A gia hạn tới 12/10, mất ý định ngay trước ChangeDue; B gia hạn tới 13/10 xong (native + sổ
+// đợt, 200); rồi ChangeDue của A chạy. #201: revision A ghi trong ý định là của TRƯỚC B → cap/forms từ chối ngay
+// (forms.period_conflict), kỳ native giữ 13/10 mà KHÔNG cần A đánh dấu/đối soát; A → 409 interrupted.
 func TestBFCNTSCampaignPool_StaleExtendDoesNotOverwriteSuccessor(t *testing.T) {
 	f, h := newCampaignPoolFx(t, nil, 0)
 	cv := f.newCampaign("Đợt kiểm gia hạn cũ ghi đè")
 	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/publish", authz.KNTinh, false, nil)
 	f.ok(c, b, &cv)
+	var probe rejectProbe
 	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
 		if op != "due" {
 			return next(ctx)
@@ -580,11 +671,14 @@ func TestBFCNTSCampaignPool_StaleExtendDoesNotOverwriteSuccessor(t *testing.T) {
 		if sc != http.StatusOK {
 			return fmt.Errorf("yêu cầu kế tiếp HTTP %d %s", sc, sb)
 		}
-		return next(ctx)
+		err := next(ctx)
+		probe.take(t, f, cv.ID, *cv.FormsPeriodID, err)
+		return err
 	})
 	c, b = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", authz.KNTinh, false,
 		map[string]any{"due_at": "2026-10-12T03:00:00Z", "reason": "Yêu cầu cũ không được đè yêu cầu kế tiếp"})
-	wantProblem(t, c, string(b), "extension.cnts_campaign_state", http.StatusConflict)
+	wantProblem(t, c, string(b), "extension.cnts_campaign_interrupted", http.StatusConflict)
+	probe.wantRejected(t, "2026-10-13T03:00:00Z", "open")
 	assertNativeMatchesLedger(t, f, cv.ID, "collecting", "2026-10-13T03:00:00Z")
 }
 
@@ -594,6 +688,7 @@ func TestBFCNTSCampaignPool_StaleLaterExtendDoesNotOverwriteSuccessor(t *testing
 	cv := f.newCampaign("Đợt kiểm gia hạn cũ dài hơn")
 	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/publish", authz.KNTinh, false, nil)
 	f.ok(c, b, &cv)
+	var probe rejectProbe
 	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
 		if op != "due" {
 			return next(ctx)
@@ -605,11 +700,14 @@ func TestBFCNTSCampaignPool_StaleLaterExtendDoesNotOverwriteSuccessor(t *testing
 		if sc != http.StatusOK {
 			return fmt.Errorf("yêu cầu kế tiếp HTTP %d %s", sc, sb)
 		}
-		return next(ctx)
+		err := next(ctx)
+		probe.take(t, f, cv.ID, *cv.FormsPeriodID, err)
+		return err
 	})
 	c, b = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/extend", authz.KNTinh, false,
 		map[string]any{"due_at": "2026-10-20T03:00:00Z", "reason": "Yêu cầu cũ hạn dài hơn không được đè"})
-	wantProblem(t, c, string(b), "extension.cnts_campaign_state", http.StatusConflict)
+	wantProblem(t, c, string(b), "extension.cnts_campaign_interrupted", http.StatusConflict)
+	probe.wantRejected(t, "2026-10-13T03:00:00Z", "open")
 	assertNativeMatchesLedger(t, f, cv.ID, "collecting", "2026-10-13T03:00:00Z")
 }
 
@@ -682,6 +780,7 @@ func TestBFCNTSCampaignPool_StaleCloseDoesNotOverwriteSuccessor(t *testing.T) {
 	cv := f.newCampaign("Đợt kiểm đóng cũ ghi đè")
 	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/publish", authz.KNTinh, false, nil)
 	f.ok(c, b, &cv)
+	var probe rejectProbe
 	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
 		if op != "close" {
 			return next(ctx)
@@ -693,11 +792,27 @@ func TestBFCNTSCampaignPool_StaleCloseDoesNotOverwriteSuccessor(t *testing.T) {
 		if sc != http.StatusOK {
 			return fmt.Errorf("yêu cầu kế tiếp HTTP %d %s", sc, sb)
 		}
-		return next(ctx)
+		err := next(ctx)
+		probe.take(t, f, cv.ID, *cv.FormsPeriodID, err)
+		return err
 	})
 	c, b = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/close", authz.KNTinh, false, nil)
-	wantProblem(t, c, string(b), "extension.cnts_campaign_state", http.StatusConflict)
+	wantProblem(t, c, string(b), "extension.cnts_campaign_interrupted", http.StatusConflict)
+	probe.wantRejected(t, "2026-10-13T03:00:00Z", "open")
 	assertNativeMatchesLedger(t, f, cv.ID, "collecting", "2026-10-13T03:00:00Z")
+	// Ảnh chụp đóng băng / outbox chốt kỳ của lệnh đóng cũ không được sinh.
+	if n := f.closedArtifacts(*cv.FormsPeriodID); n != "0/0" {
+		t.Fatalf("lệnh đóng cũ bị từ chối vẫn sinh ảnh chụp/outbox: %s", n)
+	}
+}
+
+// closedArtifacts: "<số ảnh chụp chốt>/<số outbox chốt kỳ>" của kỳ native pid.
+func (f *aggFx) closedArtifacts(pid string) string {
+	f.t.Helper()
+	rows := f.admin.query(`SELECT (SELECT count(*) FROM pf_forms.close_snapshot WHERE tenant_id = $1 AND period_ref = $2::text::uuid)::text || '/' ||
+	    (SELECT count(*) FROM shared.outbox WHERE tenant_id = $1 AND event_type = $3::text AND payload->>'period_ref' = $2::text)::text`,
+		f.tid, pid, formsport.EventPeriodClosed)
+	return fmt.Sprint(rows[0][0])
 }
 
 // Mở lại đợt cũ: đợt Đã đóng; A mở lại (hạn 15/10), mất ý định ngay trước ReopenPeriod; B mở lại (16/10) rồi C đóng đợt, cả hai
@@ -709,11 +824,20 @@ func TestBFCNTSCampaignPool_StaleReopenDoesNotOverwriteSuccessor(t *testing.T) {
 		c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+p, authz.KNTinh, false, nil)
 		f.ok(c, b, &cv)
 	}
+	var probe rejectProbe
+	dueCalls := 0
+	countDue := func(ctx context.Context, op string, next func(context.Context) error) error {
+		if op == "due" {
+			dueCalls++
+		}
+		return next(ctx)
+	}
 	h.set(func(ctx context.Context, op string, next func(context.Context) error) error {
 		if op != "reopen" {
 			return next(ctx)
 		}
 		h.set(nil)
+		defer h.set(countDue) // sau lời gọi bị từ chối: đếm lời gọi đổi hạn còn lại của yêu cầu cũ
 		campIntentSQL(t, f, cv.ID, sqlCampExpire)
 		sc, sb := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/reopen", authz.KNTinh, true,
 			map[string]any{"due_at": "2026-10-16T03:00:00Z", "reason": "Mở lại xong trong lúc lệnh mở lại cũ treo"})
@@ -724,10 +848,16 @@ func TestBFCNTSCampaignPool_StaleReopenDoesNotOverwriteSuccessor(t *testing.T) {
 		if sc != http.StatusOK {
 			return fmt.Errorf("đóng kế tiếp HTTP %d %s", sc, sb)
 		}
-		return next(ctx)
+		err := next(ctx)
+		probe.take(t, f, cv.ID, *cv.FormsPeriodID, err)
+		return err
 	})
 	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/reopen", authz.KNTinh, true,
 		map[string]any{"due_at": "2026-10-15T03:00:00Z", "reason": "Lệnh mở lại cũ không được đè kết quả"})
-	wantProblem(t, c, string(b), "extension.cnts_campaign_state", http.StatusConflict)
+	wantProblem(t, c, string(b), "extension.cnts_campaign_interrupted", http.StatusConflict)
+	probe.wantRejected(t, "2026-10-16T03:00:00Z", "closed")
+	if dueCalls != 0 {
+		t.Fatalf("mở lại cũ bị từ chối không được gọi bước đổi hạn: %d", dueCalls)
+	}
 	assertNativeMatchesLedger(t, f, cv.ID, "closed", "2026-10-16T03:00:00Z")
 }
