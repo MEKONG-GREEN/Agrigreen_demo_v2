@@ -330,7 +330,7 @@ func (x *localACKTx209) Commit(c context.Context) error {
 			return e
 		}
 	} else {
-		if e := x.Tx.Rollback(c); e != nil {
+		if e := x.Rollback(c); e != nil {
 			return e
 		}
 	}
