@@ -82,7 +82,7 @@ func (pb Publisher) DefineTemplate(ctx context.Context, def port.TemplateDef, id
 	if err := json.Unmarshal(def.Fields, &fields); err != nil {
 		return port.TemplateRef{}, port.ErrInvalidTemplate.WithField("fields", "JSON mảng trường")
 	}
-	t, err := pb.Svc.DefineTemplate(ctx, TemplateInput{Profile: def.Profile, Code: def.Code, Title: def.Title, Fields: fields}, idem)
+	t, err := pb.Svc.DefineTemplate(ctx, TemplateInput{Profile: def.Profile, Code: def.Code, Title: def.Title, Fields: fields, BaseVersion: def.BaseVersion}, idem)
 	if err != nil {
 		return port.TemplateRef{}, err
 	}
