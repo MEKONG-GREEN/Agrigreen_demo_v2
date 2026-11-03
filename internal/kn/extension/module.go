@@ -26,6 +26,7 @@ import (
 	zmaphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/handler"
 	modelapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/app"
 	modelhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/departments"
 	dhapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/depthome/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/handler"
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
@@ -124,6 +125,8 @@ type Module struct {
 	records *krapp.Service
 	// AUDIT-LOG-KN (#73): nguồn nhật ký KN, quyền xem, sổ lượt xem bền (module_knaudit.go).
 	audit *knaudit.Service
+	// KNSPLIT-2-PARTY-KN-ROUTES (#118): danh mục phòng ban của pf/party, binding HTTP do KN sở hữu (extension/departments).
+	departments partyport.DepartmentAdmin
 }
 
 // New tạo module với pool của vai extension_app.
@@ -224,15 +227,20 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerKHTCExternal(rg)                         // W11.67
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
-	modelhandler.Handler{Svc: m.model}.RegisterApp(rg) // W11.47
-	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg) // W11.48
-	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)   // W11.52
-	m.registerDeptHome(rg)                             // W11.54
-	m.registerCNTSCampaigns(rg)                        // W11.50
-	m.registerKNAttrs(rg)                              // BF-SRV-KN-ATTRS
-	m.registerCNTSKNQG(rg)                             // W11.53
-	m.registerKNRecords(rg)                            // KNSPLIT-2-KN-RECORDS
+	modelhandler.Handler{Svc: m.model}.RegisterApp(rg)      // W11.47
+	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg)      // W11.48
+	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)        // W11.52
+	m.registerDeptHome(rg)                                  // W11.54
+	m.registerCNTSCampaigns(rg)                             // W11.50
+	m.registerKNAttrs(rg)                                   // BF-SRV-KN-ATTRS
+	m.registerCNTSKNQG(rg)                                  // W11.53
+	m.registerKNRecords(rg)                                 // KNSPLIT-2-KN-RECORDS
+	departments.Handler{Svc: m.departments}.RegisterApp(rg) // KNSPLIT-2-PARTY-KN-ROUTES (#118): GET /v1/departments
 }
+
+// UseDepartmentAdmin (KNSPLIT-2 #118) nối cổng quản trị phòng ban của pf/party cho /v1/departments*. Chưa nối → các
+// route đó trả 503 extension.dependency_unavailable (đóng).
+func (m *Module) UseDepartmentAdmin(d partyport.DepartmentAdmin) { m.departments = d }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham
 // chiếu program_ref qua cổng này.
@@ -241,8 +249,10 @@ func (m *Module) KHTCPrograms() port.KHTCPrograms { return khtcapp.Ports{Svc: m.
 // KHTCPlans là cổng đọc Kế hoạch năm theo ngày hiệu lực (W11.62 kỳ KHTC, W11.63 phiếu, W11.65 mẫu).
 func (m *Module) KHTCPlans() port.KHTCPlans { return khtcapp.Ports{Svc: m.khtc} }
 
-// RegisterAdmin: module chưa có route quản trị (tham số SLA đặt qua pf/masterdata).
-func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
+// RegisterAdmin gắn route Admin API: danh mục phòng ban (#118). Tham số SLA đặt qua pf/masterdata.
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
+	departments.Handler{Svc: m.departments}.RegisterAdmin(rg)
+}
 
 // SyncSource cho pf/sync: chiều xuống "task", "directive".
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }

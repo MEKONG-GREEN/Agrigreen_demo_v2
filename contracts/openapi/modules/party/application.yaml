@@ -43,22 +43,6 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/KNOrgTreeNode"}}
         "401": {$ref: "#/components/responses/Problem"}
-# @ag-order: 19
-  /v1/departments:
-    get:
-      summary: "Phòng ban của đơn vị (bước 2 đăng nhập, FN-CH-00.01) — chỉ selectable = true chọn được"
-      operationId: knListDepartments
-      tags: [party]
-      parameters:
-        - {name: org_ref, in: query, schema: {type: string, format: uuid}, description: "Đơn vị; vắng = Nút cấp 1/2 gần nhất của Nút người gọi"}
-      responses:
-        "200":
-          description: Danh sách theo thứ tự hiển thị (account_count/record_count luôn null ở Application API)
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNDepartmentList"}
-        "401": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
 # @ag-order: 20
   /v1/departments/{code}/modules:
     get:

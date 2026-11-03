@@ -456,7 +456,7 @@ paths:
     get:
       summary: "Phòng ban của đơn vị (bước 2 đăng nhập, FN-CH-00.01) — chỉ selectable = true chọn được"
       operationId: knListDepartments
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: org_ref, in: query, schema: {type: string, format: uuid}, description: "Đơn vị; vắng = Nút cấp 1/2 gần nhất của Nút người gọi"}
       responses:
