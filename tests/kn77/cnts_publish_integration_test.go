@@ -120,7 +120,7 @@ type pubTracking struct {
 func TestCNTSPublish_TargetOwnerDraft_BF_CN_PUBLISH(t *testing.T) {
 	owner := ids.New()
 	f := newAggFx(t, facilityDir{}, func(fm *forms.Module, kn *extension.Module) {
-		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control()})
+		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Conditional: fm.ConditionalControl()})
 	})
 	f.kn.UseReportCycle(extension.ReportCycleDeps{Regions: pubRegions{}, Assignments: pubAssignments{owner: owner, node: f.node}})
 	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", authz.KNAdmin, nil)
@@ -293,7 +293,7 @@ func (f *aggFx) trackedPeriods(k authz.KNContext, code string) []string {
 func TestCNTSTrackingScope_BF_CN_PUBLISH(t *testing.T) {
 	facA, facB := ids.New(), ids.New()
 	f := newAggFx(t, facilityDir{facA: "X1", facB: "X2"}, func(fm *forms.Module, kn *extension.Module) {
-		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control()})
+		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Conditional: fm.ConditionalControl()})
 	})
 	f.kn.UseReportCycle(extension.ReportCycleDeps{Regions: pubRegions{}})
 	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", authz.KNAdmin, nil)
