@@ -24,6 +24,7 @@ import {
   type ProjectDetail,
   type ProjectSave,
 } from "./api";
+import { ImportPanel } from "./ImportPanel";
 import { ReasonBox, SiteForm, SitePanel } from "./parts";
 
 export function ProjectsScreen() {
@@ -188,7 +189,7 @@ function ProjectPanel({ mapi, projectRef, officers, onChanged }: { mapi: CntsMod
 }
 
 function ProjectBody({ mapi, p, officers, reload }: { mapi: CntsModelApi; p: ProjectDetail; officers: Candidate[]; reload: () => void }) {
-  const [mode, setMode] = useState<"edit" | "close" | "reopen" | "site" | null>(null);
+  const [mode, setMode] = useState<"edit" | "close" | "reopen" | "site" | "import" | null>(null);
   const [site, setSite] = useState<string | null>(null);
   const [editSite, setEditSite] = useState<string | null>(null);
   const act = useAction();
@@ -220,6 +221,9 @@ function ProjectBody({ mapi, p, officers, reload }: { mapi: CntsModelApi; p: Pro
               <button className="btn" onClick={() => setMode("site")}>
                 Thêm điểm trình diễn
               </button>
+              <button className="btn" onClick={() => setMode("import")}>
+                Nạp Excel điểm, hộ
+              </button>
               <button className="btn" onClick={() => setMode("close")}>
                 Kết thúc dự án
               </button>
@@ -246,6 +250,7 @@ function ProjectBody({ mapi, p, officers, reload }: { mapi: CntsModelApi; p: Pro
           }}
         />
       ) : null}
+      {mode === "import" ? <ImportPanel mapi={mapi} projectRef={p.ref} projectCode={p.code} onDone={(committed) => (committed ? reload() : setMode(null))} /> : null}
       {mode === "site" ? <SiteForm mapi={mapi} projectRef={p.ref} officers={officers} communes={communes} onDone={(ref) => (setMode(null), ref && (reload(), setSite(ref)))} /> : null}
       {editing ? <SiteForm key={editing.ref} mapi={mapi} projectRef={p.ref} site={editing} officers={officers} communes={communes} onDone={(ref) => (setEditSite(null), ref && reload())} /> : null}
       <h3>Điểm trình diễn</h3>
