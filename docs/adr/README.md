@@ -41,6 +41,7 @@
 | 0037 | [Tách xác thực và phân quyền, không mạo danh](0037-tach-xac-thuc-va-phan-quyen-khong-mao-danh.md) | Đề xuất — chờ MKG ký (A7); ghi lại KN P1 (đã hiện thực, pf 000060–000061) làm `ResolveContext` ĐTK 1; phần còn lại W7.2 |
 | 0038 | [Bộ chạy migration theo module — sổ theo module, thứ tự topo, vai `own_<module>`](0038-bo-chay-migration-theo-module.md) | Đề xuất — hiện thực bước 1 ở W7.1 (sau cờ `AG_MIGRATE_RUNNER=v2`, mặc định v1 một bản phát hành) |
 | 0041 | [MFA theo nhóm cho cán bộ KN, phiên giữ theo D9, realm quản trị riêng, vô hiệu tài khoản 45 ngày](0041-mfa-theo-nhom-d24.md) | Chấp nhận — quyết định CEO D24, D25 (13/10/2026), ứng với v4.3 ADR-23/P-1…P-5; hiện thực gói MFA (pf 20261013134254, 20261013142347); sửa ADR-0010 |
+| 0048 | [Liên kết khách có OTP](0048-lien-ket-khach-co-otp.md) | Khung dormant #184; owner/transport/public flow ở #200 |
 | 0049 | [`cap/price` = module năng lực `pf/price`](0049-cap-price-pf-price.md) | Đề xuất — khung hiện thực ở W11.71 (pf 000138); số 0039–0048 dành cho ADR khác của đợt; bị thay thế một phần bởi ADR-0055 (Báo giá là của KN) |
 | 0050 | [`dom/hrm` = module nghiệp vụ `pf/hrm`; danh mục nhân sự ở module của chủ](0050-dom-hrm-pf-hrm.md) | Đề xuất — khung + danh mục nhân sự ở W11.21 (pf 000147); dữ liệu thật chờ Q-070 |
 | 0051 | [Tách `cap/export` thành module năng lực `pf/export` — mẫu văn bản có phiên bản, bộ ghi .docx tất định, sổ lần xuất có băm, số văn bản tự cấp](0051-cap-export-pf-export-docx.md) | Đề xuất — hiện thực ở W10.17 (pf 20261024090957); dùng thật chờ Q-062 |
@@ -67,4 +68,3 @@ Số của ADR **chưa viết** mà tài liệu khác đã nhắc tới. Viết 
 | 0045 | Phân loại dữ liệu 4 mức | như trên |
 | 0046 | Phụ thuộc OR-Tools | như trên |
 | 0047 | Dữ liệu vị trí người lái/người đếm | như trên, W12.19 |
-| 0048 | Liên kết khách có OTP | như trên |

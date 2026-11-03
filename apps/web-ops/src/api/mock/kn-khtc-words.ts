@@ -1,4 +1,6 @@
 // GIẢ LẬP W10.17: Word KHTC Mẫu 1–5 từ bản Excel đã lưu, qua sổ lần xuất giả lập của `cap/export` (./export).
+import { bindArchiveMockWord, archiveMockWords, archiveMockWord } from "./kn-khtc-archive-word-store";
+import { TENANT } from "./personas";
 import type { components } from "../generated/application";
 import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
@@ -10,6 +12,7 @@ const KHTC = "ke_hoach_tai_chinh";
 const subject = (id: string) => `khtc_report:${id}`;
 const word = (r: ReturnType<typeof mockExportRun>): Word => { const { subject: _s, ...rest } = r; void _s; return rest; };
 export const khtcWordRoutes: Route[] = [
+    {method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/exports\/([^/]+)\/words(?:\/([^/]+)\/download)?$/,handler:archiveRead},
     { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/exports\/([^/]+)\/word$/, handler: create },
     { method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/words(?:\/([^/]+)\/download)?$/, handler: read },
 ];
@@ -42,6 +45,10 @@ function create(ctx: Ctx): Response {
     const run = mockExportRun({ template: document ? "khtc.fixed" : `khtc.${x.detail.content.data.template}`, subject: subject(id), fileName: `bao-cao-khtc-${x.detail.content.data.template}-${id}-v${x.meta.version}.docx`,
         docNumber: no ? (no.includes("/") ? no : `${no}/BC-TTKN`) : x.meta.provisional ? "…/BC-TTKN" : "", series: x.meta.provisional ? undefined : "BC-TTKN", actor: ctx.persona.me.actor_ref,
         lines: [date, "BÁO CÁO", x.detail.content.data.period.name, `Bản xuất Excel phiên bản ${x.meta.version}`, ...compiled, ...x.detail.content.data.rows.map(r => `${r.name}: trong kỳ ${r.in_period}, lũy kế ${r.year_to_date}`),...(document ? [] : [...x.detail.content.data.metrics.map(m=>m.label+": "+(m.text??m.value.Increment??m.value.Sum??m.value.Cumulative??"")), ...Object.values(x.detail.content.texts)])] });
+    const stored = mockExportBody(subject(id),run.id);
+    if (!stored) return problem(503,"extension.khtc_dependency_unavailable","Không có byte đã lưu");
+    bindArchiveMockWord({tenant:ctx.persona.me.tenant_id,period:id,exportID,exportName:x.detail.content.data.period.name,exportVersion:x.meta.version,body:stored.body,
+      meta:{period_id:id,export_id:exportID,run_id:run.id,version:run.seq,template:run.template,template_version:run.template_version,template_hash:run.template_hash,input_hash:run.input_hash,body_hash:run.body_hash,size:new TextEncoder().encode(stored.body).length,file_name:run.file_name.replace(/\.docx$/,"-gia-lap.txt"),content_type:"text/plain; charset=utf-8",doc_number:run.doc_number,doc_number_auto:run.doc_number_auto,actor_ref:run.actor_ref,at:run.at}});
     return json(word(run), 201);
 }
 function read(ctx: Ctx): Response {
@@ -54,4 +61,20 @@ function read(ctx: Ctx): Response {
         return json({ items: mockExportRuns(subject(id)).map(word) });
     const r = mockExportBody(subject(id), runID);
     return r ? downloadResponse(r) : problem(404, "export.run_not_found", "Không có lần xuất này");
+}
+
+function archiveRead(ctx: Ctx): Response {
+ const [period,exportID,runID] = ctx.params as [string,string,string|undefined];
+ const kc=knContext(ctx.request.headers.get("X-AG-Context")??"");
+ if (!kc || !allowed(ctx,false)) return problem(403,"forbidden","Không có quyền");
+ const p=khtcMockStore().find(p=>p.p.id===period && (p.adhocTenant??TENANT)===ctx.persona.me.tenant_id);
+ if (!p || p.terminal==="cancelled" || !khtcReportExport(period,exportID)) return problem(404,"extension.khtc_report_not_found","Không có bản xuất");
+ if (runID) {
+   const b=archiveMockWord(ctx.persona.me.tenant_id,period,exportID,runID);
+   return b ? new Response(b.body,{headers:{"Content-Type":b.meta.content_type,"Content-Disposition":`attachment; filename="${b.meta.file_name}"`,"Cache-Control":"no-store"}}) : problem(404,"extension.khtc_report_not_found","Không có Word đã xác minh");
+ }
+ const offset=ctx.url.searchParams.get("offset")??"0", limit=ctx.url.searchParams.get("limit")??"20";
+ if (ctx.url.searchParams.getAll("offset").length>1 || ctx.url.searchParams.getAll("limit").length>1 || !/^\d{1,6}$/.test(offset) || +offset>100000 || !/^\d{1,2}$/.test(limit) || +limit<1 || +limit>50) return problem(422,"extension.khtc_report_invalid","Phân trang không hợp lệ");
+ const items=archiveMockWords(ctx.persona.me.tenant_id,period,exportID), x=khtcReportExport(period,exportID)!;
+ return json({period_id:period,export_id:exportID,export_version:x.meta.version,export_name:x.detail.content.data.period.name,items:items.slice(+offset,+offset+(+limit)).map(b=>b.meta),has_more:items.length>+offset+(+limit),offset:+offset},200,{"Cache-Control":"no-store"});
 }

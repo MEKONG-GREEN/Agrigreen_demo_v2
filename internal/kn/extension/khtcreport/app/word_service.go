@@ -53,6 +53,9 @@ func (s *Service) ExportWord(ctx context.Context, id, exportID uuid.UUID, idem s
 	if err != nil {
 		return exportport.Run{}, err
 	}
+	if !archiveBodyMatches(x.Body, x.BodyHash) {
+		return exportport.Run{}, ErrDependency.WithDetail("Excel đã lưu không khớp băm")
+	}
 	key, version, data, err := fixedTemplateWord(x.Content.TemplateSnapshot, x.Content, templateTerminal(x.Content), x.Filter, x.Version)
 	if err != nil {
 		return exportport.Run{}, err
@@ -67,7 +70,14 @@ func (s *Service) ExportWord(ctx context.Context, id, exportID uuid.UUID, idem s
 	} else {
 		req.Number = &exportport.Numbering{Series: WordSeries, Var: VarNumber}
 	}
-	return s.Exporter.Export(ctx, req)
+	run, err := s.Exporter.Export(ctx, req)
+	if err != nil {
+		return exportport.Run{}, err
+	}
+	if err = s.bindWord(ctx, c, id, x, req, run); err != nil {
+		return exportport.Run{}, err
+	}
+	return run, nil
 }
 
 // WordHistory trả các lần xuất Word của báo cáo (mới nhất trước).
