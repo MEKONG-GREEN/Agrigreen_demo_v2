@@ -70,8 +70,32 @@ function appraisalLink(tree: MenuTree, pathname: string): MenuLink | null | unde
  return !admin && center && detail ? links.find(l => l.node.href === HRM_OWN_APPRAISAL) ?? null : null;
 }
 
+// Historical FN19 pages have department aliases, while module menus use the
+// canonical HRM leaf. Only actual page shapes map, preserving the entire suffix
+// so the normal longest-prefix matcher and usable menu permissions still apply.
+function hrmCatalogAlias(tree: MenuTree, pathname: string): string | undefined {
+  const prefix = "/kn/phong-ban/hanh_chinh_tong_hop/danh-muc-nhan-su";
+  if (pathname !== prefix && !pathname.startsWith(prefix + "/")) return undefined;
+  if (tree.role !== "admin" && (tree.role !== "kn_tinh" || tree.department_code !== "hanh_chinh_tong_hop")) return undefined;
+  const tail = pathname.slice(prefix.length);
+  const kind = "(?:position|grade|education_level|major|major_group|ethnicity|religion|political_theory|state_mgmt|foreign_language|language_level|it_level|award_form|discipline_form|change_type|leave_reason)";
+  const code = "[a-z][a-z0-9_]{0,39}";
+  const grade = "[A-Za-z0-9][A-Za-z0-9._-]{0,39}";
+  const catalog = new RegExp(`^/${kind}(?:/them-moi)?$`).test(tail)
+    || new RegExp(`^/grade/muc/${grade}(?:/sua)?$`).test(tail)
+    || new RegExp(`^/${kind}/muc/${code}(?:/sua)?$`).test(tail);
+  const scale = tail === "/he-so" || new RegExp(`^/he-so/${grade}(?:/them-moi)?$`).test(tail);
+  const rule = /^\/quy-tac\/(?:promotion|achievement_conversion)(?:\/them-moi)?$/.test(tail);
+  return tail === "" || catalog || scale || rule ? "/kn/nhan-su/danh-muc" + tail : undefined;
+}
+
 /** Mục đang chọn: khớp tiền tố dài nhất (trang chi tiết thuộc mục danh sách). Chỉ một mục active. */
 export function findActive(tree: MenuTree, pathname: string): MenuLink | undefined {
+  const canonical = hrmCatalogAlias(tree, pathname);
+  if (canonical) {
+    const active = findActive(tree, canonical);
+    if (active) return active;
+  }
   const appraisal = appraisalLink(tree, pathname);
   if(appraisal !== undefined)return appraisal ?? undefined;
   let best: MenuLink | undefined;
