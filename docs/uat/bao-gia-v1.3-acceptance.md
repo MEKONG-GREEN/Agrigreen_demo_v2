@@ -162,3 +162,9 @@ Bổ sung kỹ thuật cho BG-FN-AD-04.01/02, BRD v1.3; không đổi trạng th
 | Quyền/phiên/thử lại | URL sửa/thêm của Tỉnh chỉ xem; mất response sau commit thử lại không tạo xã lần hai; response của phiên Admin cũ không điều hướng sang phiên mới |
 
 Các test `point-detail.test.tsx`, `point-routes.test.ts`, `points.test.tsx`, browser `price-points182.spec.ts` và PG `TestPricePointsHTTP_W1172` được đọc cùng kết quả cụ thể ở markerREADY đúngSHA. Browser dùng API giả lập, không thay kiểm backend/realm/kho triển khai. Không có ô số mới; các trường số ở items/tickets/surveys còn thuộc #198, chưa được suy rộng kết luận. Nhập Excel xã và nhật ký nhóm vùng đầy đủ còn gap; phần items/tickets/reports/surveys theo #198.
+
+## BF-SWEEP-PRICE-REST (#198) — lát danh mục, 03/11/2026
+
+Chỉ chuyển item thêm/sửa/xem/ngưng/thay thế và nhóm hàng thêm/sửa/xem sang route riêng; dùng validateForm/required, giữ hiệu lực/thứ tự/khóa trường và idempotency. Log ItemVersion lấy actor/event_time/cũ→mới thật, hiển thị Tỉnh/Admin; không hiển thị actor Log mới cho TW. Nhóm hàng chỉ có snapshot/version/valid_from nên nói rõ thiếu lịch sử, không dựng Log giả. Bằng chứng UI/quyền/context/mấtACK/HTTP-PG/CI đúngSHA nằm ở issue198 khi hoàn tất; không thay UAT của PO.
+
+Child #204 giữ Gán xã/Bộ vụ/Đề xuất và ticket/report/survey/Log nhóm/nhóm vùng/Excel gap còn lại. Metadata history trong payload ItemDetail là hợp đồng backend có trước; chưa chứng nhận hạn chế backend/PII chỉ vì ẩn UI. Không đổi các trạng thái toàn AC ở bảng trên thành đạt vì lát này; đọc docs/kn/gia-dinh/BF-SWEEP-PRICE-REST.md và issue204 cho giới hạn.

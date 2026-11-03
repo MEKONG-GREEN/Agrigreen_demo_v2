@@ -194,6 +194,10 @@ func (s *Service) ImportDraft(ctx context.Context, year int, data []byte) (Draft
 			e.ProgramRef = &ref
 		}
 		if v := get("sort"); v != "" {
+			if !domain.IsInputInteger(v) {
+				bad("sort", "thứ tự phải là số nguyên có giới hạn")
+				continue
+			}
 			n, err := strconv.Atoi(v)
 			if err != nil {
 				bad("sort", "thứ tự phải là số nguyên")
@@ -206,11 +210,17 @@ func (s *Service) ImportDraft(ctx context.Context, year int, data []byte) (Draft
 			k   string
 			dst **decimal.Decimal
 		}{{"qty", &e.PlannedQty}, {"budget", &e.Budget}} {
-			v := strings.ReplaceAll(get(x.k), " ", "")
+			raw := get(x.k)
+			if len(raw) > 512 {
+				bad(x.k, "số quá dài")
+				ok = false
+				continue
+			}
+			v := strings.ReplaceAll(raw, " ", "")
 			if v == "" {
 				continue
 			}
-			dv, err := decimal.NewFromString(v)
+			dv, err := domain.ParseInputDecimal(v)
 			if err != nil {
 				bad(x.k, "không phải số (dấu thập phân là dấu chấm)")
 				ok = false
@@ -219,6 +229,10 @@ func (s *Service) ImportDraft(ctx context.Context, year int, data []byte) (Draft
 			*x.dst = &dv
 		}
 		if v := get("points"); v != "" {
+			if !domain.IsInputInteger(v) {
+				bad("points", "số điểm phải là số nguyên có giới hạn")
+				continue
+			}
 			n, err := strconv.Atoi(v)
 			if err != nil {
 				bad("points", "số điểm phải là số nguyên")
