@@ -50,16 +50,13 @@ func SummarizeDashboard(data Data, department, field string, now time.Time) (Das
 			continue
 		}
 		root := entry
-		fieldCode := entry.FieldCode
+		fieldCode := InheritedFieldCode(entry, entries)
 		for depth := 0; root.ParentRef != nil && depth < 16; depth++ {
 			p, ok := entries[*root.ParentRef]
 			if !ok {
 				break
 			}
 			root = p
-			if fieldCode == "" {
-				fieldCode = p.FieldCode
-			}
 		}
 		if field != "" && fieldCode != field {
 			continue

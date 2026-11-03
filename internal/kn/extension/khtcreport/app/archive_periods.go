@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	"github.com/jackc/pgx/v5"
-	"strings"
 )
 
 type ArchivePeriodsResult struct {
@@ -24,7 +23,7 @@ func (s *Service) ArchivePeriods(ctx context.Context, q ArchiveQuery) (ArchivePe
 	out := ArchivePeriodsResult{Items: []store.ArchivePeriod{}, Offset: q.Offset}
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		var e error
-		out.Items, e = store.ArchivePeriods(ctx, tx, q.Year, q.Kind, strings.TrimSpace(q.Search), q.Offset, q.Limit+1)
+		out.Items, e = store.ArchivePeriodChoices(ctx, tx, q.scanQuery(), q.fields(), q.Offset, q.Limit+1)
 		return e
 	})
 	if err != nil {
