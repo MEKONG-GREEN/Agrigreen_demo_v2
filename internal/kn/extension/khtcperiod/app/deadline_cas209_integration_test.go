@@ -104,16 +104,17 @@ func TestDeadline209StoredReplayAndSuccessor(t *testing.T) {
 	if !second.DueAt.After(first.DueAt) || second.Overdue || len(second.Events) != 2 || second.Events[1].Seq <= first.Events[0].Seq {
 		t.Fatalf("successor projection: %+v", second)
 	}
+	outboxBeforeReplay := f.outboxCount209(t)
 	replay := mustChange209(t, s, ctx, p, p.DueAt.Add(2*time.Hour), "first209")
 	a, _ := json.Marshal(first)
 	b, _ := json.Marshal(replay)
-	if string(a) != string(b) || probe.count() != 2 {
+	if string(a) != string(b) || probe.count() != 2 || f.outboxCount209(t) != outboxBeforeReplay {
 		t.Fatalf("not exact stored operation replay: first%s replay%s calls%d", a, b, probe.count())
 	}
 	_, e := s.ChangeDeadline(ctx, uuid.MustParse(p.ID), khtcpapp.DeadlineInput{DueAt: p.DueAt.Add(99 * time.Hour)}, "first209")
 	assertConflict209(t, e)
 	before, _ := authz.FromContext(ctx)
-	changed := before
+	changed := authz.Principal{ActorRef: before.ActorRef, TenantID: before.TenantID, MFA: before.MFA, Roles: append([]string(nil), before.Roles...), OrgRef: before.OrgRef, AuthTime: before.AuthTime}
 	copyKN := *before.KN
 	copyKN.ViewOnly = true
 	changed.KN = &copyKN
@@ -504,3 +505,65 @@ func TestDeadline209PoolOneAndPendingConcurrency(t *testing.T) {
 }
 
 func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
+
+func TestDeadline209NewRequestActorAndTenantBoundaries(t *testing.T) {
+	f := newDeadlineFx209(t)
+	p := f.open209()
+	probe := &casProbe209{ConditionalPeriodControl: f.fm.ConditionalControl()}
+	s, ctx := f.consumer209(probe)
+	key := uuid.NewString()
+	_ = mustChange209(t, s, ctx, p, p.DueAt.Add(time.Hour), key)
+	before, _ := authz.FromContext(ctx)
+	for _, tc := range []struct {
+		name          string
+		actor, tenant uuid.UUID
+		status        int
+	}{{"anotherActor", uuid.New(), f.tid, 409}, {"foreignTenant", f.actor, uuid.New(), 404}} {
+		t.Run(tc.name, func(t *testing.T) {
+			k := *before.KN
+			principal := authz.Principal{ActorRef: tc.actor, TenantID: tc.tenant, MFA: before.MFA, Roles: append([]string(nil), before.Roles...), KN: &k}
+			principal = fixture.Bind(t, principal)
+			_, e := s.ChangeDeadline(authz.WithPrincipal(context.Background(), principal), uuid.MustParse(p.ID), khtcpapp.DeadlineInput{DueAt: p.DueAt.Add(time.Hour), Reason: "Sở thay đổi hạn nộp báo cáo"}, key)
+			var pr *problem.Problem
+			if !errors.As(e, &pr) || pr.Status != tc.status {
+				t.Fatalf("new request boundary: %v want%d", e, tc.status)
+			}
+		})
+	}
+	if probe.count() != 1 {
+		t.Fatalf("boundary request dispatched native:%d", probe.count())
+	}
+}
+
+func TestDeadline209AdhocUsesConditionalOperationAuthority(t *testing.T) {
+	f := newDeadlineFx209(t)
+	_ = f.open209() // install actual native template through the owner before adhoc.
+	probe := &casProbe209{ConditionalPeriodControl: f.fm.ConditionalControl()}
+	s, ctx := f.consumer209(probe)
+	from := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
+	due := f.clk.Now().Add(24 * time.Hour)
+	export := due.Add(24 * time.Hour)
+	d, e := s.Open(ctx, khtcpapp.OpenInput{Request: domain.Request{Type: domain.TypeAdhoc, Year: 2026, Name: "Kỳ phát sinh đối soát CAS209", From: &from, To: &to}, Overrides: domain.Overrides{DueAt: &due, ExportDueAt: &export}, Departments: []string{"trong_trot"}}, uuid.NewString())
+	if e != nil {
+		t.Fatal(e)
+	}
+	changed, e := s.ChangeDeadline(ctx, d.Period.ID, khtcpapp.DeadlineInput{DueAt: due.Add(time.Hour), Reason: "Điều chỉnh hạn kỳ phát sinh"}, uuid.NewString())
+	if e != nil || !changed.DueAt.Equal(due.Add(time.Hour)) || probe.count() != 1 {
+		t.Fatalf("adhoc public CAS/authority: outcome%+v error%v calls%d", changed, e, probe.count())
+	}
+	admin := fixture.Bind(t, authz.Principal{ActorRef: f.actor, TenantID: f.tid, MFA: true, KN: &authz.KNContext{Role: authz.KNAdmin, Scope: authz.Scope{All: true}}})
+	changed, e = s.ChangeDeadline(authz.WithPrincipal(context.Background(), admin), d.Period.ID, khtcpapp.DeadlineInput{DueAt: due.Add(2 * time.Hour), Reason: "Admin điều chỉnh hạn kỳ phát sinh"}, uuid.NewString())
+	if e != nil || !changed.DueAt.Equal(due.Add(2*time.Hour)) || probe.count() != 2 {
+		t.Fatalf("adhoc Admin MFA public CAS: outcome%+v error%v calls%d", changed, e, probe.count())
+	}
+}
+
+func (f *deadlineFx209) outboxCount209(t *testing.T) int {
+	t.Helper()
+	var n int
+	if e := pgtest.Get(t).AdminPool(t, migrations.PF).QueryRow(context.Background(), `SELECT count(*) FROM shared.outbox WHERE tenant_id=$1`, f.tid).Scan(&n); e != nil {
+		t.Fatal(e)
+	}
+	return n
+}
