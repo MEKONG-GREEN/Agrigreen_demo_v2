@@ -250,7 +250,10 @@ func TestPriceReview204LifecycleAndReplay(t *testing.T) {
 		t.Fatalf("missing correction %v", lines)
 	}
 	badDay := map[string]any{"version": 2, "day": "2026-10-09", "reason": "Ngày tương lai"}
-	e.call("tinh", "POST", path+"/redate", badDay, "", 422)
+	blockedDay := e.call("tinh", "POST", path+"/redate", badDay, "", 409)
+	if blockedDay["code"] != "price.ticket_not_locked" || after != e.counts() {
+		t.Fatalf("target reviewGate must deny unlocked date409 before quote/existence checks, without append: %v", blockedDay)
+	}
 	moved := e.call("tinh", "POST", path+"/redate", map[string]any{"version": 2, "day": "2026-10-07", "reason": "Sửa nhầm ngày"}, "", 201)
 	version := moved["ticket"].(map[string]any)["version"]
 	del := map[string]any{"version": version, "reason": "Phiếu sai204"}
