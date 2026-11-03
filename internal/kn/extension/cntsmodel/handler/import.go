@@ -63,7 +63,7 @@ func importOut(p *app.ImportPlan) gin.H {
 	}
 	refs := refsOut(p.SiteRefs)
 	return gin.H{"project_ref": p.ProjectRef.String(), "project_code": optStr(p.ProjectCode), "valid": p.Valid(),
-		"committed": p.Committed, "replayed": p.Replayed, "site_count": len(p.Sites), "household_count": len(p.Households),
+		"committed": p.Committed, "replayed": p.Replayed, "site_count": p.SiteCount(), "household_count": p.HouseholdCount(),
 		"sites": sites, "households": hhs, "issues": issuesOut(p.Issues), "issues_truncated": p.Truncated, "site_refs": refs}
 }
 

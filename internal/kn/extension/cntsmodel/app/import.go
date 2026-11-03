@@ -16,6 +16,8 @@ package app
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -83,18 +85,49 @@ type ImportPlan struct {
 	Truncated   bool // còn lỗi ngoài importMaxIssues lỗi đầu
 	Committed   bool
 	Replayed    bool
-	SiteRefs    []uuid.UUID // điểm đã tạo (lần ghi đầu)
+	SiteRefs    []uuid.UUID // điểm đã tạo (lần ghi đầu, hoặc đọc lại từ sổ khi phát lại)
+
+	ledger                 bool // phát lại theo sổ: không có dòng chi tiết, chỉ số đếm
+	ledgerSites, ledgerHHs int
+}
+
+// SiteCount, HouseholdCount là số điểm, hộ của lần nạp (phát lại theo sổ: số đã ghi).
+func (p ImportPlan) SiteCount() int {
+	if p.ledger {
+		return p.ledgerSites
+	}
+	return len(p.Sites)
+}
+
+func (p ImportPlan) HouseholdCount() int {
+	if p.ledger {
+		return p.ledgerHHs
+	}
+	return len(p.Households)
 }
 
 // Valid: không còn lỗi và có ít nhất một dòng.
-func (p ImportPlan) Valid() bool { return len(p.Issues) == 0 && len(p.Sites)+len(p.Households) > 0 }
+func (p ImportPlan) Valid() bool { return len(p.Issues) == 0 && p.SiteCount()+p.HouseholdCount() > 0 }
 
 func (p *ImportPlan) issue(sheet string, row int, col, msg string) {
 	p.Issues = append(p.Issues, domain.ImportIssue{Sheet: sheet, Row: row, Column: col, Message: msg})
 }
 
-func idemImportSite(k string, row int) string { return "csite:imp:" + k + ":" + strconv.Itoa(row) }
-func idemImportHH(k string, row int) string   { return "chh:imp:" + k + ":" + strconv.Itoa(row) }
+// importOp là dấu bền vững của MỘT thao tác nạp (#176 review P2): khóa idem từng dòng mang băm của Idempotency-Key và băm
+// SHA-256 nội dung tệp — "csite:imp:<băm khóa>:<băm tệp>:<dòng>". Mất bản lưu phản hồi của middleware thì sổ vẫn biết
+// khóa này đã ghi tệp NÀO: cùng tệp → trả kết quả gốc; tệp khác cùng khóa → idempotency_key_reused, không báo đã ghi.
+type importOp struct{ key, file string }
+
+func newImportOp(idem string, data []byte) importOp {
+	k := sha256.Sum256([]byte(idem))
+	f := sha256.Sum256(data)
+	return importOp{key: hex.EncodeToString(k[:16]), file: hex.EncodeToString(f[:16])}
+}
+
+func (o importOp) sitePrefix() string       { return "csite:imp:" + o.key + ":" }
+func (o importOp) hhPrefix() string         { return "chh:imp:" + o.key + ":" }
+func (o importOp) site(row int) string      { return o.sitePrefix() + o.file + ":" + strconv.Itoa(row) }
+func (o importOp) household(row int) string { return o.hhPrefix() + o.file + ":" + strconv.Itoa(row) }
 
 // importFile là hai bảng đã đọc thô.
 type importFile struct {
@@ -449,17 +482,30 @@ func (s *Service) PreviewImport(ctx context.Context, in ImportInput) (*ImportPla
 // errImportRace: kiểm lại trong giao dịch thấy trùng (dữ liệu đổi giữa lúc kiểm và lúc ghi) — lỗi ở plan.Issues.
 var errImportRace = errors.New("import: trùng dữ liệu khi ghi")
 
-// replayedImport cho biết lần nạp với khóa k đã ghi vào dự án project (dòng đầu tiên mang khóa idem suy từ k).
-func replayedImport(ctx context.Context, tx pgx.Tx, k string, project uuid.UUID, pl *ImportPlan) (bool, error) {
-	if len(pl.Sites) > 0 {
-		prev, err := store.SiteByIdem(ctx, tx, idemImportSite(k, pl.Sites[0].Row))
-		return prev != nil && prev.ProjectRef == project, err
+// priorImport tìm lần nạp đã ghi với cùng Idempotency-Key (theo sổ, không cần bản lưu phản hồi). nil = chưa ghi. Đã ghi
+// tệp khác hoặc vào dự án khác → IdempotencyConflict. Cùng tệp, cùng dự án → kết quả gốc (điểm đã tạo, số điểm/hộ).
+func priorImport(ctx context.Context, tx pgx.Tx, op importOp, project uuid.UUID) (*ImportPlan, error) {
+	rows, err := store.ImportRows(ctx, tx, op.sitePrefix(), op.hhPrefix())
+	if err != nil || len(rows) == 0 {
+		return nil, err
 	}
-	if len(pl.Households) > 0 {
-		prev, err := store.HouseholdByIdem(ctx, tx, idemImportHH(k, pl.Households[0].Row))
-		return prev != nil && prev.ProjectRef == project, err
+	pl := &ImportPlan{ProjectRef: project, Committed: true, Replayed: true, SiteRefs: []uuid.UUID{}}
+	sites, hhs := 0, 0
+	for _, r := range rows {
+		rest := strings.TrimPrefix(strings.TrimPrefix(r.IdemKey, op.sitePrefix()), op.hhPrefix())
+		file, _, _ := strings.Cut(rest, ":")
+		if file != op.file || r.ProjectRef != project {
+			return nil, problem.IdempotencyConflict.WithDetail("Idempotency-Key đã dùng để nạp một tệp khác — chọn lại tệp và gửi như thao tác mới")
+		}
+		if r.Kind == "site" {
+			sites++
+			pl.SiteRefs = append(pl.SiteRefs, r.Ref)
+		} else {
+			hhs++
+		}
 	}
-	return false, nil
+	pl.ledger, pl.ledgerSites, pl.ledgerHHs = true, sites, hhs
+	return pl, nil
 }
 
 // CommitImport kiểm lại tệp và ghi mọi điểm, hộ trong một giao dịch. Tệp còn lỗi → plan.Valid() = false, không ghi gì.
@@ -473,33 +519,25 @@ func (s *Service) CommitImport(ctx context.Context, in ImportInput) (*ImportPlan
 	if err != nil {
 		return nil, err
 	}
+	op := newImportOp(in.IdemKey, in.Data)
 	// Phát lại trước mọi kiểm "đã có" (lần ghi trước đã tạo chính các điểm/hộ này).
-	probe := &ImportPlan{}
-	for _, x := range sites {
-		probe.Sites = append(probe.Sites, ImportSite{SiteRow: x})
-	}
-	for _, h := range hhs {
-		probe.Households = append(probe.Households, ImportHousehold{Row: h.Row})
-	}
 	var p *store.Project
 	var existing []store.Site
-	replayed := false
+	var prior *ImportPlan
 	if err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		var e error
 		// Quyền, dự án kiểm trước cả khi phát lại (người khác/dự án đã kết thúc không nhận lại kết quả).
 		if p, existing, _, e = s.importProject(ctx, tx, c, in.ProjectRef); e != nil {
 			return e
 		}
-		if len(issues) == 0 {
-			replayed, e = replayedImport(ctx, tx, in.IdemKey, in.ProjectRef, probe)
-		}
+		prior, e = priorImport(ctx, tx, op, in.ProjectRef)
 		return e
 	}); err != nil {
 		return nil, err
 	}
-	if replayed {
-		probe.ProjectRef, probe.Committed, probe.Replayed = in.ProjectRef, true, true
-		return probe, nil
+	if prior != nil {
+		prior.ProjectCode = p.Code
+		return prior, nil
 	}
 	pl, err := s.plan(ctx, c, *p, existing, sites, hhs, issues)
 	if err != nil || !pl.Valid() {
@@ -529,9 +567,9 @@ func (s *Service) CommitImport(ctx context.Context, in ImportInput) (*ImportPlan
 	}
 	refs := make([]uuid.UUID, len(pl.Sites))
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
-		pl.Issues, replayed = nil, false
+		pl.Issues, prior = nil, nil
 		var e error
-		if replayed, e = replayedImport(ctx, tx, in.IdemKey, in.ProjectRef, pl); e != nil || replayed {
+		if prior, e = priorImport(ctx, tx, op, in.ProjectRef); e != nil || prior != nil {
 			return e
 		}
 		if e = store.Lock(ctx, tx, "proj:"+in.ProjectRef.String()); e != nil {
@@ -576,7 +614,7 @@ func (s *Service) CommitImport(ctx context.Context, in ImportInput) (*ImportPlan
 		at := s.now()
 		for i, x := range pl.Sites {
 			refs[i] = ids.New()
-			row := store.Site{Meta: c.meta(at, idemImportSite(in.IdemKey, x.Row)), Ref: refs[i], Event: domain.EventCreated,
+			row := store.Site{Meta: c.meta(at, op.site(x.Row)), Ref: refs[i], Event: domain.EventCreated,
 				ProjectRef: cur.Ref, Site: x.Site}
 			row.OfficerRef = x.OfficerRef
 			if e := store.InsertSite(ctx, tx, c.p.TenantID, &row); e != nil {
@@ -590,7 +628,7 @@ func (s *Service) CommitImport(ctx context.Context, in ImportInput) (*ImportPlan
 			} else {
 				site = refs[h.siteIdx] // plan: hộ không có siteRef luôn trỏ một điểm hợp lệ của tệp
 			}
-			row := store.Household{Meta: c.meta(at, idemImportHH(in.IdemKey, h.Row)), Ref: ids.New(), Event: domain.EventCreated,
+			row := store.Household{Meta: c.meta(at, op.household(h.Row)), Ref: ids.New(), Event: domain.EventCreated,
 				SiteRef: site, ProjectRef: cur.Ref, CommuneCode: h.CommuneCode, PersonRef: persons[i], Household: h.Household}
 			if e := store.InsertHousehold(ctx, tx, c.p.TenantID, &row); e != nil {
 				return e
@@ -603,14 +641,25 @@ func (s *Service) CommitImport(ctx context.Context, in ImportInput) (*ImportPlan
 		sortIssues(pl)
 		return pl, nil
 	case dup(err):
-		replayed = true
+		// Lần gửi song song cùng khóa vừa ghi trước: đọc lại theo sổ (cùng tệp → kết quả gốc, tệp khác → từ chối).
+		if err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+			var e error
+			prior, e = priorImport(ctx, tx, op, in.ProjectRef)
+			return e
+		}); err != nil {
+			return nil, err
+		}
+		if prior == nil {
+			return nil, ErrImportInvalid.WithDetail("Ghi trùng khóa nhưng không thấy lần nạp trước — thử lại")
+		}
+		fallthrough
+	case prior != nil:
+		prior.ProjectCode = pl.ProjectCode
+		return prior, nil
 	case err != nil:
 		return nil, err
 	}
-	pl.Committed, pl.Replayed = true, replayed
-	if !replayed {
-		pl.SiteRefs = refs
-	}
+	pl.Committed, pl.SiteRefs = true, refs
 	return pl, nil
 }
 

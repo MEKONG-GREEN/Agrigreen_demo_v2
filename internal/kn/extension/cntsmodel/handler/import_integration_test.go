@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -171,6 +172,10 @@ func TestCNTSModelImport_W1153c(t *testing.T) {
 		{"D1", "Nguyễn V. Bình", "912345678", "", "", "", "", ""}, // trùng SĐT cùng điểm (ô số mất số 0)
 		{"D9", "Trần Thị Cúc", "0987654321", "", "", "", "", ""},  // mã điểm không có
 		{"D1", "Phạm Văn Đạt", "0123", "1,5", "ha", "", "", ""},   // SĐT sai
+		{"D1", "Hộ số mũ", "0934111222", "1E+400", "con", "", "", ""},
+		{"D1", "Hộ chuỗi dài", "0934111223", strings.Repeat("9", 5000), "con", "", "", ""},
+		{"D1", "Hộ số âm", "0934111224", "-5", "con", "", "", ""},
+		{"D1", "Hộ quá lớn", "0934111225", "1000000000000", "con", "", "", ""},
 	}
 	data := book(t, badSites, badHH)
 	k := key()
@@ -182,7 +187,8 @@ func TestCNTSModelImport_W1153c(t *testing.T) {
 		col   string
 	}{{domain.SheetSites, 3, "C"}, {domain.SheetSites, 4, "E"}, {domain.SheetSites, 5, "E"}, {domain.SheetSites, 6, "D"},
 		{domain.SheetSites, 6, "H"}, {domain.SheetSites, 7, "A"}, {domain.SheetSites, 8, "I"}, {domain.SheetHouseholds, 3, "C"},
-		{domain.SheetHouseholds, 4, "A"}, {domain.SheetHouseholds, 5, "C"}} {
+		{domain.SheetHouseholds, 4, "A"}, {domain.SheetHouseholds, 5, "C"}, {domain.SheetHouseholds, 6, "D"},
+		{domain.SheetHouseholds, 7, "D"}, {domain.SheetHouseholds, 8, "D"}, {domain.SheetHouseholds, 9, "D"}} {
 		if !issueAt(is, w.sheet, w.row, w.col) {
 			t.Errorf("thiếu lỗi %s dòng %d cột %s: %s", w.sheet, w.row, w.col, r)
 		}
@@ -268,6 +274,29 @@ func TestCNTSModelImport_W1153c(t *testing.T) {
 	}
 	if n := f.count(`SELECT count(*) FROM pf_extension.cnts_demo_site WHERE tenant_id = $1`, f.tenant); n != 2 {
 		t.Fatalf("phát lại tạo bản sao: %d điểm", n)
+	}
+	if fmt.Sprint(list(c3, "site_refs")) != fmt.Sprint(list(c1, "site_refs")) || num(c3, "site_count") != "2" || num(c3, "household_count") != "3" {
+		t.Fatalf("phát lại theo sổ phải trả kết quả gốc: %v / %v", c3, c1)
+	}
+	// #176 review P2: mất bản lưu phản hồi, gửi tệp B KHÁC nội dung cùng khóa (cùng dự án, cùng dòng đầu) → từ chối,
+	// không báo đã ghi; gửi lại đúng tệp A → kết quả gốc.
+	dropReceipt := func() {
+		if _, err := f.pool.Exec(context.Background(), `DELETE FROM shared.idempotency_key WHERE tenant_id = $1 AND idem_key = $2`, f.tenant, k); err != nil {
+			t.Fatal(err)
+		}
+	}
+	other := book(t, [][]any{goodSites[0], {"D9", "Điểm ấp Mỹ Lợi", "30002", "GA_TP", "", "", "", "", ""}}, goodHH)
+	dropReceipt()
+	if rb := chu.upload(imp, k, other); rb.status != 422 || str(rb.body, "code") != "idempotency_key_reused" || rb.body["committed"] == true {
+		t.Fatalf("tệp khác cùng khóa sau mất bản lưu: %d %s", rb.status, rb.raw)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_extension.cnts_demo_site WHERE tenant_id = $1`, f.tenant); n != 2 {
+		t.Fatalf("tệp B đã ghi: %d điểm", n)
+	}
+	dropReceipt()
+	c4 := want(t, chu.upload(imp, k, good), 200, "", "gửi lại tệp A sau tệp B")
+	if c4["replayed"] != true || fmt.Sprint(list(c4, "site_refs")) != fmt.Sprint(list(c1, "site_refs")) {
+		t.Fatalf("tệp A phải nhận kết quả gốc: %s", c4)
 	}
 	// Nạp lại cùng tệp bằng khóa khác: trùng điểm đã có → chặn, không ghi.
 	again := want(t, chu.upload(imp, key(), good), 422, "extension.cnts_import_invalid", "nạp lại cùng tệp")

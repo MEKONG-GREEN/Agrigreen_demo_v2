@@ -530,3 +530,26 @@ func CooperativeExists(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (bool, err
 	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_cooperative_pub.v1_cooperatives WHERE org_ref = $1)`, ref).Scan(&ok)
 	return ok, err
 }
+
+// ImportRow là một dòng sổ (điểm hoặc hộ) đã ghi bởi một lần nạp Excel (W11.53c), tìm theo tiền tố khóa idem.
+type ImportRow struct {
+	Kind       string // "site" | "household"
+	Ref        uuid.UUID
+	ProjectRef uuid.UUID
+	IdemKey    string
+}
+
+// ImportRows trả các dòng sổ có khóa idem bắt đầu bằng sitePrefix (điểm) hoặc hhPrefix (hộ): điểm trước, theo dòng Excel.
+func ImportRows(ctx context.Context, tx pgx.Tx, sitePrefix, hhPrefix string) ([]ImportRow, error) {
+	// Cùng tiền tố, đuôi là số dòng Excel → sắp theo độ dài rồi chữ = theo số dòng.
+	rows, err := tx.Query(ctx, `SELECT kind, ref, project_ref, idem_key FROM (
+	    SELECT 'site' AS kind, site_ref AS ref, project_ref, idem_key FROM pf_extension.cnts_demo_site WHERE starts_with(idem_key, $1)
+	    UNION ALL
+	    SELECT 'household', household_ref, project_ref, idem_key FROM pf_extension.cnts_model_household WHERE starts_with(idem_key, $2)) r
+	  ORDER BY kind DESC, char_length(idem_key), idem_key`, sitePrefix, hhPrefix)
+	return collect(rows, err, func(r pgx.Row) (ImportRow, error) {
+		var x ImportRow
+		err := r.Scan(&x.Kind, &x.Ref, &x.ProjectRef, &x.IdemKey)
+		return x, err
+	})
+}

@@ -4,7 +4,7 @@
 // Xem trước (máy chủ kiểm, không ghi) → Ghi (cả tệp hoặc không ghi gì). Lỗi theo sheet/dòng/cột. Họ tên, SĐT chủ hộ chỉ
 // hiện dạng che bớt (máy chủ không trả lại). Tệp được chụp một lần lúc chọn: xem trước và ghi gửi đúng cùng byte; bấm Ghi
 // lại sau mất phản hồi giữ cùng Idempotency-Key (useAction) — máy chủ phát lại, không tạo bản sao.
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { DataTable, StatusPill } from "@/components/patterns/list";
 import { useAction } from "@/kn/cycle/common";
 import { saveBlob } from "@/kn/cnts/knqg/api";
@@ -13,37 +13,53 @@ import { ImportRejected, dmy, importFileError, issueWhere, snapshotFile, type Cn
 export function ImportPanel({ mapi, projectRef, projectCode, onDone }: { mapi: CntsModelApi; projectRef: string; projectCode: string; onDone: (committed: boolean) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [fileErr, setFileErr] = useState<string | null>(null);
-  const [preview, setPreview] = useState<ImportResult | null>(null);
+  // #176 review P2: kết quả xem trước gắn đúng snapshot đã gửi xem trước; đổi tệp → bỏ. Phản hồi của snapshot cũ trả muộn
+  // (sau khi đã chọn tệp khác) bị bỏ qua, và nút Ghi chỉ gửi đúng snapshot đã xem trước hợp lệ.
+  const [preview, setPreview] = useState<{ file: File; result: ImportResult } | null>(null);
+  const current = useRef<File | null>(null);
+  const [picking, setPicking] = useState(false);
   const act = useAction();
   const pick = async (f: File | undefined) => {
     setPreview(null);
     setFile(null);
+    current.current = null;
     const err = importFileError(f ?? null);
     setFileErr(err);
     if (!f || err) return;
-    setFile(await snapshotFile(f));
+    setPicking(true);
+    try {
+      const snap = await snapshotFile(f);
+      current.current = snap;
+      setFile(snap);
+    } finally {
+      setPicking(false);
+    }
   };
   const template = async () => {
     const b = await act.run(() => mapi.importTemplate(projectRef));
     if (b) saveBlob(b, `mau-nap-diem-ho-${projectCode.toLowerCase()}.xlsx`);
   };
   const check = async () => {
-    if (!file) return setFileErr(importFileError(null));
-    const r = await act.run(() => mapi.previewImport(projectRef, file));
-    if (r) setPreview(r);
+    const snap = file;
+    if (!snap) return setFileErr(importFileError(null));
+    const r = await act.run(() => mapi.previewImport(projectRef, snap));
+    if (r && current.current === snap) setPreview({ file: snap, result: r });
   };
+  const ready = !!preview && preview.file === file && preview.result.valid && !preview.result.committed;
   const commit = async () => {
-    if (!file) return;
+    const snap = preview?.file;
+    if (!ready || !snap) return;
     const r = await act.run(
-      () => mapi.commitImport(projectRef, file),
+      () => mapi.commitImport(projectRef, snap),
       (x) => `Đã nạp ${x.site_count} điểm, ${x.household_count} hộ${x.replayed ? " (lần ghi trước — không tạo bản sao)" : ""}.`,
     );
     if (r) {
-      setPreview(r);
+      if (current.current === snap) setPreview({ file: snap, result: r });
       onDone(true);
     }
   };
-  const issues = act.problem instanceof ImportRejected ? act.problem.issues : (preview?.issues ?? []);
+  const shown = preview?.file === file ? preview?.result : undefined;
+  const issues = act.problem instanceof ImportRejected ? act.problem.issues : (shown?.issues ?? []);
   return (
     <section className="card sec" aria-label="Nạp Excel điểm, hộ">
       <h3>Nạp Excel điểm trình diễn, hộ tham gia</h3>
@@ -63,6 +79,7 @@ export function ImportPanel({ mapi, projectRef, projectCode, onDone }: { mapi: C
               type="file"
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               aria-invalid={fileErr ? true : undefined}
+              disabled={act.busy || picking}
               onChange={(e) => {
                 void pick(e.target.files?.[0]);
                 e.target.value = "";
@@ -77,10 +94,10 @@ export function ImportPanel({ mapi, projectRef, projectCode, onDone }: { mapi: C
             <small className="mute">{file.name}</small>
           ) : null}
         </div>
-        <button className="btn" disabled={act.busy || !file} onClick={() => void check()}>
+        <button className="btn" disabled={act.busy || picking || !file} onClick={() => void check()}>
           Xem trước
         </button>
-        <button className="btn btn-primary" disabled={act.busy || !file || !preview?.valid || preview.committed} onClick={() => void commit()}>
+        <button className="btn btn-primary" disabled={act.busy || picking || !ready} onClick={() => void commit()}>
           Ghi vào dự án
         </button>
         <button className="btn" onClick={() => onDone(false)}>
@@ -103,16 +120,16 @@ export function ImportPanel({ mapi, projectRef, projectCode, onDone }: { mapi: C
           />
         </>
       ) : null}
-      {preview ? (
+      {shown ? (
         <>
           <p>
-            {preview.committed ? <StatusPill tone="ok">Đã ghi</StatusPill> : preview.valid ? <StatusPill tone="info">Ghi được</StatusPill> : null} {preview.site_count} điểm mới,{" "}
-            {preview.household_count} hộ.
+            {shown.committed ? <StatusPill tone="ok">Đã ghi</StatusPill> : shown.valid ? <StatusPill tone="info">Ghi được</StatusPill> : null} {shown.site_count} điểm mới,{" "}
+            {shown.household_count} hộ.
           </p>
-          {preview.sites.length ? (
+          {shown.sites.length ? (
             <DataTable
               caption="Điểm trình diễn trong tệp"
-              rows={preview.sites}
+              rows={shown.sites}
               rowKey={(x) => String(x.row)}
               columns={[
                 { key: "row", header: "Dòng", cell: (x) => x.row },
@@ -125,10 +142,10 @@ export function ImportPanel({ mapi, projectRef, projectCode, onDone }: { mapi: C
               ]}
             />
           ) : null}
-          {preview.households.length ? (
+          {shown.households.length ? (
             <DataTable
               caption="Hộ tham gia trong tệp"
-              rows={preview.households}
+              rows={shown.households}
               rowKey={(x) => String(x.row)}
               columns={[
                 { key: "row", header: "Dòng", cell: (x) => x.row },
