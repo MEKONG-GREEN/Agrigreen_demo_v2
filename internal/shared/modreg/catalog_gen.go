@@ -23,6 +23,7 @@ var catalog = []CatalogEntry{
 	{Name: "pf/extension", Kind: "domain", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_extension", "pf_extension_pub"}, Shares: []string{}, PubReadOwners: []string{"pf/cooperative", "pf/extension", "pf/forms", "pf/masterdata", "pf/party", "pf/price"}},
 	{Name: "pf/forms", Kind: "capability", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_forms", "pf_forms_pub"}, Shares: []string{}},
 	{Name: "pf/geo", Kind: "capability", Enable: "per_tenant", Permissions: []string{"coop_manager", "farmer", "geo_admin", "map_consumer"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_geo", "pf_geo_pub"}, Shares: []string{}},
+	{Name: "pf/guestlink", Kind: "capability", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_guestlink"}, Shares: []string{}},
 	{Name: "pf/hrm", Kind: "domain", Enable: "per_tenant", Permissions: []string{}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_hrm"}, Shares: []string{}},
 	{Name: "pf/kref", Kind: "kernel", Enable: "always", Permissions: []string{}, Zones: []string{"pf", "mkg"}, OwnsSchema: []string{"k_ref"}, Shares: []string{}},
 	{Name: "pf/masterdata", Kind: "capability", Enable: "per_tenant", Permissions: []string{"masterdata_admin"}, Zones: []string{"pf"}, OwnsSchema: []string{"pf_masterdata", "pf_masterdata_pub"}, Shares: []string{}},
