@@ -3,13 +3,11 @@ import { logout, sidebar } from "./helpers";
 
 test("FN11 203: điều chỉnh đã chốt trên route, số lỗi không ghi, lịch sử và bản cũ giữ nguyên",async({page},info)=>{
  test.setTimeout(180_000);await page.clock.setFixedTime(new Date("2030-06-01T09:00:00Z"));
- const login=async()=>{await page.getByLabel("Email hoặc số điện thoại").fill("admin.mekong@mekonggreen.vn");await page.getByLabel("Mật khẩu",{exact:true}).fill("KhuyenNong@2026");await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();};
+ const login=async(identifier="admin.mekong@mekonggreen.vn")=>{await page.getByLabel("Email hoặc số điện thoại").fill(identifier);await page.getByLabel("Mật khẩu",{exact:true}).fill("KhuyenNong@2026");await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();};
  await page.goto("/login");await login();
  await sidebar(page).getByRole("link",{name:"Phòng ban",exact:true}).click();
  await page.getByLabel("Trạng thái Phòng Hành chính - Tổng hợp",{exact:true}).selectOption("active");await expect(page.getByRole("status").filter({hasText:"Đã đổi"})).toBeVisible();
- await logout(page);await login();
- const dept=sidebar(page).getByRole("button",{name:"Phòng Hành chính - Tổng hợp",exact:true});if(await dept.getAttribute("aria-expanded")==="false")await dept.click();
- const group=sidebar(page).getByRole("button",{name:"Hồ sơ nhân sự",exact:true});if(await group.getAttribute("aria-expanded")==="false")await group.click();
+ await logout(page);await login("hung.tq@angiang.gov.vn");
  await sidebar(page).getByRole("link",{name:"Kế hoạch nhân lực năm",exact:true}).click();
  await expect(page).toHaveURL(/\/kn\/nhan-su\/ke-hoach$/);
  await page.getByRole("button",{name:"Mở kỳ kế hoạch",exact:true}).click();

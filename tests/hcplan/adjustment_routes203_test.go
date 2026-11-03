@@ -117,7 +117,7 @@ func TestAdjustmentRoutes203NativeContract(t *testing.T) {
 	if !bytes.Equal(w1.Body.Bytes(), w2.Body.Bytes()) || w2.Header().Get(idempotency.ReplayedHeader) != "true" {
 		t.Fatal("retry did not replay original response")
 	}
-	if first["reason"] != strings.Repeat("😀", 500) || first["actor_ref"] != f.who["hcth"].ActorRef.String() || first["recorded_at"] == "" {
+	if first["reason"] != strings.Repeat("😀", 500) || first["actor_ref"] != f.who["hcth"].ActorRef.String() || first["recorded_at"] != "2026-10-12T03:00:00Z" {
 		t.Fatalf("real adjustment metadata: %v", first)
 	}
 	if num(first["seq"]) != num(replay["seq"]) {
