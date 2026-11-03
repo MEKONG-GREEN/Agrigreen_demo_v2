@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/store"
 	"github.com/jackc/pgx/v5"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -132,17 +133,20 @@ func TestDeadline209StaleAndDueABA(t *testing.T) {
 			native := f.fm.ConditionalControl()
 			probe := &casProbe209{ConditionalPeriodControl: native}
 			s, ctx := f.consumer209(probe)
+			var snapshotOnce sync.Once
 			probe.snapshotHook = func(c context.Context, snapshot formsport.PeriodControlSnapshot) {
-				applied, e := native.ChangeDueCAS(c, "kn_khtc", uuid.MustParse(p.FormsPeriodID), snapshot.Revision, p.DueAt.Add(6*time.Hour), "successor209", "successor209")
-				if e != nil {
-					t.Fatal(e)
-				}
-				if aba {
-					_, e = native.ChangeDueCAS(c, "kn_khtc", uuid.MustParse(p.FormsPeriodID), applied, p.DueAt, "ABA successor209", "aba209")
+				snapshotOnce.Do(func() {
+					applied, e := native.ChangeDueCAS(c, "kn_khtc", uuid.MustParse(p.FormsPeriodID), snapshot.Revision, p.DueAt.Add(6*time.Hour), "successor209", "successor209")
 					if e != nil {
 						t.Fatal(e)
 					}
-				}
+					if aba {
+						_, e = native.ChangeDueCAS(c, "kn_khtc", uuid.MustParse(p.FormsPeriodID), applied, p.DueAt, "ABA successor209", "aba209")
+						if e != nil {
+							t.Fatal(e)
+						}
+					}
+				})
 			}
 			_, e := s.ChangeDeadline(ctx, uuid.MustParse(p.ID), khtcpapp.DeadlineInput{DueAt: p.DueAt.Add(time.Hour)}, "stale209")
 			assertConflict209(t, e)
@@ -498,3 +502,5 @@ func TestDeadline209PoolOneAndPendingConcurrency(t *testing.T) {
 		}
 	})
 }
+
+func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }

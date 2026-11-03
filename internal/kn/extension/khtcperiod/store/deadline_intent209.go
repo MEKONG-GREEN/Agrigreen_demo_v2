@@ -38,7 +38,7 @@ func scanDeadline(r pgx.Row) (*DeadlineIntent, error) {
 	return &v, nil
 }
 func DeadlineByKey(ctx context.Context, tx pgx.Tx, key string) (*DeadlineIntent, error) {
-	return scanDeadline(tx.QueryRow(ctx, `SELECT `+deadlineColumns+` FROM pf_extension.khtc_deadline_intent WHERE request_key=$1 ORDER BY recorded_at DESC,seq DESC LIMIT 1`, key))
+	return scanDeadline(tx.QueryRow(ctx, `SELECT `+deadlineColumns+` FROM pf_extension.khtc_deadline_intent WHERE request_key=$1 ORDER BY seq DESC LIMIT 1`, key))
 }
 func DeadlineByOperation(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*DeadlineIntent, error) {
 	return scanDeadline(tx.QueryRow(ctx, `SELECT `+deadlineColumns+` FROM pf_extension.khtc_deadline_intent WHERE operation_id=$1 ORDER BY seq DESC LIMIT 1`, id))

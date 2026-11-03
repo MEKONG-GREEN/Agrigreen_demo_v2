@@ -26,7 +26,7 @@ CREATE TABLE pf_extension.khtc_deadline_intent (
  CHECK((phase='completed')=(outcome IS NOT NULL))
 ) PARTITION BY RANGE(recorded_at);
 SELECT shared.apply_ledger('pf_extension.khtc_deadline_intent','pf_extension.khtc_deadline_intent');
-CREATE INDEX khtc_deadline_key ON pf_extension.khtc_deadline_intent(tenant_id,request_key,recorded_at DESC,seq DESC);
+CREATE INDEX khtc_deadline_key ON pf_extension.khtc_deadline_intent(tenant_id,request_key,seq DESC);
 CREATE INDEX khtc_deadline_resource ON pf_extension.khtc_deadline_intent(tenant_id,period_id,operation_id,seq DESC);
 GRANT SELECT,INSERT ON pf_extension.khtc_deadline_intent TO r_extension;
 
@@ -58,3 +58,4 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER a_deadline_intent209 BEFORE INSERT ON pf_extension.khtc_deadline_intent FOR EACH ROW EXECUTE FUNCTION pf_extension.check_deadline_intent209();
+
