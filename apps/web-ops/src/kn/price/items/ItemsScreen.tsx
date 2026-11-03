@@ -5,6 +5,9 @@
 // Cấp Quốc gia chỉ xem; Cấp Xã chỉ thấy tab Đề xuất (đề xuất của mình). Mọi thay đổi có ngày hiệu lực — vắng = ngày báo
 // giá kế tiếp (BR-02).
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { itemFilters, itemHref, vnItemToday, type ItemFilters } from "./item-routes";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
@@ -37,23 +40,27 @@ import {
 type Tab = "items" | "groups" | "assign" | "sets" | "proposals";
 const PAGE = 20;
 
-function vnToday(): string {
-  return new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
-}
-
 export function usePriceItemApi(): PriceItemApi {
   const { api } = useAuth();
   return useMemo(() => createPriceItemApi(api), [api]);
 }
 
 export function ItemsScreen({ initialTab }: { initialTab?: "proposals" }) {
+  const auth = useAuth();
+  const query = useSearchParams();
+  const filters = itemFilters(query, vnItemToday());
+  const key = `${auth.principal?.tenantId}:${auth.principal?.subject}:${auth.kn.context?.context_id}:${auth.kn.context?.role}:${initialTab}:${JSON.stringify(filters)}`;
+  return <ItemCatalog key={key} initialTab={initialTab} initialFilters={filters} />;
+}
+
+function ItemCatalog({ initialTab, initialFilters }: { initialTab?: "proposals"; initialFilters: ItemFilters }) {
   const { kn } = useAuth();
   const pa = usePriceItemApi();
   const role = kn.context?.role;
   const [tab, setTab] = useState<Tab>(
-    role === "kn_xa" || initialTab === "proposals" ? "proposals" : "items",
+    role === "kn_xa" || initialTab === "proposals" ? "proposals" : initialFilters.tab,
   );
-  const [at, setAt] = useState(vnToday());
+  const [at, setAt] = useState(initialFilters.at);
   const [nonce, setNonce] = useState(0);
   const bump = () => setNonce((n) => n + 1);
   const catalog = useLoad(() => pa.catalog(at), [at, nonce]);
@@ -113,6 +120,7 @@ export function ItemsScreen({ initialTab }: { initialTab?: "proposals" }) {
               <LoadState s={list}>
                 {(d) => (
                   <ItemsTab
+                    initialFilters={initialFilters}
                     pa={pa}
                     at={at}
                     items={d.items}
@@ -182,17 +190,12 @@ export function ItemsScreen({ initialTab }: { initialTab?: "proposals" }) {
 // Tab Mặt hàng
 // ---------------------------------------------------------------------------------------------------------------------
 
-type Dlg =
-  | { kind: "create"; base?: Partial<PriceItemInput> }
-  | { kind: "revise"; item: PriceItem }
-  | { kind: "retire"; item: PriceItem }
-  | { kind: "history"; code: string };
-
 function stateTone(s: PriceItem["state"]) {
   return s === "active" ? "ok" : s === "pending" ? "info" : "neutral";
 }
 
 function ItemsTab({
+  initialFilters,
   pa,
   at,
   items,
@@ -201,6 +204,7 @@ function ItemsTab({
   steward,
   onChanged,
 }: {
+  initialFilters: ItemFilters;
   pa: PriceItemApi;
   at: string;
   items: PriceItem[];
@@ -209,12 +213,12 @@ function ItemsTab({
   steward: boolean;
   onChanged: () => void;
 }) {
-  const [group, setGroup] = useState("");
-  const [kind, setKind] = useState("");
-  const [state, setState] = useState("");
-  const [q, setQ] = useState("");
+  const [group, setGroup] = useState(initialFilters.group);
+  const [kind, setKind] = useState(initialFilters.kind);
+  const [state, setState] = useState(initialFilters.state);
+  const [q, setQ] = useState(initialFilters.q);
   const [page, setPage] = useState(1);
-  const [dlg, setDlg] = useState<Dlg | null>(null);
+  const filters: ItemFilters = { at, tab: "items", group, kind, state, q };
   const act = useAction();
   const groupName = (c: string) =>
     cat.groups.find((g) => g.code === c)?.name ?? c;
@@ -306,30 +310,12 @@ function ItemsTab({
       header: "Thao tác",
       cell: (i) => (
         <span className="row">
-          <button
-            type="button"
-            className="btn btn-o btn-sm"
-            onClick={() => setDlg({ kind: "history", code: i.code })}
-          >
-            Lịch sử
-          </button>
+          <Link className="btn btn-o btn-sm" href={itemHref(i.code, filters)}>Xem / Log</Link>
           {canEdit && i.state !== "retired" && (!i.has_price || steward) ? (
-            <button
-              type="button"
-              className="btn btn-o btn-sm"
-              onClick={() => setDlg({ kind: "revise", item: i })}
-            >
-              Sửa
-            </button>
+            <Link className="btn btn-o btn-sm" href={itemHref(`${i.code}/sua`, filters)}>Sửa</Link>
           ) : null}
           {steward && i.state !== "retired" ? (
-            <button
-              type="button"
-              className="btn btn-d btn-sm"
-              onClick={() => setDlg({ kind: "retire", item: i })}
-            >
-              Ngưng
-            </button>
+            <Link className="btn btn-d btn-sm" href={itemHref(`${i.code}/ngung`, filters)}>Ngưng</Link>
           ) : null}
         </span>
       ),
@@ -396,13 +382,7 @@ function ItemsTab({
           placeholder="Tìm theo mã, tên mặt hàng"
         />
         {canEdit ? (
-          <button
-            type="button"
-            className="btn btn-p btn-sm"
-            onClick={() => setDlg({ kind: "create" })}
-          >
-            Thêm mặt hàng
-          </button>
+          <Link className="btn btn-p btn-sm" href={itemHref("them-moi", filters)}>Thêm mặt hàng</Link>
         ) : null}
       </FilterBar>
       <DataTable
@@ -416,75 +396,8 @@ function ItemsTab({
         onPage={setPage}
         empty="Chưa có mặt hàng phù hợp."
       />
-      {dlg?.kind === "create" ? (
-        <ItemDialog
-          title={
-            dlg.base?.replaces_code
-              ? `Tạo mặt hàng thay thế cho ${dlg.base.replaces_code}`
-              : "Thêm mặt hàng"
-          }
-          cat={cat}
-          base={dlg.base}
-          create
-          onClose={() => setDlg(null)}
-          onSave={(b) => pa.createItem(b)}
-          onDone={onChanged}
-        />
-      ) : null}
-      {dlg?.kind === "revise" ? (
-        <ItemDialog
-          title={`Sửa mặt hàng ${dlg.item.code}`}
-          cat={cat}
-          base={dlg.item}
-          locked={dlg.item.has_price}
-          onClose={() => setDlg(null)}
-          onSave={(b) => pa.reviseItem(dlg.item.code, b)}
-          onDone={onChanged}
-          onReplace={
-            canEdit
-              ? () =>
-                  setDlg({
-                    kind: "create",
-                    base: {
-                      ...toInput(dlg.item),
-                      replaces_code: dlg.item.code,
-                    },
-                  })
-              : undefined
-          }
-        />
-      ) : null}
-      {dlg?.kind === "retire" ? (
-        <RetireDialog
-          pa={pa}
-          item={dlg.item}
-          onClose={() => setDlg(null)}
-          onDone={onChanged}
-        />
-      ) : null}
-      {dlg?.kind === "history" ? (
-        <HistoryDialog
-          pa={pa}
-          code={dlg.code}
-          at={at}
-          cat={cat}
-          onClose={() => setDlg(null)}
-        />
-      ) : null}
     </>
   );
-}
-
-function toInput(i: PriceItem): PriceItemInput {
-  return {
-    name: i.name,
-    variety: i.variety,
-    group_code: i.group_code,
-    unit_code: i.unit_code,
-    spec: i.spec ?? "",
-    sale_place: i.sale_place ?? "",
-    kind: i.kind,
-  };
 }
 
 /** Thêm / sửa / duyệt đề xuất: thông tin, loại, hiệu lực, "Thay thế cho", xã áp dụng; ĐVT, quy cách khóa khi đã có giá. */
@@ -733,261 +646,41 @@ export function ItemDialog({
   );
 }
 
-function RetireDialog({
-  pa,
-  item,
-  onClose,
-  onDone,
-}: {
-  pa: PriceItemApi;
-  item: PriceItem;
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const [to, setTo] = useState("");
-  const [reason, setReason] = useState("");
-  const act = useAction();
-  const save = async () => {
-    const r = await act.run(() =>
-      pa.retireItem(item.code, {
-        reason: reason.trim(),
-        ...(to ? { valid_to: to } : {}),
-      }),
-    );
-    if (r) {
-      onDone();
-      onClose();
-    }
-  };
-  return (
-    <Dialog
-      title={`Ngưng ${item.code} — ${itemLabel(item)}`}
-      onClose={onClose}
-      actions={
-        <button
-          type="button"
-          className="btn btn-d btn-sm"
-          disabled={act.busy || !reason.trim()}
-          onClick={save}
-        >
-          Ngưng
-        </button>
-      }
-    >
-      {act.view}
-      <div className="field">
-        <label htmlFor="pr-to">Hiệu lực đến</label>
-        <input
-          id="pr-to"
-          type="date"
-          className="input"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-        />
-        <span className="mute small">
-          Để trống: đến hết hôm nay. Báo cáo các ngày trước vẫn hiển thị mặt
-          hàng.
-        </span>
-      </div>
-      <div className="field">
-        <label htmlFor="pr-reason" className="req">
-          Lý do
-        </label>
-        <textarea
-          id="pr-reason"
-          className="input"
-          maxLength={500}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-      </div>
-    </Dialog>
-  );
-}
-
-function HistoryDialog({
-  pa,
-  code,
-  at,
-  cat,
-  onClose,
-}: {
-  pa: PriceItemApi;
-  code: string;
-  at: string;
-  cat: PriceCatalog;
-  onClose: () => void;
-}) {
-  const s = useLoad(() => pa.item(code, at), [code, at]);
-  const unitName = (c: string) =>
-    cat.units.find((u) => u.code === c)?.name ?? c;
-  return (
-    <Dialog title={`Lịch sử thay đổi ${code}`} onClose={onClose}>
-      <LoadState s={s}>
-        {(d) => (
-          <>
-            {d.replaced_by.length ? (
-              <p>Được thay thế bởi: {d.replaced_by.join(", ")}</p>
-            ) : null}
-            <table className="dt">
-              <thead>
-                <tr>
-                  <th scope="col">Phiên bản</th>
-                  <th scope="col">Hiệu lực từ</th>
-                  <th scope="col">Nội dung</th>
-                  <th scope="col">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.history.map((h) => (
-                  <tr key={h.version}>
-                    <td>{h.version}</td>
-                    <td>{dmy(h.valid_from)}</td>
-                    <td>
-                      {itemLabel(h)} · {unitName(h.unit_code)}
-                      {h.spec ? ` · ${h.spec}` : ""} · thứ tự {h.sort_order}
-                    </td>
-                    <td>
-                      {h.status === "retired"
-                        ? `Ngưng${h.note ? `: ${h.note}` : ""}`
-                        : "Hoạt động"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-      </LoadState>
-    </Dialog>
-  );
-}
-
 // ---------------------------------------------------------------------------------------------------------------------
 // Tab Nhóm hàng
 // ---------------------------------------------------------------------------------------------------------------------
 
-function GroupsTab({
-  pa,
-  at,
-  steward,
-  nonce,
-  onChanged,
-}: {
-  pa: PriceItemApi;
-  at: string;
-  steward: boolean;
-  nonce: number;
-  onChanged: () => void;
+function GroupsTab({ pa, at, steward, nonce, onChanged }: {
+  pa: PriceItemApi; at: string; steward: boolean; nonce: number; onChanged: () => void;
 }) {
-  const s = useLoad(() => pa.groups(at), [at, nonce]);
+  const s = useLoad(() => pa.groups(at), [pa, at, nonce]);
   const act = useAction();
-  const [edit, setEdit] = useState<{ code?: string; name: string } | null>(
-    null,
-  );
-  const save = async () => {
-    if (!edit) return;
-    const r = await act.run(() =>
-      edit.code
-        ? pa.reviseGroup(edit.code, { name: edit.name.trim() })
-        : pa.createGroup({ name: edit.name.trim() }),
-    );
-    if (r) {
-      setEdit(null);
-      onChanged();
-    }
+  const [removeCode, setRemoveCode] = useState<string | null>(null);
+  const filters: ItemFilters = { at, tab: "groups", group: "", kind: "", state: "", q: "" };
+  const remove = async () => {
+    if (!removeCode || !steward || act.busy) return;
+    const result = await act.run(() => pa.retireGroup(removeCode), "Đã xóa nhóm hàng");
+    if (result) { setRemoveCode(null); onChanged(); }
   };
-  const remove = (code: string) =>
-    act
-      .run(() => pa.retireGroup(code), "Đã xóa nhóm hàng")
-      .then((r) => r && onChanged());
-  return (
-    <>
+  return <>
+    {!removeCode && act.view}
+    {steward && <div className="row" style={{ marginBottom: 12 }}><Link className="btn btn-p btn-sm" href={itemHref("nhom-hang/them-moi", filters)}>Thêm nhóm hàng</Link></div>}
+    <LoadState s={s}>{(data) => <DataTable caption="Nhóm hàng" columns={[
+      { key: "code", header: "Mã", cell: (group) => group.code },
+      { key: "name", header: "Tên nhóm", cell: (group) => group.name },
+      { key: "items", header: "Số mặt hàng", cell: (group) => group.items },
+      { key: "acts", header: "Thao tác", cell: (group) => <span className="row">
+        <Link className="btn btn-o btn-sm" href={itemHref(`nhom-hang/${group.code}`, filters)}>Xem</Link>
+        {steward && <><Link className="btn btn-o btn-sm" href={itemHref(`nhom-hang/${group.code}/sua`, filters)}>Sửa tên</Link>
+          <button type="button" className="btn btn-d btn-sm" disabled={act.busy || group.items > 0}
+            title={group.items > 0 ? "Nhóm còn mặt hàng không được xóa." : undefined} onClick={() => setRemoveCode(group.code)}>Xóa</button></>}
+      </span> },
+    ]} rows={data.groups} rowKey={(group) => group.code} page={1} pageSize={data.groups.length || 1} total={data.groups.length} />}</LoadState>
+    {removeCode && <Dialog title={`Xóa nhóm ${removeCode}`} onClose={() => setRemoveCode(null)} actions={<button type="button" className="btn btn-d" disabled={act.busy} onClick={remove}>Xác nhận xóa</button>}>
       {act.view}
-      {steward ? (
-        <div className="row" style={{ marginBottom: 12 }}>
-          <button
-            type="button"
-            className="btn btn-p btn-sm"
-            onClick={() => setEdit({ name: "" })}
-          >
-            Thêm nhóm hàng
-          </button>
-        </div>
-      ) : null}
-      <LoadState s={s}>
-        {(d) => (
-          <DataTable
-            caption="Nhóm hàng"
-            columns={[
-              { key: "code", header: "Mã", cell: (g) => g.code },
-              { key: "name", header: "Tên nhóm", cell: (g) => g.name },
-              { key: "items", header: "Số mặt hàng", cell: (g) => g.items },
-              {
-                key: "acts",
-                header: "Thao tác",
-                cell: (g) =>
-                  steward ? (
-                    <span className="row">
-                      <button
-                        type="button"
-                        className="btn btn-o btn-sm"
-                        onClick={() => setEdit({ code: g.code, name: g.name })}
-                      >
-                        Sửa tên
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-d btn-sm"
-                        disabled={act.busy}
-                        onClick={() => remove(g.code)}
-                      >
-                        Xóa
-                      </button>
-                    </span>
-                  ) : null,
-              },
-            ]}
-            rows={d.groups}
-            rowKey={(g) => g.code}
-            page={1}
-            pageSize={100}
-            total={d.groups.length}
-            onPage={() => undefined}
-          />
-        )}
-      </LoadState>
-      {edit ? (
-        <Dialog
-          title={edit.code ? `Sửa nhóm ${edit.code}` : "Thêm nhóm hàng"}
-          onClose={() => setEdit(null)}
-          actions={
-            <button
-              type="button"
-              className="btn btn-p btn-sm"
-              disabled={act.busy || !edit.name.trim()}
-              onClick={save}
-            >
-              Lưu
-            </button>
-          }
-        >
-          <div className="field">
-            <label htmlFor="pg-name" className="req">
-              Tên nhóm
-            </label>
-            <input
-              id="pg-name"
-              className="input"
-              maxLength={100}
-              value={edit.name}
-              onChange={(e) => setEdit({ ...edit, name: e.target.value })}
-            />
-          </div>
-        </Dialog>
-      ) : null}
-    </>
-  );
+      <p>Chỉ xóa được nhóm không còn mặt hàng. Lịch sử các ngày trước vẫn giữ nguyên.</p>
+    </Dialog>}
+  </>;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
