@@ -277,3 +277,5 @@ Các hàng Không thêm chặn riêng và KH AD04.02 nằm nguyên ở §3–5 �
 | `/kn/quan-tri/phong-ban` | HC FN-03 | `apps/web-ops/src/app/kn/quan-tri/phong-ban/page.tsx:1` | Có page/alias; trạng thái Lệch theo FN, chưa UAT; không suy từ có file thành đã đạt. |
 
 Kiểm đủ 76 route/biến thể (gồm 9 placeholder); 67 hàng chức năng vẫn giữ nguyên mã, tên và đoạn BRD. Có 35 đề xuất chặn nghiệp vụ riêng; các hàng khác vẫn chịu cổng A/UAT/quyền. Tệp này chỉ là ma trận và đề xuất, không thay quyết định PO hoặc chứng cứ trình duyệt.
+
+Bổ sung 03/11/2026 — #197 phần đầu: tham số nâng bậc/quy đổi FN19 có route chi tiết/thêm phiên bản, Log từ metadata thật, NumberField/validateForm và guard raw ba tỷ lệ native trước Decimal. [Phạm vi và giới hạn](gia-dinh/BF-SWEEP-HCTH-FORMS-REST.md). Sáu màn HCTH còn lại chuyển [#203](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/203); giữ trạng thái Lệch, Q070 và chưa có UAT khách.

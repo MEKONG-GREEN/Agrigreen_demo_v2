@@ -228,3 +228,6 @@ Bổ sung KH-FN-TI-02.09 (Mẫu5 cutoff sớm,16/10): `TestKH_M5_ProgramUsesCuto
 ## Lát UI Danh mục theo BRD v2.3 — BF-SWEEP-KHTC #164
 
 Bổ sung riêng FN-AD-04.01 theo DOCX v2.3 ngày 08/10/2026, SHA-256 `15859351f90574bf667190b1a12160465ba03f8ca9e408b94c90d285a3502e25`; không đổi phạm vi hoặc kết quả lịch sử của khung v2.2 trên đây. Cả 7 loại có DataTable/STT, route Thêm/Sửa/Chi tiết với DetailPage + Log thật, lỗi bắt buộc/lỗi máy chủ theo trường và kiểm số trước parser. Kiểm thử: `apps/web-ops/src/kn/khtc/catalog.test.tsx`, E2E `kn-khtc-catalog.spec.ts`, backend `TestFN_AD_04_01_Catalog` giữ nguyên API/quyền. Trạng thái UI: chờ Claude review và khách UAT. [Giả định/phạm vi](../kn/gia-dinh/BF-SWEEP-KHTC.md); các màn KHTC còn lại theo #180, không trùng #163 HCTH. Không thay M1–M7, mẫu giấy hoặc FormGrid.
+
+### Lát dashboard #189
+FN-TI-02.01: bổ sung keyset/batch100 toàn năm, filter trước projection và adhoc theo quyền; kiểm TestDashboard189PagesAndNativeProjectionScope. Chưa đánh dấu đạt toàn FN: live đến ngày/no-period, lãnh đạo phòng gốc, badge, nhắc và field đầy đủ còn ở #202. Căn cứ BRD KHTC v2.3; bằng chứng PASS đúng SHA ở issue ready, không suy từ tên test.

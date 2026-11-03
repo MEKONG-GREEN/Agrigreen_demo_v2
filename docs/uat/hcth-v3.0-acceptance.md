@@ -209,3 +209,7 @@ không đổi trạng thái các AC còn pending hoặc cần PO ở các mục 
 Tải500 người **đồng thời**, NLTX tháng 7/2026 bốn người và UAT toàn phòng còn ở
 [#188 W11.31-FINAL](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/188).
 Không suy diễn tải tuần tự thành chứng nhận SLA <3s/<5s của hệ thống triển khai.
+
+## BF-SWEEP-HCTH-FORMS-REST — phần đầu #197: tham số FN19
+
+[Phạm vi](../kn/gia-dinh/BF-SWEEP-HCTH-FORMS-REST.md): hai loại tham số có trang chi tiết/thêm phiên bản theo ngày và Log, giữ cả alias phòng ban; HCTH xem và Admin ghi theo API hiện có. Regression kiểm mọi ô số, URL/ngày, lịch sử bất biến, hủy, context và retry. Guard native chặn số mũ/chuỗi dài trước Decimal, giữ biên và precision hiện hữu. Chưa có UAT khách hoặc xác nhận cấu hình Q070; API chưa trả actor nên Log nêu thiếu thông tin. Sáu màn còn lại ở [#203](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/203), không coi toàn A1–A5/FN19 đã đạt và không đổi mẫu giấy/FormGrid/M1–M7.
