@@ -95,3 +95,33 @@ Phiên bản `accounts.kn-roles/2`, `Provisional=true` (bản tạm, chờ khác
   - Kết quả của legacy giống hệt KN-attributes, và giống hệt khi bật cả ba adapter #95 + #72 + #79.
   - Catalog cấu hình sai bị từ chối ngay lúc khởi động.
 - Khác biệt đã biết khi bật cả ba adapter: trong nhập CSV, ô cấp quản lý là nhãn lạ (ví dụ "Không có") báo "mã cấp quản lý không hợp lệ" thay cho câu danh mục. Lý do là #68 kiểm cú pháp trước khi gọi adapter. Dòng đó vẫn bị từ chối như cũ. Test chốt đúng 2 dòng khác biệt này; mọi phản hồi khác giống hệt. Cần Codex/PO xác nhận chấp nhận trước rollout #57.
+
+## Đơn vị nội bộ, ủy quyền có hạn và phạm vi nhân sự KN (#195)
+
+Hợp đồng chung mới (chỉ khai báo, chưa dùng): `accport.UnitDelegationPolicy` trong `internal/platform/accounts/port/unit_delegation.go`, kèm `ValidateInternalUnitDefinition`, `ValidateDelegationDefinition`, `ErrUnitDelegationDefinition`, `ErrOwnerAttributesRevoked`. Factory chủ KN: `extension.UnitDelegationPolicy() (accport.UnitDelegationPolicy, error)` ở `internal/kn/extension/module_unit_delegation.go`. Accounts, handler và gốc lắp ráp **không đổi**; nối provider vào `accounts.Deps`/Service và thay các nhánh legacy là việc của #196.
+
+**Định nghĩa** (dữ liệu chủ, không I/O, mỗi lần đọc là bản sao):
+
+| Phần | Giá trị KN | Thay cho chỗ legacy |
+|---|---|---|
+| `InternalUnitDefinition.Kinds` | `ban_giam_doc`, `van_phong`, `phong`, `tram`, `trai`, `tang_cuong` (nhãn như cũ) | `port.InternalUnitKinds`, `domain.NormalizeInternalUnit`, nhãn `kind_label`/`kinds` của handler |
+| `DepartmentKinds` | `phong` | `domain.NormalizeInternalUnit` (chỉ loại phòng gắn phòng ban) |
+| `OrgKinds` | `ttkn_national`, `ttkn_province` | `app.checkUnitRefs` (không HTX, MKG, DCRD, tổ khuyến nông) |
+| `SeedStatus`, `Seed` | Ban Giám đốc + 5 phòng có module, đúng `seeddata/internal_units_an_giang.json` | `app.SeedInternalUnits` |
+| `DelegationDefinition.Powers` | `mo_lai_ky`, `duyet_bao_cao` | `port.Powers`, `domain.NormalizeDelegation`, `power_label`/`powers` |
+| `MaxDuration` | 30 ngày | `domain.DelegationMaxDays` |
+| `GranteeRoles` | `kn_tinh` | điều kiện vai người nhận trong `app.CreateDelegation` |
+
+**Quyết định** (chỉ đọc phiên chủ KN đã giải ở server qua `port.RequireSession`; không đọc `Principal.KN`, header, payload hay vai realm):
+
+- `handled=false` chỉ khi request native thật (không chọn phiên, không có ràng buộc KN dở dang), như `DefaultUnit` #60. Consumer giữ kết quả native (hiện là 428 `accounts.context_required`). Phiên lạ profile, payload hỏng, ràng buộc dở dang hay sai vai → lỗi cuối, không quay về đường cũ.
+- `AuthorizeDelegationGrant(ctx, department)`: phiên Cấp Tỉnh, Manager, không chỉ xem, không chế độ hỗ trợ, phòng ban (so nguyên văn, rỗng = phòng của phiên) đúng phòng của phiên → `Allowed` kèm `UnitRef`, `Department` của phiên. `Allowed=false` → consumer trả `accounts.delegation_forbidden`. Chặt hơn cũ ở một điểm: phiên thiếu phòng ban/đơn vị bị từ chối.
+- `AuthorizeDelegationRevoke(ctx)`: chỉ cần phiên Cấp Tỉnh. Admin API không dùng.
+- `PeopleScope(ctx)`: trả `all` / `self` / `internal_unit` (kèm `UnitRef`, `InternalUnit`, `MemberRole=kn_tinh`, `OfficerRole=kn_xa`) để accounts tự truy vấn dữ liệu hiện hành. Cờ quyền tính lại từ catalog chủ KN (#79); nhóm/nhiệm vụ/cấp không còn trong catalog → `ErrOwnerAttributesRevoked` (consumer: `accounts.context_revoked`).
+- Giữ native ở accounts, không giao cho owner: tenant (RLS), người giao là actor khi thu hồi, người nhận còn lần gán hiệu lực cùng đơn vị/phòng phủ hết hạn, khóa idempotency gắn actor + nội dung, thu hồi/hết hạn, giải lại ngữ cảnh mỗi request, chặn ghi ở ngữ cảnh chỉ xem, quyền quản trị tài khoản (`knCaller`).
+
+**Bằng chứng parity:**
+
+- `internal/platform/accounts/port/unit_delegation_test.go`: định nghĩa zero hoặc sai cấu trúc bị từ chối (29 ca).
+- `internal/kn/extension/module_unit_delegation_test.go`: định nghĩa bằng giá trị bridge, cách ly bản sao, ma trận cấp ủy quyền (lãnh đạo theo cấp/nhóm, phòng khác, không cắt khoảng trắng, không lãnh đạo, chỉ xem, hỗ trợ, Quốc gia/Xã/Admin), chọn phiên (native, chưa xác thực, ràng buộc dở dang, profile lạ, payload giả), thu hồi theo vai, ma trận phạm vi nhân sự (kể cả Manager giả trong payload và thuộc tính bị thu hồi).
+- `tests/knaccounts/unit_delegation_pg_test.go` (PostgreSQL thật, HTTP; chạy hai lượt: bridge và cả ba adapter #95/#72/#79): middleware quan sát gắn ngay sau `mod.Middleware()` gọi adapter bằng đúng context accounts nhận, so với phản hồi cũ: danh mục quyền/thời hạn, seed (lặp lại an toàn), loại đơn vị, phòng ban theo loại, loại Nút (HTX/tổ bị từ chối), phạm vi nhân sự (so với `KNPeople().PeopleInScope` cùng request), cấp ủy quyền (phòng khác, người nhận khác phòng, quá hạn, quyền lạ, không lãnh đạo, Quốc gia/Xã, chỉ xem, native), thu hồi (người nhận, sai vai, native, phát lại, thu hồi hai lần), quyền nhận được trên ngữ cảnh tái dùng sau thu hồi và sau hết hạn (đồng hồ giả), phát lại sau khi mất quyền lãnh đạo, tenant khác (adapter không bao giờ thấy request) và mất lần gán.

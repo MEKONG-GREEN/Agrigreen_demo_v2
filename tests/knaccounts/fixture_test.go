@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -38,6 +39,8 @@ type fixtureDeps struct {
 	Roles           *accport.RoleCatalog
 	AssignmentRules accport.AssignmentRules
 	Attributes      *accport.AttributeCatalog
+	Clock           clock.Clock     // nil = đồng hồ hệ thống
+	AppProbe        gin.HandlerFunc // chạy sau mod.Middleware() của Application API: quan sát ngữ cảnh đã giải ở server
 }
 
 type fixture struct {
@@ -48,6 +51,7 @@ type fixture struct {
 	dir    *accounts.MemoryDirectory
 	tenant uuid.UUID
 	depts  *fakeDepartments
+	mod    *accounts.Module
 
 	national, p91, team30292, coop30292, team31120 uuid.UUID
 }
@@ -70,7 +74,11 @@ func newFixture(t *testing.T, d fixtureDeps) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mod := accounts.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, accounts.Deps{
+	var clk clock.Clock = clock.System{}
+	if d.Clock != nil {
+		clk = d.Clock
+	}
+	mod := accounts.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clk, accounts.Deps{
 		Directory: f.dir, Scope: pty, Orgs: pty, Roles: d.Roles, AssignmentRules: d.AssignmentRules, Attributes: d.Attributes,
 		Departments: f.depts, Sessions: sessions,
 	})
@@ -81,7 +89,12 @@ func newFixture(t *testing.T, d fixtureDeps) *fixture {
 	f.srv = httptest.NewServer(eng)
 	t.Cleanup(f.srv.Close)
 	appEng := httpx.NewEngine(log, 1<<20)
-	mod.RegisterApp(appEng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), mod.Middleware(), idempotency.Middleware(ops)))
+	appChain := []gin.HandlerFunc{httpx.Authenticate(f.iss.Verifier()), mod.Middleware()}
+	if d.AppProbe != nil {
+		appChain = append(appChain, d.AppProbe)
+	}
+	f.mod = mod
+	mod.RegisterApp(appEng.Group("/v1", append(appChain, idempotency.Middleware(ops))...))
 	f.app = httptest.NewServer(appEng)
 	t.Cleanup(f.app.Close)
 	return f
