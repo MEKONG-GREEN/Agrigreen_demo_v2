@@ -1,1 +1,1 @@
-- [ ] W11.69-ARCHIVE-POLICY-FIELDS (#205): lĩnh vực từ snapshot/hàng thực xuất, metadata complete/partial/unknown, lựa chọn đầy đủ và filter xuyên tệp dưới current reader; phần policy/legacy còn #227. Chờ đủ bằng chứng và Claude review.
+- [ ] ARCHIVE-POLICY-FIELDS-205 (#205 W11.69-ARCHIVE-POLICY-FIELDS): lĩnh vực từ snapshot/hàng thực xuất, metadata complete/partial/unknown, lựa chọn đầy đủ và filter xuyên tệp dưới current reader; phần policy/legacy còn #227. Chờ đủ bằng chứng và Claude review.

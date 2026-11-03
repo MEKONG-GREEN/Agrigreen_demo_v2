@@ -1,4 +1,4 @@
-## W11.69-ARCHIVE-POLICY-FIELDS — Lĩnh vực của tệp đã xuất (#205)
+## ARCHIVE-POLICY-FIELDS-205 — W11.69-ARCHIVE-POLICY-FIELDS: Lĩnh vực của tệp đã xuất (#205)
 
 Nguồn: BRD KHTC v2.3 Product Drive, DOCX SHA256 `15859351f90574bf667190b1a12160465ba03f8ca9e408b94c90d285a3502e25`, P713–738/P1592–1615; issue205, review199 và hợp đồng kho hiện hữu. Đây là lát fields-only, chưa hoàn tất toàn bộ chính sách kho, FN/UAT hoặc G1.
 
