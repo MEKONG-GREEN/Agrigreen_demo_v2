@@ -27,40 +27,18 @@ import (
 
 // TemplateInput là định nghĩa một phiên bản biểu.
 type TemplateInput struct {
-	Profile string
-	Code    string
-	Title   string
-	Fields  []domain.Field
-	Fixture bool
+	Profile     string
+	Code        string
+	Title       string
+	Fields      []domain.Field
+	Fixture     bool
+	BaseVersion *int64
 }
 
 // DefineTemplate ghi phiên bản mới của biểu (profile, code) — phiên bản cũ giữ nguyên, kỳ đã phát hành giữ phiên
 // bản của nó.
 func (s *Service) DefineTemplate(ctx context.Context, in TemplateInput, idem string) (store.Template, error) {
-	_, a, err := s.resolve(ctx, in.Profile)
-	if err != nil {
-		return store.Template{}, err
-	}
-	if !a.define {
-		return store.Template{}, problem.Forbidden.WithDetail("định nghĩa biểu cần vai define_by của cấu hình")
-	}
-	in.Title = strings.TrimSpace(in.Title)
-	if err := domain.ValidateTemplate(in.Code, in.Title, in.Fields); err != nil {
-		var te domain.ErrTemplate
-		if errorsAs(err, &te) {
-			return store.Template{}, port.ErrInvalidTemplate.WithField(te.Field, te.Msg)
-		}
-		return store.Template{}, port.ErrInvalidTemplate.WithDetail(err.Error())
-	}
-	if !a.allowsTemplate(in.Code) {
-		return store.Template{}, problem.Forbidden.WithDetail("biểu ngoài phạm vi")
-	}
-	t := store.Template{ID: ids.New(), Profile: in.Profile, Code: in.Code, Title: in.Title, Fields: in.Fields, Fixture: in.Fixture,
-		ActorRef: a.ref, EventTime: s.Clock.Now().UTC()}
-	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
-		return store.InsertTemplate(ctx, tx, a.tenant, &t, idemOr(idem, "template:"+in.Code))
-	})
-	return t, classify(err)
+	return s.defineTemplateVersion(ctx, in, in.BaseVersion, idem)
 }
 
 // InstallFixtures ghi các biểu mẫu thử (fixture = true) cho profile — cơ chế chạy được khi chưa có biểu thật (Q-01).

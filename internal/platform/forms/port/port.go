@@ -74,6 +74,8 @@ type Profile struct {
 	// NoReopen: kỳ đã chốt KHÔNG mở lại được (W11.27 HCTH BR-02 — sau chốt chỉ điều chỉnh qua sổ riêng của bên dùng, ảnh
 	// chụp đóng băng là bản chính thức). Mặc định false giữ hành vi mở lại của các profile khác.
 	NoReopen bool
+	// RequireDefinitionPolicy prevents missing owner registration from granting DefineBy.
+	RequireDefinitionPolicy bool `json:"-"`
 }
 
 // Loại đơn vị lá (W11.05). Đơn vị = người và luồng nhiều bước (HCTH, D3 §2.5) CHỪA CHỖ: hằng số có, cấu hình và
@@ -264,6 +266,8 @@ type ReviewGuard interface {
 type TemplateDef struct {
 	Profile, Code, Title string
 	Fields               json.RawMessage
+	// BaseVersion is mandatory with a definition policy; 0 creates a new code.
+	BaseVersion *int64
 }
 
 // TemplateRef là phiên bản biểu đã có.
