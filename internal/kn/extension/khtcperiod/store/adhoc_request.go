@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	pd "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -117,6 +118,32 @@ func AdhocRequestInbox(ctx context.Context, tx pgx.Tx, dept string) ([]AdhocRequ
 			return nil, e
 		}
 		out = append(out, *r)
+	}
+	return out, rows.Err()
+}
+
+// ActiveAdhocRequestsForPeriods is the same latest non-failed projection as
+// ActiveAdhocRequest, batched for the already authorized dashboard page.
+func ActiveAdhocRequestsForPeriods(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID]map[string]*AdhocRequest, error) {
+	out := map[uuid.UUID]map[string]*AdhocRequest{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	query := strings.Replace(adhocSelect, "SELECT r.id,", "SELECT DISTINCT ON (r.period_id,r.department) r.id,", 1)
+	rows, err := tx.Query(ctx, query+` WHERE r.period_id=ANY($1::uuid[]) AND coalesce(e.action,'intent') NOT IN('failed','cancelled') ORDER BY r.period_id,r.department,r.seq DESC`, uuidStrings(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		row, e := scanAdhocRequest(rows)
+		if e != nil {
+			return nil, e
+		}
+		if out[row.PeriodID] == nil {
+			out[row.PeriodID] = map[string]*AdhocRequest{}
+		}
+		out[row.PeriodID][row.Department] = row
 	}
 	return out, rows.Err()
 }
