@@ -74,10 +74,6 @@ func (f fakeNames) DisplayNames(context.Context, []uuid.UUID) (map[uuid.UUID]str
 // Tiện ích
 // ---------------------------------------------------------------------------
 
-func deptBody(org uuid.UUID, code string) map[string]any {
-	return map[string]any{"org_ref": org.String(), "code": code, "name": "Phòng " + code, "description": "Phòng ban thử", "sort_order": 10}
-}
-
 func (c caller) adminWithKey(method, path, idem string, body any) resp {
 	c.f.t.Helper()
 	b, _ := json.Marshal(body)
