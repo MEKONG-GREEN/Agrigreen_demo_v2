@@ -8,6 +8,8 @@ Mã lĩnh vực lấy từ `data.plan.Entries` của payload đã xuất, áp đ
 
 Một tệp có thể mang nhiều mã. Metadata `complete`, `partial`, `unknown` được trình bày riêng; tệp cũ chưa rõ lĩnh vực vẫn có mặt trong danh sách mặc định và không được gán mã thay thế. Mã lĩnh vực và trạng thái thiếu metadata là hai bộ lọc khác nhau. Các trang lựa chọn xét đầy đủ ứng viên khớp năm/loại/kỳ/phiên bản/tìm kiếm/lĩnh vực, không dừng sau 10.000 bản xuất. Các lựa chọn lĩnh vực giữ trang mã hữu hạn; lựa chọn kỳ giữ prefix có giới hạn theo offset/limit, không giữ toàn bộ tập kỳ trong bộ nhớ.
 
+Bộ chọn kỳ bỏ điều kiện kỳ đang chọn; bộ chọn mã lĩnh vực bỏ điều kiện chính mã đang chọn, để có thể đổi giá trị. Các facet còn lại vẫn giao nhau. Lifetime token riêng chặn phản hồi A cũ sau khi đã chuyển A→B→A; thao tác A mới vẫn hoạt động.
+
 GET chọn kỳ giữ `q` tìm tên kỳ tương thích API190. `document_q` mới mang bộ lọc kho (tên kỳ hoặc số văn bản); hai điều kiện giao nhau trước phân trang. Không đổi ngữ nghĩa `q` của danh sách kho và lựa chọn lĩnh vực. Bộ lọc lĩnh vực đi cùng xem trước, Excel, Word, lịch sử và body ZIP. Thay bộ lọc bỏ lựa chọn/preview cũ. Thay tenant/actor/context/vai/MFA/API làm mất dữ liệu phiên và chặn tải hoàn tất muộn. Resource xem trước được key theo bản xuất/bộ lọc, không đổi tiêu đề B mà vẫn hiển thị dữ liệu A trong lúc B chờ.
 
 ### Quyền, byte và giới hạn

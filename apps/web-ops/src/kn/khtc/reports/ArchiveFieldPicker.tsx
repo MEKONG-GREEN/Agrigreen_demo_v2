@@ -8,7 +8,7 @@ type Props={api:ReturnType<typeof createArchiveApi>;query:ArchiveQuery;onChoose:
 export function ArchiveFieldPicker({api,query,onChoose,onClose}:Props){
  const [cursors,setCursors]=useState<string[]>([""]);
  const after=cursors[cursors.length-1];
- const rows=useLoad(()=>api.fields({...query,offset:undefined,after,limit:20}),[api,query,after]);
+ const rows=useLoad(()=>api.fields({year:query.year,kind:query.kind,period_id:query.period_id,q:query.q,versions:query.versions,field_status:query.field_status,after,limit:20}),[api,query,after]);
  return <section className="card sec" aria-label="Chọn lĩnh vực đã xuất"><h2>Lĩnh vực trong bản xuất</h2>
   <p>Mã lĩnh vực được giữ từ các hàng thực xuất. Tệp chưa rõ metadata không được gán mã thay thế.</p>
   <button type="button" className="btn btn-o" onClick={onClose}>Đóng chọn lĩnh vực</button>

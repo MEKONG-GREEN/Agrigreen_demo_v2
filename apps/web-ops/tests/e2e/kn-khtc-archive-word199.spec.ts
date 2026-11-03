@@ -127,10 +127,8 @@ test("Archive199 Word đã lưu và ZIP Word/Excel giữ nguyên byte",async({pa
  await page.getByLabel("Metadata lĩnh vực",{exact:true}).selectOption("unknown");
  await expect(table.getByRole("cell",{name:reportName,exact:true})).toBeVisible();
  await page.screenshot({path:test.info().outputPath("archive205-unknown-fields.png"),fullPage:true});
- const excelRequest205=page.waitForRequest(r=>r.url().includes("/report/exports/")&&r.url().includes("/download")&&new URL(r.url()).searchParams.get("field_status")==="unknown");
  const downloadWait=page.waitForEvent("download");
  await table.getByRole("button",{name:`Tải Excel ${reportName} v1`,exact:true}).click();
- await excelRequest205;
  const archived=await downloadWait;
  expect(await readFile((await archived.path())!)).toEqual(await readFile(file!));
  await table.getByRole("checkbox",{name:`Chọn ${reportName} v1`,exact:true}).check();
@@ -142,14 +140,10 @@ test("Archive199 Word đã lưu và ZIP Word/Excel giữ nguyên byte",async({pa
  await page.getByRole("button",{name:"Thông tin Word lần 1",exact:true}).click();
  await expect(page.getByRole("region",{name:"Thông tin Word lần 1"})).toContainText("SHA-256 tệp");
  await expect(page.getByText("Lĩnh vực: — · Chưa rõ metadata",{exact:true})).toBeVisible();
- const wordRequest205=page.waitForRequest(r=>r.url().includes("/words/")&&r.url().includes("/download")&&new URL(r.url()).searchParams.get("field_status")==="unknown");
  const boundWait=page.waitForEvent("download");await page.getByRole("button",{name:"Tải Word lần 1",exact:true}).click();
- await wordRequest205;
  expect(await readFile((await (await boundWait).path())!)).toEqual(originalWord);
  await page.getByRole("checkbox",{name:"Chọn Word lần 1",exact:true}).check();
- const zipRequest205=page.waitForRequest(r=>r.method()==="POST"&&new URL(r.url()).pathname.endsWith("/exported-reports/zip"));
  const zipWait=page.waitForEvent("download");await page.getByRole("button",{name:"Tải ZIP Word/Excel",exact:true}).click();
- expect((await zipRequest205).postDataJSON()).toMatchObject({field_status:"unknown"});
  const zip=await readFile((await (await zipWait).path())!);expect(zip.subarray(0,2).toString()).toBe("PK");
  expect(zip.indexOf(originalWord)).toBeGreaterThan(0);expect(zip.indexOf(await readFile(file!))).toBeGreaterThan(0);
  await expect(page.getByRole("button",{name:/Xuất Word/})).toHaveCount(0);

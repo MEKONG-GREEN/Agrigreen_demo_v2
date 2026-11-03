@@ -28,9 +28,10 @@ export function ArchiveSelectionBoundary({children}: {children: ReactNode}) {
 }
 export function useArchiveSelection() { const value=useContext(Selection); if (!value) throw new Error("Archive selection boundary missing"); return value; }
 export function useArchiveAlive(scope = "", api:ApiClient|null = null) {
- const epoch=useRef({scope,api,alive:true});
- useLayoutEffect(()=>{epoch.current={scope,api,alive:true};return()=>{epoch.current.alive=false;};},[scope,api]);
- return useCallback(()=>{const value=epoch.current;return value.alive&&value.scope===scope&&value.api===api;},[scope,api]);
+ const token=useMemo(()=>({scope,api}),[scope,api]);
+ const active=useRef<typeof token|null>(null);
+ useLayoutEffect(()=>{active.current=token;return()=>{active.current=null;};},[token]);
+ return useCallback(()=>active.current===token,[token]);
 }
 export function ArchiveBatchBar() {
   const {files,setFiles,filter} = useArchiveSelection(), auth = useAuth();
@@ -38,7 +39,7 @@ export function ArchiveBatchBar() {
   const action=useAction(), alive=useArchiveAlive(archiveFilterKey(filter),auth.api), mixed=files.some(x=>x.format==="word");
   return <section aria-label="Tệp đã chọn" className="card sec">
     <div className="row"><span>Đã chọn {files.length}/10 {mixed ? "tệp Word/Excel" : "bản Excel"} · tối đa 20 MiB</span>
-    <button type="button" className="btn" disabled={!api || !files.length || action.busy} onClick={()=>{if(api)void action.run(async()=>{const file=await api.zip(files.map(({label: _label,...target})=>{void _label;return target;}),archiveFieldSelector(filter));if(alive())saveBlob(file.blob,file.name);return true;},"Đã nhận ZIP các tệp đã lưu.");}}>Tải ZIP {mixed ? "Word/Excel" : "Excel"}</button>
+    <button type="button" className="btn" disabled={!api || !files.length || action.busy} onClick={()=>{if(api)void action.run(async()=>{const file=await api.zip(files.map(({label: _label,...target})=>{void _label;return target;}),archiveFieldSelector(filter));if(!alive())return false;saveBlob(file.blob,file.name);return true;},saved=>saved?"Đã nhận ZIP các tệp đã lưu.":"");}}>Tải ZIP {mixed ? "Word/Excel" : "Excel"}</button>
     <button type="button" className="btn btn-o" disabled={!files.length} onClick={()=>setFiles([])}>Bỏ chọn</button></div>
     {files.length > 0 && <ul>{files.map(file=><li key={archiveFileKey(file)}>{file.label}</li>)}</ul>}{action.view}
   </section>;

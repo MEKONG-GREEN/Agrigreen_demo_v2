@@ -3,7 +3,9 @@ package kn77_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	"net/http"
@@ -298,5 +300,117 @@ func TestArchive205PeriodNameDocumentCollisionCompatibility(t *testing.T) {
 		} else if len(got.Items) != 1 || got.Items[0].ID != check.want {
 			t.Fatal("period-name q compatibility broken", check.query, got)
 		}
+	}
+}
+
+// TestArchive205LegacyMissingRowCountFailsBeforeEgress creates explicitly
+// malformed historical shape through append-only fixture SQL; it never rewrites
+// a native export or disables its matching-draft/hash-chain guards.
+func TestArchive205LegacyMissingRowCountFailsBeforeEgress(t *testing.T) {
+	f := newReportFx(t)
+	status, body := f.do(http.MethodPost, "/v1/kn/khtc/catalogs/field", authz.KNAdmin, "", uuid.Nil, "", map[string]any{"code": "chan_nuoi", "name": "Chăn nuôi"})
+	f.ok(status, body, nil)
+	for _, entry := range f.planBody["entries"].([]map[string]any) {
+		if entry["kind"] == "program" {
+			entry["field_code"] = "trong_trot"
+		}
+		if entry["ref"] == f.price || entry["ref"] == f.news {
+			entry["field_code"] = "chan_nuoi"
+		}
+	}
+	f.planBody["base_version"] = 2
+	f.planBody["decision_no"] = "03/QD-KH205-LEGACY"
+	status, body = f.do(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", authz.KNTinh, khtcDept, f.khtcUser, "", f.planBody)
+	f.ok(status, body, nil)
+	p := f.open(41, dTT, dTTTT)
+	d := f.refresh(p.ID, 0)
+	original := f.export(p.ID, d.Version, true)
+	var multi struct {
+		Items []struct {
+			ID    string   `json:"id"`
+			Codes []string `json:"field_codes"`
+			State string   `json:"field_status"`
+		} `json:"items"`
+	}
+	status, body = f.do(http.MethodGet, "/v1/extension/khtc/exported-reports?year=2026&versions=true&period_id="+p.ID, authz.KNTinh, khtcDept, f.khtcUser, "", nil)
+	f.ok(status, body, &multi)
+	if len(multi.Items) != 1 || multi.Items[0].ID != original.ID || multi.Items[0].State != "complete" || !slices.Equal(multi.Items[0].Codes, []string{"chan_nuoi", "trong_trot"}) {
+		t.Fatal("native unfiltered multi-field snapshot control failed", multi)
+	}
+	pool := pgtest.Get(t).AdminPool(t, migrations.PF)
+	var expectedRecords int64
+	if err := pool.QueryRow(context.Background(), `SELECT jsonb_array_length(payload#>'{data,rows}') FROM pf_extension.khtc_report_export WHERE tenant_id=$1 AND id=$2`, f.tid, original.ID).Scan(&expectedRecords); err != nil || expectedRecords <= 0 {
+		t.Fatalf("valid control row count%d: %v", expectedRecords, err)
+	}
+	checkpoint := &reportMeter{}
+	f.ext.UseEgress(checkpoint, meter.ModeEnforce, nil)
+	validBytes := f.download(p.ID, original.ID)
+	if len(validBytes) == 0 || len(checkpoint.events) != 1 || checkpoint.events[0].Records != expectedRecords || checkpoint.events[0].Bytes != int64(len(validBytes)) {
+		t.Fatalf("valid Excel200 egress control not established: events=%d", len(checkpoint.events))
+	}
+	for _, nullRows := range []bool{false, true} {
+		draftID, exportID := ids.New(), ids.New()
+		tx, err := pool.Begin(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = tx.Exec(context.Background(), `INSERT INTO pf_extension.khtc_report_draft
+   (id,tenant_id,stream_key,period_id,action,payload,input_hash,event_time,actor_ref,idem_key,rule_version)
+   SELECT $3::uuid,x.tenant_id,'khtc_report_draft:'||x.period_id::text,x.period_id,'save',
+   CASE WHEN $4::boolean THEN jsonb_set(x.payload,'{data,rows}','null'::jsonb) ELSE x.payload #- '{data,rows}' END,
+   x.input_hash,x.event_time+interval '1 second',x.actor_ref,'archive205:legacy-draft:'||$3::uuid::text,x.rule_version
+   FROM pf_extension.khtc_report_export x WHERE x.id=$1 AND x.tenant_id=$2`, original.ID, f.tid, draftID, nullRows)
+		if err == nil {
+			_, err = tx.Exec(context.Background(), `INSERT INTO pf_extension.khtc_report_export
+    (id,tenant_id,stream_key,period_id,draft_id,payload,input_hash,export_filter,file_name,body,body_hash,provisional,event_time,actor_ref,idem_key,rule_version)
+    SELECT $4::uuid,x.tenant_id,x.stream_key,x.period_id,d.id,d.payload,d.input_hash,x.export_filter,x.file_name,x.body,x.body_hash,x.provisional,
+    x.event_time+interval '2 seconds',x.actor_ref,'archive205:legacy-export:'||$4::uuid::text,x.rule_version
+    FROM pf_extension.khtc_report_export x JOIN pf_extension.khtc_report_draft d ON d.tenant_id=x.tenant_id AND d.period_id=x.period_id AND d.id=$3
+    WHERE x.id=$1 AND x.tenant_id=$2`, original.ID, f.tid, draftID, exportID)
+		}
+		if err != nil {
+			_ = tx.Rollback(context.Background())
+			t.Fatalf("append-only legacy shape fixture null=%t: %v", nullRows, err)
+		}
+		if err = tx.Commit(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		for _, suffix := range []string{"", "&field_status=unknown"} {
+			var list struct {
+				Items []struct {
+					ID    string   `json:"id"`
+					Codes []string `json:"field_codes"`
+					State string   `json:"field_status"`
+				} `json:"items"`
+			}
+			status, body = f.do(http.MethodGet, "/v1/extension/khtc/exported-reports?year=2026&versions=true&period_id="+p.ID+suffix, authz.KNTinh, khtcDept, f.khtcUser, "", nil)
+			f.ok(status, body, &list)
+			found := false
+			for _, row := range list.Items {
+				if row.ID == exportID.String() {
+					found = true
+					if row.State != "unknown" || len(row.Codes) != 0 {
+						t.Fatal("legacy row-count metadata invented", row)
+					}
+				}
+			}
+			if !found {
+				t.Fatal("default/unknown archive lost legacy file", exportID)
+			}
+		}
+		before := len(checkpoint.events)
+		status, body = f.do(http.MethodGet, "/v1/extension/khtc/periods/"+p.ID+"/report/exports/"+exportID.String()+"/download", authz.KNTinh, khtcDept, f.khtcUser, "", nil)
+		var fail struct {
+			Code string `json:"code"`
+		}
+		if status != http.StatusServiceUnavailable || json.Unmarshal(body, &fail) != nil || fail.Code != "extension.dependency_unavailable" || bytes.HasPrefix(body, []byte("PK")) {
+			t.Fatalf("unknown row count must503 before Excel bytes, null=%t status%d code%q", nullRows, status, fail.Code)
+		}
+		if len(checkpoint.events) != before {
+			t.Fatal("unknown row count emitted a fictitious egress event instead of failing closed")
+		}
+	}
+	if !bytes.Equal(f.download(p.ID, original.ID), validBytes) {
+		t.Fatal("legacy fixture changed original stored Excel bytes")
 	}
 }

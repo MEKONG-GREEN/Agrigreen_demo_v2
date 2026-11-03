@@ -107,3 +107,14 @@ it("reselects a disjoint field while retaining other facets rather than self-fil
  fireEvent.click(screen.getByRole("button",{name:"Chọn lĩnh vực"}));fireEvent.click(await screen.findByRole("button",{name:"Chọn lĩnh vực chan_nuoi"}));await waitFor(()=>expect(last("/exported-reports").url.searchParams.get("field")).toBe("chan_nuoi"));expect(await screen.findByText("205B/BC")).toBeInTheDocument();
  const q=last("/fields").url.searchParams;expect(q.has("field")).toBe(false);expect(q.get("period_id")).toBe(id);expect(q.get("year")).toBe("2030");expect(q.get("kind")).toBe("week");expect(q.get("field_status")).toBe("complete");expect(q.get("q")).toBe("205");expect(q.get("versions")).toBe("true");
 });
+
+it("keeps the ZIP key across a lost ACK but starts a fresh action when its field filter changes",async()=>{
+ zipFailures=1;render(<KhtcArchiveScreen/>);await screen.findByText("205/BC");await chooseField();
+ fireEvent.click(screen.getByRole("checkbox",{name:"Chọn Kỳ 205 v1"}));const zipButton=screen.getByRole("button",{name:"Tải ZIP Excel"});
+ fireEvent.click(zipButton);await waitFor(()=>expect(requests.filter(r=>r.url.pathname.endsWith("/zip"))).toHaveLength(1));await waitFor(()=>expect(zipButton).toBeEnabled());
+ fireEvent.click(zipButton);await waitFor(()=>expect(saveBlob).toHaveBeenCalledTimes(1));
+ const attempts=requests.filter(r=>r.url.pathname.endsWith("/zip"));expect(attempts[0].key).toBeTruthy();expect(attempts[1].key).toBe(attempts[0].key);expect(attempts[0].body).toEqual(attempts[1].body);expect(attempts[1].body).toMatchObject({field:"trong_trot"});
+ fireEvent.click(screen.getByRole("button",{name:"Chọn lĩnh vực"}));fireEvent.click(await screen.findByRole("button",{name:"Chọn lĩnh vực chan_nuoi"}));await waitFor(()=>expect(last("/exported-reports").url.searchParams.get("field")).toBe("chan_nuoi"));
+ fireEvent.click(await screen.findByRole("checkbox",{name:"Chọn Kỳ 205 v1"}));fireEvent.click(screen.getByRole("button",{name:"Tải ZIP Excel"}));await waitFor(()=>expect(saveBlob).toHaveBeenCalledTimes(2));
+ const fresh=last("/zip");expect(fresh.key).toBeTruthy();expect(fresh.key).not.toBe(attempts[0].key);expect(fresh.body).toMatchObject({field:"chan_nuoi"});
+});

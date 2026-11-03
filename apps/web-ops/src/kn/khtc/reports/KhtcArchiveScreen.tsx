@@ -50,7 +50,7 @@ function KhtcArchiveBody({api}: {api: ApiClient | null}) {
     { key: "version", header: "Phiên bản", cell: r => <>{`v${r.version}`} {r.final ? <StatusPill tone="ok">Bản cuối</StatusPill> : r.provisional ? <StatusPill tone="warn">Tạm tính</StatusPill> : null}</> },
     { key: "actions", header: "Thao tác", cell: r => <><Link className="btn btn-o btn-sm" href={`/kn/khtc/bao-cao-da-xuat/${r.period_id}/${r.id}/word`} aria-label={`Word đã lưu ${r.period_name} v${r.version}`}>Word đã lưu</Link> <button type="button" className="btn btn-o btn-sm" disabled={action.busy || !archive}
       aria-label={`Tải Excel ${r.period_name} v${r.version}`}
-      onClick={() => { if (archive) void action.run(async () => { const file = await archive.excel(r.period_id, r.id,archiveFieldSelector(filter)); if (alive()) saveBlob(file.blob, file.name); return true; }, "Đã tải bản Excel đã xuất."); }}>Excel</button></> },
+      onClick={() => { if (archive) void action.run(async () => { const file = await archive.excel(r.period_id, r.id,archiveFieldSelector(filter)); if (!alive()) return false; saveBlob(file.blob, file.name); return true; }, saved=>saved?"Đã tải bản Excel đã xuất.":""); }}>Excel</button></> },
   ];
   return <>
     <PageHeader title="Báo cáo KHTC đã xuất">Chỉ xem và tải tệp đã xuất trong phạm vi Trung tâm của phiên. Mặc định hiện Bản cuối của mỗi kỳ; nếu chưa có thì hiện bản xuất mới nhất.</PageHeader>

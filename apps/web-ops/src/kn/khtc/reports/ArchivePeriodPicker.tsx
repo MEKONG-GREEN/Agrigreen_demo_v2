@@ -12,7 +12,7 @@ const PAGE = 20;
 export function ArchivePeriodPicker({api, year, kind, filter, onChoose, onClose}: Props) {
  const [search,setSearch]=useState("");
  const [query,setQuery]=useState({q:"",offset:0});
- const rows=useLoad(()=>api.periods({...filter,year,kind,document_q:filter?.q,q:query.q,offset:query.offset,limit:PAGE}),[api,year,kind,filter,query]);
+ const rows=useLoad(()=>api.periods({year,kind,field:filter?.field,field_status:filter?.field_status,versions:filter?.versions,document_q:filter?.q,q:query.q,offset:query.offset,limit:PAGE}),[api,year,kind,filter,query]);
  const columns:Column<ArchivePeriod>[]=[
   {key:"kind",header:"Loại báo cáo",cell:p=>REPORT_TYPES.find(t=>t.value===p.report_type)?.label??p.report_type},
   {key:"period",header:"Kỳ",cell:p=>p.name},
