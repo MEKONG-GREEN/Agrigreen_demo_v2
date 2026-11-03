@@ -279,7 +279,8 @@ func TestArchive205PeriodNameDocumentCollisionCompatibility(t *testing.T) {
 	}{
 		{"q=" + url.QueryEscape(a.Name), a.ID},
 		{"document_q=" + url.QueryEscape(a.Name), b.ID},
-		{"q=" + url.QueryEscape(a.Name) + "&document_q=" + url.QueryEscape(a.Name), ""},
+		{"q=" + url.QueryEscape(a.Name) + "&document_q=" + url.QueryEscape(a.Name), a.ID},
+		{"q=" + url.QueryEscape(b.Name) + "&document_q=205-own-document", ""},
 		{"q=" + url.QueryEscape(b.Name) + "&document_q=" + url.QueryEscape(a.Name) + "&field_status=unknown", b.ID},
 		{"q=" + url.QueryEscape(b.Name) + "&document_q=" + url.QueryEscape(a.Name) + "&field=trong_trot", ""},
 	} {

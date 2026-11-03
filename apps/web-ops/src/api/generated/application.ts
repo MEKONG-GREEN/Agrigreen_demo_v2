@@ -10252,7 +10252,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Chọn kỳ có báo cáo đã xuất trong tenant phiên, có tìm kiếm và phân trang */
+        /** Mã lĩnh vực từ các hàng đã xuất trong snapshot đóng băng, phân trang đầy đủ */
         get: operations["extensionKhtcArchiveFields"];
         put?: never;
         post?: never;
@@ -47389,10 +47389,12 @@ export interface operations {
                 field_status?: "complete" | "partial" | "unknown";
                 year: number;
                 kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+                /** @description Tìm tên kỳ (giữ tương thích API190) */
                 q?: string;
                 offset?: number;
                 limit?: number;
                 versions?: boolean;
+                /** @description Tên kỳ hoặc số văn bản tương ứng bộ lọc kho */
                 document_q?: string;
             };
             header?: never;
@@ -47435,7 +47437,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Kỳ có ít nhất một bản xuất, loại kỳ hủy và kỳ chỉ có bản soạn */
+            /** @description Mã lĩnh vực đã xác định trong mọi bản xuất khớp bộ lọc; metadata unknown không tạo mã giả */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -47477,6 +47479,7 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };

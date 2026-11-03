@@ -8,6 +8,7 @@ import { LoadState, dt, useAction, useLoad } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
 import { archiveFieldSelector, archiveFilterKey, createArchiveApi, type ArchiveWord } from "./archive-api";
 import { ArchiveSelectionBoundary, ArchiveBatchBar, archiveFileKey, useArchiveSelection, useArchiveAlive } from "./archive-selection";
+import {archiveFieldStatusLabel} from "./ArchiveFieldPicker";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function KhtcArchiveWordScreen() {
   const auth=useAuth(), params=useParams<{period: string; export: string}>();
@@ -27,7 +28,7 @@ function WordBody({period,exportID}: {period: string; exportID: string}) {
     {key:"download",header:"Thao tác",cell:r=><><button type="button" className="btn btn-o btn-sm" disabled={!api || action.busy} onClick={()=>{if(api)void action.run(async()=>{const file=await api.word(period,exportID,r.run_id,archiveFieldSelector(filter)); if(alive())saveBlob(file.blob,r.file_name);return true;},"Đã nhận tệp Word đã lưu.");}} aria-label={`Tải Word lần ${r.version}`}>Tải Word</button> <button type="button" className="btn btn-o btn-sm" onClick={()=>setInfo(r)} aria-label={`Thông tin Word lần ${r.version}`}>Thông tin</button></>},
   ];
   return <DetailPage back={{href:"/kn/khtc/bao-cao-da-xuat",label:"Báo cáo đã xuất"}} title="Word đã lưu của bản xuất" log={<LogPanel title="Log xuất Word" entries={(rows.data?.items ?? []).map(r=>({event:`Xuất Word lần ${r.version}`,actor_display:r.actor_ref,at:r.at}))} empty="Chưa có Word được xác minh liên kết với bản xuất này."/>}>
-    <LoadState s={rows}>{data=><><h2>{data.export_name} · Excel v{data.export_version}</h2><p>Chỉ tải tệp Word đã lưu và được xác minh thuộc đúng bản xuất. Tệp Word cũ chưa có liên kết xác minh không được suy đoán từ số phiên bản.</p>
+    <LoadState s={rows}>{data=><><h2>{data.export_name} · Excel v{data.export_version}</h2><p>Lĩnh vực: {data.field_codes?.join(", ") || "—"} · {archiveFieldStatusLabel(data.field_status)}</p><p>Chỉ tải tệp Word đã lưu và được xác minh thuộc đúng bản xuất. Tệp Word cũ chưa có liên kết xác minh không được suy đoán từ số phiên bản.</p>
     <DataTable caption="Word đã lưu" columns={columns} rows={data.items} rowKey={r=>r.run_id} page={Math.floor(offset/20)+1} pageSize={20}/>
     <nav className="row" aria-label="Phân trang Word"><button className="btn" disabled={offset===0 || rows.loading} onClick={()=>{setInfo(null);setOffset(x=>Math.max(0,x-20));}}>Trước</button><span>Trang {Math.floor(offset/20)+1}</span><button className="btn" disabled={!data.has_more || offset+20>100000 || rows.loading} onClick={()=>{setInfo(null);setOffset(x=>x+20);}}>Tiếp</button></nav></>}</LoadState>
     {info && rows.data?.items.some(x=>x.run_id===info.run_id) && <section aria-label={`Thông tin Word lần ${info.version}`}>

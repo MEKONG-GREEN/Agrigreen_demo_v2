@@ -30,16 +30,14 @@ function KhtcArchiveBody({api}: {api: ApiClient | null}) {
   const [choosingField,setChoosingField]=useState(false);
   const [choosingPeriod, setChoosingPeriod] = useState(false);
   const [search, setSearch] = useState("");
-  const rows = useLoad(archive ? () => archive.list(filter) : null, [archive, filter]);
+  const [reload,setReload]=useState(0);
   const action = useAction();
   const [preview, setPreview] = useState<ArchiveRow | null>(null);
-  const snapshot = useLoad(archive && preview ? () => archive.preview(preview.period_id, preview.id,archiveFieldSelector(filter)) : null, [archive, preview,filter]);
   const update = (patch: Partial<ArchiveQuery>) => {
     if (patch.year !== undefined || patch.kind !== undefined) { setPeriod(null); setChoosingPeriod(false); patch.period_id = undefined; }
     setSelected([]); setPreview(null);
     setFilter(f => ({ ...f, ...patch, offset: 0 }));
   };
-  const offset = filter.offset ?? 0;
   const columns: Column<ArchiveRow>[] = [
     { key: "select", header: "Chọn", cell: r => <input type="checkbox" aria-label={`Chọn ${r.period_name} v${r.version}`} checked={selected.some(x => x.export_id === r.id && x.format !== "word")} disabled={!selected.some(x => x.export_id === r.id && x.format !== "word") && selected.length >= 10} onChange={e => toggle({period_id:r.period_id, export_id:r.id, label:`Excel ${r.period_name} v${r.version}`}, e.target.checked)} /> },
     { key: "preview", header: "Xem", cell: r => <button type="button" className="btn btn-o btn-sm" onClick={() => setPreview(r)} aria-label={`Xem ${r.period_name} v${r.version}`}>Xem trước</button> },
@@ -69,20 +67,30 @@ function KhtcArchiveBody({api}: {api: ApiClient | null}) {
       <label>Tên kỳ hoặc số văn bản <input type="search" maxLength={200} value={search} onChange={e => setSearch(e.target.value)} /></label>
       <button type="submit" className="btn btn-o">Tìm kiếm</button>
       <label><input type="checkbox" checked={filter.versions ?? false} onChange={e => update({ versions: e.target.checked })} /> Mọi phiên bản</label>
-      <button type="button" className="btn btn-o" onClick={rows.reload}>Làm mới</button>
+      <button type="button" className="btn btn-o" onClick={()=>setReload(x=>x+1)}>Làm mới</button>
     </form>
     {choosingField&&archive&&<ArchiveFieldPicker key={archiveFilterKey(filter)} api={archive} query={filter} onClose={()=>setChoosingField(false)} onChoose={code=>{setChoosingField(false);update({field:code});}}/>}
     {choosingPeriod && archive && <ArchivePeriodPicker key={archiveFilterKey(filter)} api={archive} filter={filter} year={filter.year} kind={filter.kind} onClose={() => setChoosingPeriod(false)} onChoose={p => {setPeriod(p);setChoosingPeriod(false);update({period_id:p.id});}}/>}
     <ArchiveBatchBar />
     {action.view}
-    {preview && <section className="card sec" aria-label="Bản xuất đã lưu"><h2>{preview.period_name} · v{preview.version}</h2><button type="button" className="btn btn-o" onClick={() => setPreview(null)}>Đóng xem trước</button><LoadState s={snapshot}>{data => <>{data.template_document ? <CompiledTemplateDocument document={data.template_document} /> : <><h3>Nội dung bản xuất</h3>{Object.entries(data.content.texts).map(([key, text]) => <p key={key}>{text}</p>)}<table><caption>Số liệu bản xuất</caption><thead><tr><th>Hạng mục</th><th>Trong kỳ</th><th>Lũy kế</th></tr></thead><tbody>{data.content.data.rows.map(r => <tr key={r.ref}><td>{r.name}</td><td>{r.in_period}</td><td>{r.year_to_date}</td></tr>)}</tbody></table></>}</>}</LoadState></section>}
-    <LoadState s={rows}>{data => <>
+    {preview&&<ArchivePreviewResource key={`${preview.id}:${archiveFilterKey(filter)}`} archive={archive} preview={preview} filter={filter} onClose={()=>setPreview(null)}/> }
+    <ArchiveRowsResource key={JSON.stringify(filter)} archive={archive} filter={filter} columns={columns} reload={reload} onPage={offset=>setFilter(f=>({...f,offset}))}/>
+  </>;
+}
+type ArchiveApi=ReturnType<typeof createArchiveApi>;
+function ArchivePreviewResource({archive,preview,filter,onClose}:{archive:ArchiveApi|null;preview:ArchiveRow;filter:ArchiveQuery;onClose:()=>void}) {
+ const snapshot=useLoad(archive?()=>archive.preview(preview.period_id,preview.id,archiveFieldSelector(filter)):null,[archive,preview,filter]);
+  return <section className="card sec" aria-label="Bản xuất đã lưu"><h2>{preview.period_name} · v{preview.version}</h2><button type="button" className="btn btn-o" onClick={onClose}>Đóng xem trước</button><LoadState s={snapshot}>{data => <>{data.template_document ? <CompiledTemplateDocument document={data.template_document} /> : <><h3>Nội dung bản xuất</h3>{Object.entries(data.content.texts).map(([key, text]) => <p key={key}>{text}</p>)}<table><caption>Số liệu bản xuất</caption><thead><tr><th>Hạng mục</th><th>Trong kỳ</th><th>Lũy kế</th></tr></thead><tbody>{data.content.data.rows.map(r => <tr key={r.ref}><td>{r.name}</td><td>{r.in_period}</td><td>{r.year_to_date}</td></tr>)}</tbody></table></>}</>}</LoadState></section>;
+}
+function ArchiveRowsResource({archive,filter,columns,reload,onPage}:{archive:ArchiveApi|null;filter:ArchiveQuery;columns:Column<ArchiveRow>[];reload:number;onPage:(offset:number)=>void}) {
+ const rows=useLoad(archive?()=>archive.list(filter):null,[archive,filter,reload]);
+ const offset=filter.offset??0;
+  return <LoadState s={rows}>{data => <>
       <DataTable caption="Báo cáo đã xuất" columns={columns} rows={data.items} rowKey={r => r.id} page={Math.floor(offset / PAGE) + 1} pageSize={PAGE} />
       <nav className="row" aria-label="Phân trang báo cáo">
-        <button className="btn" disabled={offset === 0 || rows.loading} onClick={() => setFilter(f => ({ ...f, offset: Math.max(0, offset - PAGE) }))}>Trước</button>
+        <button className="btn" disabled={offset === 0 || rows.loading} onClick={() => onPage(Math.max(0,offset-PAGE))}>Trước</button>
         <span>Trang {Math.floor(offset / PAGE) + 1}</span>
-        <button className="btn" disabled={!data.has_more || offset + PAGE > 100000 || rows.loading} onClick={() => setFilter(f => ({ ...f, offset: offset + PAGE }))}>Tiếp</button>
+        <button className="btn" disabled={!data.has_more || offset + PAGE > 100000 || rows.loading} onClick={() => onPage(offset+PAGE)}>Tiếp</button>
       </nav>
-    </>}</LoadState>
-  </>;
+    </>}</LoadState>;
 }

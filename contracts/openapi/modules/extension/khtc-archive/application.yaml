@@ -35,11 +35,11 @@ paths:
         - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
         - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
         - {name: kind, in: query, schema: {type: string, enum: ['', week, month, quarter, year, program, adhoc]}}
-        - {name: q, in: query, schema: {type: string, maxLength: 200}}
+        - {name: q, in: query, description: Tìm tên kỳ (giữ tương thích API190), schema: {type: string, maxLength: 200}}
         - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
         - {name: versions, in: query, schema: {type: boolean, default: false}}
-        - {name: document_q, in: query, schema: {type: string, maxLength: 200}}
+        - {name: document_q, in: query, description: Tên kỳ hoặc số văn bản tương ứng bộ lọc kho, schema: {type: string, maxLength: 200}}
       responses:
         "200":
           description: Kỳ có ít nhất một bản xuất, loại kỳ hủy và kỳ chỉ có bản soạn
@@ -52,7 +52,7 @@ paths:
         "503": {$ref: '#/components/responses/Problem'}
   /v1/extension/khtc/exported-reports/fields:
     get:
-      summary: Chọn kỳ có báo cáo đã xuất trong tenant phiên, có tìm kiếm và phân trang
+      summary: Mã lĩnh vực từ các hàng đã xuất trong snapshot đóng băng, phân trang đầy đủ
       operationId: extensionKhtcArchiveFields
       tags: [extension]
       parameters:
@@ -67,7 +67,7 @@ paths:
         - {name: versions, in: query, schema: {type: boolean, default: false}}
       responses:
         "200":
-          description: Kỳ có ít nhất một bản xuất, loại kỳ hủy và kỳ chỉ có bản soạn
+          description: Mã lĩnh vực đã xác định trong mọi bản xuất khớp bộ lọc; metadata unknown không tạo mã giả
           content:
             application/json:
               schema: {$ref: '#/components/schemas/KHTCArchiveFields'}
@@ -94,6 +94,7 @@ paths:
         "401": {$ref: '#/components/responses/Problem'}
         "403": {$ref: '#/components/responses/Problem'}
         "404": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
         "503": {$ref: '#/components/responses/Problem'}
   /v1/extension/khtc/periods/{id}/report/exports/{exportID}/words:
     get:
