@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -426,13 +427,13 @@ func TestContact_RLSNoPII(t *testing.T) {
 	rows.Close()
 	pii := []string{"Hoàng Văn", "0987654321", "84987654321", "rieng@example.vn", "1970", "Trần Thị Mai", "0912000111", "mai@ttkn.vn"}
 	for _, x := range pii {
-		if strings.Contains(dump.String(), x) {
+		if containsPII(dump.String(), x) {
 			t.Fatalf("pf_contact chứa PII %q", x)
 		}
 	}
 	// Log của mọi request (kể cả lỗi 409/422/403) không chứa PII.
 	for _, x := range pii {
-		if strings.Contains(f.logs.String(), x) {
+		if containsPII(f.logs.String(), x) {
 			t.Fatalf("log chứa PII %q: %s", x, f.logs.String())
 		}
 	}
@@ -454,3 +455,18 @@ func TestContact_RLSNoPII(t *testing.T) {
 		t.Fatalf("DisplayNames: %v %v", names, err)
 	}
 }
+
+// containsPII: dump chứa giá trị PII x? Bỏ UUID trước khi so; giá trị toàn chữ số (năm sinh, SĐT) chỉ tính khi
+// đứng riêng — không nằm giữa chữ/số, tránh trúng ngẫu nhiên trong mã hex (UUID, băm) của dòng.
+func containsPII(dump, x string) bool {
+	dump = uuidRe.ReplaceAllString(dump, "")
+	if !digitsRe.MatchString(x) {
+		return strings.Contains(dump, x)
+	}
+	return regexp.MustCompile(`(^|[^0-9A-Za-z])` + x + `([^0-9A-Za-z]|$)`).MatchString(dump)
+}
+
+var (
+	uuidRe   = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
+	digitsRe = regexp.MustCompile(`^[0-9]+$`)
+)
