@@ -449,3 +449,52 @@ func TestDeadline209LatestPhaseFollowsSeq(t *testing.T) {
 		t.Fatalf("latest committed phase must follow seq, not recorded_at: %+v error%v", latest, e)
 	}
 }
+
+func TestDeadline209PoolOneAndPendingConcurrency(t *testing.T) {
+	t.Run("same native/consumer pool of one", func(t *testing.T) {
+		n := fixture.NewSized(t, 1)
+		f := &deadlineFx209{t: t, fm: n, roleDB: n.DB, clk: n.Clock, tid: uuid.New(), node: uuid.New(), actor: uuid.New()}
+		p := f.open209()
+		s, ctx := f.consumer209(n.ConditionalControl())
+		ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		defer cancel()
+		d := mustChange209(t, s, ctx, p, p.DueAt.Add(time.Hour), "poolone209")
+		if !d.DueAt.Equal(p.DueAt.Add(time.Hour)) {
+			t.Fatal("wrong due on pool1")
+		}
+	})
+	t.Run("prepared intent excludes another request", func(t *testing.T) {
+		f := newDeadlineFx209(t)
+		p := f.open209()
+		probe := &casProbe209{ConditionalPeriodControl: f.fm.ConditionalControl()}
+		s, ctx := f.consumer209(probe)
+		entered, release := make(chan struct{}), make(chan struct{})
+		var once sync.Once
+		probe.changeHook = func(_ context.Context, n int, _ formsport.PeriodRevision) {
+			if n == 1 {
+				close(entered)
+				<-release
+			}
+		}
+		result := make(chan error, 1)
+		go func() {
+			_, e := s.ChangeDeadline(ctx, uuid.MustParse(p.ID), khtcpapp.DeadlineInput{DueAt: p.DueAt.Add(time.Hour)}, "pendingfirst209")
+			result <- e
+		}()
+		defer once.Do(func() { close(release) })
+		select {
+		case <-entered:
+		case <-time.After(8 * time.Second):
+			t.Fatal("native barrier not reached")
+		}
+		_, e := s.ChangeDeadline(ctx, uuid.MustParse(p.ID), khtcpapp.DeadlineInput{DueAt: p.DueAt.Add(2 * time.Hour)}, "pendingsecond209")
+		assertConflict209(t, e)
+		once.Do(func() { close(release) })
+		if e = <-result; e != nil {
+			t.Fatal(e)
+		}
+		if probe.count() != 1 {
+			t.Fatalf("pending resource allowed second native writer:%d", probe.count())
+		}
+	})
+}

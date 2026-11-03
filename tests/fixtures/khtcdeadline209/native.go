@@ -30,6 +30,14 @@ type Native struct {
 func New(t testing.TB) *Native {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
+	return newWithPool(t, pool)
+}
+
+func NewSized(t testing.TB, max int32) *Native {
+	return newWithPool(t, pgtest.Get(t).SizedPool(t, migrations.PF, dbadmin.AppPlatform, max))
+}
+
+func newWithPool(t testing.TB, pool *pgxpool.Pool) *Native {
 	clk := clock.NewFixed(time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC))
 	var profile port.Profile
 	for _, p := range extension.FormProfiles() {
