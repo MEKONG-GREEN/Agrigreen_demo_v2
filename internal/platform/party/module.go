@@ -190,6 +190,10 @@ func (m *Module) UseMachineCounts(c port.CoopMachineCounts) { m.reg.Machines = c
 // UseActorNames nối danh bạ tên người thao tác cho khung Log.
 func (m *Module) UseActorNames(n port.ActorNames) { m.kn.Names = n }
 
+// DepartmentAdmin cho chủ HTTP danh mục phòng ban (KNSPLIT-2 #118): pf/party không còn đăng ký /v1/departments,
+// /v1/departments/{id}*; gốc lắp ráp nối cổng này vào module chủ KN (extension.UseDepartmentAdmin).
+func (m *Module) DepartmentAdmin() port.DepartmentAdmin { return m.kn }
+
 // CooperativeRegistrar tạo Nút HTX qua cổng nội bộ có kiểm vai cho luồng Neo D2.
 func (m *Module) CooperativeRegistrar() port.CooperativeRegistrar { return m.reg }
 
