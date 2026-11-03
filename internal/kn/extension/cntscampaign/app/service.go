@@ -49,20 +49,17 @@ var (
 	errNotLeader = problem.Forbidden.WithDetail("mở lại đợt chỉ Lãnh đạo phòng (hoặc người được ủy quyền mở lại kỳ)")
 )
 
-// Reopener là phần cổng điều khiển kỳ native mở lại kỳ đã chốt (pf/forms app.Control.ReopenPeriod). Cổng
-// formsport.PeriodControl chưa có thao tác này: gốc lắp ráp nối Control nào cài thêm Reopener thì mở lại đợt dùng được,
-// không thì trả 503.
-type Reopener interface {
-	ReopenPeriod(ctx context.Context, profile string, id uuid.UUID, reason, idem string) error
-}
-
 // Service là use case chiến dịch điều tra.
 type Service struct {
 	DB    tenant.Beginner // pool của pf/extension (db.ForModule — r_extension)
 	Clock clock.Clock
-	// Forms, Control: cap/forms (biểu, phát hành kỳ native; tiến độ, chốt, đổi hạn). Thiếu → 503.
+	// Forms, Control: cap/forms (biểu, phát hành kỳ native; đọc tiến độ). Thiếu → 503.
 	Forms   formsport.Publisher
 	Control formsport.PeriodControl
+	// Cond: cổng điều khiển kỳ native CÓ ĐIỀU KIỆN (#159 BF-FORMS-PERIOD-CAS) — MỌI lời gọi ghi kỳ native của đợt (gia hạn, đóng,
+	// mở lại + đổi hạn, đối soát, hủy bù phát hành) đi qua cổng này với revision ghi bền trong ý định (#201). Thiếu → thao tác
+	// ghi kỳ native trả 503 (fail closed), không bao giờ quay về lời gọi vô điều kiện của Control.
+	Cond formsport.ConditionalPeriodControl
 	// Figures: số liệu kỳ native (kết quả tổng hợp). Thiếu → kết quả 503.
 	Figures formsport.FiguresReader
 	// Orgs, Units: tỉnh của Nút (khu vực, tên xã). Regions: khu vực của tỉnh (phạm vi toàn tỉnh/khu vực, tiến độ theo khu
