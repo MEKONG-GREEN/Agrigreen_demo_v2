@@ -20,8 +20,8 @@ test("KHTC194: điều chỉnh theo QĐ trên route riêng, giữ nháp và xem 
   const base = new URL(page.url()).pathname;
   const item = page.getByRole("row").filter({ hasText: "Mô hình lúa chất lượng cao" });
   await item.getByRole("button", { name: "Sửa", exact: true }).click();
-  await page.getByLabel("Tên", { exact: true }).fill("Hạng mục kế hoạch194");
-  await page.getByRole("button", { name: "Xong", exact: true }).click();
+  await page.getByRole("textbox", { name: /^Tên/ }).fill("Hạng mục kế hoạch194");
+  await page.getByRole("button", { name: "Lưu vào nháp", exact: true }).click();
   await page.getByRole("button", { name: "Điều chỉnh theo QĐ", exact: true }).click();
   await expect(page).toHaveURL(/\/luu-phien-ban\?year=2030$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -44,7 +44,7 @@ test("KHTC194: điều chỉnh theo QĐ trên route riêng, giữ nháp và xem 
   await expect(page).toHaveURL(/\/phien-ban\/2\?year=2030$/);
   await expect(page.getByRole("heading", { name: "Kế hoạch năm 2030 — phiên bản 2", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Log", exact: true })).toContainText("Điều chỉnh kế hoạch v2");
-  await expect(page.getByRole("table", { name: "Nội dung phiên bản kế hoạch", exact: true }).getByText("Hạng mục kế hoạch194", { exact: true })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Các chương trình", exact: true }).getByText("Hạng mục kế hoạch194", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Lịch sử phiên bản", exact: true }).click();
   const history = page.getByRole("table", { name: "Lịch sử kế hoạch năm", exact: true });
   await expect(history.getByRole("columnheader", { name: "STT", exact: true })).toBeVisible();
