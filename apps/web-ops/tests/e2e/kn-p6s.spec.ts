@@ -53,8 +53,16 @@ async function typeCell(page: Page, letter: string, value: string): Promise<void
 }
 
 test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
-  test("Tỉnh phát hành → Xã nhập 2 xã → điều chỉnh → gửi lại → Cập nhật có nhật ký ô → chốt → Chi cục → TW chỉ xem", async ({ page }) => {
+  const calendarCases = [
+    { name: "Thứ Hai đầu tháng · v1", now: "2026-11-02T02:00:00Z", from: "2026-11-02", to: "2026-11-29", week: "Tuần 1", periods: ["Tuần 1 (02/11–08/11/2026)", "Tuần 2 (09/11–15/11/2026)", "Tuần 3 (16/11–22/11/2026)", "Tuần 4 (23/11–29/11/2026)"] },
+    { name: "Mốc lịch v2 · 00:00 VN", now: "2026-11-03T17:00:00Z", from: "2026-11-04", to: "2026-12-01", week: "Tuần 45/2026", periods: ["Tuần 45/2026 (04/11–10/11/2026)", "Tuần 46/2026 (11/11–17/11/2026)", "Tuần 47/2026 (18/11–24/11/2026)", "Tuần 48/2026 (25/11–01/12/2026)"] },
+    { name: "Cuối tháng · 23:59 VN", now: "2026-11-30T16:59:00Z", from: "2026-11-25", to: "2026-12-22", week: "Tuần 48/2026", periods: ["Tuần 48/2026 (25/11–01/12/2026)", "Tuần 49/2026 (02/12–08/12/2026)", "Tuần 50/2026 (09/12–15/12/2026)", "Tuần 51/2026 (16/12–22/12/2026)"] },
+    { name: "Ngày 1 · 00:00 VN · tuần giao tháng", now: "2026-11-30T17:00:00Z", from: "2026-11-25", to: "2026-12-22", week: "Tuần 48/2026", periods: ["Tuần 48/2026 (25/11–01/12/2026)", "Tuần 49/2026 (02/12–08/12/2026)", "Tuần 50/2026 (09/12–15/12/2026)", "Tuần 51/2026 (16/12–22/12/2026)"] },
+  ] as const;
+
+  const runLifecycle = async (page: Page, scenario: (typeof calendarCases)[number]) => {
     test.setTimeout(240_000);
+    await page.clock.setFixedTime(new Date(scenario.now));
     await page.goto("/login");
 
     // 1. Cấp Tỉnh phát hành T01 cho 2 xã (Xem trước: 1 biểu × 2 xã × 4 kỳ).
@@ -71,20 +79,26 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await nextStep();
     // BF-UI-KIT (#97) TextField: dấu * bắt buộc chỉ hiển thị (aria-hidden), trường đánh dấu aria-required.
     await expect(page.getByLabel("Vụ / đợt")).toHaveAttribute("aria-required", "true");
+    await page.getByLabel("Từ ngày").fill(scenario.from);
+    await page.getByLabel("Đến ngày").fill(scenario.to);
     await page.getByLabel("Vụ / đợt").fill("Đợt E2E");
     await nextStep();
     await page.getByLabel("T01 D 91301").fill("126");
     await page.getByLabel("T01 D 91302").fill("290");
     await nextStep();
     await expect(page.getByTestId("task-count")).toHaveText("8");
+    for (const period of scenario.periods) {
+      await expect(page.getByText(period, { exact: false })).toBeVisible();
+    }
     await page.getByRole("button", { name: "Phát hành", exact: true }).click();
     await expect(page.getByText(/Đã phát hành 8 công việc cho 2 xã, 4 kỳ/)).toBeVisible();
     await logout(page);
 
-    // 2. Cấp Xã nhập T01 Tuần 1 cho 2 xã (mỗi xã một tab) và gửi.
+    // 2. Cấp Xã nhập T01 kỳ đầu của đợt cho 2 xã (mỗi xã một tab) và gửi.
     await enter(page, "an.nv@angiang.gov.vn", /^Cấp Xã/);
     await expect(page.getByRole("heading", { level: 1, name: "Công việc cần làm" })).toBeVisible();
-    await page.getByRole("link", { name: "Nhập: T01 — Mỹ Hòa Hưng — Tuần 1" }).click();
+    await expect(page.getByRole("link", { name: `Nhập: T01 — Mỹ Hòa Hưng — ${scenario.week}` })).toBeVisible();
+    await page.getByRole("link", { name: `Nhập: T01 — Mỹ Hòa Hưng — ${scenario.week}` }).click();
     await expect(page.getByRole("tablist", { name: "Xã nhập liệu" })).toBeVisible();
     await typeCell(page, "F", "28");
     await page.getByRole("tab", { name: /Bình Đức/ }).click();
@@ -100,23 +114,23 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await page.getByRole("button", { name: "Cập nhật" }).click();
     await expect(page.getByText(/Đã cập nhật T01: 2 xã/)).toBeVisible();
     await go(page, /Rà soát & chốt kỳ/, /Nhiệm vụ/);
-    await page.getByRole("link", { name: "Rà soát T01 Bình Đức Tuần 1" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Bình Đức · T01 · Tuần 1" })).toBeVisible();
+    await page.getByRole("link", { name: `Rà soát T01 Bình Đức ${scenario.week}` }).click();
+    await expect(page.getByRole("heading", { level: 1, name: `Bình Đức · T01 · ${scenario.week}` })).toBeVisible();
     await page.getByRole("button", { name: "Yêu cầu điều chỉnh" }).click();
     // BF-SWEEP-TT (#100): lý do bắt buộc được kiểm ngay trên trường (không gọi API), lỗi gắn với ô.
     const adjReason = page.getByLabel("Lý do yêu cầu điều chỉnh");
     await expect(adjReason).toHaveAttribute("aria-required", "true");
     await expect(adjReason).toHaveAttribute("aria-invalid", "true");
     await expect(page.getByRole("alert").filter({ hasText: "Bắt buộc nhập." })).toBeVisible();
-    await page.getByLabel("Lý do yêu cầu điều chỉnh").fill("Kiểm tra lại diện tích tuần 1");
+    await page.getByLabel("Lý do yêu cầu điều chỉnh").fill(`Kiểm tra lại diện tích ${scenario.week}`);
     await page.getByRole("button", { name: "Yêu cầu điều chỉnh" }).click();
     await expect(page.getByText("Đã gửi yêu cầu điều chỉnh tới Cán bộ xã.")).toBeVisible();
     await logout(page);
 
     // 4. Cấp Xã thấy lý do, sửa Bình Đức và gửi lại.
     await enter(page, "an.nv@angiang.gov.vn", /^Cấp Xã/);
-    await expect(page.getByText("Yêu cầu điều chỉnh: Kiểm tra lại diện tích tuần 1")).toBeVisible();
-    await page.getByRole("link", { name: "Sửa: T01 — Bình Đức — Tuần 1" }).click();
+    await expect(page.getByText(`Yêu cầu điều chỉnh: Kiểm tra lại diện tích ${scenario.week}`)).toBeVisible();
+    await page.getByRole("link", { name: `Sửa: T01 — Bình Đức — ${scenario.week}` }).click();
     await page.getByRole("tab", { name: /Bình Đức/ }).click();
     await typeCell(page, "F", "25");
     await page.getByRole("button", { name: "Gửi báo cáo" }).click();
@@ -135,7 +149,7 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await expect(detail).toContainText("Tự tính");
     await expect(page.locator('[data-changed="true"]')).toHaveCount(2);
     await go(page, /Rà soát & chốt kỳ/, /Nhiệm vụ/);
-    await page.getByRole("link", { name: "Rà soát T01 Bình Đức Tuần 1" }).click();
+    await page.getByRole("link", { name: `Rà soát T01 Bình Đức ${scenario.week}` }).click();
     await page.getByRole("button", { name: /Chốt kỳ ngay/ }).click();
     await expect(page.getByText("Đã chốt kỳ — Hệ thống đã tổng hợp một lần.")).toBeVisible();
 
@@ -147,6 +161,9 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await expect(page.getByText(/Đã xuất 2 file/)).toBeVisible();
     await page.getByRole("button", { name: "Gửi email" }).click();
     await expect(page.getByText(/Đã xếp gửi email \(202\)/)).toBeVisible();
+    // Mock giao thư sau 1500 ms theo Date.now; tiến đồng hồ có kiểm soát, không đổi timer hoặc thời hạn kiểm.
+    // Mốc cuối tháng vẫn là 23:59:02 cùng ngày, giữ nguyên ca biên lịch và đường chuyển trạng thái qua UI thật.
+    await page.clock.setFixedTime(new Date(Date.parse(scenario.now) + 2_000));
     await expect(async () => {
       await page.getByRole("button", { name: "Làm mới trạng thái" }).click();
       await expect(page.getByTestId("dispatch-status")).toHaveText("Đã gửi", { timeout: 1000 });
@@ -162,7 +179,13 @@ test.describe("KN v7.7 P6s: vòng đời báo cáo các cấp", () => {
     await expect(page.getByText(/Chỉ xem — số liệu lấy từ lần cập nhật gần nhất/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Cập nhật" })).toHaveCount(0);
     await expect(page.getByText("Đã chốt").first()).toBeVisible();
-  });
+  };
+
+  for (const scenario of calendarCases) {
+    test(`${scenario.name}: Tỉnh phát hành → Xã nhập 2 xã → điều chỉnh → gửi lại → Cập nhật có nhật ký ô → chốt → Chi cục → TW chỉ xem`, async ({ page }) => {
+      await runLifecycle(page, scenario);
+    });
+  }
 
   test("Admin tạo tài khoản 2 vai trò → người dùng đổi vai trò; Menu các cấp: dải vàng, lý do, nhật ký hỗ trợ", async ({ page }) => {
     test.setTimeout(180_000);
