@@ -73,3 +73,11 @@ func TestPeriodOperation212MissingCapabilityIsClosed(t *testing.T) {
 		t.Fatalf("missing capability: %v", err)
 	}
 }
+
+func TestPeriodOperationDigest212_RejectsMalformedProfile(t *testing.T) {
+	request := PeriodOperationRequest{OperationID: uuid.New(), Profile: string([]byte{'f', 'x', 0xff}), PeriodID: uuid.New(), Action: PeriodOperationClose}
+	request.Expected = PeriodRevision{TenantID: uuid.New(), Profile: request.Profile, PeriodID: request.PeriodID, EventSeq: 1}
+	if _, err := PeriodOperationDigest(request); err == nil {
+		t.Fatal("malformed UTF8 profile was silently canonicalized")
+	}
+}

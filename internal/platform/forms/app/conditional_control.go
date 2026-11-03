@@ -45,7 +45,10 @@ func (c Control) ReopenPeriodCAS(ctx context.Context, profile string, id uuid.UU
 	return guard.result(err)
 }
 
-type controlCAS struct{ expected, applied port.PeriodRevision }
+type controlCAS struct {
+	expected, applied port.PeriodRevision
+	receipt           *periodOperation
+}
 
 func (g *controlCAS) result(err error) (port.PeriodRevision, error) {
 	if err != nil {
@@ -61,16 +64,21 @@ func checkControlRevision(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, pr
 	if guard == nil { // Existing unconditional API; never used by the CAS port.
 		return nil
 	}
+	if guard.receipt != nil {
+		if err := guard.receipt.before(ctx, tx); err != nil {
+			return err
+		}
+	}
 	expect := guard.expected
 	if expect.TenantID != tenantID || expect.PeriodID != id || expect.Profile != profile || expect.EventSeq < 1 || expect.DueSeq < 0 {
-		return port.ErrPeriodConflict
+		return rejectControl(ctx, tx, guard, port.ErrPeriodConflict)
 	}
 	eventSeq, dueSeq, err := store.ControlHeads(ctx, tx, id)
 	if err != nil {
 		return err
 	}
 	if expect.EventSeq != eventSeq || expect.DueSeq != dueSeq {
-		return port.ErrPeriodConflict
+		return rejectControl(ctx, tx, guard, port.ErrPeriodConflict)
 	}
 	return nil
 }
@@ -87,5 +95,5 @@ func appliedControlRevision(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, 
 		return err
 	}
 	guard.applied = port.PeriodRevision{TenantID: tenantID, Profile: profile, PeriodID: id, EventSeq: events, DueSeq: due}
-	return nil
+	return appliedOperation(ctx, tx, guard)
 }

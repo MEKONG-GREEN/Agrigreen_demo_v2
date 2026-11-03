@@ -894,16 +894,17 @@ func (s *Service) closeWithRevision(ctx context.Context, profile string, periodI
 			return err
 		}
 		if v.State.Status == domain.PeriodCancelled {
-			return port.ErrPeriodCancelled
+			return rejectControl(ctx, tx, expect, port.ErrPeriodCancelled)
 		}
 		if v.State.Status == domain.PeriodClosed {
-			return port.ErrPeriodClosed
+			return rejectControl(ctx, tx, expect, port.ErrPeriodClosed)
 		}
 		content := snapshotOf(v, now, port.ModeManual)
 		if pending := domain.PendingReview(content.Units); prof.RequireReviewedBeforeClose && len(pending) > 0 {
-			return port.ErrPendingReview.WithDetail("đơn vị chờ rà soát: " + strings.Join(pending, ", "))
+			return rejectControl(ctx, tx, expect, port.ErrPendingReview.WithDetail("đơn vị chờ rà soát: "+strings.Join(pending, ", ")))
 		}
 		ev := domain.Event{ID: ids.New(), Action: "closed", Mode: port.ModeManual, Actor: a.ref, At: now}
+		beginControlEffects(expect)
 		if err := store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "closed")); err != nil {
 			return err
 		}
@@ -996,10 +997,10 @@ func (s *Service) reopenWithRevision(ctx context.Context, profile string, period
 			return err
 		}
 		if v.State.Status == domain.PeriodCancelled {
-			return port.ErrPeriodCancelled
+			return rejectControl(ctx, tx, expect, port.ErrPeriodCancelled)
 		}
 		if v.State.Status != domain.PeriodClosed {
-			return port.ErrPeriodNotClosed
+			return rejectControl(ctx, tx, expect, port.ErrPeriodNotClosed)
 		}
 		for i, u := range in.Units {
 			if !slices.Contains(v.Period.Units, u) || slices.Contains(in.Units[:i], u) {
@@ -1007,6 +1008,7 @@ func (s *Service) reopenWithRevision(ctx context.Context, profile string, period
 			}
 		}
 		ev := domain.Event{ID: ids.New(), Action: "reopened", Mode: port.ModeManual, Units: in.Units, Reason: why, Actor: a.ref, At: now}
+		beginControlEffects(expect)
 		if err := store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "reopened")); err != nil {
 			return err
 		}
@@ -1069,11 +1071,12 @@ func (s *Service) cancelWithRevision(ctx context.Context, profile string, period
 		}
 		switch v.State.Status {
 		case domain.PeriodCancelled:
-			return port.ErrPeriodCancelled
+			return rejectControl(ctx, tx, expect, port.ErrPeriodCancelled)
 		case domain.PeriodClosed:
-			return port.ErrPeriodClosed
+			return rejectControl(ctx, tx, expect, port.ErrPeriodClosed)
 		}
 		ev := domain.Event{ID: ids.New(), Action: port.ActionCancelled, Mode: port.ModeManual, Reason: why, Actor: a.ref, At: now}
+		beginControlEffects(expect)
 		if err := store.InsertEvent(ctx, tx, a.tenant, periodID, profile, &ev, idemOr(idem, "cancelled")); err != nil {
 			return err
 		}

@@ -55,7 +55,7 @@ func NormalizePeriodOperation(in PeriodOperationRequest) (PeriodOperationRequest
 	if in.PeriodID == uuid.Nil || in.Expected.TenantID == uuid.Nil || in.Expected.PeriodID != in.PeriodID || in.Expected.Profile != in.Profile || in.Expected.EventSeq < 1 || in.Expected.DueSeq < 0 {
 		return bad("expected")
 	}
-	if len(in.Profile) == 0 || len(in.Profile) > 64 || strings.TrimSpace(in.Profile) != in.Profile || strings.ContainsRune(in.Profile, 0) {
+	if !utf8.ValidString(in.Profile) || len(in.Profile) == 0 || len(in.Profile) > 64 || strings.TrimSpace(in.Profile) != in.Profile || strings.ContainsRune(in.Profile, 0) {
 		return bad("profile")
 	}
 	if len(in.Reason) > 4096 || !utf8.ValidString(in.Reason) || strings.ContainsRune(in.Reason, 0) {
