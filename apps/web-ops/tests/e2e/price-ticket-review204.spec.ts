@@ -27,6 +27,8 @@ async function openReview(page: Page) {
   await sidebar(page).getByRole("link", { name: "Kiểm duyệt & công bố", exact: true }).click();
   await page.getByLabel("Ngày báo giá", { exact: true }).fill("2026-11-04");
   await page.getByRole("checkbox", { name: "Chỉ xã được phân công" }).uncheck();
+  await expect(page.getByRole("checkbox", { name: "Chỉ xã được phân công" })).not.toBeChecked();
+  await expect(page).toHaveURL(/kiem-duyet\?day=2026-11-04&mine=false&tab=tickets/);
   await page.getByRole("link", { name: "Xem / sửa", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Chi tiết phiếu báo giá", exact: true })).toBeVisible();
 }
@@ -76,6 +78,8 @@ test("204: delete cancel and real logout do not write or retain form access", as
   test.setTimeout(150_000);await page.clock.setFixedTime(new Date("2026-11-05T06:00:00Z"));await openReview(page);
   let writes=0;page.on("request",r=>{if(r.method()==="POST"&&/\/price\/tickets\//.test(r.url()))writes++;});
   await page.getByRole("link",{name:"Xóa phiếu",exact:true}).click();await page.getByRole("textbox",{name:/^Lý do/}).fill("Không lưu nội dung này");await page.getByRole("link",{name:"Hủy",exact:true}).click();expect(writes).toBe(0);
+  await page.goBack();await expect(page).toHaveURL(/\/xoa\?day=2026-11-04&mine=false&tab=tickets/);await expect(page.getByRole("textbox",{name:/^Lý do/})).toHaveValue("");
+  await page.goForward();await expect(page.getByRole("heading",{name:"Chi tiết phiếu báo giá",exact:true})).toBeVisible();expect(writes).toBe(0);
   await page.getByRole("link", { name: "Danh sách kiểm duyệt", exact: true }).click();
   await expect(page).toHaveURL(/kiem-duyet\?day=2026-11-04&mine=false&tab=tickets/);
   await logout(page);

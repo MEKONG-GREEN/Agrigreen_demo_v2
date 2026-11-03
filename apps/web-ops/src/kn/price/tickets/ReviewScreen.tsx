@@ -29,12 +29,12 @@ import { countDrafts, draftsOf, fillFromRef, SheetEditor, usePriceTicketApi, typ
 
 import { reviewHref, type ReviewFilters } from "./ticket-review-routes";
 
-export function ReviewScreen({ filters, onFilters, readOnly = false }: { filters: ReviewFilters; onFilters: (f: ReviewFilters) => void; readOnly?: boolean }) {
+export function ReviewScreen({ filters, onFilters, readOnly = false }: { filters: ReviewFilters; onFilters: (f: Partial<ReviewFilters>) => void; readOnly?: boolean }) {
   const ta = usePriceTicketApi();
   const { day, mine, tab } = filters;
-  const setDay = (day: string) => onFilters({ ...filters, day });
-  const setMine = (mine: boolean) => onFilters({ ...filters, mine });
-  const setTab = (tab: ReviewFilters["tab"]) => onFilters({ ...filters, tab });
+  const setDay = (day: string) => onFilters({ day });
+  const setMine = (mine: boolean) => onFilters({ mine });
+  const setTab = (tab: ReviewFilters["tab"]) => onFilters({ tab });
   const [nonce, setNonce] = useState(0);
   const bump = () => setNonce((n) => n + 1);
   const list = useLoad(() => ta.day({ day, mine }), [day, mine, nonce]);

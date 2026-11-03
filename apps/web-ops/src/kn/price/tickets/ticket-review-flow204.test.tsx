@@ -34,7 +34,7 @@ async function fixture(fetcher:(input:Request,init?:RequestInit)=>Promise<Respon
 function correctPath(id:string){return ["phieu",id,"hieu-chinh"];}
 function inputs(sheet:PriceSheet){const l=sheet.lines.find(l=>!!l.min&&!l.no_goods)!;return {lo:screen.getByLabelText(`Giá thấp nhất ${l.name} ${l.variety} (${l.item_code})`,{exact:false}),hi:screen.getByLabelText(`Giá cao nhất ${l.name} ${l.variety} (${l.item_code})`,{exact:false})};}
 const fill=(sheet:PriceSheet)=>{const p=inputs(sheet);fireEvent.change(p.lo,{target:{value:"00001.2300"}});fireEvent.change(p.hi,{target:{value:"9000.00"}});fireEvent.change(screen.getByLabelText("Lý do",{exact:false}),{target:{value:"Đã đối chiếu204"}});};
-beforeEach(()=>{vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2026-10-12T03:00:00Z"));resetKnAccounts(structuredClone(originalAccounts));const department=KN_DEPARTMENTS.find(d=>d.code==="thong_tin_truyen_thong")!;department.status="active";for(const account of KN_ACCOUNTS)for(const assignment of account.assignments)assignment.departments=assignment.departments.map(d=>d.code===department.code?department:d);KN_ACCOUNTS.find(a=>a.id==="kn-binh")!.assignments.find(a=>a.assignment_id==="asg-binh-tinh")!.departments.push(department);resetPriceItems();resetPricePoints();resetPriceTickets();resetPriceBoards();nav.push.mockReset();nav.replace.mockReset();state.role="kn_tinh";state.readOnly=false;state.mfa=true;state.status="authenticated";state.subject="kn-binh";});
+beforeEach(()=>{vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2026-10-12T03:00:00Z"));resetKnAccounts(structuredClone(originalAccounts));const department=KN_DEPARTMENTS.find(d=>d.code==="thong_tin_truyen_thong")!;department.status="active";for(const account of KN_ACCOUNTS)for(const assignment of account.assignments)assignment.departments=assignment.departments.map(d=>d.code===department.code?department:d);KN_ACCOUNTS.find(a=>a.id==="kn-binh")!.assignments.find(a=>a.assignment_id==="asg-binh-tinh")!.departments.push(department);resetPriceItems();resetPricePoints();resetPriceTickets();resetPriceBoards();nav.push.mockReset();nav.replace.mockReset();nav.query="day=2026-10-12&mine=false&tab=alerts";state.role="kn_tinh";state.readOnly=false;state.mfa=true;state.status="authenticated";state.subject="kn-binh";});
 afterEach(()=>{cleanup();resetKnAccounts(structuredClone(originalAccounts));KN_DEPARTMENTS.find(d=>d.code==="thong_tin_truyen_thong")!.status=originalDepartmentStatus;vi.useRealTimers();});
 describe("204 route workspace using actual typed client + native mock contract (not PG proof)",()=>{
  it("details/log use ticket ID; filter-preserving routes and cancel never write",async()=>{
@@ -79,6 +79,17 @@ describe("204 route workspace using actual typed client + native mock contract (
 
  it("reason input permits 500 Unicode runes without a UTF-16 maxlength",async()=>{
   const f=await fixture();render(<TicketReviewWorkspace path={["phieu",f.id,"xoa"]} />);const reason=await screen.findByLabelText("Lý do",{exact:false});expect(reason).not.toHaveAttribute("maxlength");fireEvent.change(reason,{target:{value:"😀".repeat(500)}});expect(reason).toHaveValue("😀".repeat(500));
+ });
+
+ it("rapid day/mine/tab intents survive delayed URL ACK and back/forward",async()=>{
+  await fixture();nav.query="day=2026-10-12&mine=true&tab=tickets";const v=render(<TicketReviewWorkspace />);
+  fireEvent.change(screen.getByLabelText("Ngày báo giá",{exact:true}),{target:{value:"2026-10-13"}});fireEvent.click(screen.getByRole("checkbox",{name:"Chỉ xã được phân công"}));fireEvent.click(screen.getByRole("tab",{name:"Cảnh báo biến động"}));
+  expect(nav.replace).toHaveBeenLastCalledWith("/kn/bao-gia/kiem-duyet?day=2026-10-13&mine=false&tab=alerts");expect(screen.getByRole("checkbox",{name:"Chỉ xã được phân công"})).not.toBeChecked();
+  nav.query="day=2026-10-13&mine=true&tab=tickets";v.rerender(<TicketReviewWorkspace />);expect(screen.getByRole("checkbox",{name:"Chỉ xã được phân công"})).not.toBeChecked();expect(screen.getByRole("tab",{name:"Cảnh báo biến động"})).toHaveAttribute("aria-selected","true");
+  act(()=>window.dispatchEvent(new PopStateEvent("popstate")));nav.query="day=2026-10-12&mine=true&tab=tickets";v.rerender(<TicketReviewWorkspace />);await waitFor(()=>expect(screen.getByRole("checkbox",{name:"Chỉ xã được phân công"})).toBeChecked());expect(screen.getByLabelText("Ngày báo giá",{exact:true})).toHaveValue("2026-10-12");
+  nav.query="day=2026-10-13&mine=false&tab=alerts";v.rerender(<TicketReviewWorkspace />);expect(screen.getByRole("checkbox",{name:"Chỉ xã được phân công"})).toBeChecked();expect(nav.replace).toHaveBeenLastCalledWith("/kn/bao-gia/kiem-duyet?day=2026-10-12&mine=true&tab=tickets");
+  nav.query="day=2026-10-12&mine=true&tab=tickets";v.rerender(<TicketReviewWorkspace />);
+  act(()=>window.dispatchEvent(new PopStateEvent("popstate")));nav.query="day=2026-10-13&mine=false&tab=alerts";v.rerender(<TicketReviewWorkspace />);await waitFor(()=>expect(screen.getByRole("checkbox",{name:"Chỉ xã được phân công"})).not.toBeChecked());expect(screen.getByLabelText("Ngày báo giá",{exact:true})).toHaveValue("2026-10-13");
  });
 
 });

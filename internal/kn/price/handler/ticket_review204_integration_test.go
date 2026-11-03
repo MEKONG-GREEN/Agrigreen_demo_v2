@@ -211,8 +211,14 @@ func TestPriceReview204LifecycleAndReplay(t *testing.T) {
 		t.Fatalf("retry not exact replay: %d %s", replay.Code, replay.Body.String())
 	}
 	changed := e.correction("3", "9000")
-	e.call("tinh", "POST", path+"/correct", changed, key, 409)
-	e.call("tinh", "POST", path+"/correct", changed, "", 409)
+	reused := e.call("tinh", "POST", path+"/correct", changed, key, 422)
+	if reused["code"] != "idempotency_key_reused" || after != e.counts() {
+		t.Fatalf("body reuse must reject by contract without append: %v", reused)
+	}
+	stale := e.call("tinh", "POST", path+"/correct", changed, "", 409)
+	if stale["code"] != "price.ticket_stale" || after != e.counts() {
+		t.Fatalf("new key with stale version must409/no append: %v", stale)
+	}
 	for _, raw := range []string{"0", "-1", "1.234", "1000000000000", strings.Repeat("9", 512)} {
 		b := e.correction(raw, raw)
 		b["version"] = 2
