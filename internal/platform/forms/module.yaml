@@ -22,6 +22,7 @@ provides:
     - ReviewGuard
     - SubmissionFeed
     - SystemProgressReader
+    - TemplateCatalog
     - Validator
   events: [pf.forms.period.closed/v1, pf.forms.submission.recorded/v1]
   internal_events: []

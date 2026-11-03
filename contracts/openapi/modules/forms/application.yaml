@@ -37,7 +37,7 @@ paths:
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
     post:
-      summary: Định nghĩa phiên bản mới của biểu (vai define_by) — phiên bản cũ và kỳ đã phát hành không đổi
+      summary: Định nghĩa phiên bản qua policy chủ nghiệp vụ hoặc DefineBy legacy; phiên bản và kỳ cũ bất biến
       operationId: formsDefineTemplate
       tags: [forms]
       parameters:
@@ -55,7 +55,8 @@ paths:
               schema: {$ref: "#/components/schemas/FormsTemplate"}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "404": {description: forms.profile_not_found, $ref: "#/components/responses/Problem"}
-        "422": {description: forms.template_invalid, $ref: "#/components/responses/Problem"}
+        "409": {description: base_version không còn hiện hành, $ref: "#/components/responses/Problem"}
+        "422": {description: forms.template_invalid hoặc base_version thiếu hoặc idempotency_key_reused, $ref: "#/components/responses/Problem"}
 # @ag-order: 322
   /v1/forms/templates/fixtures:
     post:
@@ -386,6 +387,49 @@ paths:
   # --- pf/extension Kỳ KHTC (W11.62 — BRD KHTC v2.2 FN-TI-02.03, D4 KH2): mở kỳ bằng ô chọn (tên kỳ, khoảng thời gian, hạn tự
   # điền), một phiếu mỗi phòng = kỳ native cap/forms profile kn_khtc (nộp, yêu cầu bổ sung/xác nhận ở /v1/forms), gắn kỳ nguồn
   # (calendar_id, calendar_version, native_key), tiến độ phiếu + nguồn, sửa hạn, đóng kỳ, hủy kỳ. Cấp Tỉnh Phòng KHTC ghi. ---
+# @ag-order: 935
+  /v1/forms/template-versions:
+    get:
+      summary: Lịch sử phiên bản bất biến theo profile và mã biểu trong phạm vi đọc
+      operationId: formsTemplateVersions
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: code, in: query, required: true, schema: {type: string, maxLength: 64}}
+        - {name: before_version, in: query, schema: {type: integer, format: int64, minimum: 0, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Mới trước; dùng version cuối làm before_version trang kế tiếp
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/FormsTemplate"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 936
+  /v1/forms/template-versions/{version}:
+    get:
+      summary: Chọn đúng phiên bản bất biến theo profile và mã biểu trong phạm vi đọc
+      operationId: formsTemplateVersion
+      tags: [forms]
+      parameters:
+        - $ref: "#/components/parameters/FormsProfile"
+        - {name: code, in: query, required: true, schema: {type: string, maxLength: 64}}
+        - {name: version, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      responses:
+        "200":
+          description: Phiên bản chính xác; gắn id này khi phát hành kỳ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FormsTemplate"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
 components:
   parameters:
 # @ag-order: 489
@@ -422,6 +466,7 @@ components:
         title: {type: string, minLength: 1, maxLength: 300}
         fields: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
         fixture: {type: boolean, default: false}
+        base_version: {type: integer, format: int64, minimum: 0, description: "Bắt buộc khi profile có definition policy; 0 tạo mã mới, số khác là phiên bản gốc đã đọc. Legacy bỏ trống giữ tương thích."}
 # @ag-order: 854
     FormsTemplate:
       type: object

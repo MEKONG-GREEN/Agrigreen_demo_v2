@@ -98,6 +98,9 @@ func ParseRule(k RuleKey, raw []byte) (canon []byte, refs map[Kind][]string, err
 	var v any
 	switch k {
 	case RulePromotion:
+		if err := guardRulePercentages(raw); err != nil {
+			return nil, nil, err
+		}
 		var p PromotionRules
 		if err := decodeStrict(raw, &p); err != nil {
 			return nil, nil, err

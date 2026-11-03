@@ -9,7 +9,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/auth/AuthProvider";
-import { Dialog } from "@/components/Dialog";
 import {
   DataTable,
   PageHeader,
@@ -20,36 +19,28 @@ import {
 import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
 import { catalogBase, catalogItemPath } from "./catalog-form";
 import { HrmScalesList } from "./ScaleScreens";
+import { rulePath } from "./rule-form";
 import { scaleListPath, scalePath, scaleToday, validScaleDay } from "./scale-form";
 import {
   createHrmApi,
-  dmy,
   EQUIV_LABEL,
   FIXED_KINDS,
   GRADE_TYPE_LABEL,
   KIND_LABEL,
   MAIN_KINDS,
-  normDecimal,
   RULE_LABEL,
   vnDecimal,
-  type HrmAchievementConversion,
   type HrmApi,
   type HrmAttrs,
   type HrmItem,
   type HrmKind,
-  type HrmPromotionRules,
   type HrmRuleKey,
 } from "./api";
 
 type View =
   | { t: "kind"; kind: HrmKind }
-  | { t: "scales" }
-  | { t: "rule"; key: HrmRuleKey };
+  | { t: "scales" };
 const PAGE = 20;
-
-function vnToday(): string {
-  return new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
-}
 
 export function useHrmApi(): HrmApi {
   const { api } = useAuth();
@@ -180,14 +171,7 @@ function CatalogList({ initialKind = "grade", initialScales = false, initialScal
                   () => { setView({ t: "scales" }); router.push(scaleListPath(base, initialScaleDay ?? scaleToday())); },
                   st.scales,
                 )}
-                {(["promotion", "achievement_conversion"] as HrmRuleKey[]).map(
-                  (k) =>
-                    navBtn(
-                      RULE_LABEL[k],
-                      view.t === "rule" && view.key === k,
-                      () => setView({ t: "rule", key: k }),
-                    ),
-                )}
+                {(["promotion", "achievement_conversion"] as HrmRuleKey[]).map((key) => <Link key={key} className="btn btn-o" href={rulePath(base,key,initialScaleDay ?? scaleToday())}>{RULE_LABEL[key]}</Link>)}
                 <div className="mute small" style={{ marginTop: 8 }}>
                   Danh sách khai báo sẵn
                 </div>
@@ -219,16 +203,6 @@ function CatalogList({ initialKind = "grade", initialScales = false, initialScal
                     canManage={st.can_manage}
                     nonce={nonce}
                     initialDay={initialScaleDay}
-                  />
-                ) : null}
-                {view.t === "rule" ? (
-                  <RulePanel
-                    key={view.key}
-                    ha={ha}
-                    rkey={view.key}
-                    canManage={st.can_manage}
-                    nonce={nonce}
-                    onChanged={bump}
                   />
                 ) : null}
               </section>
@@ -462,410 +436,5 @@ function KindPanel({
         );
       }}
     </LoadState>
-  );
-}
-
-const PROMOTION_FIELDS: {
-  k: keyof HrmPromotionRules;
-  label: string;
-  pct?: boolean;
-}[] = [
-  { k: "min_rating", label: "Xếp loại tối thiểu mỗi năm (NLTX)" },
-  { k: "rating_years", label: "Số năm xếp loại xét" },
-  { k: "achievement_years", label: "Số năm thành tích xét (NLTH)" },
-  { k: "nlth_quota_pct", label: "Tỷ lệ chỉ tiêu NLTH (%)", pct: true },
-  {
-    k: "nlth_retirement_months",
-    label: "NLTH nghỉ hưu: số tháng nâng trước tối đa",
-  },
-  {
-    k: "nlth_retirement_within_months",
-    label: "NLTH nghỉ hưu: trong vòng (tháng)",
-  },
-  { k: "tnvk_start_pct", label: "% TNVK khởi điểm", pct: true },
-  { k: "tnvk_step_pct", label: "% TNVK tăng mỗi chu kỳ", pct: true },
-  { k: "tnvk_cycle_months", label: "Chu kỳ TNVK (tháng)" },
-  { k: "tnvk_first_months", label: "Giữ bậc cuối trước TNVK lần đầu (tháng)" },
-  { k: "retirement_age_male_months", label: "Tuổi nghỉ hưu nam (tháng tuổi)" },
-  { k: "retirement_age_female_months", label: "Tuổi nghỉ hưu nữ (tháng tuổi)" },
-];
-
-/** Dòng mã → số tháng (kéo dài theo kỷ luật; quy đổi thành tích). */
-type CodeMonths = { code: string; months: string }[];
-
-function RulePanel({
-  ha,
-  rkey,
-  canManage,
-  nonce,
-  onChanged,
-}: {
-  ha: HrmApi;
-  rkey: HrmRuleKey;
-  canManage: boolean;
-  nonce: number;
-  onChanged: () => void;
-}) {
-  const [at, setAt] = useState(vnToday());
-  const [edit, setEdit] = useState(false);
-  const v = useLoad(() => ha.rule(rkey, at), [rkey, at, nonce]);
-  const refKind: HrmKind =
-    rkey === "promotion" ? "discipline_form" : "award_form";
-  const refs = useLoad(() => ha.list(refKind), [refKind, nonce]);
-  const refName = (c: string) =>
-    refs.data?.items.find((x) => x.code === c)?.name ?? c;
-  return (
-    <>
-      <div className="row" style={{ marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 17 }}>{RULE_LABEL[rkey]}</h2>
-        <label htmlFor="ru-at">Hiệu lực tại ngày</label>
-        <input
-          id="ru-at"
-          type="date"
-          className="input"
-          style={{ width: 170 }}
-          value={at}
-          onChange={(e) => e.target.value && setAt(e.target.value)}
-        />
-        {canManage ? (
-          <button
-            type="button"
-            className="btn btn-p btn-sm"
-            onClick={() => setEdit(true)}
-          >
-            Phiên bản mới
-          </button>
-        ) : null}
-      </div>
-      <LoadState s={v}>
-        {(d) => (
-          <>
-            {d.current ? (
-              <div className="card" style={{ padding: 16 }}>
-                <p className="small" style={{ marginTop: 0 }}>
-                  Phiên bản {d.current.version}, hiệu lực từ{" "}
-                  {dmy(d.current.valid_from)}{" "}
-                  <PlaceholderPill on={d.current.placeholder} />
-                  {d.current.note ? (
-                    <span className="mute"> — {d.current.note}</span>
-                  ) : null}
-                </p>
-                {rkey === "promotion" ? (
-                  <table className="dt">
-                    <tbody>
-                      {PROMOTION_FIELDS.map((f) => {
-                        const p = d.current!
-                          .payload as unknown as HrmPromotionRules;
-                        const raw = p[f.k];
-                        return (
-                          <tr key={f.k}>
-                            <th scope="row">{f.label}</th>
-                            <td>
-                              {f.pct ? vnDecimal(String(raw)) : String(raw)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      <tr>
-                        <th scope="row">Mốc nhắc đến kỳ (tháng tới)</th>
-                        <td>
-                          {(
-                            (d.current.payload as unknown as HrmPromotionRules)
-                              .remind_months ?? []
-                          ).join(", ")}
-                        </td>
-                      </tr>
-                      <tr>
-                        <th scope="row">Kéo dài giữ bậc theo kỷ luật</th>
-                        <td>
-                          {Object.entries(
-                            (d.current.payload as unknown as HrmPromotionRules)
-                              .discipline_extension_months ?? {},
-                          )
-                            .map(([c, m]) => `${refName(c)}: ${m} tháng`)
-                            .join(" · ") || "—"}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                ) : (
-                  <table className="dt">
-                    <thead>
-                      <tr>
-                        <th scope="col">Hình thức khen thưởng</th>
-                        <th scope="col">Số tháng nâng bậc trước hạn</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(
-                        d.current.payload as unknown as HrmAchievementConversion
-                      ).rules.map((r) => (
-                        <tr key={r.award_code}>
-                          <td>{refName(r.award_code)}</td>
-                          <td>{r.months}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            ) : (
-              <p className="mute">Chưa có phiên bản hiệu lực tại ngày này.</p>
-            )}
-            <p className="mute small" style={{ marginTop: 8 }}>
-              Các phiên bản:{" "}
-              {d.versions
-                .map(
-                  (x) =>
-                    `${dmy(x.valid_from)} (v${x.version}${x.placeholder ? ", mẫu" : ""})`,
-                )
-                .join(" · ") || "—"}
-            </p>
-            {edit ? (
-              <RuleDialog
-                ha={ha}
-                rkey={rkey}
-                base={
-                  d.current?.payload as unknown as
-                    HrmPromotionRules | HrmAchievementConversion | undefined
-                }
-                refs={refs.data?.items ?? []}
-                onClose={() => setEdit(false)}
-                onSaved={() => (setEdit(false), onChanged())}
-              />
-            ) : null}
-          </>
-        )}
-      </LoadState>
-    </>
-  );
-}
-
-function RuleDialog({
-  ha,
-  rkey,
-  base,
-  refs,
-  onClose,
-  onSaved,
-}: {
-  ha: HrmApi;
-  rkey: HrmRuleKey;
-  base?: HrmPromotionRules | HrmAchievementConversion;
-  refs: HrmItem[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [from, setFrom] = useState(vnToday());
-  const [note, setNote] = useState("");
-  const promo =
-    rkey === "promotion" ? (base as HrmPromotionRules | undefined) : undefined;
-  const [fields, setFields] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      PROMOTION_FIELDS.map((f) => [
-        f.k,
-        promo
-          ? f.pct
-            ? vnDecimal(String(promo[f.k]))
-            : String(promo[f.k])
-          : "",
-      ]),
-    ),
-  );
-  const [remind, setRemind] = useState(
-    promo?.remind_months?.join(", ") ?? "1, 3, 6",
-  );
-  const [rows, setRows] = useState<CodeMonths>(() =>
-    rkey === "promotion"
-      ? Object.entries(promo?.discipline_extension_months ?? {}).map(
-          ([code, m]) => ({ code, months: String(m) }),
-        )
-      : ((base as HrmAchievementConversion | undefined)?.rules ?? []).map(
-          (r) => ({ code: r.award_code, months: String(r.months) }),
-        ),
-  );
-  const act = useAction();
-  const payload = (): HrmPromotionRules | HrmAchievementConversion => {
-    const pairs = rows.filter((r) => r.code);
-    if (rkey === "achievement_conversion")
-      return {
-        rules: pairs.map((r) => ({
-          award_code: r.code,
-          months: Number(r.months) || 0,
-        })),
-      };
-    const p: Record<string, unknown> = {};
-    for (const f of PROMOTION_FIELDS) {
-      const raw = fields[f.k] ?? "";
-      p[f.k] =
-        f.k === "min_rating"
-          ? raw.trim()
-          : f.pct
-            ? normDecimal(raw)
-            : Number(raw) || 0;
-    }
-    p.remind_months = remind
-      .split(/[,;\s]+/)
-      .filter(Boolean)
-      .map(Number);
-    p.discipline_extension_months = Object.fromEntries(
-      pairs.map((r) => [r.code, Number(r.months) || 0]),
-    );
-    return p as unknown as HrmPromotionRules;
-  };
-  const save = () =>
-    void act
-      .run(() =>
-        ha.addRule(rkey, {
-          valid_from: from,
-          payload: payload(),
-          ...(note.trim() ? { note: note.trim() } : {}),
-        }),
-      )
-      .then((r) => r && onSaved());
-  return (
-    <Dialog
-      title={`${RULE_LABEL[rkey]} — phiên bản mới`}
-      onClose={onClose}
-      actions={
-        <button
-          type="button"
-          className="btn btn-p btn-sm"
-          disabled={act.busy}
-          onClick={save}
-        >
-          Lưu
-        </button>
-      }
-    >
-      {act.view}
-      <div className="grid2">
-        <div className="field">
-          <label htmlFor="ru-from" className="req">
-            Ngày hiệu lực
-          </label>
-          <input
-            id="ru-from"
-            type="date"
-            className="input"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="ru-note">Ghi chú (căn cứ)</label>
-          <input
-            id="ru-note"
-            className="input"
-            maxLength={500}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-        {rkey === "promotion" ? (
-          <>
-            {PROMOTION_FIELDS.map((f) => (
-              <div className="field" key={f.k}>
-                <label htmlFor={`ru-${f.k}`}>{f.label}</label>
-                {f.k === "min_rating" ? (
-                  <select
-                    id={`ru-${f.k}`}
-                    className="select"
-                    value={fields[f.k] ?? ""}
-                    onChange={(e) =>
-                      setFields((x) => ({ ...x, [f.k]: e.target.value }))
-                    }
-                  >
-                    {["HTXSNV", "HTTNV", "HTNV", "KHTNV"].map((r) => (
-                      <option key={r}>{r}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    id={`ru-${f.k}`}
-                    className="input"
-                    inputMode={f.pct ? "decimal" : "numeric"}
-                    value={fields[f.k] ?? ""}
-                    onChange={(e) =>
-                      setFields((x) => ({ ...x, [f.k]: e.target.value }))
-                    }
-                  />
-                )}
-              </div>
-            ))}
-            <div className="field">
-              <label htmlFor="ru-remind">Mốc nhắc (tháng tới, tăng dần)</label>
-              <input
-                id="ru-remind"
-                className="input"
-                value={remind}
-                onChange={(e) => setRemind(e.target.value)}
-              />
-            </div>
-          </>
-        ) : null}
-      </div>
-      <fieldset className="card" style={{ marginTop: 12, padding: 12 }}>
-        <legend className="small">
-          {rkey === "promotion"
-            ? "Kéo dài thời gian giữ bậc theo hình thức kỷ luật"
-            : "Bảng quy đổi thành tích"}
-        </legend>
-        {rows.map((r, i) => (
-          <div className="row" key={i} style={{ marginBottom: 6 }}>
-            <select
-              aria-label={`Mục ${i + 1}`}
-              className="select"
-              value={r.code}
-              onChange={(e) =>
-                setRows((xs) =>
-                  xs.map((x, j) =>
-                    j === i ? { ...x, code: e.target.value } : x,
-                  ),
-                )
-              }
-            >
-              <option value="">—</option>
-              {refs.map((x) => (
-                <option key={x.code} value={x.code}>
-                  {x.name}
-                </option>
-              ))}
-            </select>
-            <input
-              aria-label={`Số tháng ${i + 1}`}
-              className="input"
-              style={{ width: 90 }}
-              inputMode="numeric"
-              value={r.months}
-              onChange={(e) =>
-                setRows((xs) =>
-                  xs.map((x, j) =>
-                    j === i
-                      ? { ...x, months: e.target.value.replace(/\D/g, "") }
-                      : x,
-                  ),
-                )
-              }
-            />
-            <span className="small">tháng</span>
-            <button
-              type="button"
-              className="btn btn-o btn-sm"
-              onClick={() => setRows((xs) => xs.filter((_, j) => j !== i))}
-            >
-              Bỏ
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className="btn btn-o btn-sm"
-          onClick={() => setRows((xs) => [...xs, { code: "", months: "" }])}
-        >
-          + Thêm dòng
-        </button>
-      </fieldset>
-    </Dialog>
   );
 }
