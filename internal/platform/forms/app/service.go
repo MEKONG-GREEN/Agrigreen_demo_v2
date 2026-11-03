@@ -41,8 +41,12 @@ type Service struct {
 	Validators map[string]port.Validator
 	// ReviewGuards: kiểm quyền rà soát thêm của bên dùng theo profile (gọi ngoài giao dịch, trước khi ghi).
 	ReviewGuards map[string]port.ReviewGuard
-	profiles     map[string]port.Profile
-	order        []string
+	// DefinitionPolicies are registered before serving; owner callbacks run outside TX.
+	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
+	// RequiredDefinitionPolicies denies missing policies instead of falling back to DefineBy.
+	RequiredDefinitionPolicies map[string]bool
+	profiles                   map[string]port.Profile
+	order                      []string
 }
 
 var _ port.Freezer = (*Service)(nil)
@@ -55,7 +59,7 @@ func NewService(b tenant.Beginner, clk clock.Clock, approvals wfport.Approvals, 
 	if clk == nil {
 		clk = clock.System{}
 	}
-	s := &Service{DB: b, Clock: clk, Approvals: approvals, profiles: map[string]port.Profile{}}
+	s := &Service{DB: b, Clock: clk, Approvals: approvals, profiles: map[string]port.Profile{}, RequiredDefinitionPolicies: map[string]bool{}}
 	for _, p := range profiles {
 		if err := domain.ValidateProfile(p); err != nil {
 			return nil, err
@@ -64,6 +68,9 @@ func NewService(b tenant.Beginner, clk clock.Clock, approvals wfport.Approvals, 
 			return nil, fmt.Errorf("profile %s khai hai lần", p.Name)
 		}
 		s.profiles[p.Name] = p
+		if p.RequireDefinitionPolicy {
+			s.RequiredDefinitionPolicies[p.Name] = true
+		}
 		s.order = append(s.order, p.Name)
 	}
 	return s, nil
