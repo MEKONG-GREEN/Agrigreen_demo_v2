@@ -136,5 +136,22 @@ func TestInitialDraft225P804PlanlessOpenHasNoNativeEffect(t *testing.T) {
 	}
 	if code != http.StatusConflict || result.Code != "extension.khtc_plan_required" || probe.calls.Load() != 0 || nativeApplied || len(list.Items) != 0 {
 		t.Fatalf("P804 missing published owner plan must prevent dispatch: http=%d code=%s native_publish_calls=%d native_applied=%t owned_periods=%d", code, result.Code, probe.calls.Load(), nativeApplied, len(list.Items))
+	} // A real published empty plan is present; an empty department projection must
+	// not be confused with missing plan. Explicit departments remain supported.
+	code, _ = call(writer, http.MethodPost, "/v1/kn/khtc/plans/2026/versions", map[string]any{"base_version": 0, "entries": []any{}})
+	if code != http.StatusCreated {
+		t.Fatalf("published positive control setup status=%d", code)
+	}
+	code, raw = call(writer, http.MethodPost, "/v1/extension/khtc/periods", map[string]any{"report_type": "week", "year": 2026, "no": 41, "departments": []string{"trong_trot"}})
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatal("positive open response was not JSON")
+	}
+	if code != http.StatusCreated || probe.calls.Load() != 1 || result.FormsPeriodID == uuid.Nil {
+		t.Fatalf("applied-plan positive control: http=%d native_publish_calls=%d native_id_present=%t", code, probe.calls.Load(), result.FormsPeriodID != uuid.Nil)
+	}
+	k := identities.contexts[writer]
+	principal := fixture.Bind(t, authz.Principal{ActorRef: writer, TenantID: tid, OrgRef: org, MFA: true, KN: &k})
+	if snap, err := fm.ConditionalControl().ControlSnapshot(authz.WithPrincipal(context.Background(), principal), KNKHTCProfile.Name, result.FormsPeriodID); err != nil || snap.Revision.EventSeq < 1 {
+		t.Fatal("published-plan control did not create a native period")
 	}
 }

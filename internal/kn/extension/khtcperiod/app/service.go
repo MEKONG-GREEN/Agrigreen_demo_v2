@@ -270,9 +270,12 @@ func (s *Service) draft(ctx context.Context, c caller, in OpenInput, strict bool
 }
 
 // pickDepartments chọn phòng tham gia: danh sách KHTC chọn (phải là phòng đang áp dụng của đơn vị, khác KHTC); rỗng →
-// phòng phụ trách theo Kế hoạch năm (nếu W11.61 đã nối) giao với phòng đang áp dụng; không có Kế hoạch năm → mọi phòng
-// đang áp dụng trừ KHTC.
+// phòng phụ trách theo Kế hoạch năm (nếu W11.61 đã nối) giao với phòng đang áp dụng; thiếu kế hoạch hiệu lực → chặn trước khi gọi native (P804).
 func (s *Service) pickDepartments(ctx context.Context, req, avail []string, loaded bool, plan domain.Plan, d *Draft) ([]string, error) {
+	pd, err := s.publishedYearDepartments225(ctx, plan.Year, plan.Cutoff)
+	if err != nil {
+		return nil, err
+	}
 	var out []string
 	if len(req) > 0 {
 		for _, code := range req {
@@ -288,19 +291,13 @@ func (s *Service) pickDepartments(ctx context.Context, req, avail []string, load
 		}
 		return out, nil
 	}
-	if s.Plan != nil {
-		pd, err := s.Plan.PlanDepartments(ctx, plan.Year, plan.Cutoff)
-		if err != nil {
-			return nil, ErrDependency.WithDetail("Kế hoạch năm lỗi").WithCause(err)
+	for _, code := range pd {
+		if (!loaded || slices.Contains(avail, code)) && code != partyport.DeptKeHoachTaiChinh && !slices.Contains(out, code) {
+			out = append(out, code)
 		}
-		for _, code := range pd {
-			if (!loaded || slices.Contains(avail, code)) && code != partyport.DeptKeHoachTaiChinh && !slices.Contains(out, code) {
-				out = append(out, code)
-			}
-		}
-		d.PlanDepartments = len(out) > 0
 	}
-	if len(out) == 0 { // chưa có Kế hoạch năm hiệu lực (hoặc chưa phân phòng phụ trách) → mọi phòng đang áp dụng trừ KHTC
+	d.PlanDepartments = len(out) > 0
+	if len(out) == 0 { // kế hoạch đã áp dụng hợp lệ nhưng chưa phân phòng: giữ lựa chọn phòng hiện hành
 		out = append(out, avail...)
 	}
 	if len(out) == 0 {

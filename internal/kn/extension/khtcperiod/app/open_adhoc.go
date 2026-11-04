@@ -122,6 +122,10 @@ func (s *Service) openAdhoc(ctx context.Context, c caller, in OpenInput, idem st
 	if existing != nil {
 		return s.Get(ctx, existing.ID)
 	}
+	// Recovery can reach here without draft(): use the immutable owner intent, not new client years.
+	if _, err := s.publishedYearDepartments225(ctx, intent.Plan.Year, intent.Plan.Cutoff); err != nil {
+		return Detail{}, err
+	}
 	op := forms.Operation{Action: forms.OperationPublishBatch, Profile: domain.ProfileKHTC, PayloadHash: intent.BatchHash, IdemKey: intent.NativeKey}
 	nativeCtx := ext.WithKHTCOperation(ctx, OperationAuthority{DB: s.DB}, ext.KHTCOperationProof{IntentID: intent.ID, SessionID: c.k.ID, LeaseGeneration: intent.LeaseGeneration, Expected: op})
 	// Native publish owns its transaction and idempotency. On an unknown outcome we
