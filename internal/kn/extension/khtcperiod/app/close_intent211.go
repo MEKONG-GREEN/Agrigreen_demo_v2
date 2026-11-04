@@ -44,6 +44,9 @@ func closeAuthority211(c caller) (string, error) {
 	roles := slices.Clone(c.p.Roles)
 	slices.Sort(roles)
 	k := c.k
+	// Selected-session identity and expiry are request liveness, not durable owner
+	// authority. Every attempt still resolves the CURRENT trusted session below.
+	k.ID, k.ExpiresAt = uuid.Nil, time.Time{}
 	k.Communes = slices.Clone(k.Communes)
 	slices.Sort(k.Communes)
 	k.Scope.Units = slices.Clone(k.Scope.Units)
@@ -58,12 +61,12 @@ func closeAuthority211(c caller) (string, error) {
 		k.Support = &support
 	}
 	return forms.OperationHash(struct {
-		Version       string
-		Tenant, Actor uuid.UUID
-		MFA           bool
-		Roles         []string
-		Owner         ext.SessionContext
-	}{"close211/v1", c.p.TenantID, c.p.ActorRef, c.p.MFA, roles, k})
+		Version            string
+		Tenant, Actor, Org uuid.UUID
+		MFA                bool
+		Roles              []string
+		Owner              ext.SessionContext
+	}{"close211/v2", c.p.TenantID, c.p.ActorRef, c.p.OrgRef, c.p.MFA, roles, k})
 }
 func decodeClose211(v store.CloseIntent211) (closeData211, error) {
 	var d closeData211
@@ -109,7 +112,7 @@ func (s *Service) closeCurrent211(ctx context.Context, v store.CloseIntent211) (
 	if err != nil {
 		return c, err
 	}
-	if !c.p.MFA || c.p.ActorRef != v.Actor || h != v.AuthorityHash {
+	if !c.p.MFA || (!c.k.ExpiresAt.IsZero() && !s.now().Before(c.k.ExpiresAt)) || c.p.ActorRef != v.Actor || h != v.AuthorityHash {
 		return c, problem.Forbidden
 	}
 	return c, nil
@@ -403,6 +406,9 @@ func (s *Service) closeCAS211(ctx context.Context, id uuid.UUID, reason, key str
 	if !c.p.MFA {
 		return Detail{}, problem.MFARequired
 	}
+	if !c.k.ExpiresAt.IsZero() && !s.now().Before(c.k.ExpiresAt) {
+		return Detail{}, problem.Forbidden
+	}
 	authority, err := closeAuthority211(c)
 	if err != nil {
 		return Detail{}, err
@@ -515,7 +521,16 @@ func (s *Service) closeCAS211(ctx context.Context, id uuid.UUID, reason, key str
 		}
 		data.Receipt = &receipt
 	} else {
-		receipt, e := s.Operations.ReadPeriodOperation(s.closeNativeContext211(ctx, c, *v, data), data.Native)
+		nativeCtx := s.closeNativeContext211(ctx, c, *v, data)
+		receipt, e := s.Operations.ReadPeriodOperation(nativeCtx, data.Native)
+		if e == nil && receipt.Outcome == forms.PeriodOperationUnknown && data.Receipt == nil && (v.Phase == "dispatched" || v.Phase == "unresolved") {
+			// Unknown is NOT proof of rollback. Re-submit only the immutable original
+			// command: supplier212 locks its permanent OperationID before lookup/CAS.
+			// An existing key replays or stays unknown (even after receipt retention);
+			// only an absent key can apply, against the ORIGINAL Expected revision.
+			// Never acquire a fresh token/opID or re-execute a stored applied receipt.
+			receipt, e = s.Operations.ExecutePeriodOperation(nativeCtx, data.Native)
+		}
 		if e != nil || !validCloseReceipt211(c, *v, data, receipt) {
 			return Detail{}, errCloseInterrupted211.WithCause(e)
 		}

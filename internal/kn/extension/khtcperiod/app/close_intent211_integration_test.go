@@ -81,10 +81,13 @@ type receiptProbe211 struct {
 	before       func(context.Context, formsport.PeriodOperationRequest)
 	after        func(formsport.PeriodOperationReceipt, error) (formsport.PeriodOperationReceipt, error)
 	calls, reads int
+	mu           sync.Mutex
 }
 
 func (p *receiptProbe211) ExecutePeriodOperation(ctx context.Context, in formsport.PeriodOperationRequest) (formsport.PeriodOperationReceipt, error) {
+	p.mu.Lock()
 	p.calls++
+	p.mu.Unlock()
 	if p.before != nil {
 		p.before(ctx, in)
 	}
@@ -95,7 +98,9 @@ func (p *receiptProbe211) ExecutePeriodOperation(ctx context.Context, in formspo
 	return r, e
 }
 func (p *receiptProbe211) ReadPeriodOperation(ctx context.Context, in formsport.PeriodOperationRequest) (formsport.PeriodOperationReceipt, error) {
+	p.mu.Lock()
 	p.reads++
+	p.mu.Unlock()
 	return p.PeriodOperations.ReadPeriodOperation(ctx, in)
 }
 func phaseClose211(t *testing.T, f *deadlineFx209) string {

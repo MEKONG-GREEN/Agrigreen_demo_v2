@@ -350,10 +350,28 @@ func TestClose211SingleDispatchWithOneConnectionAndConcurrentReplay(t *testing.T
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	entered, release := make(chan struct{}), make(chan struct{})
-	var releaseOnce sync.Once
+	retryEntered := make(chan struct{})
+	var releaseOnce, enterOnce, retryEnterOnce sync.Once
+	var original fp.PeriodOperationRequest
+	var originalMu sync.Mutex
+	beforeCounts := nativeCountsFix211(t, f)
+	beforeOutbox := f.outboxCount209(t)
 	releaseNative := func() { releaseOnce.Do(func() { close(release) }) }
 	defer releaseNative()
-	probe := &receiptProbe211{PeriodOperations: svc.Operations, before: func(context.Context, fp.PeriodOperationRequest) { close(entered); <-release }}
+	probe := &receiptProbe211{PeriodOperations: svc.Operations, before: func(_ context.Context, in fp.PeriodOperationRequest) {
+		originalMu.Lock()
+		if original.OperationID == uuid.Nil {
+			original = in
+		} else {
+			retryEnterOnce.Do(func() { close(retryEntered) })
+		}
+		if in != original {
+			t.Error("concurrent recovery replaced original command/Expected")
+		}
+		originalMu.Unlock()
+		enterOnce.Do(func() { close(entered) })
+		<-release
+	}}
 	svc.Operations = probe
 	done := make(chan error, 1)
 	go func() {
@@ -365,14 +383,44 @@ func TestClose211SingleDispatchWithOneConnectionAndConcurrentReplay(t *testing.T
 	case <-ctx.Done():
 		t.Fatal("pool1 blocked before native dispatch")
 	}
-	_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "concurrent211")
-	assertConflict209(t, err)
+	retry := make(chan error, 1)
+	go func() {
+		_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "concurrent211")
+		retry <- err
+	}()
+	select {
+	case <-retryEntered:
+	case <-ctx.Done():
+		t.Fatal("competing exact retry did not reach supplier before release")
+	}
 	releaseNative()
-	if err = <-done; err != nil {
+	successes := 0
+	for _, result := range []<-chan error{done, retry} {
+		if err := <-result; err != nil {
+			assertConflict209(t, err)
+		} else {
+			successes++
+		}
+	}
+	if successes == 0 {
+		t.Fatal("neither concurrent owner completed")
+	}
+	out, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "concurrent211")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if probe.calls != 1 || phaseClose211(t, f) != "completed" {
-		t.Fatal("concurrent replay dispatched native twice")
+	again, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "concurrent211")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := json.Marshal(out)
+	b, _ := json.Marshal(again)
+	if string(a) != string(b) {
+		t.Fatal("concurrent replay did not preserve exact stored outcome")
+	}
+	afterCounts := nativeCountsFix211(t, f)
+	if phaseClose211(t, f) != "completed" || afterCounts != [3]int{beforeCounts[0] + 1, beforeCounts[1] + 1, beforeCounts[2] + 1} || f.outboxCount209(t) != beforeOutbox+1 {
+		t.Fatal("concurrent exact-command retry repeated native event, snapshot, anchor or outbox")
 	}
 }
 
