@@ -54,12 +54,23 @@ func (s *Service) submitted(ctx context.Context, c caller, p ps.Period) ([]domai
 	}); err != nil {
 		return nil, err
 	}
-	out := []domain.Submitted{}
+	eligible := []ps.Period{}
 	for _, period := range periods {
 		isCurrentProgram := p.Type == pd.TypeProgram && period.ID == p.ID
 		if terminal(events[period.ID]) == pd.PeriodCancelled || (period.To.After(pd.QuantityEnd(p.Type, p.To, p.Cutoff)) && !isCurrentProgram) || (period.Type != pd.TypeWeek && period.ID != p.ID) {
 			continue
 		}
+		eligible = append(eligible, period)
+	}
+	return s.submittedPeriods(ctx, c, eligible)
+}
+
+// submittedPeriods consumes only real ledger periods selected by the caller.
+// Native submissions are read outside the module transaction; sealed content is
+// checked in a separate tenant-scoped read, as in the frozen-report path.
+func (s *Service) submittedPeriods(ctx context.Context, c caller, periods []ps.Period) ([]domain.Submitted, error) {
+	out := []domain.Submitted{}
+	for _, period := range periods {
 		for _, department := range period.Departments {
 			submissions, err := s.Forms.Submissions(ctx, pd.ProfileKHTC, period.FormsPeriodRef, department)
 			if err != nil {

@@ -493,6 +493,28 @@ func Hash(value any) (string, error) {
 func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot *SourceRef, metrics []SourceMetric, at time.Time) (Data, error) {
 	data := Data{Period: period, Template: Template(period.Type), Plan: plan, Sources: snapshot, Metrics: metrics, Rows: []ProgramRow{},
 		Submissions: []Submitted{}, FormTexts: map[string]map[string]string{}, Provisional: []string{}, CapturedAt: at}
+	return composeCalculation(data, calculationWindow{year: period.Year, from: period.From,
+		to: perioddomain.QuantityEnd(period.Type, period.To, period.Cutoff), kind: period.Type,
+		currentID: &period.ID, departments: period.Departments}, submitted)
+}
+
+// calculationWindow is a pure calculation envelope, never a reporting-period
+// entity. Only Compose supplies a real current period identity.
+type calculationWindow struct {
+	year        int
+	from, to    time.Time
+	kind        string
+	currentID   *uuid.UUID
+	departments []string
+	live        bool
+}
+
+func (w calculationWindow) current(id uuid.UUID) bool {
+	return w.currentID != nil && *w.currentID == id
+}
+
+func composeCalculation(data Data, window calculationWindow, submitted []Submitted) (Data, error) {
+	plan, snapshot, metrics := data.Plan, data.Sources, data.Metrics
 	if data.Template == "" {
 		return Data{}, ErrInput
 	}
@@ -527,14 +549,14 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 	}
 	current := map[string]Submitted{}
 	for _, sheet := range latest {
-		isCurrentProgram := period.Type == perioddomain.TypeProgram && sheet.PeriodID == period.ID
-		if sheet.Year != period.Year || (sheet.To.After(perioddomain.QuantityEnd(period.Type, period.To, period.Cutoff)) && !isCurrentProgram) {
+		isCurrentProgram := window.kind == perioddomain.TypeProgram && window.current(sheet.PeriodID)
+		if sheet.Year != window.year || (sheet.To.After(window.to) && !isCurrentProgram) || (window.live && sheet.Decision == "returned") {
 			continue
 		}
-		if sheet.Type == "week" || sheet.PeriodID == period.ID {
+		if sheet.Type == "week" || window.current(sheet.PeriodID) {
 			data.Submissions = append(data.Submissions, sheet)
 		}
-		if sheet.PeriodID == period.ID {
+		if window.current(sheet.PeriodID) {
 			current[sheet.Department] = sheet
 			data.FormTexts[sheet.Department] = sheet.Sheet.Texts
 		}
@@ -554,8 +576,8 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 			missing("Phòng " + department + " đang được yêu cầu bổ sung")
 		}
 	}
-	for _, department := range period.Departments {
-		if _, ok := current[department]; !ok && period.Type != "adhoc" {
+	for _, department := range window.departments {
+		if _, ok := current[department]; !ok && window.kind != "adhoc" {
 			missing("Phòng " + department + " chưa gửi số liệu")
 		}
 	}
@@ -567,8 +589,8 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 	for _, entry := range plan.Entries {
 		entries[entry.Ref] = entry
 	}
-	trackedAt := period.From
-	if period.Type == "adhoc" && trackedAt.Year() < plan.Year {
+	trackedAt := window.from
+	if window.kind == "adhoc" && trackedAt.Year() < plan.Year {
 		trackedAt = time.Date(plan.Year, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
 	tracked := func(entry port.KHTCPlanEntry) bool {
@@ -627,7 +649,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				return Data{}, err
 			}
 			total = total.Add(n)
-			if !sheet.To.Before(period.From) {
+			if !sheet.To.Before(window.from) {
 				if _, exists := sheet.Sheet.Cells[entry.Ref.String()]; exists {
 					hasRangeSheet = true
 				}
@@ -644,7 +666,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				budget = budget.Add(b)
 			}
 			for _, adj := range sheet.Sheet.Adjustments {
-				if adj.EntryRef != entry.Ref.String() || adj.PeriodYear != period.Year {
+				if adj.EntryRef != entry.Ref.String() || adj.PeriodYear != window.year {
 					continue
 				}
 				amount, err := parse(adj.Amount)
@@ -652,7 +674,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 					return Data{}, err
 				}
 				total = total.Add(amount)
-				if !sheet.To.Before(period.From) {
+				if !sheet.To.Before(window.from) {
 					adjustment = adjustment.Add(amount)
 				}
 			}
@@ -677,7 +699,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				}
 				adjustment = decimal.Zero
 			}
-		} else if _, ok := current[entry.Department]; !ok && (period.Type != "adhoc" || !hasRangeSheet) {
+		} else if _, ok := current[entry.Department]; !ok && ((!window.live && window.kind != "adhoc") || !hasRangeSheet) {
 			row.Missing = true
 			missing("Phòng " + entry.Department + " chưa gửi số liệu")
 		}
