@@ -873,6 +873,11 @@ export function khtcReportInputs(s: Stored, dept: string) {
  return { plan: structuredClone(PLAN[dept] ?? []), submission: structuredClone(subsOf(s, dept)[0] ?? null) };
 }
 
+/** Read-only plan metadata for a dashboard without an opened reporting period. */
+export function khtcReportPlan(dept: string) {
+ return structuredClone(PLAN[dept] ?? []);
+}
+
 /** Native mock bridge: enforce existing terminal/confirmed/four-eyes/three-send rules. */
 export function khtcAdhocNativeReturn(s:Stored,dept:string,actor:string):boolean|Response{
  const last=subsOf(s,dept)[0];

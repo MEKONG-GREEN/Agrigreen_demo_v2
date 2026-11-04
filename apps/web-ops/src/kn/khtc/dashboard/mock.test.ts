@@ -3,6 +3,7 @@ import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { khtcMockStore } from "@/api/mock/kn-khtc-periods";
 import { createDashboardApi } from "./api";
+import { khtcReportPlan } from "@/api/mock/kn-khtc-forms";
 
 afterEach(() => vi.useRealTimers());
 describe("dashboard mock submission counts", () => {
@@ -31,6 +32,27 @@ describe("dashboard mock submission counts", () => {
    }
   } finally { if (previous) stored.submitted[dept] = previous; else delete stored.submitted[dept]; }
  });
+});
+it("live202 reads the same cloned Forms plan without opening a M5 period", async()=>{
+ vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2026-10-14T03:00:00Z"));
+ const original=khtcReportPlan("trong_trot");expect(original.length).toBeGreaterThan(0);
+ const clone=khtcReportPlan("trong_trot");clone[0]!.qty="999";clone.splice(1);
+ expect(khtcReportPlan("trong_trot")).toEqual(original);
+ const response=await mockFetchNoDelay(new Request("http://mock/v1/me/context",{method:"POST",headers:{Authorization:"Bearer mock.kn-admin","Content-Type":"application/json","Idempotency-Key":"dashboard202.context"},body:JSON.stringify({assignment_id:"asg-admin",department_code:null})}));
+ expect(response.status).toBe(201);const context=await response.json() as {context_id:string};
+ const api=createDashboardApi(createApiClient({baseUrl:"http://mock",getAccessToken:()=>"mock.kn-admin",getContextId:()=>context.context_id,fetch:mockFetchNoDelay}));
+ const store=khtcMockStore(), removed=store.filter(s=>s.p.report_type==="program");
+ for(const s of removed)store.splice(store.indexOf(s),1);
+ const before=structuredClone(store);
+ try {
+  const d=await api.get({year:2026,quarter:4,through_date:"2026-12-31",department:"trong_trot"});
+  expect(d.progress_period).toBeNull();expect(d.progress_window).toMatchObject({through_date:"2026-12-31",quantity_to:"2026-10-13",calendar_version:2,effective_cutoff:"2026-10-14T03:00:00.000Z"});
+  expect(d.progress.rows.map(r=>r.ref)).toEqual(original.map(r=>r.ref));
+  expect(d.progress.items).toBe(original.length);expect(d.progress.programs.every(p=>p.known===0&&p.percent===null)).toBe(true);
+  expect(store).toEqual(before);
+  const future=await api.get({year:2027,quarter:1});expect(future.progress_window).toBeNull();expect(future.progress.rows).toEqual([]);
+  for(const through_date of ["2026-11-31","2026-9-01","1e100000","1e-100000","9".repeat(100000)]) await expect(api.get({year:2026,quarter:4,through_date})).rejects.toMatchObject({status:422});
+ } finally {store.push(...removed);}
 });
 it("dashboard189 includes over 100 authorized adhoc periods and keeps department/tenant filters", async () => {
  vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2026-10-14T03:00:00Z"));

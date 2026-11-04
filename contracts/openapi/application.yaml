@@ -14895,7 +14895,7 @@ paths:
         "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/khtc/dashboard:
     get:
-      summary: "Trang chủ tổng hợp KHTC chỉ đọc; tiến độ dùng capture Mẫu 5 mới nhất trong quý, trạng thái phiếu và nguồn đọc lại mỗi lần"
+      summary: "Trang chủ tổng hợp KHTC chỉ đọc; tiến độ Mẫu 5 dùng cửa sổ nguồn thật theo năm/quý/ngày, kể cả chưa mở kỳ"
       operationId: extensionKhtcDashboard
       tags: [extension]
       parameters:
@@ -14903,6 +14903,7 @@ paths:
         - {name: quarter, in: query, schema: {type: integer, minimum: 1, maximum: 4}}
         - {name: department, in: query, schema: {type: string, maxLength: 64}}
         - {name: field, in: query, schema: {type: string, maxLength: 64}}
+        - {name: through_date, in: query, description: "Ngày yêu cầu inclusive UTC+7 trong quý/năm chọn; nguồn thực tế không vượt as_of", schema: {type: string, format: date, minLength: 10, maxLength: 10, pattern: '^\d{4}-\d{2}-\d{2}$'}}
       responses:
         "200":
           description: Số liệu live; progress_period=null khi chưa có kỳ Mẫu 5 phù hợp. Không sửa bản soạn hoặc bản đã xuất.
@@ -26880,6 +26881,7 @@ components:
                   known: {type: integer}
                   percent: {type: string, nullable: true}
         progress_period: {allOf: [{$ref: '#/components/schemas/KHTCDashboardPeriod'}], nullable: true}
+        progress_window: {allOf: [{$ref: '#/components/schemas/KHTCDashboardWindow'}], nullable: true}
         reports: {type: array, items: {$ref: '#/components/schemas/KHTCDashboardPeriod'}}
         status:
           type: array
@@ -26894,6 +26896,20 @@ components:
               kind: {type: string, enum: [form, source]}
               state: {type: string}
               at: {type: string, format: date-time, nullable: true}
+    KHTCDashboardWindow:
+      type: object
+      description: "Cửa sổ tính toán chỉ đọc, không phải kỳ báo cáo; null khi chưa có tuần đủ kết thúc trong phạm vi thực tế"
+      required: [year, quarter, through_date, effective_cutoff, from_date, quantity_to, calendar_id, calendar_version, plan_version_id]
+      properties:
+        year: {type: integer}
+        quarter: {type: integer}
+        through_date: {type: string, format: date}
+        effective_cutoff: {type: string, format: date-time}
+        from_date: {type: string, format: date}
+        quantity_to: {type: string, format: date}
+        calendar_id: {type: string}
+        calendar_version: {type: integer}
+        plan_version_id: {type: string, format: uuid, nullable: true}
     KHTCDashboardPeriod:
       type: object
       required: [id, name, type, state, cutoff, exported_at]

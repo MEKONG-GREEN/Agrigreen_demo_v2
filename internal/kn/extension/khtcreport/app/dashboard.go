@@ -20,6 +20,7 @@ import (
 type DashboardQuery struct {
 	Year, Quarter     int
 	Department, Field string
+	ThroughDate       string
 }
 type DashboardCounts struct {
 	Exported int `json:"exported"`
@@ -55,14 +56,15 @@ type Dashboard struct {
 	Counts         DashboardCounts          `json:"counts"`
 	Progress       domain.DashboardProgress `json:"progress"`
 	ProgressPeriod *DashboardPeriod         `json:"progress_period"`
+	ProgressWindow *domain.LiveM5Window     `json:"progress_window"`
 	Reports        []DashboardPeriod        `json:"reports"`
 	Status         []DashboardStatus        `json:"status"`
 	AsOf           time.Time                `json:"as_of"`
 	CanAct         bool                     `json:"can_act"`
 }
 
-// Dashboard reads live status and captures the newest eligible Mẫu 5 again on every
-// request. It never refreshes or changes a saved draft/export.
+// Dashboard reads status and composes live M5 quantities from a typed window on
+// every request, including when no M5 period exists. It never writes a capture.
 func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.Service) (Dashboard, error) {
 	c, err := s.reader(ctx)
 	if err != nil {
@@ -85,7 +87,12 @@ func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.S
 	if len(q.Department) > 64 || len(q.Field) > 64 {
 		return Dashboard{}, problem.Validation.WithField("filter", "tối đa 64 ký tự")
 	}
+	window, err := domain.NewLiveM5Window(q.Year, q.Quarter, q.ThroughDate, now)
+	if err != nil {
+		return Dashboard{}, problem.Validation.WithField("through_date", "ngày ISO hợp lệ trong năm và quý đã chọn")
+	}
 	out := Dashboard{Year: q.Year, Quarter: q.Quarter, Department: q.Department, Field: q.Field, AsOf: now, Reports: []DashboardPeriod{}, Status: []DashboardStatus{}, Progress: domain.DashboardProgress{Programs: []domain.DashboardProgram{}, Rows: []domain.ProgramRow{}}, CanAct: c.kn.Role == port.SessionRoleProvince && !c.kn.ReadOnly() && c.kn.ProvinceGroup != "lanh_dao_phong" && c.kn.ProvinceGroup != "ban_giam_doc"}
+	out.ProgressWindow = window
 	if periods == nil {
 		return Dashboard{}, ErrDependency
 	}
@@ -118,7 +125,7 @@ func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.S
 		if p.Type == pd.TypeQuarter || p.Type == pd.TypeYear {
 			out.Reports = append(out.Reports, DashboardPeriod{ID: p.ID, Name: p.Name, Type: p.Type, State: d.State, Cutoff: p.Cutoff.Format(time.DateOnly)})
 		}
-		if p.Type == pd.TypeProgram && !p.Cutoff.After(end) && !p.Cutoff.After(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)) && (selected == nil || p.Cutoff.After(selected.Cutoff)) {
+		if window != nil && p.Type == pd.TypeProgram && !p.Cutoff.After(end) && !p.Cutoff.After(window.Cutoff) && (selected == nil || p.Cutoff.After(selected.Cutoff)) {
 			copy := p
 			selected = &copy
 		}
@@ -169,17 +176,13 @@ func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.S
 		}
 	}
 	if selected != nil {
-		data, _, e := s.capture(ctx, c, *selected)
-		if e != nil {
-			return Dashboard{}, e
-		}
-		out.Progress, e = domain.SummarizeDashboard(data, q.Department, q.Field, now)
-		if e != nil {
-			return Dashboard{}, e
-		}
 		out.ProgressPeriod = &DashboardPeriod{ID: selected.ID, Name: selected.Name, Type: selected.Type, Cutoff: selected.Cutoff.Format(time.DateOnly)}
-		out.Counts.Items, out.Counts.Achieved, out.Counts.Slow = out.Progress.Items, out.Progress.Achieved, out.Progress.Slow
 	}
+	out.Progress, err = s.liveDashboard202(ctx, c, window, q, now)
+	if err != nil {
+		return Dashboard{}, err
+	}
+	out.Counts.Items, out.Counts.Achieved, out.Counts.Slow = out.Progress.Items, out.Progress.Achieved, out.Progress.Slow
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		rows, e := store.DashboardExports(ctx, tx, q.Year, q.Department)
 		if e != nil {

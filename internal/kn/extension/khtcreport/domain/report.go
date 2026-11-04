@@ -681,11 +681,11 @@ func composeCalculation(data Data, window calculationWindow, submitted []Submitt
 		}
 		if entry.DataSource == "module" {
 			metric, ok := byKey[entry.SourceKey]
-			if !ok || metric.Value.Provisional() {
+			if !ok || metric.Value.Provisional() || (window.live && metric.Value.NoSource) {
 				row.Missing = true
 				missing("Hạng mục chưa có nguồn đã chốt: " + entry.Name)
 			}
-			if ok {
+			if ok && (!window.live || (!metric.Value.Provisional() && !metric.Value.NoSource)) {
 				v := metric.Value
 				if v.Increment != nil {
 					done = *v.Increment

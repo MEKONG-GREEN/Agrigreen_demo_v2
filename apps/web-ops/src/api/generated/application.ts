@@ -10749,7 +10749,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Trang chủ tổng hợp KHTC chỉ đọc; tiến độ dùng capture Mẫu 5 mới nhất trong quý, trạng thái phiếu và nguồn đọc lại mỗi lần */
+        /** Trang chủ tổng hợp KHTC chỉ đọc; tiến độ Mẫu 5 dùng cửa sổ nguồn thật theo năm/quý/ngày, kể cả chưa mở kỳ */
         get: operations["extensionKhtcDashboard"];
         put?: never;
         post?: never;
@@ -23209,6 +23209,7 @@ export interface components {
                 }[];
             };
             progress_period: components["schemas"]["KHTCDashboardPeriod"] | null;
+            progress_window?: components["schemas"]["KHTCDashboardWindow"] | null;
             reports: components["schemas"]["KHTCDashboardPeriod"][];
             status: {
                 /** Format: uuid */
@@ -23222,6 +23223,23 @@ export interface components {
                 /** Format: date-time */
                 at: string | null;
             }[];
+        };
+        /** @description Cửa sổ tính toán chỉ đọc, không phải kỳ báo cáo; null khi chưa có tuần đủ kết thúc trong phạm vi thực tế */
+        KHTCDashboardWindow: {
+            year: number;
+            quarter: number;
+            /** Format: date */
+            through_date: string;
+            /** Format: date-time */
+            effective_cutoff: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            quantity_to: string;
+            calendar_id: string;
+            calendar_version: number;
+            /** Format: uuid */
+            plan_version_id: string | null;
         };
         KHTCDashboardPeriod: {
             /** Format: uuid */
@@ -48476,6 +48494,8 @@ export interface operations {
                 quarter?: number;
                 department?: string;
                 field?: string;
+                /** @description Ngày yêu cầu inclusive UTC+7 trong quý/năm chọn; nguồn thực tế không vượt as_of */
+                through_date?: string;
             };
             header?: never;
             path?: never;

@@ -6,5 +6,6 @@ export interface DashboardQuery {
     quarter: number;
     department?: string;
     field?: string;
+    through_date?: string;
 }
 export function createDashboardApi(api: ApiClient) { return { get: (query: DashboardQuery): Promise<Dashboard> => unwrap(api.GET("/v1/extension/khtc/dashboard", { params: { query } })) }; }
