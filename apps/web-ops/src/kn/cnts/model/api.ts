@@ -4,6 +4,8 @@
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
+import { stableMultipart } from "@/api/multipart";
+import { ApiProblem, networkProblem, parseProblemResponse, toProblem } from "@/api/problem";
 import { parseNumberInput, type NumberRule } from "@/components/form";
 import { vnDate } from "@/kn/schedule/week";
 
@@ -23,6 +25,61 @@ export type GrantSave = S["CNTSGrantSave"];
 export type GrantRole = Grant["role"];
 export type Candidate = S["CNTSGrantCandidate"];
 export type KhtcProgram = S["CNTSKHTCProgram"];
+export type ImportResult = S["CNTSImportResult"];
+export type ImportIssue = S["CNTSImportIssue"];
+
+/** W11.53c: tệp nạp điểm, hộ — .xlsx ≤ 2 MB (máy chủ kiểm lại bố cục, số dòng, chữ ký tệp). */
+export const IMPORT_MAX_BYTES = 2 * 1024 * 1024;
+
+/** Lỗi chọn tệp nạp (null = hợp lệ). */
+export function importFileError(file: File | null): string | null {
+  if (!file) return "Chọn tệp Excel (.xlsx) theo mẫu.";
+  if (!/\.xlsx$/i.test(file.name)) return "Chỉ nhận tệp Excel .xlsx (tải tệp mẫu).";
+  if (file.size <= 0 || file.size > IMPORT_MAX_BYTES) return "Tệp tối đa 2 MB.";
+  return null;
+}
+
+/** Chụp nội dung tệp một lần lúc chọn: xem trước và ghi gửi đúng cùng byte (sửa tệp trên đĩa giữa chừng không lọt vào). */
+export async function snapshotFile(file: File): Promise<File> {
+  return new File([await file.arrayBuffer()], file.name, { type: file.type, lastModified: file.lastModified });
+}
+
+/** 422 extension.cnts_import_invalid kèm danh sách lỗi theo dòng (problem mở rộng "issues" — ApiProblem chung bỏ trường lạ). */
+export class ImportRejected extends ApiProblem {
+  readonly issues: ImportIssue[];
+  constructor(body: unknown, response: Response) {
+    super(toProblem(body, response));
+    const raw = (body as { issues?: unknown } | undefined)?.issues;
+    this.issues = Array.isArray(raw)
+      ? raw
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+          .map((x) => ({
+            sheet: typeof x.sheet === "string" ? x.sheet : null,
+            row: typeof x.row === "number" ? x.row : null,
+            column: typeof x.column === "string" ? x.column : null,
+            message: typeof x.message === "string" ? x.message : "",
+          }))
+      : [];
+  }
+}
+
+/** Như unwrap, nhưng lỗi nạp mang theo issues. */
+async function unwrapImport(p: Promise<{ data?: ImportResult; error?: unknown; response: Response }>): Promise<ImportResult> {
+  let r: Awaited<typeof p>;
+  try {
+    r = await p;
+  } catch (e) {
+    if (e instanceof ApiProblem) throw e;
+    throw networkProblem();
+  }
+  if (r.error !== undefined || !r.response.ok || !r.data) throw new ImportRejected(r.error, r.response);
+  return r.data;
+}
+
+/** Vị trí lỗi "Sheet · dòng N · cột X". */
+export function issueWhere(i: ImportIssue): string {
+  return [i.sheet, i.row ? `dòng ${i.row}` : null, i.column ? `cột ${i.column}` : null].filter(Boolean).join(" · ") || "Tệp";
+}
 
 export const KIND_LABEL: Record<Project["kind"], string> = { tinh: "Khuyến nông tỉnh", knqg: "Khuyến nông quốc gia", hop_tac: "Hợp tác" };
 export const ROLE_LABEL: Record<GrantRole, string> = {
@@ -164,6 +221,36 @@ export function createCntsModelApi(api: ApiClient) {
     revokeGrant: (ref: string, body: S["CNTSGrantRevoke"]): Promise<GrantDetail> =>
       unwrap(api.POST("/v1/extension/cnts/grants/{ref}/revoke", { params: { path: { ref }, ...idem() }, body })),
     candidates: async (): Promise<Candidate[]> => (await unwrap(api.GET("/v1/extension/cnts/grant-candidates"))).items,
+    // W11.53c (FN-19 luồng phụ): nạp Excel điểm, hộ. Thân multipart tất định (src/api/multipart.ts): bấm lại sau mất phản
+    // hồi trong cùng useAction gửi đúng từng byte cũ → cùng Idempotency-Key, máy chủ phát lại thay vì báo trùng điểm (#183).
+    async importTemplate(ref: string): Promise<Blob> {
+      const res = await api.GET("/v1/extension/cnts/projects/{ref}/import-template", { params: { path: { ref } }, parseAs: "blob" });
+      // openapi-fetch đã đọc thân lỗi vào res.error — dựng problem từ đó (đọc lại thân sẽ mất mã lỗi).
+      if (!res.response.ok || !res.data) throw res.error !== undefined ? new ApiProblem(toProblem(res.error, res.response)) : await parseProblemResponse(res.response);
+      return res.data as Blob;
+    },
+    previewImport: (ref: string, file: File): Promise<ImportResult> => {
+      const mp = stableMultipart([["file", file]]);
+      return unwrapImport(
+        api.POST("/v1/extension/cnts/projects/{ref}/import/preview", {
+          params: { path: { ref }, ...idem() },
+          headers: { "Content-Type": mp.contentType },
+          body: { file: file as unknown as string },
+          bodySerializer: () => mp.body,
+        }),
+      );
+    },
+    commitImport: (ref: string, file: File): Promise<ImportResult> => {
+      const mp = stableMultipart([["file", file]]);
+      return unwrapImport(
+        api.POST("/v1/extension/cnts/projects/{ref}/import", {
+          params: { path: { ref }, ...idem() },
+          headers: { "Content-Type": mp.contentType },
+          body: { file: file as unknown as string },
+          bodySerializer: () => mp.body,
+        }),
+      );
+    },
   };
 }
 

@@ -7,7 +7,10 @@
 // mở màn phiếu của W11.63 (entry_route).
 import {AdhocInbox} from "../adhoc/AdhocInbox";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { ApiProblem } from "@/api/problem";
+import { useParams, useSearchParams } from "next/navigation";
+import { INBOX_BASE, inboxHref } from "./inbox-routes";
+import { useInboxAuthorityKey } from "./inbox-workspace";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
@@ -30,25 +33,39 @@ const TABS: { view: DeptFormsView; label: string; href: string }[] = [
 ];
 
 export function DepartmentFormsScreen({view}:{view:DeptFormsView}) {
- const {kn}=useAuth();return <DepartmentFormsBody key={JSON.stringify(kn.context)} view={view}/>;
+ const auth=useAuth(); const identity=useInboxAuthorityKey(); const params=useParams<{dept?:string}>(); const query=useSearchParams();
+ const initial=params?.dept && query.get("view")==="sent"?"sent":view;
+ if(auth.status!=="authenticated" || !auth.principal || !auth.kn.context || auth.kn.status!=="active")return <p role="alert">Chọn ngữ cảnh làm việc để đọc phiếu.</p>;
+ return <DepartmentFormsBody key={`${identity}:${view}:${params?.dept??""}:${initial}`} view={initial}/>;
 }
 function DepartmentFormsBody({view:initial}:{view:DeptFormsView}) {
+  const [view,setView]=useState(initial);
+  return <DepartmentFormsContent key={view} view={view} setView={setView}/>;
+}
+function DepartmentFormsContent({view,setView}:{view:DeptFormsView;setView:(view:DeptFormsView)=>void}) {
   const { api, kn } = useAuth();
   const params = useParams<{ dept?: string }>();
   const adminDept = params?.dept;
   // Phòng: hai mục menu (hai đường dẫn); Admin: một mục theo phòng ban, đổi góc nhìn tại chỗ.
-  const [view, setView] = useState<DeptFormsView>(initial);
+
   const dapi = useMemo(() => (api ? createDeptFormsApi(api) : null), [api]);
-  const list = useLoad(dapi ? () => dapi.list(view, adminDept) : null, [
+  const expectedDepartment=adminDept||kn.context?.department_code;
+  const list = useLoad(dapi ? async () => {
+    const response=await dapi.list(view,adminDept);
+    if(response.view!==view || response.department!==expectedDepartment)throw new ApiProblem({type:"about:blank",status:502,code:"internal_error",title:"Phản hồi hộp phiếu không khớp phòng/góc nhìn."});
+    return response;
+  } : null, [
     dapi,
     view,
     adminDept,
+    expectedDepartment,
   ]);
   const [type, setType] = useState("");
   const [state, setState] = useState(
-    initial === "current" ? "needs_action" : "",
+    view === "current" ? "needs_action" : "",
   );
   if (!dapi) return null;
+  const detailBase=adminDept?`/kn/phong-ban/${adminDept}/bao-cao-khtc`:INBOX_BASE;
 
   return (
     <div className="page">
@@ -200,6 +217,7 @@ function DepartmentFormsBody({view:initial}:{view:DeptFormsView}) {
                           </StatusPill>
                         </td>
                         <td>
+                          <Link className="btn btn-o" href={inboxHref(detailBase,r.period_id,adminDept,view)}>Chi tiết phiếu</Link>
                           <Link
                             className={
                               r.action === "view" ? "btn" : "btn btn-primary"
