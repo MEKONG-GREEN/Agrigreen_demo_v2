@@ -13819,6 +13819,86 @@ paths:
             application/octet-stream: {schema: {type: string, format: binary}}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}/draft:
+    get:
+      operationId: knKhtcInitialDraft225
+      summary: "Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225)"
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200": {description: "Kết quả thuộc thao tác/nháp chính xác", content: {application/json: {schema: {$ref: "#/components/schemas/KhtcInitialDraftState225"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      operationId: knKhtcSaveInitialDraft225
+      summary: "Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225)"
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcInitialDraftSave225"}
+      responses:
+        "201": {description: "Kết quả thuộc thao tác/nháp chính xác", content: {application/json: {schema: {$ref: "#/components/schemas/KhtcInitialDraft225"}}}}
+        "200": {description: "Đọc lại xác nhận thuộc thao tác chính xác", content: {application/json: {schema: {$ref: "#/components/schemas/KhtcInitialDraft225"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}/draft/discard:
+    post:
+      operationId: knKhtcDiscardInitialDraft225
+      summary: "Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225)"
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/KhtcInitialDraftDiscard225"}
+      responses:
+        "201": {description: "Kết quả thuộc thao tác/nháp chính xác", content: {application/json: {schema: {$ref: "#/components/schemas/KhtcInitialDraft225"}}}}
+        "200": {description: "Đọc lại xác nhận thuộc thao tác chính xác", content: {application/json: {schema: {$ref: "#/components/schemas/KhtcInitialDraft225"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}/draft/history:
+    get:
+      operationId: knKhtcInitialDraftHistory225
+      summary: "Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225)"
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+        - {name: before_revision, in: query, schema: {type: integer, minimum: 1, format: int64}}
+      responses:
+        "200": {description: "Kết quả thuộc thao tác/nháp chính xác", content: {application/json: {schema: {$ref: "#/components/schemas/KhtcInitialDraftHistory225"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/kn/khtc/plans/{year}/draft/compare:
+    get:
+      operationId: knKhtcInitialDraftCompare225
+      summary: "Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225)"
+      tags: [extension]
+      parameters:
+        - {name: year, in: path, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+      responses:
+        "200": {description: "Kết quả thuộc thao tác/nháp chính xác", content: {application/json: {schema: {$ref: "#/components/schemas/KhtcInitialDraftCompare225"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/khtc/periods/{id}/report:
     get:
       summary: "Bản soạn Mẫu 1–5, ô số chỉ đọc và mốc dữ liệu"
@@ -26873,6 +26953,70 @@ components:
               line: {type: integer}
               field: {type: string}
               message: {type: string}
+    KhtcInitialDraftEvent225:
+      type: object
+      required: [event_id, draft_id, year, revision, action, state, base_published_version, entries_count, entries_hash, note, event_time, recorded_at, actor_ref]
+      properties:
+        event_id: {type: string, format: uuid}
+        draft_id: {type: string, format: uuid}
+        year: {type: integer, minimum: 2000, maximum: 2100}
+        revision: {type: integer, format: int64, minimum: 1}
+        action: {type: string, enum: [create, save, discard]}
+        state: {type: string, enum: [active, discarded]}
+        base_published_version: {type: integer, enum: [0]}
+        entries_count: {type: integer, minimum: 0, maximum: 5000}
+        entries_hash: {type: string, pattern: '^[a-f0-9]{64}$'}
+        note: {type: string, maxLength: 1000}
+        event_time: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        actor_ref: {type: string, format: uuid}
+    KhtcInitialDraft225:
+      allOf:
+        - {$ref: '#/components/schemas/KhtcInitialDraftEvent225'}
+        - type: object
+          required: [entries]
+          properties:
+            entries: {type: array, maxItems: 5000, items: {$ref: '#/components/schemas/KhtcPlanEntry'}}
+    KhtcInitialDraftState225:
+      type: object
+      required: [year, revision, draft, available, unavailable_reason]
+      properties:
+        year: {type: integer}
+        revision: {type: integer, format: int64, minimum: 0}
+        draft: {allOf: [{$ref: '#/components/schemas/KhtcInitialDraft225'}], nullable: true}
+        available: {type: boolean}
+        unavailable_reason: {type: string, nullable: true}
+    KhtcInitialDraftSave225:
+      type: object
+      additionalProperties: false
+      required: [expected_revision, entries]
+      properties:
+        draft_id: {type: string, format: uuid, nullable: true}
+        expected_revision: {type: integer, format: int64, minimum: 0}
+        entries: {type: array, maxItems: 5000, items: {$ref: '#/components/schemas/KhtcPlanEntryInput'}}
+        note: {type: string, maxLength: 1000}
+    KhtcInitialDraftDiscard225:
+      type: object
+      additionalProperties: false
+      required: [draft_id, expected_revision]
+      properties:
+        draft_id: {type: string, format: uuid}
+        expected_revision: {type: integer, format: int64, minimum: 0}
+        note: {type: string, maxLength: 1000}
+    KhtcInitialDraftHistory225:
+      type: object
+      required: [items, next_before_revision]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/KhtcInitialDraftEvent225'}}
+        next_before_revision: {type: integer, format: int64, nullable: true}
+    KhtcInitialDraftCompare225:
+      allOf:
+        - {$ref: '#/components/schemas/KhtcInitialDraftState225'}
+        - type: object
+          required: [baseline_entries, baseline_published_version]
+          properties:
+            baseline_entries: {type: array, maxItems: 0, items: {$ref: '#/components/schemas/KhtcPlanEntry'}}
+            baseline_published_version: {type: integer, enum: [0]}
     KHTCReportSupplement:
       type: object
       required: [id, department, instruction, state, due_at, native_submission_ref, return_applied]

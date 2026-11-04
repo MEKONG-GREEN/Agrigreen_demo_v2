@@ -9937,6 +9937,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/kn/khtc/plans/{year}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225) */
+        get: operations["knKhtcInitialDraft225"];
+        put?: never;
+        /** Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225) */
+        post: operations["knKhtcSaveInitialDraft225"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/draft/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225) */
+        post: operations["knKhtcDiscardInitialDraft225"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/draft/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225) */
+        get: operations["knKhtcInitialDraftHistory225"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/kn/khtc/plans/{year}/draft/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nháp máy chủ ban đầu — không ghi phiên bản áp dụng (#225) */
+        get: operations["knKhtcInitialDraftCompare225"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report": {
         parameters: {
             query?: never;
@@ -23100,6 +23169,66 @@ export interface components {
                 field: string;
                 message: string;
             }[];
+        };
+        KhtcInitialDraftEvent225: {
+            /** Format: uuid */
+            event_id: string;
+            /** Format: uuid */
+            draft_id: string;
+            year: number;
+            /** Format: int64 */
+            revision: number;
+            /** @enum {string} */
+            action: "create" | "save" | "discard";
+            /** @enum {string} */
+            state: "active" | "discarded";
+            /** @enum {integer} */
+            base_published_version: 0;
+            entries_count: number;
+            entries_hash: string;
+            note: string;
+            /** Format: date-time */
+            event_time: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** Format: uuid */
+            actor_ref: string;
+        };
+        KhtcInitialDraft225: components["schemas"]["KhtcInitialDraftEvent225"] & {
+            entries: components["schemas"]["KhtcPlanEntry"][];
+        };
+        KhtcInitialDraftState225: {
+            year: number;
+            /** Format: int64 */
+            revision: number;
+            draft: components["schemas"]["KhtcInitialDraft225"] | null;
+            available: boolean;
+            unavailable_reason: string | null;
+        };
+        KhtcInitialDraftSave225: {
+            /** Format: uuid */
+            draft_id?: string | null;
+            /** Format: int64 */
+            expected_revision: number;
+            entries: components["schemas"]["KhtcPlanEntryInput"][];
+            note?: string;
+        };
+        KhtcInitialDraftDiscard225: {
+            /** Format: uuid */
+            draft_id: string;
+            /** Format: int64 */
+            expected_revision: number;
+            note?: string;
+        };
+        KhtcInitialDraftHistory225: {
+            items: components["schemas"]["KhtcInitialDraftEvent225"][];
+            /** Format: int64 */
+            next_before_revision: number | null;
+        };
+        KhtcInitialDraftCompare225: components["schemas"]["KhtcInitialDraftState225"] & {
+            baseline_entries: components["schemas"]["KhtcPlanEntry"][];
+            /** @enum {integer} */
+            baseline_published_version: 0;
         };
         KHTCReportSupplement: {
             /** Format: uuid */
@@ -46890,6 +47019,169 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    knKhtcInitialDraft225: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả thuộc thao tác/nháp chính xác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcInitialDraftState225"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    knKhtcSaveInitialDraft225: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcInitialDraftSave225"];
+            };
+        };
+        responses: {
+            /** @description Đọc lại xác nhận thuộc thao tác chính xác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcInitialDraft225"];
+                };
+            };
+            /** @description Kết quả thuộc thao tác/nháp chính xác */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcInitialDraft225"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    knKhtcDiscardInitialDraft225: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KhtcInitialDraftDiscard225"];
+            };
+        };
+        responses: {
+            /** @description Đọc lại xác nhận thuộc thao tác chính xác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcInitialDraft225"];
+                };
+            };
+            /** @description Kết quả thuộc thao tác/nháp chính xác */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcInitialDraft225"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    knKhtcInitialDraftHistory225: {
+        parameters: {
+            query?: {
+                limit?: number;
+                before_revision?: number;
+            };
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả thuộc thao tác/nháp chính xác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcInitialDraftHistory225"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    knKhtcInitialDraftCompare225: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                year: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả thuộc thao tác/nháp chính xác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KhtcInitialDraftCompare225"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     extensionKhtcReportGet: {

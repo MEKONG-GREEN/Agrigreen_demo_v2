@@ -11,9 +11,9 @@ import { PROGRAM_KINDS, PROGRAM_KIND_LABEL, TAB_KIND, type KhtcProgram, type Kht
 import { planHref, programHref, type PlanRoute } from "./routes";
 
 export interface ProgramDraft { code:string; name:string; kind:KhtcProgramKind }
-export function ProgramPage({route,programs,used,draft,onChange,onCreate,onPick,busy,problem,canEdit,log}: {
+export function ProgramPage({route,programs,used,draft,onChange,onCreate,onPick,busy,problem,canEdit,log,draftHelp}: {
   route:PlanRoute;programs:KhtcProgram[];used:Set<string>;draft:ProgramDraft;onChange:(d:ProgramDraft)=>void;onCreate:()=>Promise<void>;
-  onPick:(p:KhtcProgram)=>void;busy:boolean;problem:ApiProblem|null;canEdit:boolean;log:LogEntry[];
+  onPick:(p:KhtcProgram)=>void;busy:boolean;problem:ApiProblem|null;canEdit:boolean;log:LogEntry[];draftHelp?:string;
 }) {
   const server=problem?fieldErrorMap(problem):{};
   const change=(next:ProgramDraft,field:string)=>{onChange(next);setErrors(old=>{const out={...old};delete out[field];return out;});};
@@ -26,6 +26,6 @@ export function ProgramPage({route,programs,used,draft,onChange,onCreate,onPick,
       <TextField label="Mã CT/DA" required maxLength={40} disabled={busy} value={draft.code} error={errors.code||server.code} onChange={code=>change({...draft,code},"code")}/>
       <TextField label="Tên CT/DA" required maxLength={1000} disabled={busy} value={draft.name} error={errors.name||server.name} onChange={name=>change({...draft,name},"name")}/>
       <SelectField label="Loại CT/DA" disabled={busy} value={draft.kind} options={PROGRAM_KINDS.map(value=>({value,label:PROGRAM_KIND_LABEL[value]}))} onChange={kind=>onChange({...draft,kind:kind as KhtcProgramKind})}/>
-    </form><p className="mute">Lưu tạo CT/DA chủ thật. Chọn vào cây sau đó vẫn là nháp cho tới khi lưu phiên bản.</p></>:<><label className="row"><input type="checkbox" checked={all} onChange={e=>setAll(e.target.checked)}/>Hiện mọi loại</label><DataTable caption="CT/DA chủ có thể chọn" rows={choices} rowKey={p=>p.ref} columns={[{key:"code",header:"Mã",cell:p=>p.code},{key:"name",header:"Tên",cell:p=>p.name},{key:"kind",header:"Loại",cell:p=>PROGRAM_KIND_LABEL[p.kind]},{key:"pick",header:"Thao tác",cell:p=><button type="button" className="btn btn-o" onClick={()=>onPick(p)}>Chọn {p.code}</button>}]} /></>}
+    </form><p className="mute">{draftHelp ?? "Lưu tạo CT/DA chủ thật. Chọn vào cây sau đó vẫn là nháp cho tới khi lưu phiên bản."}</p></>:<><label className="row"><input type="checkbox" checked={all} onChange={e=>setAll(e.target.checked)}/>Hiện mọi loại</label><DataTable caption="CT/DA chủ có thể chọn" rows={choices} rowKey={p=>p.ref} columns={[{key:"code",header:"Mã",cell:p=>p.code},{key:"name",header:"Tên",cell:p=>p.name},{key:"kind",header:"Loại",cell:p=>PROGRAM_KIND_LABEL[p.kind]},{key:"pick",header:"Thao tác",cell:p=><button type="button" className="btn btn-o" onClick={()=>onPick(p)}>Chọn {p.code}</button>}]} /></>}
   </DetailPage>;
 }

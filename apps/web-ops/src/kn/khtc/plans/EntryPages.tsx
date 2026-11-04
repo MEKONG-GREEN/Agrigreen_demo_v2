@@ -8,9 +8,9 @@ import { DEPT_LABEL, ENTRY_KIND_LABEL, TAB_LABEL, type KhtcCatalogItem, type Kht
 import { checkEntry, ENTRY_NUMBER_RULES, type EntryDraft } from "./entry-form";
 import { planHref, type PlanRoute } from "./routes";
 
-export function EntryPage({ route, draft, onChange, canEdit, catalog, parentName, log, onSave, onCancel }: {
+export function EntryPage({ route, draft, onChange, canEdit, catalog, parentName, log, onSave, onCancel, draftHelp }: {
   route: PlanRoute; draft: EntryDraft; onChange: (d: EntryDraft) => void; canEdit: boolean; catalog: KhtcCatalogItem[]; parentName?: string; log: LogEntry[];
-  onSave: (e: KhtcPlanEntry) => void; onCancel: () => void;
+  onSave: (e: KhtcPlanEntry) => void; onCancel: () => void; draftHelp?: string;
 }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const id = useId(); const e = draft.entry; const editing = canEdit && route.view !== "entry";
@@ -23,7 +23,7 @@ export function EntryPage({ route, draft, onChange, canEdit, catalog, parentName
   const text = (label: string, field: keyof KhtcPlanEntry, required = false) => <TextField label={label} value={String(e[field] ?? "")} required={required} disabled={!editing} error={errors[field]} onChange={v => patch(field, v)} />;
   const catalogOptions = (kind: string) => catalog.filter(c => c.kind === kind && c.active).map(c => ({value:c.code,label:c.name}));
   return <DetailPage title={title} back={{href:planHref(route.base,route.year),label:"Kế hoạch năm"}} log={<LogPanel entries={log} />} actions={<><button type="button" className="btn btn-o" onClick={onCancel}>{editing ? "Hủy" : "Quay lại"}</button>{editing ? <button type="submit" form={id} className="btn btn-p">Lưu vào nháp</button> : null}</>}>
-    <p className="mute">Nháp trong workspace chỉ trở thành phiên bản lưu khi xác nhận Lưu phiên bản. Log dưới đây thuộc phiên bản đã lưu.</p>
+    <p className="mute">{draftHelp ?? "Nháp trong workspace chỉ trở thành phiên bản lưu khi xác nhận Lưu phiên bản. Log dưới đây thuộc phiên bản đã lưu."}</p>
     {!editing ? <ReadOnlyNotice>Chỉ xem nội dung kế hoạch trong ngữ cảnh hiện tại.</ReadOnlyNotice> : null}
     <LabelValueBlock title="Vị trí trong cây" items={[{label:"Tab",value:TAB_LABEL[e.tab]},{label:"Dòng cha",value:e.parent_ref ? (parentName || "Không còn dòng cha trong cây") : "CT/DA gốc"},{label:"Lĩnh vực hiện hữu",value:e.field_code || "—"}]} />
     <form id={id} noValidate onSubmit={event => { event.preventDefault(); if (!editing) return; const checked = checkEntry(draft,route.year); setErrors(checked.errors); if (checked.valid) onSave(checked.entry); }}>

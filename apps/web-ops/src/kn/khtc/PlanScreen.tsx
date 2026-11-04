@@ -6,6 +6,7 @@
 // năm trước", "Xuất Excel", "Nhập từ Excel" (thành bản nháp). Danh sách CT/DA chủ (D20) thêm/ngừng ngay trên màn.
 // Phòng chuyên môn, lãnh đạo chỉ xem.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { InitialDraftPage225 } from "./plans/InitialDraftPage225";
 import { PLAN_BASE, parsePlanRoute, planHref, type PlanRoute } from "./plans/routes";
 import { newVersionHead } from "./plans/version-form";
 import { SaveVersionPage, VersionDetailPage, VersionsPage, planVersionLog } from "./plans/VersionPages";
@@ -45,7 +46,11 @@ interface Loaded {
   catalog: KhtcCatalogItem[];
 }
 
-export function KhtcPlanScreen({ route: requestedRoute }: { route?: PlanRoute } = {}) {
+export function KhtcPlanScreen(props: { route?: PlanRoute } = {}) {
+ if(props.route?.initial)return <InitialDraftPage225 route={props.route}/>;
+ return <LegacyPlanScreen225 {...props}/>;
+}
+function LegacyPlanScreen225({ route: requestedRoute }: { route?: PlanRoute } = {}) {
   const api = useKhtcApi();
   const rights = useKhtcRights();
   const [localRoute, setLocalRoute] = useState<Omit<PlanRoute, "go">>(() => ({ base: PLAN_BASE, year: vnYear(), view: "list" }));
@@ -72,7 +77,7 @@ export function KhtcPlanScreen({ route: requestedRoute }: { route?: PlanRoute } 
         <button type="button" className="btn btn-o btn-sm" onClick={() => setYear(year - 1)} disabled={year <= 2000} aria-label="Năm trước">
           ‹
         </button>
-        <strong aria-live="polite">Năm {year}</strong>
+        <strong aria-live="polite">Năm {year}</strong>{rights.plan?<button className="btn btn-o btn-sm" onClick={()=>route.go(`${route.base}/nhap-may-chu?year=${year}`)}>Nháp máy chủ ban đầu</button>:null}
         <button type="button" className="btn btn-o btn-sm" onClick={() => setYear(year + 1)} disabled={year >= 2100} aria-label="Năm sau">
           ›
         </button>
