@@ -5,6 +5,7 @@
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { ADMIN_UNITS, CATALOGS } from "./data";
+import { xlsxOf } from "./kn-cnts-cal-xlsx";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 
 // Như máy chủ (cntsmodel/domain): kinh phí số nguyên không âm; quy mô số dương (BF-SWEEP-CNTS: web chặn trước, mock chặn lại).
@@ -180,6 +181,36 @@ function parsePoint(b: { location?: S["CNTSPoint"] | null }) {
 }
 
 export const cntsModelRoutes: Route[] = [
+  // W11.53c: nạp Excel điểm, hộ. Giả lập chỉ trả tệp mẫu tối giản (sheet điểm); đọc tệp Excel thật (nén deflate) cần máy
+  // chủ thật — xem trước/ghi trả 422 như tệp không đọc được.
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/projects\/([^/]+)\/import-template$/,
+    handler: (ctx) => {
+      seed();
+      const p = last(PROJECTS, ctx.params[0]!);
+      if (!p) return problem(404, "extension.cnts_project_not_found", "Không có chương trình, dự án");
+      if (!editProject(who(ctx), p)) return problem(403, "forbidden", "chỉ chủ nhiệm của dự án, lãnh đạo phòng hoặc Admin nạp điểm, hộ");
+      const head = ["Mã điểm (*)", "Tên điểm (*)", "Mã xã (*)", "Mã loại mô hình (*)", "Quy mô", "Đơn vị quy mô", "Mẫu nhật ký", "Cán bộ theo dõi", "Ghi chú"];
+      const bytes = xlsxOf("Điểm trình diễn", [head], []);
+      return new Response(new Blob([bytes as BlobPart]), { status: 200, headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } });
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/projects\/([^/]+)\/import(?:\/preview)?$/,
+    handler: (ctx) => {
+      seed();
+      const p = last(PROJECTS, ctx.params[0]!);
+      if (!p) return problem(404, "extension.cnts_project_not_found", "Không có chương trình, dự án");
+      if (!editProject(who(ctx), p)) return problem(403, "forbidden", "chỉ chủ nhiệm của dự án, lãnh đạo phòng hoặc Admin nạp điểm, hộ");
+      if (p.event === "closed") return problem(409, "extension.cnts_project_closed", "Dự án đã kết thúc — mở lại trước khi sửa");
+      return problem(422, "extension.cnts_import_invalid", "Tệp nạp điểm trình diễn, hộ tham gia không hợp lệ", {
+        detail: "Bản giả lập không đọc tệp Excel — dùng máy chủ thật",
+        issues: [],
+      });
+    },
+  },
   {
     method: "GET",
     pattern: /^\/v1\/extension\/cnts\/projects$/,

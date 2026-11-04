@@ -1,0 +1,1 @@
+- [ ] BF-SWEEP-KHTC-NONPLAN-UI (#226): thêm route Detail và lịch sử metadata gửi/rà soát cho hộp phiếu KHTC, giữ màn nhập và quyền hiện hữu; phần form/report/kỳ nhúng còn lại ở #229. Chờ review chéo/CI đúng SHA; không đánh dấu toàn FN/UAT/G1 hoàn tất.

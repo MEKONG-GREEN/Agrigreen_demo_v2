@@ -16131,6 +16131,90 @@ paths:
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/projects/{ref}/import-template:
+    get:
+      summary: "W11.53c FN-19 luồng phụ: tệp mẫu nạp Excel điểm trình diễn, hộ tham gia của dự án (sheet điểm, hộ, hướng dẫn: mã loại mô hình, mã xã, cán bộ, điểm đã có) — người sửa được dự án"
+      operationId: extensionCntsProjectImportTemplate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Tệp .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/projects/{ref}/import/preview:
+    post:
+      summary: "W11.53c: xem trước tệp nạp điểm, hộ (.xlsx ≤ 2 MB, ≤ 200 điểm, ≤ 2000 hộ) — kiểm bố cục, kiểu số, trùng, xã ngoài tỉnh; lỗi theo dòng/cột; KHÔNG ghi gì"
+      operationId: extensionCntsProjectImportPreview
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        "200":
+          description: Kết quả xem trước (valid = ghi được)
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSImportResult"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.read_only | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_import_invalid (tệp không đọc được, sai bố cục, quá số dòng)", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/projects/{ref}/import:
+    post:
+      summary: "W11.53c: nạp tệp điểm, hộ — kiểm lại như xem trước, chủ hộ vào kho định danh, ghi mọi dòng trong một giao dịch (còn lỗi → 422 kèm issues, không ghi gì); gọi lặp cùng Idempotency-Key trả kết quả cũ"
+      operationId: extensionCntsProjectImport
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        "200":
+          description: Phát lại lần ghi trước
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSImportResult"}
+        "201":
+          description: Đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSImportResult"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.read_only | extension.support_reason_required", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_project_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_import_invalid (kèm issues: sheet, row, column, message)", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/diary-cycles:
     get: {"summary":"Lứa nuôi trong phạm vi (W11.48, NC-02/NC-15) — kèm lợi nhuận trung bình/hộ của lứa đã hạch toán","operationId":"extensionCntsDiaryCycleList","tags":["extension"],"parameters":[{"name":"household_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"site_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"project_ref","in":"query","required":false,"schema":{"type":"string","format":"uuid"}},{"name":"status","in":"query","required":false,"schema":{"type":"string","enum":["open","closed"]}}],"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleList"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_cycle_invalid","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
     post: {"summary":"Mở lứa nuôi cho hộ mô hình — cán bộ theo dõi điểm / người ghi nhật ký (Cấp Xã), Admin","operationId":"extensionCntsDiaryCycleCreate","tags":["extension"],"parameters":[{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleSave"}}}},"responses":{"200":{"description":"Gọi lặp (Idempotency-Key) — trả bản đã ghi","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleDetail"}}}},"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryCycleDetail"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"extension.cnts_diary_cycle_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_cycle_version_conflict | extension.cnts_diary_cycle_closed | extension.cnts_diary_cycle_open_exists","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_cycle_invalid","$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
@@ -27209,6 +27293,10 @@ components:
     CNTSGrantRevoke: {"type":"object","properties":{"base_version":{"type":"integer"},"reason":{"type":"string"},"successor_ref":{"type":["string","null"],"format":"uuid"}},"required":["base_version","reason"],"additionalProperties":false}
     CNTSGrantCandidate: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"display":{"type":["string","null"]},"commune_codes":{"type":"array","items":{"type":"string"}}},"required":["ref","display","commune_codes"],"additionalProperties":false}
     CNTSGrantCandidateList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSGrantCandidate"}}},"required":["items"],"additionalProperties":false}
+    CNTSImportIssue: {"type":"object","properties":{"sheet":{"type":["string","null"]},"row":{"type":["integer","null"]},"column":{"type":["string","null"]},"message":{"type":"string"}},"required":["sheet","row","column","message"],"additionalProperties":false}
+    CNTSImportSite: {"type":"object","properties":{"row":{"type":"integer"},"code":{"type":"string"},"name":{"type":"string"},"commune_code":{"type":"string"},"model_type_code":{"type":"string"},"model_type_name":{"type":["string","null"]},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"]},"diary_form":{"type":["string","null"]},"officer_ref":{"type":["string","null"],"format":"uuid"},"officer_display":{"type":["string","null"]},"note":{"type":["string","null"]}},"required":["row","code","name","commune_code","model_type_code","model_type_name","scale","scale_unit","diary_form","officer_ref","officer_display","note"],"additionalProperties":false}
+    CNTSImportHousehold: {"type":"object","properties":{"row":{"type":"integer"},"site_key":{"type":"string"},"site_name":{"type":"string"},"commune_code":{"type":"string"},"owner_label":{"type":"string"},"owner_phone_masked":{"type":"string"},"scale":{"type":["string","null"]},"scale_unit":{"type":["string","null"]},"keeper_kind":{"type":"string","enum":["officer","self"]},"joined_on":{"type":["string","null"],"format":"date"},"note":{"type":["string","null"]}},"required":["row","site_key","site_name","commune_code","owner_label","owner_phone_masked","scale","scale_unit","keeper_kind","joined_on","note"],"additionalProperties":false}
+    CNTSImportResult: {"type":"object","properties":{"project_ref":{"type":"string","format":"uuid"},"project_code":{"type":["string","null"]},"valid":{"type":"boolean"},"committed":{"type":"boolean"},"replayed":{"type":"boolean"},"site_count":{"type":"integer"},"household_count":{"type":"integer"},"sites":{"type":"array","items":{"$ref":"#/components/schemas/CNTSImportSite"}},"households":{"type":"array","items":{"$ref":"#/components/schemas/CNTSImportHousehold"}},"issues":{"type":"array","items":{"$ref":"#/components/schemas/CNTSImportIssue"}},"issues_truncated":{"type":"boolean"},"site_refs":{"type":"array","items":{"type":"string","format":"uuid"}}},"required":["project_ref","project_code","valid","committed","replayed","site_count","household_count","sites","households","issues","issues_truncated","site_refs"],"additionalProperties":false}
     CNTSDiarySupply: {"type":"object","properties":{"item":{"type":"string","description":"Vật tư (mục 1 sổ: con giống, thức ăn con/lớn, vaccine, chế phẩm…); dòng cũ chỉ có chủng loại"},"date":{"type":"string","format":"date"},"kind":{"type":"string","description":"Chủng loại vật tư"},"quantity":{"type":"string"},"unit":{"type":"string"},"note":{"type":"string"}},"required":["date","kind","quantity","unit"],"additionalProperties":false}
     CNTSMapLatLng: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"}},"required":["lat","lng"],"additionalProperties":false}
     CNTSDiaryAccounting: {"type":"object","properties":{"cost_seed":{"type":["string","null"]},"cost_feed":{"type":["string","null"]},"cost_depreciation":{"type":["string","null"]},"cost_transport":{"type":["string","null"]},"cost_vet":{"type":["string","null"]},"cost_probiotic":{"type":["string","null"]},"revenue_heads":{"type":["integer","null"]},"revenue_output_kg":{"type":["string","null"]},"revenue_price":{"type":["string","null"]},"revenue_amount":{"type":["string","null"]},"total_cost":{"type":"string"},"profit":{"type":["string","null"]},"unit_cost":{"type":["string","null"]}},"required":["cost_seed","cost_feed","cost_depreciation","cost_transport","cost_vet","cost_probiotic","revenue_heads","revenue_output_kg","revenue_price","revenue_amount","total_cost","profit","unit_cost"],"additionalProperties":false}
