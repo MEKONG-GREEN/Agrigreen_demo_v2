@@ -30,10 +30,21 @@ describe("initial persisted draft225",()=>{
  await screen.findByText(/Đã xác nhận lưu nháp máy chủ/);await screen.findByText(/Đã nhận nháp máy chủ lần ghi 1/);
  expect(w.api.save).toHaveBeenCalledTimes(1);expect(w.api.save.mock.calls[0]![1]).toEqual({expected_revision:0,entries:[]});expect(screen.getByRole("button",{name:"Lưu nháp máy chủ"})).toBeEnabled();expect(screen.getByRole("button",{name:/Áp dụng/})).toBeDisabled();
  });
+ it("retains a known mutation ACK when the subsequent current-state reload fails",async()=>{
+ w.api.current.mockResolvedValueOnce(structuredClone(state)).mockRejectedValueOnce(new ApiProblem({type:"about:blank",title:"Không đọc được trạng thái225",status:503,code:"service_unavailable"}));
+ render(<InitialDraftPage225 route={route()}/>);fireEvent.click(await screen.findByRole("button",{name:"Tạo nháp máy chủ"}));
+ await screen.findByRole("alert");expect(w.api.save).toHaveBeenCalledTimes(1);expect(screen.getByText(/Đã xác nhận lưu nháp máy chủ/)).toBeInTheDocument();expect(screen.getByText(/Đã nhận nháp máy chủ lần ghi 1/)).toBeInTheDocument();
+ });
  it("retries an unknown ACK with the same immutable request/key instead of creating another operation",async()=>{
  w.api.save.mockRejectedValueOnce(new Error("transport unavailable"));render(<InitialDraftPage225 route={route()}/>);fireEvent.click(await screen.findByRole("button",{name:"Tạo nháp máy chủ"}));
  fireEvent.click(await screen.findByRole("button",{name:"Thử lại đúng thao tác chưa xác nhận"}));await screen.findByText(/Đã xác nhận lưu nháp máy chủ/);
  expect(w.api.save).toHaveBeenCalledTimes(2);expect(w.api.save.mock.calls[1]).toEqual(w.api.save.mock.calls[0]);
+ });
+ it("keeps the original operation through transport loss and idempotency-in-progress",async()=>{
+ w.api.save.mockRejectedValueOnce(new Error("transport unavailable")).mockRejectedValueOnce(new ApiProblem({type:"about:blank",title:"Đang ghi225",status:409,code:"idempotency_in_progress"}));
+ render(<InitialDraftPage225 route={route()}/>);fireEvent.click(await screen.findByRole("button",{name:"Tạo nháp máy chủ"}));fireEvent.click(await screen.findByRole("button",{name:"Thử lại đúng thao tác chưa xác nhận"}));
+ await screen.findByRole("alert");fireEvent.click(await screen.findByRole("button",{name:"Thử lại đúng thao tác chưa xác nhận"}));await screen.findByText(/Đã xác nhận lưu nháp máy chủ/);
+ expect(w.api.save).toHaveBeenCalledTimes(3);expect(w.api.save.mock.calls[1]).toEqual(w.api.save.mock.calls[0]);expect(w.api.save.mock.calls[2]).toEqual(w.api.save.mock.calls[0]);
  });
  for(const change of ["contextABA","yearABA","api","actor","MFA","readonly"]){it(`retires pending ACK across ${change}`,async()=>{
  const pending=deferred<InitialDraft225>();w.api.save.mockReturnValueOnce(pending.promise);const r=render(<InitialDraftPage225 route={route()}/>);fireEvent.click(await screen.findByRole("button",{name:"Tạo nháp máy chủ"}));await waitFor(()=>expect(w.api.save).toHaveBeenCalledTimes(1));

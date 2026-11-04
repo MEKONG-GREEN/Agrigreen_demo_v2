@@ -12,11 +12,14 @@ import (
 	"time"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
+	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
+	khtcdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/domain"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/workflow"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -211,7 +214,18 @@ func TestInitialDraft225NativeCRUDGenerationAndPublishFence(t *testing.T) {
 	if badStatus != 422 {
 		t.Fatalf("new draft NUL note must be validation failure without append: status=%d", badStatus)
 	}
-	body := map[string]any{"expected_revision": 0, "entries": []any{}, "note": "initial"}
+	var program struct {
+		Ref uuid.UUID `json:"ref"`
+	}
+	{
+		code, raw := call(a, http.MethodPost, "/v1/kn/khtc/programs", "draft225-real-program", map[string]any{"code": "P225", "name": "Tên CT gốc225", "kind": "program"})
+		if code != 201 || json.Unmarshal(raw, &program) != nil || program.Ref == uuid.Nil {
+			t.Fatalf("real program setup status=%d", code)
+		}
+	}
+	entryRef := ids.New()
+	entriesBody := []map[string]any{{"ref": entryRef.String(), "tab": "programs", "kind": "program", "program_ref": program.Ref.String(), "name": "Tên dòng đã chốt225", "code": "P225", "sort_order": 1, "tracking": "tracking", "communes": []string{}}}
+	body := map[string]any{"expected_revision": 0, "entries": entriesBody, "note": "initial"}
 	code, raw := call(a, http.MethodPost, path, "draft225-create", body)
 	if code != 201 {
 		t.Fatalf("create status=%d", code)
@@ -219,6 +233,19 @@ func TestInitialDraft225NativeCRUDGenerationAndPublishFence(t *testing.T) {
 	first := decode(raw)
 	if first.DraftID == "" || first.Revision != 1 || first.Actor != a.String() {
 		t.Fatal("create receipt binding incorrect")
+	}
+	// Rename the live master after the acknowledged draft. Direct public app
+	// receipt replay intentionally bypasses the HTTP cache and must retain stored data.
+	renameCode, _ := call(a, http.MethodPost, "/v1/kn/khtc/programs/"+program.Ref.String()+"/revise", "draft225-rename-master", map[string]any{"code": "P225", "name": "Tên danh mục mới225", "kind": "program", "active": true})
+	if renameCode != 201 {
+		t.Fatalf("real master rename status=%d", renameCode)
+	}
+	k := contexts[a]
+	principal := fixture.Bind(t, authz.Principal{ActorRef: a, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: true, KN: &k})
+	svc := &khtcapp.Service{DB: db.ForModule(pool, db.Module("pf/extension")), Clock: clk}
+	own, wasReplay, replayErr := svc.SaveInitialDraft225(authz.WithPrincipal(context.Background(), principal), khtcapp.InitialDraftInput225{Year: 2030, ExpectedRevision: 0, IdemKey: "draft225-create", Note: "initial", Entries: []khtcdomain.Entry{{Ref: entryRef, Tab: khtcdomain.TabPrograms, Kind: khtcdomain.EntryProgram, ProgramRef: &program.Ref, Name: "Tên dòng đã chốt225", Code: "P225", SortOrder: 1, Tracking: "tracking", Communes: []string{}}}})
+	if replayErr != nil || !wasReplay || own.Event.ID.String() != first.EventID || len(own.Entries) != 1 || own.Entries[0].Name != "Tên dòng đã chốt225" || own.Entries[0].Code != "P225" || own.Entries[0].ProgramName != "" {
+		t.Fatalf("immutable nonempty app receipt replay failed: replay=%t error=%T", wasReplay, replayErr)
 	}
 	code, replayed := call(a, http.MethodPost, path, "draft225-create", body)
 	if code != 201 || !bytes.Equal(raw, replayed) {
@@ -232,7 +259,7 @@ func TestInitialDraft225NativeCRUDGenerationAndPublishFence(t *testing.T) {
 	if code != 403 {
 		t.Fatalf("unpublished draft foreign department status=%d", code)
 	}
-	body = map[string]any{"draft_id": first.DraftID, "expected_revision": first.Revision, "entries": []any{}, "note": "shared actor edit"}
+	body = map[string]any{"draft_id": first.DraftID, "expected_revision": first.Revision, "entries": entriesBody, "note": "shared actor edit"}
 	code, raw = call(b, http.MethodPost, path, "draft225-save", body)
 	if code != 201 {
 		t.Fatalf("shared actor save status=%d", code)

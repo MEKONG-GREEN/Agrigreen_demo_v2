@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -53,12 +54,14 @@ func newDeadlineFx209(t *testing.T) *deadlineFx209 {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
-		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k})))
+		c.Request = c.Request.WithContext(authz.WithPrincipal(tenant.WithID(c.Request.Context(), base.tid), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k})))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
 	f := &deadlineFx209{khtcFx: base, fm: fm, kn: kn, pool: pool, actor: ids.New()}
 	code, body := f.do(http.MethodPost, "/v1/extension/khtc/form-template/install", authz.KNAdmin, "", uuid.Nil, "install209", nil)
+	f.ok(code, body, nil)
+	code, body = f.do(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", authz.KNTinh, khtcDept, f.actor, "fixture-plan225-deadline", map[string]any{"base_version": 0, "effective_from": "2026-01-01", "entries": []any{}})
 	f.ok(code, body, nil)
 	return f
 }

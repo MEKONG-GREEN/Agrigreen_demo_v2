@@ -15,6 +15,7 @@ import { PlanTree } from "./plans/PlanTree";
 import { entryDraft, type EntryDraft } from "./plans/entry-form";
 import { ProgramPage, type ProgramDraft } from "./plans/ProgramPages";
 import { entryHref, newEntryHref, programHref } from "./plans/routes";
+import { useAuth } from "@/auth/AuthProvider";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, ReadOnlyNotice, useAction, useLoad } from "@/kn/cycle/common";
@@ -51,6 +52,7 @@ export function KhtcPlanScreen(props: { route?: PlanRoute } = {}) {
  return <LegacyPlanScreen225 {...props}/>;
 }
 function LegacyPlanScreen225({ route: requestedRoute }: { route?: PlanRoute } = {}) {
+  const auth=useAuth(); const selected=auth.kn.context; const canReadInitialDraft=selected?.role==="admin"||(selected?.role==="kn_tinh"&&selected.department_code==="ke_hoach_tai_chinh");
   const api = useKhtcApi();
   const rights = useKhtcRights();
   const [localRoute, setLocalRoute] = useState<Omit<PlanRoute, "go">>(() => ({ base: PLAN_BASE, year: vnYear(), view: "list" }));
@@ -77,7 +79,7 @@ function LegacyPlanScreen225({ route: requestedRoute }: { route?: PlanRoute } = 
         <button type="button" className="btn btn-o btn-sm" onClick={() => setYear(year - 1)} disabled={year <= 2000} aria-label="Năm trước">
           ‹
         </button>
-        <strong aria-live="polite">Năm {year}</strong>{rights.plan?<button className="btn btn-o btn-sm" onClick={()=>route.go(`${route.base}/nhap-may-chu?year=${year}`)}>Nháp máy chủ ban đầu</button>:null}
+        <strong aria-live="polite">Năm {year}</strong>{canReadInitialDraft?<button className="btn btn-o btn-sm" onClick={()=>route.go(`${route.base}/nhap-may-chu?year=${year}`)}>Nháp máy chủ ban đầu</button>:null}
         <button type="button" className="btn btn-o btn-sm" onClick={() => setYear(year + 1)} disabled={year >= 2100} aria-label="Năm sau">
           ›
         </button>

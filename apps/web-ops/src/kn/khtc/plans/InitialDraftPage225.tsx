@@ -30,7 +30,12 @@ export function InitialDraftPage225({route}:{route:PlanRoute}){
 function DraftResource225({route}:{route:PlanRoute}){
  const auth=useAuth();const api=useMemo(()=>createDraftApi225(auth.api),[auth.api]);const khtc=useKhtcApi();
  const s=useLoad(async()=>{const [state,programs,catalog,history]=await Promise.all([api.current(route.year),khtc.programs(true),khtc.catalog(),api.history(route.year)]);return {state,programs:programs.items,catalog:catalog.items,history};},[api,khtc,route.year]);
- return <LoadState s={s}>{data=><DraftEditor225 route={route} data={data} api={api} reload={s.reload}/>}</LoadState>;
+ // A failed read is not a mutation rollback. Retain only this authority/year
+ // owner's last accepted resource so a known ACK and unsaved tree stay visible.
+ const [accepted,setAccepted]=useState<typeof s.data>(null);
+ if(s.data&&s.data!==accepted)setAccepted(s.data);
+ const current=s.data??accepted;
+ return <>{current&&s.problem?<ProblemAlert problem={s.problem}/>:null}<LoadState s={{...s,data:current,problem:current?null:s.problem}}>{data=><DraftEditor225 route={route} data={data} api={api} reload={s.reload}/>}</LoadState></>;
 }
 type Resource=Awaited<ReturnType<ReturnType<typeof createDraftApi225>["current"]>>;
 function DraftEditor225({route,data,api,reload}:{route:PlanRoute;data:{state:Resource;programs:Awaited<ReturnType<ReturnType<typeof useKhtcApi>["programs"]>>["items"];catalog:Awaited<ReturnType<ReturnType<typeof useKhtcApi>["catalog"]>>["items"];history:Awaited<ReturnType<ReturnType<typeof createDraftApi225>["history"]>>};api:ReturnType<typeof createDraftApi225>;reload:()=>void}){
@@ -65,7 +70,7 @@ function DraftEditor225({route,data,api,reload}:{route:PlanRoute;data:{state:Res
    setNotice(`Đã xác nhận ${ack.action==="discard"?"hủy nháp":"lưu nháp máy chủ"} — thế hệ ${ack.draft_id}, lần ghi ${ack.revision}. Đây không phải phiên bản áp dụng.`);
    if(stillOwn){setHead({...headRef.current,revision:ack.revision,draft:ack.action==="discard"?null:ack});if(edit.current===op.edit){setEntries(ack.action==="discard"?[]:ack.entries);setDirty(false);setDrafts({});}}
    reload();
-  }catch(e){if(!alive.current)return;if(e instanceof ApiProblem){setProblem(e);if(e.status>=400&&e.status<500){pendingRef.current=null;setPending(null);}}else setNotice("Chưa biết kết quả ghi máy chủ. Thử lại đúng thao tác để lấy xác nhận, không tạo thao tác mới.");}
+  }catch(e){if(!alive.current)return;if(e instanceof ApiProblem){setProblem(e);if(e.status>=400&&e.status<500&&e.status!==429&&e.code!=="idempotency_in_progress"){pendingRef.current=null;setPending(null);}}else setNotice("Chưa biết kết quả ghi máy chủ. Thử lại đúng thao tác để lấy xác nhận, không tạo thao tác mới.");}
   finally{busyRef.current=false;if(alive.current)setBusy(false);}
  };
  const logs=history.items.map(e=>({at:e.event_time,actor_display:e.actor_ref,event:`${e.action} — thế hệ ${e.draft_id}; lần ghi ${e.revision}`,reason:e.note||undefined}));
@@ -75,7 +80,7 @@ function DraftEditor225({route,data,api,reload}:{route:PlanRoute;data:{state:Res
  {!head.available?<p role="alert">Năm không còn đủ điều kiện tạo nháp ban đầu: {head.unavailable_reason||"đã có dữ liệu tham chiếu"}.</p>:null}
  {hasFormDirty?<p role="note">Có ô đang chỉnh sửa chưa đưa vào cây. Mở lại dòng và bấm Lưu vào nháp trước khi lưu máy chủ; Hủy chỉ quay lại, không hủy nháp máy chủ.</p>:null}{problem?<ProblemAlert problem={problem}/>:null}{notice?<p role="status">{notice}</p>:null}
  <div className="row">{pending?<button className="btn btn-p" disabled={busy} onClick={()=>void submit()}>{busy?"Đang chờ xác nhận…":"Thử lại đúng thao tác chưa xác nhận"}</button>:<><button className="btn btn-p" disabled={!canEdit||hasFormDirty} onClick={()=>void submit()}>{head.draft?"Lưu nháp máy chủ":"Tạo nháp máy chủ"}</button><button className="btn btn-o" disabled={!canEdit||hasFormDirty||!head.draft} onClick={()=>void submit(true)}>Hủy đúng nháp máy chủ lần {head.revision}</button></>}
- <button className="btn btn-o" disabled={busy||!!pending} onClick={()=>{setHead(data.state);setEntries(data.state.draft?.entries??[]);setDirty(false);setDrafts({});setFormDirty({});edit.current++;reload();}}>Bỏ thay đổi trên màn và tải lại</button><button className="btn btn-o" disabled>Áp dụng — chưa có giao thức hoàn chỉnh (#233)</button></div>
+ <button className="btn btn-o" disabled={busy||!!pending} onClick={()=>{setHead(data.state);setEntries(data.state.draft?.entries??[]);setDirty(false);setDrafts({});setFormDirty({});edit.current++;reload();}}>Bỏ thay đổi trên màn và tải lại</button><button className="btn btn-o" disabled>Áp dụng chưa được hỗ trợ cho nháp này</button></div>
  {!rights.plan?<ReadOnlyNotice>Chỉ xem nháp trong ngữ cảnh hiện tại.</ReadOnlyNotice>:null}</>;
  let content;
  const key=[route.year,route.view,route.ref,route.parent,route.kind,route.tab].join(":");

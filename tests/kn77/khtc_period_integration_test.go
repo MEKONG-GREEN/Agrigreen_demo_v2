@@ -32,6 +32,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -134,10 +135,14 @@ func newKHTCFxPool(t *testing.T, shared *pgxpool.Pool) *khtcFx {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
-		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k})))
+		c.Request = c.Request.WithContext(authz.WithPrincipal(tenant.WithID(c.Request.Context(), f.tid), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k})))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
+	// P804 requires a real owner plan before positive calendar Open. This fixture
+	// has no plan-content assertions; populated form/source fixtures seed their own.
+	code, body := f.do(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", authz.KNTinh, khtcDept, ids.New(), "fixture-plan225", map[string]any{"base_version": 0, "effective_from": "2026-01-01", "entries": []any{}})
+	f.ok(code, body, nil)
 	return f
 }
 
@@ -302,7 +307,7 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		f.fail(c, b, "extension.khtc_period_terminal")
 		// BR-DL-13 (W11.61 móc ClosedCutoff): Kế hoạch năm không được có ngày hiệu lực không sau ngày chốt 13/10 của kỳ đã đóng.
 		c, b = f.do(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", authz.KNTinh, khtcDept, me, "",
-			map[string]any{"base_version": 0, "effective_from": "2026-10-01", "entries": []any{}})
+			map[string]any{"base_version": 1, "decision_no": "QD-CUTOFF225", "decision_date": "2026-10-01", "effective_from": "2026-10-01", "entries": []any{}})
 		f.fail(c, b, "extension.khtc_effective_date_invalid")
 	})
 
