@@ -273,53 +273,7 @@ func ptrTime(t time.Time) *time.Time { return &t }
 // Close "Đóng kỳ" (BR-DL-15): chốt kỳ native (phiếu chưa gửi → Không gửi, đã gửi/yêu cầu bổ sung → Đã khóa, ảnh chụp đóng
 // băng) rồi ghi sự kiện đóng. Gọi lại sau lỗi giữa chừng: kỳ native đã chốt → chỉ ghi sự kiện.
 func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) (Detail, error) {
-	c, err := s.periodWriter(ctx, id)
-	if err != nil {
-		return Detail{}, err
-	}
-	d, err := s.Get(ctx, id)
-	if err != nil {
-		return Detail{}, err
-	}
-	dc, err := domain.CanClose(d.State, d.DueAt, s.now(), s.closeLateDays(ctx, s.now()), reason)
-	switch {
-	case errors.Is(err, domain.ErrTerminal):
-		return Detail{}, ErrTerminal
-	case errors.Is(err, domain.ErrReasonRequired):
-		return Detail{}, problem.Validation.WithField("reason", "đóng kỳ khi còn thiếu dữ liệu: lý do bắt buộc, 10–500 ký tự")
-	case err != nil:
-		return Detail{}, ErrNotClosable.WithDetail("kỳ đang " + domain.PeriodLabels[d.State] + ": " + err.Error())
-	}
-	if s.CancelGuard != nil {
-		// Đang hủy kỳ (ý định còn hạn): không chốt kỳ native ở cap/forms — trigger cũng chặn sự kiện 'closed', kiểm trước để
-		// không để lại kỳ native đã chốt mà sổ KHTC chưa đóng (review #143 N6).
-		pending, err := s.CancelGuard.CancelPending(ctx, id)
-		if err != nil {
-			return Detail{}, ErrDependency.WithDetail("trạng thái hủy kỳ lỗi").WithCause(err)
-		}
-		if pending {
-			return Detail{}, ErrCancelling
-		}
-	}
-	nativeKey := eventIdem(idem, "forms-close", id)
-	nativeCtx := ctx
-	if d.Period.Type == domain.TypeAdhoc {
-		nativeCtx = BindAdhocOperation(ctx, s.DB, c.k, id, formsport.Operation{Action: formsport.OperationClose, Profile: domain.ProfileKHTC, PeriodID: d.Period.FormsPeriodRef, IdemKey: nativeKey})
-	}
-	if err := s.Control.ClosePeriod(nativeCtx, domain.ProfileKHTC, d.Period.FormsPeriodRef, nativeKey); err != nil &&
-		!errors.Is(err, formsport.ErrPeriodClosed) {
-		return Detail{}, err
-	}
-	st := d.State
-	e := store.Event{PeriodID: id, Action: store.ActionClosed, Forced: dc.Forced, State: &st}
-	if dc.Reason != "" {
-		why := dc.Reason
-		e.Reason = &why
-	}
-	if err := s.appendEvent(ctx, c, e, eventIdem(idem, "close", id)); err != nil {
-		return Detail{}, err
-	}
-	return s.Get(ctx, id)
+	return s.closeCAS211(ctx, id, reason, idem)
 }
 
 // Cancel "Hủy kỳ" (BR-DL-18): kỳ Đã mở/Đang thu thập/Trễ hạn/Đủ dữ liệu, báo cáo chưa có Bản cuối, lý do bắt buộc. Hủy kỳ

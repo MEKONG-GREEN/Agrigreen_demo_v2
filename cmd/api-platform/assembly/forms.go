@@ -47,8 +47,11 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 	// extension.khtc_max_submissions ghi đè). Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
 	// ngay dưới. W11.63: phiếu Báo cáo cho KHTC — nhập/rà soát qua cổng Entry; bài nộp kn_khtc phải mang bảng số liệu đã
 	// niêm phong (KHTCFormValidator ở trên).
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Entry: fm.Entry(),
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Operations: fm.PeriodOperations(), Entry: fm.Entry(),
 		MaxSubmissions: KNKHTCProfile.MaxSubmissions})
+	if err := fm.UsePeriodOperationPolicy(KNKHTCProfile.Name, kn.KHTCCloseOperationPolicy211()); err != nil {
+		return nil, err
+	}
 	// PFPUB (ADR-0053 §7): kỳ KHTC mở kèm kỳ nguồn quy đổi theo lịch D8; "Đủ dữ liệu" theo cờ chốt của nguồn.
 	kn.UseKHTCSourceCrosswalk(kn.KHTCSourceCrosswalk())
 	// W11.50: chiến dịch điều tra CNTS — đợt là kỳ native kn_cnts loại `adhoc` (không vào lũy kế, không vào tổng KHTC).

@@ -85,6 +85,8 @@ type Service struct {
 	Forms              formsport.Publisher
 	Control            formsport.PeriodControl
 	ConditionalControl formsport.ConditionalPeriodControl
+	Operations         formsport.PeriodOperations
+	CloseGuard         CloseGuard211
 	// Departments: phòng ban đang áp dụng của đơn vị (mặc định phòng tham gia, tên phòng). Tùy chọn.
 	Departments partyport.Departments
 	// Crosswalk (gói PFPUB), Plan (W11.61), Reports (KH6): tùy chọn — xem extension/port/khtc.go.

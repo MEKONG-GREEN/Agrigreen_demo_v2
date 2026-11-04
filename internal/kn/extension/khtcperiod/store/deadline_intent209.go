@@ -50,7 +50,7 @@ func LockDeadline(ctx context.Context, tx pgx.Tx, tid, period uuid.UUID, key str
 }
 func PendingDeadline(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bool, error) {
 	var pending bool
-	err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM(SELECT DISTINCT ON(operation_id)phase FROM pf_extension.khtc_deadline_intent WHERE period_id=$1 ORDER BY operation_id,seq DESC)x WHERE phase NOT IN('completed','undone'))`, id).Scan(&pending)
+	err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM(SELECT DISTINCT ON(operation_id)phase FROM pf_extension.khtc_deadline_intent WHERE period_id=$1 ORDER BY operation_id,seq DESC)x WHERE phase NOT IN('completed','undone')) OR EXISTS(SELECT 1 FROM(SELECT DISTINCT ON(operation_id)phase FROM pf_extension.khtc_close_intent211 WHERE period_id=$1 ORDER BY operation_id,seq DESC)y WHERE phase NOT IN('completed','rejected'))`, id).Scan(&pending)
 	return pending, err
 }
 func InsertDeadline(ctx context.Context, tx pgx.Tx, tid uuid.UUID, v DeadlineIntent) error {

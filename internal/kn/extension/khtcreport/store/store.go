@@ -53,6 +53,10 @@ func Lock(ctx context.Context, tx pgx.Tx, tid, period uuid.UUID) error {
 // ClaimCancel ghi ý định hủy kỳ (P0-POOL-SHARED-2, #143) hạn lease tính bằng giờ DB; ý định khác còn hạn → false.
 // Gọi trong giao dịch đã giữ Lock.
 func ClaimCancel(ctx context.Context, tx pgx.Tx, tid, period, token uuid.UUID, lease time.Duration) (bool, error) {
+	closing, closeErr := CloseReserved211(ctx, tx, tid, period)
+	if closeErr != nil || closing {
+		return false, closeErr
+	}
 	var ok bool
 	err := tx.QueryRow(ctx, `INSERT INTO pf_extension.khtc_cancel_intent (tenant_id, period_id, claim_id, claim_until, updated_at)
 	  VALUES ($1, $2, $3, now() + $4::interval, now())

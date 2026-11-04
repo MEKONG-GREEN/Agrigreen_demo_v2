@@ -25,6 +25,7 @@ type KHTCDeps struct {
 	Forms              formsport.Publisher
 	Control            formsport.PeriodControl
 	ConditionalControl formsport.ConditionalPeriodControl
+	Operations         formsport.PeriodOperations
 	Entry              formsport.Entry // W11.63: nhập, rà soát phiếu (thiếu → route phiếu trả 503)
 	Departments        partyport.Departments
 	Crosswalk          port.KHTCSourceCrosswalk // gói PFPUB (bộ quy đổi kỳ nguồn)
@@ -83,6 +84,7 @@ func (m *Module) UseKHTCPeriods(d KHTCDeps) {
 	s := m.khtcSvc()
 	s.Forms, s.Control, s.MaxSubmissions = d.Forms, d.Control, d.MaxSubmissions
 	s.ConditionalControl = d.ConditionalControl
+	s.Operations = d.Operations
 	if d.Entry != nil {
 		m.khtcFormSvc().Entry = d.Entry
 		if m.khtcReports != nil {
@@ -135,4 +137,9 @@ func (p planDepartments) PlanDepartments(ctx context.Context, year int, on time.
 		out = append(out, e.Department)
 	}
 	return out, nil
+}
+
+// KHTCCloseOperationPolicy211 binds public supplier receipts to durable KN Close intents.
+func (m *Module) KHTCCloseOperationPolicy211() formsport.PeriodOperationPolicy {
+	return m.khtcSvc().CloseOperationPolicy211
 }
