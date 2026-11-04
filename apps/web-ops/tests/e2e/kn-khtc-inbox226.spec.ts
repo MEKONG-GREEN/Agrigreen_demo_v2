@@ -1,0 +1,36 @@
+import {expect,test} from "@playwright/test";
+import {MOCK_KN_PASSWORD} from "../../src/api/mock/kn-accounts";
+import {sidebar} from "./helpers";
+
+test("226 private inbox Detail and History retain actual metadata and existing entry route",async({page})=>{
+  await page.clock.setFixedTime(new Date("2030-06-01T09:00:00Z"));
+  await page.goto("/login");
+  await page.getByLabel("Email hoặc số điện thoại").fill("admin.mekong@mekonggreen.vn");
+  await page.getByLabel("Mật khẩu",{exact:true}).fill(MOCK_KN_PASSWORD);
+  await page.getByRole("button",{name:"Đăng nhập",exact:true}).click();
+  await sidebar(page).getByRole("link",{name:"Phòng ban",exact:true}).click();
+  await page.getByLabel("Trạng thái Phòng Chăn nuôi - Thủy sản",{exact:true}).selectOption("active");
+  const folder=sidebar(page).getByRole("button",{name:"Phòng Chăn nuôi - Thủy sản",exact:true});
+  if(await folder.getAttribute("aria-expanded")!=="true")await folder.click();
+  await sidebar(page).getByRole("link",{name:"Báo cáo cho KHTC",exact:true}).click();
+  await expect(page.getByRole("heading",{name:/Báo cáo cho KHTC/})).toBeVisible();
+  await page.getByRole("link",{name:"Chi tiết phiếu",exact:true}).first().click();
+  await expect(page.getByRole("heading",{name:/Chi tiết phiếu/})).toBeVisible();
+  const entry=page.getByRole("link",{name:/Mở phiếu để nhập|Xem nội dung phiếu/});
+  await expect(entry).toHaveAttribute("href",/^\/kn\/khtc\/phieu\/[0-9a-f-]+\?department=chan_nuoi_thuy_san$/);
+  await expect(page.getByRole("button",{name:/^Lưu|^Gửi KHTC/})).toHaveCount(0);
+  await page.screenshot({path:"D:/Projects/coordination/226-detail.png",fullPage:true});
+  await page.getByRole("link",{name:"Lịch sử gửi và rà soát",exact:true}).click();
+  await expect(page.getByRole("heading",{name:/Lịch sử gửi và rà soát/})).toBeVisible();
+  const history=page.getByRole("table",{name:"Các lần gửi phiếu"});
+  await expect(history.getByRole("row")).toHaveCount(3);
+  await expect(history.getByText("Yêu cầu bổ sung",{exact:true})).toBeVisible();
+  await expect(page.getByText(/chưa có thông tin người thực hiện/)).toBeVisible();
+  await expect(page.getByRole("button",{name:/^Lưu|^Gửi KHTC/})).toHaveCount(0);
+  await page.screenshot({path:"D:/Projects/coordination/226-history.png",fullPage:true});
+  await page.getByRole("link",{name:"Quay lại chi tiết",exact:true}).click();
+  await page.getByRole("link",{name:"Danh sách phiếu",exact:true}).click();
+  await page.getByRole("button",{name:"Phiếu đã gửi",exact:true}).click();
+  await page.getByRole("link",{name:"Chi tiết phiếu",exact:true}).first().click();
+  await expect(page.getByRole("link",{name:"Danh sách phiếu",exact:true})).toHaveAttribute("href",/\?view=sent$/);
+});

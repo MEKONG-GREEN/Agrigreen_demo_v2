@@ -35,15 +35,15 @@ function InboxResource({ route }: { route: InboxRoute }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true;
-    if (!api || status !== "authenticated" || !principal || !kn.context || !department) return;
+    if (!api || status !== "authenticated" || !principal || !kn.context || kn.status!=="active" || !department) return;
     void createKhtcFormApi(api).get(route.id, department).then(value => {
       if (!active) return;
       if (value.period.id !== route.id || value.department !== department) { setFailed(true); return; }
       setSheet(value);
     }, () => { if (active) setFailed(true); });
     return () => { active = false; };
-  }, [api, status, principal, kn.context, department, route.id]);
-  if (status !== "authenticated" || !principal || !kn.context) return <p role="alert">Chọn ngữ cảnh làm việc để đọc phiếu.</p>;
+  }, [api, status, principal, kn.status, kn.context, department, route.id]);
+  if (status !== "authenticated" || !principal || !kn.context || kn.status!=="active") return <p role="alert">Chọn ngữ cảnh làm việc để đọc phiếu.</p>;
   if (!department) return <p role="alert">Chọn phòng để đọc phiếu.</p>;
   if (failed) return <p role="alert">Không đọc được phiếu trong ngữ cảnh hiện tại. Kiểm tra quyền, phòng và mã kỳ.</p>;
   if (!sheet) return <p role="status">Đang đọc phiếu…</p>;

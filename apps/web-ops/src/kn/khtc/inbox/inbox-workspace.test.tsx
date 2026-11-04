@@ -7,7 +7,7 @@ import { inboxHref, INBOX_BASE, parseInboxRoute } from "./inbox-routes";
 const state=vi.hoisted(()=>({path:"",search:"",api:{} as object,status:"authenticated",principal:{actor_ref:"actor-a",tenant_id:"tenant-a",amr:["mfa"]},context:{context_id:"ctx-a",department_code:"trong_trot",role:"kn_tinh",read_only:false}}));
 const get=vi.hoisted(()=>vi.fn());
 vi.mock("next/navigation",()=>({usePathname:()=>state.path,useSearchParams:()=>new URLSearchParams(state.search)}));
-vi.mock("@/auth/AuthProvider",()=>({useAuth:()=>({api:state.api,status:state.status,principal:state.principal,kn:{context:state.context}})}));
+vi.mock("@/auth/AuthProvider",()=>({useAuth:()=>({api:state.api,status:state.status,principal:state.principal,kn:{status:"active",context:state.context}})}));
 vi.mock("@/shell/Breadcrumb",()=>({useBreadcrumbTail:()=>undefined}));
 vi.mock("../forms/api",()=>({KHTC_DEPT:"ke_hoach_tai_chinh",createKhtcFormApi:()=>({get})}));
 const A="11111111-1111-4111-8111-111111111111",B="22222222-2222-4222-8222-222222222222";

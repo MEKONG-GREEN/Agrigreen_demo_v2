@@ -1,6 +1,6 @@
 export const INBOX_BASE = "/kn/bao-cao-khtc";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const departments = new Set(["trong_trot", "chan_nuoi_thuy_san", "thong_tin_tuyen_truyen", "hanh_chinh_tong_hop", "ke_hoach_tai_chinh"]);
+const departments = new Set(["trong_trot", "chan_nuoi_thuy_san", "thong_tin_truyen_thong", "hanh_chinh_tong_hop", "ke_hoach_tai_chinh"]);
 export type InboxRoute = { id: string; department?: string; base: string; history: boolean; view: "current" | "sent" };
 
 export function parseInboxRoute(path: string, query: URLSearchParams): InboxRoute | null {
