@@ -435,3 +435,212 @@ func TestClose211SameKeyNoMFAAndChangedActorCannotReplay(t *testing.T) {
 		}
 	}
 }
+
+func TestClose211NativeSuccessorABANeverBecomesOwnOutcome(t *testing.T) {
+	for _, stage := range []string{"beforeHydration", "duringHydration"} {
+		t.Run(stage, func(t *testing.T) {
+			f := newDeadlineFx209(t)
+			p := f.open209()
+			id := uuid.MustParse(p.ID)
+			nativeID := uuid.MustParse(p.FormsPeriodID)
+			f.clk.Advance(p.DueAt.Sub(f.clk.Now()) + 4*24*time.Hour)
+			native := f.fm.ConditionalControl()
+			conditional := &casProbe209{ConditionalPeriodControl: native}
+			svc, ctx := closeConsumer211(t, f, conditional)
+			probe := &receiptProbe211{PeriodOperations: svc.Operations}
+			svc.Operations = probe
+			var successor fp.PeriodRevision
+			replace := func() {
+				original, e := native.ControlSnapshot(ctx, "kn_khtc", nativeID)
+				if e != nil {
+					t.Fatal(e)
+				}
+				reopened, e := native.ReopenPeriodCAS(ctx, "kn_khtc", nativeID, original.Revision, "Mở lại theo quyết định kế tiếp211", "successor-reopen211")
+				if e != nil {
+					t.Fatal(e)
+				}
+				successor, e = native.ClosePeriodCAS(ctx, "kn_khtc", nativeID, reopened, "successor-close211")
+				if e != nil {
+					t.Fatal(e)
+				}
+				if successor == original.Revision {
+					t.Fatal("native ABA did not advance heads")
+				}
+			}
+			if stage == "beforeHydration" {
+				probe.after = func(r fp.PeriodOperationReceipt, e error) (fp.PeriodOperationReceipt, error) {
+					if e == nil {
+						replace()
+					}
+					return r, e
+				}
+			} else {
+				var once sync.Once
+				conditional.snapshotHook = func(_ context.Context, snap fp.PeriodControlSnapshot) {
+					if snap.Progress.Status == "closed" {
+						once.Do(replace)
+					}
+				}
+			}
+			_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "successor-"+stage)
+			assertConflict209(t, err)
+			_, err = svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "successor-"+stage)
+			assertConflict209(t, err)
+			current, err := native.ControlSnapshot(ctx, "kn_khtc", nativeID)
+			if err != nil || current.Revision != successor || current.Progress.Status != "closed" || probe.calls != 1 || phaseClose211(t, f) != "unresolved" {
+				t.Fatalf("own outcome consumed successor: calls=%d err=%v", probe.calls, err)
+			}
+			var count int
+			if err = tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
+				return tx.QueryRow(ctx, `SELECT count(*) FROM pf_extension.khtc_period_event WHERE tenant_id=$1 AND period_id=$2 AND action='closed'`, f.tid, id).Scan(&count)
+			}); err != nil || count != 0 {
+				t.Fatal("successor generated a false local owned Close event")
+			}
+		})
+	}
+}
+func TestClose211ClosedSubmitAndReviewCannotChangeAcceptedHead(t *testing.T) {
+	f := newDeadlineFx209(t)
+	p := f.open209()
+	id := uuid.MustParse(p.ID)
+	nativeID := uuid.MustParse(p.FormsPeriodID)
+	svc, ctx := closeConsumer211(t, f, f.fm.ConditionalControl())
+	sender := submitter211(t, f)
+	sub, err := f.fm.Entry211().Submit(sender, "kn_khtc", nativeID, "trong_trot", map[string]string{"ket_qua": "Accepted head211"}, 0, "accepted-head211")
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe := &receiptProbe211{PeriodOperations: svc.Operations}
+	svc.Operations = probe
+	assertClosed := func(err error) {
+		var pe *problem.Problem
+		if !errors.As(err, &pe) || pe.Code != "forms.period_closed" {
+			t.Fatalf("closed native write was not rejected: %v", err)
+		}
+	}
+	probe.after = func(r fp.PeriodOperationReceipt, e error) (fp.PeriodOperationReceipt, error) {
+		if e == nil {
+			_, submitErr := f.fm.Entry211().Submit(sender, "kn_khtc", nativeID, "trong_trot", map[string]string{"ket_qua": "Forbidden successor211"}, 1, "closed-submit211")
+			assertClosed(submitErr)
+			_, reviewErr := f.fm.Entry211().Review(ctx, "kn_khtc", sub.ID, "accepted", "Không được thay head sau Close211", "closed-review211")
+			assertClosed(reviewErr)
+		}
+		return r, e
+	}
+	out, err := svc.Close(ctx, id, "", "accepted-close211")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Forms) != 1 || out.Forms[0].View.Attempt != 1 || out.Forms[0].ReviewedAt != nil || out.Forms[0].ReviewNote != "" {
+		t.Fatal("closed write changed accepted head projection")
+	}
+}
+
+type closeGuardHook211 struct {
+	pa.CloseGuard211
+	before func()
+}
+
+func (g closeGuardHook211) BeginClose211(ctx context.Context, id, op, event uuid.UUID) error {
+	g.before()
+	return g.CloseGuard211.BeginClose211(ctx, id, op, event)
+}
+func TestClose211CancelWinsBeforeReservationHasNoNativeIO(t *testing.T) {
+	f := newDeadlineFx209(t)
+	p := f.open209()
+	id := uuid.MustParse(p.ID)
+	f.clk.Advance(p.DueAt.Sub(f.clk.Now()) + 4*24*time.Hour)
+	svc, ctx := closeConsumer211(t, f, f.fm.ConditionalControl())
+	probe := &receiptProbe211{PeriodOperations: svc.Operations}
+	svc.Operations = probe
+	svc.CloseGuard = closeGuardHook211{CloseGuard211: svc.CloseGuard, before: func() {
+		err := tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
+			if e := rs.Lock(ctx, tx, f.tid, id); e != nil {
+				return e
+			}
+			won, e := rs.ClaimCancel(ctx, tx, f.tid, id, uuid.New(), time.Minute)
+			if e == nil && !won {
+				return errors.New("Cancel fixture did not win reservation gap")
+			}
+			return e
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}}
+	_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "cancel-wins211")
+	assertConflict209(t, err)
+	if phaseClose211(t, f) != "rejected" || probe.calls != 0 || probe.reads != 0 {
+		t.Fatal("Cancel won but Close called native or retained uncertain phase")
+	}
+	native, err := f.fm.ConditionalControl().ControlSnapshot(ctx, "kn_khtc", uuid.MustParse(p.FormsPeriodID))
+	if err != nil || native.Progress.Status != "open" {
+		t.Fatal("Cancel gap closed native period")
+	}
+}
+func TestClose211AdminAdhocOwnCompletedReplay(t *testing.T) {
+	f := newDeadlineFx209(t)
+	svc, ctx := closeConsumer211(t, f, f.fm.ConditionalControl())
+	d := openAdhoc211(t, f, svc, ctx)
+	f.clk.Advance(d.DueAt.Sub(f.clk.Now()) + 4*24*time.Hour)
+	principal := fixture.Bind(t, authz.Principal{ActorRef: uuid.New(), TenantID: f.tid, MFA: true, KN: &authz.KNContext{ID: uuid.New(), Role: authz.KNAdmin, Scope: authz.Scope{All: true}}})
+	admin := authz.WithPrincipal(context.Background(), principal)
+	probe := &receiptProbe211{PeriodOperations: svc.Operations}
+	svc.Operations = probe
+	out, err := svc.Close(admin, d.Period.ID, "Đóng kỳ ngoại lệ đủ lý do", "admin-adhoc211")
+	if err != nil {
+		t.Fatal(err)
+	}
+	replay, err := svc.Close(admin, d.Period.ID, "Đóng kỳ ngoại lệ đủ lý do", "admin-adhoc211")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := json.Marshal(out)
+	b, _ := json.Marshal(replay)
+	if string(a) != string(b) || probe.calls != 1 || probe.reads != 1 || out.State != pd.PeriodClosed {
+		t.Fatal("own Admin receipt replay failed after terminal event")
+	}
+}
+
+func TestClose211PendingDeadlineWinsResourceFence(t *testing.T) {
+	f := newDeadlineFx209(t)
+	p := f.open209()
+	id := uuid.MustParse(p.ID)
+	f.clk.Advance(p.DueAt.Sub(f.clk.Now()) + 4*24*time.Hour)
+	control := &casProbe209{ConditionalPeriodControl: f.fm.ConditionalControl()}
+	svc, ctx := closeConsumer211(t, f, control)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	entered, release := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	releaseNative := func() { releaseOnce.Do(func() { close(release) }) }
+	defer releaseNative()
+	control.changeHook = func(context.Context, int, fp.PeriodRevision) { close(entered); <-release }
+	probe := &receiptProbe211{PeriodOperations: svc.Operations}
+	svc.Operations = probe
+	done := make(chan error, 1)
+	go func() {
+		_, err := svc.ChangeDeadline(ctx, id, pa.DeadlineInput{DueAt: p.DueAt.Add(time.Hour), Reason: "Đổi hạn đã giữ tài nguyên211"}, "deadline-wins211")
+		done <- err
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("Deadline did not acquire prepared resource fence")
+	}
+	_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "close-after-pending-deadline211")
+	assertConflict209(t, err)
+	releaseNative()
+	if err = <-done; err != nil {
+		t.Fatal(err)
+	}
+	if probe.calls != 0 || probe.reads != 0 || control.count() != 1 {
+		t.Fatal("pending Deadline allowed Close native I/O")
+	}
+	var intents int
+	if err = tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FROM pf_extension.khtc_close_intent211 WHERE tenant_id=$1`, f.tid).Scan(&intents)
+	}); err != nil || intents != 0 {
+		t.Fatal("Close recorded an intent across an owned pending Deadline")
+	}
+}
