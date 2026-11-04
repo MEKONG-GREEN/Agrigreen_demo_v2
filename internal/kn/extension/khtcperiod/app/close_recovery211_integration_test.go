@@ -7,15 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	rs "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms"
 	fp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	fixture "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/fixtures/khtcdeadline209"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -122,19 +118,9 @@ func TestClose211RenewedSessionRetainsStableAuthority(t *testing.T) {
 	}
 }
 
-// Count real native effects/anchors, not transport attempts. The supplier's
-// OperationID lock is responsible for deduplication of exact-command retries.
+// Effects are read through the test-only composition fixture, never by KN runtime.
 func nativeCountsFix211(t *testing.T, f *deadlineFx209) [3]int {
-	t.Helper()
-	pool := pgtest.Get(t).AdminPool(t, migrations.PF)
-	var out [3]int
-	if err := pool.QueryRow(context.Background(), `SELECT
- (SELECT count(*) FROM pf_forms.period_event WHERE tenant_id=$1),
- (SELECT count(*) FROM pf_forms.close_snapshot WHERE tenant_id=$1),
- (SELECT count(*) FROM pf_forms.period_operation_key WHERE tenant_id=$1)`, f.tid).Scan(&out[0], &out[1], &out[2]); err != nil {
-		t.Fatal(err)
-	}
-	return out
+	return f.fm.CloseEffectCounts211(t, f.tid)
 }
 
 func TestClose211RenewedSessionCannotAdoptChangedAuthority(t *testing.T) {
@@ -184,26 +170,6 @@ func TestClose211RenewedSessionCannotAdoptChangedAuthority(t *testing.T) {
 	}
 }
 
-// Missing retained receipt is a read-boundary fault. The real permanent key,
-// native ledger and append-only protections remain present and unchanged.
-type missingReceiptFix211 struct{ tenant.Beginner }
-type missingReceiptTxFix211 struct{ pgx.Tx }
-type missingReceiptRowFix211 struct{}
-
-func (missingReceiptRowFix211) Scan(...any) error { return pgx.ErrNoRows }
-func (b missingReceiptFix211) BeginTx(ctx context.Context, o pgx.TxOptions) (pgx.Tx, error) {
-	tx, e := b.Beginner.BeginTx(ctx, o)
-	if e != nil {
-		return nil, e
-	}
-	return missingReceiptTxFix211{tx}, nil
-}
-func (tx missingReceiptTxFix211) QueryRow(ctx context.Context, q string, args ...any) pgx.Row {
-	if q == "SELECT content,recorded_at FROM pf_forms.period_operation_receipt WHERE tenant_id=$1 AND id=$2 ORDER BY seq LIMIT 1" {
-		return missingReceiptRowFix211{}
-	}
-	return tx.Tx.QueryRow(ctx, q, args...)
-}
 func TestClose211PermanentKeyWithoutReceiptNeverRepeatsEffects(t *testing.T) {
 	f := newDeadlineFx209(t)
 	p := f.open209()
@@ -222,14 +188,8 @@ func TestClose211PermanentKeyWithoutReceiptNeverRepeatsEffects(t *testing.T) {
 	assertConflict209(t, err)
 	beforeCounts := nativeCountsFix211(t, f)
 	beforeOutbox := f.outboxCount209(t)
-	masked, err := forms.New(missingReceiptFix211{f.fm.Pool}, f.clk, forms.Deps{Profiles: extension.FormProfiles()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = masked.UsePeriodOperationPolicy("kn_khtc", svc.CloseOperationPolicy211); err != nil {
-		t.Fatal(err)
-	}
-	retry := &receiptProbe211{PeriodOperations: masked.PeriodOperations(), before: func(_ context.Context, in fp.PeriodOperationRequest) {
+	masked := f.fm.MissingReceiptOperations211(t, svc.CloseOperationPolicy211)
+	retry := &receiptProbe211{PeriodOperations: masked, before: func(_ context.Context, in fp.PeriodOperationRequest) {
 		if in != original {
 			t.Error("key retention retry replaced original command")
 		}
