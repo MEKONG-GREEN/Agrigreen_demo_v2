@@ -1,14 +1,14 @@
-# BF-KHTC-HRM-PERIOD-CAS-REST — Đóng kỳ KHTC có receipt
+## BF-KHTC-HRM-PERIOD-CAS-REST — Đóng kỳ KHTC có receipt
 
 Ngày: 04/11/2026. Phạm vi #211 là một họ thao tác hoàn chỉnh: Close KHTC. Phần còn lại thuộc #228; tài liệu này không xác nhận hoàn tất HRM, Cancel, Open/bù mở kỳ, UAT hoặc toàn bộ BRD.
 
-## Lệnh và quyền
+### Lệnh và quyền
 
 Giữ quy tắc BR-DL-15 của BRD KHTC v2.3: đóng bình thường khi đủ điều kiện, hoặc đóng ngoại lệ sau số ngày quá hạn cho phép với lý do hợp lệ. Bản cuối đã có không cấm Close. Lý do quyết định được giữ trong sổ KN; lệnh Close gửi native có Reason rỗng theo hợp đồng receipt #212.
 
 Close yêu cầu phiên hiện tại hợp lệ và MFA. Intent ràng buộc tenant, actor, assignment, vai trò, phạm vi và request gốc. Khóa dùng lại với actor/nội dung/quyền khác bị từ chối trước supplier; không trả kết quả thành công từ cache cũ. Direct service không MFA trả403; middleware idempotency HTTP hiện hữu có thể trả409 khi cùng khóa đổi authority hash. Không thay đổi middleware dùng chung.
 
-## Sở hữu và đối soát
+### Sở hữu và đối soát
 
 Intent được ghi trước I/O; pha dispatched được ghi trước Execute. Intent đang chờ dùng cùng khóa tài nguyên với deadline #209. Reservation phía báo cáo lấy cùng khóa snapshot với Cancel và không tự hết hạn khi kết quả chưa biết. Cancel thắng khoảng trống trước reservation thì Close kết thúc bằng bằng chứng chưa gọi native; Close thắng thì chặn Cancel, Final mới và snapshot mới. Final trước reservation vẫn được phép.
 
@@ -20,13 +20,13 @@ LastSubmissionID bị loại khỏi JSON public được giữ bằng map UUID r
 
 LOCAL completion ghi cùng giao dịch dữ liệu extension: own event ID, outcome bất biến, completed phase và kết thúc reservation. Callback không gọi native/port/Get trong giao dịch KN. Mất ACK commit được đối soát bằng chính event/outcome này; không dùng latest Get hoặc một thao tác tiếp theo làm bằng chứng sở hữu.
 
-## Lỗi và giới hạn
+### Lỗi và giới hạn
 
 - `extension.khtc_report_closing` (409): reservation Close đang giữ snapshot; Final mới hoặc capture mới phải chờ đối soát thao tác gốc.
 - Kết quả chưa xác định trả409 và giữ intent/reservation. Thiếu capability receipt/CAS/guard không rơi về đường Close legacy.
 - Chưa thay caller Cancel legacy, chưa làm giao thức bù Open/HCTH, chưa xác nhận revocation qua OIDC production. Supplier #212 và session registry thật là hợp đồng runtime; fixture registry chỉ là composition test.
 - Migration chỉ thêm ledger/trigger extension, không ghi dữ liệu HTX hoặc sửa Forms private schema. Không đổi hash lịch sử của #209.
 
-## Kiểm chứng
+### Kiểm chứng
 
 Bằng chứng chạy test, source SHA, sai oracle fixture đã sửa, mutation/control và giới hạn thực thi được giữ riêng trong packet review #211. Không suy PASS từ compile hoặc từ một lần chạy ở SHA cũ. Native dùng pg-ephemeral riêng, Go1.26.10, count1/p1/timeout55m; CI exact SHA và review chéo Claude vẫn là điều kiện trước tích hợp.
