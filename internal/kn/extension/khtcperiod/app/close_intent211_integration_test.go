@@ -12,8 +12,10 @@ import (
 	khtcpapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/app"
 	reportapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/app"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
+	fixture "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/fixtures/khtcdeadline209"
 	"github.com/google/uuid"
 )
 
@@ -64,6 +66,10 @@ func TestClose211HeldOriginalCannotCloseSuccessor(t *testing.T) {
 func closeConsumer211(t *testing.T, f *deadlineFx209, control formsport.ConditionalPeriodControl) (*khtcpapp.Service, context.Context) {
 	t.Helper()
 	svc, ctx := f.consumer209(control)
+	p, _ := authz.FromContext(ctx)
+	p.MFA = true
+	p = fixture.Bind(t, p)
+	ctx = authz.WithPrincipal(context.Background(), p)
 	svc.Operations = f.fm.PeriodOperations()
 	svc.CloseGuard = &reportapp.Service{DB: f.roleDB, Clock: f.clk}
 	if err := f.fm.UsePeriodOperationPolicy("kn_khtc", svc.CloseOperationPolicy211); err != nil {

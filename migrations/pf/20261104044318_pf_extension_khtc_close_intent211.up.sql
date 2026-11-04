@@ -40,7 +40,7 @@ BEGIN
    OR NOT((prior.phase='prepared' AND NEW.phase IN('dispatched','rejected')) OR(prior.phase='dispatched' AND NEW.phase IN('applied','rejected','unresolved')) OR(prior.phase='applied' AND NEW.phase IN('hydrated','unresolved')) OR(prior.phase='unresolved' AND NEW.phase IN('applied','hydrated','rejected','completed')) OR(prior.phase='hydrated' AND NEW.phase IN('completed','unresolved')))
   THEN RAISE EXCEPTION 'khtc_close_phase_conflict211' USING ERRCODE='23514'; END IF;
  END IF;
- IF NEW.phase IN('applied','hydrated','completed') AND NOT(NEW.payload ? 'receipt') THEN RAISE EXCEPTION 'khtc_close_receipt_required211' USING ERRCODE='23514'; END IF;
+ IF NEW.phase IN('applied','hydrated','completed') AND (NOT(NEW.payload ? 'receipt') OR NEW.payload->'receipt'->>'outcome'<>'applied') THEN RAISE EXCEPTION 'khtc_close_receipt_required211' USING ERRCODE='23514'; END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER a_close_intent211 BEFORE INSERT ON pf_extension.khtc_close_intent211 FOR EACH ROW EXECUTE FUNCTION pf_extension.check_close_intent211();
