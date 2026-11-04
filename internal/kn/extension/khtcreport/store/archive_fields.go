@@ -47,13 +47,14 @@ func walkArchive(ctx context.Context, tx pgx.Tx, q ArchiveScanQuery, visit func(
 		return err
 	}
 	defer rows.Close()
+	var projections archiveProjectionMemo
 	for rows.Next() {
 		var x ArchiveCandidate
 		var payload, filter []byte
 		if err = rows.Scan(&x.Row.ID, &x.Row.PeriodID, &x.Row.PeriodName, &x.Row.ReportType, &x.Row.DocumentNo, &x.Row.Version, &x.Row.Final, &x.Row.Provisional, &x.Row.ActorRef, &x.Row.At, &x.PeriodAt, &x.Header.DraftID, &x.Header.InputHash, &x.Header.BodyHash, &x.Header.FileName, &payload, &filter); err != nil {
 			return err
 		}
-		x.Fields = domain.ProjectArchiveFields(payload, filter)
+		x.Fields = projections.project(payload, filter)
 		x.Row.FieldCodes = x.Fields.Codes
 		x.Row.FieldStatus = x.Fields.Status
 		x.Header.ID = x.Row.ID
