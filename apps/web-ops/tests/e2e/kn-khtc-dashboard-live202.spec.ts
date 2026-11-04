@@ -20,15 +20,20 @@ async function normalKhtc202(page:Page) {
  await sidebar(page).getByRole("link",{name:"Người dùng",exact:true}).click();
  await page.getByRole("link",{name:"Tạo tài khoản",exact:true}).click();
  const main=page.getByRole("main");
- await main.getByLabel("Họ tên").fill("Cán bộ dashboard202");
- await main.getByLabel("Email").fill(identifier);
- await main.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912020202");
  const assignment=main.getByRole("group",{name:"Vai trò và phạm vi"});
  await assignment.getByRole("combobox",{name:"Vai trò",exact:true}).selectOption("kn_tinh");
  await assignment.getByRole("checkbox",{name:"trong_trot",exact:true}).uncheck();
  await assignment.getByRole("checkbox",{name:"ke_hoach_tai_chinh",exact:true}).check();
- await main.getByLabel("Họ tên").fill("Cán bộ dashboard202");
- await expect(main.getByLabel("Họ tên")).toHaveValue("Cán bộ dashboard202");
+ // Choose assignment first; then establish and verify the complete profile before Save.
+ const profileValue2020="Cán bộ dashboard202";
+ await main.getByLabel("Họ tên").fill(profileValue2020);
+ const profileValue2021=identifier;
+ await main.getByLabel("Email").fill(profileValue2021);
+ const profileValue2022="0912020202";
+ await main.getByLabel("Số điện thoại (tên đăng nhập)").fill(profileValue2022);
+ await expect(main.getByLabel("Họ tên")).toHaveValue(profileValue2020);
+ await expect(main.getByLabel("Email")).toHaveValue(profileValue2021);
+ await expect(main.getByLabel("Số điện thoại (tên đăng nhập)")).toHaveValue(profileValue2022);
  await main.getByRole("button",{name:"Lưu",exact:true}).click();
  await expect(page.getByRole("heading",{level:1,name:"Cán bộ dashboard202"})).toBeVisible();
  await logout(page);await login(identifier);
