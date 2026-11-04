@@ -106,8 +106,17 @@ type publicRoutes interface {
 
 // chain: xác thực (+ MFA) → middleware của module (KN v7.7: ngữ cảnh phiên X-AG-Context của
 // pf/accounts) → Idempotency-Key.
+type afterContextModule interface{ AfterContextMiddleware() gin.HandlerFunc }
+
 func chain(d Deps, auth ...gin.HandlerFunc) []gin.HandlerFunc {
 	out := append(auth, httpx.Middlewares(d.Modules)...)
+	for _, m := range d.Modules {
+		if late, ok := m.(afterContextModule); ok {
+			if h := late.AfterContextMiddleware(); h != nil {
+				out = append(out, h)
+			}
+		}
+	}
 	return append(out, idempotency.Middleware(db.ForModule(d.Ops, db.Ops)))
 }
 

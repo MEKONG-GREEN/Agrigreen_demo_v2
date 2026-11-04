@@ -25,6 +25,7 @@ type Handler struct{ Svc *app.Service }
 
 // RegisterApp gắn route Application API.
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
+	h.registerInitialDraft225(rg)
 	rg.GET("/kn/khtc/catalogs", h.listCatalog)
 	rg.POST("/kn/khtc/catalogs/:kind", h.createCatalog)
 	rg.POST("/kn/khtc/catalogs/:kind/:code/revise", h.reviseCatalog)

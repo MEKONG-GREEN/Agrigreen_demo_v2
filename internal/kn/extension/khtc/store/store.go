@@ -332,11 +332,16 @@ func InsertEntries(ctx context.Context, tx pgx.Tx, tid, versionID uuid.UUID, yea
 
 // Entries đọc cây của một phiên bản theo thứ tự lưu.
 func Entries(ctx context.Context, tx pgx.Tx, versionID uuid.UUID) ([]domain.Entry, error) {
-	rows, err := tx.Query(ctx, `SELECT entry_ref, tab, kind, parent_ref, program_ref, sort_order, coalesce(code, ''), name,
+	return readPlanEntryRows225(ctx, tx, `SELECT entry_ref, tab, kind, parent_ref, program_ref, sort_order, coalesce(code, ''), name,
 	    coalesce(unit_code, ''), planned_qty::text, coalesce(scale_note, ''), budget::text, coalesce(funding_code, ''),
 	    coalesce(field_code, ''), coalesce(department_code, ''), communes, points_count, coalesce(data_source, ''),
 	    coalesce(source_key, ''), tracking, stopped_from, coalesce(stop_decision, ''), coalesce(note, '')
 	  FROM pf_extension.khtc_plan_entry WHERE version_id = $1::uuid ORDER BY position`, versionID)
+}
+
+// Both ledgers use the same bounded numeric columns; callers provide fixed SQL only.
+func readPlanEntryRows225(ctx context.Context, tx pgx.Tx, query string, args ...any) ([]domain.Entry, error) {
+	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

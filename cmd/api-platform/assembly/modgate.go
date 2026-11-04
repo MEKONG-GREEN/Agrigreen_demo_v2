@@ -48,3 +48,11 @@ func (g gated) RegisterPublic(rg *gin.RouterGroup) {
 		p.RegisterPublic(rg)
 	}
 }
+
+// Forward the optional late phase without reordering gates or existing middleware.
+func (g gated) AfterContextMiddleware() gin.HandlerFunc {
+	if late, ok := g.inner.(afterContextModule); ok {
+		return late.AfterContextMiddleware()
+	}
+	return nil
+}

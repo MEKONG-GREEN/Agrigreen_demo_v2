@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"errors"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/store"
 	ext "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/jackc/pgx/v5"
 	"net/http"
 	"time"
 )
@@ -25,4 +27,34 @@ func (s *Service) publishedYearDepartments225(ctx context.Context, year int, cut
 		return nil, ErrDependency.WithDetail("Không xác minh được kế hoạch năm đã áp dụng").WithCause(err)
 	}
 	return depts, nil
+}
+
+// PlanYearReferences is the public owned-calendar seam. It never reads Forms SQL.
+func (s *Service) PlanYearReferences(ctx context.Context, year int) (ext.KHTCPlanYearReferences, error) {
+	var out ext.KHTCPlanYearReferences
+	p, k, err := ext.RequireSession(ctx)
+	if err != nil {
+		return out, err
+	}
+	if (k.Role == ext.SessionRoleAdmin || k.Support != nil) && !p.MFA {
+		return out, problem.MFARequired
+	}
+	if k.Role != ext.SessionRoleAdmin && (k.Role != ext.SessionRoleProvince || k.Department != "ke_hoach_tai_chinh") {
+		return out, problem.Forbidden
+	}
+	if year < 2000 || year > 2100 {
+		return out, problem.Validation.WithField("year", "năm 2000–2100")
+	}
+	if s.DB == nil {
+		return out, ErrDependency
+	}
+	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		out, e = store.PlanYearReferences225(ctx, tx, p.TenantID, year)
+		return e
+	})
+	if err != nil {
+		return out, ErrDependency.WithDetail("Không xác minh được tham chiếu năm kế hoạch").WithCause(err)
+	}
+	return out, nil
 }

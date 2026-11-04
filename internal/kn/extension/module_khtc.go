@@ -72,6 +72,7 @@ func (m *Module) khtcSvc() *khtcpapp.Service {
 		m.khtcPeriods = &khtcpapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Params: m.svc.Params, Plan: planDepartments{plans: m.KHTCPlans()}}
 		if m.khtc != nil {
 			m.khtc.ClosedCutoff = m.khtcPeriods.ClosedCutoff
+			m.khtc.YearReferences = m.khtcPeriods
 		}
 	}
 	return m.khtcPeriods

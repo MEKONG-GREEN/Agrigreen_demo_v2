@@ -155,3 +155,144 @@ func TestInitialDraft225P804PlanlessOpenHasNoNativeEffect(t *testing.T) {
 		t.Fatal("published-plan control did not create a native period")
 	}
 }
+
+func TestInitialDraft225NativeCRUDGenerationAndPublishFence(t *testing.T) {
+	env := pgtest.Get(t)
+	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
+	clk := clock.NewFixed(time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC))
+	kn := extension.New(pool, clk, extension.Deps{})
+	fm, err := wireForms(pool, clk, workflow.New(pool, clk), kn, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tid, org, a, b, other := ids.New(), ids.New(), ids.New(), ids.New(), ids.New()
+	contexts := map[uuid.UUID]authz.KNContext{}
+	for _, actor := range []uuid.UUID{a, b} {
+		contexts[actor] = authz.KNContext{ID: ids.New(), Role: authz.KNTinh, ExpiresAt: clk.Now().Add(time.Hour), Department: "ke_hoach_tai_chinh", OrgRef: org, Scope: authz.Scope{Units: []string{"X1"}}}
+	}
+	contexts[other] = authz.KNContext{ID: ids.New(), Role: authz.KNTinh, ExpiresAt: clk.Now().Add(time.Hour), Department: "trong_trot", OrgRef: org, Scope: authz.Scope{Units: []string{"X1"}}}
+	issuer := authztest.New(t)
+	router := NewRouter(Deps{Log: telemetry.NewLogger("test", io.Discard), Verifier: issuer.Verifier(), Ops: pool, Modules: []httpx.Module{kn, &planSession225{t: t, contexts: contexts}, fm}})
+	call := func(actor uuid.UUID, method, path, key string, body any) (int, []byte) {
+		t.Helper()
+		raw, e := json.Marshal(body)
+		if e != nil {
+			t.Fatal(e)
+		}
+		req := httptest.NewRequest(method, path, bytes.NewReader(raw))
+		req.Header.Set("Authorization", "Bearer "+issuer.Sign(t, authztest.Token{Subject: actor, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: true}))
+		req.Header.Set("Content-Type", "application/json")
+		if key != "" {
+			req.Header.Set("Idempotency-Key", key)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec.Code, rec.Body.Bytes()
+	}
+	type receipt struct {
+		DraftID  string `json:"draft_id"`
+		EventID  string `json:"event_id"`
+		Revision int64  `json:"revision"`
+		Actor    string `json:"actor_ref"`
+		Action   string `json:"action"`
+	}
+	decode := func(raw []byte) receipt {
+		t.Helper()
+		var r receipt
+		if e := json.Unmarshal(raw, &r); e != nil {
+			t.Fatal("receipt JSON invalid")
+		}
+		return r
+	}
+	path := "/v1/kn/khtc/plans/2030/draft"
+	body := map[string]any{"expected_revision": 0, "entries": []any{}, "note": "initial"}
+	code, raw := call(a, http.MethodPost, path, "draft225-create", body)
+	if code != 201 {
+		t.Fatalf("create status=%d", code)
+	}
+	first := decode(raw)
+	if first.DraftID == "" || first.Revision != 1 || first.Actor != a.String() {
+		t.Fatal("create receipt binding incorrect")
+	}
+	code, replayed := call(a, http.MethodPost, path, "draft225-create", body)
+	if code != 201 || !bytes.Equal(raw, replayed) {
+		t.Fatalf("same-operation original ACK status=%d identical=%t", code, bytes.Equal(raw, replayed))
+	}
+	code, _ = call(a, http.MethodPost, "/v1/kn/khtc/plans/2030/versions", "draft225-publish", map[string]any{"base_version": 0, "entries": []any{}})
+	if code != 409 {
+		t.Fatalf("active draft publish fence status=%d", code)
+	}
+	code, _ = call(other, http.MethodGet, path, "", nil)
+	if code != 403 {
+		t.Fatalf("unpublished draft foreign department status=%d", code)
+	}
+	body = map[string]any{"draft_id": first.DraftID, "expected_revision": first.Revision, "entries": []any{}, "note": "shared actor edit"}
+	code, raw = call(b, http.MethodPost, path, "draft225-save", body)
+	if code != 201 {
+		t.Fatalf("shared actor save status=%d", code)
+	}
+	second := decode(raw)
+	if second.Revision != 2 || second.DraftID != first.DraftID || second.Actor != b.String() {
+		t.Fatal("shared generation receipt incorrect")
+	}
+	code, _ = call(a, http.MethodPost, path, "draft225-stale", body)
+	if code != 409 {
+		t.Fatalf("stale revision status=%d", code)
+	}
+	discard := map[string]any{"draft_id": first.DraftID, "expected_revision": second.Revision, "note": "discard exact generation"}
+	code, discardRaw := call(a, http.MethodPost, path+"/discard", "draft225-discard", discard)
+	if code != 201 {
+		t.Fatalf("discard status=%d", code)
+	}
+	gone := decode(discardRaw)
+	if gone.Revision != 3 || gone.Action != "discard" {
+		t.Fatal("discard is not durable revision")
+	}
+	code, newRaw := call(b, http.MethodPost, path, "draft225-recreate", map[string]any{"expected_revision": 3, "entries": []any{}})
+	if code != 201 {
+		t.Fatalf("recreate status=%d", code)
+	}
+	next := decode(newRaw)
+	if next.Revision != 4 || next.DraftID == first.DraftID {
+		t.Fatal("recreated draft reused generation")
+	}
+	code, replayed = call(a, http.MethodPost, path+"/discard", "draft225-discard", discard)
+	if code != 201 || !bytes.Equal(discardRaw, replayed) {
+		t.Fatalf("old discard own receipt status=%d identical=%t", code, bytes.Equal(discardRaw, replayed))
+	}
+	code, _ = call(a, http.MethodPost, path+"/discard", "draft225-stale-discard", discard)
+	if code != 409 {
+		t.Fatalf("old generation fresh discard status=%d", code)
+	}
+	code, currentRaw := call(b, http.MethodGet, path, "", nil)
+	if code != 200 {
+		t.Fatalf("reload status=%d", code)
+	}
+	var state struct {
+		Revision int64    `json:"revision"`
+		Draft    *receipt `json:"draft"`
+	}
+	if e := json.Unmarshal(currentRaw, &state); e != nil {
+		t.Fatal("state JSON invalid")
+	}
+	if state.Revision != 4 || state.Draft == nil || state.Draft.DraftID != next.DraftID {
+		t.Fatal("late old discard changed successor")
+	}
+	code, historyRaw := call(a, http.MethodGet, path+"/history?limit=2", "", nil)
+	if code != 200 {
+		t.Fatalf("history status=%d", code)
+	}
+	var history struct {
+		Items []receipt `json:"items"`
+	}
+	if e := json.Unmarshal(historyRaw, &history); e != nil {
+		t.Fatal("history JSON invalid")
+	}
+	if len(history.Items) != 2 || history.Items[0].Revision != 4 || history.Items[1].Revision != 3 {
+		t.Fatal("history not immutable sequence ordered")
+	}
+	code, _ = call(a, http.MethodGet, "/v1/kn/khtc/plans/2030", "", nil)
+	if code != 404 {
+		t.Fatalf("server draft leaked into published plan status=%d", code)
+	}
+}

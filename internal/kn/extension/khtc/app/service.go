@@ -67,6 +67,8 @@ type Service struct {
 	// EntryUsage (tùy chọn, W11.63 nối): dòng kế hoạch nào đã có số liệu ở phiếu — "đã có số liệu chỉ Ngừng theo dõi,
 	// không xóa". nil = chưa có phiếu (xóa được).
 	EntryUsage func(ctx context.Context, year int, refs []uuid.UUID) (map[uuid.UUID]bool, error)
+	// YearReferences is mandatory for initial server-draft writes; missing is not an empty year.
+	YearReferences port.KHTCPlanYearReferencesReader
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

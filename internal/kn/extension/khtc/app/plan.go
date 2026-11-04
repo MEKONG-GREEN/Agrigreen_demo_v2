@@ -255,6 +255,13 @@ func (s *Service) SaveVersion(ctx context.Context, in SaveInput) (PlanView, bool
 		if err := store.Lock(ctx, tx, "plan:"+strconv.Itoa(in.Year)); err != nil {
 			return err
 		}
+		draft, err := store.CurrentDraft225(ctx, tx, in.Year)
+		if err != nil {
+			return err
+		}
+		if draftActive225(draft) {
+			return ErrDraftActive225
+		}
 		vs, err := store.Versions(ctx, tx, in.Year)
 		if err != nil {
 			return err
