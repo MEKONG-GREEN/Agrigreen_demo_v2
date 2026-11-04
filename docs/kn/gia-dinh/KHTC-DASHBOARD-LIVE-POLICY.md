@@ -1,4 +1,4 @@
-# KHTC-DASHBOARD-LIVE-POLICY — cửa sổ Mẫu 5 trực tiếp (#202)
+## KHTC-DASHBOARD-LIVE-POLICY — cửa sổ Mẫu 5 trực tiếp (#202)
 
 Mã issue gốc: `W11.69-DASHBOARD-LIVE-POLICY`.
 
@@ -6,7 +6,7 @@ Phạm vi đầu tiên của #202 là tiến độ Mẫu 5 theo năm, quý và n
 
 Nguồn nghiệp vụ: BRD KHTC v2.3 ngày 08/10/2026, SHA-256 `15859351F90574BF667190B1A12160465BA03F8CA9E408B94C90D285A3502E25`, FN-TI-02.01 (P752–765), BR-DL-01/02/05/06/13 (P300/302/308/310/324). Chỉ phiếu đã gửi và nguồn đã chốt được đưa vào mức đạt/bình quân. Bản nháp và lần gửi mới nhất đã trả bổ sung không được thay thế bằng lần gửi cũ.
 
-## Ngày yêu cầu và ngày đọc thực tế
+### Ngày yêu cầu và ngày đọc thực tế
 
 - `through_date` là ngày ISO chính tắc trong năm/quý đã chọn; kiểm độ dài và ASCII trước phân tích ngày. Không truyền thì mặc định ngày cuối quý hoặc ngày hiện tại Việt Nam, lấy ngày sớm hơn.
 - Không có quy tắc BRD cấm chọn ngày tương lai. Ngày yêu cầu tương lai vẫn được nhận; `effective_cutoff` là min(cuối ngày yêu cầu UTC+7, thời điểm đọc thực tế). Không dự báo số hoặc kế hoạch tương lai.
@@ -16,7 +16,7 @@ Nguồn nghiệp vụ: BRD KHTC v2.3 ngày 08/10/2026, SHA-256 `15859351F90574BF
 - `as_of` luôn là thời điểm đọc; không phải ngày người dùng chọn. `progress_period` chỉ được điền khi có kỳ Mẫu 5 thật; khi không có kỳ thì null, không tạo ID hoặc liên kết báo cáo giả.
 - Cổng nguồn công bố trả số đã chốt hiện được công bố cho khoảng tuần, không cam kết khôi phục ảnh chụp sự kiện chốt tại một thời điểm lịch sử tùy ý. `effective_cutoff` chọn kế hoạch/giá/xác nhận và khoảng số liệu; `as_of` nói rõ lúc đọc nguồn hiện hữu. Không mô tả cửa sổ này là bản báo cáo lịch sử đã đóng băng.
 
-## Tính toán và ranh giới
+### Tính toán và ranh giới
 
 Cửa sổ đọc là kiểu tính toán riêng, không phải `ps.Period`. Core số Mẫu 5 được dùng chung với Compose; adapter bản báo cáo thật giữ nguyên đầu vào/đầu ra/băm. Bridge tổng hợp chỉ đặt năm tính toán trong envelope nội bộ để gọi hàm tổng hợp cũ, không tuần hoàn envelope đó qua port, DB hay JSON báo cáo.
 
@@ -24,6 +24,6 @@ Phiếu được đọc qua cổng native và xác minh bảng niêm phong, phò
 
 Giao diện tạo tài nguyên đọc mới khi đổi route, bộ lọc hoặc quyền hiện hành (actor, tenant, assignment/context, role/phạm vi, MFA, trạng thái phiên, mục tiêu hỗ trợ, API object). Dữ liệu và danh mục cũ bị gỡ ngay; kết quả muộn thuộc tài nguyên đã hủy không được đưa vào lần A mới sau A→B→A. Lý do hỗ trợ chỉ là văn bản audit, không làm đổi quyền hay tạo hàng loạt GET. Quyết định cho phép đọc vẫn ở API; không suy ra quyền mới từ tên phòng hay dữ liệu cũ.
 
-## Kiểm chứng bắt buộc
+### Kiểm chứng bắt buộc
 
 Golden cố định cho Compose cũ bảo vệ JSON byte/hash; test live so cùng dòng Mẫu 5 thật; native no-period RED→GREEN, sealed/sent vs draft/returned, canceled/future/cross-tenant/cutoff, nguồn công bố/chốt thật, hơn 10.000 metadata không liên quan, và counters no-write. Các cổng web/Go/native, controlled negative, E2E giờ giả lập và CI đúng SHA phải xanh trước gửi Claude review. Tài liệu này không tự xác nhận các cổng chưa chạy.
