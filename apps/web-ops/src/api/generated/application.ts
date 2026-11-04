@@ -23270,6 +23270,11 @@ export interface components {
             calendar_version: number;
             /** Format: uuid */
             plan_version_id: string | null;
+            /**
+             * @description Cửa sổ có thật nhưng ngữ cảnh hiện tại chưa được cấp đọc số liệu phiếu native; không phải thiếu kế hoạch hay số 0.
+             * @enum {string}
+             */
+            unavailable_reason?: "native_forms_access_unavailable";
         };
         KHTCDashboardPeriod: {
             /** Format: uuid */

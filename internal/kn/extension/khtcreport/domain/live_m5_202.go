@@ -9,21 +9,26 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
 
+type LiveM5UnavailableReason string
+
+const LiveM5NativeFormsAccessUnavailable LiveM5UnavailableReason = "native_forms_access_unavailable"
+
 // LiveM5Window is a read/calculation window, not an opened reporting period.
 // ThroughDate is inclusive in Vietnam time; quantities include only full KHTC
 // weeks ending on/before it. Price/confirmation and effective-plan reads use the
 // requested cutoff, independently of the last quantity week.
 type LiveM5Window struct {
-	Year                             int       `json:"year"`
-	Quarter                          int       `json:"quarter"`
-	ThroughDate                      string    `json:"through_date"`
-	EffectiveCutoff                  string    `json:"effective_cutoff"`
-	FromDate                         string    `json:"from_date"`
-	QuantityTo                       string    `json:"quantity_to"`
-	CalendarID                       string    `json:"calendar_id"`
-	CalendarVersion                  int       `json:"calendar_version"`
-	PlanVersionID                    *string   `json:"plan_version_id"`
-	From, To, Cutoff, ConfirmationAt time.Time `json:"-"`
+	Year                             int                     `json:"year"`
+	Quarter                          int                     `json:"quarter"`
+	ThroughDate                      string                  `json:"through_date"`
+	EffectiveCutoff                  string                  `json:"effective_cutoff"`
+	FromDate                         string                  `json:"from_date"`
+	QuantityTo                       string                  `json:"quantity_to"`
+	CalendarID                       string                  `json:"calendar_id"`
+	CalendarVersion                  int                     `json:"calendar_version"`
+	PlanVersionID                    *string                 `json:"plan_version_id"`
+	UnavailableReason                LiveM5UnavailableReason `json:"unavailable_reason,omitempty"`
+	From, To, Cutoff, ConfirmationAt time.Time               `json:"-"`
 }
 
 func NewLiveM5Window(year, quarter int, raw string, now time.Time) (*LiveM5Window, error) {

@@ -61,7 +61,9 @@ func (s *Service) ReadLive202(ctx context.Context, w LiveWindow, sourceKeys []st
 		}
 		key, err := domain.ParseSourceKey(raw)
 		if err != nil {
-			return LiveValues{}, ErrDependency.WithDetail("Khóa nguồn kế hoạch không hợp lệ")
+			// Match the existing snapshot reader's Invalid/unknown semantics:
+			// strict parsing remains unchanged and invalid keys produce no value.
+			continue
 		}
 		prior := map[string]domain.Frozen{}
 		for week, values := range frozen {

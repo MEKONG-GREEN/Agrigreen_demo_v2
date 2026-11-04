@@ -78,6 +78,10 @@ function handle(ctx: Ctx): Response {
     const selected = periods.filter(s => window && s.p.report_type === "program" && s.p.cutoff_date <= effectiveDay).sort((a, b) => b.p.cutoff_date.localeCompare(a.p.cutoff_date))[0];
     if (selected)
         out.progress_period = { id: selected.p.id, name: selected.p.name, type: "program", state: selected.terminal || selected.p.state, cutoff: selected.p.cutoff_date, exported_at: null };
+    if (window && kc.role === "kn_tw") {
+        window.unavailable_reason = "native_forms_access_unavailable";
+        return json(out);
+    }
     if (window) {
       const weeks = periods.filter(s => s.p.report_type === "week" && s.p.to_date <= window.quantity_to).sort((a,b)=>a.p.to_date.localeCompare(b.p.to_date));
       try {

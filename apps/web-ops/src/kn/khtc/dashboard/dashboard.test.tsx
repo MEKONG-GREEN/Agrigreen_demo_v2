@@ -14,11 +14,13 @@ const requests: Request[] = [];
 const lastDashboard=()=>requests.filter(r=>r.url.includes("/dashboard")).at(-1)!;
 let sent = 1, canAct = false;
 let live = false, livePeriod=false;
-let planState: "normal"|"missing"|"filtered_empty"|"valid_empty"|"zero"="normal";
+let planState: "normal"|"missing"|"filtered_empty"|"valid_empty"|"zero"|"unavailable"|"future"="normal";
 const data = (): Dashboard => ({ year: 2026, quarter: 4, department: "", field: "", as_of: "2026-10-13T03:00:00Z", can_act: canAct, counts: { exported: 2, open: 1, sent, forms: 4, achieved: 1, items: 3, slow: 1 }, progress: { items: 3, achieved: 1, slow: 1, missing: 1, programs: [{ ref: "ct1", name: "Chương trình lúa", items: 3, known: 2, percent: "23.81" }], rows: [] }, progress_period: { id: "p1", name: "Mẫu 5 đến 13/10", type: "program", state: "collecting", cutoff: "2026-10-13", exported_at: null }, reports: [], status: [{ period_id: "p1", period_name: "Tuần 41", department: "trong_trot", name: "Trồng trọt", kind: "form", state: "submitted", at: "2026-10-13T02:00:00Z" }] });
 beforeEach(() => { Object.assign(auth,activeAuth());route.pathname="/kn/khtc/trang-chu";vi.setSystemTime(new Date("2026-10-13T03:00:00Z")); requests.length = 0; sent = 1; canAct = false; live=false;livePeriod=false;planState="normal"; auth.api = createApiClient({ baseUrl: "http://mock", getAccessToken: () => "test", fetch: async (r) => { requests.push(r); if (r.url.includes("/dashboard")) {
         const d=data(); if(live){if(!livePeriod)d.progress_period=null;d.progress_window={year:2026,quarter:4,through_date:"2026-12-31",effective_cutoff:"2026-10-13T03:00:00Z",from_date:"2025-12-31",quantity_to:"2026-10-13",calendar_id:"ke_hoach_tai_chinh",calendar_version:2,plan_version_id:planState==="valid_empty"?"real-plan-version":null};}
-        if(["missing","filtered_empty","valid_empty"].includes(planState)){d.counts.items=0;d.counts.achieved=0;d.counts.slow=0;d.progress={items:0,achieved:0,slow:0,missing:0,rows:[],programs:[]};if(planState==="filtered_empty")d.field="no_matches";}
+        if(planState==="unavailable"&&d.progress_window)d.progress_window.unavailable_reason="native_forms_access_unavailable";
+        if(planState==="future"){d.progress_window=null;d.progress_period=null;}
+        if(["missing","filtered_empty","valid_empty","unavailable","future"].includes(planState)){d.counts.items=0;d.counts.achieved=0;d.counts.slow=0;d.progress={items:0,achieved:0,slow:0,missing:0,rows:[],programs:[]};if(planState==="filtered_empty")d.field="no_matches";}
         if(planState==="zero"){d.counts.achieved=0;d.progress.programs[0]!.percent="0";}
         return Response.json(d); } return Response.json({ counts: [], items: [{ code: "trong_trot", name: "Trồng trọt", active: true }] }); } }); });
 afterEach(() => { vi.useRealTimers(); });
@@ -53,6 +55,26 @@ describe("Trang chủ tổng hợp KHTC", () => {
         live=true;planState="zero";render(<KhtcDashboardScreen/>);await screen.findByText("0%");
         expect(screen.getByRole("link",{name:/Hạng mục đạt ít nhất 100% KH/})).toHaveTextContent("0/3");
         expect(screen.queryByText("Chưa có Kế hoạch năm hiệu lực cho mốc số liệu đã chọn.")).not.toBeInTheDocument();
+    });
+    it.each(["unavailable","future"] as const)("TW %s giữ metadata nhưng không giả thiếu kế hoạch hoặc đạt 0",async state=>{
+        live=true;livePeriod=true;planState=state;
+        auth.principal={...auth.principal!,orgRef:"org-national",roles:["kn_national_admin"],level:"tw",scopeAll:true,scopeUnits:[]};
+        auth.kn={...auth.kn,assignments:[{...auth.kn.assignments[0]!,role:"kn_tw",org_ref:"org-national"}],context:{...auth.kn.context!,role:"kn_tw",org_ref:"org-national"}};
+        render(<KhtcDashboardScreen/>);
+        expect(await screen.findByRole("link",{name:/Hạng mục đạt ít nhất 100% KH/})).toHaveTextContent("—");
+        expect(screen.getByText("2")).toBeInTheDocument();
+        expect(screen.getByText("1/4")).toBeInTheDocument();
+        expect(screen.queryByText("Chưa có Kế hoạch năm hiệu lực cho mốc số liệu đã chọn.")).not.toBeInTheDocument();
+        expect(screen.queryByText("23,81%")).not.toBeInTheDocument();
+        if(state==="unavailable"){
+            expect(screen.getByText(/Tiến độ trực tiếp chưa khả dụng trong ngữ cảnh Trung ương/)).toBeInTheDocument();
+            expect(screen.getByRole("link",{name:"Mẫu 5 đến 13/10"})).toHaveAttribute("href","/kn/khtc/tong-hop/p1");
+            expect(screen.queryByText("Chưa có tuần báo cáo đủ kết thúc trong năm, quý đã chọn.")).not.toBeInTheDocument();
+        }else{
+            expect(screen.getByText("Chưa có tuần báo cáo đủ kết thúc trong năm, quý đã chọn.")).toBeInTheDocument();
+            expect(screen.queryByText(/Tiến độ trực tiếp chưa khả dụng/)).not.toBeInTheDocument();
+        }
+        expect(requests.every(r=>r.method==="GET")).toBe(true);
     });
 });
 

@@ -26972,6 +26972,10 @@ components:
         calendar_id: {type: string}
         calendar_version: {type: integer}
         plan_version_id: {type: string, format: uuid, nullable: true}
+        unavailable_reason:
+          type: string
+          enum: [native_forms_access_unavailable]
+          description: Cửa sổ có thật nhưng ngữ cảnh hiện tại chưa được cấp đọc số liệu phiếu native; không phải thiếu kế hoạch hay số 0.
     KHTCDashboardPeriod:
       type: object
       required: [id, name, type, state, cutoff, exported_at]

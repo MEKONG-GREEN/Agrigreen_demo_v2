@@ -3,6 +3,7 @@ package adhocintegration_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	native "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/fixtures/knadhoc"
@@ -212,7 +214,8 @@ func TestDashboard202NoProgramPeriodReadsSentWeeklySheet(t *testing.T) {
 	f := newReportFx(t)
 	// Use the actual public-view reader for the live path, never the golden port
 	// used by older report fixtures. This test's asserted number is native Forms.
-	f.ext.UseKHTCSourceReader(f.ext.KHTCSources())
+	reader := &dashboard202ActualReader{KHTCSources: f.ext.KHTCSources()}
+	f.ext.UseKHTCSourceReader(reader)
 	week := f.open(41, dTT)
 	code, body := f.send(week.ID, dTT, "submit", 0, ttSheet(f.item, "7"))
 	f.ok(code, body, nil)
@@ -226,15 +229,86 @@ func TestDashboard202NoProgramPeriodReadsSentWeeklySheet(t *testing.T) {
 	if after := dashboard202Ledger(t, f); after != before {
 		t.Fatalf("GET appended ledger: before%v after%v", before, after)
 	}
+	found := false
 	for _, row := range d.Progress.Rows {
 		if row.Ref.String() == f.item {
 			if row.Missing || row.YearToDate != "7" {
 				t.Fatalf("real sent weekly sheet lost without M5 period: %+v", row)
 			}
-			return
+			found = true
 		}
 	}
-	t.Fatal("real sent weekly item absent solely because no M5 period was opened")
+	if !found {
+		t.Fatal("real sent weekly item absent solely because no M5 period was opened")
+	}
+	// The real national session retains its metadata reader, but does not gain
+	// native kn_khtc submission permission as a side effect of the live feature.
+	tw := adhocOwnerContext(t, f, authz.KNTW, khtcDept, f.khtcUser, false, false, uuid.Nil)
+	_, denied := f.nativeEntry.Submissions(tw, "kn_khtc", uuid.MustParse(week.FormsPeriodID), dTT)
+	var forbidden *problem.Problem
+	if !errors.As(denied, &forbidden) || forbidden.Status != http.StatusForbidden || forbidden.Code != problem.Forbidden.Code {
+		t.Fatalf("national native permission changed: %v", denied)
+	}
+	queries := len(reader.queries)
+	for _, query := range []string{"year=2026&quarter=4", "year=2027&quarter=1"} {
+		var national report.Dashboard
+		code, body = f.do(http.MethodGet, "/v1/extension/khtc/dashboard?"+query, authz.KNTW, khtcDept, f.khtcUser, "", nil)
+		f.ok(code, body, &national)
+		if len(national.Progress.Rows) != 0 || len(national.Progress.Programs) != 0 || national.Progress.Missing != 0 || national.Counts.Items != 0 || national.Counts.Achieved != 0 || national.Counts.Slow != 0 || national.CanAct {
+			t.Fatal("national unavailable live read leaked submitted numbers or claimed zero attainment")
+		}
+		if strings.Contains(query, "2026") {
+			if national.ProgressWindow == nil || national.ProgressWindow.UnavailableReason != "native_forms_access_unavailable" || national.ProgressWindow.PlanVersionID != nil || national.Counts.Open != 1 || national.Counts.Forms != 1 || len(national.Status) != 1 || national.Status[0].PeriodID.String() != week.ID {
+				t.Fatal("national metadata/unavailable window changed")
+			}
+		} else if national.ProgressWindow != nil {
+			t.Fatal("future national selection invented a window to report unavailability")
+		}
+		if len(reader.queries) != queries || dashboard202Ledger(t, f) != before {
+			t.Fatal("national unavailable/future read performed new source reads or appended ledger")
+		}
+	}
+}
+
+func TestDashboard202ExistingInvalidPlanKeysRemainMissing(t *testing.T) {
+	// Preserve existing accepted legacy keys; do not rewrite the old fixtures or
+	// broaden ParseSourceKey merely to make a dashboard read succeed.
+	f := &reportFx{kfFx: newKHTCFormFxWith(t, nil)}
+	reader := &dashboard202ActualReader{KHTCSources: f.ext.KHTCSources()}
+	f.ext.UseKHTCSourceReader(reader)
+	week := f.open(41, dTT)
+	code, body := f.send(week.ID, dTT, "submit", 0, ttSheet(f.item, "7"))
+	f.ok(code, body, nil)
+	f.cw.unreadable = true
+	before := dashboard202Ledger(t, f)
+	code, body = f.khtc(http.MethodGet, "/dashboard?year=2026&quarter=4", f.khtcUser, "", nil)
+	var d report.Dashboard
+	f.ok(code, body, &d)
+	manual, unknown := false, 0
+	for _, row := range d.Progress.Rows {
+		if row.Ref.String() == f.item {
+			manual = !row.Missing && row.YearToDate == "7"
+		}
+		if row.Ref.String() == f.itemMod || row.Ref.String() == f.price {
+			if !row.Missing || row.YearToDate != "0" {
+				t.Fatal("invalid legacy key fabricated a known module value")
+			}
+			unknown++
+		}
+	}
+	if !manual || unknown != 2 || len(reader.queries) != 0 || dashboard202Ledger(t, f) != before {
+		t.Fatal("invalid keys blocked actual manual items, requested unused sources, or wrote state")
+	}
+	known := 0
+	for _, program := range d.Progress.Programs {
+		known += program.Known
+		if program.Percent != nil && *program.Percent != "7" {
+			t.Fatal("unknown module inputs were averaged as real zeroes")
+		}
+	}
+	if known != 1 || d.Progress.Missing < 2 {
+		t.Fatal("invalid module inputs became known attainment")
+	}
 }
 
 func TestDashboard202DraftReturnedCancelledFutureAndMetadata(t *testing.T) {

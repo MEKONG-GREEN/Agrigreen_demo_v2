@@ -21,6 +21,13 @@ func (s *Service) liveDashboard202(ctx context.Context, c caller, window *domain
 	if window == nil {
 		return empty, nil
 	}
+	// The existing national reader may read dashboard metadata, but the native
+	// kn_khtc profile does not grant that role submission access. Keep the actual
+	// caller and report this bounded live slice as unavailable before new I/O.
+	if c.kn.Role == port.SessionRoleNational {
+		window.UnavailableReason = domain.LiveM5NativeFormsAccessUnavailable
+		return empty, nil
+	}
 	if s.Plans == nil || s.Forms == nil {
 		return empty, ErrDependency
 	}
@@ -55,7 +62,12 @@ func (s *Service) liveDashboard202(ctx context.Context, c caller, window *domain
 	keys := []string{}
 	for _, entry := range plan.Entries {
 		if entry.DataSource == "module" && entry.SourceKey != "" {
-			keys = append(keys, entry.SourceKey)
+			// Older accepted plans can retain invalid source keys. As with the
+			// snapshot reader, they stay missing instead of blocking unrelated
+			// status/manual items or inventing a numeric value.
+			if _, err := sd.ParseSourceKey(entry.SourceKey); err == nil {
+				keys = append(keys, entry.SourceKey)
+			}
 		}
 	}
 	if len(keys) > 0 {

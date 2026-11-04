@@ -1,9 +1,7 @@
 import {test,expect,type Page} from "@playwright/test";
 import {sidebar,logout} from "./helpers";
 import {MOCK_KN_PASSWORD,findKnAccount} from "../../src/api/mock/kn-accounts";
-import type {components} from "../../src/api/generated/application";
 
-type Dashboard=components["schemas"]["KHTCDashboard"];
 const endpoint="/v1/extension/khtc/dashboard";
 
 async function normalKhtc202(page:Page) {
@@ -36,53 +34,81 @@ async function normalKhtc202(page:Page) {
  await logout(page);await login(identifier);
 }
 
+type DashboardRequest202={method:string;path:string;query:string};
+declare global {interface Window {__dashboardRequests202:DashboardRequest202[]}}
+async function observeDashboard202(page:Page) {
+ await page.addInitScript(()=>{
+  const events:{method:string;path:string;query:string}[]=[];
+  Object.defineProperty(window,"__dashboardRequests202",{value:events});
+  const NativeRequest=window.Request;
+  window.Request=class extends NativeRequest {
+   constructor(input:RequestInfo|URL,init?:RequestInit) {
+    super(input,init);
+    const url=new URL(this.url);
+    // Passive construction metadata only. Never inspect headers or payload.
+    if(url.pathname.includes("/khtc/"))events.push({method:this.method,path:url.pathname,query:url.searchParams.toString()});
+   }
+  };
+ });
+}
+async function dashboardReads202(page:Page) {
+ return page.evaluate(path=>window.__dashboardRequests202.filter(r=>r.path===path&&r.method==="GET"),endpoint);
+}
+async function changedDashboard202(page:Page,action:()=>Promise<unknown>,query:Record<string,string|null>) {
+ const before=(await dashboardReads202(page)).length;
+ await action();
+ await expect.poll(async()=> (await dashboardReads202(page)).slice(before).some(r=>Object.entries(query).every(([key,value])=>new URLSearchParams(r.query).get(key)===value))).toBe(true);
+ await expect(page.getByRole("button",{name:"Làm mới",exact:true})).toBeEnabled();
+}
 for(const clock of ["2026-10-13T03:00:00Z","2026-10-13T16:59:59Z"]) {
  test(`Dashboard202 cửa sổ thật không mở Mẫu5 (${clock})`,async({page},info)=>{
   test.setTimeout(180000);
   await page.clock.setFixedTime(new Date(clock));
+  await observeDashboard202(page);
   await normalKhtc202(page);
-  const writes:string[]=[];
-  page.on("request",request=>{const u=new URL(request.url());if(u.pathname.includes("/khtc/")&&request.method()!=="GET")writes.push(request.method()+" "+u.pathname);});
+  // The read-only observation window starts after legitimate account/setup writes.
+  await page.evaluate(()=>{window.__dashboardRequests202.length=0;});
   await sidebar(page).getByRole("link",{name:"Trang chủ phòng",exact:true}).click();
   await expect(page.getByRole("heading",{name:"Trang chủ tổng hợp KHTC",exact:true})).toBeVisible();
-  // Login may already land on this route; request a real reload rather than
-  // assuming navigation to the current page always starts another GET.
-  const next=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&r.request().method()==="GET");
-  await page.getByRole("button",{name:"Làm mới",exact:true}).click();
-  const initial=await (await next).json() as Dashboard;
-  await expect(page.getByRole("heading",{name:"Trang chủ tổng hợp KHTC",exact:true})).toBeVisible();
-  expect(initial.progress_period).toBeNull();
-  expect(initial.progress_window).toMatchObject({through_date:"2026-10-13",quantity_to:"2026-10-13",calendar_version:2});
-  expect(initial.progress.rows.length).toBeGreaterThan(0);
-  await expect(page.getByText(/Mẫu 5 trực tiếp/)).toBeVisible();
+  // Mock transport is in-process. Observe native Request construction, then
+  // actual UI completion; browser network responses cannot witness this GET.
+  await changedDashboard202(page,()=>page.getByRole("button",{name:"Làm mới",exact:true}).click(),{year:"2026",quarter:"4",through_date:null});
+  const live=page.getByText(/^Mẫu 5 trực tiếp/);
+  const readTime=clock.endsWith("16:59:59Z")?"23:59":"10:00";
+  await expect(live).toContainText("Yêu cầu đến 2026-10-13");
+  await expect(live).toContainText("Số liệu tuần đến 2026-10-13");
+  await expect(live).toContainText(`Mốc thực tế 13/10/2026 ${readTime}`);
+  await expect(live).toContainText(`Đọc lúc 13/10/2026 ${readTime}`);
+  await expect(page.getByText(/\d+\/\d+ hạng mục có số liệu/).first()).toBeVisible();
+  await expect(page.getByText("Chưa mở kỳ báo cáo quý hoặc năm.")).toBeVisible();
+  await expect(page.getByText(/^Kỳ Mẫu 5 đã mở:/)).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Mở kỳ mới",exact:true})).toBeVisible();
-  const future=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&new URL(r.url()).searchParams.get("through_date")==="2026-12-31");
-  await page.getByLabel("Đến ngày",{exact:true}).fill("2026-12-31");
-  const f=await(await future).json() as Dashboard;
-  expect(f.progress_window?.through_date).toBe("2026-12-31");
-  expect(f.progress_window?.quantity_to).toBe("2026-10-13");
-  expect(Date.parse(f.progress_window!.effective_cutoff)).toBeLessThanOrEqual(Date.parse(f.as_of));
-  expect(f.progress_period).toBeNull();
-  const past=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&new URL(r.url()).searchParams.get("through_date")==="2026-10-06");
-  await page.getByLabel("Đến ngày",{exact:true}).fill("2026-10-06");
-  expect((await(await past).json() as Dashboard).progress_window?.quantity_to).toBe("2026-10-06");
-  const futureYear=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&new URL(r.url()).searchParams.get("year")==="2027");
-  await page.getByRole("combobox",{name:"Năm",exact:true}).selectOption("2027");
-  const futureData=await(await futureYear).json() as Dashboard;
-  expect(futureData.progress_window).toBeNull();expect(futureData.progress.rows).toEqual([]);
+  await changedDashboard202(page,()=>page.getByLabel("Đến ngày",{exact:true}).fill("2026-12-31"),{year:"2026",through_date:"2026-12-31"});
+  await expect(live).toContainText("Yêu cầu đến 2026-12-31");
+  await expect(live).toContainText("Số liệu tuần đến 2026-10-13");
+  await expect(live).toContainText(`Mốc thực tế 13/10/2026 ${readTime}`);
+  await expect(page.getByText(/^Kỳ Mẫu 5 đã mở:/)).toHaveCount(0);
+  await changedDashboard202(page,()=>page.getByLabel("Đến ngày",{exact:true}).fill("2026-10-06"),{through_date:"2026-10-06"});
+  await expect(live).toContainText("Số liệu tuần đến 2026-10-06");
+  await expect(live).toContainText("Mốc thực tế 06/10/2026 23:59");
+  await changedDashboard202(page,()=>page.getByRole("combobox",{name:"Năm",exact:true}).selectOption("2027"),{year:"2027",through_date:null});
   await expect(page.getByLabel("Đến ngày",{exact:true})).toHaveValue("");
   await expect(page.getByText("Chưa có tuần báo cáo đủ kết thúc trong năm, quý đã chọn.")).toBeVisible();
-  const current=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&new URL(r.url()).searchParams.get("year")==="2026");
-  await page.getByRole("combobox",{name:"Năm",exact:true}).selectOption("2026");await current;
+  await expect(page.getByText(/\d+\/\d+ hạng mục có số liệu/)).toHaveCount(0);
+  await expect(page.getByText(/^Chưa có Kế hoạch năm hiệu lực/)).toHaveCount(0);
+  await changedDashboard202(page,()=>page.getByRole("combobox",{name:"Năm",exact:true}).selectOption("2026"),{year:"2026",through_date:null});
+  await expect(live).toContainText("Yêu cầu đến 2026-10-13");
   if(clock.endsWith("16:59:59Z")) {
    await page.clock.setFixedTime(new Date(Date.parse(clock)+2000));
-   const refreshed=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint);
-   await page.getByRole("button",{name:"Làm mới",exact:true}).click();
-   const d=await(await refreshed).json() as Dashboard;
-   expect(d.progress_window?.through_date).toBe("2026-10-14");
-   expect(d.progress_window?.quantity_to).toBe("2026-10-13");
+   await changedDashboard202(page,()=>page.getByRole("button",{name:"Làm mới",exact:true}).click(),{year:"2026",quarter:"4"});
+   await expect(live).toContainText("Yêu cầu đến 2026-10-14");
+   await expect(live).toContainText("Số liệu tuần đến 2026-10-13");
+   await expect(live).toContainText("Mốc thực tế 14/10/2026 00:00");
+   await expect(live).toContainText("Đọc lúc 14/10/2026 00:00");
   }
   await page.screenshot({path:info.outputPath("dashboard-live202.png"),fullPage:true});
+  expect((await dashboardReads202(page)).length).toBeGreaterThan(0);
+  const writes=await page.evaluate(()=>window.__dashboardRequests202.filter(r=>r.method!=="GET"));
   expect(writes).toEqual([]);
  });
 }

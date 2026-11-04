@@ -22,6 +22,10 @@ Cửa sổ đọc là kiểu tính toán riêng, không phải `ps.Period`. Core
 
 Phiếu được đọc qua cổng native và xác minh bảng niêm phong, phòng/kỳ, hash nội dung; chỉ các kỳ tuần thật chưa hủy đủ ngày được chọn trước giới hạn truy vấn. Nguồn đọc qua `KHTCSources`, tái dùng `EvaluateAt` và số tuần đã đóng; I/O port ở ngoài transaction. Không gọi Refresh và không tạo snapshot trên GET. Quyền đọc hiện tại giữ nguyên KHTC/Admin; không mở quyền PN hay archive.
 
+Đọc metadata/trạng thái KHTC hiện hữu của Trung ương vẫn trả 200 với ngữ cảnh thực. Profile phiếu native hiện không cấp vai này đọc bài nộp, nên lát đầu chưa tính số trực tiếp cho Trung ương: cửa sổ có thật mang `unavailable_reason=native_forms_access_unavailable`, không đọc kế hoạch/phiếu/nguồn mới, không suy ra thiếu kế hoạch hay đạt 0. Giao diện giữ metadata/kỳ thật và hiện thông báo chưa khả dụng; phần mở rộng quyền/dữ liệu lãnh đạo thuộc #230. Nếu quý tương lai thực sự chưa có tuần đủ kết thúc, cửa sổ vẫn null với thông báo chưa có tuần cho mọi vai, không dựng cửa sổ giả để mang lý do.
+
+Khóa nguồn sai dạng còn tồn tại trong Kế hoạch năm đã được chấp nhận trước đây giữ ngữ nghĩa thiếu dữ liệu như đường snapshot cũ: parser không nới; hạng mục vẫn có mặt và được đánh dấu thiếu, không có số module giả. Không gọi nguồn ngoài khi không có khóa hợp lệ cần đọc; lỗi phụ thuộc hoặc dữ liệu toàn vẹn của nguồn hợp lệ vẫn được trả lỗi.
+
 Giao diện tạo tài nguyên đọc mới khi đổi route, bộ lọc hoặc quyền hiện hành (actor, tenant, assignment/context, role/phạm vi, MFA, trạng thái phiên, mục tiêu hỗ trợ, API object). Dữ liệu và danh mục cũ bị gỡ ngay; kết quả muộn thuộc tài nguyên đã hủy không được đưa vào lần A mới sau A→B→A. Lý do hỗ trợ chỉ là văn bản audit, không làm đổi quyền hay tạo hàng loạt GET. Quyết định cho phép đọc vẫn ở API; không suy ra quyền mới từ tên phòng hay dữ liệu cũ.
 
 ### Kiểm chứng bắt buộc
