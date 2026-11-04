@@ -104,10 +104,11 @@ func (c Control) changeDue(ctx context.Context, profile string, id uuid.UUID, du
 		}
 		switch v.State.Status {
 		case domain.PeriodCancelled:
-			return port.ErrPeriodCancelled
+			return rejectControl(ctx, tx, expect, port.ErrPeriodCancelled)
 		case domain.PeriodClosed:
-			return port.ErrPeriodClosed
+			return rejectControl(ctx, tx, expect, port.ErrPeriodClosed)
 		}
+		beginControlEffects(expect)
 		if err := store.InsertDue(ctx, tx, a.tenant, id, due, reason, a.ref, now, idemOr(idem, "due")); err != nil {
 			return err
 		}

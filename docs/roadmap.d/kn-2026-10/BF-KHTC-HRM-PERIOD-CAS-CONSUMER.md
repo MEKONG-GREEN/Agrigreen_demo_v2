@@ -1,0 +1,1 @@
+- [ ] BF-KHTC-HRM-PERIOD-CAS-CONSUMER (#209): lát ChangeDeadline + conditional undo, ý định append-only và stored outcome; chưa nghiệm thu toàn consumer CAS, còn #211/#212; sau #199/#184, chờ kiểm đầy đủ và Claude review chéo.

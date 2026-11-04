@@ -43,6 +43,8 @@ type Service struct {
 	ReviewGuards map[string]port.ReviewGuard
 	// DefinitionPolicies are registered before serving; owner callbacks run outside TX.
 	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
+	// PeriodOperationPolicies are registered by owners before serving; nil disables receipts.
+	PeriodOperationPolicies map[string]port.PeriodOperationPolicy
 	// RequiredDefinitionPolicies denies missing policies instead of falling back to DefineBy.
 	RequiredDefinitionPolicies map[string]bool
 	profiles                   map[string]port.Profile
@@ -177,7 +179,26 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 	if s.DB == nil {
 		return errNoPool
 	}
-	return db.WithModuleTenantTx(ctx, s.DB, DBModule, tid, fn)
+	op, _ := ctx.Value(periodOperationContext{}).(*periodOperation)
+	stopped := false
+	err := db.WithModuleTenantTx(ctx, s.DB, DBModule, tid, func(tx pgx.Tx) error {
+		callErr := fn(tx)
+		if errors.Is(callErr, errReceiptStop) && op != nil && op.durable && !op.effects {
+			stopped = true
+			return nil // Only replay/rejection, never a partly executed mutation.
+		}
+		return callErr
+	})
+	if err != nil {
+		return err
+	} // Includes unknown COMMIT acknowledgement: never manufacture success.
+	if op != nil && op.durable {
+		op.acknowledged = true
+	}
+	if stopped {
+		return errReceiptStop
+	}
+	return nil
 }
 
 func idemOr(key, suffix string) string {

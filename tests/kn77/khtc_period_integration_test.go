@@ -126,7 +126,7 @@ func newKHTCFxPool(t *testing.T, shared *pgxpool.Pool) *khtcFx {
 	}
 	kn := extension.New(pool, clk, extension.Deps{})
 	cw := &crosswalk{}
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), Crosswalk: cw,
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Crosswalk: cw,
 		MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
 	f := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New()}
 	f.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.Discard, nil)), 8<<20)

@@ -18,6 +18,7 @@ provides:
     - FiguresReader
     - Freezer
     - PeriodControl
+    - PeriodOperations
     - Publisher
     - ReviewGuard
     - SubmissionFeed

@@ -82,8 +82,9 @@ type Service struct {
 	Clock  clock.Clock
 	Params params.Params // tùy chọn
 	// Forms, Control: cap/forms (phát hành kỳ native; tiến độ, chốt, hủy). Thiếu → 503.
-	Forms   formsport.Publisher
-	Control formsport.PeriodControl
+	Forms              formsport.Publisher
+	Control            formsport.PeriodControl
+	ConditionalControl formsport.ConditionalPeriodControl
 	// Departments: phòng ban đang áp dụng của đơn vị (mặc định phòng tham gia, tên phòng). Tùy chọn.
 	Departments partyport.Departments
 	// Crosswalk (gói PFPUB), Plan (W11.61), Reports (KH6): tùy chọn — xem extension/port/khtc.go.
