@@ -2,19 +2,20 @@ package app
 
 import (
 	"context"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"strings"
 	"unicode/utf8"
 )
 
 type ArchiveQuery struct {
-	Year          int
-	Kind, Search  string
-	PeriodID      uuid.UUID
-	AllVersions   bool
-	Offset, Limit int
+	Year                                      int
+	Kind, Search                              string
+	DocumentSearch, Field, FieldStatus, After string
+	PeriodID                                  uuid.UUID
+	AllVersions                               bool
+	Offset, Limit                             int
 }
 type ArchiveResult struct {
 	Items   []store.ArchiveRow `json:"items"`
@@ -23,6 +24,9 @@ type ArchiveResult struct {
 }
 
 func (q ArchiveQuery) Validate() error {
+	if !q.fields().Valid() || !(domain.ArchiveFieldSelector{Code: q.After}).Valid() || !utf8.ValidString(q.DocumentSearch) || len(q.DocumentSearch) > 800 || utf8.RuneCountInString(q.DocumentSearch) > 200 {
+		return ErrInvalid
+	}
 	if q.Year < 2000 || q.Year > 2100 || q.Offset < 0 || q.Offset > 100000 || q.Limit < 1 || q.Limit > 50 || !utf8.ValidString(q.Search) || len(q.Search) > 800 || utf8.RuneCountInString(q.Search) > 200 {
 		return ErrInvalid
 	}
@@ -45,7 +49,7 @@ func (s *Service) Archive(ctx context.Context, q ArchiveQuery) (ArchiveResult, e
 	out := ArchiveResult{Items: []store.ArchiveRow{}, Offset: q.Offset}
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		var e error
-		out.Items, e = store.Archive(ctx, tx, q.Year, q.Kind, strings.TrimSpace(q.Search), q.AllVersions, q.Offset, q.Limit+1, q.PeriodID)
+		out.Items, e = store.ArchiveFiltered(ctx, tx, q.scanQuery(), q.fields(), q.Offset, q.Limit+1)
 		return e
 	})
 	if err != nil {

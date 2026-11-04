@@ -24,6 +24,11 @@ func archiveWordID(c *gin.Context, key string) (uuid.UUID, bool) {
 }
 func archiveWordsQuery(values url.Values) (app.ArchiveWordsQuery, error) {
 	q := app.ArchiveWordsQuery{Limit: 20}
+	field, err := archiveFieldQuery(values)
+	if err != nil {
+		return q, err
+	}
+	q.Fields = field
 	for key, target := range map[string]*int{"offset": &q.Offset, "limit": &q.Limit} {
 		if len(values[key]) > 1 {
 			return q, app.ErrInvalid
@@ -83,7 +88,12 @@ func (h Handler) archiveWordDownload(c *gin.Context) {
 	if !ok {
 		return
 	}
-	run, err := h.Svc.DownloadArchiveWord(c.Request.Context(), period, export, runID)
+	field, err := archiveFieldQuery(c.Request.URL.Query())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	run, err := h.Svc.DownloadArchiveWord(c.Request.Context(), period, export, runID, field)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

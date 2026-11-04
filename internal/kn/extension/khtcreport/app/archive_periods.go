@@ -24,7 +24,10 @@ func (s *Service) ArchivePeriods(ctx context.Context, q ArchiveQuery) (ArchivePe
 	out := ArchivePeriodsResult{Items: []store.ArchivePeriod{}, Offset: q.Offset}
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		var e error
-		out.Items, e = store.ArchivePeriods(ctx, tx, q.Year, q.Kind, strings.TrimSpace(q.Search), q.Offset, q.Limit+1)
+		scan := q.scanQuery()
+		scan.Search = strings.TrimSpace(q.DocumentSearch)
+		scan.PeriodSearch = strings.TrimSpace(q.Search)
+		out.Items, e = store.ArchivePeriodChoices(ctx, tx, scan, q.fields(), q.Offset, q.Limit+1)
 		return e
 	})
 	if err != nil {

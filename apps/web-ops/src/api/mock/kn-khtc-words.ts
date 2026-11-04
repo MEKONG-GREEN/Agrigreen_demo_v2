@@ -6,7 +6,7 @@ import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
 import { downloadResponse, mockExportBody, mockExportRun, mockExportRuns, placeDateLine } from "./export";
 import { khtcMockStore } from "./kn-khtc-periods";
-import { khtcReportExport, renderKhtcMockFixed } from "./kn-khtc-reports";
+import { archiveFields205, archiveMatches205, archiveSelector205Valid, khtcReportExport, renderKhtcMockFixed } from "./kn-khtc-reports";
 type Word = components["schemas"]["KHTCReportWord"];
 const KHTC = "ke_hoach_tai_chinh";
 const subject = (id: string) => `khtc_report:${id}`;
@@ -69,6 +69,10 @@ function archiveRead(ctx: Ctx): Response {
  if (!kc || !allowed(ctx,false)) return problem(403,"forbidden","Không có quyền");
  const p=khtcMockStore().find(p=>p.p.id===period && (p.adhocTenant??TENANT)===ctx.persona.me.tenant_id);
  if (!p || p.terminal==="cancelled" || !khtcReportExport(period,exportID)) return problem(404,"extension.khtc_report_not_found","Không có bản xuất");
+ const snapshot=khtcReportExport(period,exportID)!;
+ const selector={field:ctx.url.searchParams.get("field")??undefined,field_status:ctx.url.searchParams.get("field_status")??undefined};
+ if(ctx.url.searchParams.getAll("field").length>1||ctx.url.searchParams.getAll("field_status").length>1||!archiveSelector205Valid(selector))return problem(422,"extension.khtc_report_invalid","Bộ lọc không hợp lệ");
+ if(!archiveMatches205(snapshot.detail.content,snapshot.meta.filter,selector))return problem(404,"extension.khtc_report_not_found","Không có bản xuất");
  if (runID) {
    const b=archiveMockWord(ctx.persona.me.tenant_id,period,exportID,runID);
    return b ? new Response(b.body,{headers:{"Content-Type":b.meta.content_type,"Content-Disposition":`attachment; filename="${b.meta.file_name}"`,"Cache-Control":"no-store"}}) : problem(404,"extension.khtc_report_not_found","Không có Word đã xác minh");
@@ -76,5 +80,5 @@ function archiveRead(ctx: Ctx): Response {
  const offset=ctx.url.searchParams.get("offset")??"0", limit=ctx.url.searchParams.get("limit")??"20";
  if (ctx.url.searchParams.getAll("offset").length>1 || ctx.url.searchParams.getAll("limit").length>1 || !/^\d{1,6}$/.test(offset) || +offset>100000 || !/^\d{1,2}$/.test(limit) || +limit<1 || +limit>50) return problem(422,"extension.khtc_report_invalid","Phân trang không hợp lệ");
  const items=archiveMockWords(ctx.persona.me.tenant_id,period,exportID), x=khtcReportExport(period,exportID)!;
- return json({period_id:period,export_id:exportID,export_version:x.meta.version,export_name:x.detail.content.data.period.name,items:items.slice(+offset,+offset+(+limit)).map(b=>b.meta),has_more:items.length>+offset+(+limit),offset:+offset},200,{"Cache-Control":"no-store"});
+ return json({period_id:period,export_id:exportID,export_version:x.meta.version,export_name:x.detail.content.data.period.name,items:items.slice(+offset,+offset+(+limit)).map(b=>b.meta),has_more:items.length>+offset+(+limit),offset:+offset,...archiveFields205(x.detail.content,x.meta.filter)},200,{"Cache-Control":"no-store"});
 }
