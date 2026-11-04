@@ -65,9 +65,9 @@ func TestClose211HeldOriginalCannotCloseSuccessor(t *testing.T) {
 
 func closeConsumer211(t *testing.T, f *deadlineFx209, control formsport.ConditionalPeriodControl) (*khtcpapp.Service, context.Context) {
 	t.Helper()
-	svc, ctx := f.consumer209(control)
+	svc, _ := f.consumer209(control)
 	p := fixture.Bind(t, authz.Principal{ActorRef: f.actor, TenantID: f.tid, MFA: true, KN: &authz.KNContext{ID: uuid.NewSHA1(f.tid, []byte("close211")), Role: authz.KNTinh, Department: khtcDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1"}}}})
-	ctx = authz.WithPrincipal(context.Background(), p)
+	ctx := authz.WithPrincipal(context.Background(), p)
 	svc.Operations = f.fm.PeriodOperations()
 	svc.CloseGuard = &reportapp.Service{DB: f.roleDB, Clock: f.clk}
 	if err := f.fm.UsePeriodOperationPolicy("kn_khtc", svc.CloseOperationPolicy211); err != nil {

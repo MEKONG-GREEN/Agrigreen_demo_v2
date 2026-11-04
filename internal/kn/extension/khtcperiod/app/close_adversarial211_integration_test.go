@@ -423,8 +423,12 @@ func TestClose211SameKeyNoMFAAndChangedActorCannotReplay(t *testing.T) {
 		denied := authz.WithPrincipal(context.Background(), principal)
 		_, err := svc.Close(denied, id, "Đóng kỳ ngoại lệ đủ lý do", "protected-replay211")
 		var pe *problem.Problem
-		if !errors.As(err, &pe) || pe.Status != 403 {
-			t.Fatalf("%s replay must deny403: %v", mode, err)
+		wantStatus := http.StatusForbidden
+		if mode == "changedActor" {
+			wantStatus = http.StatusConflict
+		}
+		if !errors.As(err, &pe) || pe.Status != wantStatus {
+			t.Fatalf("%s replay must deny%d: %v", mode, wantStatus, err)
 		}
 		if count(ctx) != before || probe.calls != 1 || probe.reads != 0 {
 			t.Fatal("revoked replay reached supplier or appended intent")
