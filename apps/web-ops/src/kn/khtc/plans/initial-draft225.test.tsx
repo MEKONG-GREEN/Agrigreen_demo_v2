@@ -46,6 +46,18 @@ describe("initial persisted draft225",()=>{
  await screen.findByRole("alert");fireEvent.click(await screen.findByRole("button",{name:"Thử lại đúng thao tác chưa xác nhận"}));await screen.findByText(/Đã xác nhận lưu nháp máy chủ/);
  expect(w.api.save).toHaveBeenCalledTimes(3);expect(w.api.save.mock.calls[1]).toEqual(w.api.save.mock.calls[0]);expect(w.api.save.mock.calls[2]).toEqual(w.api.save.mock.calls[0]);
  });
+ it("does not navigate from an old master-create ACK after committed route ABA",async()=>{
+ const pending=deferred<object>();w.khtc.createProgram.mockReturnValueOnce(pending.promise);const go=vi.fn();const a:PlanRoute={...route(),view:"new-program",tab:"programs",go};
+ const r=render(<InitialDraftPage225 route={a}/>);fireEvent.change(await screen.findByLabelText(/Mã CT\/DA/),{target:{value:"CT225"}});fireEvent.change(screen.getByLabelText(/Tên CT\/DA/),{target:{value:"CT chờ xác nhận225"}});fireEvent.click(screen.getByRole("button",{name:"Lưu CT/DA chủ"}));await waitFor(()=>expect(w.khtc.createProgram).toHaveBeenCalledTimes(1));
+ expect(screen.getByLabelText(/Tên CT\/DA/)).toBeDisabled();
+ r.rerender(<InitialDraftPage225 route={{...a,view:"list"}}/>);await screen.findByRole("button",{name:"Chọn CT/DA vào tab"});
+ r.rerender(<InitialDraftPage225 route={a}/>);await screen.findByRole("heading",{name:"CT/DA chủ mới"});expect(go).not.toHaveBeenCalled();
+ await act(async()=>pending.resolve({}));expect(go).not.toHaveBeenCalled();
+ });
+ it("still navigates after master creation acknowledged in the same committed route",async()=>{
+ w.khtc.createProgram.mockResolvedValueOnce({});const go=vi.fn();render(<InitialDraftPage225 route={{...route(),view:"new-program",tab:"programs",go}}/>);
+ fireEvent.change(await screen.findByLabelText(/Mã CT\/DA/),{target:{value:"CT225"}});fireEvent.change(screen.getByLabelText(/Tên CT\/DA/),{target:{value:"CT đúng tuyến225"}});fireEvent.click(screen.getByRole("button",{name:"Lưu CT/DA chủ"}));await waitFor(()=>expect(go).toHaveBeenCalledTimes(1));expect(go).toHaveBeenCalledWith(base+"/chon-chuong-trinh?year=2035&tab=programs");
+ });
  for(const change of ["contextABA","yearABA","api","actor","MFA","readonly"]){it(`retires pending ACK across ${change}`,async()=>{
  const pending=deferred<InitialDraft225>();w.api.save.mockReturnValueOnce(pending.promise);const r=render(<InitialDraftPage225 route={route()}/>);fireEvent.click(await screen.findByRole("button",{name:"Tạo nháp máy chủ"}));await waitFor(()=>expect(w.api.save).toHaveBeenCalledTimes(1));
  if(change==="contextABA"){w.auth.kn.context={...w.auth.kn.context!,context_id:"contextB"};r.rerender(<InitialDraftPage225 route={route()}/>);await screen.findByRole("button",{name:"Tạo nháp máy chủ"});w.auth.kn.context={...w.auth.kn.context!,context_id:"contextA"};}
