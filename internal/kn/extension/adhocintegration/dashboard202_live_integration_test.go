@@ -187,7 +187,7 @@ func TestDashboard202ActualPublicClosedSourcesAndCutoff(t *testing.T) {
 		t.Fatal("historical no-plan window invented a plan/item/write")
 	}
 	for _, raw := range []string{"through_date=1e100000", "through_date=1e-100000", "through_date=" + strings.Repeat("9", 100000), "year=" + strings.Repeat("9", 100000), "year=1e100000", "year=1e-100000", "quarter=1e100000", "quarter=1e-100000", "quarter=" + strings.Repeat("9", 100000), "through_date=2026-11-31", "through_date=2026-10-13&through_date=2026-10-06"} {
-		code, body = f.khtc(http.MethodGet, "/dashboard?"+raw, f.khtcUser, "", nil)
+		code, _ = f.khtc(http.MethodGet, "/dashboard?"+raw, f.khtcUser, "", nil)
 		if code != 422 {
 			t.Fatalf("hostile query admitted %d (body omitted)", code)
 		}
