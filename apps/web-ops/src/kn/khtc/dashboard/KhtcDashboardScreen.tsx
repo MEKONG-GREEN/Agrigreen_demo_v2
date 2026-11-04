@@ -34,6 +34,7 @@ export function KhtcDashboardScreen() {
    </section>
    <section className="card"><h2>Tiến độ các chương trình</h2>
     {d.progress_window ? <p>Mẫu 5 trực tiếp · Yêu cầu đến {d.progress_window.through_date} · Số liệu tuần đến {d.progress_window.quantity_to} · Mốc thực tế {dt(d.progress_window.effective_cutoff)}. Đọc lúc {dt(d.as_of)}.</p> : d.progress_period ? <p>Mẫu 5: <Link href={`/kn/khtc/tong-hop/${d.progress_period.id}`}>{d.progress_period.name}</Link> · Số liệu đến {d.progress_period.cutoff}. Phiếu và nguồn được đọc lại lúc {dt(d.as_of)}.</p> : <p>Chưa có tuần báo cáo đủ kết thúc trong năm, quý đã chọn.</p>}
+    {d.progress_window && d.progress_period && <p>Kỳ Mẫu 5 đã mở: <Link href={`/kn/khtc/tong-hop/${d.progress_period.id}`}>{d.progress_period.name}</Link> · Số liệu của kỳ đến {d.progress_period.cutoff}.</p>}
     {d.progress.missing > 0 && <p role="status">{d.progress.missing} hạng mục chưa đủ dữ liệu; chưa đưa vào tỷ lệ bình quân.</p>}
     {d.progress.programs.map(p => <div key={p.ref} className="row">{d.progress_period && !d.progress_window ? <Link href={`/kn/khtc/tong-hop/${d.progress_period.id}`}>{p.name}</Link> : <span>{p.name}</span>}<strong>{p.percent === null ? "Chưa có số liệu" : `${p.percent.replace(".", ",")}%`}</strong><span>{p.known}/{p.items} hạng mục có số liệu</span></div>)}
    </section>
