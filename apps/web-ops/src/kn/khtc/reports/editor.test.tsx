@@ -35,3 +35,26 @@ describe("W11.66 minimal editor", () => {
         expect((await createReportApi(auth.api!).get(p.id)).content.admin.signer?.override).toBeNull();
     });
 });
+
+it("keeps the232 save acknowledgement after reloading the saved version and content", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-10-14T03:00:00Z"));
+    try {
+        const year = new Date().getFullYear() + 5;
+        const p = await createKhtcPeriodApi(auth.api!).open({ report_type: "week", year, no: 6, departments: ["trong_trot"] });
+        const initial = await createReportApi(auth.api!).get(p.id);
+        render(<KhtcReportsScreen />);
+        fireEvent.change(screen.getByLabelText("Năm"), { target: { value: String(year) } });
+        fireEvent.click(await screen.findByRole("button", { name: p.name }));
+        const text = await screen.findByLabelText(/B Hạn chế/);
+        fireEvent.change(text, { target: { value: "Lời văn đã lưu để kiểm phản hồi232" } });
+        fireEvent.click(screen.getByRole("button", { name: "Lưu bản soạn" }));
+        await screen.findByText(new RegExp(`^Phiên bản soạn ${initial.version + 1} ·`));
+        expect(screen.getByLabelText(/B Hạn chế/)).toHaveValue("Lời văn đã lưu để kiểm phản hồi232");
+        expect((await createReportApi(auth.api!).get(p.id)).content.texts.B).toBe("Lời văn đã lưu để kiểm phản hồi232");
+        expect(screen.getByText("Đã lưu bản soạn", { exact: true }).closest('[role="status"]')).toBeVisible();
+    } finally {
+        vi.useRealTimers();
+    }
+});
+
