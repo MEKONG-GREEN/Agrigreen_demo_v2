@@ -22,10 +22,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	fixture "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/fixtures/khtcdeadline209"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // The identity projection is a trusted fixture, not an accounts lifecycle test.
@@ -294,5 +296,103 @@ func TestInitialDraft225NativeCRUDGenerationAndPublishFence(t *testing.T) {
 	code, _ = call(a, http.MethodGet, "/v1/kn/khtc/plans/2030", "", nil)
 	if code != 404 {
 		t.Fatalf("server draft leaked into published plan status=%d", code)
+	}
+}
+
+// Bootstrap only the Admin assignment current-state fixture, as in the existing
+// root session test. Both selected sessions below are produced by public Accounts
+// routes; actual Build/List/Gated/ResolveContext/cache policy remain in the path.
+func TestInitialDraft225BuildListPublicRenewalAndCurrentPolicy(t *testing.T) {
+	env := pgtest.Get(t)
+	now := time.Now().UTC()
+	clk := clock.NewFixed(now)
+	mods, pools, err := Build(context.Background(), func(_ context.Context, role string) (*pgxpool.Pool, error) {
+		return env.Pool(t, migrations.PF, role), nil
+	}, clk, External{Vault: clienttest.New()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tid, actor, assignment, org := ids.New(), ids.New(), ids.New(), ids.New()
+	_, err = env.AdminPool(t, migrations.PF).Exec(context.Background(), `INSERT INTO pf_accounts.role_assignment_current
+ (tenant_id,assignment_id,user_ref,role,department_codes,commune_codes,valid_from,active,last_event_id,last_seq,created_by,created_at,updated_by,updated_at)
+ VALUES($1,$2,$3,'admin',ARRAY[]::text[],ARRAY[]::text[],$4,true,$5,1,$3,$4,$3,$4)`, tid, assignment, actor, now.Add(-time.Hour), ids.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer := authztest.New(t)
+	router := NewRouter(Deps{Log: telemetry.NewLogger("test", io.Discard), Verifier: issuer.Verifier(), Ops: env.Pool(t, migrations.PF, dbadmin.AppPlatform), Pools: pools, Modules: mods.List()})
+	call := func(method, path, key, selected string, mfa bool, body any) (int, []byte) {
+		t.Helper()
+		raw, e := json.Marshal(body)
+		if e != nil {
+			t.Fatal(e)
+		}
+		req := httptest.NewRequest(method, path, bytes.NewReader(raw))
+		req.Header.Set("Authorization", "Bearer "+issuer.Sign(t, authztest.Token{Subject: actor, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: mfa}))
+		req.Header.Set("Content-Type", "application/json")
+		if key != "" {
+			req.Header.Set("Idempotency-Key", key)
+		}
+		if selected != "" {
+			req.Header.Set(authz.ContextHeader, selected)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec.Code, rec.Body.Bytes()
+	}
+	selectCtx := func(key string) string {
+		t.Helper()
+		code, raw := call(http.MethodPost, "/v1/me/context", key, "", true, map[string]any{"assignment_id": assignment.String(), "department_code": nil})
+		if code != 201 {
+			t.Fatalf("public selection status=%d", code)
+		}
+		var x struct {
+			ID string `json:"context_id"`
+		}
+		if json.Unmarshal(raw, &x) != nil || x.ID == "" {
+			t.Fatal("public context ID missing")
+		}
+		return x.ID
+	}
+	a := selectCtx("draft225-real-select-a")
+	body := map[string]any{"expected_revision": 0, "entries": []any{}}
+	path := "/v1/kn/khtc/plans/2031/draft"
+	code, original := call(http.MethodPost, path, "draft225-real-create", a, true, body)
+	if code != 201 {
+		t.Fatalf("real root draft create status=%d", code)
+	}
+	clk.Advance(time.Second)
+	b := selectCtx("draft225-real-select-b")
+	if a == b {
+		t.Fatal("public renewal reused context identity")
+	}
+	code, replayed := call(http.MethodPost, path, "draft225-real-create", b, true, body)
+	if code != 201 || !bytes.Equal(original, replayed) {
+		t.Fatalf("real same-grant renewal status=%d original_ack=%t", code, bytes.Equal(original, replayed))
+	}
+	for _, target := range []string{path, "/v1/kn/khtc/plans/02031/draft", "/v1/kn/khtc/plans/not-a-year/draft"} {
+		code, _ = call(http.MethodPost, target, "draft225-real-create", b, false, body)
+		if code != 403 {
+			t.Fatalf("current Admin MFA policy must precede cache/year parsing status=%d", code)
+		}
+	}
+	code, raw := call(http.MethodGet, path+"/history", "", b, true, nil)
+	if code != 200 {
+		t.Fatalf("real history status=%d", code)
+	}
+	var history struct {
+		Items []json.RawMessage `json:"items"`
+	}
+	if json.Unmarshal(raw, &history) != nil || len(history.Items) != 1 {
+		t.Fatal("renewal or denied replay appended an event")
+	}
+	// Public revocation must prevent the old exact-key ACK from being read.
+	code, _ = call(http.MethodPost, "/v1/accounts/users/"+actor.String()+"/assignments/"+assignment.String()+"/revoke", "draft225-real-revoke", b, true, map[string]any{"reason": "Thu hồi phân công kiểm thử"})
+	if code != 200 {
+		t.Fatalf("public revoke status=%d", code)
+	}
+	code, _ = call(http.MethodPost, path, "draft225-real-create", b, true, body)
+	if code != 403 {
+		t.Fatalf("revoked current grant recovered cached ACK status=%d", code)
 	}
 }
