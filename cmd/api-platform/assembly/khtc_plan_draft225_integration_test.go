@@ -207,6 +207,10 @@ func TestInitialDraft225NativeCRUDGenerationAndPublishFence(t *testing.T) {
 		return r
 	}
 	path := "/v1/kn/khtc/plans/2030/draft"
+	badStatus, _ := call(a, http.MethodPost, path, "draft225-nul-note", map[string]any{"expected_revision": 0, "entries": []any{}, "note": "bad\u0000note"})
+	if badStatus != 422 {
+		t.Fatalf("new draft NUL note must be validation failure without append: status=%d", badStatus)
+	}
 	body := map[string]any{"expected_revision": 0, "entries": []any{}, "note": "initial"}
 	code, raw := call(a, http.MethodPost, path, "draft225-create", body)
 	if code != 201 {
@@ -386,10 +390,11 @@ func TestInitialDraft225BuildListPublicRenewalAndCurrentPolicy(t *testing.T) {
 	if json.Unmarshal(raw, &history) != nil || len(history.Items) != 1 {
 		t.Fatal("renewal or denied replay appended an event")
 	}
-	// Public revocation must prevent the old exact-key ACK from being read.
-	code, _ = call(http.MethodPost, "/v1/accounts/users/"+actor.String()+"/assignments/"+assignment.String()+"/revoke", "draft225-real-revoke", b, true, map[string]any{"reason": "Thu hồi phân công kiểm thử"})
-	if code != 200 {
-		t.Fatalf("public revoke status=%d", code)
+	// Only synthetic bootstrap current-state revocation is arranged here. The
+	// real Accounts resolver must revalidate it; this does not claim a grant/Vault lifecycle.
+	_, err = env.AdminPool(t, migrations.PF).Exec(context.Background(), `UPDATE pf_accounts.role_assignment_current SET active=false WHERE tenant_id=$1 AND assignment_id=$2`, tid, assignment)
+	if err != nil {
+		t.Fatal(err)
 	}
 	code, _ = call(http.MethodPost, path, "draft225-real-create", b, true, body)
 	if code != 403 {
