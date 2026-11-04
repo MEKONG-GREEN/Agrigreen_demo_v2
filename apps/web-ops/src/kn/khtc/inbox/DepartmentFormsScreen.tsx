@@ -7,7 +7,9 @@
 // mở màn phiếu của W11.63 (entry_route).
 import {AdhocInbox} from "../adhoc/AdhocInbox";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import { INBOX_BASE, inboxHref } from "./inbox-routes";
+import { useInboxAuthorityKey } from "./inbox-workspace";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
@@ -30,7 +32,10 @@ const TABS: { view: DeptFormsView; label: string; href: string }[] = [
 ];
 
 export function DepartmentFormsScreen({view}:{view:DeptFormsView}) {
- const {kn}=useAuth();return <DepartmentFormsBody key={JSON.stringify(kn.context)} view={view}/>;
+ const auth=useAuth(); const identity=useInboxAuthorityKey(); const params=useParams<{dept?:string}>(); const query=useSearchParams();
+ const initial=params?.dept && query.get("view")==="sent"?"sent":view;
+ if(auth.status!=="authenticated" || !auth.principal || !auth.kn.context)return <p role="alert">Chọn ngữ cảnh làm việc để đọc phiếu.</p>;
+ return <DepartmentFormsBody key={`${identity}:${view}:${params?.dept??""}:${initial}`} view={initial}/>;
 }
 function DepartmentFormsBody({view:initial}:{view:DeptFormsView}) {
   const { api, kn } = useAuth();
@@ -49,6 +54,7 @@ function DepartmentFormsBody({view:initial}:{view:DeptFormsView}) {
     initial === "current" ? "needs_action" : "",
   );
   if (!dapi) return null;
+  const detailBase=adminDept?`/kn/phong-ban/${adminDept}/bao-cao-khtc`:INBOX_BASE;
 
   return (
     <div className="page">
@@ -200,6 +206,7 @@ function DepartmentFormsBody({view:initial}:{view:DeptFormsView}) {
                           </StatusPill>
                         </td>
                         <td>
+                          <Link className="btn btn-o" href={inboxHref(detailBase,r.period_id,adminDept,view)}>Chi tiết phiếu</Link>
                           <Link
                             className={
                               r.action === "view" ? "btn" : "btn btn-primary"
