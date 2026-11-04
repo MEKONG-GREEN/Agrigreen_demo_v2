@@ -1,0 +1,1 @@
+- #232 BF-CI-KHTC-ADHOC-SAVE-STATUS: tách owner xác nhận lưu khỏi editor version/final, reset list/detail/lựa chọn theo quyền và API, giữ nháp khi409/422 và bỏ ACK cũ sau đổi resource; API/quyền server/migration không đổi. Chưa tuyên bố hoàn tất toàn văn BRD/UAT; chờ đủ cổng, CI exact SHA và Claude review.

@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import type { ApiClient } from "@/api/client";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useLoad } from "@/kn/cycle/common";
 import { DEPT_LABEL, TEMPLATE_LABEL } from "../api";
@@ -22,19 +23,40 @@ function saveFile(file: {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function KhtcReportsScreen({ mode = "editor", adhoc = false, initialPeriod = "" }: {
+type ReportScreenProps = {
     initialPeriod?: string;
     adhoc?: boolean;
     mode?: "editor" | "progress" | "history";
-}) {
-    const { api } = useAuth();
+};
+const reportClients = new WeakMap<object, number>();
+let nextReportClient = 0;
+function reportAuthorityKey(auth: ReturnType<typeof useAuth>) {
+    const p = auth.principal, k = auth.kn?.context;
+    let client = auth.api ? reportClients.get(auth.api) : 0;
+    if (client === undefined) { client = ++nextReportClient; reportClients.set(auth.api, client); }
+    // Authority/client identity only: display labels, menu, badges and support
+    // reason updates must not discard a draft or an acknowledged operation.
+    return JSON.stringify([client, auth.status, !!auth.scopeWarning,
+        p?.subject, p?.tenantId, p?.orgRef, p?.mfa, p?.level,
+        [...(p?.roles ?? [])].sort(), p?.scopeAll, [...(p?.scopeUnits ?? [])].sort(),
+        auth.kn?.status, k?.context_id, k?.assignment_id, k?.role,
+        k?.department_code, k?.org_ref, (k?.communes ?? []).map(c => c.code).sort(),
+        !!k?.read_only, !!k?.manager, k?.mgmt_level_code, k?.province_group,
+        k?.internal_unit_code, [...(k?.duties ?? [])].sort(), [...(k?.powers ?? [])].sort(),
+        k?.support_session_id, k?.on_behalf_of]);
+}
+export function KhtcReportsScreen(props: ReportScreenProps) {
+    const auth = useAuth();
+    const scopeKey = JSON.stringify([reportAuthorityKey(auth), props.mode ?? "editor", !!props.adhoc, props.initialPeriod ?? ""]);
+    return <ReportsWorkspace key={scopeKey} {...props} api={auth.api} />;
+}
+function ReportsWorkspace({ mode = "editor", adhoc = false, initialPeriod = "", api }: ReportScreenProps & {api: ApiClient}) {
     const reports = useMemo(() => api ? createReportApi(api) : null, [api]);
     const periods = useMemo(() => api ? createKhtcPeriodApi(api) : null, [api]);
     const [year, setYear] = useState(new Date().getFullYear());
     const [kind, setKind] = useState("");
     const [selected, setSelected] = useState(initialPeriod);
     const list = useLoad(periods ? () => periods.list(year) : null, [periods, year]);
-    const detail = useLoad(reports && selected ? () => reports.get(selected) : null, [reports, selected]);
     return <>
   <PageHeader title={adhoc ? "Báo cáo phát sinh" : mode === "history" ? "Báo cáo đã xuất" : mode === "progress" ? "Tiến độ các chương trình" : "Soạn báo cáo KHTC"}>{adhoc ? "Chọn chỉ tiêu từ dữ liệu đã có trong khoảng thời gian của kỳ; số liệu có truy vết, Word và Excel giữ cùng ảnh chụp." : "Mẫu 1–5 · Số liệu lấy từ nguồn đã chốt và phiếu đã gửi của các phòng."}</PageHeader>
   <section className="card sec">
@@ -42,14 +64,22 @@ export function KhtcReportsScreen({ mode = "editor", adhoc = false, initialPerio
    <label>Loại báo cáo <select value={kind} onChange={e => setKind(e.target.value)}><option value="">Tất cả</option>{REPORT_TYPES.filter(t => adhoc ? t.value === "adhoc" : t.value !== "adhoc").map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
    <LoadState s={list}>{items => <ul>{items.filter(p => (adhoc ? p.report_type === "adhoc" : p.report_type !== "adhoc") && p.state !== "cancelled" && (!kind || p.report_type === kind)).map(p => <li key={p.id}><button className="btn" aria-pressed={selected === p.id} onClick={() => setSelected(p.id)}>{p.name}</button></li>)}{!items.length && <li>Chưa có kỳ báo cáo trong năm.</li>}</ul>}</LoadState>
   </section>
-  {selected && reports && <LoadState s={detail}>{d => <ReportEditor key={`${d.period_id}:${d.version}:${d.final?.export_id ?? ""}`} d={d} api={reports} mode={mode} reload={detail.reload}/>}</LoadState>}
+  {selected && reports && <ReportResource key={selected} id={selected} api={reports} mode={mode} />}
  </>;
 }
-function ReportEditor({ d, api, mode, reload }: {
+// Acknowledgements belong to this selected report, not its versioned editor.
+// It also outlives a failed reload without claiming that the reload succeeded.
+function ReportResource({ id, api, mode }: {id: string; api: ReportApi; mode: "editor" | "progress" | "history"}) {
+    const detail = useLoad(() => api.get(id), [api, id]);
+    const act = useAction();
+    return <>{act.view}<LoadState s={detail}>{d => <ReportEditor key={`${d.period_id}:${d.version}:${d.final?.export_id ?? ""}`} d={d} api={api} mode={mode} reload={detail.reload} act={act}/>}</LoadState></>;
+}
+function ReportEditor({ d, api, mode, reload, act }: {
     d: ReportDetail;
     api: ReportApi;
     mode: "editor" | "progress" | "history";
     reload: () => void;
+    act: ReturnType<typeof useAction>;
 }) {
     const id = d.period_id;
     const { data } = d.content;
@@ -62,7 +92,6 @@ function ReportEditor({ d, api, mode, reload }: {
     const allItems = (data.rows ?? []).filter(r => r.kind === "item");
     const history = useLoad(() => api.history(id), [api, id]);
     const words = useLoad(() => api.words(id), [api, id]);
-    const act = useAction();
     const dirty = Object.keys(admin).length > 0 || Object.keys(texts).length > 0 || adhocSelection !== undefined;
     const writable = d.editable && !act.busy;
     const selected=adhocSelection??d.content.adhoc;
@@ -76,7 +105,6 @@ function ReportEditor({ d, api, mode, reload }: {
   {d.source_changed && <p role="alert" className="alert alert-warn">Nguồn đã thay đổi. Cập nhật số liệu trước khi đánh dấu Bản cuối. Các tệp đã xuất được giữ nguyên.</p>}
   {d.source_error && <p role="alert" className="alert alert-warn">{d.source_error}</p>}
   {!!data.provisional?.length && <div role="status" className="alert alert-warn"><strong>Tạm tính</strong><ul>{data.provisional.map((reason, i) => <li key={i}>{reason}</li>)}</ul></div>}
-  {act.view}
   {mode !== "history" && <>
    {mode === "editor" && <>
     <h3>Thông tin văn bản</h3>
