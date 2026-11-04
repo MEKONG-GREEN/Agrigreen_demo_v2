@@ -9,6 +9,8 @@ import (
 
 // ArchiveRow contains immutable metadata, never draft payloads or file bytes.
 type ArchiveRow struct {
+	FieldCodes  []string  `json:"field_codes"`
+	FieldStatus string    `json:"field_status"`
 	ID          uuid.UUID `json:"id"`
 	PeriodID    uuid.UUID `json:"period_id"`
 	PeriodName  string    `json:"period_name"`
