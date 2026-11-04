@@ -264,7 +264,21 @@ func TestClose211OfflineHeldDoesNotInventAcceptedSubmission(t *testing.T) {
 			svc, ctx := closeConsumer211(t, f, conditional)
 			probe := &receiptProbe211{PeriodOperations: svc.Operations}
 			svc.Operations = probe
-			held := func() { heldSubmission211(t, f, submitter211(t, f), nativeID, "held-"+stage) }
+			held := func() {
+				before, e := f.fm.ConditionalControl().ControlSnapshot(ctx, "kn_khtc", nativeID)
+				if e != nil {
+					t.Fatal(e)
+				}
+				f.clk.Advance(time.Second) // held must be AFTER Close, not an equal fixed-clock timestamp.
+				heldSubmission211(t, f, submitter211(t, f), nativeID, "held-"+stage)
+				after, e := f.fm.ConditionalControl().ControlSnapshot(ctx, "kn_khtc", nativeID)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if before.Revision != after.Revision || len(after.Progress.Units) != 1 || after.Progress.Units[0].Status != "awaiting_reopen" || before.Progress.Units[0].Status == after.Progress.Units[0].Status {
+					t.Fatal("held fixture did not change only raw progress status after owned Close")
+				}
+			}
 			if stage == "beforeHydration" {
 				probe.after = func(r fp.PeriodOperationReceipt, e error) (fp.PeriodOperationReceipt, error) {
 					if e == nil {
@@ -295,5 +309,125 @@ func TestClose211OfflineHeldDoesNotInventAcceptedSubmission(t *testing.T) {
 				t.Fatalf("offline held changed accepted close projection: sent=%d calls=%d", out.Counts.FormsSent, probe.calls)
 			}
 		})
+	}
+}
+
+func TestClose211SingleDispatchWithOneConnectionAndConcurrentReplay(t *testing.T) {
+	n := fixture.NewSized(t, 1)
+	f := &deadlineFx209{t: t, fm: n, roleDB: n.DB, clk: n.Clock, tid: uuid.New(), node: uuid.New(), actor: uuid.New()}
+	p := f.open209()
+	id := uuid.MustParse(p.ID)
+	f.clk.Advance(p.DueAt.Sub(f.clk.Now()) + 4*24*time.Hour)
+	svc, ctx := closeConsumer211(t, f, f.fm.ConditionalControl())
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	entered, release := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	releaseNative := func() { releaseOnce.Do(func() { close(release) }) }
+	defer releaseNative()
+	probe := &receiptProbe211{PeriodOperations: svc.Operations, before: func(context.Context, fp.PeriodOperationRequest) { close(entered); <-release }}
+	svc.Operations = probe
+	done := make(chan error, 1)
+	go func() {
+		_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "concurrent211")
+		done <- err
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("pool1 blocked before native dispatch")
+	}
+	_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "concurrent211")
+	assertConflict209(t, err)
+	releaseNative()
+	if err = <-done; err != nil {
+		t.Fatal(err)
+	}
+	if probe.calls != 1 || phaseClose211(t, f) != "completed" {
+		t.Fatal("concurrent replay dispatched native twice")
+	}
+}
+
+// Native effect may exist even when its ACK and receipt read are both unavailable.
+// Keep its reservation and original operation, rather than guessing rollback.
+type unknownRead211 struct{ fp.PeriodOperations }
+
+func (p unknownRead211) ReadPeriodOperation(context.Context, fp.PeriodOperationRequest) (fp.PeriodOperationReceipt, error) {
+	return fp.PeriodOperationReceipt{}, nil
+}
+func TestClose211UnknownReceiptKeepsFenceAndNeverExecutesAgain(t *testing.T) {
+	f := newDeadlineFx209(t)
+	p := f.open209()
+	id := uuid.MustParse(p.ID)
+	f.clk.Advance(p.DueAt.Sub(f.clk.Now()) + 4*24*time.Hour)
+	control := &casProbe209{ConditionalPeriodControl: f.fm.ConditionalControl()}
+	svc, ctx := closeConsumer211(t, f, control)
+	probe := &receiptProbe211{PeriodOperations: svc.Operations, after: func(r fp.PeriodOperationReceipt, e error) (fp.PeriodOperationReceipt, error) {
+		if e == nil {
+			return fp.PeriodOperationReceipt{}, errors.New("synthetic lost Close ACK211")
+		}
+		return r, e
+	}}
+	svc.Operations = probe
+	_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "missing-receipt211")
+	assertConflict209(t, err)
+	svc.Operations = unknownRead211{probe}
+	for i := 0; i < 2; i++ {
+		_, err = svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "missing-receipt211")
+		assertConflict209(t, err)
+	}
+	_, err = svc.ChangeDeadline(ctx, id, pa.DeadlineInput{DueAt: f.clk.Now().Add(time.Hour), ExportDueAt: f.clk.Now().Add(2 * time.Hour)}, "deadline-during-unknown211")
+	assertConflict209(t, err)
+	var reserved, claimed bool
+	err = tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
+		var e error
+		reserved, e = rs.CloseReserved211(ctx, tx, f.tid, id)
+		if e != nil {
+			return e
+		}
+		claimed, e = rs.ClaimCancel(ctx, tx, f.tid, id, uuid.New(), time.Minute)
+		return e
+	})
+	if err != nil || !reserved || claimed || probe.calls != 1 || control.count() != 0 || phaseClose211(t, f) != "unresolved" {
+		t.Fatalf("unknown receipt lost fence reserved=%v cancelClaimed=%v calls=%d deadlineCalls=%d err=%v", reserved, claimed, probe.calls, control.count(), err)
+	}
+}
+func TestClose211SameKeyNoMFAAndChangedActorCannotReplay(t *testing.T) {
+	f := newDeadlineFx209(t)
+	p := f.open209()
+	id := uuid.MustParse(p.ID)
+	f.clk.Advance(p.DueAt.Sub(f.clk.Now()) + 4*24*time.Hour)
+	svc, ctx := closeConsumer211(t, f, f.fm.ConditionalControl())
+	probe := &receiptProbe211{PeriodOperations: svc.Operations}
+	svc.Operations = probe
+	if _, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "protected-replay211"); err != nil {
+		t.Fatal(err)
+	}
+	var before int
+	count := func(ctx context.Context) int {
+		var n int
+		if err := tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `SELECT count(*) FROM pf_extension.khtc_close_intent211 WHERE tenant_id=$1`, f.tid).Scan(&n)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	before = count(ctx)
+	for _, mode := range []string{"noMFA", "changedActor"} {
+		actor, mfa := f.actor, false
+		if mode == "changedActor" {
+			actor, mfa = uuid.New(), true
+		}
+		principal := fixture.Bind(t, authz.Principal{ActorRef: actor, TenantID: f.tid, MFA: mfa, KN: &authz.KNContext{ID: uuid.NewSHA1(f.tid, []byte("close211")), Role: authz.KNTinh, Department: khtcDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1"}}}})
+		denied := authz.WithPrincipal(context.Background(), principal)
+		_, err := svc.Close(denied, id, "Đóng kỳ ngoại lệ đủ lý do", "protected-replay211")
+		var pe *problem.Problem
+		if !errors.As(err, &pe) || pe.Status != 403 {
+			t.Fatalf("%s replay must deny403: %v", mode, err)
+		}
+		if count(ctx) != before || probe.calls != 1 || probe.reads != 0 {
+			t.Fatal("revoked replay reached supplier or appended intent")
+		}
 	}
 }
