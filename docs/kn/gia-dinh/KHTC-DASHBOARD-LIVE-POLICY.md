@@ -1,4 +1,6 @@
-# W11.69-DASHBOARD-LIVE-POLICY — cửa sổ Mẫu 5 trực tiếp (#202)
+# KHTC-DASHBOARD-LIVE-POLICY — cửa sổ Mẫu 5 trực tiếp (#202)
+
+Mã issue gốc: `W11.69-DASHBOARD-LIVE-POLICY`.
 
 Phạm vi đầu tiên của #202 là tiến độ Mẫu 5 theo năm, quý và ngày yêu cầu, kể cả chưa mở kỳ Mẫu 5. Không mở kỳ, lưu bản soạn, cập nhật ảnh chụp hoặc cấp quyền phòng chuyên môn khi đọc. Phần quyền lãnh đạo, badge, nhắc phòng và các quyết định trường dữ liệu khác thuộc #230.
 

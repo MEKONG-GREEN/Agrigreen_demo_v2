@@ -29,6 +29,8 @@ async function normalKhtc202(page:Page) {
  await assignment.getByRole("combobox",{name:"Vai trò",exact:true}).selectOption("kn_tinh");
  await assignment.getByRole("checkbox",{name:"trong_trot",exact:true}).uncheck();
  await assignment.getByRole("checkbox",{name:"ke_hoach_tai_chinh",exact:true}).check();
+ await main.getByLabel("Họ tên").fill("Cán bộ dashboard202");
+ await expect(main.getByLabel("Họ tên")).toHaveValue("Cán bộ dashboard202");
  await main.getByRole("button",{name:"Lưu",exact:true}).click();
  await expect(page.getByRole("heading",{level:1,name:"Cán bộ dashboard202"})).toBeVisible();
  await logout(page);await login(identifier);
@@ -37,7 +39,7 @@ async function normalKhtc202(page:Page) {
 for(const clock of ["2026-10-13T03:00:00Z","2026-10-13T16:59:59Z"]) {
  test(`Dashboard202 cửa sổ thật không mở Mẫu5 (${clock})`,async({page},info)=>{
   test.setTimeout(180000);
-  await page.clock.install({time:new Date(clock)});
+  await page.clock.setFixedTime(new Date(clock));
   await normalKhtc202(page);
   const writes:string[]=[];
   page.on("request",request=>{const u=new URL(request.url());if(u.pathname.includes("/khtc/")&&request.method()!=="GET")writes.push(request.method()+" "+u.pathname);});
@@ -69,7 +71,7 @@ for(const clock of ["2026-10-13T03:00:00Z","2026-10-13T16:59:59Z"]) {
   const current=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&new URL(r.url()).searchParams.get("year")==="2026");
   await page.getByRole("combobox",{name:"Năm",exact:true}).selectOption("2026");await current;
   if(clock.endsWith("16:59:59Z")) {
-   await page.clock.runFor(2000);
+   await page.clock.setFixedTime(new Date(Date.parse(clock)+2000));
    const refreshed=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint);
    await page.getByRole("button",{name:"Làm mới",exact:true}).click();
    const d=await(await refreshed).json() as Dashboard;
