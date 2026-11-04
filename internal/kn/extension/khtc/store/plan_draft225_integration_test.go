@@ -16,9 +16,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/shopspring/decimal"
+	"os"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) { os.Exit(pgtest.Run(m)) }
 
 func TestDraft225TypedHeaderSerializesConcurrentLateAppend(t *testing.T) {
 	env := pgtest.Get(t)
