@@ -57,4 +57,40 @@ describe("206 program name matches the native 500-rune limit", () => {
       expect(screen.queryByText("Tối đa 500 ký tự.")).toBeNull();
     });
   }
-});
+
+  // Native validates Go TrimSpace of the existing JS.trim() transport payload.
+  // Do not silently rewrite that payload or trim a significant BOM a second time.
+  for (const [label, value] of [
+    ["500 ASCII with NEL edges", `\u0085${"a".repeat(500)}\u0085`],
+    ["NEL-BOM-NEL with the native-significant BOM retained", "\u0085\uFEFF\u0085"],
+  ]) {
+    it(`accepts ${label} and preserves the existing transport payload`, async () => {
+      const h = harness();
+      fireEvent.change(h.name, { target: { value } });
+      await act(async () => h.save());
+      await waitFor(() => expect(h.requests).toHaveLength(1));
+      expect(h.transport).toHaveBeenCalledTimes(1);
+      expect(h.requests[0]).toEqual({ method: "POST", path: "/v1/kn/khtc/programs", body: { code: "NAME500", name: value, kind: "program" } });
+      expect(h.name).not.toHaveAttribute("aria-invalid", "true");
+    });
+  }
+
+  it("rejects NEL-only as required before a POST", async () => {
+    const h = harness();
+    fireEvent.change(h.name, { target: { value: "\u0085" } });
+    await act(async () => h.save());
+    expect(h.transport).not.toHaveBeenCalled();
+    expect(h.requests).toHaveLength(0);
+    expect(await screen.findByText("Bắt buộc nhập.")).toBeVisible();
+    expect(h.name).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("counts the significant BOM after NEL trimming toward the 500-rune cap", async () => {
+    const h = harness();
+    fireEvent.change(h.name, { target: { value: `\u0085\uFEFF${"a".repeat(500)}\u0085` } });
+    await act(async () => h.save());
+    expect(h.transport).not.toHaveBeenCalled();
+    expect(h.requests).toHaveLength(0);
+    expect(await screen.findByText("Tối đa 500 ký tự.")).toBeVisible();
+    expect(h.name).toHaveAttribute("aria-invalid", "true");
+  });});
