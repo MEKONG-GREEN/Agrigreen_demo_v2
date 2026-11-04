@@ -6,6 +6,7 @@ import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
+import { publishedOwnerPlanGuard225 } from "./kn-khtc";
 
 type S = components["schemas"];
 type Period = S["KHTCPeriod"];
@@ -500,6 +501,8 @@ export const khtcPeriodRoutes: Route[] = [
           "Kỳ cùng loại, cùng năm, cùng số tuần/tháng/quý đã mở (chưa hủy)",
         );
       }
+      const ownerYear=b.year??new Date(plan.to).getUTCFullYear();const cutoff=b.cutoff_date??ds(plan.to);
+      const planGuard225=publishedOwnerPlanGuard225(ownerYear,cutoff);if(planGuard225)return planGuard225;
       const s: Stored = {
         p: build(
           b,

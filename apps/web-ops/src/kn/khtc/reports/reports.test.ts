@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import { describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
@@ -10,6 +11,7 @@ const code = (p: Promise<unknown>) => p.then(() => "ok", (e: unknown) => e insta
 describe("W11.66 report contract", () => {
     it("uses submitted sheets, keeps old download bytes, locks numeric inputs and requires provisional acknowledgement", async () => {
         const api = client(), periods = createKhtcPeriodApi(api), forms = createKhtcFormApi(api), reports = createReportApi(api);
+        await ensurePublishedMockPlan225(new Date().getFullYear()+4);
         const p = await periods.open({ report_type: "week", year: new Date().getFullYear() + 4, no: 4, departments: ["trong_trot"] });
         const f = await forms.get(p.id, "trong_trot"), row = f.tabs.flatMap(t => t.rows).find(r => !r.module_sourced)!;
         const input = emptyContent();
@@ -41,6 +43,7 @@ describe("W11.66 report contract", () => {
     it("initializes only M5 section II from the previous program report and preserves a saved blank", async () => {
         const api = client(), periods = createKhtcPeriodApi(api), reports = createReportApi(api);
         const year = new Date().getFullYear() + 6;
+        await ensurePublishedMockPlan225(year);
         const open = (as_of_date: string) => periods.open({ report_type: "program", year, as_of_date, due_at: `${year}-12-31T03:00:00Z`, departments: ["trong_trot"] });
         const first = await open(`${year}-10-06`);
         await reports.save(first.id, { base_version: 0, texts: { I: "Đánh giá cũ", II: "Kế hoạch kỳ trước" } });

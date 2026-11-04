@@ -35,20 +35,20 @@ function DraftResource225({route}:{route:PlanRoute}){
  const [accepted,setAccepted]=useState<typeof s.data>(null);
  if(s.data&&s.data!==accepted)setAccepted(s.data);
  const current=s.data??accepted;
- return <>{current&&s.problem?<ProblemAlert problem={s.problem}/>:null}<LoadState s={{...s,data:current,problem:current?null:s.problem}}>{data=><DraftEditor225 route={route} data={data} api={api} reload={s.reload}/>}</LoadState></>;
+ return <>{current&&s.problem?<ProblemAlert problem={s.problem} onRetry={s.reload}/>:null}<LoadState s={{...s,data:current,problem:current?null:s.problem}}>{data=><DraftEditor225 route={route} data={data} api={api} reload={s.reload}/>}</LoadState></>;
 }
 type Resource=Awaited<ReturnType<ReturnType<typeof createDraftApi225>["current"]>>;
 function DraftEditor225({route,data,api,reload}:{route:PlanRoute;data:{state:Resource;programs:Awaited<ReturnType<ReturnType<typeof useKhtcApi>["programs"]>>["items"];catalog:Awaited<ReturnType<ReturnType<typeof useKhtcApi>["catalog"]>>["items"];history:Awaited<ReturnType<ReturnType<typeof createDraftApi225>["history"]>>};api:ReturnType<typeof createDraftApi225>;reload:()=>void}){
  const khtc=useKhtcApi();const rights=useKhtcRights();
  const [head,setHead]=useState<InitialDraftState225>(data.state);const headRef=useRef(head);useLayoutEffect(()=>{headRef.current=head;},[head]);
  const [entries,setEntries]=useState<KhtcPlanEntry[]>(data.state.draft?.entries??[]);
- const [dirty,setDirty]=useState(false);const dirtyRef=useRef(dirty);useLayoutEffect(()=>{dirtyRef.current=dirty;},[dirty]);const [formDirty,setFormDirty]=useState<Record<string,boolean>>({});const hasFormDirty=Object.values(formDirty).some(Boolean);const edit=useRef(0);const alive=useRef(true);
+ const [dirty,setDirty]=useState(false);const dirtyRef=useRef(dirty);useLayoutEffect(()=>{dirtyRef.current=dirty;},[dirty]);const [formDirty,setFormDirty]=useState<Record<string,boolean>>({});const hasFormDirty=Object.values(formDirty).some(Boolean);const formDirtyRef=useRef(hasFormDirty);useLayoutEffect(()=>{formDirtyRef.current=hasFormDirty;},[hasFormDirty]);const edit=useRef(0);const alive=useRef(true);
  useLayoutEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
  const [pending,setPending]=useState<Pending|null>(null);const pendingRef=useRef<Pending|null>(null);
  const [busy,setBusy]=useState(false);const busyRef=useRef(false);const [problem,setProblem]=useState<ApiProblem|null>(null);const [notice,setNotice]=useState("");
  const [tab,setTab]=useState<KhtcTab>(route.tab??"programs");const [drafts,setDrafts]=useState<Record<string,EntryDraft>>({});
  const [programDraft,setProgramDraft]=useState<ProgramDraft>({code:"",name:"",kind:"program"});const programAction=useAction();
- useEffect(()=>{if(!dirtyRef.current&&!pendingRef.current){setHead(data.state);setEntries(data.state.draft?.entries??[]);}},[data.state]);
+ useEffect(()=>{if(!dirtyRef.current&&!formDirtyRef.current&&!pendingRef.current){setHead(data.state);setEntries(data.state.draft?.entries??[]);}},[data.state]);
  const [older,setOlder]=useState<{source:typeof data.history;page:typeof data.history}|null>(null);const history=older?.source===data.history?older.page:data.history;const historySource=useRef(data.history);useLayoutEffect(()=>{historySource.current=data.history;},[data.history]);
  const canEdit=rights.plan&&head.available&&!busy&&!pending;
  const change=(next:KhtcPlanEntry[])=>{if(!canEdit)return;edit.current++;setEntries(next);setDirty(true);};
@@ -84,7 +84,7 @@ function DraftEditor225({route,data,api,reload}:{route:PlanRoute;data:{state:Res
  {!rights.plan?<ReadOnlyNotice>Chỉ xem nháp trong ngữ cảnh hiện tại.</ReadOnlyNotice>:null}</>;
  let content;
  const key=[route.year,route.view,route.ref,route.parent,route.kind,route.tab].join(":");
- const routeToken=useMemo(()=>({}),[key]);const routeIdentity=useRef(routeToken);useLayoutEffect(()=>{routeIdentity.current=routeToken;},[routeToken]);
+ const routeToken=useMemo(()=>({key}),[key]);const routeIdentity=useRef(routeToken);useLayoutEffect(()=>{routeIdentity.current=routeToken;},[routeToken]);
  const selected=entries.find(e=>e.ref===route.ref);const parent=entries.find(e=>e.ref===route.parent);
  const fresh=useMemo(()=>route.view==="new-entry"&&parent&&parent.kind!=="item"&&(route.kind!=="group"||parent.kind==="program")&&parent.tab===route.tab?blankEntry(parent.tab,route.kind!,parent,Math.min(100000,(childrenOf(entries,parent.ref).length+1)*10)):null,
  // A form ref is stable through its local edits and acknowledged head updates.

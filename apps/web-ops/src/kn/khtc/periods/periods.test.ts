@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import { describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
@@ -83,6 +84,7 @@ describe("Kỳ KHTC — lịch và tên kỳ (BRD Mục II.4)", () => {
 describe("Kỳ KHTC — mở / trùng / hủy / đóng (mock theo hợp đồng)", () => {
   it("mở kỳ sinh một phiếu mỗi phòng, không mở trùng, hủy rồi mở lại được", async () => {
     const api = client();
+    await ensurePublishedMockPlan225(2030);
     const draft = await api.preview({
       report_type: "week",
       year: 2030,

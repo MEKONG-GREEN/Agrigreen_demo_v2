@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import { describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
@@ -24,6 +25,7 @@ describe("W11.67 số liệu nguồn ngoài", () => {
     it("nạp hai bước ghi 3 dòng, báo lỗi 1; sửa cần lý do; ô Nhập ngoài vào bản soạn Mẫu 1", async () => {
         const api = client(), periods = createKhtcPeriodApi(api), ext = createExternalApi(api), reports = createReportApi(api);
         const year = new Date().getFullYear() + 7;
+        await ensurePublishedMockPlan225(year);
         const p = await periods.open({ report_type: "week", year, no: 39, departments: ["trong_trot"] });
         const csv = "Chỉ tiêu,Kỳ,Giá trị,ĐVT,Cơ quan cung cấp,Văn bản / kênh,Ngày\n" +
             `Diện tích lúa Thu Đông,${year}-W39,12450,ha,Cục Thống kê,File tổng hợp,${year}-09-29\n` +

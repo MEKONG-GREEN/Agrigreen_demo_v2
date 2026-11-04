@@ -6,11 +6,13 @@
 //   - Kế hoạch: base_version khác phiên bản mới nhất → 409; điều chỉnh thiếu số/ngày QĐ/ngày hiệu lực → 422;
 //     hạng mục thiếu phòng phụ trách → 422; số La Mã theo thứ tự CT ở tab Các chương trình.
 //   - Xuất Excel trả tệp giả; nhập Excel không đọc tệp (422) — chỉ máy chủ thật đọc .xlsx.
-// Dữ liệu là GIẢ LẬP. Trạng thái nằm trong bộ nhớ tab.
+// Dữ liệu GIẢ LẬP của họ kế hoạch được giữ trong sessionStorage của tab; không phải dữ liệu máy chủ thật.
 // ============================================================================
 import type { components } from "../generated/application";
 import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
+import { khtcMockStore } from "./kn-khtc-periods";
+import { hex64 } from "./g5";
 
 type S = components["schemas"];
 type Item = S["KhtcCatalogItem"];
@@ -112,7 +114,9 @@ function seed(): Store {
 let STORE: Store = seed();
 /** Kiểm thử: đặt lại dữ liệu giả lập. */
 export function resetKhtcMock(): void {
+  window.sessionStorage.removeItem(STORAGE_KEY225);
   STORE = seed();
+  INITIAL225.clear();RECEIPTS225.clear();persistedRaw225=null;
 }
 
 const last = <T>(xs: T[]): T => xs[xs.length - 1]!;
@@ -192,7 +196,8 @@ function catalogWrite(ctx: Ctx, kind: string, code: string, create: boolean): Re
     recorded_at: now(),
     actor: ACTOR,
   };
-  STORE.items.set(key, [...(vs ?? []), it]);
+  const items=new Map(STORE.items);items.set(key,[...(vs??[]),it]);
+  const failed=commitState225({...STORE,items});if(failed)return failed;
   return json(it, 201);
 }
 
@@ -220,23 +225,15 @@ function programWrite(ctx: Ctx, ref: string | null): Response {
     recorded_at: now(),
     actor: ACTOR,
   };
-  STORE.programs.set(id, [...(vs ?? []), p]);
+  const programs=new Map(STORE.programs);programs.set(id,[...(vs??[]),p]);
+  const failed=commitState225({...STORE,programs});if(failed)return failed;
   return json(p, 201);
 }
 
-function savePlan(ctx: Ctx, year: number): Response {
-  const deny = need(ctx, "plan");
-  if (deny) return deny;
-  const b = (ctx.body ?? {}) as S["KhtcPlanSave"];
-  const vs = STORE.plans.get(year) ?? [];
-  if (b.base_version !== vs.length) return problem(409, "extension.khtc_plan_version_conflict", "Kế hoạch đã có phiên bản mới hơn — tải lại rồi điều chỉnh", { latest_version: vs.length });
-  if (vs.length && (!b.decision_no || !b.decision_date || !b.effective_from))
-    return problem(422, "extension.khtc_effective_date_invalid", "Điều chỉnh theo QĐ bắt buộc số, ngày quyết định và ngày hiệu lực");
-  const eff = b.effective_from || `${year}-01-01`;
-  if (!eff.startsWith(String(year))) return problem(422, "extension.khtc_effective_date_invalid", "Ngày hiệu lực trong năm kế hoạch");
+function materializePlanRows225(input: EntryIn[]) {
   const errors: { field: string; reason: string }[] = [];
   const byRef = new Map<string, EntryIn>();
-  const entries: Entry[] = (b.entries ?? []).map((x, i) => {
+  const entries: Entry[] = input.map((x, i) => {
     if (x.kind === "item" && !x.department_code) errors.push({ field: `entries.${i}.department_code`, reason: "hạng mục có đúng một phòng phụ trách" });
     if (x.kind !== "program" && (!x.parent_ref || !byRef.has(x.parent_ref))) errors.push({ field: `entries.${i}.parent_ref`, reason: "cha phải đứng trước" });
     byRef.set(x.ref, x);
@@ -273,6 +270,21 @@ function savePlan(ctx: Ctx, year: number): Response {
       note: x.note || null,
     };
   });
+  return {entries,errors};
+}
+
+function savePlan(ctx: Ctx, year: number): Response {
+  const deny = need(ctx, "plan");
+  if (deny) return deny;
+  if(hasActiveInitialDraft225(year,ctx.persona.me.tenant_id))return problem(409,"extension.khtc_initial_draft_active","Đã có nháp máy chủ của năm này");
+  const b = (ctx.body ?? {}) as S["KhtcPlanSave"];
+  const vs = STORE.plans.get(year) ?? [];
+  if (b.base_version !== vs.length) return problem(409, "extension.khtc_plan_version_conflict", "Kế hoạch đã có phiên bản mới hơn — tải lại rồi điều chỉnh", { latest_version: vs.length });
+  if (vs.length && (!b.decision_no || !b.decision_date || !b.effective_from))
+    return problem(422, "extension.khtc_effective_date_invalid", "Điều chỉnh theo QĐ bắt buộc số, ngày quyết định và ngày hiệu lực");
+  const eff = b.effective_from || `${year}-01-01`;
+  if (!eff.startsWith(String(year))) return problem(422, "extension.khtc_effective_date_invalid", "Ngày hiệu lực trong năm kế hoạch");
+  const {entries,errors}=materializePlanRows225(b.entries??[]);
   if (errors.length) return problem(422, "extension.khtc_plan_invalid", "Kế hoạch năm không hợp lệ", { errors });
   const v: Version = {
     id: uuid(),
@@ -288,7 +300,8 @@ function savePlan(ctx: Ctx, year: number): Response {
     recorded_at: now(),
     actor: ACTOR,
   };
-  STORE.plans.set(year, [...vs, { v, entries }]);
+  const plans=new Map(STORE.plans);plans.set(year,[...vs,{v,entries}]);
+  const failed=commitState225({...STORE,plans});if(failed)return failed;
   return planBodyCreated(year);
 }
 function planBodyCreated(year: number): Response {
@@ -299,7 +312,95 @@ function planBodyCreated(year: number): Response {
 
 const year = (ctx: Ctx) => Number.parseInt(ctx.params[0]!, 10);
 
-export const khtcRoutes: Route[] = [
+
+// These exports are lazy reads. Neither module's initialization calls its peer.
+export function hasPublishedOwnerPlan225(year:number,cutoff:string):boolean {
+ return (STORE.plans.get(year)??[]).some(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.v.effective_from)&&x.v.effective_from<=cutoff);
+}
+type Draft225=S["KhtcInitialDraft225"];
+type State225={revision:number;draft:Draft225|null;events:Draft225[]};
+let INITIAL225=new Map<string,State225>();
+type Receipt225={authority:string;request:string;receipt:Draft225};
+let RECEIPTS225=new Map<string,Receipt225>();
+const draftKey225=(tenant:string,year:number)=>`${tenant}:${year}`;
+export function hasActiveInitialDraft225(year:number,tenant:string):boolean{return !!INITIAL225.get(draftKey225(tenant,year))?.draft;}
+export function isInitialDraftMockPath225(path:string){return /^\/v1\/kn\/khtc\/plans\/[^/]+\/draft(?:\/(?:discard|history|compare))?\/?$/.test(path);}
+/** Current policy and complete available mock authority facts. Context identity/expiry alone are ephemeral. */
+export function initialDraftMockPolicy225(request:Request,persona:Ctx["persona"]):{authority:string;denied:Response|null}{
+ const k=knContext(request.headers.get("X-AG-Context")??"");
+ const deny=(code="forbidden")=>({authority:"",denied:problem(403,code,"Không có quyền nháp máy chủ trong phiên hiện tại")});
+ if(!k||!(k.role==="admin"||k.role==="kn_tinh"&&k.department_code===KHTC))return deny();
+ if(!Number.isFinite(Date.parse(k.expires_at))||Date.parse(k.expires_at)<=Date.now())return deny("accounts.context_expired");
+ if((k.role==="admin"||k.support_session_id)&&!persona.amr.includes("otp"))return deny("mfa_required");
+ if(request.method!=="GET"&&request.method!=="HEAD"&&k.read_only)return deny("accounts.context_read_only");
+ const authority=JSON.stringify([persona.me.tenant_id,persona.me.actor_ref,[...persona.me.roles].sort(),[...persona.amr].sort(),k.assignment_id,k.role,k.department_code,k.org_ref,k.communes.map(x=>x.code).sort(),!!k.read_only,!!k.manager,k.mgmt_level_code,k.province_group,k.internal_unit_code,[...(k.duties??[])].sort(),[...(k.powers??[])].sort(),k.support_session_id,k.on_behalf_of]);
+ return {authority,denied:restoreState225()};
+}
+function currentState225(ctx:Ctx,year:number){
+ const stored=INITIAL225.get(draftKey225(ctx.persona.me.tenant_id,year))??{revision:0,draft:null,events:[]};
+ // Every owned status counts, including cancelled/closed; never infer absence from a page.
+ const referenced=khtcMockStore().some(x=>x.p.year===year);
+ const available=!(STORE.plans.get(year)?.length)&&!referenced;
+ return {stored,body:{year,revision:stored.revision,draft:stored.draft?structuredClone(stored.draft):null,available,unavailable_reason:available?null:"Năm đã có phiên bản hoặc tham chiếu kỳ"}};
+}
+const plain225=(x:unknown):x is Record<string,unknown>=>!!x&&typeof x==="object"&&!Array.isArray(x);
+const uuid225=(x:unknown)=>typeof x==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x)&&x!=="00000000-0000-0000-0000-000000000000";
+function decimal225(x:unknown,scale:number,digits:number):boolean {
+ if(x==null)return true;
+ if(typeof x!=="string"||x.length>66||! /^-?[0-9]{1,32}(\.[0-9]{1,32})?$/.test(x))return false;
+ const [whole,rawFraction=""]=x.replace(/^-/ ,"").split(".");const integer=whole!.replace(/^0+/,"")||"0",fraction=rawFraction.replace(/0+$/,"");
+ return !(x.startsWith("-")&&(integer!=="0"||fraction!==""))&&integer.length<=digits&&fraction.length<=scale;
+}
+function boundedDraftRows225(input:unknown):input is EntryIn[]{
+ if(!Array.isArray(input)||input.length>5000)return false;
+ let bytes=0;const refs=new Map<string,EntryIn>();
+ const fields=new Set(["ref","tab","kind","parent_ref","program_ref","sort_order","code","name","unit_code","planned_qty","scale_note","budget","funding_code","field_code","department_code","communes","points_count","data_source","source_key","tracking","stopped_from","stop_decision","note"]);
+ for(const unknownRow of input){
+  if(!plain225(unknownRow)||Object.keys(unknownRow).some(k=>!fields.has(k)))return false;
+  const x=unknownRow as EntryIn;if(!uuid225(x.ref)||refs.has(x.ref)||!["programs","prev_year","central_project","cooperation","research","advisory"].includes(x.tab)||!["program","group","item"].includes(x.kind))return false;
+  if(!Number.isSafeInteger(x.sort_order??0)||(x.sort_order??0)<0||(x.sort_order??0)>100000)return false;
+  if(x.points_count!=null&&(!Number.isSafeInteger(x.points_count)||x.points_count<0||x.points_count>100000))return false;
+  if(!decimal225(x.planned_qty,4,16)||!decimal225(x.budget,2,18))return false;
+  for(const [key,max] of [["code",40],["name",1000],["unit_code",40],["scale_note",1000],["funding_code",40],["field_code",40],["department_code",40],["data_source",10],["source_key",100],["stop_decision",100],["note",2000]] as const){const value=x[key];if(value!=null&&(typeof value!=="string"||value.includes("\u0000")||Array.from(value).length>max))return false;}
+  if(x.communes!=null&&(!Array.isArray(x.communes)||x.communes.length>500||x.communes.some(c=>typeof c!=="string"||c.includes("\u0000")||c.length>40)))return false;
+  if(x.kind==="program"){if(x.parent_ref||!uuid225(x.program_ref)||!STORE.programs.get(x.program_ref!)?.at(-1)?.active)return false;}
+  else {const parent=x.parent_ref?refs.get(x.parent_ref):null;if(!parent||parent.tab!==x.tab||parent.kind==="item"||x.kind==="group"&&parent.kind!=="program")return false;if(typeof x.name!=="string"||!x.name.trim())return false;}
+  if(x.kind==="item"&&(!x.department_code||!["trong_trot","chan_nuoi_thuy_san","thong_tin_truyen_thong","hanh_chinh_tong_hop"].includes(x.department_code)))return false;
+  bytes+=new TextEncoder().encode(JSON.stringify(x)).length;if(bytes>1<<20)return false;refs.set(x.ref,x);
+ }
+ return true;
+}
+function stableJSON225(x:unknown):string {if(Array.isArray(x))return `[${x.map(stableJSON225).join(",")}]`;if(plain225(x))return `{${Object.keys(x).sort().map(k=>`${JSON.stringify(k)}:${stableJSON225(x[k])}`).join(",")}}`;return JSON.stringify(x);}
+function draftRequest225(ctx:Ctx,discard=false):Response {
+ const policy=initialDraftMockPolicy225(ctx.request,ctx.persona);if(policy.denied)return policy.denied;
+ const rawYear=ctx.params[0]??"";if(!/^(20\d{2}|2100)$/.test(rawYear))return problem(422,"validation_failed","Năm không hợp lệ");const year=Number(rawYear);
+ const b=ctx.body;if(!plain225(b)||Object.keys(b).some(k=>!(discard?["draft_id","expected_revision","note"]:["draft_id","expected_revision","note","entries"]).includes(k)))return problem(422,"validation_failed","Thân nháp không hợp lệ");
+ if(!Number.isSafeInteger(b.expected_revision)||(b.expected_revision as number)<0||b.draft_id!=null&&!uuid225(b.draft_id)||discard&&!uuid225(b.draft_id)||b.note!=null&&(typeof b.note!=="string"||b.note.includes("\u0000")||Array.from(b.note).length>1000)||!discard&&!boundedDraftRows225(b.entries))return problem(422,"validation_failed","Nội dung nháp vượt giới hạn hoặc không hợp lệ");
+ const key=ctx.request.headers.get("Idempotency-Key");if(!key||key.length>200)return problem(400,"idempotency_key_required","Thiếu khóa thao tác");
+ // This exact bounded canonical string is the receipt binding, NEVER the weak display fingerprint.
+ const request=stableJSON225({year,discard,body:b});const receiptKey=`${ctx.persona.me.tenant_id}:${key}`;const previous=RECEIPTS225.get(receiptKey);
+ if(previous)return previous.authority===policy.authority&&previous.request===request?json(structuredClone(previous.receipt),200):problem(409,"extension.khtc_draft_operation_conflict","Khóa thao tác đã thuộc nội dung hoặc quyền khác");
+ const {stored,body}=currentState225(ctx,year);if(!body.available)return problem(409,"extension.khtc_initial_draft_year_in_use","Năm đã có dữ liệu tham chiếu");
+ if(stored.revision!==b.expected_revision||(b.draft_id??null)!==(stored.draft?.draft_id??null))return problem(409,"extension.khtc_draft_revision_conflict","Nháp đã thay đổi");
+ const rows=discard?[]:materializePlanRows225(b.entries as EntryIn[]).entries;
+ const action=discard?"discard":stored.draft?"save":"create";
+ const receipt:Draft225={event_id:uuid(),draft_id:stored.draft?.draft_id??uuid(),year,revision:stored.revision+1,action,state:discard?"discarded":"active",base_published_version:0,entries_count:rows.length,
+ // DEMO fingerprint only; not SHA-256 or a security/authority claim. Native tests prove real hashes.
+ entries_hash:hex64(stableJSON225(rows)),note:typeof b.note==="string"?b.note.trim():"",event_time:now(),recorded_at:now(),actor_ref:ctx.persona.me.actor_ref,entries:structuredClone(rows)};
+ const next:State225={revision:receipt.revision,draft:discard?null:structuredClone(receipt),events:[...stored.events,structuredClone(receipt)]};const initial=new Map(INITIAL225),receipts=new Map(RECEIPTS225);initial.set(draftKey225(ctx.persona.me.tenant_id,year),next);receipts.set(receiptKey,{authority:policy.authority,request,receipt:structuredClone(receipt)});const failed=commitState225(STORE,initial,receipts);return failed??json(receipt,201);
+}
+const initialDraftRoutes225:Route[]=[
+ {method:"GET",pattern:/^\/v1\/kn\/khtc\/plans\/([^/]+)\/draft(?:\/(history|compare))?$/,handler:ctx=>{
+  const policy=initialDraftMockPolicy225(ctx.request,ctx.persona);if(policy.denied)return policy.denied;const raw=ctx.params[0]??"";if(!/^(20\d{2}|2100)$/.test(raw))return problem(422,"validation_failed","Năm không hợp lệ");const year=Number(raw);const {stored,body}=currentState225(ctx,year);
+  if(ctx.params[1]==="history"){const limitRaw=ctx.url.searchParams.get("limit")??"50",beforeRaw=ctx.url.searchParams.get("before_revision")??"0";if(!/^[0-9]{1,3}$/.test(limitRaw)||!/^[0-9]{1,19}$/.test(beforeRaw))return problem(422,"validation_failed","Phân trang không hợp lệ");const limit=Number(limitRaw),before=Number(beforeRaw);if(limit<1||limit>100||!Number.isSafeInteger(before)||before<0)return problem(422,"validation_failed","Phân trang không hợp lệ");const all=[...stored.events].reverse().filter(x=>!before||x.revision<before),page=all.slice(0,limit);return json({items:page.map(({entries,...e})=>{void entries;return e;}),next_before_revision:all.length>limit?page.at(-1)!.revision:null});}
+  return json(ctx.params[1]==="compare"?{...body,baseline_entries:[],baseline_published_version:0}:body);
+ }},
+ {method:"POST",pattern:/^\/v1\/kn\/khtc\/plans\/([^/]+)\/draft$/,handler:ctx=>draftRequest225(ctx)},
+ {method:"POST",pattern:/^\/v1\/kn\/khtc\/plans\/([^/]+)\/draft\/discard$/,handler:ctx=>draftRequest225(ctx,true)},
+];
+
+const rawKhtcRoutes225: Route[] = [
+ ...initialDraftRoutes225,
   {
     method: "GET",
     pattern: /^\/v1\/kn\/khtc\/catalogs$/,
@@ -412,3 +513,59 @@ export const khtcRoutes: Route[] = [
     handler: (ctx) => need(ctx, "plan") ?? problem(422, "extension.khtc_import_invalid", "Tệp Excel kế hoạch năm không đọc được", { detail: "Bản giả lập không đọc tệp .xlsx" }),
   },
 ];
+
+
+// Only semantic KHTC data and receipt bindings; never AuthProvider/token/session payloads.
+const STORAGE_KEY225="ag.kn.khtc.initial225.v1";
+let persistedRaw225:string|null=null;
+type Envelope225={version:1;items:[string,Item[]][];programs:[string,Program[]][];plans:[number,{v:Version;entries:Entry[]}[]][];initial:[string,State225][];receipts:[string,Receipt225][]};
+const storageFailure225=()=>problem(503,"extension.khtc_draft_storage_unavailable","Không đọc hoặc ghi được dữ liệu kế hoạch trong tab này; chưa xác nhận thao tác");
+const integer225=(v:unknown):v is number=>typeof v==="number"&&Number.isSafeInteger(v)&&v>=0;
+function entriesStored225(value:unknown):value is Entry[]{
+ return Array.isArray(value)&&value.length<=5000&&value.every(x=>plain225(x)&&uuid225(x.ref)&&typeof x.name==="string"&&typeof x.kind==="string"&&typeof x.tab==="string"&&integer225(x.sort_order)&&Array.isArray(x.communes)&&x.communes.every(c=>typeof c==="string")&&decimal225(x.planned_qty,4,16)&&decimal225(x.budget,2,18));
+}
+function eventStored225(x:unknown):x is Draft225{
+ return plain225(x)&&uuid225(x.event_id)&&uuid225(x.draft_id)&&integer225(x.year)&&integer225(x.revision)&&x.revision>0&&["create","save","discard"].includes(String(x.action))&&x.state===(x.action==="discard"?"discarded":"active")&&x.base_published_version===0&&typeof x.entries_hash==="string"&&/^[0-9a-f]{64}$/.test(x.entries_hash)&&typeof x.note==="string"&&typeof x.actor_ref==="string"&&typeof x.event_time==="string"&&typeof x.recorded_at==="string"&&entriesStored225(x.entries)&&x.entries_count===x.entries.length;
+}
+function pairsStored225(value:unknown,key:(x:unknown)=>boolean,row:(x:unknown)=>boolean):boolean{
+ if(!Array.isArray(value))return false;const seen=new Set<unknown>();
+ return value.every(pair=>Array.isArray(pair)&&pair.length===2&&key(pair[0])&&!seen.has(pair[0])&&(seen.add(pair[0]),row(pair[1])));
+}
+function envelopeStored225(value:unknown):value is Envelope225{
+ if(!plain225(value)||value.version!==1||Object.keys(value).sort().join(",")!=="initial,items,plans,programs,receipts,version")return false;
+ const text=(x:unknown)=>typeof x==="string";
+ if(!pairsStored225(value.items,text,x=>Array.isArray(x)&&x.length>0&&x.every(y=>plain225(y)&&typeof y.kind==="string"&&typeof y.code==="string"&&typeof y.name==="string"&&integer225(y.version)&&uuid225(y.version_id))))return false;
+ if(!pairsStored225(value.programs,uuid225,x=>Array.isArray(x)&&x.length>0&&x.every(y=>plain225(y)&&uuid225(y.ref)&&typeof y.code==="string"&&typeof y.name==="string"&&integer225(y.version))))return false;
+ if(!pairsStored225(value.plans,integer225,x=>Array.isArray(x)&&x.length>0&&x.every(y=>plain225(y)&&plain225(y.v)&&uuid225(y.v.id)&&integer225(y.v.version)&&typeof y.v.effective_from==="string"&&entriesStored225(y.entries))))return false;
+ if(!pairsStored225(value.initial,text,x=>plain225(x)&&integer225(x.revision)&&Array.isArray(x.events)&&x.events.length===x.revision&&x.events.every((e,i)=>eventStored225(e)&&e.revision===i+1)&&(x.draft===null?x.revision===0||x.events.at(-1)?.action==="discard":eventStored225(x.draft)&&x.draft.state==="active"&&JSON.stringify(x.draft)===JSON.stringify(x.events.at(-1)))))return false;
+ const events=new Set((value.initial as [string,State225][]).flatMap(([,state])=>state.events.map(e=>JSON.stringify(e))));
+ return pairsStored225(value.receipts,text,x=>plain225(x)&&typeof x.authority==="string"&&typeof x.request==="string"&&eventStored225(x.receipt)&&events.has(JSON.stringify(x.receipt)));
+}
+function snapshot225(store:Store,initial:Map<string,State225>,receipts:Map<string,Receipt225>):Envelope225{
+ return {version:1,items:[...store.items],programs:[...store.programs],plans:[...store.plans],initial:[...initial],receipts:[...receipts]};
+}
+function restoreState225():Response|null{
+ try{
+  if(typeof window==="undefined")return storageFailure225();
+  const raw=window.sessionStorage.getItem(STORAGE_KEY225);
+  // Missing only means a fresh tab. Removing existing persisted state is not a reset.
+  if(raw===null)return persistedRaw225===null?null:storageFailure225();
+  if(raw===persistedRaw225)return null;
+  const saved:unknown=JSON.parse(raw);if(!envelopeStored225(saved))return storageFailure225();
+  STORE={items:new Map(saved.items),programs:new Map(saved.programs),plans:new Map(saved.plans)};INITIAL225=new Map(saved.initial);RECEIPTS225=new Map(saved.receipts);persistedRaw225=raw;return null;
+ }catch{return storageFailure225();}
+}
+function commitState225(store:Store,initial=INITIAL225,receipts=RECEIPTS225):Response|null{
+ try{
+  const candidate=JSON.stringify(snapshot225(store,initial,receipts));
+  window.sessionStorage.setItem(STORAGE_KEY225,candidate);
+  // No RAM mutation or ACK until the complete candidate is durably accepted by storage.
+  STORE=store;INITIAL225=initial;RECEIPTS225=receipts;persistedRaw225=candidate;return null;
+ }catch{return storageFailure225();}
+}
+export function publishedOwnerPlanGuard225(year:number,cutoff:string):Response|null{
+ const failed=restoreState225();return failed??(hasPublishedOwnerPlan225(year,cutoff)?null:problem(409,"extension.khtc_plan_required","Năm chưa có kế hoạch tại ngày chốt"));
+}
+export const khtcRoutes:Route[]=rawKhtcRoutes225.map(route=>({...route,handler:ctx=>{
+ const failed=restoreState225();return failed??route.handler(ctx);
+}}));

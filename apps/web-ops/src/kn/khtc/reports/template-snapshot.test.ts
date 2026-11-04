@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
@@ -20,6 +21,7 @@ describe("fixed template composer snapshot",()=>{
  it("pins published frame, rejects locked writes and keeps exports frozen across publish/refresh",async()=>{
   const client=createApiClient({baseUrl:"http://mock",getAccessToken:()=>"mock.tinh",getContextId:()=>null,fetch:mockFetchNoDelay});
   const periods=createKhtcPeriodApi(client),reports=createReportApi(client),templates=await adminApi();
+  await ensurePublishedMockPlan225(new Date().getFullYear());
   const p=await periods.open({report_type:"week",year:new Date().getFullYear(),no:35,departments:["trong_trot"]});
   expect((await reports.get(p.id)).content.template_snapshot?.mode).toBe("legacy");
   const definition=(await templates.get("mau_1")).definition;

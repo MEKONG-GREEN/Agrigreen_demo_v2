@@ -34,6 +34,7 @@ describe("initial persisted draft225",()=>{
  w.api.current.mockResolvedValueOnce(structuredClone(state)).mockRejectedValueOnce(new ApiProblem({type:"about:blank",title:"Không đọc được trạng thái225",status:503,code:"service_unavailable"}));
  render(<InitialDraftPage225 route={route()}/>);fireEvent.click(await screen.findByRole("button",{name:"Tạo nháp máy chủ"}));
  await screen.findByRole("alert");expect(w.api.save).toHaveBeenCalledTimes(1);expect(screen.getByText(/Đã xác nhận lưu nháp máy chủ/)).toBeInTheDocument();expect(screen.getByText(/Đã nhận nháp máy chủ lần ghi 1/)).toBeInTheDocument();
+ fireEvent.click(screen.getByRole("button",{name:"Thử lại"}));await waitFor(()=>expect(w.api.current).toHaveBeenCalledTimes(3));expect(screen.getByText(/Đã xác nhận lưu nháp máy chủ/)).toBeInTheDocument();
  });
  it("retries an unknown ACK with the same immutable request/key instead of creating another operation",async()=>{
  w.api.save.mockRejectedValueOnce(new Error("transport unavailable"));render(<InitialDraftPage225 route={route()}/>);fireEvent.click(await screen.findByRole("button",{name:"Tạo nháp máy chủ"}));
@@ -57,6 +58,15 @@ describe("initial persisted draft225",()=>{
  it("still navigates after master creation acknowledged in the same committed route",async()=>{
  w.khtc.createProgram.mockResolvedValueOnce({});const go=vi.fn();render(<InitialDraftPage225 route={{...route(),view:"new-program",tab:"programs",go}}/>);
  fireEvent.change(await screen.findByLabelText(/Mã CT\/DA/),{target:{value:"CT225"}});fireEvent.change(screen.getByLabelText(/Tên CT\/DA/),{target:{value:"CT đúng tuyến225"}});fireEvent.click(screen.getByRole("button",{name:"Lưu CT/DA chủ"}));await waitFor(()=>expect(go).toHaveBeenCalledTimes(1));expect(go).toHaveBeenCalledWith(base+"/chon-chuong-trinh?year=2035&tab=programs");
+ });
+ it("does not adopt a colleague revision underneath an unsaved row form on master refresh",async()=>{
+ const e={...blankEntry("programs","program",null,1),name:"Server row1",program_ref:"01990000-0000-7000-8000-000000002254"};const first={...receipt(),entries:[e],entries_count:1};state={...state,revision:1,draft:first};const go=vi.fn();const editRoute:PlanRoute={...route(),view:"edit-entry",ref:e.ref,go};
+ const r=render(<InitialDraftPage225 route={editRoute}/>);fireEvent.change(await screen.findByLabelText(/^Tên/),{target:{value:"Local row chưa lưu225"}});
+ r.rerender(<InitialDraftPage225 route={{...route(),view:"new-program",tab:"programs",go}}/>);fireEvent.change(await screen.findByLabelText(/Mã CT\/DA/),{target:{value:"OTHER225"}});fireEvent.change(screen.getByLabelText(/Tên CT\/DA/),{target:{value:"Master khác225"}});
+ w.khtc.createProgram.mockImplementationOnce(async()=>{state={...state,revision:2,draft:{...first,revision:2,entries:[{...e,name:"Colleague row2"}]}};return {};});fireEvent.click(screen.getByRole("button",{name:"Lưu CT/DA chủ"}));await waitFor(()=>expect(w.api.current).toHaveBeenCalledTimes(2));await act(async()=>{await Promise.resolve();});
+ r.rerender(<InitialDraftPage225 route={editRoute}/>);expect(await screen.findByLabelText(/^Tên/)).toHaveValue("Local row chưa lưu225");fireEvent.click(screen.getByRole("button",{name:"Lưu vào nháp"}));r.rerender(<InitialDraftPage225 route={{...route(),go}}/>);
+ w.api.save.mockRejectedValueOnce(new ApiProblem({type:"about:blank",title:"Colleague changed225",status:409,code:"extension.khtc_draft_revision_conflict"}));fireEvent.click(await screen.findByRole("button",{name:"Lưu nháp máy chủ"}));await screen.findByRole("alert");expect(w.api.save.mock.calls[0]![1].expected_revision).toBe(1);expect(screen.getByText("Local row chưa lưu225")).toBeInTheDocument();
+ fireEvent.click(screen.getByRole("button",{name:"Bỏ thay đổi trên màn và tải lại"}));await screen.findByText("Colleague row2");expect(screen.getByText(/Đã nhận nháp máy chủ lần ghi 2/)).toBeInTheDocument();
  });
  for(const change of ["contextABA","yearABA","api","actor","MFA","readonly"]){it(`retires pending ACK across ${change}`,async()=>{
  const pending=deferred<InitialDraft225>();w.api.save.mockReturnValueOnce(pending.promise);const r=render(<InitialDraftPage225 route={route()}/>);fireEvent.click(await screen.findByRole("button",{name:"Tạo nháp máy chủ"}));await waitFor(()=>expect(w.api.save).toHaveBeenCalledTimes(1));

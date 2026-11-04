@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import { describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
@@ -84,6 +85,7 @@ describe("W11.63 phiếu KHTC — tính trước trên màn (BR-DL-05, BR-DL-12)
 
 describe("W11.63 phiếu KHTC — giả lập theo hợp đồng", () => {
   it("KH-FN-PN-03.01/03.02: phiếu kỳ này ở 4 phòng; nháp → Tiếp tục; nguồn module không nhập; gửi lại chỉ khi yêu cầu bổ sung", async () => {
+    await ensurePublishedMockPlan225(new Date().getFullYear()+1);
     const forms = createKhtcFormApi(api());
     const periods = createKhtcPeriodApi(api());
     const p = await periods.open({

@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import {expect,it} from "vitest";
 import {createApiClient} from "@/api/client";
 import {mockFetchNoDelay} from "@/api/mock/handler";
@@ -12,6 +13,7 @@ it("W11.68 usage is tenant-bound saved revision evidence, not auto-load/default 
  const ctx:Ctx={url,persona,params:[],body:null,request:new Request(url)};
  // Existing fixed-report fixture caller; native session/role gates are PG-tested.
  const client=createApiClient({baseUrl:"http://mock",getAccessToken:()=>"mock.tinh",getContextId:()=>null,fetch:mockFetchNoDelay});
+ await ensurePublishedMockPlan225(2039);
  const p=await createKhtcPeriodApi(client).open({report_type:"week",year:2039,no:1});
  const reports=createReportApi(client);
  expect(khtcTemplateNarrativeUsage(ctx,crypto.randomUUID())).toBeNull();

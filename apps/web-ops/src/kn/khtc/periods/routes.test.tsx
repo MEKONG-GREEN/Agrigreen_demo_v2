@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
@@ -26,6 +27,7 @@ beforeEach(async () => {
   auth.context = { context_id: "test-context", role: "kn_tinh", department_code: "ke_hoach_tai_chinh", read_only: false };
   auth.api = createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.tinh", getContextId: () => null, fetch: track });
   khtcMockStore().splice(0);
+  await ensurePublishedMockPlan225(2030);
   period = await createKhtcPeriodApi(auth.api).open({ report_type: "month", year: 2030, no: 1, departments: ["trong_trot"] });
   writes.length = 0;
 });

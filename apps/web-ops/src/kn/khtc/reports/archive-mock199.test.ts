@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import {afterEach,beforeEach,expect,it,vi} from "vitest";
 import {createApiClient} from "@/api/client";
 import {mockFetchNoDelay} from "@/api/mock/handler";
@@ -14,6 +15,7 @@ afterEach(()=>vi.useRealTimers());
 it("mock retains explicit Word bytes, does not infer another snapshot, and ZIPs mixed files",async()=>{
  const legacy=createApiClient({baseUrl:"http://mock",getAccessToken:()=>"mock.tinh",getContextId:()=>null,fetch:mockFetchNoDelay});
  const reports=createReportApi(legacy), periods=createKhtcPeriodApi(legacy);
+ await ensurePublishedMockPlan225(2039);
  const p=await periods.open({report_type:"week",year:2039,no:17,departments:["trong_trot"]});
  let d=await reports.save(p.id,{base_version:0,admin:{document_no:"199"},texts:{B:"Frozen Word input"}});
  const x=await reports.export(p.id,d.version,true,{}), w=await reports.word(p.id,x.id), original=await reports.downloadWord(p.id,w.id);

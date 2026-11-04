@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import { describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
@@ -13,6 +14,7 @@ describe("W10.17 Word KHTC qua cap/export (giả lập)", () => {
     it("xuất Word từ bản Excel, tự cấp {n}/BC-TTKN một lần mỗi báo cáo, không cấp cho bản Tạm tính, lịch sử và tải lại", async () => {
         const api = client(), periods = createKhtcPeriodApi(api), forms = createKhtcFormApi(api), reports = createReportApi(api);
         const year = new Date().getFullYear() + 9;
+        await ensurePublishedMockPlan225(year);
         const open = (no: number) => periods.open({ report_type: "week", year, no, departments: ["trong_trot"] });
         const draft = await open(5);
         let dv = await reports.save(draft.id, { base_version: 0, admin: { report_date: "" } });

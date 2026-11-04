@@ -1,3 +1,4 @@
+import { ensurePublishedMockPlan225 } from "../plans/mock-plan-fixture225";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
@@ -26,6 +27,7 @@ afterEach(() => vi.useRealTimers());
 describe("W11.66 minimal editor", () => {
     it("preserves unsaved text, blocks refresh/export until save, and resets administrative overrides", async () => {
         const year = new Date().getFullYear() + 5;
+    await ensurePublishedMockPlan225(year);
         const p = await createKhtcPeriodApi(auth.api!).open({ report_type: "week", year, no: 5, departments: ["trong_trot"] });
         render(<KhtcReportsScreen />);
         fireEvent.change(screen.getByLabelText("Năm"), { target: { value: String(year) } });
@@ -54,6 +56,7 @@ it("keeps the232 save acknowledgement after reloading the saved version and cont
     vi.setSystemTime(new Date("2030-10-14T03:00:00Z"));
     try {
         const year = new Date().getFullYear() + 5;
+    await ensurePublishedMockPlan225(year);
         const p = await createKhtcPeriodApi(auth.api!).open({ report_type: "week", year, no: 6, departments: ["trong_trot"] });
         const initial = await createReportApi(auth.api!).get(p.id);
         render(<KhtcReportsScreen />);
@@ -80,6 +83,7 @@ function fixedClock232() {
 async function report232() {
     fixedClock232();
     const year = new Date().getFullYear() + 5;
+    await ensurePublishedMockPlan225(year);
     const p = await createKhtcPeriodApi(auth.api!).open({ report_type: "week", year, no: nextReport232++, departments: ["trong_trot"] });
     return {p, year, initial: await createReportApi(auth.api!).get(p.id)};
 }

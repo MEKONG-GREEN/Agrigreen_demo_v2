@@ -3,6 +3,7 @@ import { problem, type Route } from "./http";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { contextProblem, personaForContext } from "./kn";
 import { supportGuard, supportRecord } from "./kn-admin";
+import { initialDraftMockPolicy225, isInitialDraftMockPath225 } from "./kn-khtc";
 
 // BEGIN GENERATED MOCK ROUTES
 import { orderedRoutes, type RouteRegistration } from "./registry";
@@ -164,6 +165,12 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
     // Bề mặt Admin: mọi route bắt buộc token đã qua yếu tố thứ hai (mục 11).
     if (opts.surface === "admin" && !persona.amr.includes("otp")) return problem(403, "mfa_required", "MFA required");
 
+    // #225 only: current selected authority/support policy precedes cached ACKs.
+    // Keep all other families on their existing ordering and fingerprint recipe.
+    const initial225=opts.surface==="app"&&isInitialDraftMockPath225(url.pathname);
+    const draftPolicy225=initial225?initialDraftMockPolicy225(request,persona):null;
+    if(draftPolicy225?.denied)return draftPolicy225.denied;
+    if(initial225){const denied=supportGuard(request,url);if(denied)return denied;}
     let body: unknown = undefined;
     // POST bắt buộc Idempotency-Key; PUT/PATCH (KN v7.7 P1/P7) đọc thân như POST, khóa tùy chọn.
     if (request.method === "POST" || ((request.method === "PUT" || request.method === "PATCH") && request.headers.get("Content-Type")?.includes("json"))) {
@@ -173,6 +180,9 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
       let fingerprintBody: string;
       if (type.includes("json")) {
         const text = await request.text();
+        // Match the existing native 1MiB body budget before JSON parsing/cache.
+        // Parsed mock values do not prove native duplicate-occurrence parsing.
+        if(initial225&&(text.length>(1<<20)||new TextEncoder().encode(text).length>(1<<20)))return problem(413,"payload_too_large","Thân nháp vượt giới hạn");
         fingerprintBody = text;
         try {
           body = text ? JSON.parse(text) : undefined;
@@ -187,7 +197,7 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
         body = bytes;
         fingerprintBody = binaryFingerprint(bytes);
       }
-      const fingerprint = `${opts.surface}|${persona.id}|${url.pathname}${url.search}|${fingerprintBody}`;
+      const fingerprint = `${opts.surface}|${draftPolicy225?.authority??persona.id}|${url.pathname}${url.search}|${fingerprintBody}`;
       const prev = replay.get(key);
       if (prev) {
         if (prev.fingerprint !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
