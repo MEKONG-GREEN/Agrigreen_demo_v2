@@ -7,6 +7,7 @@ import (
 	"time"
 
 	pd "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -156,10 +157,17 @@ func (s *Service) readBoundWord(ctx context.Context, b store.WordBinding) (expor
 
 // DownloadArchiveWord commits a read-attempt audit before calling the stored-file
 // port. It never resolves placeholders, renders Word or allocates document numbers.
-func (s *Service) DownloadArchiveWord(ctx context.Context, period, export, runID uuid.UUID) (exportport.Run, error) {
+func (s *Service) DownloadArchiveWord(ctx context.Context, period, export, runID uuid.UUID, fields ...domain.ArchiveFieldSelector) (exportport.Run, error) {
 	c, err := s.reader(ctx)
 	if err != nil {
 		return exportport.Run{}, err
+	}
+	field := domain.ArchiveFieldSelector{}
+	if len(fields) > 0 {
+		field = fields[0]
+	}
+	if !field.Valid() {
+		return exportport.Run{}, ErrInvalid
 	}
 	if s.Exporter == nil {
 		return exportport.Run{}, ErrDependency
@@ -168,6 +176,9 @@ func (s *Service) DownloadArchiveWord(ctx context.Context, period, export, runID
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		header, e := archiveHeader(ctx, tx, period, export)
 		if e != nil {
+			return e
+		}
+		if _, e = requireArchiveField(ctx, tx, period, export, field); e != nil {
 			return e
 		}
 		binding, e = boundWordMetadata(ctx, tx, header, runID)
@@ -190,10 +201,13 @@ func (s *Service) DownloadArchiveWord(ctx context.Context, period, export, runID
 	return run, nil
 }
 
-type ArchiveWordsQuery struct{ Offset, Limit int }
+type ArchiveWordsQuery struct {
+	Offset, Limit int
+	Fields        domain.ArchiveFieldSelector
+}
 
 func (q ArchiveWordsQuery) Validate() error {
-	if q.Offset < 0 || q.Offset > 100000 || q.Limit < 1 || q.Limit > 50 {
+	if !q.Fields.Valid() || q.Offset < 0 || q.Offset > 100000 || q.Limit < 1 || q.Limit > 50 {
 		return ErrInvalid
 	}
 	return nil
@@ -207,6 +221,8 @@ type ArchiveWordsResult struct {
 	Items         []store.WordBinding `json:"items"`
 	HasMore       bool                `json:"has_more"`
 	Offset        int                 `json:"offset"`
+	FieldCodes    []string            `json:"field_codes"`
+	FieldStatus   string              `json:"field_status"`
 }
 
 func (s *Service) ArchiveWords(ctx context.Context, period, export uuid.UUID, q ArchiveWordsQuery) (ArchiveWordsResult, error) {
@@ -223,6 +239,12 @@ func (s *Service) ArchiveWords(ctx context.Context, period, export uuid.UUID, q 
 		if e != nil {
 			return e
 		}
+		meta, e := requireArchiveField(ctx, tx, period, export, q.Fields)
+		if e != nil {
+			return e
+		}
+		out.FieldCodes = meta.Codes
+		out.FieldStatus = meta.Status
 		out.ExportVersion = header.Version
 		out.ExportName = header.Name
 		out.Items, e = store.WordBindings(ctx, tx, period, export, q.Offset, q.Limit+1)

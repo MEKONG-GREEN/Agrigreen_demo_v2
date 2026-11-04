@@ -10,6 +10,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	"github.com/jackc/pgx/v5"
 )
@@ -23,7 +24,7 @@ type archivePreparedFile struct {
 	At        time.Time
 }
 
-func (s *Service) prepareArchiveZIP(ctx context.Context, c caller, in []ArchiveSelection) ([]archivePreparedFile, error) {
+func (s *Service) prepareArchiveZIP(ctx context.Context, c caller, in []ArchiveSelection, field domain.ArchiveFieldSelector) ([]archivePreparedFile, error) {
 	files := make([]archivePreparedFile, 0, len(in))
 	var total int64
 	err := s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
@@ -34,6 +35,9 @@ func (s *Service) prepareArchiveZIP(ctx context.Context, c caller, in []ArchiveS
 			}
 			header, err := archiveHeader(ctx, tx, selection.PeriodID, selection.ExportID)
 			if err != nil {
+				return err
+			}
+			if _, err = requireArchiveField(ctx, tx, selection.PeriodID, selection.ExportID, field); err != nil {
 				return err
 			}
 			file := archivePreparedFile{Selection: selection, Header: *header, Size: header.Size, Name: fmt.Sprintf("bao-cao-%s-v%d.xlsx", header.ID, header.Version), At: header.At}
@@ -117,15 +121,22 @@ func (b *archiveBudgetBuffer) Bytes() []byte { return b.body.Bytes() }
 // ArchiveZIP copies already stored Word/Excel bytes. Metadata and total size are
 // authorized before reads, each body is checked before copy and the ZIP writer
 // itself has a hard byte budget (including container overhead).
-func (s *Service) ArchiveZIP(ctx context.Context, in []ArchiveSelection) ([]byte, error) {
+func (s *Service) ArchiveZIP(ctx context.Context, in []ArchiveSelection, fields ...domain.ArchiveFieldSelector) ([]byte, error) {
 	c, err := s.reader(ctx)
 	if err != nil {
 		return nil, err
 	}
+	field := domain.ArchiveFieldSelector{}
+	if len(fields) > 0 {
+		field = fields[0]
+	}
+	if !field.Valid() {
+		return nil, ErrInvalid
+	}
 	if err = ValidateArchiveSelection(in); err != nil {
 		return nil, err
 	}
-	files, err := s.prepareArchiveZIP(ctx, c, in)
+	files, err := s.prepareArchiveZIP(ctx, c, in, field)
 	if err != nil {
 		return nil, err
 	}

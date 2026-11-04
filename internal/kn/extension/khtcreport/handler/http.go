@@ -23,6 +23,7 @@ type Handler struct{ Svc *app.Service }
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/extension/khtc/exported-reports", h.archive)
 	rg.GET("/extension/khtc/exported-reports/periods", h.archive)
+	rg.GET("/extension/khtc/exported-reports/fields", h.archive)
 	rg.POST("/extension/khtc/exported-reports/zip", h.archiveZIP)
 	g := rg.Group("/extension/khtc/periods/:id/report")
 	g.GET("", h.get)
@@ -162,7 +163,17 @@ func (h Handler) history(c *gin.Context) {
 	if !ok {
 		return
 	}
-	rows, err := h.Svc.History(c.Request.Context(), id)
+	field, err := archiveFieldQuery(c.Request.URL.Query())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	var rows []store.Export
+	if field.Code != "" || field.Status != "" {
+		rows, err = h.Svc.ArchiveHistory(c.Request.Context(), id, field)
+	} else {
+		rows, err = h.Svc.History(c.Request.Context(), id)
+	}
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -199,7 +210,12 @@ func (h Handler) download(c *gin.Context) {
 	if !ok {
 		return
 	}
-	row, err := h.Svc.Download(c.Request.Context(), id, exportID)
+	field, err := archiveFieldQuery(c.Request.URL.Query())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	row, err := h.Svc.DownloadArchiveExcel(c.Request.Context(), id, exportID, field)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

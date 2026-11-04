@@ -82,7 +82,8 @@ Nguồn và giới hạn: [giả định W11.53](../kn/gia-dinh/W11.53.md) (Q-05
 | Menu Tỉnh "Mẫu biểu dự án", TW "Mẫu biểu, nghiệm thu năm (07)" | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
 
 Luồng trình duyệt (Mẫu 05 → ký → Mẫu 07 gửi → xác nhận; ảnh Mẫu 03): Playwright `tests/e2e/kn-cnts-knqg.spec.ts` (W11.53b).
-Chưa nghiệm thu: nạp Excel điểm/hộ (FN-19 luồng phụ — ticket con của #158), in ảnh thực địa vào Word.
+Nạp Excel điểm/hộ (FN-19 luồng phụ, [giả định W11.53c](../kn/gia-dinh/W11.53c.md)): tệp mẫu, xem trước không ghi, lỗi theo dòng/cột, số mũ/chuỗi dài bị chặn, xã ngoài tỉnh, trùng trong tệp và với dữ liệu đã có, ghi một giao dịch, chủ hộ ở kho định danh, phát lại theo Idempotency-Key — `TestCNTSModelImport_W1153c`, `TestParseScale`, `TestParseSites`, `TestParseHouseholds`, `TestParseLayout`; Vitest `src/kn/cnts/model/import.test.ts`.
+Chưa nghiệm thu: in ảnh thực địa vào Word Mẫu 03, đối chiếu mẫu gốc Mẫu 01.
 
 ## Nhật ký nuôi BM-08/09/19 W11.48
 

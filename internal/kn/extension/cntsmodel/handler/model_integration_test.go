@@ -114,13 +114,15 @@ type fix struct {
 	xa     *xaScopes
 	vault  *clienttest.Fake
 	clk    *clock.Fixed
+	names  *actorNames // W11.53c: tên hiển thị cán bộ (ghép "Cán bộ theo dõi" khi nạp Excel)
 	// sessions là phép chiếu phiên chủ của module (#71: kèm phạm vi quyền FN-14), như assembly API.
 	sessions *authz.SessionRegistry
 }
 
 func newFix(t *testing.T) *fix {
 	env := pgtest.Get(t)
-	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, vault: clienttest.New()}
+	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, vault: clienttest.New(),
+		names: &actorNames{m: map[uuid.UUID]string{}}}
 	f.pool = env.AdminPool(t, migrations.PF)
 	f.clk = clock.NewFixed(t0)
 	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, extension.Deps{Units: units{}})
@@ -132,6 +134,7 @@ func newFix(t *testing.T) *fix {
 	mod.UseCNTSCatalogs(catalogs{})
 	mod.UseXaScopes(f.xa)
 	mod.UseCNTSModelVault(f.vault)
+	mod.UseReportCycle(extension.ReportCycleDeps{Names: f.names})
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 4<<20)
 	mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.knMiddleware(), idempotency.Middleware(ops)))

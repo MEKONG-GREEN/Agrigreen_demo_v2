@@ -1,0 +1,1 @@
+- [ ] BF-SWEEP-KHTC-REMAINING (#206): lát Plan-only CT/DA/nhóm/hạng mục qua route UI-KIT, numeric bounds, cây phiên bản và confirmed ACK/CAS; child225/226 giữ phần còn lại. Chờ đủ bằng chứng và Claude review.
