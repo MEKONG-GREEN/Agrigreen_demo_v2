@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { DataTable } from "@/components/patterns/list";
-import { DEPT_LABEL, ENTRY_KIND_LABEL, TABS, TAB_LABEL, treeRows, vnDecimal, type KhtcPlanEntry, type KhtcTab } from "../api";
+import { DEPT_LABEL, ENTRY_KIND_LABEL, TABS, TAB_LABEL, dmy, treeRows, vnDecimal, type KhtcPlanEntry, type KhtcTab } from "../api";
 
 /** Snapshot order and hierarchy, shared by workspace and immutable saved versions. */
 export function PlanTree({ entries, initialTab = "programs", onTabChange, actions }: { entries: KhtcPlanEntry[]; initialTab?: KhtcTab; onTabChange?: (tab:KhtcTab)=>void; actions?: (entry: KhtcPlanEntry) => ReactNode }) {
@@ -16,7 +16,7 @@ export function PlanTree({ entries, initialTab = "programs", onTabChange, action
       {key:"qty",header:"Khối lượng KH",cell:r=>vnDecimal(r.e.planned_qty)},
       {key:"budget",header:"Kinh phí KH",cell:r=>vnDecimal(r.e.budget)},
       {key:"dept",header:"Phòng phụ trách",cell:r=>DEPT_LABEL[r.e.department_code??""]||r.e.department_code||"—"},
-      {key:"tracking",header:"Theo dõi",cell:r=>r.e.tracking==="stopped"?`Ngừng từ ${r.e.stopped_from}`:"Đang theo dõi"},
+      {key:"tracking",header:"Theo dõi",cell:r=>r.e.tracking==="stopped"?`Ngừng từ ${dmy(r.e.stopped_from)}`:"Đang theo dõi"},
       ...(actions?[{key:"actions",header:"Thao tác",cell:(r:{e:KhtcPlanEntry;depth:number})=>actions(r.e)}]:[]),
     ]} />
   </>;

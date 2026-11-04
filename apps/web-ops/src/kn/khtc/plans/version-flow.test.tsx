@@ -5,7 +5,8 @@ import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetKhtcMock } from "@/api/mock/kn-khtc";
 import { createKhtcApi } from "../api";
 import { PlanWorkspace } from "./PlanWorkspace";
-import { PLAN_BASE, planHref } from "./routes";
+import { PlanTree } from "./PlanTree";
+import { PLAN_BASE, planHref, programHref } from "./routes";
 const nav=vi.hoisted(()=>({path:"/kn/khtc/ke-hoach-nam",search:"year=2030",push:vi.fn()}));
 vi.mock("next/navigation",()=>({usePathname:()=>nav.path,useSearchParams:()=>new URLSearchParams(nav.search),useRouter:()=>({push:nav.push})}));
 const auth:{api:ApiClient|null;context:{context_id:string;role:string;department_code:string;read_only:boolean};principal:{actor_ref:string;tenant_id:string;amr:string[]}}={api:null,context:{context_id:"",role:"admin",department_code:"ke_hoach_tai_chinh",read_only:false},principal:{actor_ref:"one",tenant_id:"one",amr:["mfa"]}};
@@ -58,11 +59,65 @@ function fillDecision(){
   fireEvent.change(screen.getByRole("textbox",{name:/Ngày hiệu lực/}),{target:{value:"2030-07-01"}});
 }
 describe("kế hoạch194 — phiên bản qua route",()=>{
+  it("206 consumes only the acknowledged copy provenance before saving an adjustment",async()=>{
+    vi.setSystemTime(new Date("2031-06-01T09:00:00Z"));resetKhtcMock();nav.search="year=2032";
+    const view=render(<PlanWorkspace/>);
+    fireEvent.click(await screen.findByRole("button",{name:"Sao chép từ năm trước"}));
+    await screen.findByRole("row",{name:/Mô hình lúa chất lượng cao/});
+    fireEvent.click(screen.getByRole("button",{name:"Lưu kế hoạch"}));navigate(view,nav.push.mock.calls.at(-1)![0] as string);
+    fireEvent.click(await screen.findByRole("button",{name:"Lưu phiên bản"}));
+    await waitFor(()=>expect(nav.push).toHaveBeenCalledWith(planHref(PLAN_BASE,2032,"version",1)));
+    expect(writes[0]!.body).toMatchObject({base_version:0,copied_from_year:2031});
+    const api=createKhtcApi(auth.api!);const first=await api.plan(2032,1);
+    expect(first!.version.copied_from_year).toBe(2031);
+    navigate(view,planHref(PLAN_BASE,2032));
+    const row=await screen.findByRole("row",{name:/Mô hình lúa chất lượng cao/});fireEvent.click(within(row).getByRole("button",{name:"Sửa"}));navigate(view,nav.push.mock.calls.at(-1)![0] as string);
+    fireEvent.change(screen.getByRole("textbox",{name:/^Tên/}),{target:{value:"Adjustment after copy206"}});fireEvent.click(screen.getByRole("button",{name:"Lưu vào nháp"}));navigate(view,planHref(PLAN_BASE,2032));
+    fireEvent.click(screen.getByRole("button",{name:"Điều chỉnh theo QĐ"}));navigate(view,nav.push.mock.calls.at(-1)![0] as string);
+    fireEvent.change(screen.getByRole("textbox",{name:/Số quyết định/}),{target:{value:"QĐ206-v2"}});
+    fireEvent.change(screen.getByRole("textbox",{name:/Ngày quyết định/}),{target:{value:"2032-06-01"}});
+    fireEvent.change(screen.getByRole("textbox",{name:/Ngày hiệu lực/}),{target:{value:"2032-07-01"}});
+    fireEvent.click(screen.getByRole("button",{name:"Lưu phiên bản"}));
+    await waitFor(()=>expect(nav.push).toHaveBeenCalledWith(planHref(PLAN_BASE,2032,"version",2)));
+    expect(writes).toHaveLength(2);expect(writes[1]!.body.base_version).toBe(1);expect(writes[1]!.body).not.toHaveProperty("copied_from_year");
+    const second=await api.plan(2032,2);expect(second!.version.copied_from_year).toBeNull();
+    const firstAgain=(await api.plan(2032,1))!;expect(firstAgain.version).toEqual(first!.version);expect(firstAgain.entries).toEqual(first!.entries);
+  });
+  it("206 consumed copy metadata does not survive a late ACK with successor entry edits",async()=>{
+    vi.setSystemTime(new Date("2031-06-01T09:00:00Z"));resetKhtcMock();nav.search="year=2032";
+    const view=render(<PlanWorkspace/>);fireEvent.click(await screen.findByRole("button",{name:"Sao chép từ năm trước"}));await screen.findByRole("row",{name:/Mô hình lúa chất lượng cao/});
+    navigate(view,planHref(PLAN_BASE,2032,"save"));gate=new Promise<void>(resolve=>{release=resolve;});fireEvent.click(screen.getByRole("button",{name:"Lưu phiên bản"}));await waitFor(()=>expect(writes).toHaveLength(1));
+    navigate(view,planHref(PLAN_BASE,2032));const row=await screen.findByRole("row",{name:/Mô hình lúa chất lượng cao/});fireEvent.click(within(row).getByRole("button",{name:"Sửa"}));navigate(view,nav.push.mock.calls.at(-1)![0] as string);
+    fireEvent.change(screen.getByRole("textbox",{name:/^Tên/}),{target:{value:"Copy successor206"}});fireEvent.click(screen.getByRole("button",{name:"Lưu vào nháp"}));navigate(view,planHref(PLAN_BASE,2032));nav.push.mockClear();
+    release!();await waitFor(()=>expect(completedWrites).toBe(1));await act(async()=>{await Promise.resolve();});
+    expect(nav.push).not.toHaveBeenCalled();expect(screen.getByText("Copy successor206")).toBeInTheDocument();
+    navigate(view,planHref(PLAN_BASE,2032,"save"));
+    expect(screen.getByRole("textbox",{name:/Ngày hiệu lực/})).toHaveValue("");
+    fireEvent.change(screen.getByRole("textbox",{name:/Số quyết định/}),{target:{value:"QĐ206-successor"}});
+    fireEvent.change(screen.getByRole("textbox",{name:/Ngày quyết định/}),{target:{value:"2032-06-01"}});fireEvent.change(screen.getByRole("textbox",{name:/Ngày hiệu lực/}),{target:{value:"2032-07-01"}});
+    fireEvent.click(screen.getByRole("button",{name:"Lưu phiên bản"}));await waitFor(()=>expect(completedWrites).toBe(2));
+    expect(writes[1]!.body.base_version).toBe(1);expect(writes[1]!.body).not.toHaveProperty("copied_from_year");
+    const api=createKhtcApi(auth.api!);expect((await api.plan(2032,1))!.entries.some(e=>e.name==="Copy successor206")).toBe(false);expect((await api.plan(2032,2))!.entries.some(e=>e.name==="Copy successor206")).toBe(true);
+  });
+  it("206 lost copy ACK retries the same provenance and key before consuming it",async()=>{
+    vi.setSystemTime(new Date("2031-06-01T09:00:00Z"));resetKhtcMock();nav.search="year=2032";
+    const view=render(<PlanWorkspace/>);fireEvent.click(await screen.findByRole("button",{name:"Sao chép từ năm trước"}));await screen.findByRole("row",{name:/Mô hình lúa chất lượng cao/});navigate(view,planHref(PLAN_BASE,2032,"save"));
+    loseAck=true;fireEvent.click(screen.getByRole("button",{name:"Lưu phiên bản"}));await waitFor(()=>expect(writes).toHaveLength(1));await waitFor(()=>expect(screen.getByRole("button",{name:"Lưu phiên bản"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"Lưu phiên bản"}));await waitFor(()=>expect(nav.push).toHaveBeenCalledWith(planHref(PLAN_BASE,2032,"version",1)));
+    expect(writes).toHaveLength(2);expect(writes[0]!.body.copied_from_year).toBe(2031);expect(writes[1]).toEqual(writes[0]);
+    const api=createKhtcApi(auth.api!);expect((await api.versions(2032)).items).toHaveLength(1);expect((await api.plan(2032,1))!.version.copied_from_year).toBe(2031);
+  });
+  it("206 tree displays stopped dates in the common day/month/year format",async()=>{
+    const plan=(await createKhtcApi(auth.api!).plan(2030))!;
+    render(<PlanTree entries={plan.entries.map(e=>e.kind==="item"?{...e,tracking:"stopped",stopped_from:"2030-03-02"}:e)}/>);
+    expect(screen.getAllByText("Ngừng từ 02/03/2030").length).toBeGreaterThan(0);expect(screen.queryByText("Ngừng từ 2030-03-02")).not.toBeInTheDocument();
+  });
   it("206 late ACK after route ABA updates confirmed base but cannot navigate or recreate a dirty draft",async()=>{
     const view=render(<PlanWorkspace/>);await dirtyPlan(view);navigate(view,planHref(PLAN_BASE,2030,"save"));await screen.findByRole("textbox",{name:/Số quyết định/});fillDecision();
     gate=new Promise<void>(resolve=>{release=resolve;});fireEvent.click(screen.getByRole("button",{name:"Lưu phiên bản"}));await waitFor(()=>expect(writes).toHaveLength(1));
     navigate(view,planHref(PLAN_BASE,2030,"history"));navigate(view,planHref(PLAN_BASE,2030,"save"));nav.push.mockClear();release!();await waitFor(()=>expect(completedWrites).toBe(1));await act(async()=>{await Promise.resolve();});
     expect(nav.push).not.toHaveBeenCalled();expect(screen.getByRole("button",{name:"Lưu phiên bản"})).toBeDisabled();
+    expect(screen.getByRole("textbox",{name:/Số quyết định/})).toHaveValue("");expect(screen.getByRole("textbox",{name:/Ngày quyết định/})).toHaveValue("");
     navigate(view,planHref(PLAN_BASE,2030));expect(screen.getByText("Phiên bản 2/2")).toBeInTheDocument();
   });
   it.each(["actor","tenant","context","role","mfa"])("206 %s identity replacement discards an unfinished form",async kind=>{
@@ -124,6 +179,7 @@ describe("kế hoạch194 — phiên bản qua route",()=>{
     const view=render(<PlanWorkspace/>);const row=await screen.findByRole("row",{name:/Mô hình lúa chất lượng cao/});fireEvent.click(within(row).getByRole("button",{name:"Sửa"}));const edit=nav.push.mock.calls.at(-1)![0] as string;
     auth.context={...auth.context,read_only:true};navigate(view,edit);await screen.findByText(/Chỉ xem nội dung kế hoạch/);
     expect(screen.queryByRole("button",{name:"Lưu vào nháp"})).not.toBeInTheDocument();expect(screen.getByRole("textbox",{name:/^Tên/})).toBeDisabled();
+    navigate(view,programHref(PLAN_BASE,2030,"programs",true));expect(await screen.findByRole("note")).toHaveTextContent("Chỉ xem — không có quyền lập kế hoạch.");expect(screen.queryByRole("button",{name:"Lưu CT/DA chủ"})).not.toBeInTheDocument();
     navigate(view,planHref(PLAN_BASE,2030,"version",1));const table=await screen.findByRole("table",{name:"Các chương trình"});expect(within(table).getByText("Mô hình lúa chất lượng cao")).toBeInTheDocument();
     expect(screen.getAllByRole("tab")).toHaveLength(6);expect(screen.queryByRole("button",{name:"Sửa"})).not.toBeInTheDocument();
   });

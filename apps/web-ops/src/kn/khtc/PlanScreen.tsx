@@ -111,7 +111,7 @@ function Editor({
 }) {
   const api = useKhtcApi();
   const [entries, setEntries] = useState<KhtcPlanEntry[]>(data.plan?.entries ?? []);
-  const [copiedFrom, setCopiedFrom] = useState<number | undefined>(undefined);
+  const [copiedFrom, setCopiedFrom] = useState<{ year: number } | undefined>(undefined);
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState<KhtcTab>("programs");
   const [drafts,setDrafts]=useState<Record<string,EntryDraft>>({});
@@ -160,7 +160,7 @@ function Editor({
   const copyPrev = async () => {
     const d = await act.run(() => api.copyDraft(year), (r) => `Đã chép ${r.entries.length} dòng còn theo dõi của năm ${r.from_year} (bản nháp — chưa lưu)`);
     if (d) {
-      setCopiedFrom(year - 1);
+      setCopiedFrom({ year: year - 1 });
       change(d.entries);
     }
   };
@@ -202,14 +202,20 @@ function Editor({
         saving.current = true;
         const scope = epoch.current;
         const submittedRevision=revision.current;const submittedRoute=currentRoute.current;
+        const submittedCopy=copiedFrom;
+        const body=toSave(entries,{base_version:plan?.latest_version??0,copied_from_year:submittedCopy?.year,...head});
         try {
-          const saved = await act.run(() => api.save(year, toSave(entries, { base_version: plan?.latest_version ?? 0, copied_from_year: copiedFrom, ...head })), p => `Đã lưu phiên bản ${p.version.version}`);
+          const saved = await act.run(() => api.save(year, body), p => `Đã lưu phiên bản ${p.version.version}`);
           if (saved && scope.active) {
             // Only our confirmed result may advance the CAS base. A changed route suppresses navigation,
             // but must not strand the still-live workspace on the old base or discard later local edits.
             setPlan(saved);setProblems([]);
             if(revision.current===submittedRevision){setEntries(saved.entries);setDirty(false);}
-            if(currentRoute.current===submittedRoute){setSaveHead(newVersionHead(year,true));route.go(planHref(route.base,year,"version",saved.version.version));}
+            // Consume only metadata from this confirmed request, even after route changes.
+            // Object identity preserves a later copy/head intent, including same-value ABA.
+            if(body.copied_from_year!==undefined)setCopiedFrom(current=>current===submittedCopy?undefined:current);
+            setSaveHead(current=>current===head?newVersionHead(year,true):current);
+            if(currentRoute.current===submittedRoute)route.go(planHref(route.base,year,"version",saved.version.version));
             reload();
           }
         } finally { saving.current = false; }
