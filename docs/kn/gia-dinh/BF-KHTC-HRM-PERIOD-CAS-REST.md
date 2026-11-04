@@ -10,9 +10,9 @@ Close yêu cầu phiên hiện tại hợp lệ và MFA. Intent ràng buộc ten
 
 ### Sở hữu và đối soát
 
-Intent được ghi trước I/O; pha dispatched được ghi trước Execute. Intent đang chờ dùng cùng khóa tài nguyên với deadline #209. Reservation phía báo cáo lấy cùng khóa snapshot với Cancel và không tự hết hạn khi kết quả chưa biết. Cancel thắng khoảng trống trước reservation thì Close kết thúc bằng bằng chứng chưa gọi native; Close thắng thì chặn Cancel, Final mới và snapshot mới. Final trước reservation vẫn được phép.
+Các đọc điều kiện Get/ControlSnapshot diễn ra trước PREPARE. Intent và pha dispatched được ghi trước Execute gây hiệu ứng native. Intent đang chờ dùng cùng khóa tài nguyên với deadline #209. Reservation phía báo cáo lấy cùng khóa snapshot với Cancel và không tự hết hạn khi kết quả chưa biết. Cancel thắng khoảng trống trước reservation thì Close kết thúc bằng bằng chứng chưa gọi native Execute/chưa gây hiệu ứng native; Close thắng thì chặn Cancel, Final mới và snapshot mới. Final trước reservation vẫn được phép.
 
-Mỗi operation chỉ được Execute một lần sau khi thắng chuyển pha. Retry của dispatched/unresolved chỉ Read receipt gốc. Mất ACK không có nghĩa rollback, không cấp Expected mới, không undo mù, không đổi operation ID để vượt xung đột. Receipt chưa biết giữ reservation và chặn hành động cạnh tranh.
+Mỗi operation chỉ được Execute một lần sau khi thắng chuyển pha. Retry của dispatched/unresolved chỉ Read receipt gốc. Mất ACK không có nghĩa rollback, không cấp Expected mới, không undo mù, không đổi operation ID để vượt xung đột. Receipt chưa biết giữ reservation và chặn hành động cạnh tranh. Policy owner từ chối intent rejected, kể cả public Execute giữ command gốc; unresolved vẫn được Read để đối soát.
 
 Receipt applied với SnapshotID/No/hash riêng được lưu trước hydration. Hydration dùng ControlSnapshot trước/sau public Progress; cả hai revision phải trùng own Applied và kỳ đã đóng. Submit đã nhận và Review bị native khóa sau Close. Bản offline giữ lại vẫn có thể đổi nhãn hiển thị thô; không coi toàn bộ Progress bất biến. Dữ liệu được dùng để chiếu kết quả là head bài đã nhận, phiên bản, quyết định, thời điểm và metadata; không biến bản offline giữ lại thành bài đã nộp. Thay đổi revision/successor trong hydration khiến thao tác chưa đối soát, không lấy Get mới làm kết quả của thao tác cũ.
 

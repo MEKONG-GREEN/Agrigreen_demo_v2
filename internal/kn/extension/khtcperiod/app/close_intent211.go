@@ -161,7 +161,7 @@ func (s *Service) CloseOperationPolicy211(ctx context.Context, p authz.Principal
 	if err != nil {
 		return deny, err
 	}
-	if v == nil || v.Phase == "prepared" {
+	if v == nil || v.Phase == "prepared" || v.Phase == "rejected" {
 		return deny, problem.Forbidden
 	}
 	c, err := s.closeCurrent211(ctx, *v)

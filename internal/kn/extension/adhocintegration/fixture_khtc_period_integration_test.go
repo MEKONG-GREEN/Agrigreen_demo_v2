@@ -93,7 +93,7 @@ func (f *khtcFx) doMFA(method, path, role, dept string, actor uuid.UUID, idem st
 	return f.doWithMFA211(method, path, role, dept, actor, idem, body, true)
 }
 func (f *khtcFx) khtcMFA(method, path string, actor uuid.UUID, idem string, body any) (int, []byte) {
-	return f.doMFA(method, "/v1/kn/khtc"+path, authz.KNTinh, khtcDept, actor, idem, body)
+	return f.doMFA(method, "/v1/extension/khtc"+path, authz.KNTinh, khtcDept, actor, idem, body)
 }
 func (f *khtcFx) doWithMFA211(method, path, role, dept string, actor uuid.UUID, idem string, body any, mfa bool) (int, []byte) {
 	f.t.Helper()

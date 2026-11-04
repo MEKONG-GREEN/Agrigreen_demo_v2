@@ -121,7 +121,7 @@ func TestClose211AdhocAcceptedSubmissionAfterGetUsesOwnedRequestProjection(t *te
 		t.Fatal("stored adhoc outcome changed")
 	}
 }
-func seedFinal211(t *testing.T, f *deadlineFx209, ctx context.Context, id uuid.UUID) {
+func seedExport211(t *testing.T, f *deadlineFx209, ctx context.Context, id uuid.UUID) uuid.UUID {
 	t.Helper()
 	content := rd.Draft{}
 	hash := strings.Repeat("a", 64)
@@ -135,10 +135,40 @@ func seedFinal211(t *testing.T, f *deadlineFx209, ctx context.Context, id uuid.U
 		if err := rs.InsertExport(ctx, tx, f.tid, &export, "export211"); err != nil {
 			return err
 		}
-		return rs.InsertFinal(ctx, tx, f.tid, rs.Final{ID: uuid.New(), PeriodID: id, ExportID: export.ID, ActorRef: f.actor, At: f.clk.Now()}, "final211")
+		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
+	return export.ID
+}
+func assertFinalCount211(t *testing.T, f *deadlineFx209, ctx context.Context, id uuid.UUID, want int) {
+	t.Helper()
+	var count int
+	err := tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT count(*) FROM pf_extension.khtc_report_final WHERE tenant_id=$1 AND period_id=$2`, f.tid, id).Scan(&count)
+	})
+	if err != nil || count != want {
+		t.Fatalf("report Final count=%d want=%d error=%v", count, want, err)
+	}
+}
+func seedFinal211(t *testing.T, f *deadlineFx209, ctx context.Context, id uuid.UUID) {
+	t.Helper()
+	exportID := seedExport211(t, f, ctx, id)
+	assertFinalCount211(t, f, ctx, id, 0)
+	err := tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
+		reserved, e := rs.CloseReserved211(ctx, tx, f.tid, id)
+		if e != nil {
+			return e
+		}
+		if reserved {
+			return errors.New("positive first Final control unexpectedly has a Close reservation")
+		}
+		return rs.InsertFinal(ctx, tx, f.tid, rs.Final{ID: uuid.New(), PeriodID: id, ExportID: exportID, ActorRef: f.actor, At: f.clk.Now()}, "final211")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertFinalCount211(t, f, ctx, id, 1)
 }
 func TestClose211NormalCloseWithExistingFinal(t *testing.T) {
 	f := newDeadlineFx209(t)
@@ -165,17 +195,14 @@ func TestClose211ReservedBlocksNewFinalAndSnapshotSQL(t *testing.T) {
 	id := uuid.MustParse(p.ID)
 	f.clk.Advance(p.DueAt.Sub(f.clk.Now()) + 4*24*time.Hour)
 	svc, ctx := closeConsumer211(t, f, f.fm.ConditionalControl())
-	seedFinal211(t, f, ctx, id)
+	exportID := seedExport211(t, f, ctx, id)
+	assertFinalCount211(t, f, ctx, id, 0)
 	probe := &receiptProbe211{PeriodOperations: svc.Operations}
 	probe.before = func(_ context.Context, _ fp.PeriodOperationRequest) {
 		for _, kind := range []string{"final", "snapshot"} {
 			err := tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
 				if kind == "final" {
-					var export uuid.UUID
-					if e := tx.QueryRow(ctx, `SELECT export_id FROM pf_extension.khtc_report_final WHERE tenant_id=$1 AND period_id=$2 LIMIT 1`, f.tid, id).Scan(&export); e != nil {
-						return e
-					}
-					return rs.InsertFinal(ctx, tx, f.tid, rs.Final{ID: uuid.New(), PeriodID: id, ExportID: export, ActorRef: f.actor, At: f.clk.Now()}, "foreign-final211")
+					return rs.InsertFinal(ctx, tx, f.tid, rs.Final{ID: uuid.New(), PeriodID: id, ExportID: exportID, ActorRef: f.actor, At: f.clk.Now()}, "foreign-final211")
 				}
 				_, e := tx.Exec(ctx, `INSERT INTO pf_extension.khtc_snapshot (id,tenant_id,stream_key,period_id,period_from,period_to,window_from,target_calendar_id,target_calendar_version,target_rule,crosswalk_version,closed,figures_hash,status_hash,row_count,value_count,change_count,event_time,actor_ref,idem_key,rule_version) VALUES($1,$2,'khtc_snapshot:'||$3::uuid::text,$3,'2026-10-01','2026-10-07','2026-01-01','test211',1,'test211','test211',true,$4,$4,0,0,0,$5,$6,'foreign-snapshot211','test211')`, uuid.New(), f.tid, id, strings.Repeat("a", 64), f.clk.Now(), f.actor)
 				return e
@@ -190,6 +217,7 @@ func TestClose211ReservedBlocksNewFinalAndSnapshotSQL(t *testing.T) {
 	if _, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "reserved-sql211"); err != nil {
 		t.Fatal(err)
 	}
+	assertFinalCount211(t, f, ctx, id, 0)
 	if probe.calls != 1 {
 		t.Fatal("native dispatch count changed")
 	}
@@ -545,7 +573,7 @@ func (g closeGuardHook211) BeginClose211(ctx context.Context, id, op, event uuid
 	g.before()
 	return g.CloseGuard211.BeginClose211(ctx, id, op, event)
 }
-func TestClose211CancelWinsBeforeReservationHasNoNativeIO(t *testing.T) {
+func TestClose211CancelWinsBeforeReservationHasNoNativeEffect(t *testing.T) {
 	f := newDeadlineFx209(t)
 	p := f.open209()
 	id := uuid.MustParse(p.ID)
@@ -571,7 +599,35 @@ func TestClose211CancelWinsBeforeReservationHasNoNativeIO(t *testing.T) {
 	_, err := svc.Close(ctx, id, "Đóng kỳ ngoại lệ đủ lý do", "cancel-wins211")
 	assertConflict209(t, err)
 	if phaseClose211(t, f) != "rejected" || probe.calls != 0 || probe.reads != 0 {
-		t.Fatal("Cancel won but Close called native or retained uncertain phase")
+		t.Fatal("Cancel won but Close dispatched a native command or retained uncertain phase")
+	}
+	// A valid original command is not authority after its owner has rejected it.
+	var data struct {
+		Native fp.PeriodOperationRequest `json:"native"`
+	}
+	var payload []byte
+	err = tenant.WithTenantTx(ctx, f.roleDB, f.tid, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT payload FROM pf_extension.khtc_close_intent211 WHERE tenant_id=$1 AND period_id=$2 ORDER BY seq DESC LIMIT 1`, f.tid, id).Scan(&payload)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(payload, &data); err != nil {
+		t.Fatal(err)
+	}
+	before, err := f.fm.ConditionalControl().ControlSnapshot(ctx, "kn_khtc", uuid.MustParse(p.FormsPeriodID))
+	if err != nil || before.Revision != data.Native.Expected {
+		t.Fatal("rejected command fixture is not otherwise valid at its original native revision")
+	}
+	beforeOutbox := f.outboxCount209(t)
+	receipt, err := f.fm.PeriodOperations().ExecutePeriodOperation(ctx, data.Native)
+	var denied *problem.Problem
+	if !errors.As(err, &denied) || denied.Status != http.StatusForbidden {
+		t.Fatalf("rejected owner intent must deny public Execute403: outcome=%s err=%v", receipt.Outcome, err)
+	}
+	after, err := f.fm.ConditionalControl().ControlSnapshot(ctx, "kn_khtc", uuid.MustParse(p.FormsPeriodID))
+	if err != nil || after.Revision != before.Revision || after.Progress.Status != "open" || f.outboxCount209(t) != beforeOutbox || phaseClose211(t, f) != "rejected" {
+		t.Fatal("rejected owner policy allowed a native effect")
 	}
 	native, err := f.fm.ConditionalControl().ControlSnapshot(ctx, "kn_khtc", uuid.MustParse(p.FormsPeriodID))
 	if err != nil || native.Progress.Status != "open" {
