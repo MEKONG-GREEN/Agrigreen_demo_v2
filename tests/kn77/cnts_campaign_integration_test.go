@@ -78,7 +78,7 @@ func (f *aggFx) campaignCall(method, path, role string, manager bool, body any) 
 
 func TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150(t *testing.T) {
 	f := newAggFx(t, facilityDir{}, func(fm *forms.Module, kn *extension.Module) {
-		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Figures: fm.Figures()})
+		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Conditional: fm.ConditionalControl(), Figures: fm.Figures()})
 	})
 	// k_ref.org: Nút TTKN tỉnh 89 của phiên Cấp Tỉnh (view pf_forms_pub lấy tỉnh của kỳ native từ Nút phát hành).
 	ctx := context.Background()
