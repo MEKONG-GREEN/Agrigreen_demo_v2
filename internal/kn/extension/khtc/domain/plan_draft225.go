@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"strings"
 )
 
 // Bound resource work before EntriesHash invokes Decimal.String, even for direct callers.
@@ -45,7 +46,9 @@ func CheckDraftResource225(es []Entry) error {
 			name, value string
 			max         int
 		}{{"code", e.Code, 160}, {"name", e.Name, 4000}, {"unit_code", e.UnitCode, 160}, {"scale_note", e.ScaleNote, 4000}, {"funding_code", e.FundingCode, 160}, {"field_code", e.FieldCode, 160}, {"department_code", e.Department, 160}, {"data_source", e.DataSource, 40}, {"source_key", e.SourceKey, 400}, {"stop_decision", e.StopDecision, 400}, {"note", e.Note, 8000}} {
-			if len(t.value) > t.max {
+			if strings.IndexByte(t.value, 0) >= 0 {
+				bad.add(f(t.name), "không nhận ký tự NUL")
+			} else if len(t.value) > t.max {
 				bad.add(f(t.name), "nội dung vượt giới hạn")
 			}
 		}
@@ -53,7 +56,7 @@ func CheckDraftResource225(es []Entry) error {
 			bad.add(f("communes"), "tối đa 500 xã")
 		}
 		for _, c := range e.Communes {
-			if len(c) > 40 {
+			if strings.IndexByte(c, 0) >= 0 || len(c) > 40 {
 				bad.add(f("communes"), "mã xã vượt giới hạn")
 				break
 			}
@@ -65,7 +68,7 @@ func CheckDraftResource225(es []Entry) error {
 	return nil
 }
 func DraftRequestHash225(year int, generation uuid.UUID, revision int64, action, note string, es []Entry) ([]byte, error) {
-	if len(note) > 4000 {
+	if len(note) > 4000 || strings.IndexByte(note, 0) >= 0 {
 		return nil, errors.New("draft note resource bound")
 	}
 	if err := CheckDraftResource225(es); err != nil {

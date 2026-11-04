@@ -42,3 +42,16 @@ func TestDraft225BoundsBeforeHash(t *testing.T) {
 		})
 	}
 }
+
+func TestDraft225NULRejectedBeforeHash(t *testing.T) {
+	for name, input := range map[string]struct {
+		note    string
+		entries []domain.Entry
+	}{"note": {note: "bad\x00note"}, "entry": {entries: []domain.Entry{{Name: "bad\x00name"}}}, "commune": {entries: []domain.Entry{{Communes: []string{"X\x001"}}}}} {
+		t.Run(name, func(t *testing.T) {
+			if hash, err := domain.DraftRequestHash225(2030, uuid.Nil, 0, "create", input.note, input.entries); err == nil || hash != nil {
+				t.Fatal("NUL reached request hashing instead of validation")
+			}
+		})
+	}
+}
