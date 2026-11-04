@@ -22,6 +22,8 @@ Cửa sổ đọc là kiểu tính toán riêng, không phải `ps.Period`. Core
 
 Phiếu được đọc qua cổng native và xác minh bảng niêm phong, phòng/kỳ, hash nội dung; chỉ các kỳ tuần thật chưa hủy đủ ngày được chọn trước giới hạn truy vấn. Nguồn đọc qua `KHTCSources`, tái dùng `EvaluateAt` và số tuần đã đóng; I/O port ở ngoài transaction. Không gọi Refresh và không tạo snapshot trên GET. Quyền đọc hiện tại giữ nguyên KHTC/Admin; không mở quyền PN hay archive.
 
+Giao diện tạo tài nguyên đọc mới khi đổi route, bộ lọc hoặc quyền hiện hành (actor, tenant, assignment/context, role/phạm vi, MFA, trạng thái phiên, mục tiêu hỗ trợ, API object). Dữ liệu và danh mục cũ bị gỡ ngay; kết quả muộn thuộc tài nguyên đã hủy không được đưa vào lần A mới sau A→B→A. Lý do hỗ trợ chỉ là văn bản audit, không làm đổi quyền hay tạo hàng loạt GET. Quyết định cho phép đọc vẫn ở API; không suy ra quyền mới từ tên phòng hay dữ liệu cũ.
+
 ## Kiểm chứng bắt buộc
 
 Golden cố định cho Compose cũ bảo vệ JSON byte/hash; test live so cùng dòng Mẫu 5 thật; native no-period RED→GREEN, sealed/sent vs draft/returned, canceled/future/cross-tenant/cutoff, nguồn công bố/chốt thật, hơn 10.000 metadata không liên quan, và counters no-write. Các cổng web/Go/native, controlled negative, E2E giờ giả lập và CI đúng SHA phải xanh trước gửi Claude review. Tài liệu này không tự xác nhận các cổng chưa chạy.

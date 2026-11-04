@@ -43,8 +43,12 @@ for(const clock of ["2026-10-13T03:00:00Z","2026-10-13T16:59:59Z"]) {
   await normalKhtc202(page);
   const writes:string[]=[];
   page.on("request",request=>{const u=new URL(request.url());if(u.pathname.includes("/khtc/")&&request.method()!=="GET")writes.push(request.method()+" "+u.pathname);});
-  const next=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&r.request().method()==="GET");
   await sidebar(page).getByRole("link",{name:"Trang chủ phòng",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Trang chủ tổng hợp KHTC",exact:true})).toBeVisible();
+  // Login may already land on this route; request a real reload rather than
+  // assuming navigation to the current page always starts another GET.
+  const next=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&r.request().method()==="GET");
+  await page.getByRole("button",{name:"Làm mới",exact:true}).click();
   const initial=await (await next).json() as Dashboard;
   await expect(page.getByRole("heading",{name:"Trang chủ tổng hợp KHTC",exact:true})).toBeVisible();
   expect(initial.progress_period).toBeNull();

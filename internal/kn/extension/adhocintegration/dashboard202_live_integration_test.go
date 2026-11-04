@@ -25,11 +25,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func dashboard202Ledger(t *testing.T, f *reportFx) [6]int64 {
+func dashboard202Ledger(t *testing.T, f *reportFx) [8]int64 {
 	t.Helper()
 	pool := db.ForModule(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), extension.DBModule)
 	ctx := adhocOwnerContext(t, f, authz.KNTinh, khtcDept, f.khtcUser, false, false, uuid.Nil)
-	var counts [6]int64
+	var counts [8]int64
 	err := tenant.WithTenantTx(ctx, pool, f.tid, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT
 		 (SELECT count(*) FROM pf_extension.khtc_period),
@@ -37,7 +37,9 @@ func dashboard202Ledger(t *testing.T, f *reportFx) [6]int64 {
 		 (SELECT count(*) FROM pf_extension.khtc_snapshot),
 		 (SELECT count(*) FROM pf_extension.khtc_report_draft),
 		 (SELECT count(*) FROM pf_extension.khtc_report_export),
-		 (SELECT count(*) FROM pf_extension.khtc_form_sheet)`).Scan(&counts[0], &counts[1], &counts[2], &counts[3], &counts[4], &counts[5])
+		 (SELECT count(*) FROM pf_extension.khtc_form_sheet),
+		 (SELECT count(*) FROM pf_extension.khtc_plan_version),
+		 (SELECT count(*) FROM pf_extension.khtc_plan_entry)`).Scan(&counts[0], &counts[1], &counts[2], &counts[3], &counts[4], &counts[5], &counts[6], &counts[7])
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -177,7 +179,14 @@ func TestDashboard202ActualPublicClosedSourcesAndCutoff(t *testing.T) {
 	if future.ProgressWindow != nil || len(reader.queries) != beforeCalls {
 		t.Fatal("future empty quarter read sources or invented window")
 	}
-	for _, raw := range []string{"through_date=1e100000", "through_date=1e-100000", "through_date=" + strings.Repeat("9", 100000), "year=" + strings.Repeat("9", 100000), "quarter=1e100000", "quarter=1e-100000", "through_date=2026-11-31", "through_date=2026-10-13&through_date=2026-10-06"} {
+	beforePlanless := dashboard202Ledger(t, f)
+	code, body = f.khtc(http.MethodGet, "/dashboard?year=2025&quarter=4", f.khtcUser, "", nil)
+	var planless report.Dashboard
+	f.ok(code, body, &planless)
+	if planless.ProgressWindow == nil || planless.ProgressWindow.PlanVersionID != nil || len(planless.Progress.Rows) != 0 || planless.Counts.Items != 0 || dashboard202Ledger(t, f) != beforePlanless {
+		t.Fatal("historical no-plan window invented a plan/item/write")
+	}
+	for _, raw := range []string{"through_date=1e100000", "through_date=1e-100000", "through_date=" + strings.Repeat("9", 100000), "year=" + strings.Repeat("9", 100000), "year=1e100000", "year=1e-100000", "quarter=1e100000", "quarter=1e-100000", "quarter=" + strings.Repeat("9", 100000), "through_date=2026-11-31", "through_date=2026-10-13&through_date=2026-10-06"} {
 		code, body = f.khtc(http.MethodGet, "/dashboard?"+raw, f.khtcUser, "", nil)
 		if code != 422 {
 			t.Fatalf("hostile query admitted %d (body omitted)", code)
@@ -290,4 +299,9 @@ func TestDashboard202DraftReturnedCancelledFutureAndMetadata(t *testing.T) {
 		}
 	}
 	read("9", false)
+	code, body = f.khtc(http.MethodPost, "/periods/"+week.ID+"/forms/"+dTT+"/review", f.khtcUser, "", map[string]any{"decision": "returned", "note": "Xác minh giá trị 0 thực tế dashboard202"})
+	f.ok(code, body, nil)
+	code, body = f.send(week.ID, dTT, "submit", 2, ttSheet(f.item, "0"))
+	f.ok(code, body, nil)
+	read("0", false)
 }
