@@ -117,6 +117,16 @@ test("Archive199 Word đã lưu và ZIP Word/Excel giữ nguyên byte",async({pa
  await expect(page.getByText(`Kỳ: ${reportName}`,{exact:true})).toBeVisible();
  const table=page.getByRole("table",{name:"Báo cáo đã xuất",exact:true});
  await expect(table.getByRole("cell",{name:reportName,exact:true})).toBeVisible();
+ // #205: this existing mock capture freezes no plan entries; retain the file
+ // explicitly as unknown rather than inferring a field from its department.
+ await expect(table.getByRole("cell",{name:/Chưa rõ metadata$/})).toBeVisible();
+ await page.getByRole("button",{name:"Chọn lĩnh vực",exact:true}).click();
+ const fieldPicker=page.getByRole("region",{name:"Chọn lĩnh vực đã xuất",exact:true});
+ await expect(fieldPicker).toContainText("Không có mã lĩnh vực trong bộ lọc hiện tại.");
+ await fieldPicker.getByRole("button",{name:"Đóng chọn lĩnh vực",exact:true}).click();
+ await page.getByLabel("Metadata lĩnh vực",{exact:true}).selectOption("unknown");
+ await expect(table.getByRole("cell",{name:reportName,exact:true})).toBeVisible();
+ await page.screenshot({path:test.info().outputPath("archive205-unknown-fields.png"),fullPage:true});
  const downloadWait=page.waitForEvent("download");
  await table.getByRole("button",{name:`Tải Excel ${reportName} v1`,exact:true}).click();
  const archived=await downloadWait;
@@ -129,6 +139,7 @@ test("Archive199 Word đã lưu và ZIP Word/Excel giữ nguyên byte",async({pa
  await expect(page.getByRole("complementary",{name:"Log xuất Word"})).toContainText("Xuất Word lần 1");
  await page.getByRole("button",{name:"Thông tin Word lần 1",exact:true}).click();
  await expect(page.getByRole("region",{name:"Thông tin Word lần 1"})).toContainText("SHA-256 tệp");
+ await expect(page.getByText("Lĩnh vực: — · Chưa rõ metadata",{exact:true})).toBeVisible();
  const boundWait=page.waitForEvent("download");await page.getByRole("button",{name:"Tải Word lần 1",exact:true}).click();
  expect(await readFile((await (await boundWait).path())!)).toEqual(originalWord);
  await page.getByRole("checkbox",{name:"Chọn Word lần 1",exact:true}).check();

@@ -22,13 +22,14 @@ import (
 
 // KHTCDeps là port của module khác cho Kỳ KHTC. Forms, Control bắt buộc; còn lại tùy chọn (xem extension/port/khtc.go).
 type KHTCDeps struct {
-	Forms       formsport.Publisher
-	Control     formsport.PeriodControl
-	Entry       formsport.Entry // W11.63: nhập, rà soát phiếu (thiếu → route phiếu trả 503)
-	Departments partyport.Departments
-	Crosswalk   port.KHTCSourceCrosswalk // gói PFPUB (bộ quy đổi kỳ nguồn)
-	Plan        port.KHTCPlanDepartments // W11.61 (phòng phụ trách theo Kế hoạch năm)
-	Reports     port.KHTCReportStates    // KH6 (Bản cuối chặn hủy kỳ)
+	Forms              formsport.Publisher
+	Control            formsport.PeriodControl
+	ConditionalControl formsport.ConditionalPeriodControl
+	Entry              formsport.Entry // W11.63: nhập, rà soát phiếu (thiếu → route phiếu trả 503)
+	Departments        partyport.Departments
+	Crosswalk          port.KHTCSourceCrosswalk // gói PFPUB (bộ quy đổi kỳ nguồn)
+	Plan               port.KHTCPlanDepartments // W11.61 (phòng phụ trách theo Kế hoạch năm)
+	Reports            port.KHTCReportStates    // KH6 (Bản cuối chặn hủy kỳ)
 	// MaxSubmissions: số lần gửi tối đa mặc định của phiếu (= KNKHTCProfile.MaxSubmissions; tham số
 	// extension.khtc_max_submissions ghi đè theo tenant).
 	MaxSubmissions int
@@ -81,6 +82,7 @@ func (m *Module) khtcSvc() *khtcpapp.Service {
 func (m *Module) UseKHTCPeriods(d KHTCDeps) {
 	s := m.khtcSvc()
 	s.Forms, s.Control, s.MaxSubmissions = d.Forms, d.Control, d.MaxSubmissions
+	s.ConditionalControl = d.ConditionalControl
 	if d.Entry != nil {
 		m.khtcFormSvc().Entry = d.Entry
 		if m.khtcReports != nil {

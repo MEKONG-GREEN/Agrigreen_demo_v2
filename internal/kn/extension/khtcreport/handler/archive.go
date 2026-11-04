@@ -11,7 +11,20 @@ import (
 )
 
 func (h Handler) archive(c *gin.Context) {
-	q := app.ArchiveQuery{Kind: c.Query("kind"), Search: c.Query("q"), Limit: 20}
+	q := app.ArchiveQuery{Kind: c.Query("kind"), Search: c.Query("q"), DocumentSearch: c.Query("document_q"), After: c.Query("after"), Limit: 20}
+	field, fieldErr := archiveFieldQuery(c.Request.URL.Query())
+	if fieldErr != nil {
+		httpx.Fail(c, fieldErr)
+		return
+	}
+	q.Field = field.Code
+	q.FieldStatus = field.Status
+	for _, key := range []string{"year", "kind", "q", "document_q", "after", "versions", "period_id", "offset", "limit"} {
+		if len(c.Request.URL.Query()[key]) > 1 {
+			httpx.Fail(c, app.ErrInvalid)
+			return
+		}
+	}
 	if raw := c.Query("period_id"); raw != "" {
 		// No alternate UUID representations or nil sentinel are accepted from clients.
 		id, err := uuid.Parse(raw)
@@ -57,6 +70,16 @@ func (h Handler) archive(c *gin.Context) {
 		q.AllVersions = true
 	default:
 		httpx.Fail(c, app.ErrInvalid)
+		return
+	}
+	if strings.HasSuffix(c.FullPath(), "/exported-reports/fields") {
+		out, err := h.Svc.ArchiveFields(c.Request.Context(), q)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		c.Header("Cache-Control", "no-store")
+		c.JSON(http.StatusOK, out)
 		return
 	}
 	if strings.HasSuffix(c.FullPath(), "/exported-reports/periods") {
