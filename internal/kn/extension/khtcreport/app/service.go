@@ -125,6 +125,8 @@ func classify(err error) error {
 			return ErrFinal
 		case "khtc_report_cancelled":
 			return ErrCancelled
+		case "khtc_report_closing211":
+			return ErrClosing211
 		case "khtc_report_cancelling":
 			return ErrCancelling
 		case "khtc_report_export_draft":

@@ -183,7 +183,10 @@ func TestKH_UR_TI_13_RefreshOwnerOnlyDiffHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	kn := extension.New(pool, clk, extension.Deps{})
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Operations: fm.PeriodOperations(), MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
+	if err := fm.UsePeriodOperationPolicy(platformasm.KNKHTCProfile.Name, kn.KHTCCloseOperationPolicy211()); err != nil {
+		t.Fatal(err)
+	}
 	src := &goldenReader{}
 	kn.UseKHTCSourceReader(src)
 	f := &khtcFx{t: t, clk: clk, tid: ids.New(), node: ids.New()}
@@ -192,7 +195,7 @@ func TestKH_UR_TI_13_RefreshOwnerOnlyDiffHistory(t *testing.T) {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
-		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k})))
+		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k, MFA: c.GetHeader("X-Test-MFA") == "true"})))
 		c.Request = c.Request.WithContext(tenant.WithID(c.Request.Context(), f.tid))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
@@ -275,7 +278,7 @@ func TestKH_UR_TI_13_RefreshOwnerOnlyDiffHistory(t *testing.T) {
 		if cum, _, _, _, _ := s.value(t, keyLuaTD); !cum.Equal(decimal.NewFromInt(3050)) {
 			t.Fatalf("W48: %+v", s.Values)
 		}
-		c, b := f.khtc(http.MethodPost, "/periods/"+pw48+"/close", me, "", map[string]any{"reason": "Phòng chưa gửi phiếu, đóng ngoại lệ tuần 48"})
+		c, b := f.khtcMFA(http.MethodPost, "/periods/"+pw48+"/close", me, "", map[string]any{"reason": "Phòng chưa gửi phiếu, đóng ngoại lệ tuần 48"})
 		f.ok(c, b, nil)
 		c, b = f.khtc(http.MethodPost, "/periods/"+pw48+"/sources/refresh", me, "", nil)
 		f.fail(c, b, "extension.khtc_period_terminal")

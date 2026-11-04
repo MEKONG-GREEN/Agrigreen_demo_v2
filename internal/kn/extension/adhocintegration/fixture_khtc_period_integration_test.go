@@ -87,6 +87,15 @@ type khtcFx struct {
 
 // do gọi API như phiên (vai, phòng ban, người); idem rỗng → khóa mới. Trả mã HTTP và thân.
 func (f *khtcFx) do(method, path, role, dept string, actor uuid.UUID, idem string, body any) (int, []byte) {
+	return f.doWithMFA211(method, path, role, dept, actor, idem, body, false)
+}
+func (f *khtcFx) doMFA(method, path, role, dept string, actor uuid.UUID, idem string, body any) (int, []byte) {
+	return f.doWithMFA211(method, path, role, dept, actor, idem, body, true)
+}
+func (f *khtcFx) khtcMFA(method, path string, actor uuid.UUID, idem string, body any) (int, []byte) {
+	return f.doMFA(method, "/v1/kn/khtc"+path, authz.KNTinh, khtcDept, actor, idem, body)
+}
+func (f *khtcFx) doWithMFA211(method, path, role, dept string, actor uuid.UUID, idem string, body any, mfa bool) (int, []byte) {
 	f.t.Helper()
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
@@ -104,6 +113,9 @@ func (f *khtcFx) do(method, path, role, dept string, actor uuid.UUID, idem strin
 		actor = ids.New()
 	}
 	req.Header.Set("X-Test-Actor", actor.String())
+	if mfa {
+		req.Header.Set("X-Test-MFA", "true")
+	}
 	if method == http.MethodPost {
 		if idem == "" {
 			idem = "t-" + ids.New().String()

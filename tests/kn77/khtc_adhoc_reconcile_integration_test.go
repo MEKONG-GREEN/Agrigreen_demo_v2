@@ -50,7 +50,7 @@ func (e *adhocUncertainEntry) Submit(ctx context.Context, profile string, id uui
 	return out, err
 }
 func (f *reportFx) replaceEntry(entry formsport.Entry) {
-	f.ext.UseKHTCPeriods(extension.KHTCDeps{Forms: f.nativeForms, Control: f.nativeControl, Entry: entry, MaxSubmissions: 3})
+	f.ext.UseKHTCPeriods(extension.KHTCDeps{Forms: f.nativeForms, Control: f.nativeControl, ConditionalControl: f.nativeConditional, Operations: f.nativeOperations, Entry: entry, MaxSubmissions: 3})
 }
 func TestW1168ReconcileLostNativeResponses(t *testing.T) {
 	for _, mode := range []string{"before-return", "after-return", "after-submit"} {
@@ -132,7 +132,7 @@ func TestW1168RequestCloseRaceNeverReopensNative(t *testing.T) {
 		t.Fatal("Return did not start")
 	}
 	f.clk.Advance(11 * 24 * time.Hour)
-	c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{"reason": "Đóng kỳ ngoại lệ theo quyết định chỉ đạo"})
+	c, b = f.khtcMFA(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{"reason": "Đóng kỳ ngoại lệ theo quyết định chỉ đạo"})
 	f.ok(c, b, nil)
 	close(e.reviewRelease)
 	select {

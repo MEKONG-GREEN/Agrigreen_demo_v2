@@ -37,7 +37,7 @@ func TestDashboard189PagesAndNativeProjectionScope(t *testing.T) {
 	closed := f.open(1, dTT)
 	cancelled := f.open(2, dTT)
 	f.open(3, dTT)
-	code, body := f.khtc(http.MethodPost, "/periods/"+closed.ID+"/close", f.khtcUser, "", map[string]any{"reason": "Đóng kỳ quá hạn để kiểm phạm vi dashboard"})
+	code, body := f.khtcMFA(http.MethodPost, "/periods/"+closed.ID+"/close", f.khtcUser, "", map[string]any{"reason": "Đóng kỳ quá hạn để kiểm phạm vi dashboard"})
 	f.ok(code, body, nil)
 	code, body = f.khtc(http.MethodPost, "/periods/"+cancelled.ID+"/cancel", f.khtcUser, "", map[string]any{"reason": "Hủy kỳ để kiểm phạm vi dashboard"})
 	f.ok(code, body, nil)

@@ -89,7 +89,7 @@ func ReleaseCancel(ctx context.Context, tx pgx.Tx, tid, period, token uuid.UUID,
 func CancelPending(ctx context.Context, tx pgx.Tx, tid, period uuid.UUID) (bool, error) {
 	var ok bool
 	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_extension.khtc_cancel_intent
-	  WHERE tenant_id = $1 AND period_id = $2 AND claim_until > now())`, tid, period).Scan(&ok)
+	  WHERE tenant_id = $1 AND period_id = $2 AND claim_until > now()) OR pf_extension.fn_khtc_close_reserved211($1,$2)`, tid, period).Scan(&ok)
 	return ok, err
 }
 

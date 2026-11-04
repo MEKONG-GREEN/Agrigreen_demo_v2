@@ -129,7 +129,7 @@ func TestW1165_ComposerPinsPublishedLegacyAndExportHistory(t *testing.T) {
 	if got := fixedReport(t, f, legacyPeriod.ID); got.Content.TemplateSnapshot.Mode != "legacy" || got.Content.TemplateSnapshot.Hash != legacy.Content.TemplateSnapshot.Hash {
 		t.Fatal("first publication displaced legacy draft")
 	}
-	c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
+	c, b = f.khtcMFA(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
 	f.ok(c, b, nil)
 	if got := fixedReport(t, f, p.ID); got.Content.TemplateTerminal == nil || *got.Content.TemplateTerminal != "" {
 		t.Fatal("live terminal rewrote saved revision")

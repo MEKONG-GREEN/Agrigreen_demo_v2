@@ -126,15 +126,18 @@ func newKHTCFxPool(t *testing.T, shared *pgxpool.Pool) *khtcFx {
 	}
 	kn := extension.New(pool, clk, extension.Deps{})
 	cw := &crosswalk{}
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Crosswalk: cw,
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Operations: fm.PeriodOperations(), Crosswalk: cw,
 		MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
+	if err := fm.UsePeriodOperationPolicy(platformasm.KNKHTCProfile.Name, kn.KHTCCloseOperationPolicy211()); err != nil {
+		t.Fatal(err)
+	}
 	f := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New()}
 	f.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.Discard, nil)), 8<<20)
 	g := f.eng.Group("/v1", func(c *gin.Context) {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
-		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k})))
+		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k, MFA: c.GetHeader("X-Test-MFA") == "true"})))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
@@ -143,6 +146,15 @@ func newKHTCFxPool(t *testing.T, shared *pgxpool.Pool) *khtcFx {
 
 // do gọi API như phiên (vai, phòng ban, người); idem rỗng → khóa mới. Trả mã HTTP và thân.
 func (f *khtcFx) do(method, path, role, dept string, actor uuid.UUID, idem string, body any) (int, []byte) {
+	return f.doWithMFA211(method, path, role, dept, actor, idem, body, false)
+}
+func (f *khtcFx) doMFA(method, path, role, dept string, actor uuid.UUID, idem string, body any) (int, []byte) {
+	return f.doWithMFA211(method, path, role, dept, actor, idem, body, true)
+}
+func (f *khtcFx) khtcMFA(method, path string, actor uuid.UUID, idem string, body any) (int, []byte) {
+	return f.doMFA(method, "/v1/kn/khtc"+path, authz.KNTinh, khtcDept, actor, idem, body)
+}
+func (f *khtcFx) doWithMFA211(method, path, role, dept string, actor uuid.UUID, idem string, body any, mfa bool) (int, []byte) {
 	f.t.Helper()
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
@@ -160,6 +172,9 @@ func (f *khtcFx) do(method, path, role, dept string, actor uuid.UUID, idem strin
 		actor = ids.New()
 	}
 	req.Header.Set("X-Test-Actor", actor.String())
+	if mfa {
+		req.Header.Set("X-Test-MFA", "true")
+	}
 	if method == http.MethodPost {
 		if idem == "" {
 			idem = "t-" + ids.New().String()
@@ -293,7 +308,7 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		if p = f.get(p.ID); p.State != "complete" || !p.CanClose || p.CloseForced {
 			t.Fatalf("đủ dữ liệu: %s", p.State)
 		}
-		c, b := f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", me, "", map[string]any{})
+		c, b := f.khtcMFA(http.MethodPost, "/periods/"+p.ID+"/close", me, "", map[string]any{})
 		f.ok(c, b, &p)
 		if st, _, _, _, _ := p.form(t, tt); p.State != "closed" || p.FormsStatus != "closed" || st != "locked" {
 			t.Fatalf("đóng kỳ: %s", b)
@@ -311,15 +326,15 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		c, b := f.khtc(http.MethodPost, "/periods", me, "", map[string]any{"report_type": "month", "year": 2026, "no": 10, "departments": []string{tt, cn}})
 		f.ok(c, b, &m)
 		f.submit(m.FormsPeriodID, tt)
-		c, b = f.khtc(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{})
+		c, b = f.khtcMFA(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{})
 		f.fail(c, b, "extension.khtc_period_not_closable")
 		f.clk.Advance(18 * 24 * time.Hour) // 01/11: quá hạn 28/10 10:00 hơn 3 ngày
 		if m = f.get(m.ID); m.State != "late" || !m.CloseForced {
 			t.Fatalf("trễ hạn: %s %v", m.State, m.CloseForced)
 		}
-		c, b = f.khtc(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{})
+		c, b = f.khtcMFA(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{})
 		f.fail(c, b, "validation_failed")
-		c, b = f.khtc(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{"reason": "Phòng CNTS chưa gửi phiếu sau 4 ngày quá hạn"})
+		c, b = f.khtcMFA(http.MethodPost, "/periods/"+m.ID+"/close", me, "", map[string]any{"reason": "Phòng CNTS chưa gửi phiếu sau 4 ngày quá hạn"})
 		f.ok(c, b, &m)
 		if st, _, _, _, _ := m.form(t, cn); st != "not_sent" || !m.Events[len(m.Events)-1].Forced {
 			t.Fatalf("đóng ngoại lệ: %s", b)

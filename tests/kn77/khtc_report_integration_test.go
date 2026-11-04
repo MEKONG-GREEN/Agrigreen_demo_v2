@@ -373,7 +373,7 @@ func TestKH_ReportClosedSnapshotKeepsPlanVersion(t *testing.T) {
 	f.submit(p.ID, "10")
 	d := f.refresh(p.ID, 0)
 	oldPlan := d.Content.Data.Plan.VersionID
-	c, b := f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
+	c, b := f.khtcMFA(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
 	f.ok(c, b, nil)
 	f.planBody["base_version"] = 2
 	f.planBody["decision_no"] = "03/QD-KH"

@@ -253,12 +253,12 @@ func TestP0PoolShared2_KHTCCloseBlockedByCancelIntent(t *testing.T) {
 	f.submit(p.ID, "10")
 	f.refresh(p.ID, 0)
 	intentSQL(t, f, p.ID, sqlHoldIntent)
-	c, b := f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
+	c, b := f.khtcMFA(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
 	f.fail(c, b, "extension.khtc_period_cancelling")
 	if st := f.get(p.ID); st.State == "closed" || st.FormsStatus == "closed" {
 		t.Fatalf("đóng kỳ chạy khi đang hủy: %+v", st)
 	}
 	intentSQL(t, f, p.ID, sqlExpire)
-	c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
+	c, b = f.khtcMFA(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
 	f.ok(c, b, nil)
 }

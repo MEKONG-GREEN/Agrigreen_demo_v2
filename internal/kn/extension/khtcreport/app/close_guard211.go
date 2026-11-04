@@ -87,3 +87,6 @@ func (s *Service) finishClose211(ctx context.Context, id, op, event uuid.UUID, a
 		return store.ReserveEvent211(ctx, tx, p.TenantID, *r, s.now())
 	})
 }
+
+// ErrClosing211 distinguishes a durable Close fence from a cancel lease.
+var ErrClosing211 = problem.New(409, "extension.khtc_report_closing", "Kỳ đang chốt — chờ đối soát thao tác gốc")

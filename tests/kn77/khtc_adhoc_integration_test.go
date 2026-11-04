@@ -248,7 +248,7 @@ func TestW1168RequestScopesAndClosedPeriod(t *testing.T) {
 	}
 	f.tid = original
 	f.clk.Advance(11 * 24 * time.Hour)
-	c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{"reason": "Đóng sớm theo quyết định chỉ đạo"})
+	c, b = f.khtcMFA(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{"reason": "Đóng sớm theo quyết định chỉ đạo"})
 	f.ok(c, b, nil)
 	c, b = f.do(http.MethodPost, adhocRequestPath(p.ID)+"/"+r.ID+"/reconcile", authz.KNTinh, khtcDept, f.khtcUser, "", map[string]any{})
 	var cancelled adhocTestRequest

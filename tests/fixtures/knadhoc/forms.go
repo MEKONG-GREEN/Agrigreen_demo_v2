@@ -16,10 +16,13 @@ type Deps struct {
 	Validators map[string]port.Validator
 }
 type Fixture struct {
-	publisher port.Publisher
-	control   port.PeriodControl
-	entry     port.Entry
-	register  func(*gin.RouterGroup)
+	publisher   port.Publisher
+	control     port.PeriodControl
+	conditional port.ConditionalPeriodControl
+	operations  port.PeriodOperations
+	policy      func(string, port.PeriodOperationPolicy) error
+	entry       port.Entry
+	register    func(*gin.RouterGroup)
 }
 
 func New(b tenant.Beginner, clk clock.Clock, d Deps) (*Fixture, error) {
@@ -27,7 +30,7 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) (*Fixture, error) {
 	if e != nil {
 		return nil, e
 	}
-	return &Fixture{publisher: module.Publisher(), control: module.Control(), entry: module.Entry(), register: module.RegisterApp}, nil
+	return &Fixture{publisher: module.Publisher(), control: module.Control(), conditional: module.ConditionalControl(), operations: module.PeriodOperations(), policy: module.UsePeriodOperationPolicy, entry: module.Entry(), register: module.RegisterApp}, nil
 }
 func (f *Fixture) Publisher() port.Publisher      { return f.publisher }
 func (f *Fixture) Control() port.PeriodControl    { return f.control }

@@ -32,11 +32,12 @@ type closeBase211 struct {
 	Event  store.Event
 }
 type closeData211 struct {
-	Base      closeBase211                  `json:"base"`
-	Native    forms.PeriodOperationRequest  `json:"native"`
-	Receipt   *forms.PeriodOperationReceipt `json:"receipt,omitempty"`
-	Progress  *forms.PeriodProgress         `json:"progress,omitempty"`
-	Rejection string                        `json:"rejection,omitempty"`
+	Base           closeBase211                  `json:"base"`
+	Native         forms.PeriodOperationRequest  `json:"native"`
+	Receipt        *forms.PeriodOperationReceipt `json:"receipt,omitempty"`
+	Progress       *forms.PeriodProgress         `json:"progress,omitempty"`
+	SubmissionRefs map[string]uuid.UUID          `json:"submission_refs,omitempty"`
+	Rejection      string                        `json:"rejection,omitempty"`
 }
 
 func closeAuthority211(c caller) (string, error) {
@@ -69,6 +70,33 @@ func decodeClose211(v store.CloseIntent211) (closeData211, error) {
 	err := json.Unmarshal(v.Payload, &d)
 	if err != nil || d.Native.OperationID != v.OperationID || d.Base.Event.ID != v.EventID || d.Base.Detail.Period.ID != v.PeriodID {
 		return d, errCloseInterrupted211
+	}
+	if d.Progress != nil {
+		seen := map[string]bool{}
+		idsSeen := map[uuid.UUID]bool{}
+		for i := range d.Progress.Units {
+			unit := &d.Progress.Units[i]
+			if unit.Unit == "" || seen[unit.Unit] || unit.Versions < 0 {
+				return d, errCloseInterrupted211
+			}
+			seen[unit.Unit] = true
+			ref, ok := d.SubmissionRefs[unit.Unit]
+			if unit.Versions > 0 {
+				if !ok || ref == uuid.Nil || idsSeen[ref] {
+					return d, errCloseInterrupted211
+				}
+				idsSeen[ref] = true
+				id := ref
+				unit.LastSubmissionID = &id
+			} else if ok {
+				return d, errCloseInterrupted211
+			}
+		}
+		for unit := range d.SubmissionRefs {
+			if !seen[unit] {
+				return d, errCloseInterrupted211
+			}
+		}
 	}
 	return d, nil
 }
@@ -263,10 +291,19 @@ func (s *Service) hydrateClose211(ctx context.Context, c caller, v store.CloseIn
 			return errCloseInterrupted211
 		}
 	}
+	d.SubmissionRefs = map[string]uuid.UUID{}
+	for _, unit := range progress.Units {
+		if unit.Versions > 0 {
+			if unit.LastSubmissionID == nil || *unit.LastSubmissionID == uuid.Nil {
+				return errCloseInterrupted211
+			}
+			d.SubmissionRefs[unit.Unit] = *unit.LastSubmissionID
+		}
+	}
 	d.Progress = &progress
 	return nil
 }
-func closeOutcome211(d closeData211, event store.Event) Detail {
+func closeOutcome211(d closeData211, event store.Event, requests map[string]*store.AdhocRequest) Detail {
 	out := d.Base.Detail
 	out.Events = append(slices.Clone(out.Events), event)
 	out.State = domain.PeriodClosed
@@ -280,9 +317,13 @@ func closeOutcome211(d closeData211, event store.Event) Detail {
 	}
 	for i := range out.Forms {
 		row := &out.Forms[i]
+		row.NativeLate = nil
+		row.RequestDueAt = nil
+		row.RequestState = ""
 		u := units[row.Department]
 		row.View = domain.FormStateOf(domain.FormFacts{Versions: u.Versions, Decision: u.Decision, Terminal: domain.PeriodClosed, Max: out.Period.MaxSubmissions})
 		row.LastSubmittedAt, row.ReviewedAt, row.ReviewNote, row.Late = u.LastSubmittedAt, u.ReviewedAt, u.ReviewNote, u.Late
+		projectAdhocRequest(row, requests[row.Department], u, domain.PeriodClosed)
 		if row.View.CountsAsSent {
 			out.Counts.FormsSent++
 		}
@@ -325,7 +366,19 @@ func (s *Service) completeClose211(ctx context.Context, c caller, v *store.Close
 				return e
 			}
 		}
-		out = closeOutcome211(d, event)
+		requests := map[string]*store.AdhocRequest{}
+		if d.Base.Detail.Period.Type == domain.TypeAdhoc {
+			for _, dept := range d.Base.Detail.Period.Departments {
+				request, e := store.ActiveAdhocRequest(ctx, tx, v.PeriodID, dept)
+				if e != nil {
+					return e
+				}
+				if request != nil {
+					requests[dept] = request
+				}
+			}
+		}
+		out = closeOutcome211(d, event, requests)
 		raw, e := json.Marshal(out)
 		if e != nil {
 			return e
@@ -497,6 +550,11 @@ func (s *Service) closeCAS211(ctx context.Context, id uuid.UUID, reason, key str
 			}
 			return Detail{}, errCloseInterrupted211.WithCause(err)
 		}
+		if err = s.closePhase211(ctx, c, v, data, "hydrated"); err != nil {
+			return Detail{}, errCloseInterrupted211.WithCause(err)
+		}
+	}
+	if v.Phase == "applied" && data.Progress != nil {
 		if err = s.closePhase211(ctx, c, v, data, "hydrated"); err != nil {
 			return Detail{}, errCloseInterrupted211.WithCause(err)
 		}

@@ -66,9 +66,7 @@ func TestClose211HeldOriginalCannotCloseSuccessor(t *testing.T) {
 func closeConsumer211(t *testing.T, f *deadlineFx209, control formsport.ConditionalPeriodControl) (*khtcpapp.Service, context.Context) {
 	t.Helper()
 	svc, ctx := f.consumer209(control)
-	p, _ := authz.FromContext(ctx)
-	p.MFA = true
-	p = fixture.Bind(t, p)
+	p := fixture.Bind(t, authz.Principal{ActorRef: f.actor, TenantID: f.tid, MFA: true, KN: &authz.KNContext{ID: uuid.NewSHA1(f.tid, []byte("close211")), Role: authz.KNTinh, Department: khtcDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1"}}}})
 	ctx = authz.WithPrincipal(context.Background(), p)
 	svc.Operations = f.fm.PeriodOperations()
 	svc.CloseGuard = &reportapp.Service{DB: f.roleDB, Clock: f.clk}
@@ -80,12 +78,16 @@ func closeConsumer211(t *testing.T, f *deadlineFx209, control formsport.Conditio
 
 type receiptProbe211 struct {
 	formsport.PeriodOperations
+	before       func(context.Context, formsport.PeriodOperationRequest)
 	after        func(formsport.PeriodOperationReceipt, error) (formsport.PeriodOperationReceipt, error)
 	calls, reads int
 }
 
 func (p *receiptProbe211) ExecutePeriodOperation(ctx context.Context, in formsport.PeriodOperationRequest) (formsport.PeriodOperationReceipt, error) {
 	p.calls++
+	if p.before != nil {
+		p.before(ctx, in)
+	}
 	r, e := p.PeriodOperations.ExecutePeriodOperation(ctx, in)
 	if p.after != nil {
 		return p.after(r, e)

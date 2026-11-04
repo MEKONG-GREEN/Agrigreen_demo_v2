@@ -36,11 +36,25 @@ BEGIN
   IF (NEW.period_id,NEW.close_event_id,NEW.actor_ref,NEW.request_key,NEW.request_hash,NEW.authority_hash) IS DISTINCT FROM (prior.period_id,prior.close_event_id,prior.actor_ref,prior.request_key,prior.request_hash,prior.authority_hash)
    OR NEW.payload->'base' IS DISTINCT FROM prior.payload->'base' OR NEW.payload->'native' IS DISTINCT FROM prior.payload->'native'
    OR (prior.payload ? 'receipt' AND NEW.payload->'receipt' IS DISTINCT FROM prior.payload->'receipt')
-   OR (prior.payload ? 'progress' AND NEW.payload->'progress' IS DISTINCT FROM prior.payload->'progress')
+   OR (prior.payload ? 'progress' AND (NEW.payload->'progress' IS DISTINCT FROM prior.payload->'progress' OR NEW.payload->'submission_refs' IS DISTINCT FROM prior.payload->'submission_refs'))
    OR NOT((prior.phase='prepared' AND NEW.phase IN('dispatched','rejected')) OR(prior.phase='dispatched' AND NEW.phase IN('applied','rejected','unresolved')) OR(prior.phase='applied' AND NEW.phase IN('hydrated','unresolved')) OR(prior.phase='unresolved' AND NEW.phase IN('applied','hydrated','rejected','completed')) OR(prior.phase='hydrated' AND NEW.phase IN('completed','unresolved')))
   THEN RAISE EXCEPTION 'khtc_close_phase_conflict211' USING ERRCODE='23514'; END IF;
  END IF;
- IF NEW.phase IN('applied','hydrated','completed') AND (NOT(NEW.payload ? 'receipt') OR NEW.payload->'receipt'->>'outcome'<>'applied') THEN RAISE EXCEPTION 'khtc_close_receipt_required211' USING ERRCODE='23514'; END IF;
+ IF NEW.phase IN('applied','hydrated','completed') AND (NEW.payload->'receipt'->>'outcome' IS DISTINCT FROM 'applied') THEN RAISE EXCEPTION 'khtc_close_receipt_required211' USING ERRCODE='23514'; END IF;
+ IF NEW.phase IN('hydrated','completed') AND jsonb_typeof(NEW.payload->'progress') IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'khtc_close_progress_required211' USING ERRCODE='23514'; END IF;
+ -- LastSubmissionID is deliberately absent from the public progress JSON.
+ -- Its separate typed immutable binding must cover exactly accepted unit heads.
+ IF NEW.payload ? 'progress' THEN
+  IF jsonb_typeof(NEW.payload->'progress'->'Units') IS DISTINCT FROM 'array'
+     OR jsonb_typeof(COALESCE(NEW.payload->'submission_refs','{}'::jsonb)) IS DISTINCT FROM 'object'
+  THEN RAISE EXCEPTION 'khtc_close_submission_refs211' USING ERRCODE='23514'; END IF;
+  IF EXISTS(SELECT 1 FROM jsonb_each_text(COALESCE(NEW.payload->'submission_refs','{}'::jsonb)) r WHERE r.value !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' OR r.value='00000000-0000-0000-0000-000000000000' OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements(NEW.payload->'progress'->'Units') u WHERE u->>'Unit'=r.key AND u->>'Versions' ~ '^[1-9][0-9]*$'))
+   OR EXISTS(SELECT 1 FROM jsonb_array_elements(NEW.payload->'progress'->'Units') u WHERE COALESCE(u->>'Unit','')='' OR COALESCE(u->>'Versions','') !~ '^(0|[1-9][0-9]*)$' OR (u->>'Versions'<>'0') IS DISTINCT FROM (COALESCE(NEW.payload->'submission_refs','{}'::jsonb) ? (u->>'Unit')))
+   OR EXISTS(SELECT 1 FROM jsonb_array_elements(NEW.payload->'progress'->'Units') u GROUP BY u->>'Unit' HAVING count(*)>1)
+   OR EXISTS(SELECT 1 FROM jsonb_each_text(COALESCE(NEW.payload->'submission_refs','{}'::jsonb)) r GROUP BY r.value HAVING count(*)>1)
+  THEN RAISE EXCEPTION 'khtc_close_submission_refs211' USING ERRCODE='23514'; END IF;
+ END IF;
+ IF NEW.phase='rejected' AND ((prior.phase='prepared' AND NEW.payload->>'rejection'='cancel-won-before-native') OR NEW.payload->'receipt'->>'outcome'='rejected') IS NOT TRUE THEN RAISE EXCEPTION 'khtc_close_rejection_required211' USING ERRCODE='23514'; END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER a_close_intent211 BEFORE INSERT ON pf_extension.khtc_close_intent211 FOR EACH ROW EXECUTE FUNCTION pf_extension.check_close_intent211();
@@ -81,6 +95,7 @@ BEGIN
   IF prior.action<>'reserved' OR NEW.action NOT IN('completed','released') OR (NEW.period_id,NEW.close_event_id,NEW.actor_ref) IS DISTINCT FROM(prior.period_id,prior.close_event_id,prior.actor_ref)
   THEN RAISE EXCEPTION 'khtc_close_reservation_phase211' USING ERRCODE='23514'; END IF;
  END IF;
+ IF NEW.action IN('completed','released') AND NOT EXISTS(SELECT 1 FROM(SELECT phase FROM pf_extension.khtc_close_intent211 WHERE tenant_id=NEW.tenant_id AND operation_id=NEW.operation_id AND close_event_id=NEW.close_event_id ORDER BY seq DESC LIMIT 1)x WHERE phase=CASE WHEN NEW.action='completed' THEN 'completed' ELSE 'rejected' END) THEN RAISE EXCEPTION 'khtc_close_reservation_proof211' USING ERRCODE='23514'; END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER a_close_reservation211 BEFORE INSERT ON pf_extension.khtc_close_reservation211 FOR EACH ROW EXECUTE FUNCTION pf_extension.check_close_reservation211();
@@ -98,8 +113,19 @@ BEGIN
  IF NEW.action IN('closed','cancelled','deadline_changed') THEN
   PERFORM pg_advisory_xact_lock(hashtextextended('khtc_snapshot:'||NEW.tenant_id::text||':'||NEW.period_id::text,0));
   SELECT * INTO reserved FROM(SELECT DISTINCT ON(operation_id)* FROM pf_extension.khtc_close_reservation211 WHERE tenant_id=NEW.tenant_id AND period_id=NEW.period_id ORDER BY operation_id,seq DESC)x WHERE action='reserved' LIMIT 1;
-  IF FOUND AND (NEW.action<>'closed' OR NEW.id<>reserved.close_event_id OR NEW.actor_ref<>reserved.actor_ref) THEN RAISE EXCEPTION 'khtc_close_owned_event211' USING ERRCODE='23514'; END IF;
+  IF FOUND AND (NEW.action<>'closed' OR NEW.id<>reserved.close_event_id OR NEW.actor_ref<>reserved.actor_ref OR NOT EXISTS(SELECT 1 FROM(SELECT phase FROM pf_extension.khtc_close_intent211 WHERE tenant_id=NEW.tenant_id AND operation_id=reserved.operation_id ORDER BY seq DESC LIMIT 1)x WHERE phase='hydrated')) THEN RAISE EXCEPTION 'khtc_close_owned_event211' USING ERRCODE='23514'; END IF;
  END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER a_close_owner211 BEFORE INSERT ON pf_extension.khtc_period_event FOR EACH ROW EXECUTE FUNCTION pf_extension.check_period_close_owner211();
+
+-- Existing Final remains compatible with normal Close. Only NEW Final/capture
+-- inserts are fenced while a durable report-owned Close reservation is active.
+CREATE FUNCTION pf_extension.check_report_close_fence211() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtextextended('khtc_snapshot:'||NEW.tenant_id::text||':'||NEW.period_id::text,0));
+ IF pf_extension.fn_khtc_close_reserved211(NEW.tenant_id,NEW.period_id) THEN RAISE EXCEPTION 'KHTC Close owns report snapshot' USING ERRCODE='23514',CONSTRAINT='khtc_report_closing211'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER a_close_final_fence211 BEFORE INSERT ON pf_extension.khtc_report_final FOR EACH ROW EXECUTE FUNCTION pf_extension.check_report_close_fence211();
+CREATE TRIGGER a_close_snapshot_fence211 BEFORE INSERT ON pf_extension.khtc_snapshot FOR EACH ROW EXECUTE FUNCTION pf_extension.check_report_close_fence211();

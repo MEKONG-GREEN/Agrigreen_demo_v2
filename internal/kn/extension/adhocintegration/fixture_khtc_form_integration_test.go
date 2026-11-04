@@ -37,10 +37,12 @@ const (
 // kfFx là fixture phiếu KHTC: Kỳ KHTC + phiếu + Kế hoạch năm 2026 có hạng mục của TT (nhập + nguồn module), TTTT (số phiếu giá
 // nguồn module + tin bài), CNTS.
 type kfFx struct {
-	nativeForms   formsport.Publisher
-	nativeControl formsport.PeriodControl
-	nativeEntry   formsport.Entry
-	ext           *extension.Module
+	nativeForms       formsport.Publisher
+	nativeControl     formsport.PeriodControl
+	nativeConditional formsport.ConditionalPeriodControl
+	nativeOperations  formsport.PeriodOperations
+	nativeEntry       formsport.Entry
+	ext               *extension.Module
 	*khtcFx
 	khtcUser uuid.UUID
 	item     string // TT "Mô hình lúa chất lượng cao" — 100 ha
@@ -67,8 +69,11 @@ func newKHTCFormFxWith(t *testing.T, wrapControl func(formsport.PeriodControl) f
 	if wrapControl != nil {
 		control = wrapControl(control)
 	}
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: control, Entry: fm.Entry(), Crosswalk: cw,
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: control, ConditionalControl: fm.ConditionalControl(), Operations: fm.PeriodOperations(), Entry: fm.Entry(), Crosswalk: cw,
 		MaxSubmissions: fixtureKHTCProfile.MaxSubmissions})
+	if err := fm.UsePeriodOperationPolicy(fixtureKHTCProfile.Name, kn.KHTCCloseOperationPolicy211()); err != nil {
+		t.Fatal(err)
+	}
 	base := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New()}
 	base.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.MultiWriter(io.Discard, tlog{t}), nil)), 8<<20)
 	base.eng.Use(func(c *gin.Context) {
@@ -92,13 +97,13 @@ func newKHTCFormFxWith(t *testing.T, wrapControl func(formsport.PeriodControl) f
 		}
 
 		ctx := tenant.WithID(c.Request.Context(), base.tid)
-		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k, MFA: k.Role == authz.KNAdmin && c.GetHeader("X-Test-No-MFA") != "true"})))
+		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k, MFA: (k.Role == authz.KNAdmin && c.GetHeader("X-Test-No-MFA") != "true") || c.GetHeader("X-Test-MFA") == "true"})))
 		scope, _ := json.Marshal(k)
 		c.Request = c.Request.WithContext(idempotency.WithAuthorizationScope(c.Request.Context(), scope))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
-	f := &kfFx{khtcFx: base, khtcUser: ids.New(), ext: kn, nativeForms: fm.Publisher(), nativeControl: control, nativeEntry: fm.Entry()}
+	f := &kfFx{khtcFx: base, khtcUser: ids.New(), ext: kn, nativeForms: fm.Publisher(), nativeControl: control, nativeConditional: fm.ConditionalControl(), nativeOperations: fm.PeriodOperations(), nativeEntry: fm.Entry()}
 	f.seedPlan()
 	c, b := f.do(http.MethodPost, "/v1/extension/khtc/form-template/install", authz.KNAdmin, "", uuid.Nil, "", nil)
 	f.ok(c, b, nil)
