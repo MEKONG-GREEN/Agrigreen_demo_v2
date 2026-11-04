@@ -10245,6 +10245,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/exported-reports/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mã lĩnh vực từ các hàng đã xuất trong snapshot đóng băng, phân trang đầy đủ */
+        get: operations["extensionKhtcArchiveFields"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report/exports/{exportID}/preview": {
         parameters: {
             query?: never;
@@ -23101,6 +23118,9 @@ export interface components {
             id: string;
             /** Format: uuid */
             period_id: string;
+            field_codes?: string[];
+            /** @enum {string} */
+            field_status?: "complete" | "partial" | "unknown";
             period_name: string;
             /** @enum {string} */
             report_type: "week" | "month" | "quarter" | "year" | "program" | "adhoc";
@@ -23171,10 +23191,20 @@ export interface components {
             export_id: string;
             /** Format: int64 */
             export_version: number;
+            field_codes?: string[];
+            /** @enum {string} */
+            field_status?: "complete" | "partial" | "unknown";
             export_name: string;
             items: components["schemas"]["KHTCArchiveWord"][];
             has_more: boolean;
             offset: number;
+        };
+        KHTCArchiveFields: {
+            items: {
+                code: string;
+            }[];
+            has_more: boolean;
+            next_cursor: string;
         };
         KHTCDashboard: {
             year: number;
@@ -46856,7 +46886,10 @@ export interface operations {
     };
     extensionKhtcReportExports: {
         parameters: {
-            query?: never;
+            query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+            };
             header?: never;
             path: {
                 id: string;
@@ -46920,7 +46953,10 @@ export interface operations {
     };
     extensionKhtcReportDownload: {
         parameters: {
-            query?: never;
+            query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+            };
             header?: never;
             path: {
                 id: string;
@@ -47333,6 +47369,8 @@ export interface operations {
     extensionKhtcExportedReports: {
         parameters: {
             query: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
                 year: number;
                 kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
                 period_id?: string;
@@ -47365,11 +47403,17 @@ export interface operations {
     extensionKhtcArchivePeriods: {
         parameters: {
             query: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
                 year: number;
                 kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+                /** @description Tìm tên kỳ (giữ tương thích API190) */
                 q?: string;
                 offset?: number;
                 limit?: number;
+                versions?: boolean;
+                /** @description Tên kỳ hoặc số văn bản tương ứng bộ lọc kho */
+                document_q?: string;
             };
             header?: never;
             path?: never;
@@ -47392,9 +47436,46 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionKhtcArchiveFields: {
+        parameters: {
+            query: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+                year: number;
+                kind?: "" | "week" | "month" | "quarter" | "year" | "program" | "adhoc";
+                q?: string;
+                after?: string;
+                period_id?: string;
+                limit?: number;
+                versions?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mã lĩnh vực đã xác định trong mọi bản xuất khớp bộ lọc; metadata unknown không tạo mã giả */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCArchiveFields"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionKhtcArchivePreview: {
         parameters: {
-            query?: never;
+            query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+            };
             header?: never;
             path: {
                 id: string;
@@ -47416,12 +47497,15 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };
     extensionKhtcArchiveWords: {
         parameters: {
             query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
                 offset?: number;
                 limit?: number;
             };
@@ -47452,7 +47536,10 @@ export interface operations {
     };
     extensionKhtcArchiveWordDownload: {
         parameters: {
-            query?: never;
+            query?: {
+                field?: string;
+                field_status?: "complete" | "partial" | "unknown";
+            };
             header?: never;
             path: {
                 id: string;
@@ -47490,6 +47577,9 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    field?: string;
+                    /** @enum {string} */
+                    field_status?: "complete" | "partial" | "unknown";
                     items: {
                         /** Format: uuid */
                         period_id: string;

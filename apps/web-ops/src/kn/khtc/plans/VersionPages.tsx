@@ -1,5 +1,6 @@
 "use client";
 
+import { PlanTree } from "./PlanTree";
 import Link from "next/link";
 import { useId, useState } from "react";
 import { TextField } from "@/components/form";
@@ -7,7 +8,7 @@ import { DetailPage, LabelValueBlock, LogPanel, type LogEntry } from "@/componen
 import { DataTable } from "@/components/patterns/list";
 import { fieldErrorMap, type ApiProblem } from "@/api/problem";
 import { LoadState, ReadOnlyNotice, useLoad } from "@/kn/cycle/common";
-import { dmy, useKhtcApi, vnDecimal, type KhtcPlanVersion } from "../api";
+import { dmy, useKhtcApi, type KhtcPlanVersion } from "../api";
 import { planHref, type PlanRoute } from "./routes";
 import { validateVersionHead, type VersionHead } from "./version-form";
 
@@ -77,10 +78,7 @@ export function VersionDetailPage({ route }: { route: PlanRoute }) {
     return <DetailPage title={`Kế hoạch năm ${route.year} — phiên bản ${route.version}`} back={back} log={<LogPanel entries={planVersionLog([plan.version])} />}>
       <ReadOnlyNotice>Chỉ xem phiên bản đã lưu.</ReadOnlyNotice>
       <LabelValueBlock title="Thông tin phiên bản" items={[{label:"Quyết định",value:plan.version.decision_no},{label:"Ngày quyết định",value:dmy(plan.version.decision_date)},{label:"Hiệu lực",value:dmy(plan.version.effective_from)},{label:"Số dòng",value:plan.version.entries_count},{label:"Ghi chú",value:plan.version.note}]} />
-      <DataTable caption="Nội dung phiên bản kế hoạch" rows={plan.entries} rowKey={e => e.ref} columns={[
-        {key:"name",header:"Nội dung",cell:e=>e.name}, {key:"qty",header:"Khối lượng KH",cell:e=>vnDecimal(e.planned_qty)},
-        {key:"budget",header:"Kinh phí KH",cell:e=>vnDecimal(e.budget)}, {key:"department",header:"Phòng phụ trách",cell:e=>e.department_code||"—"},
-      ]} />
+      <PlanTree entries={plan.entries} />
     </DetailPage>;
   }}</LoadState>;
 }

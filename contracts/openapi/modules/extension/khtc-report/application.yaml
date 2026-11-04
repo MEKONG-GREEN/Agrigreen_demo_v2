@@ -81,6 +81,8 @@ paths:
       operationId: extensionKhtcReportExports
       tags: [extension]
       parameters:
+        - {name: field, in: query, schema: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}}
+        - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
         "200":
@@ -127,6 +129,8 @@ paths:
       operationId: extensionKhtcReportDownload
       tags: [extension]
       parameters:
+        - {name: field, in: query, schema: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}}
+        - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
