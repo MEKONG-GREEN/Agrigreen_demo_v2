@@ -156,3 +156,22 @@ func ttSheet(item, done string) map[string]any {
 	return map[string]any{"cells": map[string]any{item: map[string]string{"done": done, "people": "30"}},
 		"texts": map[string]string{"cong_tac_khac": "Tập huấn 2 lớp IPM"}}
 }
+
+// Valid review fixtures capture the public submission identity before deciding;
+// stale-intent regressions use an explicitly retained older target instead.
+func (f *kfFx) reviewForm241(pid, dept, decision, note string) (int, []byte) {
+	var current struct {
+		Submissions []struct {
+			ID      string `json:"id"`
+			Attempt int64  `json:"attempt"`
+		} `json:"submissions"`
+	}
+	code, body := f.khtc(http.MethodGet, "/periods/"+pid+"/forms/"+dept, f.khtcUser, "", nil)
+	f.ok(code, body, &current)
+	if len(current.Submissions) == 0 {
+		f.t.Fatal("review fixture requires a submitted public target")
+	}
+	target := current.Submissions[0]
+	return f.khtc(http.MethodPost, "/periods/"+pid+"/forms/"+dept+"/review", f.khtcUser, "",
+		map[string]any{"decision": decision, "note": note, "expected_submission_id": target.ID, "base_attempt": target.Attempt})
+}

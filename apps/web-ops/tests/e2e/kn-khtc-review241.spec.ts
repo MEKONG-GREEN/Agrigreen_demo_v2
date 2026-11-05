@@ -18,6 +18,7 @@ test("241 reviewer: đúng phòng, chỉ đọc nguồn, ghi chú và xác nhậ
   await sidebar(page).getByRole("link", { name: "Người dùng", exact: true }).click();
   await page.getByRole("link", { name: "Tạo tài khoản", exact: true }).click();
   const main = page.getByRole("main");
+  await expect(main.getByRole("button", { name: "Lưu", exact: true })).toBeEnabled();
   await main.getByLabel("Họ tên").fill("Cán bộ KHTC kiểm thử 241");
   await main.getByLabel("Email").fill("khtc.review241@example.test");
   await main.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912345241");
@@ -25,6 +26,7 @@ test("241 reviewer: đúng phòng, chỉ đọc nguồn, ghi chú và xác nhậ
   await assignment.getByRole("combobox", { name: "Vai trò", exact: true }).selectOption("kn_tinh");
   await assignment.getByRole("checkbox", { name: "trong_trot", exact: true }).uncheck();
   await assignment.getByRole("checkbox", { name: "ke_hoach_tai_chinh", exact: true }).check();
+  await expect(main.getByLabel("Họ tên")).toHaveValue("Cán bộ KHTC kiểm thử 241");
   await main.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Cán bộ KHTC kiểm thử 241" })).toBeVisible();
   await logout(page); await login("0912345241");
@@ -57,6 +59,6 @@ test("241 reviewer: đúng phòng, chỉ đọc nguồn, ghi chú và xác nhậ
   await dialog.getByRole("button", { name: "Gửi yêu cầu bổ sung", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Đã gửi yêu cầu bổ sung cho lần gửi 1." })).toBeVisible();
   await expect(page.getByRole("textbox")).toHaveCount(0);
-  await expect(page.getByText("Bổ sung diện tích thực hiện đã đối chiếu với kế hoạch.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Yêu cầu bổ sung: Bổ sung diện tích thực hiện đã đối chiếu với kế hoạch." })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("241-review-ack.png"), fullPage: true });
 });
