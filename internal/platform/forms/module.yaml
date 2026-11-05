@@ -19,6 +19,7 @@ provides:
     - Freezer
     - PeriodControl
     - PeriodOperations
+    - PublishOperations
     - Publisher
     - ReviewGuard
     - SubmissionFeed
