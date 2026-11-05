@@ -60,6 +60,17 @@ test("KHTC225: nháp máy chủ ban đầu giữ cây qua F5, Log và hủy đú
   await expect(page.getByText(`create — thế hệ ${generation}; lần ghi 1`,{exact:true})).toBeVisible();
   // A real browser reload recreates modules, API adapters and selected-context resources.
   await page.reload();
+  // The pre-existing mock department switch is RAM-only. Restore that public
+  // access prerequisite through the SPA; never inject auth or touch the saved draft.
+  await sidebar(page).getByRole("link",{name:"Phòng ban",exact:true}).click();
+  await page.getByLabel("Trạng thái Phòng Kế hoạch - Tài chính",{exact:true}).selectOption("active");
+  await expect(page.getByRole("status").filter({hasText:"Đã đổi"})).toBeVisible();
+  await logout(page);await login();
+  await sidebar(page).getByRole("button",{name:"Phòng Kế hoạch - Tài chính",exact:true}).click();
+  await sidebar(page).getByRole("link",{name:"Kế hoạch năm",exact:true}).click();
+  await page.getByRole("button",{name:"Năm sau",exact:true}).click();
+  await page.getByRole("button",{name:"Nháp máy chủ ban đầu",exact:true}).click();
+  await page.getByRole("button",{name:"Log nháp máy chủ",exact:true}).click();
   try {
     await expect(page.getByRole("heading",{name:"Nháp máy chủ ban đầu — năm 2031"})).toBeVisible();
   } catch (error) {
