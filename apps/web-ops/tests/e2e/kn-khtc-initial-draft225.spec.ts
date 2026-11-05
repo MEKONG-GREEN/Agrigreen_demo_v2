@@ -60,7 +60,14 @@ test("KHTC225: nháp máy chủ ban đầu giữ cây qua F5, Log và hủy đú
   await expect(page.getByText(`create — thế hệ ${generation}; lần ghi 1`,{exact:true})).toBeVisible();
   // A real browser reload recreates modules, API adapters and selected-context resources.
   await page.reload();
-  await expect(page.getByRole("heading",{name:"Nháp máy chủ ban đầu — năm 2031"})).toBeVisible();
+  try {
+    await expect(page.getByRole("heading",{name:"Nháp máy chủ ban đầu — năm 2031"})).toBeVisible();
+  } catch (error) {
+    try {
+      await page.screenshot({path:info.outputPath("225-after-f5-failure.png"),fullPage:true,mask:[page.locator('input[type="password"], input[type="email"]')]});
+    } catch { /* Keep the original business assertion even if artifact capture fails. */ }
+    throw error;
+  }
   await expect(page.getByText(`create — thế hệ ${generation}; lần ghi 1`,{exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Cây nháp",exact:true}).click();
   const item=page.getByRole("row").filter({has:page.getByRole("cell",{name:"Hạng mục · Hạng mục nháp225",exact:true})});
