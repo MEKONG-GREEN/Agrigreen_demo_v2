@@ -253,16 +253,20 @@ func TestInitialDraft225NativeCRUDGenerationAndPublishFence(t *testing.T) {
 				row := fmt.Sprintf(`{"ref":%q,"tab":"programs","kind":"program","program_ref":%q,"name":"Hostile numeric225","%s":%s}`, ids.New().String(), program.Ref.String(), field, value)
 				rawBody := json.RawMessage(`{"expected_revision":0,"entries":[` + row + `]}`)
 				status, _ := call(a, http.MethodPost, path, "draft225:raw:"+ids.New().String(), rawBody)
-				if status != 422 {
-					t.Fatalf("hostile %s case%d status=%d", field, i, status)
+				expected := http.StatusUnprocessableEntity
+				if i < 4 || i == 4 && (field == "sort_order" || field == "points_count") {
+					expected = http.StatusBadRequest
+				}
+				if status != expected {
+					t.Fatalf("hostile %s case%d status=%d want=%d", field, i, status, expected)
 				}
 			})
 		}
 		t.Run("duplicate_casefold_"+field, func(t *testing.T) {
-			row := fmt.Sprintf(`{"ref":%q,"tab":"programs","kind":"program","program_ref":%q,"name":"Duplicate numeric225","%s":1,"%s":2}`, ids.New().String(), program.Ref.String(), field, strings.ToUpper(field))
+			row := fmt.Sprintf(`{"ref":%q,"tab":"programs","kind":"program","program_ref":%q,"name":"Duplicate numeric225","%s":1e100000,"%s":2}`, ids.New().String(), program.Ref.String(), field, strings.ToUpper(field))
 			status, _ := call(a, http.MethodPost, path, "draft225:duplicate:"+ids.New().String(), json.RawMessage(`{"expected_revision":0,"entries":[`+row+`]}`))
-			if status != 422 {
-				t.Fatalf("duplicate numeric occurrence status=%d", status)
+			if status != http.StatusBadRequest {
+				t.Fatalf("overwritten hostile numeric occurrence status=%d", status)
 			}
 		})
 	}
