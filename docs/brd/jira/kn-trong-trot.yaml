@@ -151,3 +151,312 @@ items:
     loai: subtask
     cha: E06-S04
     jira: MAKN-113
+  - id: E02
+    loai: epic
+    jira: MAKN-117
+  - id: E03
+    loai: epic
+    jira: MAKN-118
+  - id: E05
+    loai: epic
+    jira: MAKN-119
+  - id: E01-S03
+    loai: story
+    cha: E01
+    jira: MAKN-120
+    sprint: 3
+    muc_brd: ["§IV 3.2", "§IV 4.6"]
+    ma_yc: ["UR-XA-03", "UR-XA-04", "UR-XA-08", "UR-XA-12", "UR-XA-15", "FN-XA-03.02", "FN-AD-04.06"]
+  - id: E01-S03-T01
+    loai: subtask
+    cha: E01-S03
+    jira: MAKN-136
+  - id: E01-S03-T02
+    loai: subtask
+    cha: E01-S03
+    jira: MAKN-137
+  - id: E01-S03-T03
+    loai: subtask
+    cha: E01-S03
+    jira: MAKN-138
+  - id: E01-S04
+    loai: story
+    cha: E01
+    jira: MAKN-121
+    sprint: 3
+    muc_brd: ["§IV 3.2", "§IV 4.6"]
+    ma_yc: ["UR-XA-06", "UR-XA-07", "UR-XA-10", "UR-XA-11", "FN-XA-03.02"]
+  - id: E01-S04-T01
+    loai: subtask
+    cha: E01-S04
+    jira: MAKN-139
+  - id: E01-S04-T02
+    loai: subtask
+    cha: E01-S04
+    jira: MAKN-140
+  - id: E01-S04-T03
+    loai: subtask
+    cha: E01-S04
+    jira: MAKN-141
+  - id: E01-S05
+    loai: story
+    cha: E01
+    jira: MAKN-122
+    sprint: 6
+    muc_brd: ["§IV 3.2", "§VI"]
+    ma_yc: ["FN-AD-04.06", "N-14"]
+  - id: E01-S05-T01
+    loai: subtask
+    cha: E01-S05
+    jira: MAKN-142
+  - id: E01-S05-T02
+    loai: subtask
+    cha: E01-S05
+    jira: MAKN-143
+  - id: E01-S05-T03
+    loai: subtask
+    cha: E01-S05
+    jira: MAKN-144
+  - id: E01-S05-T04
+    loai: subtask
+    cha: E01-S05
+    jira: MAKN-145
+  - id: E01-S06
+    loai: story
+    cha: E01
+    jira: MAKN-127
+    sprint: 5
+    muc_brd: ["§IV 2.5", "§VI"]
+    ma_yc: ["FN-TI-02.05", "N-14"]
+  - id: E01-S06-T01
+    loai: subtask
+    cha: E01-S06
+    jira: MAKN-146
+  - id: E01-S06-T02
+    loai: subtask
+    cha: E01-S06
+    jira: MAKN-147
+  - id: E01-S06-T03
+    loai: subtask
+    cha: E01-S06
+    jira: MAKN-148
+  - id: E01-S07
+    loai: story
+    cha: E01
+    jira: MAKN-128
+    sprint: 4
+    muc_brd: ["§VI", "§IV 2.5", "§IV 3.2"]
+    ma_yc: ["N-14", "FN-TI-02.05", "FN-XA-03.02"]
+  - id: E01-S07-T01
+    loai: subtask
+    cha: E01-S07
+    jira: MAKN-149
+  - id: E01-S07-T02
+    loai: subtask
+    cha: E01-S07
+    jira: MAKN-150
+  - id: E01-S07-T03
+    loai: subtask
+    cha: E01-S07
+    jira: MAKN-151
+  - id: E02-S01
+    loai: story
+    cha: E02
+    jira: MAKN-123
+    sprint: 3
+    muc_brd: ["§IV 2.6", "§I.8"]
+    ma_yc: ["UR-TI-06", "FN-TI-02.06"]
+  - id: E02-S01-T01
+    loai: subtask
+    cha: E02-S01
+    jira: MAKN-152
+  - id: E02-S01-T02
+    loai: subtask
+    cha: E02-S01
+    jira: MAKN-153
+  - id: E02-S02
+    loai: story
+    cha: E02
+    jira: MAKN-129
+    sprint: 4
+    muc_brd: ["§IV 2.6", "§VI"]
+    ma_yc: ["UR-TI-06", "FN-TI-02.06"]
+  - id: E02-S02-T01
+    loai: subtask
+    cha: E02-S02
+    jira: MAKN-154
+  - id: E02-S02-T02
+    loai: subtask
+    cha: E02-S02
+    jira: MAKN-155
+  - id: E02-S02-T03
+    loai: subtask
+    cha: E02-S02
+    jira: MAKN-156
+  - id: E02-S02-T04
+    loai: subtask
+    cha: E02-S02
+    jira: MAKN-157
+  - id: E02-S03
+    loai: story
+    cha: E02
+    jira: MAKN-124
+    sprint: 6
+    muc_brd: ["§VI"]
+    ma_yc: ["N-14"]
+  - id: E02-S03-T01
+    loai: subtask
+    cha: E02-S03
+    jira: MAKN-158
+  - id: E02-S03-T02
+    loai: subtask
+    cha: E02-S03
+    jira: MAKN-159
+  - id: E02-S03-T03
+    loai: subtask
+    cha: E02-S03
+    jira: MAKN-160
+  - id: E03-S01
+    loai: story
+    cha: E03
+    jira: MAKN-125
+    sprint: 5
+    muc_brd: ["§IV 1.2"]
+    ma_yc: ["UR-TW-02", "FN-TW-01.02"]
+  - id: E03-S01-T01
+    loai: subtask
+    cha: E03-S01
+    jira: MAKN-161
+  - id: E03-S01-T02
+    loai: subtask
+    cha: E03-S01
+    jira: MAKN-162
+  - id: E03-S01-T03
+    loai: subtask
+    cha: E03-S01
+    jira: MAKN-163
+  - id: E03-S02
+    loai: story
+    cha: E03
+    jira: MAKN-126
+    sprint: 6
+    muc_brd: ["§IV 1.2"]
+    ma_yc: ["FN-TW-01.02"]
+  - id: E03-S02-T01
+    loai: subtask
+    cha: E03-S02
+    jira: MAKN-164
+  - id: E03-S02-T02
+    loai: subtask
+    cha: E03-S02
+    jira: MAKN-165
+  - id: E03-S02-T03
+    loai: subtask
+    cha: E03-S02
+    jira: MAKN-166
+  - id: E03-S02-T04
+    loai: subtask
+    cha: E03-S02
+    jira: MAKN-167
+  - id: E04-S02
+    loai: story
+    cha: E04
+    jira: MAKN-130
+    sprint: 4
+    muc_brd: ["§IV 4.4"]
+    ma_yc: ["UR-AD-04", "FN-AD-04.04"]
+  - id: E04-S02-T01
+    loai: subtask
+    cha: E04-S02
+    jira: MAKN-168
+  - id: E04-S02-T02
+    loai: subtask
+    cha: E04-S02
+    jira: MAKN-169
+  - id: E04-S02-T03
+    loai: subtask
+    cha: E04-S02
+    jira: MAKN-170
+  - id: E04-S03
+    loai: story
+    cha: E04
+    jira: MAKN-131
+    sprint: 4
+    muc_brd: ["§IV 0.1"]
+    ma_yc: ["FN-CH-00.01"]
+  - id: E04-S03-T01
+    loai: subtask
+    cha: E04-S03
+    jira: MAKN-171
+  - id: E04-S03-T02
+    loai: subtask
+    cha: E04-S03
+    jira: MAKN-172
+  - id: E05-S01
+    loai: story
+    cha: E05
+    jira: MAKN-132
+    sprint: 3
+    muc_brd: ["§IV 4.2"]
+    ma_yc: ["UR-AD-02"]
+  - id: E05-S01-T01
+    loai: subtask
+    cha: E05-S01
+    jira: MAKN-173
+  - id: E05-S01-T02
+    loai: subtask
+    cha: E05-S01
+    jira: MAKN-174
+  - id: E05-S02
+    loai: story
+    cha: E05
+    jira: MAKN-133
+    sprint: 5
+    muc_brd: ["§IV 3.5"]
+    ma_yc: ["UR-XA-18", "FN-XA-03.05", "UR-KT-01"]
+  - id: E05-S02-T01
+    loai: subtask
+    cha: E05-S02
+    jira: MAKN-175
+  - id: E05-S02-T02
+    loai: subtask
+    cha: E05-S02
+    jira: MAKN-176
+  - id: E05-S02-T03
+    loai: subtask
+    cha: E05-S02
+    jira: MAKN-177
+  - id: E05-S02-T04
+    loai: subtask
+    cha: E05-S02
+    jira: MAKN-178
+  - id: E05-S03
+    loai: story
+    cha: E05
+    jira: MAKN-134
+    sprint: 5
+    muc_brd: ["§IV 2.3", "§IV 2.7", "§I.8"]
+    ma_yc: ["FN-TI-02.03", "FN-TI-02.07"]
+  - id: E05-S03-T01
+    loai: subtask
+    cha: E05-S03
+    jira: MAKN-179
+  - id: E05-S03-T02
+    loai: subtask
+    cha: E05-S03
+    jira: MAKN-180
+  - id: E06-S05
+    loai: story
+    cha: E06
+    jira: MAKN-135
+    sprint: 3
+    muc_brd: ["§VI"]
+    ma_yc: ["N-13"]
+  - id: E06-S05-T01
+    loai: subtask
+    cha: E06-S05
+    jira: MAKN-181
+  - id: E06-S05-T02
+    loai: subtask
+    cha: E06-S05
+    jira: MAKN-182
