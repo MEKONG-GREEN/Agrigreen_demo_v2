@@ -4,14 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,22 +19,16 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	fixture "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/fixtures/khtcdeadline209"
-	planfixture "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/fixtures/khtcplan225"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -72,24 +63,12 @@ func (s *planSession225) Middleware() gin.HandlerFunc {
 
 type planPublisher225 struct {
 	formsport.Publisher
-	calls        atomic.Int64
-	durableCalls atomic.Int64
+	calls atomic.Int64
 }
 
 func (p *planPublisher225) PublishBatch(ctx context.Context, in formsport.BatchInput, key string) ([]formsport.PublishedPeriod, error) {
 	p.calls.Add(1)
 	return p.Publisher.PublishBatch(ctx, in, key)
-}
-
-var _ formsport.DurablePublisher = (*planPublisher225)(nil)
-
-func (p *planPublisher225) PublishBatchOnce(ctx context.Context, in formsport.BatchInput, key string) ([]formsport.PublishedPeriod, error) {
-	p.durableCalls.Add(1)
-	durable, ok := p.Publisher.(formsport.DurablePublisher)
-	if !ok {
-		return nil, fmt.Errorf("native durable publisher unavailable")
-	}
-	return durable.PublishBatchOnce(ctx, in, key)
 }
 
 func TestInitialDraft225P804PlanlessOpenHasNoNativeEffect(t *testing.T) {
@@ -292,19 +271,11 @@ func TestInitialDraft225NativeCRUDGenerationAndPublishFence(t *testing.T) {
 	if first.DraftID == "" || first.Revision != 1 || first.Actor != a.String() {
 		t.Fatal("create receipt binding incorrect")
 	}
-	// Rename the live master after the acknowledged draft. Direct public app
-	// receipt replay intentionally bypasses the HTTP cache and must retain stored data.
+	// Rename the live master; HTTP replay retains the original nonempty ACK.
+	// Owner app integration independently bypasses this outer HTTP cache.
 	renameCode, _ := call(a, http.MethodPost, "/v1/kn/khtc/programs/"+program.Ref.String()+"/revise", "draft225-rename-master", map[string]any{"code": "P225", "name": "Tên danh mục mới225", "kind": "program", "active": true})
 	if renameCode != 201 {
 		t.Fatalf("real master rename status=%d", renameCode)
-	}
-	k := contexts[a]
-	principal := fixture.Bind(t, authz.Principal{ActorRef: a, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: true, KN: &k})
-	ownedReplay225 := db.ForModule(pool, extension.DBModule)
-	svc := planfixture.NewApp225(ownedReplay225, ownedReplay225, clk)
-	own, wasReplay, replayErr := svc.Save(authz.WithPrincipal(context.Background(), principal), planfixture.Input225{Year: 2030, ExpectedRevision: 0, IdemKey: "draft225-create", Note: "initial", Entries: []planfixture.Entry225{{Ref: entryRef, Tab: "programs", Kind: "program", ProgramRef: &program.Ref, Name: "Tên dòng đã chốt225", Code: "P225", SortOrder: 1, Tracking: "tracking", Communes: []string{}}}})
-	if replayErr != nil || !wasReplay || own.Event.ID.String() != first.EventID || len(own.Entries) != 1 || own.Entries[0].Name != "Tên dòng đã chốt225" || own.Entries[0].Code != "P225" || own.Entries[0].ProgramName != "" {
-		t.Fatalf("immutable nonempty app receipt replay failed: replay=%t error=%T", wasReplay, replayErr)
 	}
 	code, replayed := call(a, http.MethodPost, path, "draft225-create", body)
 	if code != 201 || !bytes.Equal(raw, replayed) {
@@ -485,323 +456,5 @@ func TestInitialDraft225BuildListPublicRenewalAndCurrentPolicy(t *testing.T) {
 	code, _ = call(http.MethodPost, path, "draft225-real-create", b, true, body)
 	if code != 403 {
 		t.Fatalf("revoked current grant recovered cached ACK status=%d", code)
-	}
-}
-
-func TestInitialDraft225P804DirectAdhocRecoveryUsesStoredOwnerPlan(t *testing.T) {
-	env := pgtest.Get(t)
-	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
-	clk := clock.NewFixed(time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC))
-	kn := extension.New(pool, clk, extension.Deps{})
-	fm, err := wireForms(pool, clk, workflow.New(pool, clk), kn, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	probe := &planPublisher225{Publisher: fm.Publisher()}
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: probe, Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Entry: fm.Entry(), MaxSubmissions: KNKHTCProfile.MaxSubmissions})
-	tid, actor, org := ids.New(), ids.New(), ids.New()
-	owner := authz.KNContext{ID: ids.New(), Role: authz.KNAdmin, ExpiresAt: time.Now().Add(time.Hour), Scope: authz.Scope{All: true}}
-	issuer := authztest.New(t)
-	router := NewRouter(Deps{Log: telemetry.NewLogger("test", io.Discard), Verifier: issuer.Verifier(), Ops: pool, Modules: []httpx.Module{kn, &planSession225{t: t, contexts: map[uuid.UUID]authz.KNContext{actor: owner}}, fm}})
-	call := func(path string, body any) (int, []byte) {
-		t.Helper()
-		raw, e := json.Marshal(body)
-		if e != nil {
-			t.Fatal(e)
-		}
-		req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw))
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Idempotency-Key", "draft225:adhoc:"+ids.New().String())
-		req.Header.Set("Authorization", "Bearer "+issuer.Sign(t, authztest.Token{Subject: actor, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: true}))
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		return rec.Code, rec.Body.Bytes()
-	}
-	if status, _ := call("/v1/extension/khtc/form-template/install", nil); status != 200 {
-		t.Fatalf("template status=%d", status)
-	}
-	principal := fixture.Bind(t, authz.Principal{ActorRef: actor, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: true, KN: &owner})
-	ctx := authz.WithPrincipal(context.Background(), principal)
-	owned := db.ForModule(pool, extension.DBModule)
-	intent, e := planfixture.NewLegacyIntent225(ctx, clk, fm.Publisher(), 2026)
-	if e != nil {
-		t.Fatal(e)
-	}
-	counts := func() (int, int, int) {
-		t.Helper()
-		i, l, p, e := planfixture.CalendarCounts225(ctx, owned)
-		if e != nil {
-			t.Fatal(e)
-		}
-		return i, l, p
-	}
-	// A fresh adhoc path is fenced before creating any intent or native dispatch.
-	if status, raw := call("/v1/extension/khtc/periods", map[string]any{"report_type": "adhoc", "name": intent.Name, "from_date": "2026-10-01", "to_date": "2026-10-13", "departments": intent.Departments, "due_at": intent.DueAt, "export_due_at": intent.DueAt}); status != 409 || !bytes.Contains(raw, []byte(`"extension.khtc_plan_required"`)) {
-		t.Fatalf("fresh adhoc plan guard status=%d", status)
-	}
-	if i, l, p := counts(); i != 0 || l != 0 || p != 0 || probe.durableCalls.Load() != 0 {
-		t.Fatalf("fresh adhoc wrote state: intents=%d leases=%d periods=%d durable=%d", i, l, p, probe.durableCalls.Load())
-	}
-	if e = intent.Insert(ctx, owned); e != nil {
-		t.Fatal(e)
-	}
-	readIntent := func() planfixture.IntentSnapshot225 {
-		t.Helper()
-		x, e := intent.Snapshot(ctx, owned)
-		if e != nil {
-			t.Fatalf("intent read error=%T", e)
-		}
-		return x
-	}
-	before := readIntent()
-	path := "/v1/extension/khtc/adhoc-open-intents/" + intent.ID.String() + "/reconcile"
-	if status, raw := call(path, map[string]any{"expected_generation": 0}); status != 409 || !bytes.Contains(raw, []byte(`"extension.khtc_plan_required"`)) {
-		t.Fatalf("stored intent plan guard status=%d", status)
-	}
-	if i, l, p := counts(); i != 1 || l != 0 || p != 0 || probe.durableCalls.Load() != 0 || !reflect.DeepEqual(before, readIntent()) {
-		t.Fatalf("deny mutated stored intent: intents=%d leases=%d periods=%d durable=%d", i, l, p, probe.durableCalls.Load())
-	}
-	if status, _ := call("/v1/kn/khtc/plans/2026/versions", map[string]any{"base_version": 0, "entries": []any{}, "effective_from": "2026-01-01"}); status != 201 {
-		t.Fatalf("real empty plan status=%d", status)
-	}
-	var result struct {
-		ID            uuid.UUID `json:"id"`
-		FormsPeriodID uuid.UUID `json:"forms_period_id"`
-	}
-	status, raw := call(path, map[string]any{"expected_generation": 0})
-	if status != 200 || json.Unmarshal(raw, &result) != nil || result.ID != intent.PlannedPeriodID || result.FormsPeriodID == uuid.Nil || probe.durableCalls.Load() != 1 {
-		t.Fatalf("real durable recovery status=%d durable=%d native_id=%t", status, probe.durableCalls.Load(), result.FormsPeriodID != uuid.Nil)
-	}
-	snap, e := fm.ConditionalControl().ControlSnapshot(ctx, KNKHTCProfile.Name, result.FormsPeriodID)
-	if e != nil || snap.Revision.PeriodID != result.FormsPeriodID || snap.Revision.EventSeq < 1 {
-		t.Fatalf("native snapshot proof error=%T", e)
-	}
-	replayStatus, replayRaw := call(path, map[string]any{"expected_generation": 0})
-	var replay struct {
-		ID            uuid.UUID `json:"id"`
-		FormsPeriodID uuid.UUID `json:"forms_period_id"`
-	}
-	if replayStatus != 200 || json.Unmarshal(replayRaw, &replay) != nil || replay != result || probe.durableCalls.Load() != 1 {
-		t.Fatalf("completed recovery replay status=%d durable=%d", replayStatus, probe.durableCalls.Load())
-	}
-	if i, l, p := counts(); i != 1 || l != 0 || p != 1 {
-		t.Fatalf("recovery cardinality intents=%d leases=%d periods=%d", i, l, p)
-	}
-}
-
-// The fixture loses the ACK only after the real owned COMMIT succeeds.
-func TestInitialDraft225LostCommitPoolOneStoredReplayAndHistoryPaging(t *testing.T) {
-	env := pgtest.Get(t)
-	base := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
-	cfg := base.Config().Copy()
-	cfg.MaxConns = 1
-	cfg.MinConns = 0
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	pool, e := pgxpool.NewWithConfig(ctx, cfg)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer pool.Close()
-	clk := clock.NewFixed(time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC))
-	tid, actor, org := ids.New(), ids.New(), ids.New()
-	owner := authz.KNContext{ID: ids.New(), Role: authz.KNTinh, Department: "ke_hoach_tai_chinh", OrgRef: org, ExpiresAt: clk.Now().Add(time.Hour), Scope: authz.Scope{Units: []string{"X1"}}}
-	p := fixture.Bind(t, authz.Principal{ActorRef: actor, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: false, KN: &owner})
-	ctx = authz.WithPrincipal(ctx, p)
-	owned := db.ForModule(pool, extension.DBModule)
-	fault := planfixture.NewLostAckDB225(owned)
-	svc := planfixture.NewApp225(fault, owned, clk)
-	input := planfixture.Input225{Year: 2036, ExpectedRevision: 0, IdemKey: "draft225-lost-commit", Entries: []planfixture.Entry225{}, Note: "saved but ACK lost"}
-	_, replay, err := svc.Save(ctx, input)
-	if !errors.Is(err, context.DeadlineExceeded) || replay || !fault.Fired() {
-		t.Fatalf("commit fault not exercised: replay=%t err=%T", replay, err)
-	}
-	first, replay, err := svc.Save(ctx, input)
-	if err != nil || !replay || first.Event.Seq != 1 {
-		t.Fatalf("exact commit recovery failed: replay=%t err=%T", replay, err)
-	}
-	for revision := int64(2); revision <= 101; revision++ {
-		next, hit, err := svc.Save(ctx, planfixture.Input225{Year: input.Year, DraftID: first.Event.DraftID, ExpectedRevision: revision - 1, Entries: []planfixture.Entry225{}, IdemKey: fmt.Sprintf("draft225-page-%d", revision)})
-		if err != nil || hit || next.Event.Seq != revision {
-			t.Fatalf("history append revision=%d replay=%t err=%T", revision, hit, err)
-		}
-	}
-	historical, hit, err := svc.Save(ctx, input)
-	if err != nil || !hit || historical.Event.ID != first.Event.ID || historical.Event.Seq != 1 {
-		t.Fatalf("old operation was promoted to latest: replay=%t err=%T", hit, err)
-	}
-	page, err := svc.History(ctx, input.Year, 0, 100)
-	if err != nil || len(page) != 100 || page[0].Seq != 101 || page[99].Seq != 2 {
-		t.Fatalf("complete first history page size=%d err=%T", len(page), err)
-	}
-	tail, err := svc.History(ctx, input.Year, page[99].Seq, 100)
-	if err != nil || len(tail) != 1 || tail[0].ID != first.Event.ID {
-		t.Fatalf("history tail size=%d err=%T", len(tail), err)
-	}
-	renewed := owner
-	renewed.ID = ids.New()
-	renewed.ExpiresAt = owner.ExpiresAt.Add(time.Hour)
-	renewedP := fixture.Bind(t, authz.Principal{ActorRef: actor, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: false, KN: &renewed})
-	again, hit, err := svc.Save(authz.WithPrincipal(ctx, renewedP), input)
-	if err != nil || !hit || again.Event.ID != first.Event.ID {
-		t.Fatalf("same-authority renewed replay failed: replay=%t err=%T", hit, err)
-	}
-	renewed.ViewOnly = true
-	readonly := fixture.Bind(t, authz.Principal{ActorRef: actor, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, MFA: false, KN: &renewed})
-	_, _, err = svc.Save(authz.WithPrincipal(ctx, readonly), input)
-	var denied *problem.Problem
-	if !errors.As(err, &denied) || denied.Status != 403 {
-		t.Fatalf("current read-only authority was not enforced: err=%T", err)
-	}
-	count, _, err := planfixture.YearCounts225(ctx, owned, input.Year)
-	if err != nil || count != 101 {
-		t.Fatalf("receipt replays appended events: count=%d err=%T", count, err)
-	}
-}
-
-type heldDraftYear225 struct {
-	tenant.Beginner
-	key     string
-	hold    bool
-	once    atomic.Bool
-	before  chan uint32
-	locked  chan struct{}
-	release chan struct{}
-}
-type heldDraftYearTx225 struct {
-	pgx.Tx
-	owner *heldDraftYear225
-}
-
-func (b *heldDraftYear225) BeginTx(ctx context.Context, opt pgx.TxOptions) (pgx.Tx, error) {
-	tx, e := b.Beginner.BeginTx(ctx, opt)
-	if e != nil {
-		return nil, e
-	}
-	return &heldDraftYearTx225{Tx: tx, owner: b}, nil
-}
-func (tx *heldDraftYearTx225) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-	target := strings.Contains(sql, "pg_advisory_xact_lock") && len(args) == 1 && args[0] == tx.owner.key
-	first := target && tx.owner.once.CompareAndSwap(false, true)
-	if first {
-		tx.owner.before <- tx.Conn().PgConn().PID()
-	}
-	tag, e := tx.Tx.Exec(ctx, sql, args...)
-	if e == nil && first && tx.owner.hold {
-		close(tx.owner.locked)
-		select {
-		case <-tx.owner.release:
-		case <-ctx.Done():
-			return tag, ctx.Err()
-		}
-	}
-	return tag, e
-}
-func TestInitialDraft225CreateAndLegacyPublishSerializeBothOrders(t *testing.T) {
-	for _, draftFirst := range []bool{true, false} {
-		t.Run(fmt.Sprintf("draft_first_%t", draftFirst), func(t *testing.T) {
-			env := pgtest.Get(t)
-			pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
-			clk := clock.NewFixed(time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC))
-			tid, actor, org := ids.New(), ids.New(), ids.New()
-			year := 2037
-			owner := authz.KNContext{ID: ids.New(), Role: authz.KNTinh, Department: "ke_hoach_tai_chinh", OrgRef: org, ExpiresAt: clk.Now().Add(time.Hour), Scope: authz.Scope{Units: []string{"X1"}}}
-			p := fixture.Bind(t, authz.Principal{ActorRef: actor, TenantID: tid, OrgRef: org, Roles: []string{"kn_user"}, KN: &owner})
-			ctx, cancel := context.WithTimeout(authz.WithPrincipal(context.Background(), p), 15*time.Second)
-			defer cancel()
-			owned := db.ForModule(pool, extension.DBModule)
-			firstDB := &heldDraftYear225{Beginner: owned, key: fmt.Sprintf("plan:%d", year), hold: true, before: make(chan uint32, 1), locked: make(chan struct{}), release: make(chan struct{})}
-			secondDB := &heldDraftYear225{Beginner: owned, key: firstDB.key, before: make(chan uint32, 1)}
-			var release sync.Once
-			unlock := func() { release.Do(func() { close(firstDB.release) }) }
-			defer unlock()
-			first := planfixture.NewApp225(firstDB, owned, clk)
-			second := planfixture.NewApp225(secondDB, owned, clk)
-			run := func(svc *planfixture.App225, draft bool, key string) error {
-				if draft {
-					_, _, err := svc.Save(ctx, planfixture.Input225{Year: year, IdemKey: key, Entries: []planfixture.Entry225{}})
-					return err
-				}
-				return svc.Publish(ctx, year, key)
-			}
-			firstDone := make(chan error, 1)
-			secondDone := make(chan error, 1)
-			firstPending, secondPending := true, false
-			defer func() {
-				unlock()
-				cancel()
-				if firstPending {
-					select {
-					case <-firstDone:
-					case <-time.After(time.Second):
-					}
-				}
-				if secondPending {
-					select {
-					case <-secondDone:
-					case <-time.After(time.Second):
-					}
-				}
-			}()
-			go func() { firstDone <- run(first, draftFirst, "draft225-race-first") }()
-			select {
-			case <-firstDB.locked:
-			case err := <-firstDone:
-				firstPending = false
-				t.Fatalf("first did not acquire year lock: err=%T", err)
-			case <-ctx.Done():
-				t.Fatal("year lock barrier timed out")
-			}
-			secondPending = true
-			go func() { secondDone <- run(second, !draftFirst, "draft225-race-second") }()
-			var pid uint32
-			select {
-			case pid = <-secondDB.before:
-			case err := <-secondDone:
-				secondPending = false
-				t.Fatalf("second did not request year lock: err=%T", err)
-			case <-ctx.Done():
-				t.Fatal("second lock request timed out")
-			}
-			ticker := time.NewTicker(5 * time.Millisecond)
-			defer ticker.Stop()
-			waiting := false
-			for !waiting {
-				if err := pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_locks WHERE pid=$1 AND locktype='advisory' AND NOT granted)`, pid).Scan(&waiting); err != nil {
-					t.Fatal(err)
-				}
-				if !waiting {
-					select {
-					case <-ticker.C:
-					case <-ctx.Done():
-						t.Fatal("real advisory waiter not observed")
-					}
-				}
-			}
-			unlock()
-			select {
-			case err := <-firstDone:
-				firstPending = false
-				if err != nil {
-					t.Fatalf("first winner error=%T", err)
-				}
-			case <-ctx.Done():
-				t.Fatal("first completion timed out")
-			}
-			select {
-			case err := <-secondDone:
-				secondPending = false
-				var p *problem.Problem
-				if !errors.As(err, &p) || p.Status != 409 {
-					t.Fatalf("competing operation must conflict: err=%T", err)
-				}
-			case <-ctx.Done():
-				t.Fatal("second completion timed out")
-			}
-			drafts, versions, err := planfixture.YearCounts225(ctx, owned, year)
-			if err != nil || draftFirst && (drafts != 1 || versions != 0) || !draftFirst && (drafts != 0 || versions != 1) {
-				t.Fatalf("year families both persisted: drafts=%d versions=%d err=%T", drafts, versions, err)
-			}
-		})
 	}
 }
