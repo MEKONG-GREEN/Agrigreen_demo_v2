@@ -3,7 +3,19 @@
 # đặt tên `optcore` (BuildKit). Từ gốc repo:
 #   docker build --build-context optcore=lib/optcore -t agrigreen/optimizer optimizer
 # Compose: additional_contexts trong deploy/compose/docker-compose.yml.
-FROM python:3.12-slim AS build
+FROM python:3.12-slim-trixie AS base
+# CVE-2026-109518: cả build/runtime dùng APT đã vá; tắt retry khi bootstrap bản cũ.
+RUN set -eux; \
+    apt-get -o Acquire::Retries=0 update; \
+    apt-get -o Acquire::Retries=0 install -y --no-install-recommends --only-upgrade apt libapt-pkg7.0; \
+    for apt_package in apt libapt-pkg7.0; do \
+        apt_version="$(dpkg-query -W -f='${Version}' "$apt_package")"; \
+        dpkg --compare-versions "$apt_version" ge 3.0.4; \
+        echo "$apt_package=$apt_version"; \
+    done; \
+    rm -rf /var/lib/apt/lists/*
+
+FROM base AS build
 WORKDIR /src
 COPY --from=optcore pyproject.toml README.md /optcore/
 COPY --from=optcore src /optcore/src
@@ -14,7 +26,7 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip wheel --no-cache-dir --no-deps --wheel-dir /wheels /optcore \
  && pip wheel --no-cache-dir --find-links /wheels --wheel-dir /wheels ".[milp]"
 
-FROM python:3.12-slim
+FROM base
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN groupadd --system --gid 10001 optimizer \
  && useradd --system --uid 10001 --gid optimizer --no-create-home --shell /usr/sbin/nologin optimizer
