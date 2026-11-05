@@ -2,8 +2,7 @@ import { uuidv7 } from "../idempotency";
 import { problem, type Route } from "./http";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { contextProblem, personaForContext } from "./kn";
-import { supportGuard, supportRecord } from "./kn-admin";
-import { initialDraftMockPolicy225, isInitialDraftMockPath225 } from "./kn-khtc";
+import { supportGuard, supportRecord, initialDraftMockPolicy225, isInitialDraftMockPath225 } from "./kn-admin";
 
 // BEGIN GENERATED MOCK ROUTES
 import { orderedRoutes, type RouteRegistration } from "./registry";

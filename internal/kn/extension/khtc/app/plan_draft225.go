@@ -270,7 +270,8 @@ func (s *Service) writeInitial225(ctx context.Context, in InitialDraftInput225, 
 		return out, false, problem.Validation
 	}
 	if err = domain.CheckDraftResource225(in.Entries); err != nil {
-		if fields, ok := err.(domain.Errors); ok {
+		var fields domain.Errors
+		if errors.As(err, &fields) {
 			return out, false, fieldsProblem(ErrPlanInvalid, fields)
 		}
 		return out, false, ErrPlanInvalid.WithField("entries", "dữ liệu vượt giới hạn")

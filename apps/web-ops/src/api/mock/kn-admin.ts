@@ -1122,6 +1122,8 @@ export function resetKnAdmin(): void {
   SUPPORT_OPEN.clear();
 }
 
+export { initialDraftMockPolicy225, isInitialDraftMockPath225 } from "./kn-khtc";
+
 // BEGIN GENERATED MOCK ROUTES
 import type { RouteRegistration } from "./registry";
 import { knAppRoutes as route0 } from "./kn";
