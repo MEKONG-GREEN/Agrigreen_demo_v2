@@ -9,6 +9,15 @@ jira:
   project: MAKN
   label: brd-kn-trong-trot
 items:
+  - id: E01
+    loai: epic
+    jira: MAKN-114
+  - id: E04
+    loai: epic
+    jira: MAKN-115
+  - id: E06
+    loai: epic
+    jira: MAKN-116
   - id: E01-S01
     loai: story
     cha: E01
