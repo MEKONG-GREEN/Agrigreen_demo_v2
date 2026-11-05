@@ -31,6 +31,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/form-templates", h.templates)
 	g.GET("/my-forms", h.tasks)
 	g.GET("/periods/:id/forms/:dept", h.get)
+	g.GET("/periods/:id/forms/:dept/submissions", h.submissionHistory)
+	g.GET("/periods/:id/forms/:dept/submissions/:submissionID", h.historicalSubmission)
 	g.POST("/periods/:id/forms/:dept/draft", h.draft)
 	g.POST("/periods/:id/forms/:dept/submit", h.submit)
 	g.POST("/periods/:id/forms/:dept/review", h.review)
