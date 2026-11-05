@@ -89,6 +89,16 @@ Chạy toàn bộ [checklists/quality.md](checklists/quality.md). Mục trượt
 5. Sau **mỗi** ticket tạo thành công: ghi mã Jira vào cột *Jira key* của Sheet và vào `docs/brd/jira/<mã-hệ>.yaml`. Lỗi giữa chừng → dừng, báo đã tạo những gì; lần chạy lại tiếp tục từ mục chưa có `jira:`.
 6. Xong: commit tệp nối (commit message tiếng Việt, tiền tố mã gói theo AGENTS.md §4), báo người dùng link filter Jira (`labels = brd-<mã-hệ>`), số ticket theo loại, sprint đã gán.
 
+## Chế độ phần còn lại (hệ đã triển khai một phần)
+
+Khi repo đã có mã cho BRD (có `docs/uat/*-acceptance.md`, gói trong `docs/roadmap.d/`, issue GitHub theo phòng): hỏi người dùng muốn backlog đủ BRD hay chỉ phần còn lại. Mỗi hệ BRD dùng một project Jira riêng nếu người dùng nói vậy; không trộn hệ.
+
+Chỉ phần còn lại thì:
+1. Lấy yêu cầu "một phần" và "chưa làm" từ ma trận nghiệm thu, rồi **đối chiếu lại** với các gói gộp sau ngày của ma trận (roadmap, giả định gói, mã) — ma trận thường cũ.
+2. Đọc issue GitHub đang mở của phòng để không tạo trùng; ghi số issue vào cột `Issue GitHub liên quan`.
+3. Tab Story thêm cột `Hiện trạng trong repo` (đã có gì, còn thiếu gì); tab Yêu cầu chỉ liệt kê yêu cầu còn mở, thêm cột hiện trạng.
+4. Giữ mã câu hỏi khách đã có trong repo (Q-xx) để truy vết; việc chờ khách xếp từ sprint 3, sprint 1–2 chỉ gồm việc làm được ngay.
+
 ## Chế độ cập nhật (BRD đổi phiên bản)
 
 1. Đọc BRD mới (bước 1–2), so danh mục yêu cầu với lần trước theo mã yêu cầu/mục BRD trong tệp nối.
