@@ -7,26 +7,27 @@
 //  - KhtcFormReviewScreen — /kn/khtc/ra-soat/{period_id}?department=: KHTC rà soát (FN-TI-02.04) — yêu cầu bổ sung (bắt
 //    buộc nội dung), xác nhận, phiếu trước / tiếp theo. "So sánh lần gửi" để sau G1.
 import { useParams, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useLoad } from "@/kn/cycle/common";
 import { FORM_TONE, createKhtcPeriodApi, vnDate } from "../periods/api";
+import { ApiProblem } from "@/api/problem";
+import { newIdempotencyKey, outcomeUnknown } from "@/api/idempotency";
+import { DetailPage } from "@/components/patterns/detail";
+import { useInboxAuthorityKey } from "../inbox/inbox-workspace";
+import { INBOX_BASE, parseInboxRoute } from "../inbox/inbox-routes";
+import { editorIssues } from "./editor";
+import styles from "./KhtcFormEntry.module.css";
 import { KhtcFormView } from "./KhtcFormView";
 import {
   KHTC_DEPT,
   cloneContent,
   createKhtcFormApi,
+  normalizeForSend,
   type KhtcFormContent,
   type KhtcFormSheet,
 } from "./api";
-
-function useDept(): string {
-  const { kn } = useAuth();
-  const q = useSearchParams()?.get("department");
-  const own = kn.context?.department_code ?? "";
-  return q || (own === KHTC_DEPT ? "" : own);
-}
 
 function FormHead({ f }: { f: KhtcFormSheet }) {
   return (
@@ -61,113 +62,105 @@ function FormHead({ f }: { f: KhtcFormSheet }) {
 }
 
 export function KhtcFormEntryScreen() {
- const {kn}=useAuth();
- return <FormEntry key={JSON.stringify(kn.context)}/>;
-}
-function FormEntry() {
-  const { api } = useAuth();
+  const auth = useAuth();
+  const authority = useInboxAuthorityKey();
   const { periodId } = useParams<{ periodId: string }>();
-  const dept = useDept();
-  const fapi = useMemo(() => (api ? createKhtcFormApi(api) : null), [api]);
-  const form = useLoad(fapi && dept ? () => fapi.get(periodId, dept) : null, [
-    fapi,
-    periodId,
-    dept,
-  ]);
-  // Phiếu mới nhất (phản hồi Lưu nháp / Gửi) và bản sửa cục bộ gắn với đúng phiếu đó.
-  const [view, setView] = useState<KhtcFormSheet | null>(null);
-  const [edit, setEdit] = useState<{
-    of: KhtcFormSheet;
-    c: KhtcFormContent;
-  } | null>(null);
-  const act = useAction();
-  if (!fapi) return null;
-  if (!dept)
-    return <p className="mute">Chọn phòng (?department=) để xem phiếu.</p>;
-  const apply = (r: KhtcFormSheet | null) => {
-    if (r) {
-      setView(r);
-      setEdit(null);
-    }
+  const query = useSearchParams();
+  const route = parseInboxRoute(`${INBOX_BASE}/phieu/${periodId}`, new URLSearchParams(query.toString()));
+  const dept = route?.department || (auth.kn.context?.department_code !== KHTC_DEPT ? auth.kn.context?.department_code : "") || "";
+  if (!route) return <p role="alert">Đường dẫn phiếu không hợp lệ. Kiểm tra mã kỳ và phòng.</p>;
+  if (auth.status !== "authenticated" || !auth.principal || auth.kn.status !== "active" || !auth.kn.context)
+    return <p role="alert">Chọn ngữ cảnh làm việc để đọc phiếu.</p>;
+  if (!dept) return <p role="alert">Chọn phòng để đọc phiếu.</p>;
+  // A committed route/authority change starts a new lifetime, including A → B → A.
+  return <FormEntry key={`${authority}:${periodId}:${query}`} periodId={periodId} dept={dept} />;
+}
+
+type PendingFormWrite = { kind: "draft" | "submit"; sheet: KhtcFormContent; attempt: number; key: string };
+
+function FormEntry({ periodId, dept }: { periodId: string; dept: string }) {
+  const { api, kn } = useAuth();
+  const fapi = useMemo(() => createKhtcFormApi(api), [api]);
+  const checkResource = (value: KhtcFormSheet) => {
+    if (value.period.id !== periodId || value.department !== dept) throw new Error("Mismatched form resource");
+    return value;
   };
-  return (
-    <div className="page">
-      <LoadState s={form}>
-        {() => {
-          const f =
-            view && view.period.id === periodId && view.department === dept
-              ? view
-              : form.data!;
-          const c = edit?.of === f ? edit.c : cloneContent(f.content);
-          const setContent = (next: KhtcFormContent) =>
-            setEdit({ of: f, c: next });
-          return (
-            <>
-              <PageHeader
-                title={`Phiếu ${f.department_name} · ${f.period.name}`}
-                actions={
-                  <>
-                    <StatusPill tone={FORM_TONE[f.state]}>
-                      {f.state_label}
-                    </StatusPill>
-                    {f.editable ? (
-                      <>
-                        <button
-                          className="btn"
-                          disabled={act.busy}
-                          onClick={async () =>
-                            apply(
-                              await act.run(
-                                () => fapi.draft(periodId, dept, c, f.attempt),
-                                "Đã lưu nháp.",
-                              ),
-                            )
-                          }
-                        >
-                          Lưu nháp
-                        </button>
-                        <button
-                          className="btn btn-primary"
-                          disabled={act.busy || !!f.supplement && c.adhoc_request_id!==f.supplement.id}
-                          onClick={async () =>
-                            apply(
-                              await act.run(
-                                () => fapi.submit(periodId, dept, c, f.attempt),
-                                (r) => `Đã gửi KHTC lần ${r.attempt}.`,
-                              ),
-                            )
-                          }
-                        >
-                          Gửi KHTC
-                        </button>
-                      </>
-                    ) : null}
-                  </>
-                }
-              />
-              {act.view}
-              <FormHead f={f} />
-              {f.draft_at && f.content_source === "draft" ? (
-                <p className="mute">Nháp lưu lúc {dt(f.draft_at)}.</p>
-              ) : null}
-              {!f.editable && f.state === "submitted" ? (
-                <p className="mute">
-                  Phiếu đã gửi — chỉ sửa, gửi lại khi KHTC yêu cầu bổ sung.
-                </p>
-              ) : null}
-              <section className="card sec">
-                <KhtcFormView
-                  form={f}
-                  content={c}
-                  onChange={f.editable ? setContent : undefined}
-                />
-              </section>
-            </>
-          );
-        }}
-      </LoadState>
-    </div>
-  );
+  const form = useLoad(() => fapi.get(periodId, dept).then(value => {
+    try { return checkResource(value); }
+    catch { throw new ApiProblem({ type: "about:blank", title: "Không đọc được phiếu", code: "extension.out_of_scope", status: 403 }); }
+  }), [fapi, periodId, dept]);
+  const [view, setView] = useState<KhtcFormSheet | null>(null);
+  const [edit, setEdit] = useState<KhtcFormContent | null>(null);
+  const [pending, setPending] = useState<PendingFormWrite | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [needsReload, setNeedsReload] = useState(false);
+  const flight = useRef(false);
+  const act = useAction();
+  const f = view ?? form.data;
+  const c = edit ?? (f ? cloneContent(f.content) : null);
+  const dirty = !!edit && !!f && JSON.stringify(normalizeForSend(edit)) !== JSON.stringify(normalizeForSend(f.content));
+  useEffect(() => {
+    if (!dirty && !pending) return;
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [dirty, pending]);
+  const editable = !!f?.editable && !kn.context?.read_only && !f.period.terminal
+    && (!!f.supplement || (kn.context?.role === "kn_tinh" && kn.context.department_code === dept));
+  const localIssues = f && c ? editorIssues(f, c, true) : [];
+  const invalid = localIssues.some(issue => issue.severity === "error");
+  const sendBlocked = !editable || invalid || !!f?.limit_reached || !!f?.supplement && c?.adhoc_request_id !== f.supplement.id;
+
+  const write = async (kind: PendingFormWrite["kind"]) => {
+    if (!f || !c || !editable || needsReload || flight.current || (pending && pending.kind !== kind) || (!pending && kind === "submit" && sendBlocked)) return;
+    const operation = pending ?? { kind, sheet: cloneContent(c), attempt: f.attempt, key: newIdempotencyKey() };
+    flight.current = true;
+    setPending(operation); setConfirming(false);
+    try {
+      await act.run(async () => {
+        try {
+          const response = checkResource(await fapi[kind](periodId, dept, operation.sheet, operation.attempt, operation.key));
+          setView(response); setEdit(null); setPending(null);
+          return response;
+        } catch (error) {
+          if (error instanceof ApiProblem && !outcomeUnknown({ status: error.status, code: error.code })) {
+            setPending(null);
+            if ([401, 403, 409].includes(error.status)) setNeedsReload(true);
+          }
+          throw error;
+        }
+      }, kind === "draft" ? "Đã lưu nháp." : response => `Đã gửi KHTC lần ${response.attempt}.`);
+    } finally { flight.current = false; }
+  };
+
+  if (needsReload) return <section role="alert"><p>Quyền hoặc phiên bản phiếu đã thay đổi. Tải lại để đọc trạng thái hiện tại trước khi sửa.</p><button className="btn" onClick={() => window.location.reload()}>Tải lại phiếu</button></section>;
+  return <div className={`page ${styles.entry}`}><LoadState s={form}>{() => f && c ? <DetailPage
+    back={{ href: INBOX_BASE, label: "Báo cáo cho KHTC" }}
+    title={`Phiếu ${f.department_name} · ${f.period.name}`}
+    badge={<StatusPill tone={FORM_TONE[f.state]}>{f.state_label}</StatusPill>}
+    actions={editable ? <>
+      <button className="btn" disabled={!!pending} onClick={() => void write("draft")}>Lưu nháp</button>
+      <button className="btn btn-p" disabled={!!pending || sendBlocked} onClick={() => f.supplement ? void write("submit") : setConfirming(true)}>Gửi KHTC</button>
+    </> : undefined}
+  >
+    {act.view}
+    <FormHead f={f} />
+    {f.draft_at && f.content_source === "draft" ? <p className="mute">Nháp lưu lúc {dt(f.draft_at)}.</p> : null}
+    <p role="status">{dirty ? "Có thay đổi chưa lưu." : "Nội dung đã đồng bộ."}</p>
+    {!editable ? <p className="mute">Phiếu chỉ đọc trong trạng thái và ngữ cảnh hiện tại.</p> : null}
+    {pending ? <section aria-label="Đối chiếu thao tác phiếu" role={act.busy ? "status" : "alert"}>
+      <p>{act.busy ? "Đang gửi yêu cầu; nội dung được giữ nguyên." : "Chưa xác định kết quả. Giữ nguyên nội dung và thử lại đúng thao tác này để đối chiếu."}</p>
+      <button className="btn" disabled={act.busy} onClick={() => void write(pending.kind)}>Thử lại {pending.kind === "draft" ? "Lưu nháp" : "Gửi KHTC"}</button>
+    </section> : null}
+    {confirming && !pending && !sendBlocked ? <section role="dialog" aria-label="Xác nhận gửi phiếu" className="alert alert-info">
+      <p>Gửi toàn bộ nội dung phiếu {f.department_name} · {f.period.name}, lần {f.attempt + 1}/{f.period.max_submissions || "∞"}? Phiếu đã gửi chỉ sửa khi có yêu cầu bổ sung.</p>
+      <button className="btn btn-p" onClick={() => void write("submit")}>Xác nhận gửi lần {f.attempt + 1}</button>
+      <button className="btn" onClick={() => setConfirming(false)}>Tiếp tục sửa</button>
+    </section> : null}
+    <fieldset disabled={!!pending} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} aria-label="Nội dung phiếu">
+      <KhtcFormView form={f} content={c} inputIssues={edit ? localIssues : [...f.issues, ...localIssues]} onChange={editable ? next => { if (!pending && !flight.current) { setEdit(next); setConfirming(false); } } : undefined} />
+    </fieldset>
+  </DetailPage> : null}</LoadState></div>;
 }
 
 export function KhtcFormReviewScreen() {
