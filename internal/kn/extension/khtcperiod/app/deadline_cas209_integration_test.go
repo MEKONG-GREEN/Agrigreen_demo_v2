@@ -28,6 +28,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -326,6 +327,8 @@ func (f *deadlineFx209) seedPublished225() {
 	}
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) { c.Request = c.Request.WithContext(ctx); c.Next() })
+	// Seed setup uses the standard key binding; native and consumer retain the same pool (including pool1).
+	engine.Use(idempotency.Middleware(pgtest.Get(f.t).Pool(f.t, migrations.PF, "platform_api")))
 	module.RegisterApp(engine.Group("/v1"))
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", bytes.NewBufferString(`{"base_version":0,"effective_from":"2026-01-01","entries":[]}`))
