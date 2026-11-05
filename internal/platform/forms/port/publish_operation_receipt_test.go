@@ -2,6 +2,7 @@ package port
 
 import (
 	"context"
+	"errors"
 	"math"
 	"reflect"
 	"strings"
@@ -80,7 +81,7 @@ func TestPublish224BoundsBeforeHashAndUnavailable(t *testing.T) {
 		})
 	}
 	got, err := ExecutePublishOperation(context.Background(), nil, validPublish224())
-	if err != ErrPublishOperationUnavailable || !reflect.DeepEqual(got, PublishOperationReceipt{Outcome: PublishOperationUnknown}) {
+	if !errors.Is(err, ErrPublishOperationUnavailable) || !reflect.DeepEqual(got, PublishOperationReceipt{Outcome: PublishOperationUnknown}) {
 		t.Fatal("nil capability not opaque failclosed")
 	}
 }

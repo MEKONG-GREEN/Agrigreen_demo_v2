@@ -110,7 +110,7 @@ func (c PublicationReceipts) run(ctx context.Context, in port.PublishOperationRe
 		return unknownPublish224(), err
 	}
 	op.readOnly = read
-	_, err = (Publisher{Svc: c.Svc}).publishBatchCore(ctx, op.request.Input, publishIdem224(op.request), false, op)
+	_, err = Publisher(c).publishBatchCore(ctx, op.request.Input, publishIdem224(op.request), false, op)
 	if err != nil {
 		return unknownPublish224(), err
 	} // Includes real COMMIT with lost ACK; no partial evidence.
