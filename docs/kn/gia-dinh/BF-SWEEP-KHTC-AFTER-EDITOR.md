@@ -16,7 +16,7 @@
 
 - DetailPage/breadcrumb/quay lại; nhóm nút bên phải, Yêu cầu bổ sung là nút chính; nguồn phòng chuyên môn chỉ đọc. Chọn phòng chỉ trong danh sách public của kỳ đã được đọc bằng quyền hiện tại. Kiểm UUID/query/phòng, dữ liệu GET và ACK đúng tài nguyên.
 - Thay client, actor/tenant/profile/MFA/context/role/phòng/kỳ/query tạo lifetime sạch. Phản hồi muộn và A→B→A không đưa dữ liệu hay thông báo thành công của lifetime cũ sang lifetime mới.
-- Hai quyết định đều cần xác nhận đúng phòng/kỳ/lần gửi và ghi chú đã trim. Ghi chú có nhãn, dấu bắt buộc và lỗi liên kết ô. Đổi ghi chú hủy xác nhận. Đổi phòng hoặc liên kết quay lại khi có ghi chú cần xác nhận bỏ; beforeunload cảnh báo dirty/unknown.
+- Hai quyết định đều cần xác nhận đúng phòng/kỳ/lần gửi và ghi chú đã trim. Xác nhận, đối chiếu và bỏ ghi chú nằm ngay dưới nhóm nút, trước bảng nguồn; focus chuyển vào xác nhận hoặc ô ghi chú sai để không bỏ sót ở phiếu dài. Ghi chú có nhãn, dấu bắt buộc và lỗi liên kết ô. Đổi ghi chú hủy xác nhận. Đổi phòng hoặc liên kết quay lại khi có ghi chú cần xác nhận bỏ; beforeunload cảnh báo dirty/unknown.
 - Pending/unknown khóa ghi chú, chuyển phòng và các nút quyết định. Chỉ thử lại cùng payload, target/version và Idempotency-Key. Network/408/425/429/5xx/idempotency_in_progress giữ nguyên lượt; 401/403/409 buộc đọc lại. Chỉ ACK trùng đúng ý định mới báo thành công và xóa ghi chú. Không ghi nội dung/khóa vào localStorage.
 
 ### Phần còn lại có chủ

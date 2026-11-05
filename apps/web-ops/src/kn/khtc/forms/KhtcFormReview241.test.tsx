@@ -53,7 +53,10 @@ describe("review241 — quyết định gắn với lần gửi đã đọc", ()
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "  Kiểm tra số liệu  " } });
     fireEvent.click(screen.getByRole("button", { name: "Yêu cầu bổ sung" }));
     expect(calls.review).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog", { name: "Xác nhận yêu cầu bổ sung" })).toHaveTextContent("Kiểm tra số liệu");
+    const dialog = screen.getByRole("dialog", { name: "Xác nhận yêu cầu bổ sung" });
+    expect(dialog).toHaveTextContent("Kiểm tra số liệu");
+    expect(dialog).toHaveFocus();
+    expect(dialog.compareDocumentPosition(screen.getByRole("textbox")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Gửi yêu cầu bổ sung" }));
     await waitFor(() => expect(calls.review).toHaveBeenCalledTimes(1));
     expect(calls.review.mock.calls[0]).toEqual([A, "trong_trot", { expected_submission_id: SID, base_attempt: 1, decision: "returned", note: "Kiểm tra số liệu" }, expect.any(String)]);
@@ -181,6 +184,7 @@ describe("review241 — đường dẫn, quyền và ghi chú", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yêu cầu bổ sung" }));
     const note = screen.getByRole("textbox", { name: /Nội dung yêu cầu bổ sung/ });
     expect(note).toHaveAttribute("aria-invalid", "true"); expect(note).toHaveAccessibleDescription("Bắt buộc nhập nội dung yêu cầu bổ sung.");
+    expect(note).toHaveFocus();
     expect(calls.review).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Xác nhận" }));
     expect(screen.getByRole("dialog", { name: "Xác nhận phiếu số liệu" })).toBeInTheDocument();

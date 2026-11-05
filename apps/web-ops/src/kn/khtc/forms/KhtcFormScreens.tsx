@@ -223,6 +223,8 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
   const [leaving, setLeaving] = useState<ReviewNavigation | null>(null);
   const [needsReload, setNeedsReload] = useState(false);
   const flight = useRef(false);
+  const noteSection = useRef<HTMLElement>(null);
+  const dialog = useRef<HTMLElement>(null);
   const act = useAction();
   const f = view ?? form.data;
   const latest = f?.submissions[0];
@@ -243,6 +245,8 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
     return () => window.removeEventListener("beforeunload", guard);
   }, [dirty, pending]);
 
+  useEffect(() => { if (confirming || leaving) dialog.current?.focus(); }, [confirming, leaving]);
+
   const navigate = (target: ReviewNavigation) => {
     if (pending || flight.current) return;
     if (dirty) { setConfirming(null); setLeaving(target); return; }
@@ -251,8 +255,11 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
   const prepare = (decision: KhtcFormReviewInput["decision"]) => {
     if (!canReview || !latest || pending || flight.current || needsReload) return;
     setNoteRequired(decision === "returned");
-    if (noteTooLong || decision === "returned" && !normalizedNote
-      || decision === "returned" && !f?.can_request_supplement || decision === "accepted" && !f?.can_confirm) return;
+    if (noteTooLong || decision === "returned" && !normalizedNote) {
+      noteSection.current?.querySelector("textarea")?.focus();
+      return;
+    }
+    if (decision === "returned" && !f?.can_request_supplement || decision === "accepted" && !f?.can_confirm) return;
     setLeaving(null);
     setConfirming({ input: { expected_submission_id: latest.id, base_attempt: latest.attempt, decision, note: normalizedNote }, key: newIdempotencyKey() });
   };
@@ -300,16 +307,7 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
     </>}
   >
     {act.view}
-    <SelectField label="Phòng được giao phiếu" value={department} disabled={!!pending} options={departments.map(d => ({ value: d.code, label: d.name }))} onChange={dept => { if (dept && dept !== department) navigate({ department: dept }); }} />
-    <FormHead f={f} />
-    {latest ? <p className="mute">Lần gửi đang đọc: {latest.attempt} · Gửi lúc {dt(latest.submitted_at)}.</p> : null}
-    <KhtcFormView form={f} content={f.content} />
-    {canReview ? <section className="sec" aria-label="Rà soát">
-      <TextField label="Nội dung yêu cầu bổ sung, điều chỉnh" multiline maxLength={4000} value={note} disabled={!!pending}
-        required={noteRequired} error={noteError} hint="Tối đa 1000 ký tự; bắt buộc khi yêu cầu bổ sung."
-        onChange={value => { if (!pending && !flight.current) { setNote(value.slice(0, 4001)); setConfirming(null); } }} />
-    </section> : <p className="mute">Phiếu chỉ đọc trong trạng thái và ngữ cảnh hiện tại.</p>}
-    {confirming && !pending ? <section role="dialog" aria-label={confirming.input.decision === "returned" ? "Xác nhận yêu cầu bổ sung" : "Xác nhận phiếu số liệu"} className="alert alert-info">
+    {confirming && !pending ? <section ref={dialog} tabIndex={-1} role="dialog" aria-label={confirming.input.decision === "returned" ? "Xác nhận yêu cầu bổ sung" : "Xác nhận phiếu số liệu"} className="alert alert-info">
       <p>{confirming.input.decision === "returned" ? "Gửi yêu cầu bổ sung" : "Xác nhận"} phiếu {f.department_name} · {f.period.name}, lần gửi {confirming.input.base_attempt}?</p>
       {confirming.input.note ? <p className={reviewStyles.note}>{confirming.input.note}</p> : null}
       <button className="btn btn-p" onClick={() => void dispatch(confirming)}>{confirming.input.decision === "returned" ? "Gửi yêu cầu bổ sung" : "Xác nhận lần gửi"}</button>
@@ -319,10 +317,19 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
       <p>{act.busy ? "Đang gửi yêu cầu rà soát; giữ nguyên lần gửi và ghi chú." : "Chưa xác định kết quả. Giữ nguyên lần gửi, nội dung và thử lại đúng thao tác này để đối chiếu."}</p>
       <button className="btn" disabled={act.busy} onClick={() => void dispatch(pending)}>Thử lại thao tác rà soát</button>
     </section> : null}
-    {leaving && !pending ? <section role="dialog" aria-label="Bỏ ghi chú chưa gửi?" className="alert alert-info">
+    {leaving && !pending ? <section ref={dialog} tabIndex={-1} role="dialog" aria-label="Bỏ ghi chú chưa gửi?" className="alert alert-info">
       <p>Ghi chú của phiếu này chưa được gửi. Bỏ ghi chú để chuyển?</p>
       <button className="btn" onClick={() => { if ("back" in leaving) router.push(backHref); else onDepartment(leaving.department); }}>Bỏ ghi chú và chuyển</button>
       <button className="btn btn-p" onClick={() => setLeaving(null)}>Giữ ghi chú</button>
     </section> : null}
+    <SelectField label="Phòng được giao phiếu" value={department} disabled={!!pending} options={departments.map(d => ({ value: d.code, label: d.name }))} onChange={dept => { if (dept && dept !== department) navigate({ department: dept }); }} />
+    <FormHead f={f} />
+    {latest ? <p className="mute">Lần gửi đang đọc: {latest.attempt} · Gửi lúc {dt(latest.submitted_at)}.</p> : null}
+    <KhtcFormView form={f} content={f.content} />
+    {canReview ? <section ref={noteSection} className="sec" aria-label="Rà soát">
+      <TextField label="Nội dung yêu cầu bổ sung, điều chỉnh" multiline maxLength={4000} value={note} disabled={!!pending}
+        required={noteRequired} error={noteError} hint="Tối đa 1000 ký tự; bắt buộc khi yêu cầu bổ sung."
+        onChange={value => { if (!pending && !flight.current) { setNote(value.slice(0, 4001)); setConfirming(null); } }} />
+    </section> : <p className="mute">Phiếu chỉ đọc trong trạng thái và ngữ cảnh hiện tại.</p>}
   </DetailPage> : null}</LoadState></div>;
 }

@@ -43,6 +43,7 @@ test("241 reviewer: đúng phòng, chỉ đọc nguồn, ghi chú và xác nhậ
   await expect(page.getByRole("textbox")).toHaveCount(1);
   await page.getByRole("button", { name: "Yêu cầu bổ sung", exact: true }).click();
   await expect(note).toHaveAttribute("aria-invalid", "true");
+  await expect(note).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath("241-review-note-required.png"), fullPage: true });
   await note.fill("Ghi chú riêng của Trồng trọt");
   await page.getByRole("button", { name: "Phiếu tiếp theo", exact: true }).click();
@@ -55,6 +56,11 @@ test("241 reviewer: đúng phòng, chỉ đọc nguồn, ghi chú và xác nhậ
   const dialog = page.getByRole("dialog", { name: "Xác nhận yêu cầu bổ sung" });
   await expect(dialog).toContainText("lần gửi 1");
   await expect(dialog).toContainText("Bổ sung diện tích thực hiện");
+  await expect(dialog).toBeFocused();
+  const dialogBox = await dialog.boundingBox();
+  const pickerBox = await page.getByRole("combobox", { name: "Phòng được giao phiếu" }).boundingBox();
+  expect(dialogBox).not.toBeNull(); expect(pickerBox).not.toBeNull();
+  expect(dialogBox!.y + dialogBox!.height).toBeLessThan(pickerBox!.y);
   await page.screenshot({ path: testInfo.outputPath("241-review-confirmation.png"), fullPage: true });
   await dialog.getByRole("button", { name: "Gửi yêu cầu bổ sung", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Đã gửi yêu cầu bổ sung cho lần gửi 1." })).toBeVisible();
