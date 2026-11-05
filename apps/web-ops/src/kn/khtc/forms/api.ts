@@ -168,10 +168,11 @@ export function createKhtcFormApi(api: ApiClient) {
       dept: string,
       sheet: KhtcFormContent,
       base_attempt: number,
+      key?: string,
     ): Promise<KhtcFormSheet> =>
       unwrap(
         api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/draft", {
-          params: { ...path(id, dept), ...idem() },
+          params: { ...path(id, dept), header: { "Idempotency-Key": key ?? newIdempotencyKey() } },
           body: { sheet: normalizeForSend(sheet), base_attempt },
         }),
       ),
@@ -180,8 +181,10 @@ export function createKhtcFormApi(api: ApiClient) {
       dept: string,
       sheet: KhtcFormContent,
       base_attempt: number,
+      key?: string,
     ): Promise<KhtcFormSheet> => {
       const body={sheet:normalizeForSend(sheet),base_attempt};
+      if (key) return unwrap(api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/submit", { params: { ...path(id, dept), header: { "Idempotency-Key": key } }, body }));
       return mutate("submit:"+id+":"+dept+":"+base_attempt,body,key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/submit",{
         params:{...path(id,dept),header:{"Idempotency-Key":key}},body
       })));
