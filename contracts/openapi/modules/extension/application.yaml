@@ -1928,20 +1928,17 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [decision]
-              properties:
-                decision: {type: string, enum: [returned, accepted]}
-                note: {type: string}
+              $ref: "#/components/schemas/KHTCFormReviewInput"
       responses:
         "200":
-          description: Phiếu sau rà soát
+          description: Phiếu hiện hành và xác nhận native của đúng lần gửi đã rà soát
           content:
             application/json:
-              schema: {$ref: "#/components/schemas/KHTCFormSheet"}
+              schema: {$ref: "#/components/schemas/KHTCFormReviewResult"}
         "403": {description: "forbidden | self_approval", $ref: "#/components/responses/Problem"}
         "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
-        "409": {description: extension.khtc_form_not_reviewable, $ref: "#/components/responses/Problem"}
+        "400": {description: "JSON hoặc số phiên bản không hợp lệ; thân tối đa 16 KiB", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.khtc_form_not_reviewable | forms.submission_superseded | forms.already_reviewed", $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   # --- pf/hrm (dom/hrm, W11.21 — ADR-0050): danh mục nhân sự Phòng HCTH (BRD HCTH v3.0 FN-19, UR-ADM-08). Đọc: Admin và Cấp Tỉnh
   # của Phòng Hành chính – Tổng hợp (port.Access ở gốc lắp ráp); ghi: Admin. Mọi bản ghi là phiên bản (sổ chỉ ghi thêm); ngừng sử
@@ -3882,6 +3879,25 @@ components:
         label: {type: string}
         plan: {type: string}
         rows: {type: array, items: {$ref: "#/components/schemas/KHTCFormRow"}}
+# @ag-order: 3000
+    KHTCFormReviewInput:
+      type: object
+      required: [decision, expected_submission_id, base_attempt]
+      properties:
+        decision: {type: string, enum: [returned, accepted]}
+        note: {type: string, maxLength: 1000, description: "Nội dung bắt buộc khi returned; chuẩn hóa khoảng trắng đầu/cuối"}
+        expected_submission_id: {type: string, format: uuid, description: Mã lần gửi mà người rà soát đã đọc}
+        base_attempt: {type: integer, format: int64, minimum: 1, description: Số phiên bản của lần gửi đã đọc}
+# @ag-order: 3001
+    KHTCFormReviewResult:
+      allOf:
+        - $ref: "#/components/schemas/KHTCFormSheet"
+        - type: object
+          required: [reviewed_submission_id, reviewed_attempt, review_decision]
+          properties:
+            reviewed_submission_id: {type: string, format: uuid, description: Mã từ kết quả native Forms của thao tác}
+            reviewed_attempt: {type: integer, format: int64, minimum: 1}
+            review_decision: {type: string, enum: [returned, accepted]}
 # @ag-order: 1109
     KHTCFormSheet:
       type: object

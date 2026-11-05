@@ -23081,6 +23081,33 @@ export interface components {
             status: string;
             rating: components["schemas"]["HrmAppraisalRating"];
         };
+        KHTCFormReviewInput: {
+            /** @enum {string} */
+            decision: "returned" | "accepted";
+            /** @description Nội dung bắt buộc khi returned; chuẩn hóa khoảng trắng đầu/cuối */
+            note?: string;
+            /**
+             * Format: uuid
+             * @description Mã lần gửi mà người rà soát đã đọc
+             */
+            expected_submission_id: string;
+            /**
+             * Format: int64
+             * @description Số phiên bản của lần gửi đã đọc
+             */
+            base_attempt: number;
+        };
+        KHTCFormReviewResult: components["schemas"]["KHTCFormSheet"] & {
+            /**
+             * Format: uuid
+             * @description Mã từ kết quả native Forms của thao tác
+             */
+            reviewed_submission_id: string;
+            /** Format: int64 */
+            reviewed_attempt: number;
+            /** @enum {string} */
+            review_decision: "returned" | "accepted";
+        };
         CNTSDesignView: {
             code: string;
             bm: string;
@@ -39590,28 +39617,26 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @enum {string} */
-                    decision: "returned" | "accepted";
-                    note?: string;
-                };
+                "application/json": components["schemas"]["KHTCFormReviewInput"];
             };
         };
         responses: {
-            /** @description Phiếu sau rà soát */
+            /** @description Phiếu hiện hành và xác nhận native của đúng lần gửi đã rà soát */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["KHTCFormSheet"];
+                    "application/json": components["schemas"]["KHTCFormReviewResult"];
                 };
             };
+            /** @description JSON hoặc số phiên bản không hợp lệ; thân tối đa 16 KiB */
+            400: components["responses"]["Problem"];
             /** @description forbidden | self_approval */
             403: components["responses"]["Problem"];
             /** @description extension.khtc_form_not_found */
             404: components["responses"]["Problem"];
-            /** @description extension.khtc_form_not_reviewable */
+            /** @description extension.khtc_form_not_reviewable | forms.submission_superseded | forms.already_reviewed */
             409: components["responses"]["Problem"];
             /** @description validation_failed */
             422: components["responses"]["Problem"];

@@ -828,8 +828,16 @@ export const khtcFormRoutes: Route[] = [
         return problem(403, "forbidden", "Không có quyền", {
           detail: "chỉ Cấp Tỉnh Phòng KHTC rà soát phiếu",
         });
-      const b = (ctx.body ?? {}) as { decision?: string; note?: string };
+      const b = (ctx.body ?? {}) as Partial<S["KHTCFormReviewInput"]>;
+      const uuid = /^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (typeof b.expected_submission_id !== "string" || !uuid.test(b.expected_submission_id) || !Number.isSafeInteger(b.base_attempt) || b.base_attempt! < 1)
+        return problem(422, "validation_failed", "Thiếu mã và phiên bản lần gửi đã đọc");
+      if (b.note !== undefined && typeof b.note !== "string" || (b.note?.length ?? 0) > 4000 || Array.from(b.note?.trim() ?? "").length > 1000)
+        return problem(422, "validation_failed", "Nội dung tối đa 1000 ký tự");
       const f = sheet(s, dept, false, true);
+      const target = subsOf(s, dept)[0];
+      if (!target || target.id !== b.expected_submission_id || target.attempt !== b.base_attempt)
+        return problem(409, "extension.khtc_form_not_reviewable", "Lần gửi đã thay đổi — tải lại phiếu");
       if (b.decision === "returned") {
         if (!f.can_request_supplement)
           return problem(
@@ -863,7 +871,7 @@ export const khtcFormRoutes: Route[] = [
       last.decision = b.decision as "returned" | "accepted";
       last.note = b.note?.trim() ?? "";
       sync(s, dept);
-      return json(sheet(s, dept, false, true));
+      return json({ ...sheet(s, dept, false, true), reviewed_submission_id: last.id, reviewed_attempt: last.attempt, review_decision: last.decision } satisfies S["KHTCFormReviewResult"]);
     },
   },
 ];

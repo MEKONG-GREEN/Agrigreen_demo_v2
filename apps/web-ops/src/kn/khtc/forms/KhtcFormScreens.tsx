@@ -6,14 +6,16 @@
 //  - "Phiếu kỳ này" (FN-PN-03.01) là màn của W11.11 (/kn/bao-cao-khtc); /kn/khtc/phieu dùng lại màn đó.
 //  - KhtcFormReviewScreen — /kn/khtc/ra-soat/{period_id}?department=: KHTC rà soát (FN-TI-02.04) — yêu cầu bổ sung (bắt
 //    buộc nội dung), xác nhận, phiếu trước / tiếp theo. "So sánh lần gửi" để sau G1.
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { PageHeader, StatusPill } from "@/components/patterns/list";
+import { StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useLoad } from "@/kn/cycle/common";
 import { FORM_TONE, createKhtcPeriodApi, vnDate } from "../periods/api";
 import { ApiProblem } from "@/api/problem";
 import { newIdempotencyKey, outcomeUnknown } from "@/api/idempotency";
+import { SelectField, TextField } from "@/components/form";
+import reviewStyles from "./KhtcFormReview.module.css";
 import { DetailPage } from "@/components/patterns/detail";
 import { useInboxAuthorityKey } from "../inbox/inbox-workspace";
 import { INBOX_BASE, parseInboxRoute } from "../inbox/inbox-routes";
@@ -27,6 +29,7 @@ import {
   normalizeForSend,
   type KhtcFormContent,
   type KhtcFormSheet,
+  type KhtcFormReviewInput,
 } from "./api";
 
 function FormHead({ f }: { f: KhtcFormSheet }) {
@@ -163,124 +166,163 @@ function FormEntry({ periodId, dept }: { periodId: string; dept: string }) {
   </DetailPage> : null}</LoadState></div>;
 }
 
+const REVIEW_DEPARTMENTS = new Set(["trong_trot", "chan_nuoi_thuy_san", "thong_tin_truyen_thong", "hanh_chinh_tong_hop", "ke_hoach_tai_chinh"]);
+const REVIEW_UUID = /^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function KhtcFormReviewScreen() {
-  const { api } = useAuth();
+  const auth = useAuth();
   const { periodId } = useParams<{ periodId: string }>();
-  const q = useSearchParams()?.get("department") ?? "";
-  const fapi = useMemo(() => (api ? createKhtcFormApi(api) : null), [api]);
-  const papi = useMemo(() => (api ? createKhtcPeriodApi(api) : null), [api]);
-  const period = useLoad(papi ? () => papi.get(periodId) : null, [
-    papi,
-    periodId,
-  ]);
-  const depts = period.data?.departments.map((d) => d.code) ?? [];
-  const [dept, setDept] = useState(q);
-  const cur = dept || depts[0] || "";
-  const form = useLoad(fapi && cur ? () => fapi.get(periodId, cur) : null, [
-    fapi,
-    periodId,
-    cur,
-  ]);
+  const query = useSearchParams()?.toString() ?? "";
+  const authority = useInboxAuthorityKey();
+  const params = new URLSearchParams(query);
+  const dept = params.get("department") ?? "";
+  if (typeof periodId !== "string" || !REVIEW_UUID.test(periodId)
+    || [...params.keys()].some(key => key !== "department" || params.getAll(key).length !== 1)
+    || params.has("department") && !REVIEW_DEPARTMENTS.has(dept)) return <p role="alert">Đường dẫn rà soát không hợp lệ.</p>;
+  if (auth.status !== "authenticated" || !auth.principal || auth.kn.status !== "active" || !auth.kn.context)
+    return <p role="alert">Chọn ngữ cảnh làm việc để đọc phiếu.</p>;
+  return <ReviewPeriod key={`${authority}:${periodId}:${query}`} periodId={periodId} requestedDepartment={dept} />;
+}
+
+function ReviewPeriod({ periodId, requestedDepartment }: { periodId: string; requestedDepartment: string }) {
+  const { api } = useAuth();
+  const papi = useMemo(() => createKhtcPeriodApi(api), [api]);
+  const period = useLoad(() => papi.get(periodId).then(value => {
+    if (value.id !== periodId || value.departments.some(d => !REVIEW_DEPARTMENTS.has(d.code))
+      || new Set(value.departments.map(d => d.code)).size !== value.departments.length)
+      throw new ApiProblem({ type: "about:blank", title: "Không đọc được kỳ", code: "extension.out_of_scope", status: 403 });
+    return value;
+  }), [papi, periodId]);
+  const [department, setDepartment] = useState(requestedDepartment);
+  const departments = period.data?.departments ?? [];
+  const current = department || departments[0]?.code || "";
+  return <LoadState s={period}>{() => departments.some(d => d.code === current)
+    ? <ReviewSheet key={current} periodId={periodId} department={current} departments={departments} onDepartment={setDepartment} />
+    : <p role="alert">Phòng không được giao phiếu trong kỳ này.</p>}</LoadState>;
+}
+
+type PendingReview = { input: KhtcFormReviewInput; key: string };
+type ReviewNavigation = { department: string } | { back: true };
+
+function ReviewSheet({ periodId, department, departments, onDepartment }: {
+  periodId: string; department: string; departments: { code: string; name: string }[]; onDepartment: (dept: string) => void;
+}) {
+  const { api, kn } = useAuth();
+  const router = useRouter();
+  const fapi = useMemo(() => createKhtcFormApi(api), [api]);
+  const form = useLoad(() => fapi.get(periodId, department).then(value => {
+    if (value.period.id !== periodId || value.department !== department)
+      throw new ApiProblem({ type: "about:blank", title: "Không đọc được phiếu", code: "extension.out_of_scope", status: 403 });
+    return value;
+  }), [fapi, periodId, department]);
+  const [view, setView] = useState<KhtcFormSheet | null>(null);
   const [note, setNote] = useState("");
+  const [noteRequired, setNoteRequired] = useState(false);
+  const [confirming, setConfirming] = useState<PendingReview | null>(null);
+  const [pending, setPending] = useState<PendingReview | null>(null);
+  const [leaving, setLeaving] = useState<ReviewNavigation | null>(null);
+  const [needsReload, setNeedsReload] = useState(false);
+  const flight = useRef(false);
   const act = useAction();
-  if (!fapi || !papi) return null;
-  const idx = depts.indexOf(cur);
-  const done = (r: KhtcFormSheet | null) => {
-    if (r) {
-      setNote("");
-      form.reload();
-      period.reload();
-    }
+  const f = view ?? form.data;
+  const latest = f?.submissions[0];
+  const normalizedNote = note.trim();
+  const noteTooLong = note.length > 4000 || Array.from(normalizedNote).length > 1000;
+  const noteError = noteTooLong ? "Tối đa 1000 ký tự."
+    : noteRequired && !normalizedNote ? "Bắt buộc nhập nội dung yêu cầu bổ sung." : undefined;
+  const dirty = note !== "";
+  const backHref = `/kn/khtc/ky-bao-cao/ky/${periodId}`;
+  const canReview = !!f?.can_review && f.state === "submitted" && !f.period.terminal && !kn.context?.read_only
+    && (kn.context?.role === "kn_tinh" && kn.context.department_code === KHTC_DEPT || kn.context?.role === "admin" && f.period.report_type === "adhoc")
+    && !!latest && REVIEW_UUID.test(latest.id) && Number.isSafeInteger(latest.attempt) && latest.attempt > 0 && latest.attempt === f.attempt && !latest.decision;
+  const index = departments.findIndex(d => d.code === department);
+  useEffect(() => {
+    if (!dirty && !pending) return;
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [dirty, pending]);
+
+  const navigate = (target: ReviewNavigation) => {
+    if (pending || flight.current) return;
+    if (dirty) { setConfirming(null); setLeaving(target); return; }
+    if ("back" in target) router.push(backHref); else onDepartment(target.department);
   };
-  return (
-    <div className="page">
-      <PageHeader
-        title="Rà soát phiếu số liệu"
-        actions={
-          <>
-            <button
-              className="btn"
-              disabled={idx <= 0}
-              onClick={() => setDept(depts[idx - 1] ?? "")}
-            >
-              Phiếu trước
-            </button>
-            <button
-              className="btn"
-              disabled={idx < 0 || idx >= depts.length - 1}
-              onClick={() => setDept(depts[idx + 1] ?? "")}
-            >
-              Phiếu tiếp theo
-            </button>
-          </>
+  const prepare = (decision: KhtcFormReviewInput["decision"]) => {
+    if (!canReview || !latest || pending || flight.current || needsReload) return;
+    setNoteRequired(decision === "returned");
+    if (noteTooLong || decision === "returned" && !normalizedNote
+      || decision === "returned" && !f?.can_request_supplement || decision === "accepted" && !f?.can_confirm) return;
+    setLeaving(null);
+    setConfirming({ input: { expected_submission_id: latest.id, base_attempt: latest.attempt, decision, note: normalizedNote }, key: newIdempotencyKey() });
+  };
+  const dispatch = async (operation: PendingReview) => {
+    if (flight.current || needsReload || !canReview || !latest
+      || operation.input.expected_submission_id !== latest.id || operation.input.base_attempt !== latest.attempt) return;
+    flight.current = true;
+    setPending(operation); setConfirming(null);
+    try {
+      await act.run(async () => {
+        try {
+          const response = await fapi.review(periodId, department, operation.input, operation.key);
+          if (response.period.id !== periodId || response.department !== department
+            || response.reviewed_submission_id !== operation.input.expected_submission_id
+            || response.reviewed_attempt !== operation.input.base_attempt || response.review_decision !== operation.input.decision) {
+            setNeedsReload(true);
+            throw new ApiProblem({ type: "about:blank", title: "Chưa đối chiếu được kết quả rà soát", code: "extension.review_ack_mismatch", status: 503 });
+          }
+          setView(response); setNote(""); setPending(null); setNoteRequired(false);
+          return response;
+        } catch (error) {
+          if (error instanceof ApiProblem && !outcomeUnknown({ status: error.status, code: error.code })) {
+            setPending(null);
+            if ([401, 403, 409].includes(error.status)) setNeedsReload(true);
+          }
+          throw error;
         }
-      />
-      {act.view}
-      <LoadState s={form}>
-        {(f) => (
-          <>
-            <h2>
-              Phiếu {f.department_name} · {f.period.name}{" "}
-              <StatusPill tone={FORM_TONE[f.state]}>{f.state_label}</StatusPill>
-            </h2>
-            <FormHead f={f} />
-            <section className="card sec">
-              <KhtcFormView form={f} content={f.content} />
-            </section>
-            {f.can_review ? (
-              <section className="card sec" aria-label="Rà soát">
-                <label className="field" style={{ display: "block" }}>
-                  <span>Nội dung yêu cầu bổ sung, điều chỉnh</span>
-                  <textarea
-                    className="input"
-                    rows={3}
-                    style={{ width: "100%" }}
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                  />
-                </label>
-                <div className="row">
-                  <button
-                    className="btn btn-primary"
-                    disabled={
-                      act.busy || !f.can_request_supplement || !note.trim()
-                    }
-                    title={
-                      f.limit_reached
-                        ? "Đã gửi đủ số lần tối đa — chỉ xác nhận"
-                        : undefined
-                    }
-                    onClick={async () =>
-                      done(
-                        await act.run(
-                          () => fapi.review(periodId, cur, "returned", note),
-                          "Đã gửi yêu cầu bổ sung.",
-                        ),
-                      )
-                    }
-                  >
-                    Yêu cầu bổ sung
-                  </button>
-                  <button
-                    className="btn"
-                    disabled={act.busy || !f.can_confirm}
-                    onClick={async () =>
-                      done(
-                        await act.run(
-                          () => fapi.review(periodId, cur, "accepted"),
-                          "Đã xác nhận phiếu.",
-                        ),
-                      )
-                    }
-                  >
-                    Xác nhận
-                  </button>
-                </div>
-              </section>
-            ) : null}
-          </>
-        )}
-      </LoadState>
-    </div>
-  );
+      }, response => response.review_decision === "returned" ? `Đã gửi yêu cầu bổ sung cho lần gửi ${response.reviewed_attempt}.` : `Đã xác nhận lần gửi ${response.reviewed_attempt}.`);
+    } finally { flight.current = false; }
+  };
+
+  if (needsReload) return <section role="alert"><p>Chưa đối chiếu được kết quả trong phiên bản hoặc quyền hiện tại. Tải lại phiếu và kiểm tra trạng thái trước khi tiếp tục.</p><button className="btn" onClick={() => window.location.reload()}>Tải lại phiếu</button></section>;
+  return <div className={`page ${reviewStyles.review}`} onClickCapture={event => {
+    if ((dirty || pending) && event.target instanceof Element && event.target.closest("a.back-link")) { event.preventDefault(); navigate({ back: true }); }
+  }}><LoadState s={form}>{() => f ? <DetailPage
+    back={{ href: backHref, label: "Thông tin kỳ báo cáo" }} title={`Rà soát phiếu ${f.department_name} · ${f.period.name}`}
+    badge={<StatusPill tone={FORM_TONE[f.state]}>{f.state_label}</StatusPill>}
+    actions={<>
+      <button className="btn" disabled={!!pending || index <= 0} onClick={() => navigate({ department: departments[index - 1]!.code })}>Phiếu trước</button>
+      <button className="btn" disabled={!!pending || index < 0 || index >= departments.length - 1} onClick={() => navigate({ department: departments[index + 1]!.code })}>Phiếu tiếp theo</button>
+      {canReview ? <>
+        <button className="btn btn-p" disabled={!!pending || !f.can_request_supplement} onClick={() => prepare("returned")}>Yêu cầu bổ sung</button>
+        <button className="btn" disabled={!!pending || !f.can_confirm} onClick={() => prepare("accepted")}>Xác nhận</button>
+      </> : null}
+    </>}
+  >
+    {act.view}
+    <SelectField label="Phòng được giao phiếu" value={department} disabled={!!pending} options={departments.map(d => ({ value: d.code, label: d.name }))} onChange={dept => { if (dept && dept !== department) navigate({ department: dept }); }} />
+    <FormHead f={f} />
+    {latest ? <p className="mute">Lần gửi đang đọc: {latest.attempt} · Gửi lúc {dt(latest.submitted_at)}.</p> : null}
+    <KhtcFormView form={f} content={f.content} />
+    {canReview ? <section className="sec" aria-label="Rà soát">
+      <TextField label="Nội dung yêu cầu bổ sung, điều chỉnh" multiline maxLength={4000} value={note} disabled={!!pending}
+        required={noteRequired} error={noteError} hint="Tối đa 1000 ký tự; bắt buộc khi yêu cầu bổ sung."
+        onChange={value => { if (!pending && !flight.current) { setNote(value.slice(0, 4001)); setConfirming(null); } }} />
+    </section> : <p className="mute">Phiếu chỉ đọc trong trạng thái và ngữ cảnh hiện tại.</p>}
+    {confirming && !pending ? <section role="dialog" aria-label={confirming.input.decision === "returned" ? "Xác nhận yêu cầu bổ sung" : "Xác nhận phiếu số liệu"} className="alert alert-info">
+      <p>{confirming.input.decision === "returned" ? "Gửi yêu cầu bổ sung" : "Xác nhận"} phiếu {f.department_name} · {f.period.name}, lần gửi {confirming.input.base_attempt}?</p>
+      {confirming.input.note ? <p className={reviewStyles.note}>{confirming.input.note}</p> : null}
+      <button className="btn btn-p" onClick={() => void dispatch(confirming)}>{confirming.input.decision === "returned" ? "Gửi yêu cầu bổ sung" : "Xác nhận lần gửi"}</button>
+      <button className="btn" onClick={() => setConfirming(null)}>Tiếp tục rà soát</button>
+    </section> : null}
+    {pending ? <section aria-label="Đối chiếu thao tác rà soát" role={act.busy ? "status" : "alert"}>
+      <p>{act.busy ? "Đang gửi yêu cầu rà soát; giữ nguyên lần gửi và ghi chú." : "Chưa xác định kết quả. Giữ nguyên lần gửi, nội dung và thử lại đúng thao tác này để đối chiếu."}</p>
+      <button className="btn" disabled={act.busy} onClick={() => void dispatch(pending)}>Thử lại thao tác rà soát</button>
+    </section> : null}
+    {leaving && !pending ? <section role="dialog" aria-label="Bỏ ghi chú chưa gửi?" className="alert alert-info">
+      <p>Ghi chú của phiếu này chưa được gửi. Bỏ ghi chú để chuyển?</p>
+      <button className="btn" onClick={() => { if ("back" in leaving) router.push(backHref); else onDepartment(leaving.department); }}>Bỏ ghi chú và chuyển</button>
+      <button className="btn btn-p" onClick={() => setLeaving(null)}>Giữ ghi chú</button>
+    </section> : null}
+  </DetailPage> : null}</LoadState></div>;
 }

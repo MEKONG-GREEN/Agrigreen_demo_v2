@@ -1,0 +1,8 @@
+.review :global(.pg-head > .row) {
+  margin-inline-start: auto;
+}
+
+.note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

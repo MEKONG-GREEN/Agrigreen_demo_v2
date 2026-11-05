@@ -8,6 +8,8 @@ import { newIdempotencyKey } from "@/api/idempotency";
 
 type S = components["schemas"];
 export type KhtcFormSheet = S["KHTCFormSheet"];
+export type KhtcFormReviewInput = S["KHTCFormReviewInput"];
+export type KhtcFormReviewResult = S["KHTCFormReviewResult"];
 export type KhtcFormTask = S["KHTCFormTask"];
 export type KhtcFormContent = S["KHTCFormContent"];
 export type KhtcFormCell = S["KHTCFormCell"];
@@ -143,8 +145,6 @@ export function normalizeForSend(c: KhtcFormContent): KhtcFormContent {
   };
 }
 
-const idem = () => ({ header: { "Idempotency-Key": newIdempotencyKey() } });
-
 export function createKhtcFormApi(api: ApiClient) {
   const mutate=createRetryingMutation();
   const path = (id: string, dept: string) => ({ path: { id, dept } });
@@ -192,13 +192,13 @@ export function createKhtcFormApi(api: ApiClient) {
     review: (
       id: string,
       dept: string,
-      decision: "returned" | "accepted",
-      note?: string,
-    ): Promise<KhtcFormSheet> =>
+      input: KhtcFormReviewInput,
+      key: string,
+    ): Promise<KhtcFormReviewResult> =>
       unwrap(
         api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/review", {
-          params: { ...path(id, dept), ...idem() },
-          body: { decision, note },
+          params: { ...path(id, dept), header: { "Idempotency-Key": key } },
+          body: input,
         }),
       ),
   };

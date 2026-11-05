@@ -41,7 +41,8 @@ describe("W11.68 actual caller",()=>{
  expect((await forms.get(p.id,"trong_trot")).supplement?.id).toBe(request.id);
  await expect(forms.submit(p.id,"trong_trot",emptyContent(),0)).rejects.toBeInstanceOf(ApiProblem);
  await forms.submit(p.id,"trong_trot",{...emptyContent(),adhoc_request_id:request.id,adhoc_values:{SO_LOP:"12,5"},adhoc_text:"Đã đối chiếu"},0);
- await createKhtcFormApi(admin).review(p.id,"trong_trot","accepted","Đã đối chiếu");
+ const reviewTarget=await createKhtcFormApi(admin).get(p.id,"trong_trot");
+ await createKhtcFormApi(admin).review(p.id,"trong_trot",{decision:"accepted",note:"Đã đối chiếu",expected_submission_id:reviewTarget.submissions[0]!.id,base_attempt:reviewTarget.attempt},"adhoc-review-241");
  let d=await reports.refresh(p.id,0);d=await reports.refresh(p.id,d.version);
  const key="bo_sung:"+request.id+":SO_LOP";expect(d.content.data.metrics.find(m=>m.key===key)?.value.Sum).toBe("12.5");
  d=await reports.save(p.id,{base_version:d.version,texts:{noi_dung:"Báo cáo đã soạn"},adhoc:{rows:[],metrics:[key]}});
