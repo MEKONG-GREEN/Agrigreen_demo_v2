@@ -28,9 +28,12 @@ node_modules/
 __pycache__/
 .venv/
 
-# Worktree và cấu hình cá nhân của agent; riêng quy ước dùng chung .claude/rules/ được commit
+# Worktree và cấu hình cá nhân của agent; riêng phần dùng chung .claude/rules/, .claude/skills/,
+# .claude/agents/ được commit
 .claude/*
 !.claude/rules/
+!.claude/skills/
+!.claude/agents/
 
 # Cấu hình sinh cho VPS (deploy/vps/prepare.sh)
 deploy/compose/.vps/
