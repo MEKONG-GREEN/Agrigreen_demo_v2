@@ -46,6 +46,23 @@ describe("initial225 mock persistence and immutable recovery",()=>{
   const fail=vi.spyOn(Storage.prototype,"getItem").mockImplementation(()=>{throw new DOMException("Unavailable","SecurityError");});
   await expect(f.draft.save(2044,body,"read225-first")).rejects.toMatchObject({status:503});fail.mockRestore();expect((await f.draft.current(2044)).revision).toBe(1);
  });
+ it("replays a persisted receipt after master retirement and cache loss but rejects a fresh retired-ref write",async()=>{
+  const f=await fixture225();const program=await f.plan.createProgram({code:"RETIRED225",name:"Originally active225",kind:"program"});
+  const row={...f.blankEntry("programs","program",null,1),program_ref:program.ref,name:"Pinned active row225"};const body={expected_revision:0,entries:f.toSave([row],{base_version:0}).entries};
+  const ack=await f.draft.save(2048,body,"retired225-own");await f.plan.reviseProgram(program.ref,{code:program.code,name:program.name,kind:"program",active:false});
+  vi.resetModules();const restored=await fixture225();const replay=await restored.draft.save(2048,body,"retired225-own");expect(replay.event_id).toBe(ack.event_id);expect(replay.entries).toEqual(ack.entries);
+  await expect(restored.draft.save(2048,{...body,draft_id:ack.draft_id,expected_revision:1},"retired225-fresh")).rejects.toMatchObject({status:422});expect((await restored.draft.current(2048)).revision).toBe(1);
+ });
+ it("rejects a persisted published bucket whose year differs from its actual version before Open",async()=>{
+  const f=await fixture225();await f.plan.save(2046,{base_version:0,effective_from:"2046-01-01",entries:[]});
+  const {createKhtcPeriodApi}=await import("@/kn/khtc/periods/api");const {createApiClient}=await import("@/api/client");const {mockToken}=await import("./personas");const {mockFetchNoDelay}=await import("./handler");
+  const periodClient=()=>createApiClient({baseUrl:"http://mock",getAccessToken:()=>mockToken("tinh"),getContextId:()=>null,fetch:mockFetchNoDelay});
+  const periods=createKhtcPeriodApi(periodClient());expect((await periods.open({report_type:"week",year:2046,no:1,departments:["trong_trot"]})).year).toBe(2046);
+  const saved=JSON.parse(window.sessionStorage.getItem(storageKey)!) as {plans:[number,unknown][]};const tuple=saved.plans.find(([year])=>year===2046)!;tuple[0]=2047;window.sessionStorage.setItem(storageKey,JSON.stringify(saved));
+  vi.resetModules();const restored=await fixture225();await expect(restored.draft.current(2047)).rejects.toMatchObject({status:503});
+  const khtcMock=await import("./kn-khtc");expect(khtcMock.publishedOwnerPlanGuard225(2047,"2047-01-01")?.status).toBe(503);
+  const restoredPeriods=createKhtcPeriodApi(periodClient());await expect(restoredPeriods.open({report_type:"week",year:2047,no:1,departments:["trong_trot"]})).rejects.toMatchObject({status:503});expect((await restoredPeriods.list(2047)).length).toBe(0);
+ });
  it("imports/resets without a cycle and never invents a plan for an unknown future year",async()=>{
   const f=await fixture225();expect((await f.draft.current(2045)).revision).toBe(0);expect((await f.plan.versions(2045)).items).toHaveLength(0);
   const khtcMock=await import("./kn-khtc");expect(khtcMock.publishedOwnerPlanGuard225(2045,"2045-01-01")?.status).toBe(409);

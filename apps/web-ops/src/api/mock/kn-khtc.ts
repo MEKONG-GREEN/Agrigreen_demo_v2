@@ -363,7 +363,7 @@ function boundedDraftRows225(input:unknown):input is EntryIn[]{
   if(!decimal225(x.planned_qty,4,16)||!decimal225(x.budget,2,18))return false;
   for(const [key,max] of [["code",40],["name",1000],["unit_code",40],["scale_note",1000],["funding_code",40],["field_code",40],["department_code",40],["data_source",10],["source_key",100],["stop_decision",100],["note",2000]] as const){const value=x[key];if(value!=null&&(typeof value!=="string"||value.includes("\u0000")||Array.from(value).length>max))return false;}
   if(x.communes!=null&&(!Array.isArray(x.communes)||x.communes.length>500||x.communes.some(c=>typeof c!=="string"||c.includes("\u0000")||c.length>40)))return false;
-  if(x.kind==="program"){if(x.parent_ref||!uuid225(x.program_ref)||!STORE.programs.get(x.program_ref!)?.at(-1)?.active)return false;}
+  if(x.kind==="program"){if(x.parent_ref||!uuid225(x.program_ref))return false;}
   else {const parent=x.parent_ref?refs.get(x.parent_ref):null;if(!parent||parent.tab!==x.tab||parent.kind==="item"||x.kind==="group"&&parent.kind!=="program")return false;if(typeof x.name!=="string"||!x.name.trim())return false;}
   if(x.kind==="item"&&(!x.department_code||!["trong_trot","chan_nuoi_thuy_san","thong_tin_truyen_thong","hanh_chinh_tong_hop"].includes(x.department_code)))return false;
   bytes+=new TextEncoder().encode(JSON.stringify(x)).length;if(bytes>1<<20)return false;refs.set(x.ref,x);
@@ -380,6 +380,7 @@ function draftRequest225(ctx:Ctx,discard=false):Response {
  // This exact bounded canonical string is the receipt binding, NEVER the weak display fingerprint.
  const request=stableJSON225({year,discard,body:b});const receiptKey=`${ctx.persona.me.tenant_id}:${key}`;const previous=RECEIPTS225.get(receiptKey);
  if(previous)return previous.authority===policy.authority&&previous.request===request?json(structuredClone(previous.receipt),200):problem(409,"extension.khtc_draft_operation_conflict","Khóa thao tác đã thuộc nội dung hoặc quyền khác");
+ if(!discard&&(b.entries as EntryIn[]).some(x=>x.kind==="program"&&!STORE.programs.get(x.program_ref!)?.at(-1)?.active))return problem(422,"extension.khtc_plan_invalid","CT/DA không còn đang áp dụng cho lần ghi mới");
  const {stored,body}=currentState225(ctx,year);if(!body.available)return problem(409,"extension.khtc_initial_draft_year_in_use","Năm đã có dữ liệu tham chiếu");
  if(stored.revision!==b.expected_revision||(b.draft_id??null)!==(stored.draft?.draft_id??null))return problem(409,"extension.khtc_draft_revision_conflict","Nháp đã thay đổi");
  const rows=discard?[]:materializePlanRows225(b.entries as EntryIn[]).entries;
@@ -537,6 +538,8 @@ function envelopeStored225(value:unknown):value is Envelope225{
  if(!pairsStored225(value.items,text,x=>Array.isArray(x)&&x.length>0&&x.every(y=>plain225(y)&&typeof y.kind==="string"&&typeof y.code==="string"&&typeof y.name==="string"&&integer225(y.version)&&uuid225(y.version_id))))return false;
  if(!pairsStored225(value.programs,uuid225,x=>Array.isArray(x)&&x.length>0&&x.every(y=>plain225(y)&&uuid225(y.ref)&&typeof y.code==="string"&&typeof y.name==="string"&&integer225(y.version))))return false;
  if(!pairsStored225(value.plans,integer225,x=>Array.isArray(x)&&x.length>0&&x.every(y=>plain225(y)&&plain225(y.v)&&uuid225(y.v.id)&&integer225(y.v.version)&&typeof y.v.effective_from==="string"&&entriesStored225(y.entries))))return false;
+ // A tuple key cannot promote another year's immutable version into plan presence.
+ if(!(value.plans as [number,{v:Version;entries:Entry[]}[]][]).every(([year,versions])=>year>=2000&&year<=2100&&versions.every(({v},i)=>v.year===year&&v.version===i+1&&new RegExp(`^${year}-[0-9]{2}-[0-9]{2}$`).test(v.effective_from))))return false;
  if(!pairsStored225(value.initial,text,x=>plain225(x)&&integer225(x.revision)&&Array.isArray(x.events)&&x.events.length===x.revision&&x.events.every((e,i)=>eventStored225(e)&&e.revision===i+1)&&(x.draft===null?x.revision===0||x.events.at(-1)?.action==="discard":eventStored225(x.draft)&&x.draft.state==="active"&&JSON.stringify(x.draft)===JSON.stringify(x.events.at(-1)))))return false;
  const events=new Set((value.initial as [string,State225][]).flatMap(([,state])=>state.events.map(e=>JSON.stringify(e))));
  return pairsStored225(value.receipts,text,x=>plain225(x)&&typeof x.authority==="string"&&typeof x.request==="string"&&eventStored225(x.receipt)&&events.has(JSON.stringify(x.receipt)));
