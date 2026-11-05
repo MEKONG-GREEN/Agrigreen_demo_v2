@@ -44,6 +44,8 @@ describe("history242 — trang lịch sử và nội dung chỉ đọc", () => {
     expect(within(changed).getByText("10")).toBeInTheDocument(); expect(within(changed).getByText("12")).toBeInTheDocument();
     expect(within(changed).getByText("Đã thay đổi")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("1 ô thay đổi");
+    expect(screen.getByText("Phòng Trồng trọt", { exact: true })).toBeInTheDocument();
+    expect(screen.getByText("Kỳ kiểm thử", { exact: true })).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "Log gửi và rà soát" })).toHaveTextContent("Gửi phiếu lần 1");
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Lưu|Gửi|Xác nhận/ })).not.toBeInTheDocument();

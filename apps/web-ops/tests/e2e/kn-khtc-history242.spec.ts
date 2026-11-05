@@ -106,6 +106,10 @@ test("242 lịch sử: hai lần gửi thật qua UI, so sánh readonly và gi�
   await expect(page.getByRole("button", { name: "Mở menu", exact: true })).toHaveAttribute("aria-expanded", "false");
   await expect(diff).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("242-history-compare-mobile.png"), fullPage: true, animations: "disabled" });
+  const breadcrumbBox = await page.getByRole("navigation", { name: "Breadcrumb", exact: true }).boundingBox();
+  const headingBox = await page.getByRole("heading", { level: 1 }).boundingBox();
+  expect(breadcrumbBox).not.toBeNull(); expect(headingBox).not.toBeNull();
+  expect(breadcrumbBox!.y + breadcrumbBox!.height).toBeLessThanOrEqual(headingBox!.y);
   const seven = changed.getByText("7", { exact: true }), nine = changed.getByText("9", { exact: true });
   const valueBox = await seven.boundingBox();
   expect(valueBox).not.toBeNull(); expect(valueBox!.width).toBeGreaterThan(80);

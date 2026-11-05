@@ -47,8 +47,9 @@ function HistoryList({ route, history }: { route: HistoryRoute; history: Submiss
     { key: "reviewer", header: "Người rà soát", cell: row => row.reviewer_ref ? <span className={styles.identity}>{row.reviewer_ref}</span> : "—" },
     { key: "note", header: "Nội dung rà soát", cell: row => <span className={styles.value}>{row.review_note || "—"}</span> },
   ];
-  return <div className={`page ${styles.history}`}><DetailPage title={`Lịch sử gửi · ${history.department_name} · ${history.period.name}`}
+  return <div className={`page ${styles.history}`}><DetailPage title="Lịch sử gửi phiếu"
     back={{ href: `/kn/khtc/ra-soat/${route.periodId}?department=${route.department}`, label: "Rà soát phiếu hiện tại" }}>
+    <p>{history.department_name} · {history.period.name}</p>
     <p>Chọn lần gửi để đọc nội dung đã niêm phong và so sánh với một lần gửi khác của cùng phiếu.</p>
     <DataTable caption="Các lần gửi phiếu" columns={columns} rows={history.items} rowKey={row => row.id} empty="Phiếu chưa có lần gửi nào." />
   </DetailPage></div>;
@@ -79,7 +80,7 @@ function SnapshotDetail({ route, history, data, other }: { route: HistoryRoute; 
     ...(other ? [{ key: "other", header: `Lần gửi ${other.submission.attempt}`, cell: (row: (typeof fields)[number]) => <span className={`${styles.value} ${row.changed ? styles.changed : ""}`}>{row.other ?? "Không có nội dung"}</span> },
       { key: "changed", header: "Đối chiếu", cell: (row: (typeof fields)[number]) => row.changed ? "Đã thay đổi" : "Giữ nguyên" }] : []),
   ];
-  return <div className={`page ${styles.history}`}><DetailPage title={`Lần gửi ${data.submission.attempt} · ${data.department_name} · ${data.period.name}`}
+  return <div className={`page ${styles.history}`}><DetailPage title={`Lần gửi ${data.submission.attempt}`}
     back={{ href: historyHref({ periodId: route.periodId, department: route.department }), label: "Lịch sử gửi" }}
     badge={<StatusPill tone="neutral">Chỉ đọc</StatusPill>}
     actions={<SelectField label="So sánh với" value={route.compareWith ?? ""} placeholder="Không so sánh"
@@ -87,6 +88,8 @@ function SnapshotDetail({ route, history, data, other }: { route: HistoryRoute; 
       onChange={value => router.push(historyHref({ ...route, compareWith: value || undefined }))} />}
     log={<LogPanel title="Log gửi và rà soát" entries={submissionLog(data.submission)} />}>
     <LabelValueBlock title="Thông tin lần gửi" items={[
+      { label: "Phòng", value: data.department_name },
+      { label: "Kỳ báo cáo", value: data.period.name },
       { label: "Gửi lúc", value: dt(data.submission.submitted_at) },
       { label: "Người gửi", value: <span className={styles.identity}>{data.submission.submitter_ref}</span> },
       { label: "Rà soát", value: decisionLabel(data.submission) },
