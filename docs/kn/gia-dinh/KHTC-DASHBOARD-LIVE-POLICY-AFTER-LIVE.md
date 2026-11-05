@@ -1,17 +1,20 @@
-# #230 — số kỳ đang mở cho menu và thẻ tổng hợp
+## KHTC-DASHBOARD-LIVE-POLICY-AFTER-LIVE — số kỳ đang mở cho menu và thẻ tổng hợp
+
+Mã ticket #230: `W11.69-DASHBOARD-LIVE-POLICY-AFTER-LIVE`. Tên tệp dùng alias hợp lệ của cổng tài liệu.
 
 Nguồn: BRD KHTC v2.3 P742–774, đặc biệt P768; DOCX Product SHA256 `15859351F90574BF667190B1A12160465BA03F8CA9E408B94C90D285A3502E25`. #202 và các phụ thuộc đã gộp trước lát này. Prototype chỉ là đặc tả; giữ M1–M7.
 
-## Phạm vi lát đầu
+### Phạm vi lát đầu
 
 - Nguồn `extension.khtc_periods.open` trên mục Kỳ báo cáo dùng cùng use case với `counts.open_all` của thẻ Kỳ đang mở. Tổng bao gồm mọi năm/quý, không phụ thuộc bộ lọc số liệu trên dashboard và không giới hạn trang đầu 100. Các trạng thái Đã mở/Đang thu thập/Trễ hạn/Đủ dữ liệu là các kỳ chưa có sự kiện đóng/hủy của sổ KHTC.
 - Giữ nguyên `counts.open`, các bảng/trạng thái/số liệu theo bộ lọc và budget native Progress/Drafts của #189/#202. Trường mới `open_all` là bổ sung tương thích; thiếu trường ở máy chủ cũ thì thẻ hiện chưa biết, không lấy số đã lọc thay thế.
 - Bộ đếm là metadata sổ KHTC theo quyền đọc hiện hữu, không chứng minh native Forms còn nhận ghi hoặc một thao tác đóng/hủy đã được ACK. Không dùng số đếm để đối soát mutation/receipt.
 - `GET /v1/extension/khtc/open-period-count` không có đầu vào số; một aggregate đọc trên transaction tenant, áp cùng reader và bộ lọc phát sinh hiện hữu. Không gọi Forms/Progress/Drafts/nguồn ngoài trong transaction hoặc theo từng dòng. Không đổi grant/lãnh đạo/TW/MFA, không đọc private SQL Forms, không ghi HTX, không migration.
+- Layout `/kn` của module lắp sidebar KHTC vào prop component tổng quát của AppShell; root shell dùng chung chuyển quyền render khung cho layout này. AuthProvider và toàn bộ kiểm quyền/hiển thị AppShell vẫn dùng chung, mỗi trang chỉ có một khung. Không tạo import từ shell dùng chung vào module KN, không sửa baseline.
 - API không lưu đệm; lỗi không trả số 0 giả. Web chỉ đọc khi menu được phép có nguồn badge, bỏ số khi lỗi/đổi quyền/ngữ cảnh/API/route/hết hạn, hủy request và bỏ late response/ABA. Số 0 đã đọc được thì ẩn badge. Giữ các nguồn badge khác.
 - Làm mới khi vào/đổi trang, focus, tab hiện lại và mỗi 30 giây khi tab hiện. Đây là cập nhật theo lượt đọc, chưa có push thời gian thực. Không dùng badge làm xác nhận ghi thành công. Menu tăng v14; mọi tệp sinh/golden sinh từ nguồn đúng lệnh.
 
-## Bằng chứng và phần còn lại
+### Bằng chứng và phần còn lại
 
 Ca PostgreSQL RED chứng minh trường tổng thiếu trong khi có 106 kỳ không terminal được phép đọc, ngoài năm/quý lọc; giữ lỗi fixture đầu riêng. Đối chứng backend kiểm hơn 100 dòng/nhiều năm, closed/cancelled, phát sinh theo quyền, vai bị từ chối, tenant và không gọi Progress cho kỳ ngoài bộ lọc. Gói gửi review phải kèm đầy đủ log cổng/DB/web/E2E, controlled FAIL→restore/control PASS, scanner mặc định và CI đúng SHA xanh.
 

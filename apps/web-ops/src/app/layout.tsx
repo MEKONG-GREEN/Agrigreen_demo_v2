@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AuthProvider } from "@/auth/AuthProvider";
-import { AppShell } from "@/components/AppShell";
+import { RootShell } from "@/components/AppShell";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="vi">
       <body>
         <AuthProvider>
-          <AppShell>{children}</AppShell>
+          <RootShell>{children}</RootShell>
         </AuthProvider>
       </body>
     </html>
