@@ -40,6 +40,7 @@ components:
           properties:
             exported: {type: integer}
             open: {type: integer}
+            open_all: {type: integer, minimum: 0, description: "Toàn bộ kỳ KHTC chưa đóng/hủy trong phạm vi đọc; không phụ thuộc bộ lọc dữ liệu của dashboard. Thiếu trường ở máy chủ cũ là chưa biết, không thay bằng open đã lọc."}
             sent: {type: integer}
             forms: {type: integer}
             achieved: {type: integer}

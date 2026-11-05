@@ -30,6 +30,7 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/weeks", h.weeks)
 	g.GET("/form-template", h.template)
 	g.POST("/form-template/install", h.install)
+	g.GET("/open-period-count", h.openPeriodCount)
 	g.GET("/periods", h.list)
 	g.POST("/periods/preview", h.preview)
 	g.POST("/periods", h.open)
