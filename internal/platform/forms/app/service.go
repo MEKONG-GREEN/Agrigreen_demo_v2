@@ -45,6 +45,8 @@ type Service struct {
 	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
 	// PeriodOperationPolicies are registered by owners before serving; nil disables receipts.
 	PeriodOperationPolicies map[string]port.PeriodOperationPolicy
+	// PublishOperationPolicies authorize the additive batch receipt capability before native TX.
+	PublishOperationPolicies map[string]port.PublishOperationPolicy
 	// RequiredDefinitionPolicies denies missing policies instead of falling back to DefineBy.
 	RequiredDefinitionPolicies map[string]bool
 	profiles                   map[string]port.Profile

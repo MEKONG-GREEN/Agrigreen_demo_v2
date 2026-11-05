@@ -141,6 +141,15 @@ func Periods(ctx context.Context, tx pgx.Tx, profile string, limit int) ([]Perio
 
 // InsertEvent ghi sự kiện kỳ native (máy trạng thái kiểm ở trigger trg_transition — sai → AGF01).
 func InsertEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, periodRef uuid.UUID, profile string, e *domain.Event, idem string) error {
+	_, err := insertEvent(ctx, tx, tid, periodRef, profile, e, idem)
+	return err
+}
+
+// InsertEventProof224 returns the exact partitioned identity from the native INSERT.
+func InsertEventProof224(ctx context.Context, tx pgx.Tx, tid, periodRef uuid.UUID, profile string, e *domain.Event, idem string) (time.Time, error) {
+	return insertEvent(ctx, tx, tid, periodRef, profile, e, idem)
+}
+func insertEvent(ctx context.Context, tx pgx.Tx, tid, periodRef uuid.UUID, profile string, e *domain.Event, idem string) (time.Time, error) {
 	var reason *string
 	if e.Reason != "" {
 		reason = &e.Reason
@@ -149,10 +158,12 @@ func InsertEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, periodRef uuid.U
 	if units == nil {
 		units = []string{}
 	}
-	return tx.QueryRow(ctx, `INSERT INTO pf_forms.period_event (id, tenant_id, stream_key, period_ref, profile, origin, action, mode, units, reason,
+	var recordedAt time.Time
+	err := tx.QueryRow(ctx, `INSERT INTO pf_forms.period_event (id, tenant_id, stream_key, period_ref, profile, origin, action, mode, units, reason,
 	    event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'period:' || $3::uuid::text, $3::uuid, $4, 'native', $5, $6, $7, $8, $9, $10, $11, $12) RETURNING seq`,
-		e.ID, tid, periodRef, profile, e.Action, e.Mode, units, reason, e.At.UTC(), e.Actor, idem, domain.RuleVersion).Scan(&e.Seq)
+	  VALUES ($1, $2, 'period:' || $3::uuid::text, $3::uuid, $4, 'native', $5, $6, $7, $8, $9, $10, $11, $12) RETURNING seq,recorded_at`,
+		e.ID, tid, periodRef, profile, e.Action, e.Mode, units, reason, e.At.UTC(), e.Actor, idem, domain.RuleVersion).Scan(&e.Seq, &recordedAt)
+	return recordedAt.UTC(), err
 }
 
 // Events đọc sự kiện của kỳ theo seq.

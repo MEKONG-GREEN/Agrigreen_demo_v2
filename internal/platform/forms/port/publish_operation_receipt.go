@@ -26,7 +26,6 @@ type PublishOperationRequest struct {
 
 const (
 	PublishOperationApplied    = "applied"
-	PublishOperationRejected   = "rejected"
 	PublishOperationUnknown    = "unknown"
 	MaxPublishOperationPeriods = 366
 	MaxPublishOperationUnits   = 2000
@@ -34,7 +33,6 @@ const (
 
 var (
 	ErrPublishOperationUnavailable = problem.New(http.StatusServiceUnavailable, "forms.publish_receipt_unavailable", "Chưa nối policy receipt phát hành kỳ")
-	ErrPublishOperationConflict    = problem.New(http.StatusConflict, "forms.publish_receipt_conflict", "Operation phát hành đã gắn với yêu cầu khác")
 )
 
 // NormalizePublishOperation bounds work before hashing, owns all mutable input,
@@ -112,7 +110,7 @@ func NormalizePublishOperation(in PublishOperationRequest) (PublishOperationRequ
 		if utf8.RuneCountInString(period.Label) < 1 || utf8.RuneCountInString(period.Label) > 200 || len(period.Key) > 20 || utf8.RuneCountInString(period.Rule) > 200 {
 			return bad("periods")
 		}
-		if period.DueAt.IsZero() || period.DueAt.Year() < 1 || period.DueAt.Year() > 9999 {
+		if period.DueAt.IsZero() || period.DueAt.UTC().Year() < 1 || period.DueAt.UTC().Year() > 9999 {
 			return bad("due_at")
 		}
 		period.DueAt = period.DueAt.UTC().Truncate(time.Microsecond)
@@ -173,7 +171,6 @@ type PublishOperationReceipt struct {
 	ActorRef      uuid.UUID           `json:"actor_ref"`
 	AuthorityHash string              `json:"authority_hash"`
 	Outcome       string              `json:"outcome"`
-	RejectionCode string              `json:"rejection_code"`
 	Items         []PublishedCreation `json:"items"`
 	RecordedAt    time.Time           `json:"recorded_at"`
 }

@@ -119,8 +119,20 @@ func (pb Publisher) PublishBatchOnce(ctx context.Context, in port.BatchInput, id
 	return pb.publishBatch(ctx, in, idem, true)
 }
 func (pb Publisher) publishBatch(ctx context.Context, in port.BatchInput, idem string, replay bool) ([]port.PublishedPeriod, error) {
+	return pb.publishBatchCore(ctx, in, idem, replay, nil)
+}
+
+// publishBatchCore is the shared native implementation, with optional atomic receipt hooks.
+func (pb Publisher) publishBatchCore(ctx context.Context, in port.BatchInput, idem string, replay bool, op *publishOperation224) ([]port.PublishedPeriod, error) {
 	s := pb.Svc
-	prof, a, err := s.resolve(ctx, in.Profile)
+	var prof port.Profile
+	var a actor
+	var err error
+	if op == nil {
+		prof, a, err = s.resolve(ctx, in.Profile)
+	} else {
+		prof, a = op.profile, op.actor
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +203,7 @@ func (pb Publisher) publishBatch(ctx context.Context, in port.BatchInput, idem s
 	}
 	now := s.Clock.Now().UTC()
 	var out []port.PublishedPeriod
+	var creations []port.PublishedCreation
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
 		if replay {
 			if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended('forms:publish_once:'||$1::uuid::text||':'||$2,0))", a.tenant, idem); err != nil {
@@ -215,6 +228,15 @@ func (pb Publisher) publishBatch(ctx context.Context, in port.BatchInput, idem s
 		if t.Fixture && !prof.AllowFixtures {
 			return port.ErrFixtureTemplate
 		}
+		if op != nil {
+			done, err := op.before(ctx, tx)
+			if err != nil {
+				return err
+			}
+			if done {
+				return nil
+			}
+		}
 		for i, pd := range in.Periods {
 			key := pd.Key
 			if key == "" {
@@ -236,10 +258,22 @@ func (pb Publisher) publishBatch(ctx context.Context, in port.BatchInput, idem s
 			if publicationSource != "" {
 				ev.Reason = "Nguồn cấp quyền: " + publicationSource
 			}
-			if err := store.InsertEvent(ctx, tx, a.tenant, p.ID, p.Profile, &ev, idemOr(storageKey, "published:"+key)); err != nil {
+			var recordedAt time.Time
+			if op == nil {
+				err = store.InsertEvent(ctx, tx, a.tenant, p.ID, p.Profile, &ev, idemOr(storageKey, "published:"+key))
+			} else {
+				recordedAt, err = store.InsertEventProof224(ctx, tx, a.tenant, p.ID, p.Profile, &ev, idemOr(storageKey, "published:"+key))
+			}
+			if err != nil {
 				return err
 			}
+			if op != nil {
+				creations = append(creations, port.PublishedCreation{ID: p.ID, Key: pd.Key, Label: p.Label, DueAt: p.DueAt, Applied: port.PeriodRevision{TenantID: a.tenant, PeriodID: p.ID, Profile: p.Profile, EventSeq: ev.Seq, DueSeq: 0}, EventID: ev.ID, EventRecordedAt: recordedAt})
+			}
 			out = append(out, port.PublishedPeriod{ID: p.ID, Key: pd.Key, Label: p.Label, DueAt: p.DueAt})
+		}
+		if op != nil {
+			return op.applied(ctx, tx, creations, now)
 		}
 		return nil
 	})
