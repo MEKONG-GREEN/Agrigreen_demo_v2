@@ -35,6 +35,9 @@ test("229 editor: lỗi ô, Lưu nháp và xác nhận Gửi trên phiếu thư�
   await expect(page.getByRole("status").filter({ hasText: "Đã lưu nháp." })).toBeVisible();
   await expect(page.getByText("Có thay đổi chưa lưu.", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 })).toHaveCSS("font-family", /Noto Serif/);
+  const sendBox = await page.getByRole("button", { name: "Gửi KHTC", exact: true }).boundingBox();
+  expect(sendBox?.x).toBeGreaterThan(page.viewportSize()!.width * 0.65);
+  await expect(page.getByRole("button", { name: "Gửi KHTC", exact: true })).toHaveClass(/btn-p(?:\s|$)/);
   await page.screenshot({ path: testInfo.outputPath("229-editor-saved.png"), fullPage: true });
   await page.getByRole("button", { name: "Gửi KHTC", exact: true }).click();
   const confirmation = page.getByRole("dialog", { name: "Xác nhận gửi phiếu" });

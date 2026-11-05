@@ -467,7 +467,7 @@ export function KhtcFormView({
 
       <h3>Kết quả kiểm tra</h3>
       {allIssues.length === 0 ? (
-        <p className="mute">{editable ? "Chưa phát hiện lỗi ở các ô nhập. Máy chủ kiểm tra lại khi lưu/gửi." : "Đạt 3 quy tắc kiểm tra."}</p>
+        <p className="mute">{editable ? "Chưa phát hiện lỗi ở các ô nhập." : "Đạt 3 quy tắc kiểm tra."}</p>
       ) : (
         <ul aria-label="Kết quả kiểm tra">
           {allIssues.map((i, k) => (

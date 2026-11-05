@@ -18,6 +18,7 @@ import { DetailPage } from "@/components/patterns/detail";
 import { useInboxAuthorityKey } from "../inbox/inbox-workspace";
 import { INBOX_BASE, parseInboxRoute } from "../inbox/inbox-routes";
 import { editorIssues } from "./editor";
+import styles from "./KhtcFormEntry.module.css";
 import { KhtcFormView } from "./KhtcFormView";
 import {
   KHTC_DEPT,
@@ -133,19 +134,19 @@ function FormEntry({ periodId, dept }: { periodId: string; dept: string }) {
   };
 
   if (needsReload) return <section role="alert"><p>Quyền hoặc phiên bản phiếu đã thay đổi. Tải lại để đọc trạng thái hiện tại trước khi sửa.</p><button className="btn" onClick={() => window.location.reload()}>Tải lại phiếu</button></section>;
-  return <div className="page"><LoadState s={form}>{() => f && c ? <DetailPage
+  return <div className={`page ${styles.entry}`}><LoadState s={form}>{() => f && c ? <DetailPage
     back={{ href: INBOX_BASE, label: "Báo cáo cho KHTC" }}
     title={`Phiếu ${f.department_name} · ${f.period.name}`}
     badge={<StatusPill tone={FORM_TONE[f.state]}>{f.state_label}</StatusPill>}
     actions={editable ? <>
       <button className="btn" disabled={!!pending} onClick={() => void write("draft")}>Lưu nháp</button>
-      <button className="btn btn-primary" disabled={!!pending || sendBlocked} onClick={() => f.supplement ? void write("submit") : setConfirming(true)}>Gửi KHTC</button>
+      <button className="btn btn-p" disabled={!!pending || sendBlocked} onClick={() => f.supplement ? void write("submit") : setConfirming(true)}>Gửi KHTC</button>
     </> : undefined}
   >
     {act.view}
     <FormHead f={f} />
     {f.draft_at && f.content_source === "draft" ? <p className="mute">Nháp lưu lúc {dt(f.draft_at)}.</p> : null}
-    <p role="status">{dirty ? "Có thay đổi chưa lưu." : "Đang xem nội dung từ máy chủ."}</p>
+    <p role="status">{dirty ? "Có thay đổi chưa lưu." : "Nội dung đã đồng bộ."}</p>
     {!editable ? <p className="mute">Phiếu chỉ đọc trong trạng thái và ngữ cảnh hiện tại.</p> : null}
     {pending ? <section aria-label="Đối chiếu thao tác phiếu" role={act.busy ? "status" : "alert"}>
       <p>{act.busy ? "Đang gửi yêu cầu; nội dung được giữ nguyên." : "Chưa xác định kết quả. Giữ nguyên nội dung và thử lại đúng thao tác này để đối chiếu."}</p>
@@ -153,7 +154,7 @@ function FormEntry({ periodId, dept }: { periodId: string; dept: string }) {
     </section> : null}
     {confirming && !pending && !sendBlocked ? <section role="dialog" aria-label="Xác nhận gửi phiếu" className="alert alert-info">
       <p>Gửi toàn bộ nội dung phiếu {f.department_name} · {f.period.name}, lần {f.attempt + 1}/{f.period.max_submissions || "∞"}? Phiếu đã gửi chỉ sửa khi có yêu cầu bổ sung.</p>
-      <button className="btn btn-primary" onClick={() => void write("submit")}>Xác nhận gửi lần {f.attempt + 1}</button>
+      <button className="btn btn-p" onClick={() => void write("submit")}>Xác nhận gửi lần {f.attempt + 1}</button>
       <button className="btn" onClick={() => setConfirming(false)}>Tiếp tục sửa</button>
     </section> : null}
     <fieldset disabled={!!pending} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }} aria-label="Nội dung phiếu">

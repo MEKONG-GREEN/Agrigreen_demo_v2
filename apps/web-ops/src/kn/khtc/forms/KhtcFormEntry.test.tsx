@@ -177,6 +177,6 @@ describe("editor229 — lifetime và ACK", () => {
     render(<KhtcFormEntryScreen />); const input = await screen.findByRole("textbox", { name: "F Mô hình lúa" }); fireEvent.change(input, { target: { value: "7" } });
     expect(screen.getByText("Có thay đổi chưa lưu.")).toBeInTheDocument(); const before = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(before); expect(before.defaultPrevented).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Lưu nháp" })); await screen.findByText("Đã lưu nháp."); expect(screen.queryByText("Có thay đổi chưa lưu.")).not.toBeInTheDocument();
-    const after = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(after); expect(after.defaultPrevented).toBe(false);
+    await waitFor(() => { const after = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(after); expect(after.defaultPrevented).toBe(false); });
   });
 });
