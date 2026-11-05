@@ -31,6 +31,11 @@ type historySubmissionDTO struct {
 	Reviewer    *uuid.UUID `json:"reviewer_ref"`
 	ReviewedAt  *time.Time `json:"reviewed_at"`
 }
+type historyPlanDTO struct {
+	VersionID  uuid.UUID `json:"version_id"`
+	Version    int       `json:"version"`
+	DecisionNo string    `json:"decision_no"`
+}
 type historyRowDTO struct {
 	EntryRef uuid.UUID `json:"entry_ref"`
 	Name     string    `json:"name"`
@@ -108,6 +113,10 @@ func (h Handler) historicalSubmission(c *gin.Context) {
 	for _, row := range data.Rows {
 		rows = append(rows, historyRowDTO{EntryRef: row.EntryRef, Name: row.Name, Unit: row.Unit})
 	}
+	var plan *historyPlanDTO
+	if data.Plan != nil {
+		plan = &historyPlanDTO{VersionID: data.Plan.VersionID, Version: data.Plan.Version, DecisionNo: data.Plan.DecisionNo}
+	}
 	sections := data.Sections
 	if sections == nil {
 		sections = []domain.Section{}
@@ -115,7 +124,7 @@ func (h Handler) historicalSubmission(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{"period": historyPeriodOf(data.Period), "department": dept,
 		"department_name": app.DeptName(dept), "submission": historySubmissionOf(data.Submission), "sheet_id": data.Sheet.ID,
-		"content_hash": hex.EncodeToString(data.Sheet.ContentHash), "plan_version_ref": data.Sheet.PlanVersionRef,
+		"content_hash": hex.EncodeToString(data.Sheet.ContentHash), "plan_version_ref": data.Sheet.PlanVersionRef, "plan": plan,
 		"template_code": data.Sheet.TemplateCode, "template_version": data.Sheet.TemplateVersion,
 		"content": data.Sheet.Content, "rows": rows, "sections": sections})
 }

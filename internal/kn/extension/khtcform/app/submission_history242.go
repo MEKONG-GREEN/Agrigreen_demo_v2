@@ -36,6 +36,7 @@ type SubmissionSnapshot struct {
 	Period     ps.Period
 	Department string
 	Submission forms.SubmissionRef
+	Plan       *ext.KHTCPlan
 	Sheet      store.Sheet
 	Rows       []HistoryRow
 	Sections   []domain.Section
@@ -144,6 +145,7 @@ func (s *Service) HistoricalSubmission(ctx context.Context, id uuid.UUID, dept s
 			if plan.VersionID != *sealed.PlanVersionRef || plan.Year != sealed.Year {
 				return SubmissionSnapshot{}, ErrDependency.WithDetail("Không đối chiếu được phiên bản kế hoạch đã gửi")
 			}
+			out.Plan = &plan
 			for _, row := range plan.Entries {
 				if row.Kind == "item" && row.Department == dept {
 					out.Rows = append(out.Rows, HistoryRow{EntryRef: row.Ref, Name: row.Name, Unit: row.UnitCode})

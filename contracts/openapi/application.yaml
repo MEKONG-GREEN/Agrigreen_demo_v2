@@ -13816,6 +13816,42 @@ paths:
             application/octet-stream: {schema: {type: string, format: binary}}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/forms/{dept}/submissions:
+    get:
+      summary: Lịch sử gửi của đúng kỳ và phòng qua cổng Forms; không liệt kê bảng niêm phong mồ côi
+      operationId: extensionKhtcFormSubmissionHistory
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Định danh và thông tin gửi/rà soát thực; không phải audit đầy đủ hay receipt của thao tác
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSubmissionHistory"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/forms/{dept}/submissions/{submissionID}:
+    get:
+      summary: Nội dung bất biến của đúng lần gửi; không dựng lại số tự tính hoặc kiểm tra từ nguồn hiện hành
+      operationId: extensionKhtcFormHistoricalSubmission
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: dept, in: path, required: true, schema: {type: string}}
+        - {name: submissionID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Payload niêm phong đã kiểm native/tenant/phòng/base attempt/người gửi/hash; nhãn theo đúng phiên bản kế hoạch
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/KHTCFormSubmissionSnapshot"}
+        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
+        "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
+        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
+
   /v1/extension/khtc/periods/{id}/report:
     get:
       summary: "Bản soạn Mẫu 1–5, ô số chỉ đọc và mốc dữ liệu"
@@ -26860,6 +26896,70 @@ components:
             reviewed_submission_id: {type: string, format: uuid, description: Mã từ kết quả native Forms của thao tác}
             reviewed_attempt: {type: integer, format: int64, minimum: 1}
             review_decision: {type: string, enum: [returned, accepted]}
+    KHTCFormHistoryPeriod:
+      type: object
+      required: [id, name, report_type, year]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        report_type: {type: string}
+        year: {type: integer}
+    KHTCFormSubmissionHeader:
+      type: object
+      required: [id, attempt, submitted_at, submitter_ref, native_late, decision, review_note, reviewer_ref, reviewed_at]
+      properties:
+        id: {type: string, format: uuid}
+        attempt: {type: integer, format: int64, minimum: 1}
+        submitted_at: {type: string, format: date-time}
+        submitter_ref: {type: string, format: uuid}
+        native_late: {type: boolean, description: Ghi nhận tại lần gửi của Forms; không suy lại theo hạn hiện tại}
+        decision: {type: string, enum: ["", returned, accepted]}
+        review_note: {type: string}
+        reviewer_ref: {type: [string, "null"], format: uuid}
+        reviewed_at: {type: [string, "null"], format: date-time}
+    KHTCFormSubmissionHistory:
+      type: object
+      required: [period, department, department_name, items]
+      properties:
+        period: {$ref: "#/components/schemas/KHTCFormHistoryPeriod"}
+        department: {type: string}
+        department_name: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/KHTCFormSubmissionHeader"}}
+    KHTCFormHistoryRow:
+      type: object
+      required: [entry_ref, name, unit]
+      properties:
+        entry_ref: {type: string, format: uuid}
+        name: {type: string, description: Nhãn hạng mục của phiên bản kế hoạch được bảng niêm phong tham chiếu}
+        unit: {type: string}
+    KHTCFormHistoryPlan:
+      type: object
+      required: [version_id, version, decision_no]
+      properties:
+        version_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        decision_no: {type: string}
+    KHTCFormSubmissionSnapshot:
+      type: object
+      required: [period, department, department_name, submission, sheet_id, content_hash, plan_version_ref, plan, template_code, template_version, content, rows, sections]
+      properties:
+        period: {$ref: "#/components/schemas/KHTCFormHistoryPeriod"}
+        department: {type: string}
+        department_name: {type: string}
+        submission: {$ref: "#/components/schemas/KHTCFormSubmissionHeader"}
+        sheet_id: {type: string, format: uuid}
+        content_hash: {type: string, pattern: '^[0-9a-f]{64}$', description: SHA256 của nội dung niêm phong; không có nghĩa là receipt của thao tác}
+        plan_version_ref: {type: [string, "null"], format: uuid}
+        plan:
+          oneOf:
+            - {type: "null"}
+            - {$ref: "#/components/schemas/KHTCFormHistoryPlan"}
+        template_code: {type: string}
+        template_version: {type: integer}
+        content: {$ref: "#/components/schemas/KHTCFormContent"}
+        rows: {type: array, items: {$ref: "#/components/schemas/KHTCFormHistoryRow"}}
+        sections: {type: array, items: {$ref: "#/components/schemas/KHTCFormSection"}}
+
     CNTSDesignView:
       type: object
       required: [code, bm, title, period_type, due, template_id, version, fields]

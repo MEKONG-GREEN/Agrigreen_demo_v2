@@ -230,7 +230,7 @@ func TestKHTCHistory242_RejectsMismatchedNativeAndSealedReferences(t *testing.T)
 
 func TestKHTCHistory242_RecordedPlanSurvivesNewVersion(t *testing.T) {
 	f := newKHTCFormFx(t)
-	p := f.open(41, dTT)
+	p := f.open(42, dTT)
 	code, body := f.send(p.ID, dTT, "submit", 0, ttSheet(f.item, "10"))
 	f.ok(code, body, nil)
 	id, _ := reviewTarget241(f, p.ID, dTT)
