@@ -65,7 +65,7 @@ func TestKHTCOpenCount230_GlobalMetadataAndDashboard(t *testing.T) {
 					action = ps.ActionCancelled
 				}
 				reason := "Sự kiện kết thúc kỳ kiểm thử 230"
-				e := ps.Event{ID: ids.New(), PeriodID: p.ID, Action: action, Reason: &reason, State: &action, ActorRef: f.khtcUser, EventTime: f.clk.Now()}
+				e := ps.Event{ID: ids.New(), PeriodID: p.ID, Action: action, Reason: &reason, State: nil, ActorRef: f.khtcUser, EventTime: f.clk.Now()}
 				if err := ps.InsertEvent(context.Background(), tx, f.tid, &e, "open-count-230-event:"+e.ID.String()); err != nil {
 					return err
 				}
