@@ -24,11 +24,11 @@ describe("history242 — nguồn HTTP và định danh", () => {
     if (field === "reviewer") data.submission.reviewer_ref = null;
     if (field === "hash") data.content_hash = "not-a-hash";
     if (field === "plan") data.plan!.version_id = ACTOR242;
-    await expect(apiFor(data).submission(PERIOD242, DEPT242, FIRST242)).rejects.toMatchObject({ code: "extension.history_resource_mismatch" });
+    await expect(apiFor(data).submission(PERIOD242, DEPT242, FIRST242)).rejects.toMatchObject({ code: "extension.out_of_scope" });
   });
   it("không nhận header khác phạm vi hoặc trùng định danh/attempt", async () => {
     const data = history242(); data.items.push({ ...data.items[0]! });
-    await expect(apiFor(data).history(PERIOD242, DEPT242)).rejects.toMatchObject({ code: "extension.history_resource_mismatch" });
+    await expect(apiFor(data).history(PERIOD242, DEPT242)).rejects.toMatchObject({ code: "extension.out_of_scope" });
     data.items.pop(); data.department = "hanh_chinh_tong_hop";
     await expect(apiFor(data).history(PERIOD242, DEPT242)).rejects.toMatchObject({ status: 403 });
   });

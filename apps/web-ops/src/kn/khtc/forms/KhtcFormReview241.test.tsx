@@ -222,8 +222,8 @@ describe("history242 — điều hướng khỏi ghi chú rà soát", () => {
     const operation = deferred<KhtcFormReviewResult>(); calls.review.mockReturnValueOnce(operation.promise);
     render(<KhtcFormReviewScreen />);
     await screen.findByRole("heading", { name: /Kỳ A/ });
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận", exact: true }));
-    fireEvent.click(screen.getByRole("button", { name: "Xác nhận lần gửi", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận" }));
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận lần gửi" }));
     await waitFor(() => expect(calls.review).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("button", { name: "Lịch sử và so sánh lần gửi" })).toBeDisabled();
     expect(calls.push).not.toHaveBeenCalled();

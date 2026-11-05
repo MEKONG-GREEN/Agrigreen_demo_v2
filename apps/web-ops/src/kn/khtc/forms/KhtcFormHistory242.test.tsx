@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { KhtcFormHistoryScreen } from "./KhtcFormHistoryScreen";
 import type { SubmissionSnapshot } from "./submission-history";
+import type * as HistoryModule from "./submission-history";
 import { DEPT242, FIRST242, ITEM242, PERIOD242, SECOND242, history242, snapshot242 } from "./history242-testdata";
 
 const state = vi.hoisted(() => ({ period: "", submission: undefined as string | undefined, search: "", api: {} as object,
@@ -11,7 +12,7 @@ const calls = vi.hoisted(() => ({ history: vi.fn(), submission: vi.fn(), push: v
 vi.mock("next/navigation", () => ({ useParams: () => ({ periodId: state.period, submissionId: state.submission }), useSearchParams: () => new URLSearchParams(state.search), useRouter: () => ({ push: calls.push }) }));
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: state.api, status: state.status, principal: state.principal, kn: { status: state.knStatus, context: state.context } }) }));
 vi.mock("@/shell/Breadcrumb", () => ({ useBreadcrumbTail: () => undefined }));
-vi.mock("./submission-history", async original => ({ ...await original<typeof import("./submission-history")>(), createSubmissionHistoryApi: () => calls }));
+vi.mock("./submission-history", async original => ({ ...await original<typeof HistoryModule>(), createSubmissionHistoryApi: () => calls }));
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(yes => { resolve = yes; }); return { promise, resolve }; }
 
 beforeEach(() => {

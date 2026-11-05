@@ -27,7 +27,7 @@ export function historyHref(route: HistoryRoute): string {
 }
 
 function guard(ok: unknown): asserts ok {
-  if (!ok) throw new ApiProblem({ type: "about:blank", title: "Không đối chiếu được lịch sử phiếu trong ngữ cảnh hiện tại", code: "extension.history_resource_mismatch", status: 403 });
+  if (!ok) throw new ApiProblem({ type: "about:blank", title: "Không đối chiếu được lịch sử phiếu trong ngữ cảnh hiện tại", code: "extension.out_of_scope", status: 403 });
 }
 function checkHeader(sub: SubmissionHeader) {
   guard(sub && validID(sub.id) && Number.isSafeInteger(sub.attempt) && sub.attempt > 0 && validID(sub.submitter_ref)

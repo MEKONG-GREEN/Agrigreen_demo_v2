@@ -29,6 +29,10 @@ test("242 lịch sử: hai lần gửi thật qua UI, so sánh readonly và gi�
   };
   const openReview = async () => {
     await login("0912345242");
+    // Login may honor the previous form's returnTo. Use the public menu to
+    // reach the period list while keeping the tab's submitted mock records.
+    const periodsLink = sidebar(page).getByRole("link", { name: /^Kỳ báo cáo & phiếu các phòng/ });
+    await periodsLink.click();
     const list = page.getByRole("table", { name: "Danh sách kỳ báo cáo", exact: true });
     await list.getByRole("row").filter({ hasText: "Tuần 50" }).getByRole("link").first().click();
     await page.getByRole("table", { name: "Tiến độ nộp phiếu và nguồn module", exact: true }).getByRole("row")
