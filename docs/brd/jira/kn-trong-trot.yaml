@@ -1,0 +1,30 @@
+he: kn-trong-trot
+brd:
+  link: https://drive.google.com/file/d/1oxmO1OINElxx1NjsQkeHSxklQCMpWEDO/view
+  file_id: 1oxmO1OINElxx1NjsQkeHSxklQCMpWEDO
+  phien_ban: v7.7 (Final)
+  modified_time: 2026-11-03T06:28:22Z
+jira:
+  site: mekonggreen-teamproduct.atlassian.net
+  project: MAKN
+  label: brd-kn-trong-trot
+items:
+  - id: E01-S01
+    loai: story
+    cha: E01
+    jira: MAKN-86
+    sprint: 1
+    muc_brd: ["§IV 4.5", "§IV 3.2"]
+    ma_yc: ["UR-AD-05", "FN-AD-04.05"]
+  - id: E01-S01-T01
+    loai: subtask
+    cha: E01-S01
+    jira: MAKN-87
+  - id: E01-S01-T02
+    loai: subtask
+    cha: E01-S01
+    jira: MAKN-88
+  - id: E01-S01-T03
+    loai: subtask
+    cha: E01-S01
+    jira: MAKN-89
