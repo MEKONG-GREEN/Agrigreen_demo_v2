@@ -3,11 +3,13 @@ package app_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
 	khtcdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/domain"
+	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
 	periodapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -19,9 +21,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	fixture "github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/fixtures/khtcdeadline209"
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"sync"
@@ -108,12 +113,42 @@ func TestInitialDraft225LostCommitPoolOneStoredReplayAndHistoryPaging(t *testing
 		t.Fatalf("old operation was promoted to latest: replay=%t err=%T", hit, err)
 	}
 	page, err := svc.InitialDraftHistory225(ctx, input.Year, 0, 100)
-	if err != nil || len(page) != 100 || page[0].Seq != 101 || page[99].Seq != 2 {
-		t.Fatalf("complete first history page size=%d err=%T", len(page), err)
+	if err != nil || len(page) != 101 || page[0].Seq != 101 || page[99].Seq != 2 || page[100].ID != first.Event.ID {
+		t.Fatalf("app history lookahead size=%d err=%T", len(page), err)
 	}
 	tail, err := svc.InitialDraftHistory225(ctx, input.Year, page[99].Seq, 100)
 	if err != nil || len(tail) != 1 || tail[0].ID != first.Event.ID {
 		t.Fatalf("history tail size=%d err=%T", len(tail), err)
+	}
+	// The service supplies one lookahead row; the real HTTP DTO owns the 100-row page/cursor.
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Request = c.Request.WithContext(ctx); c.Next() })
+	ownedHandler := khtchandler.Handler{Svc: svc}
+	ownedHandler.RegisterApp(engine.Group("/v1"))
+	type historyPage225 struct {
+		Items []struct {
+			ID       string `json:"event_id"`
+			Revision int64  `json:"revision"`
+		} `json:"items"`
+		Next *int64 `json:"next_before_revision"`
+	}
+	readHistory := func(query string) historyPage225 {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/kn/khtc/plans/2036/draft/history?"+query, nil))
+		var result historyPage225
+		if rec.Code != 200 || json.Unmarshal(rec.Body.Bytes(), &result) != nil {
+			t.Fatalf("owned history HTTP status=%d", rec.Code)
+		}
+		return result
+	}
+	firstPage := readHistory("limit=100")
+	if len(firstPage.Items) != 100 || firstPage.Items[0].Revision != 101 || firstPage.Items[99].Revision != 2 || firstPage.Next == nil || *firstPage.Next != 2 {
+		t.Fatalf("HTTP history first page size=%d cursor_set=%t", len(firstPage.Items), firstPage.Next != nil)
+	}
+	lastPage := readHistory(fmt.Sprintf("limit=100&before_revision=%d", *firstPage.Next))
+	if len(lastPage.Items) != 1 || lastPage.Items[0].ID != first.Event.ID.String() || lastPage.Items[0].Revision != 1 || lastPage.Next != nil {
+		t.Fatalf("HTTP history tail size=%d cursor_set=%t", len(lastPage.Items), lastPage.Next != nil)
 	}
 	renewed := owner
 	renewed.ID = ids.New()

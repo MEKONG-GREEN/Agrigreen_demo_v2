@@ -72,7 +72,7 @@ func TestW1168RecoveryReloadExpiryAdoptionAndScope(t *testing.T) {
 	pool := db.ForModule(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), extension.DBModule)
 	broken := &lostAdhocPublisher{Publisher: f.nativeForms}
 	broken.after.Store(true)
-	s := periodapp.Service{DB: pool, Clock: f.clk, Forms: broken, Control: f.nativeControl, MaxSubmissions: 3}
+	s := periodapp.Service{DB: pool, Clock: f.clk, Forms: broken, Control: f.nativeControl, Plan: publishedDepartments225{f.ext.KHTCPlans()}, MaxSubmissions: 3}
 	base := adhocOwnerContext(t, f, authz.KNAdmin, "", f.khtcUser, true, false, uuid.Nil)
 	old := adhocLeaseContext(t, base, ids.New(), f.clk.Now().Add(time.Minute), nil)
 	if _, e := s.Open(old, adhocOpenInput(), "lost-browser-key"); e == nil {
@@ -174,7 +174,7 @@ func TestW1168RecoveryInflightOldSessionAndConcurrentAdoption(t *testing.T) {
 	pool := db.ForModule(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), extension.DBModule)
 	publisher := &blockedAdhocPublisher{Publisher: f.nativeForms, entered: make(chan struct{}), release: make(chan struct{})}
 	publisher.block.Store(true)
-	s := periodapp.Service{DB: pool, Clock: f.clk, Forms: publisher, Control: f.nativeControl, MaxSubmissions: 3}
+	s := periodapp.Service{DB: pool, Clock: f.clk, Forms: publisher, Control: f.nativeControl, Plan: publishedDepartments225{f.ext.KHTCPlans()}, MaxSubmissions: 3}
 	base := adhocOwnerContext(t, f, authz.KNAdmin, "", f.khtcUser, true, false, uuid.Nil)
 	old := adhocLeaseContext(t, base, ids.New(), f.clk.Now().Add(time.Minute), nil)
 	oldResult := make(chan error, 1)

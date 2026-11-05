@@ -30,6 +30,25 @@ import (
 	"time"
 )
 
+// This adapter resolves the fixture's existing populated plan; it never seeds or fakes presence.
+type publishedDepartments225 struct{ plans ext.KHTCPlans }
+
+func (p publishedDepartments225) PlanDepartments(ctx context.Context, year int, on time.Time) ([]string, error) {
+	plan, err := p.plans.PlanAt(ctx, year, on)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, entry := range plan.Entries {
+		if entry.Department != "" && entry.Tracking != "stopped" && !seen[entry.Department] {
+			seen[entry.Department] = true
+			out = append(out, entry.Department)
+		}
+	}
+	return out, nil
+}
+
 func adhocOwnerContext(t *testing.T, f *reportFx, role, dept string, actor uuid.UUID, mfa, readonly bool, session uuid.UUID) context.Context {
 	t.Helper()
 	if session == uuid.Nil {
@@ -120,7 +139,7 @@ func TestW1168AdhocPublishLostResponseAndOwnCommitFailure(t *testing.T) {
 			} else {
 				db.fail.Store(true)
 			}
-			service := periodapp.Service{DB: db, Clock: f.clk, Forms: publisher, Control: f.nativeControl, MaxSubmissions: 3}
+			service := periodapp.Service{DB: db, Clock: f.clk, Forms: publisher, Control: f.nativeControl, Plan: publishedDepartments225{f.ext.KHTCPlans()}, MaxSubmissions: 3}
 			ctx := adhocOwnerContext(t, f, authz.KNAdmin, "", f.khtcUser, true, false, uuid.Nil)
 			input := adhocOpenInput()
 			if _, err := service.Open(ctx, input, "lost-publish"); err == nil {
@@ -147,7 +166,7 @@ func TestW1168AdhocPublishLostResponseAndOwnCommitFailure(t *testing.T) {
 func TestW1168AdhocPublishConcurrentSingleBatch(t *testing.T) {
 	f := newReportFx(t)
 	pool := db.ForModule(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), extension.DBModule)
-	service := periodapp.Service{DB: pool, Clock: f.clk, Forms: f.nativeForms, Control: f.nativeControl, MaxSubmissions: 3}
+	service := periodapp.Service{DB: pool, Clock: f.clk, Forms: f.nativeForms, Control: f.nativeControl, Plan: publishedDepartments225{f.ext.KHTCPlans()}, MaxSubmissions: 3}
 	ctx := adhocOwnerContext(t, f, authz.KNAdmin, "", f.khtcUser, true, false, uuid.Nil)
 	idsOut := make(chan uuid.UUID, 2)
 	errs := make(chan error, 2)
@@ -189,7 +208,7 @@ func TestW1168AdminOperationRequiresRealMetadataAndExactBinding(t *testing.T) {
 	f := newReportFx(t)
 	pool := db.ForModule(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform), extension.DBModule)
 	ctx := adhocOwnerContext(t, f, authz.KNAdmin, "", f.khtcUser, true, false, uuid.Nil)
-	service := periodapp.Service{DB: pool, Clock: f.clk, Forms: f.nativeForms, Control: f.nativeControl, MaxSubmissions: 3}
+	service := periodapp.Service{DB: pool, Clock: f.clk, Forms: f.nativeForms, Control: f.nativeControl, Plan: publishedDepartments225{f.ext.KHTCPlans()}, MaxSubmissions: 3}
 	d, err := service.Open(ctx, adhocOpenInput(), "proof-publish")
 	if err != nil {
 		t.Fatal(err)

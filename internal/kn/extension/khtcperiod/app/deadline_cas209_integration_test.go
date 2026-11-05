@@ -1,12 +1,18 @@
 package app_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/store"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
@@ -61,9 +67,9 @@ func (p *casProbe209) ChangeDueCAS(ctx context.Context, profile string, id uuid.
 }
 func (p *casProbe209) count() int { p.mu.Lock(); defer p.mu.Unlock(); return p.calls }
 func (f *deadlineFx209) consumer209(control formsport.ConditionalPeriodControl) (*khtcpapp.Service, context.Context) {
-	svc := &khtcpapp.Service{DB: f.roleDB, Clock: f.clk, Forms: f.fm.Publisher(), Control: f.fm.Control(), ConditionalControl: control, MaxSubmissions: 3}
+	svc := &khtcpapp.Service{DB: f.roleDB, Clock: f.clk, Forms: f.fm.Publisher(), Control: f.fm.Control(), ConditionalControl: control, Plan: publishedDepartments225{f.plan225().KHTCPlans()}, MaxSubmissions: 3}
 	p := fixture.Bind(f.t, authz.Principal{ActorRef: f.actor, TenantID: f.tid, KN: &authz.KNContext{ID: uuid.NewSHA1(f.tid, []byte("deadline209")), Role: authz.KNTinh, Department: khtcDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1"}}}})
-	return svc, authz.WithPrincipal(context.Background(), p)
+	return svc, authz.WithPrincipal(tenant.WithID(context.Background(), f.tid), p)
 }
 func mustChange209(t *testing.T, s *khtcpapp.Service, ctx context.Context, p khtcPeriod, due time.Time, key string) khtcpapp.Detail {
 	t.Helper()
@@ -284,7 +290,54 @@ func newDeadlineFx209(t *testing.T) *deadlineFx209 {
 	n := fixture.New(t)
 	return &deadlineFx209{t: t, fm: n, roleDB: n.DB, clk: n.Clock, tid: uuid.New(), node: uuid.New(), actor: uuid.New()}
 }
+
+// The fixture uses the actual published plan port, including typed absence.
+type publishedDepartments225 struct{ plans extport.KHTCPlans }
+
+func (p publishedDepartments225) PlanDepartments(ctx context.Context, year int, on time.Time) ([]string, error) {
+	plan, err := p.plans.PlanAt(ctx, year, on)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, entry := range plan.Entries {
+		if entry.Department != "" && entry.Tracking != "stopped" && !seen[entry.Department] {
+			seen[entry.Department] = true
+			out = append(out, entry.Department)
+		}
+	}
+	return out, nil
+}
+func (f *deadlineFx209) plan225() *extension.Module {
+	return extension.New(f.fm.Pool, f.clk, extension.Deps{})
+}
+func (f *deadlineFx209) seedPublished225() {
+	f.t.Helper()
+	module := f.plan225()
+	principal := fixture.Bind(f.t, authz.Principal{ActorRef: f.actor, TenantID: f.tid, MFA: true, KN: &authz.KNContext{Role: authz.KNAdmin, Scope: authz.Scope{All: true}}})
+	ctx := authz.WithPrincipal(tenant.WithID(context.Background(), f.tid), principal)
+	_, err := module.KHTCPlans().PlanAt(ctx, 2026, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	if err == nil {
+		return
+	}
+	if !errors.Is(err, extport.ErrKHTCPlanNotFound) {
+		f.t.Fatal(err)
+	}
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Request = c.Request.WithContext(ctx); c.Next() })
+	module.RegisterApp(engine.Group("/v1"))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", bytes.NewBufferString(`{"base_version":0,"effective_from":"2026-01-01","entries":[]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "fixture225-deadline-plan")
+	engine.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		f.t.Fatalf("real fixture plan status=%d", rec.Code)
+	}
+}
 func (f *deadlineFx209) open209() khtcPeriod {
+	f.seedPublished225()
 	s, ctx := f.consumer209(f.fm.ConditionalControl())
 	admin := fixture.Bind(f.t, authz.Principal{ActorRef: f.actor, TenantID: f.tid, MFA: true, KN: &authz.KNContext{Role: authz.KNAdmin, Scope: authz.Scope{All: true}}})
 	if _, e := s.InstallTemplate(authz.WithPrincipal(context.Background(), admin), "install209"); e != nil {

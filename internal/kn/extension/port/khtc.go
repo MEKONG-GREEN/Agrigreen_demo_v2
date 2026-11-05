@@ -132,7 +132,8 @@ type KHTCSourceCrosswalk interface {
 }
 
 // KHTCPlanDepartments trả phòng phụ trách các hạng mục của Kế hoạch năm có hiệu lực tại ngày on (W11.61 — danh mục
-// CT/DA, Kế hoạch năm). Chưa nối → KHTC chọn phòng tham gia khi mở kỳ (mặc định: mọi phòng ban đang áp dụng trừ KHTC).
+// CT/DA, Kế hoạch năm). Provider là bắt buộc trước native Open; chưa nối phải từ chối.
+// Chưa có phiên bản trả ErrKHTCPlanNotFound; danh sách rỗng chỉ hợp lệ khi phiên bản thật không có phòng phụ trách.
 type KHTCPlanDepartments interface {
 	PlanDepartments(ctx context.Context, year int, on time.Time) ([]string, error)
 }
