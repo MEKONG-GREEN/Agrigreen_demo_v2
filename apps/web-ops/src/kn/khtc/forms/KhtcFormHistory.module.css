@@ -2,6 +2,10 @@
   min-width: 0;
 }
 
+.history :global(.dt) {
+  min-width: 42rem;
+}
+
 .value {
   display: block;
   white-space: pre-wrap;
