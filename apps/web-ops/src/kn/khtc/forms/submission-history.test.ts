@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
+import { knPersonaById } from "@/api/mock/kn-accounts";
 import { compareSnapshots, createSubmissionHistoryApi, historyHref, parseHistoryRoute } from "./submission-history";
 import { ACTOR242, DEPT242, FIRST242, ITEM242, PERIOD242, PLAN242, SECOND242, history242, snapshot242 } from "./history242-testdata";
 
@@ -8,6 +9,16 @@ describe("history242 — nguồn HTTP và định danh", () => {
     return createSubmissionHistoryApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.tinh", getContextId: () => "history242",
       fetch: async request => { requests.push(request); return Response.json(body); } }));
   }
+  it("giữ nguyên mã actor hiển thị đã ghi nhận của persona giả lập hiện hữu", async () => {
+    const sender = knPersonaById("kn-cnts")!.me.actor_ref;
+    const reviewer = knPersonaById("kn-admin")!.me.actor_ref;
+    const data = snapshot242();
+    data.submission.submitter_ref = sender; data.submission.reviewer_ref = reviewer;
+    expect(await apiFor(data).submission(PERIOD242, DEPT242, FIRST242)).toEqual(data);
+    const list = history242();
+    for (const sub of list.items) { sub.submitter_ref = sender; if (sub.decision) sub.reviewer_ref = reviewer; }
+    expect(await apiFor(list).history(PERIOD242, DEPT242)).toEqual(list);
+  });
   it("chỉ GET đúng period/department/submission, không gửi mutation hay idempotency key", async () => {
     const requests: Request[] = [], snapshot = snapshot242();
     expect(await apiFor(snapshot, requests).submission(PERIOD242, DEPT242, FIRST242)).toEqual(snapshot);

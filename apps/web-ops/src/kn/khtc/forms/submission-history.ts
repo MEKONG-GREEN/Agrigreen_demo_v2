@@ -11,6 +11,8 @@ export type HistoryRoute = { periodId: string; department: string; submissionId?
 const UUID = /^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DEPARTMENTS = new Set(["trong_trot", "chan_nuoi_thuy_san", "thong_tin_truyen_thong", "hanh_chinh_tong_hop", "ke_hoach_tai_chinh"]);
 const validID = (value: unknown): value is string => typeof value === "string" && value.length === 36 && UUID.test(value);
+// Recorded actor references are display values; resource and route IDs remain UUIDs.
+const validActorRef = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 
 export function parseHistoryRoute(period: unknown, submission: unknown, query: URLSearchParams): HistoryRoute | null {
   if (!validID(period) || submission !== undefined && !validID(submission)
@@ -30,11 +32,11 @@ function guard(ok: unknown): asserts ok {
   if (!ok) throw new ApiProblem({ type: "about:blank", title: "Không đối chiếu được lịch sử phiếu trong ngữ cảnh hiện tại", code: "extension.out_of_scope", status: 403 });
 }
 function checkHeader(sub: SubmissionHeader) {
-  guard(sub && validID(sub.id) && Number.isSafeInteger(sub.attempt) && sub.attempt > 0 && validID(sub.submitter_ref)
+  guard(sub && validID(sub.id) && Number.isSafeInteger(sub.attempt) && sub.attempt > 0 && validActorRef(sub.submitter_ref)
     && typeof sub.submitted_at === "string" && Number.isFinite(Date.parse(sub.submitted_at))
     && ["", "accepted", "returned"].includes(sub.decision));
   guard(sub.decision === "" ? sub.reviewer_ref === null && sub.reviewed_at === null && !sub.review_note
-    : validID(sub.reviewer_ref) && typeof sub.reviewed_at === "string" && Number.isFinite(Date.parse(sub.reviewed_at)));
+    : validActorRef(sub.reviewer_ref) && typeof sub.reviewed_at === "string" && Number.isFinite(Date.parse(sub.reviewed_at)));
 }
 
 export function createSubmissionHistoryApi(api: ApiClient) {
