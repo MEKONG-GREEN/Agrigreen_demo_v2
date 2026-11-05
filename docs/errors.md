@@ -193,6 +193,12 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 404 | `extension.contact_unavailable` | pf/extension: cán bộ trong danh bạ chưa khai số điện thoại ở tài khoản (hoặc tài khoản đã khóa) — không gọi/nhắn 1 chạm được (US-DIR-02) |
 | 403 | `extension.farmer_household_required` | pf/extension: tài khoản nông dân chưa liên kết nông hộ nào (HTX US-SUPPORT-01) |
 | 422 | `extension.household_invalid` | pf/extension: `household_ref` của yêu cầu hỗ trợ không thuộc tài khoản, hoặc tài khoản có nhiều nông hộ mà không chọn |
+| 409 | `extension.khtc_draft_revision_conflict` | KHTC225: draft ID/revision không còn đúng; tải lại hoặc giữ nguyên thao tác chưa xác nhận, không ghép nội dung cũ vào revision mới |
+| 409 | `extension.khtc_initial_draft_active` | KHTC225: năm có nháp máy chủ active; lần công bố SaveVersion mới bị chặn dưới cùng khóa năm |
+| 409 | `extension.khtc_initial_draft_year_in_use` | KHTC225: năm đã có phiên bản áp dụng hoặc metadata kỳ/ý định mở kỳ; không tạo nháp ban đầu |
+| 409 | `extension.khtc_draft_operation_conflict` | KHTC225: khóa thao tác đã gắn với nội dung, actor hoặc quyền khác; không trả biên nhận cũ |
+| 409 | `extension.khtc_plan_required` | P804/KHTC225: chưa có PlanAt thật cho owner Year/Cutoff; chặn trước mọi native dispatch mới, kể cả recovery phát sinh |
+| 503 | `extension.khtc_draft_storage_unavailable` | CHỈ MOCK/tab: sessionStorage unavailable/quota/envelope hỏng hoặc version/năm không hợp lệ; không ACK hay reset active fence. Native dùng `extension.dependency_unavailable` hiện có |
 | 404 | `extension.support_request_not_found` | pf/extension: không có yêu cầu hỗ trợ |
 | 409 | `extension.id_reused` | pf/extension: `id` do máy sinh đã dùng cho bản ghi khác |
 | 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục); consumer `pf.extension.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
