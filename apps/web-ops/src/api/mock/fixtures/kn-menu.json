@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -2086,7 +2086,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -2284,7 +2284,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -2385,7 +2385,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -2468,7 +2468,7 @@
         "label": "Kỳ báo cáo \u0026 phiếu các phòng",
         "route": "/kn/khtc/ky-bao-cao",
         "icon": "task",
-        "badge_source": null,
+        "badge_source": "extension.khtc_periods.open",
         "enabled": true,
         "children": []
        },
@@ -2630,7 +2630,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -2732,7 +2732,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -2860,7 +2860,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -3171,7 +3171,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -3342,7 +3342,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -3434,7 +3434,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -3736,7 +3736,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -3862,7 +3862,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   },
@@ -4664,7 +4664,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v13",
+    "menu_version": "kn.menu/v14",
     "org_ref": null
    }
   }
@@ -4707,5 +4707,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v13"
+ "menu_version": "kn.menu/v14"
 }
