@@ -13,7 +13,7 @@ import { canSee, disabledModules, findNavItem, homeFor, visibleNav, type Disable
 import { AccountMenu } from "@/shell/AccountMenu";
 import { Breadcrumb, BreadcrumbTailProvider, useBreadcrumbTailValue, type Crumb } from "@/shell/Breadcrumb";
 import { crumbsFor, legacyMenu, menuAllows, withExtraGroups } from "@/shell/menu";
-import { Sidebar } from "@/shell/Sidebar";
+import { KhtcOpenBadgeSidebar } from "@/kn/khtc/dashboard/KhtcOpenBadgeSidebar";
 import { useStoredValue, writeStoredValue } from "@/lib/useStoredValue";
 import { Icon } from "./Icon";
 import { NotificationBell } from "./NotificationBell";
@@ -149,7 +149,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <a href="#main" className="skip-link">
           Bỏ qua điều hướng
         </a>
-        <Sidebar
+        <KhtcOpenBadgeSidebar
           menu={menu}
           pathname={pathname}
           badges={kn.badges}

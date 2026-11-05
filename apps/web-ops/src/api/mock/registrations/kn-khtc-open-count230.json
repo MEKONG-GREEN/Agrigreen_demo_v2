@@ -1,0 +1,11 @@
+{
+  "id": "kn-khtc-open-count230",
+  "source": "./kn-khtc-open-count230",
+  "app": [
+    {
+      "export": "khtcOpenCountRoutes230",
+      "order": 10230
+    }
+  ],
+  "admin": []
+}

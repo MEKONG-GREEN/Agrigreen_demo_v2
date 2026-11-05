@@ -10776,6 +10776,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/open-period-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đếm toàn bộ kỳ KHTC chưa đóng/hủy theo tenant và quyền đọc hiện hữu */
+        get: operations["extensionKhtcOpenPeriodCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/kn/machine-profiles/{cooperative_ref}": {
         parameters: {
             query?: never;
@@ -23268,6 +23285,8 @@ export interface components {
             counts: {
                 exported: number;
                 open: number;
+                /** @description Toàn bộ kỳ KHTC chưa đóng/hủy trong phạm vi đọc; không phụ thuộc bộ lọc dữ liệu của dashboard. Thiếu trường ở máy chủ cũ là chưa biết, không thay bằng open đã lọc. */
+                open_all?: number;
                 sent: number;
                 forms: number;
                 achieved: number;
@@ -23337,6 +23356,10 @@ export interface components {
             cutoff: string;
             /** Format: date-time */
             exported_at: string | null;
+        };
+        KHTCOpenPeriodCount: {
+            /** Format: int64 */
+            open_count: number;
         };
         KHTCReportPeriod: {
             /** Format: uuid */
@@ -48712,6 +48735,30 @@ export interface operations {
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcOpenPeriodCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Số đếm metadata cùng nguồn với thẻ Kỳ đang mở; không là receipt thao tác native */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCOpenPeriodCount"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };
