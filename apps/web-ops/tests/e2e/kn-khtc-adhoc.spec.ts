@@ -65,7 +65,8 @@ test("W11.68 Admin giao số liệu mới, phòng trả lời, bốn mắt rà s
  await page.getByRole("link",{name:"Rà soát",exact:true}).first().click();
  await expect(page.getByLabel(/^Số lớp mới browser/)).toBeDisabled();
  await page.getByRole("button",{name:"Xác nhận",exact:true}).click();
- await expect(page.getByRole("status").filter({hasText:"Đã xác nhận phiếu"})).toBeVisible();
+ await page.getByRole("dialog",{name:"Xác nhận phiếu số liệu"}).getByRole("button",{name:"Xác nhận lần gửi",exact:true}).click();
+ await expect(page.getByRole("status").filter({hasText:"Đã xác nhận lần gửi 1."})).toBeVisible();
  await adhocMenu(page);await page.getByRole("button",{name:reportName,exact:true}).click();
  // The synthetic source deliberately advances once after its first snapshot;
  // follow the visible update action again, as an operator would after that alert.

@@ -61,6 +61,10 @@ func newKHTCFormFx(t *testing.T) *kfFx { return newKHTCFormFxWith(t, nil) }
 
 // newKHTCFormFxWith: wrapControl khác nil bọc cổng điều khiển kỳ native cap/forms (P0-POOL-SHARED-2: chặn/làm chậm CancelPeriod).
 func newKHTCFormFxWith(t *testing.T, wrapControl func(formsport.PeriodControl) formsport.PeriodControl) *kfFx {
+	return newKHTCFormFxPorts(t, wrapControl, nil)
+}
+
+func newKHTCFormFxPorts(t *testing.T, wrapControl func(formsport.PeriodControl) formsport.PeriodControl, wrapEntry func(formsport.Entry) formsport.Entry) *kfFx {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	ops := env.Pool(t, migrations.PF, "platform_api")
@@ -76,7 +80,11 @@ func newKHTCFormFxWith(t *testing.T, wrapControl func(formsport.PeriodControl) f
 	if wrapControl != nil {
 		control = wrapControl(control)
 	}
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: control, Entry: fm.Entry(), Crosswalk: cw,
+	entry := fm.Entry()
+	if wrapEntry != nil {
+		entry = wrapEntry(entry)
+	}
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: control, Entry: entry, Crosswalk: cw,
 		MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
 	base := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New()}
 	base.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.MultiWriter(io.Discard, tlog{t}), nil)), 8<<20)
@@ -239,8 +247,9 @@ func (f *kfFx) send(pid, dept, op string, base int64, sheet map[string]any) (int
 }
 
 func (f *kfFx) reviewForm(pid, dept, decision, note string) (int, []byte) {
+	id, attempt := reviewTarget241(f, pid, dept)
 	return f.do(http.MethodPost, formPath(pid, dept)+"/review", authz.KNTinh, khtcDept, f.khtcUser, "",
-		map[string]any{"decision": decision, "note": note})
+		map[string]any{"decision": decision, "note": note, "expected_submission_id": id, "base_attempt": attempt})
 }
 
 func ttSheet(item, done string) map[string]any {
@@ -424,7 +433,9 @@ func TestKH_FN_TI_02_04_ReviewRulesAndRequest(t *testing.T) {
 		!r.CanRequestSupplement || !r.CanConfirm {
 		t.Fatalf("rà soát: %+v", r)
 	}
-	c, b = f.do(http.MethodPost, formPath(p.ID, dTT)+"/review", authz.KNTinh, dTT, uuid.Nil, "", map[string]any{"decision": "accepted"})
+	target, attempt := reviewTarget241(f, p.ID, dTT)
+	c, b = f.do(http.MethodPost, formPath(p.ID, dTT)+"/review", authz.KNTinh, dTT, uuid.Nil, "",
+		map[string]any{"decision": "accepted", "expected_submission_id": target, "base_attempt": attempt})
 	f.fail(c, b, "forbidden")
 	c, b = f.reviewForm(p.ID, dTT, "returned", "")
 	f.fail(c, b, "validation_failed")

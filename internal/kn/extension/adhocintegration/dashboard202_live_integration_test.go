@@ -352,7 +352,7 @@ func TestDashboard202DraftReturnedCancelledFutureAndMetadata(t *testing.T) {
 	code, body = f.khtc(http.MethodPost, "/periods/"+cancelled.ID+"/cancel", f.khtcUser, "", map[string]any{"reason": "Hủy nguồn tuần trong regression dashboard202"})
 	f.ok(code, body, nil)
 	read("7", false)
-	code, body = f.khtc(http.MethodPost, "/periods/"+week.ID+"/forms/"+dTT+"/review", f.khtcUser, "", map[string]any{"decision": "returned", "note": "Bổ sung lại số liệu dashboard202"})
+	code, body = f.reviewForm241(week.ID, dTT, "returned", "Bổ sung lại số liệu dashboard202")
 	f.ok(code, body, nil)
 	read("0", true)
 	code, body = f.send(week.ID, dTT, "submit", 1, ttSheet(f.item, "9"))
@@ -373,7 +373,7 @@ func TestDashboard202DraftReturnedCancelledFutureAndMetadata(t *testing.T) {
 		}
 	}
 	read("9", false)
-	code, body = f.khtc(http.MethodPost, "/periods/"+week.ID+"/forms/"+dTT+"/review", f.khtcUser, "", map[string]any{"decision": "returned", "note": "Xác minh giá trị 0 thực tế dashboard202"})
+	code, body = f.reviewForm241(week.ID, dTT, "returned", "Xác minh giá trị 0 thực tế dashboard202")
 	f.ok(code, body, nil)
 	code, body = f.send(week.ID, dTT, "submit", 2, ttSheet(f.item, "0"))
 	f.ok(code, body, nil)

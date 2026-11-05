@@ -42,7 +42,7 @@ func TestKHTCDashboardLiveMau5(t *testing.T) {
 	if !found {
 		t.Fatal("missing program item")
 	}
-	code, body = f.khtc(http.MethodPost, "/periods/"+week.ID+"/forms/"+dTT+"/review", f.khtcUser, "", map[string]any{"decision": "returned", "note": "Bổ sung số liệu tiến độ"})
+	code, body = f.reviewForm241(week.ID, dTT, "returned", "Bổ sung số liệu tiến độ")
 	f.ok(code, body, nil)
 	d = read()
 	if d.Counts.Sent != 1 {

@@ -4,6 +4,8 @@
 package handler
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -315,18 +317,22 @@ func (h Handler) review(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var r struct {
-		Decision string `json:"decision"`
-		Note     string `json:"note"`
-	}
-	if err := c.ShouldBindJSON(&r); err != nil {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
+	var r app.ReviewInput
+	decoder := json.NewDecoder(c.Request.Body)
+	if err := decoder.Decode(&r); err != nil || decoder.Decode(&struct{}{}) != io.EOF {
 		httpx.Fail(c, problem.BadRequest.WithDetail("Thân request phải là JSON hợp lệ"))
 		return
 	}
-	f, err := h.Svc.Review(c.Request.Context(), id, dept, r.Decision, r.Note, idempotency.KeyFromContext(c.Request.Context()))
+	f, err := h.Svc.Review(c.Request.Context(), id, dept, r, idempotency.KeyFromContext(c.Request.Context()))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, formOf(f))
+	c.JSON(http.StatusOK, struct {
+		formDTO
+		ReviewedSubmissionID uuid.UUID `json:"reviewed_submission_id"`
+		ReviewedAttempt      int64     `json:"reviewed_attempt"`
+		ReviewDecision       string    `json:"review_decision"`
+	}{formOf(f.Form), f.ReviewedSubmissionID, f.ReviewedAttempt, f.ReviewDecision})
 }

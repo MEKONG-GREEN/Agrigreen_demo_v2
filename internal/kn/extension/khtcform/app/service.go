@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -693,44 +694,86 @@ const (
 	DecisionAccepted = "accepted" // Xác nhận phiếu
 )
 
-// Review "Yêu cầu bổ sung" / "Xác nhận phiếu" — Cấp Tỉnh Phòng KHTC; dùng rà soát bốn mắt của cap/forms (người rà soát ≠
-// người gửi). Gửi lần cuối cho phép (3/3) chỉ còn Xác nhận; kỳ đã đóng thì không rà soát.
-func (s *Service) Review(ctx context.Context, id uuid.UUID, dept, decision, note, idem string) (Form, error) {
+// ReviewInput giữ đúng lần gửi mà người rà soát đã đọc; không tự chuyển sang lần mới hơn.
+type ReviewInput struct {
+	ExpectedSubmissionID uuid.UUID `json:"expected_submission_id"`
+	BaseAttempt          int64     `json:"base_attempt"`
+	Decision             string    `json:"decision"`
+	Note                 string    `json:"note"`
+}
+
+// ReviewResult tách xác nhận native của thao tác khỏi phiếu hiện hành đọc sau đó.
+type ReviewResult struct {
+	Form                 Form
+	ReviewedSubmissionID uuid.UUID
+	ReviewedAttempt      int64
+	ReviewDecision       string
+}
+
+func validateReview(in ReviewInput) error {
+	if in.ExpectedSubmissionID == uuid.Nil {
+		return problem.Validation.WithField("expected_submission_id", "bắt buộc mã lần gửi đã đọc")
+	}
+	if in.BaseAttempt < 1 {
+		return problem.Validation.WithField("base_attempt", "phải là số nguyên dương của lần gửi đã đọc")
+	}
+	if in.Decision != DecisionAccepted && in.Decision != DecisionReturned {
+		return problem.Validation.WithField("decision", "returned | accepted")
+	}
+	if len(in.Note) > 4000 || utf8.RuneCountInString(in.Note) > 1000 {
+		return problem.Validation.WithField("note", "tối đa 1000 ký tự")
+	}
+	if in.Decision == DecisionReturned && in.Note == "" {
+		return problem.Validation.WithField("note", "bắt buộc khi yêu cầu bổ sung")
+	}
+	return nil
+}
+
+// Review rà soát bốn mắt đúng phiên bản đã đọc. Native Forms kiểm lại phiên bản cuối
+// dưới khóa của kỳ, kể cả khi có lần gửi mới giữa s.load và Entry.Review.
+func (s *Service) Review(ctx context.Context, id uuid.UUID, dept string, in ReviewInput, idem string) (ReviewResult, error) {
+	in.Note = strings.TrimSpace(in.Note)
+	if err := validateReview(in); err != nil {
+		return ReviewResult{}, err
+	}
 	c, err := s.caller(ctx, dept)
 	if err != nil {
-		return Form{}, err
+		return ReviewResult{}, err
 	}
 	f, err := s.load(ctx, c, id, dept)
 	if err != nil {
-		return Form{}, err
+		return ReviewResult{}, err
 	}
 	if !c.review && (c.k.Role != extport.SessionRoleAdmin || c.k.ReadOnly() || f.Period.Type != pdomain.TypeAdhoc) {
-		return Form{}, errNotKHTC
+		return ReviewResult{}, errNotKHTC
 	}
-	switch decision {
-	case DecisionReturned:
-		if !f.View.CanRequestSupplement {
-			return Form{}, ErrNotReviewable.WithDetail("\"Yêu cầu bổ sung\" chỉ khi phiếu Đã gửi (chưa đủ số lần gửi tối đa) và kỳ chưa đóng")
-		}
-	case DecisionAccepted:
-		if !f.View.CanConfirm {
-			return Form{}, ErrNotReviewable.WithDetail("\"Xác nhận\" chỉ khi phiếu Đã gửi và kỳ chưa đóng")
-		}
-	default:
-		return Form{}, problem.Validation.WithField("decision", "returned | accepted")
+	if len(f.Submissions) == 0 || f.Submissions[0].ID != in.ExpectedSubmissionID || f.Submissions[0].Attempt != in.BaseAttempt {
+		return ReviewResult{}, ErrNotReviewable.WithDetail("Lần gửi đã thay đổi — tải lại phiếu trước khi rà soát")
 	}
-	if len(f.Submissions) == 0 {
-		return Form{}, ErrNotReviewable
+	if in.Decision == DecisionReturned && !f.View.CanRequestSupplement {
+		return ReviewResult{}, ErrNotReviewable.WithDetail("\"Yêu cầu bổ sung\" chỉ khi phiếu Đã gửi (chưa đủ số lần gửi tối đa) và kỳ chưa đóng")
+	}
+	if in.Decision == DecisionAccepted && !f.View.CanConfirm {
+		return ReviewResult{}, ErrNotReviewable.WithDetail("\"Xác nhận\" chỉ khi phiếu Đã gửi và kỳ chưa đóng")
 	}
 	if c.k.Role == extport.SessionRoleAdmin && !c.p.MFA {
-		return Form{}, problem.MFARequired
+		return ReviewResult{}, problem.MFARequired
 	}
 	nativeKey := "khtc:form:review:" + idemOr(idem)
-	nativeCtx := s.adhocReviewContext(ctx, c, f.Period, f.Submissions[0].ID, decision, note, nativeKey)
-	if _, err := s.Entry.Review(nativeCtx, pdomain.ProfileKHTC, f.Submissions[0].ID, decision, note, nativeKey); err != nil {
-		return Form{}, err
+	nativeCtx := s.adhocReviewContext(ctx, c, f.Period, in.ExpectedSubmissionID, in.Decision, in.Note, nativeKey)
+	ack, err := s.Entry.Review(nativeCtx, pdomain.ProfileKHTC, in.ExpectedSubmissionID, in.Decision, in.Note, nativeKey)
+	if err != nil {
+		return ReviewResult{}, err
 	}
-	return s.load(ctx, c, id, dept)
+	if ack.ID != in.ExpectedSubmissionID || ack.Version != in.BaseAttempt || ack.Unit != dept ||
+		ack.Decision != in.Decision || ack.ReviewNote != in.Note || ack.ReviewedAt == nil {
+		return ReviewResult{}, ErrDependency.WithDetail("Chưa đối chiếu được kết quả rà soát của lần gửi")
+	}
+	current, err := s.load(ctx, c, id, dept)
+	if err != nil {
+		return ReviewResult{}, err
+	}
+	return ReviewResult{Form: current, ReviewedSubmissionID: ack.ID, ReviewedAttempt: ack.Version, ReviewDecision: ack.Decision}, nil
 }
 
 // ---------------------------------------------------------------------------
