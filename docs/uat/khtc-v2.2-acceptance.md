@@ -244,3 +244,9 @@ Phạm vi: chỉ Word có liên kết tường minh, đã kiểm full input hash
 KH-FN-TI-02.02/KH-UR-TI-02: lát UI Lưu/Điều chỉnh theo QĐ, lịch sử và đúng phiên bản trên URL riêng, DetailPage/DataTable/Log thật, kiểm đầu quyết định, nháp workspace và retry/đổi ngữ cảnh. JSON/Excel được kiểm số trước parser. [Phạm vi và giới hạn](../kn/gia-dinh/BF-SWEEP-KHTC-FINAL.md). Chưa có UAT khách và chưa đạt toàn vòng đời năm/bản điều chỉnh trên server theo BRD v2.3; #206 giữ phần đó cùng form CT/DA/hạng mục và màn còn lại. Không đổi kết luận các ca G1 tối thiểu v2.2 thành nghiệm thu v2.3.
 ### Lát dashboard #189
 FN-TI-02.01: bổ sung keyset/batch100 toàn năm, filter trước projection và adhoc theo quyền; kiểm TestDashboard189PagesAndNativeProjectionScope. Chưa đánh dấu đạt toàn FN: live đến ngày/no-period, lãnh đạo phòng gốc, badge, nhắc và field đầy đủ còn ở #202. Căn cứ BRD KHTC v2.3; bằng chứng PASS đúng SHA ở issue ready, không suy từ tên test.
+
+### Lát lịch sử nội dung FN-TI-02.04 — #242, đối chiếu BRD v2.3
+
+Không đổi kết luận của bộ khung v2.2 phía trên thành nghiệm thu v2.3. Kịch bản: phòng gửi lần 1; KHTC yêu cầu bổ sung; phòng gửi lần 2 rồi có nháp mới; mở lại chi tiết lần 1 và đối chiếu lần 2 — đúng nội dung, actor/time và nhãn kế hoạch gốc, không thể sửa. Thử chéo tenant/phòng/submission, native/sealed sai liên kết và kế hoạch hiệu lực mới; phải từ chối hoặc vẫn giữ đúng bản cũ. Đổi quyền/API/URL theo A→B→A trong lúc GET chậm không lộ dữ liệu lifetime cũ; ghi chú reviewer phải xác nhận bỏ trước khi chuyển và chặn chuyển khi kết quả chưa rõ.
+
+Native `TestKHTCHistory242_*`, web `submission-history.test.ts`/`KhtcFormHistory242.test.tsx`, browser `kn-khtc-history242.spec.ts`; kết quả thực ghi tại SHA ready, không suy từ tên test. [Phạm vi và giới hạn](../kn/gia-dinh/BF-SWEEP-KHTC-AFTER-REVIEWER.md). #244 giữ phần audit/receipt, Excel gốc/cảnh báo báo cáo, kết quả tự tính lịch sử, report editor và kỳ nhúng. Chưa có UAT khách hoặc hoàn tất toàn FN/KHTC/G1.
