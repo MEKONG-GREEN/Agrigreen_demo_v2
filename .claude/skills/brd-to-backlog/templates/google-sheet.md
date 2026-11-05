@@ -1,6 +1,6 @@
 # Bố cục Google Sheet bản nháp
 
-Tên tệp: `Backlog nháp — <mã-hệ> — BRD <phiên bản> — <yyyy-mm-dd>`, đặt trong folder BRD. Hàng 1 mỗi tab là tiêu đề cột, cố định (freeze) hàng 1 và cột mã; bật lọc. Cột *Duyệt* dùng data validation `OK, Sửa, Bỏ`. Ô nhiều dòng (tiêu chí nghiệm thu) bật wrap text.
+Tên tệp: `Backlog nháp — <mã-hệ> — BRD <phiên bản> — <yyyy-mm-dd>`, đặt trong folder review riêng (xem SKILL.md bước 6), không đặt chung folder BRD. Hàng 1 mỗi tab là tiêu đề cột, cố định (freeze) hàng 1 và cột mã; bật lọc. Cột *Duyệt* dùng data validation `OK, Sửa, Bỏ`. Ô nhiều dòng (tiêu chí nghiệm thu) bật wrap text.
 
 Thứ tự tab:
 
@@ -8,15 +8,22 @@ Thứ tự tab:
 Bảng hai cột *Mục* / *Giá trị*: Hệ · Tệp BRD (link) · Phiên bản / modifiedTime · Ngày chạy · Velocity (ghi "giả định" nếu mặc định) · Dự phòng % · Ngày bắt đầu sprint 1 · Độ dài sprint · Số Epic / Story / Sub-task · Tổng điểm · Số sprint · Số câu hỏi mở · Trạng thái (`Chờ duyệt` / `Đã duyệt` / `Đã tạo ticket`) · Cách duyệt (một dòng hướng dẫn dùng cột *Duyệt*).
 
 ### 2. Yêu cầu
-`Mã` · `Mục BRD` · `Loại` · `Ưu tiên BRD` · `Vai trò` · `Tiên quyết` · `Tóm tắt` · `Story phủ` (mã tạm, cách nhau dấu phẩy) · `Trạng thái phủ` (`Đủ` / `Thiếu` / `Câu hỏi`)
+`Mã` · `Mục BRD` · `Loại` · `Ưu tiên BRD` · `Vai trò` · `Tiên quyết` · `Tóm tắt` · `Story phủ` (mã tạm, cách nhau dấu phẩy) · `Trạng thái phủ` (`Đủ` / `Thiếu` / `Ngoài phạm vi`)
 
-Tab này cũng là **ma trận truy vết**.
+Tab này cũng là **ma trận truy vết**. `Story phủ` và `Trạng thái phủ` là công thức đọc cột `Mã yêu cầu` của tab Story (khớp nguyên mã, có dấu phân cách hai bên), để sửa Story là phủ cập nhật ngay:
+
+```
+H2: =IFERROR(TEXTJOIN(", ",TRUE,FILTER(Story!$A$2:$A,ISNUMBER(SEARCH(", "&$A2&",",", "&Story!$Q$2:$Q&",")))),"")
+I2: =IF($H2<>"","Đủ",IF(ISNUMBER(SEARCH("ngoài phạm vi",$G2)),"Ngoài phạm vi","Thiếu"))
+```
+
+Viết H2:I2 một lần rồi `copyPaste` (PASTE_FORMULA) xuống các dòng còn lại.
 
 ### 3. Epic
 `Mã tạm` · `Summary` · `Mục tiêu` · `Trong phạm vi` · `Ngoài phạm vi` · `Chỉ số thành công` · `Mã yêu cầu` · `Mục BRD` · `Phụ thuộc` · `Priority` · `Lý do priority` · `Tổng điểm` · `Sprint` · `Duyệt` · `Ghi chú duyệt` · `Jira key`
 
 ### 4. Story
-`Mã tạm` · `Epic` · `Summary` · `Vai trò` · `Tôi muốn` · `Để` · `Tiêu chí nghiệm thu` · `Quy tắc nghiệp vụ` · `Kiểm nhập (server)` · `Phi chức năng` · `Story point` · `Priority` · `Lý do priority` · `Phụ thuộc` · `Sprint` · `Mã yêu cầu` · `Mục BRD` · `Giả định / câu hỏi` · `Duyệt` · `Ghi chú duyệt` · `Jira key`
+`Mã tạm` · `Epic` · `Summary` · `Vai trò` · `Tôi muốn` · `Để` · `Tiêu chí nghiệm thu` · `Quy tắc nghiệp vụ` · `Kiểm nhập (server)` · `Phi chức năng` · `Lưu ý kỹ thuật` (mục AGENTS.md §9 áp dụng) · `Story point` · `Priority` · `Lý do priority` · `Phụ thuộc` · `Sprint` · `Mã yêu cầu` · `Mục BRD` · `Giả định / câu hỏi` · `Duyệt` · `Ghi chú duyệt` · `Jira key`
 
 ### 5. Sub-task
 `Mã tạm` · `Story` · `Loại` · `Summary` · `Việc cần làm` · `Hoàn thành khi` · `Ước lượng (giờ)` · `Duyệt` · `Ghi chú duyệt` · `Jira key`
@@ -25,6 +32,16 @@ Tab này cũng là **ma trận truy vết**.
 `Sprint` · `Từ ngày` · `Đến ngày` · `Sprint goal` · `Story` (mã tạm) · `Tổng điểm` · `Năng lực kế hoạch` · `Còn trống` · `Rủi ro / chờ trả lời`
 
 Dòng cuối: *Backlog (chưa xếp sprint)* với Story `Lowest` và Story bị chặn.
+
+Ngày, Story, tổng điểm, năng lực là công thức tham chiếu tab Tổng quan (ô velocity, dự phòng, ngày bắt đầu, độ dài sprint) và tab Story, để người duyệt đổi velocity hay ngày bắt đầu là kế hoạch tính lại:
+
+```
+B2: ='Tổng quan'!$B$9+'Tổng quan'!$B$10*($A2-1)      C2: =B2+'Tổng quan'!$B$10-3
+E2: =IFERROR(TEXTJOIN(", ",TRUE,FILTER(Story!$A$2:$A,Story!$P$2:$P=$A2)),"")
+F2: =SUMIFS(Story!$L$2:$L,Story!$P$2:$P,$A2)          G2: ='Tổng quan'!$B$8      H2: =G2-F2
+```
+
+Tab Epic: `Tổng điểm` = `SUMIFS` điểm Story theo Epic; `Sprint` = `"S"&MINIFS(...)&"–S"&MAXIFS(...)`. Tab Tổng quan: các số đếm (Epic, Story, Sub-task, tổng điểm, số sprint, câu hỏi, yêu cầu thiếu phủ) đều là công thức.
 
 ### 7. Câu hỏi mở
 `Mã` (Q1…) · `Mục BRD` · `Câu hỏi` · `Ảnh hưởng` (Story) · `Mức` (`Chặn` / `Quan trọng` / `Nhỏ`) · `Giả định tạm` · `Người trả lời` · `Trả lời`

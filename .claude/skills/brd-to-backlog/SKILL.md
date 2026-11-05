@@ -76,7 +76,7 @@ Chạy toàn bộ [checklists/quality.md](checklists/quality.md). Mục trượt
 ## Bước 6 — Bản nháp cho người duyệt
 
 1. Đọc skill `anthropic-skills:google-workspace` trước khi tạo Google Sheet.
-2. Tạo Google Sheet **trong chính folder BRD**, tên `Backlog nháp — <mã-hệ> — BRD <phiên bản> — <yyyy-mm-dd>`, bố cục theo [templates/google-sheet.md](templates/google-sheet.md).
+2. Tạo Google Sheet trong **folder review riêng**, không đặt chung folder BRD: folder người dùng chỉ định, hoặc nếu chưa có thì tạo folder `Backlog nháp` cùng cấp với folder BRD (cùng folder cha) và báo người dùng. Tên tệp `Backlog nháp — <mã-hệ> — BRD <phiên bản> — <yyyy-mm-dd>`, bố cục theo [templates/google-sheet.md](templates/google-sheet.md). Số tổng hợp (phủ yêu cầu, tổng điểm, ngày sprint, Story mỗi sprint) là công thức, không gõ tay.
 3. Gửi người dùng: link Sheet; số Epic/Story/Sub-task, tổng điểm, số sprint; các giả định (velocity, ngày bắt đầu); số câu hỏi mở và 3–5 câu quan trọng nhất. **Dừng, chờ duyệt.**
 4. Người dùng sửa trực tiếp trên Sheet (cột *Duyệt*: `OK` / `Sửa` / `Bỏ`, cột *Ghi chú duyệt*) hoặc góp ý trong chat. Khi họ báo xong: đọc lại Sheet, áp dụng, chạy lại bước 5, cập nhật Sheet, báo thay đổi. Lặp tới khi người dùng đồng ý tạo ticket.
 

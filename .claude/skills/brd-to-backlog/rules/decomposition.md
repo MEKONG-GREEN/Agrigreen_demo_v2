@@ -32,6 +32,7 @@ Quy tắc:
 
 - **Một Story = một lát dọc mang giá trị cho một vai trò**, demo được (có giao diện hoặc API kiểm được), làm xong trong một sprint.
 - Viết theo mẫu "Là `<vai trò>`, tôi muốn `<hành động>` để `<giá trị>`". Vai trò lấy đúng tên trong BRD.
+- Summary mở đầu bằng **động từ** ("Tạo tài khoản…", "Xem thống kê…"), không mở đầu bằng vai trò hay danh từ ("Admin tạo…", "Thống kê vụ cho…"). Hai Story cùng hành động khác vai trò thì thêm vai trò trong ngoặc ở cuối: `Quản lý tài khoản Thành viên HTX trong nhóm (Đại diện HTX)`.
 - Cách tách một FN lớn (theo thứ tự ưu tiên):
   1. theo **bước luồng chính** có giá trị riêng (tạo / gửi / duyệt);
   2. theo **thao tác dữ liệu** (xem danh sách, xem chi tiết, thêm, sửa, ngừng dùng) — gộp lại nếu mỗi phần quá nhỏ (< 2 điểm);

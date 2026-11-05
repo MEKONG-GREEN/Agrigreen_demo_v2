@@ -44,7 +44,7 @@ Thuật toán:
 4. Story phụ thuộc phải ở **sprint sau** tiền đề. Ngoại lệ: cùng sprint nếu tiền đề ≤ 3 điểm và ghi rõ thứ tự làm trong cột *Phụ thuộc*.
 5. Không xếp Story có câu hỏi mở chặn (BRD chưa đủ để làm) vào sprint 1–2; đặt sau và ghi "chờ trả lời Qn".
 6. Sprint 1 ưu tiên nền tảng + **ít nhất một lát dọc demo được**. Mỗi sprint có *Sprint goal* một câu mô tả luồng demo được cuối sprint.
-7. Ngày sprint: sprint n bắt đầu `ngày bắt đầu + (n−1) × 14 ngày`, kết thúc sau 13 ngày (thứ Sáu tuần thứ hai nếu bắt đầu thứ Hai).
+7. Ngày sprint: sprint n bắt đầu `ngày bắt đầu + (n−1) × 14 ngày`, kết thúc `bắt đầu + 11 ngày` (thứ Sáu tuần thứ hai nếu bắt đầu thứ Hai). Sprint trùng nghỉ lễ dài (Tết Nguyên đán, 30/4–1/5, 2/9) → ghi ở cột *Rủi ro*, đề xuất giảm tải.
 
 Đầu ra: tab *Sprint plan* (mỗi sprint: ngày, goal, Story, tổng điểm, năng lực, còn trống, rủi ro) và cột *Sprint* trên tab Story/Epic (Epic ghi khoảng sprint, vd `S1–S3`).
 
