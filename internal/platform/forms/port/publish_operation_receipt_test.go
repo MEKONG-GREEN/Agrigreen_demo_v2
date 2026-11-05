@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/google/uuid"
 )
 
@@ -83,5 +84,15 @@ func TestPublish224BoundsBeforeHashAndUnavailable(t *testing.T) {
 	got, err := ExecutePublishOperation(context.Background(), nil, validPublish224())
 	if !errors.Is(err, ErrPublishOperationUnavailable) || !reflect.DeepEqual(got, PublishOperationReceipt{Outcome: PublishOperationUnknown}) {
 		t.Fatal("nil capability not opaque failclosed")
+	}
+}
+
+func TestPublish224RequiresExplicitUnitKind(t *testing.T) {
+	in := validPublish224()
+	in.Input.UnitKind = ""
+	_, err := NormalizePublishOperation(in)
+	var bad *problem.Problem
+	if !errors.As(err, &bad) || bad.Code != problem.Validation.Code || bad.Status != problem.Validation.Status {
+		t.Fatal("new publication command accepted an unpinned profile default unit kind")
 	}
 }

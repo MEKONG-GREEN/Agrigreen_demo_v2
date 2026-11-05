@@ -37,7 +37,7 @@ var (
 
 // NormalizePublishOperation bounds work before hashing, owns all mutable input,
 // preserves collection order and nil-vs-zero MaxSubmissions, and uses SQL date /
-// timestamptz precision. Empty kind/key remain explicit inputs, not live defaults.
+// timestamptz precision. UnitKind is mandatory; empty keys remain explicit inputs.
 func NormalizePublishOperation(in PublishOperationRequest) (PublishOperationRequest, error) {
 	bad := func(field string) (PublishOperationRequest, error) {
 		return PublishOperationRequest{}, problem.Validation.WithField(field, "giá trị không hợp lệ")
@@ -58,7 +58,7 @@ func NormalizePublishOperation(in PublishOperationRequest) (PublishOperationRequ
 	if b.TemplateID == uuid.Nil {
 		return bad("template_id")
 	}
-	if !text(b.UnitKind, 32) || strings.TrimSpace(b.UnitKind) != b.UnitKind {
+	if b.UnitKind == "" || !text(b.UnitKind, 32) || strings.TrimSpace(b.UnitKind) != b.UnitKind {
 		return bad("unit_kind")
 	}
 	if len(b.Periods) < 1 || len(b.Periods) > MaxPublishOperationPeriods {

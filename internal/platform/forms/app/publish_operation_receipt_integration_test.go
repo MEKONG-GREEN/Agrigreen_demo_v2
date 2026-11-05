@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -461,6 +463,7 @@ func TestPublishOperation224_ManyPeriodsAndPinnedDefaults(t *testing.T) {
 	profile.MaxSubmissions = 3
 	f.svc.profiles["fx"] = profile
 	req.Input.MaxSubmissions = nil
+	req.Input.UnitKind = port.UnitCommune // This case pins a resource kind while varying only submission defaults.
 	req.Input.Periods = nil
 	for i := 0; i < 32; i++ {
 		from := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC).AddDate(0, 0, i)
@@ -649,4 +652,121 @@ func (tx holdPublishLockTx224) Exec(ctx context.Context, q string, args ...any) 
 		}
 	}
 	return tag, nil
+}
+
+func TestPublishOperation224_ExplicitKindSurvivesProfileDefaultReorder(t *testing.T) {
+	f, _, ctx, req := publishFixture224(t)
+	profileA := fxProfile
+	profileA.UnitKinds = []string{port.UnitFacility, port.UnitHousehold}
+	serviceA, err := NewService(f.own, f.clk, sqlApprovals{}, []port.Profile{profileA})
+	f.must(err, "supported multi-kind startup A")
+	serviceA.PublishOperationPolicies = f.svc.PublishOperationPolicies
+	capabilityA := PublicationReceipts{serviceA}
+	target := ids.New()
+	principal, _ := authz.FromContext(ctx)
+	subject := ctx.Value(fixtureActorKey{}).(port.ResolvedActor)
+	subject.Scope = authz.Scope{Units: []string{"X1"}}
+	subject.AllowsTarget = func(kind string, ref uuid.UUID) bool { return kind == port.UnitFacility && ref == target }
+	ctx = fixtureContext(ctx, principal, subject)
+	req.Input.Units = []string{target.String()}
+	req.Input.UnitParents = []string{"X1"}
+	req.Input.UnitKind = ""
+	unknown, err := capabilityA.ExecutePublishOperation(ctx, req)
+	f.want(err, "validation_failed", "ambiguous newcap default kind must be rejected before dispatch")
+	unknownPublishTest224(t, unknown)
+	if !reflect.DeepEqual(nativeCounts224(f), []int{0, 0, 0, 0, 0, 0}) {
+		t.Fatal("implicit kind created native or operation evidence")
+	}
+	req.OperationID = ids.New()
+	req.Input.UnitKind = port.UnitFacility
+	original, err := capabilityA.ExecutePublishOperation(ctx, req)
+	appliedPublish224(t, original, err, 2)
+	profileB := profileA
+	profileB.UnitKinds = []string{port.UnitHousehold, port.UnitFacility}
+	serviceB, err := NewService(f.own, f.clk, sqlApprovals{}, []port.Profile{profileB})
+	f.must(err, "supported startup B same DB/allowed kinds, reordered default")
+	serviceB.PublishOperationPolicies = serviceA.PublishOperationPolicies
+	capabilityB := PublicationReceipts{serviceB}
+	read, err := capabilityB.ReadPublishOperation(ctx, req)
+	f.must(err, "original explicitly authorized facility receipt after restart/default reorder")
+	replay, err := capabilityB.ExecutePublishOperation(ctx, req)
+	f.must(err, "anchored exact replay after default reorder")
+	if !reflect.DeepEqual(read, original) || !reflect.DeepEqual(replay, original) || !reflect.DeepEqual(nativeCounts224(f), []int{2, 2, 2, 1, 1, 0}) {
+		t.Fatal("default reorder reinterpreted command/result or duplicated native publication")
+	}
+	legacy := req.Input
+	legacy.UnitKind = ""
+	published, err := (Publisher{serviceA}).PublishBatch(ctx, legacy, "legacy-default-kind224")
+	f.must(err, "legacy Publisher still accepts its configured default")
+	if len(published) != 2 || f.scalar(`SELECT count(*) FROM pf_forms.period_spec WHERE tenant_id=$1 AND unit_kind='facility'`, f.tid) != 4 || count212(f, "publish_operation_key") != 1 {
+		t.Fatal("newcap guard changed legacy default behavior")
+	}
+}
+
+func TestPublishOperation224_SQLRequiresExplicitKind(t *testing.T) {
+	f, _, ctx, req := publishFixture224(t)
+	req, err := port.NormalizePublishOperation(req)
+	f.must(err, "canonical explicit command")
+	published, err := (Publisher{f.svc}).PublishBatch(ctx, req.Input, publishIdem224(req))
+	f.must(err, "real native setup without receipt")
+	principal, _ := authz.FromContext(ctx)
+	receipt := port.PublishOperationReceipt{OperationID: req.OperationID, TenantID: req.TenantID, Profile: req.Input.Profile, ActorRef: principal.ActorRef, AuthorityHash: strings.Repeat("a", 64), Outcome: port.PublishOperationApplied}
+	receipt.RequestDigest, err = port.PublishOperationDigest(req)
+	f.must(err, "valid canonical digest")
+	for i, item := range published {
+		created := port.PublishedCreation{ID: item.ID, Key: item.Key, Label: item.Label, DueAt: item.DueAt, Applied: port.PeriodRevision{TenantID: req.TenantID, PeriodID: item.ID, Profile: req.Input.Profile, DueSeq: 0}}
+		err = f.env.AdminPool(t, migrations.PF).QueryRow(ctx, `SELECT id,seq,recorded_at FROM pf_forms.period_event WHERE tenant_id=$1 AND period_ref=$2 AND origin='native' AND action='published'`, f.tid, item.ID).Scan(&created.EventID, &created.Applied.EventSeq, &created.EventRecordedAt)
+		f.must(err, fmt.Sprintf("native SQL proof setup item%d", i))
+		receipt.Items = append(receipt.Items, created)
+	}
+	checkProof := func(command []byte, content port.PublishOperationReceipt) bool {
+		t.Helper()
+		raw, err := json.Marshal(content)
+		f.must(err, "proof content JSON")
+		var valid bool
+		err = f.svc.tx(ctx, f.tid, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `SELECT pf_forms.publish_operation_proof224($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,true)`, req.TenantID, req.OperationID, content.ActorRef, content.Profile, content.RequestDigest, content.AuthorityHash, string(command), string(raw)).Scan(&valid)
+		})
+		f.must(err, "own r_forms SQL proof")
+		return valid
+	}
+	command, err := json.Marshal(req)
+	f.must(err, "valid command JSON")
+	if !checkProof(command, receipt) {
+		t.Fatal("valid explicit native creation proof failed before negative")
+	}
+	empty := req
+	empty.Input.UnitKind = ""
+	emptyCommand, err := json.Marshal(empty)
+	f.must(err, "empty-kind SQL fixture")
+	sum := sha256.Sum256(emptyCommand)
+	emptyReceipt := receipt
+	emptyReceipt.RequestDigest = hex.EncodeToString(sum[:])
+	if checkProof(emptyCommand, emptyReceipt) {
+		t.Fatal("SQL proof accepted implicit empty unit kind")
+	}
+	err = f.svc.tx(ctx, f.tid, func(tx pgx.Tx) error {
+		return store.InsertPublishOperation224(ctx, tx, empty, &emptyReceipt, f.clk.Now())
+	})
+	code, constraint := pgCode(err)
+	if code != "23514" || constraint != "publish_operation_native_proof224" {
+		t.Fatalf("empty-kind receipt INSERT not blocked by exact native proof: %s/%s", code, constraint)
+	}
+	var object, input map[string]json.RawMessage
+	f.must(json.Unmarshal(emptyCommand, &object), "command object")
+	f.must(json.Unmarshal(object["input"], &input), "input object")
+	delete(input, "UnitKind")
+	object["input"], err = json.Marshal(input)
+	f.must(err, "missing-kind input")
+	missingCommand, err := json.Marshal(object)
+	f.must(err, "missing-kind command")
+	sum = sha256.Sum256(missingCommand)
+	missingReceipt := receipt
+	missingReceipt.RequestDigest = hex.EncodeToString(sum[:])
+	if checkProof(missingCommand, missingReceipt) {
+		t.Fatal("SQL proof accepted missing unit kind")
+	}
+	if !reflect.DeepEqual(nativeCounts224(f), []int{2, 2, 2, 0, 0, 0}) {
+		t.Fatal("SQL negative changed native setup or created operation evidence")
+	}
 }

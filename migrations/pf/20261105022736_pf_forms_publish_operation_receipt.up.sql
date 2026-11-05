@@ -63,7 +63,7 @@ BEGIN
  OR p_content->>'request_digest' IS DISTINCT FROM p_digest OR p_content->>'authority_hash' IS DISTINCT FROM p_authority
  OR p_content->>'outcome' IS DISTINCT FROM 'applied' THEN RETURN false; END IF;
  v_input:=p_request->'input';v_periods:=v_input->'Periods';v_items:=p_content->'items';
- IF v_input->>'Profile' IS DISTINCT FROM p_profile OR jsonb_typeof(v_items) IS DISTINCT FROM 'array' OR jsonb_typeof(v_periods) IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+ IF v_input->>'Profile' IS DISTINCT FROM p_profile OR nullif(v_input->>'UnitKind','') IS NULL OR jsonb_typeof(v_items) IS DISTINCT FROM 'array' OR jsonb_typeof(v_periods) IS DISTINCT FROM 'array' THEN RETURN false; END IF;
  v_count:=jsonb_array_length(v_items);
  IF v_count<1 OR v_count>366 OR v_count<>jsonb_array_length(v_periods)
  OR v_count<>(SELECT count(DISTINCT x->>'id') FROM jsonb_array_elements(v_items) x)
@@ -93,7 +93,7 @@ BEGIN
    AND e.idem_key='forms.publish_operation:'||p_operation::text||':published:'||v_part
    AND s.profile=p_profile AND s.actor_ref=p_actor AND s.seq=1
    AND s.idem_key='forms.publish_operation:'||p_operation::text||':spec:'||v_part
-   AND (v_input->>'UnitKind'='' OR s.unit_kind=v_input->>'UnitKind')
+   AND s.unit_kind=v_input->>'UnitKind'
    AND (jsonb_array_length(v_input->'UnitParents')=0 OR to_jsonb(s.unit_parents)=v_input->'UnitParents')
    AND (v_input->'MaxSubmissions'='null'::jsonb OR coalesce(s.max_submissions,0)=(v_input->>'MaxSubmissions')::integer)
    AND coalesce(s.period_kind,'')=v_period->>'Kind' AND coalesce(s.period_key,'')=v_period->>'Key'
