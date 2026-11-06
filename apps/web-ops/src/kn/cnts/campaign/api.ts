@@ -40,6 +40,7 @@ export interface CampaignForm {
   goal: string;
   field: CampaignInput["field"];
   template_code: string;
+  template_version: string; // #192 FN-21 B1: phiên bản biểu đã chọn ("" = mới nhất lúc phát hành)
   scope_mode: CampaignInput["scope_mode"];
   regions: string;
   communes: string; // mã xã, cách nhau bởi dấu phẩy/khoảng trắng
@@ -50,7 +51,7 @@ export interface CampaignForm {
 }
 
 export function emptyForm(): CampaignForm {
-  return { name: "", goal: "", field: "chan_nuoi", template_code: "", scope_mode: "communes", regions: "", communes: "", from_date: "", to_date: "",
+  return { name: "", goal: "", field: "chan_nuoi", template_code: "", template_version: "", scope_mode: "communes", regions: "", communes: "", from_date: "", to_date: "",
     due_at: "", remind_before_hours: "24" };
 }
 
@@ -63,7 +64,8 @@ export function toLocalInput(iso: string): string {
 }
 
 export function formOf(c: Campaign): CampaignForm {
-  return { name: c.name, goal: c.goal ?? "", field: c.field as CampaignInput["field"], template_code: c.template_code, scope_mode: c.scope_mode,
+  return { name: c.name, goal: c.goal ?? "", field: c.field as CampaignInput["field"], template_code: c.template_code,
+    template_version: c.template_version ? String(c.template_version) : "", scope_mode: c.scope_mode,
     regions: c.regions.join(", "), communes: c.scope_mode === "communes" ? c.communes.join(", ") : "", from_date: c.from_date, to_date: c.to_date,
     due_at: toLocalInput(c.due_at), remind_before_hours: String(c.remind_before_hours) };
 }
@@ -90,6 +92,7 @@ export function payload(f: CampaignForm): CampaignInput {
     ...(f.goal.trim() ? { goal: f.goal.trim() } : {}),
     field: f.field,
     template_code: f.template_code,
+    template_version: f.template_version ? Number(f.template_version) : null,
     scope_mode: f.scope_mode,
     regions: f.scope_mode === "regions" ? split(f.regions) : [],
     communes: f.scope_mode === "communes" ? split(f.communes) : [],
@@ -128,6 +131,9 @@ export function createCampaignApi(api: ApiClient) {
     },
     templates: async (): Promise<FormsTemplate[]> =>
       (await unwrap(api.GET("/v1/forms/templates", { params: { query: { profile: "kn_cnts" } } }))).items,
+    /** #192: phiên bản của biểu (mới trước) để chọn đúng phiên bản khi tạo đợt (FN-21 B1, thiết kế tại FN-07). */
+    versions: async (code: string): Promise<S["CNTSDesignVersion"][]> =>
+      (await unwrap(api.GET("/v1/extension/cnts/form-designs/{code}/versions", { params: { path: { code } } }))).items,
   };
 }
 

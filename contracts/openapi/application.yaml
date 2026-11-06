@@ -16667,7 +16667,7 @@ paths:
         "404": {description: "extension.cnts_outbreak_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/form-designs:
     get:
-      summary: Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS; chỉ Cấp Tỉnh CNTS và Admin
+      summary: Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS và các biểu điều tra; chỉ Cấp Tỉnh CNTS và Admin
       operationId: extCntsFormDesigns
       tags: [extension]
       responses:
@@ -16681,6 +16681,28 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/CNTSDesignView"}}
         "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "#192 FN-07: tạo biểu điều tra mới (phiên bản 1) hoặc sao chép biểu có sẵn; cán bộ tổng hợp Cấp Tỉnh CNTS hoặc Admin"
+      operationId: extCntsFormDesignCreate
+      tags: [extension]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSDesignCreateInput"}
+      responses:
+        "201":
+          description: Mã biểu CNTS-DT-<hậu tố> và phiên bản 1
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDesignSaved"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/knqg-specs:
     get:
@@ -16763,6 +16785,53 @@ paths:
         "404": {description: extension.cnts_knqg_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: "extension.cnts_knqg_exists | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
         "422": {description: "extension.cnts_knqg_invalid | extension.cnts_knqg_project_kind", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/form-designs/{code}/versions:
+    parameters:
+      - {name: code, in: path, required: true, schema: {type: string, pattern: "^[A-Z0-9][A-Z0-9._-]{0,63}$"}}
+    get:
+      summary: "#192 FN-07: lịch sử phiên bản của biểu (mới trước); chỉ Cấp Tỉnh CNTS và Admin"
+      operationId: extCntsFormDesignVersions
+      tags: [extension]
+      parameters:
+        - {name: before_version, in: query, required: false, schema: {type: integer, minimum: 0}, description: "0 hoặc bỏ trống = mới nhất; trang sau dùng phiên bản cuối trang"}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Phiên bản giảm dần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSDesignVersion"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "#192 FN-07 B1–B2: lưu cấu trúc thành phiên bản mới; mẫu KNQG từ chối (BR-02); chỉ thêm chỉ tiêu (UR-TINH-07)"
+      description: Kỳ đã phát hành giữ phiên bản cũ (BR-01, AC-03). base_version là phiên bản đã đọc; người khác lưu trước → 409.
+      operationId: extCntsFormDesignSave
+      tags: [extension]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSDesignSaveInput"}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDesignSaved"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/knqg-docs/{ref}:
     get:
       summary: "W11.53: chi tiết biểu — nội dung, thao tác được phép, cảnh báo (quy tắc 11), nội dung còn thiếu, điều kiện gửi Mẫu 07 (quy tắc 10), lịch sử phiên bản"
@@ -27002,12 +27071,15 @@ components:
 
     CNTSDesignView:
       type: object
-      required: [code, bm, title, period_type, due, template_id, version, fields]
+      required: [code, bm, title, kind, period_type, due, locked, can_edit, template_id, version, fields]
       properties:
         code: {type: string}
         bm: {type: string}
         title: {type: string}
+        kind: {type: string, enum: [report, survey], description: "report = biểu kỳ của phòng; survey = biểu điều tra (FN-21)"}
         period_type: {type: string}
+        locked: {type: boolean, description: "Mẫu cố định theo TTKN Quốc gia — không sửa cấu trúc (FN-07 BR-02)"}
+        can_edit: {type: boolean, description: "Phiên hiện tại được lưu phiên bản mới cho biểu này"}
         due: {type: string}
         template_id: {type: [string, "null"], format: uuid}
         version: {type: [integer, "null"]}
@@ -27027,6 +27099,38 @@ components:
               line: {type: integer}
               field: {type: string}
               message: {type: string}
+    CNTSDesignVersion:
+      type: object
+      required: [template_id, version, title, fields]
+      properties:
+        template_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        title: {type: string}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+    CNTSDesignSaved:
+      type: object
+      required: [code, version]
+      properties:
+        code: {type: string}
+        version: {$ref: "#/components/schemas/CNTSDesignVersion"}
+    CNTSDesignSaveInput:
+      type: object
+      required: [base_version, title, fields]
+      properties:
+        base_version: {type: integer, minimum: 0, description: "Phiên bản đã đọc (0 khi biểu chưa có phiên bản)"}
+        title: {type: string, minLength: 1, maxLength: 200}
+        fields: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
+      additionalProperties: false
+    CNTSDesignCreateInput:
+      type: object
+      required: [code_suffix, title]
+      properties:
+        code_suffix: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9-]{0,39}$", description: "Mã biểu = CNTS-DT-<hậu tố in hoa>"}
+        title: {type: string, minLength: 1, maxLength: 200}
+        source_code: {type: string, description: "Sao chép từ biểu này (bỏ trống = tạo từ fields, vd kết quả kiểm Excel hợp lệ)"}
+        source_version: {type: integer, minimum: 0, description: "0 hoặc bỏ trống = phiên bản mới nhất của biểu nguồn"}
+        fields: {type: array, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
+      additionalProperties: false
     KHTCReportSupplement:
       type: object
       required: [id, department, instruction, state, due_at, native_submission_ref, return_applied]
@@ -27437,7 +27541,7 @@ components:
       properties:
         reason: {type: string, minLength: 10, maxLength: 1000}
         base_version: {type: integer}
-    CNTSCampaignInput: {"type":"object","required":["name","field","template_code","scope_mode","from_date","to_date","due_at"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"goal":{"type":"string","maxLength":2000},"field":{"type":"string","enum":["chan_nuoi","thu_y","thuy_san","khac"]},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"owner_ref":{"type":"string","format":"uuid"},"remind_before_hours":{"type":"integer","minimum":0,"maximum":168}},"additionalProperties":false}
+    CNTSCampaignInput: {"type":"object","required":["name","field","template_code","scope_mode","from_date","to_date","due_at"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"goal":{"type":"string","maxLength":2000},"field":{"type":"string","enum":["chan_nuoi","thu_y","thuy_san","khac"]},"template_code":{"type":"string"},"template_version":{"type":["integer","null"],"minimum":1,"description":"#192 FN-21 B1: phiên bản biểu điều tra đã chọn (FN-07); bỏ trống = mới nhất lúc phát hành"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"owner_ref":{"type":"string","format":"uuid"},"remind_before_hours":{"type":"integer","minimum":0,"maximum":168}},"additionalProperties":false}
     CNTSPoint: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"source":{"type":"string","enum":["gps","map"]}},"required":["lat","lng","source"],"additionalProperties":false}
     CNTSCampaignDueInput: {"type":"object","required":["due_at","reason"],"properties":{"due_at":{"type":"string","format":"date-time"},"reason":{"type":"string","minLength":10,"maxLength":500}},"additionalProperties":false}
     CNTSProjectVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","actor_display"],"additionalProperties":false}
@@ -27447,7 +27551,7 @@ components:
     CNTSProjectList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSProject"}},"can_create":{"type":"boolean"}},"required":["items","can_create"],"additionalProperties":false}
     CNTSCampaignProgress: {"type":"object","required":["period_status","total","submitted","pending","overdue","missed","returned","regions","units"],"properties":{"period_status":{"type":"string"},"total":{"type":"integer"},"submitted":{"type":"integer"},"pending":{"type":"integer"},"overdue":{"type":"integer"},"missed":{"type":"integer"},"returned":{"type":"integer"},"regions":{"type":"array","items":{"type":"object","required":["code","name","total","submitted","pending","overdue","missed"],"properties":{"code":{"type":"string"},"name":{"type":"string"},"total":{"type":"integer"},"submitted":{"type":"integer"},"pending":{"type":"integer"},"overdue":{"type":"integer"},"missed":{"type":"integer"}},"additionalProperties":false}},"units":{"type":"array","items":{"type":"object","required":["commune","commune_name","region_code","region_name","status","versions","late","last_submitted_at"],"properties":{"commune":{"type":"string"},"commune_name":{"type":"string"},"region_code":{"type":"string"},"region_name":{"type":"string"},"status":{"type":"string"},"versions":{"type":"integer"},"late":{"type":"boolean"},"last_submitted_at":{"type":["string","null"],"format":"date-time"}},"additionalProperties":false}}},"additionalProperties":false}
     CNTSKHTCProgram: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string"},"active":{"type":"boolean"}},"required":["ref","code","name","kind","active"],"additionalProperties":false}
-    CNTSCampaign: {"type":"object","required":["id","version","name","goal","field","template_code","scope_mode","regions","communes","tasks","from_date","to_date","due_at","remind_before_hours","state","province_code","updated_by","updated_at","owner","forms_period_id","period_key","template_version","progress","events"],"properties":{"id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"name":{"type":"string"},"goal":{"type":["string","null"]},"field":{"type":"string"},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"tasks":{"type":"integer"},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"remind_before_hours":{"type":"integer"},"state":{"type":"string","enum":["draft","collecting","closed"]},"province_code":{"type":["string","null"]},"updated_by":{"$ref":"#/components/schemas/CNTSCampaignActor"},"updated_at":{"type":"string","format":"date-time"},"owner":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignActor"},{"type":"null"}]},"forms_period_id":{"type":["string","null"],"format":"uuid"},"period_key":{"type":["string","null"]},"template_version":{"type":["integer","null"]},"progress":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignProgress"},{"type":"null"}]},"events":{"type":"array","items":{"$ref":"#/components/schemas/CNTSCampaignEvent"}}},"additionalProperties":false}
+    CNTSCampaign: {"type":"object","required":["id","version","name","goal","field","template_code","scope_mode","regions","communes","tasks","from_date","to_date","due_at","remind_before_hours","state","province_code","updated_by","updated_at","owner","forms_period_id","period_key","template_version","progress","events"],"properties":{"id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"name":{"type":"string"},"goal":{"type":["string","null"]},"field":{"type":"string"},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"tasks":{"type":"integer"},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"remind_before_hours":{"type":"integer"},"state":{"type":"string","enum":["draft","collecting","closed"]},"province_code":{"type":["string","null"]},"updated_by":{"$ref":"#/components/schemas/CNTSCampaignActor"},"updated_at":{"type":"string","format":"date-time"},"owner":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignActor"},{"type":"null"}]},"forms_period_id":{"type":["string","null"],"format":"uuid"},"period_key":{"type":["string","null"]},"template_version":{"type":["integer","null"],"description":"Phiên bản biểu đã phát hành; Nháp: phiên bản đã chọn (null = mới nhất lúc phát hành)"},"progress":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignProgress"},{"type":"null"}]},"events":{"type":"array","items":{"$ref":"#/components/schemas/CNTSCampaignEvent"}}},"additionalProperties":false}
     CNTSKHTCProgramList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSKHTCProgram"}}},"required":["items"],"additionalProperties":false}
     CNTSCampaignRemindResult: {"type":"object","required":["campaign","reminded"],"properties":{"campaign":{"$ref":"#/components/schemas/CNTSCampaign"},"reminded":{"type":"integer"}},"additionalProperties":false}
     CNTSProjectDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["active","closed"]},"site_count":{"type":"integer"},"household_count":{"type":"integer"},"can_edit":{"type":"boolean"},"manager_display":{"type":["string","null"]},"sites":{"type":"array","items":{"$ref":"#/components/schemas/CNTSSite"}},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSProjectVersion"}},"program":{"anyOf":[{"$ref":"#/components/schemas/CNTSKHTCProgram"},{"type":"null"}]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","status","site_count","household_count","can_edit","manager_display","sites","versions","program"],"additionalProperties":false}
