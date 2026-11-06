@@ -4765,7 +4765,8 @@ paths:
                 required: [status]
                 properties:
                   status: {type: string, enum: [accepted]}
-        "400": {description: "validation_error (email sai cú pháp) | bad_request", $ref: "#/components/responses/Problem"}
+        "400": {description: "bad_request (thân không phải JSON)", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (email sai cú pháp)", $ref: "#/components/responses/Problem"}
         "429": {description: rate_limited, $ref: "#/components/responses/Problem"}
         "503": {description: accounts.dependency_unavailable, $ref: "#/components/responses/Problem"}
   /v1/public/password-reset/confirm:
@@ -4791,9 +4792,9 @@ paths:
                 password: {type: string, format: password, minLength: 1, maxLength: 256}
       responses:
         "204": {description: Đã đặt mật khẩu mới}
-        "400": {description: "validation_error | bad_request", $ref: "#/components/responses/Problem"}
+        "400": {description: "bad_request (thân không phải JSON)", $ref: "#/components/responses/Problem"}
         "410": {description: accounts.reset_link_invalid, $ref: "#/components/responses/Problem"}
-        "422": {description: accounts.password_policy, $ref: "#/components/responses/Problem"}
+        "422": {description: "accounts.password_policy | validation_failed (mật khẩu rỗng hoặc quá 256 byte)", $ref: "#/components/responses/Problem"}
         "503": {description: accounts.dependency_unavailable, $ref: "#/components/responses/Problem"}
   /v1/reports/templates:
     get:

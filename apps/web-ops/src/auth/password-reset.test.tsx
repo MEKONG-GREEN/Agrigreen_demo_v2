@@ -39,9 +39,8 @@ describe("Quên mật khẩu — tự đặt lại qua email", () => {
 describe("Đặt lại mật khẩu từ liên kết email", () => {
   beforeEach(() => window.history.replaceState(null, "", `/login/dat-lai-mat-khau#token=${TOKEN}`));
 
-  it("mã lấy từ '#', xóa khỏi thanh địa chỉ; mật khẩu ngắn/không khớp bị chặn; đặt xong; dùng lại mã → liên kết mới", async () => {
+  it("mã lấy từ '#', xóa khỏi thanh địa chỉ khi đã dùng; mật khẩu ngắn/không khớp bị chặn; đặt xong; dùng lại mã → liên kết mới", async () => {
     const { unmount } = render(<ResetPasswordPage />);
-    expect(window.location.hash).toBe("");
     const pw = screen.getByLabelText("Mật khẩu mới");
     const again = screen.getByLabelText("Nhập lại mật khẩu mới");
     await userEvent.type(pw, "ngan");
@@ -58,6 +57,7 @@ describe("Đặt lại mật khẩu từ liên kết email", () => {
     await userEvent.type(again, "Mat-khau-moi-2026!");
     await userEvent.click(screen.getByRole("button", { name: "Đặt mật khẩu mới" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Mọi phiên đăng nhập cũ đã bị đăng xuất");
+    expect(window.location.hash).toBe("");
     unmount();
 
     window.history.replaceState(null, "", `/login/dat-lai-mat-khau#token=${TOKEN}`);

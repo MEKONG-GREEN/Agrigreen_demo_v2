@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useId, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { BrandMark } from "@/shell/BrandMark";
@@ -12,6 +12,16 @@ function tokenFromHash(hash: string): string {
   return new URLSearchParams(hash.replace(/^#/u, "")).get("token") ?? "";
 }
 
+const noSubscribe = () => () => {};
+const hashToken = () => tokenFromHash(window.location.hash);
+/** Kết xuất ở máy chủ: chưa biết mã (null) — tránh lệch khi hydrate. */
+const serverToken = () => null;
+
+/** Xóa mã khỏi thanh địa chỉ và lịch sử khi liên kết đã dùng xong hoặc hết hiệu lực. */
+function forgetToken() {
+  window.history.replaceState(null, "", window.location.pathname);
+}
+
 /**
  * Đặt mật khẩu mới từ liên kết email (BRD 2.0 FN-CH-00.01, #255). Thành công: mọi phiên cũ bị thu hồi; tài khoản bắt MFA
  * vẫn nhập OTP khi đăng nhập lại.
@@ -19,7 +29,7 @@ function tokenFromHash(hash: string): string {
 export default function ResetPasswordPage() {
   const { api } = useAuth();
   const id = useId();
-  const [token, setToken] = useState<string | null>(null);
+  const token = useSyncExternalStore(noSubscribe, hashToken, serverToken);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
@@ -27,12 +37,6 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
-
-  useEffect(() => {
-    setToken(tokenFromHash(window.location.hash));
-    // Xóa mã khỏi thanh địa chỉ và lịch sử ngay khi đọc.
-    window.history.replaceState(null, "", window.location.pathname);
-  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -42,6 +46,7 @@ export default function ResetPasswordPage() {
     setBusy(true);
     try {
       const { response, error: problem } = await api.POST("/v1/public/password-reset/confirm", { body: { token: token ?? "", password } });
+      if (response.status === 204 || response.status === 410) forgetToken();
       if (response.status === 204) setDone(true);
       else if (response.status === 410) setExpired(true);
       else if (response.status === 422) {

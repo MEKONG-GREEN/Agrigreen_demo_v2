@@ -33323,8 +33323,10 @@ export interface operations {
                     };
                 };
             };
-            /** @description validation_error (email sai cú pháp) | bad_request */
+            /** @description bad_request (thân không phải JSON) */
             400: components["responses"]["Problem"];
+            /** @description validation_failed (email sai cú pháp) */
+            422: components["responses"]["Problem"];
             /** @description rate_limited */
             429: components["responses"]["Problem"];
             /** @description accounts.dependency_unavailable */
@@ -33356,11 +33358,11 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description validation_error | bad_request */
+            /** @description bad_request (thân không phải JSON) */
             400: components["responses"]["Problem"];
             /** @description accounts.reset_link_invalid */
             410: components["responses"]["Problem"];
-            /** @description accounts.password_policy */
+            /** @description accounts.password_policy | validation_failed (mật khẩu rỗng hoặc quá 256 byte) */
             422: components["responses"]["Problem"];
             /** @description accounts.dependency_unavailable */
             503: components["responses"]["Problem"];
