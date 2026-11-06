@@ -110,7 +110,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     items.map((i) => (i.children.length ? [i.label, tree(i.children)] : i.status === "coming_soon" ? `${i.label}*` : i.label));
   const menuOf = (name: string) => cases.find((c) => c.name === name)!.menu;
   const groupsOf = (name: string) => Object.fromEntries(menuOf(name).groups.map((g) => [g.label, tree(g.items)]));
-  const KHTC: Tree = ["Báo cáo cho KHTC", ["Phiếu kỳ này", "Phiếu đã gửi", "Tiến độ các CT của phòng*", "Báo cáo KHTC đã xuất*"]];
+  const KHTC: Tree = ["Báo cáo cho KHTC", ["Phiếu kỳ này", "Phiếu đã gửi", "Tiến độ các CT của phòng", "Báo cáo KHTC đã xuất*"]];
   const T = (t02: boolean) =>
     ["T01 · Tiến độ XG", ...(t02 ? ["T02 · Lúa mùa"] : []), "T03 · Phân trà", "T04 · Rau màu", "T05 · Sâu bệnh lúa", "T06 · Sâu bệnh khác", "T07 · Thu hoạch"];
   const V = ["V01 · 3G3T", "V02 · 1P5G", "V03 · CGH", "V04 · CCG", "V05 · Lượng giống", "V06 · Mô hình"];
@@ -226,7 +226,8 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       const tree = fromKnMenu(cases.find((c) => c.name === `kn_tinh/${code}`)!.menu);
       const links = menuLinks(tree).map((l) => l.node.href);
       expect(links).toEqual(expect.arrayContaining(["/kn/bao-cao-khtc", "/kn/bao-cao-khtc/da-gui"]));
-      expect(links).not.toContain("/kn/bao-cao-khtc/tien-do"); // FN-PN-03.03 Sắp có
+      expect(links).toContain("/kn/bao-cao-khtc/tien-do"); // #215: prepared M5 projection is ready.
+      expect(links).not.toContain("/kn/bao-cao-khtc/da-xuat"); // #247: departmental archive remains pending.
     }
     expect(khtcItem("kn_tinh/ke_hoach_tai_chinh")).toBeUndefined();
     expect(khtcItem("kn_xa/trong_trot")).toBeUndefined();

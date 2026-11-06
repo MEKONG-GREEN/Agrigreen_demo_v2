@@ -2,13 +2,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PNProgressScreen } from "./PNProgressScreen";
 import type { PNPeriod, PNProgress } from "./api";
+import type * as PNApi from "./api";
 import type * as Files from "@/lib/files";
 import { saveBlob } from "@/lib/files";
 
 const state = vi.hoisted(() => ({ api: {}, status: "authenticated", knStatus: "active", principal: { actor_ref: "actor-a", tenant_id: "tenant-a", amr: ["mfa"] }, context: { context_id: "ctx-a", role: "kn_tinh", department_code: "trong_trot", read_only: false } }));
 const calls = vi.hoisted(() => ({ periods: vi.fn(), get: vi.fn(), excel: vi.fn() }));
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ api: state.api, status: state.status, principal: state.principal, kn: { status: state.knStatus, context: state.context } }) }));
-vi.mock("./api", async original => ({ ...await original<typeof import("./api")>(), createPNProgressApi: () => calls }));
+vi.mock("./api", async original => ({ ...await original<typeof PNApi>(), createPNProgressApi: () => calls }));
 vi.mock("@/shell/Breadcrumb", () => ({ useBreadcrumbTail: () => undefined }));
 vi.mock("@/lib/files", async original => ({ ...await original<typeof Files>(), saveBlob: vi.fn() }));
 const A = "01900000-0000-7000-8000-000000000215", B = "01900000-0000-7000-8000-000000000216", S = "01900000-0000-7000-8000-000000000217", P = "01900000-0000-7000-8000-000000000218";

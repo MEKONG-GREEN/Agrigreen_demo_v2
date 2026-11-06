@@ -14971,6 +14971,30 @@ paths:
         "401": {$ref: '#/components/responses/Problem'}
         "403": {$ref: '#/components/responses/Problem'}
         "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/pending-review:
+    get:
+      summary: Phiếu thường niên đã gửi chờ rà soát, phân trang theo nhóm kỳ chưa kết thúc
+      description: Đọc native Progress bằng caller hiện tại. Không gồm kỳ phát sinh; không trả tổng toàn cục. Trang rỗng vẫn có thể có next_cursor. Không suy quyền mutation từ kết quả đọc.
+      operationId: extensionKhtcPendingReview243
+      tags: [extension]
+      parameters:
+        - in: query
+          name: before
+          required: false
+          schema: {type: string, format: uuid, minLength: 36, maxLength: 36}
+      responses:
+        "200":
+          description: Tối đa 25 kỳ thường niên mỗi trang, gồm lần gửi cuối chưa có quyết định; không suy từ nháp hoặc bảng số liệu niêm phong
+          headers:
+            Cache-Control: {schema: {type: string, enum: [no-store]}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCPendingReviewPage243'}
+        "400": {$ref: '#/components/responses/Problem'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
   /v1/kn/machine-profiles/{cooperative_ref}:
     get:
       summary: "TT-10 (BF-SRV-KN-ATTRS): hồ sơ KN riêng — năm sản xuất theo loại máy của HTX (mọi vai KN trong phạm vi)"
@@ -27181,6 +27205,25 @@ components:
       required: [open_count]
       properties:
         open_count: {type: integer, format: int64, minimum: 0}
+    KHTCPendingReviewPage243:
+      type: object
+      required: [rows, next_cursor]
+      properties:
+        rows:
+          type: array
+          items: {$ref: '#/components/schemas/KHTCPendingReviewRow243'}
+        next_cursor: {type: string, format: uuid, nullable: true}
+    KHTCPendingReviewRow243:
+      type: object
+      required: [period_id, period_name, department, department_name, submission_id, attempt, submitted_at]
+      properties:
+        period_id: {type: string, format: uuid}
+        period_name: {type: string}
+        department: {type: string}
+        department_name: {type: string}
+        submission_id: {type: string, format: uuid}
+        attempt: {type: integer, format: int64, minimum: 1}
+        submitted_at: {type: string, format: date-time}
     KHTCPNPeriod:
       type: object
       required: [id, name, year, from, to, cutoff]

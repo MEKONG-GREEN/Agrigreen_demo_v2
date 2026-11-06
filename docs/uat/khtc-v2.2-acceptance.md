@@ -225,6 +225,12 @@ Bổ sung KH-FN-TI-02.09 (Mẫu5 cutoff sớm,16/10): `TestKH_M5_ProgramUsesCuto
 - Dashboard và phần archive còn lại nằm ở #166/#167: xem trước/Word/zip, lọc kỳ/lĩnh vực, cấp quyền phòng có số liệu và tên hiển thị người xuất; giữ Q-027/Q-055 theo PO. Chưa nghiệm thu toàn bộ W11.69.
 - W11.69 phần đầu: TW/KHTC vào kho đã xuất từ menu có thể bấm và trang mặc định; Playwright 	ests/e2e/kn-khtc-archive.spec.ts chuẩn bị tài khoản đúng phòng qua UI mock, kiểm bộ lọc có accessible name rõ và không có nút soạn/xuất mới.
 
+### Lát audit đọc kho #227 (BRD v2.3, chờ review/gộp)
+
+- Ghi nhận list, choices kỳ/lĩnh vực, history có/không bộ lọc, preview và Excel bằng sổ archive access hiện hữu; không sửa bytes/hash/số đã cấp hoặc cấp quyền mới. Actor/context/clock/trace lấy từ request thật, lỗi audit INSERT và COMMIT đều không trả dữ liệu. Metadata/preview không khẳng định đã truyền xong mạng.
+- Native HTTP: `TestArchive227ReadAuditIsCommittedBeforeMetadata`, `TestArchive227ReadAuditFailureAndCommitRollback`, `TestArchive227ExistingAuthorityBeforeAllReadPaths`. Có real owner/exporter PostgreSQL, deferred COMMIT failure/rollback/recovery; Word GET đã lưu và mixed ZIP POST sai vai/phòng dùng fresh key, không file bytes/không FilePort, cross-tenant và byte giữ nguyên sau đổi nguồn live.
+- [Giả định](../kn/gia-dinh/ARCHIVE-READ-AUDIT-227.md); quyền snapshot/phòng gốc/leadership, audit deny/cache-hit và attestation/direct Word legacy vẫn ở #246, actual #227 merge trước khi sửa chung. Không đánh dấu các hàng toàn FN-TW-01.01/FN-PN-03.03, UAT người dùng hoặc G1 thành đạt.
+
 ### Lát tiến độ phòng #215 (BRD v2.3, chờ review/gộp)
 
 - Tiến độ chỉ xem theo snapshot Mẫu 5 đã chuẩn bị: hiển thị ID/version/mốc thật, lọc chương trình/mức đạt và Excel cùng snapshot. Server chỉ trả hạng mục đúng phòng và nhãn tổ tiên; không mở quyền báo cáo/kho cũ. Chưa có bản lưu thì không tạo hay tự bắt nguồn, không xuất dữ liệu giả.
@@ -250,3 +256,6 @@ Phạm vi: chỉ Word có liên kết tường minh, đã kiểm full input hash
 KH-FN-TI-02.02/KH-UR-TI-02: lát UI Lưu/Điều chỉnh theo QĐ, lịch sử và đúng phiên bản trên URL riêng, DetailPage/DataTable/Log thật, kiểm đầu quyết định, nháp workspace và retry/đổi ngữ cảnh. JSON/Excel được kiểm số trước parser. [Phạm vi và giới hạn](../kn/gia-dinh/BF-SWEEP-KHTC-FINAL.md). Chưa có UAT khách và chưa đạt toàn vòng đời năm/bản điều chỉnh trên server theo BRD v2.3; #206 giữ phần đó cùng form CT/DA/hạng mục và màn còn lại. Không đổi kết luận các ca G1 tối thiểu v2.2 thành nghiệm thu v2.3.
 ### Lát dashboard #189
 FN-TI-02.01: bổ sung keyset/batch100 toàn năm, filter trước projection và adhoc theo quyền; kiểm TestDashboard189PagesAndNativeProjectionScope. Chưa đánh dấu đạt toàn FN: live đến ngày/no-period, lãnh đạo phòng gốc, badge, nhắc và field đầy đủ còn ở #202. Căn cứ BRD KHTC v2.3; bằng chứng PASS đúng SHA ở issue ready, không suy từ tên test.
+
+
+Bổ sung #243 — FN-TI-02.01/FN-TI-02.04: hộp phiếu thường niên chờ rà soát có menu riêng, đọc lần gửi cuối native theo trang kỳ, không suy từ nháp/bảng niêm phong; mở reviewer hiện hữu và giữ quyền hiện tại. [Phạm vi/giới hạn](../kn/gia-dinh/KHTC-DASHBOARD-PENDING-INBOX.md). Badge toàn cục, public batch và phần dashboard còn lại ở #245. Chưa đổi trạng thái toàn FN, chưa UAT khách hoặc G1; kết quả cổng đúng SHA trong issue READY sau khi thực sự đạt.

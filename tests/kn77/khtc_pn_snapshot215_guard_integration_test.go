@@ -62,7 +62,7 @@ func TestPN215UnpreparedSourceAndCurrentAuthority(t *testing.T) {
 	for _, key := range []string{"snapshot_id", "program"} {
 		c, b = f.do(http.MethodGet, base+"/"+pid+"?"+key+"="+strings.Repeat("9", 100000), authz.KNTinh, dTT, actor, "", nil)
 		if c != http.StatusUnprocessableEntity {
-			t.Fatalf("unbounded identity accepted: %s status%d", key, c)
+			t.Fatalf("unbounded identity accepted: %s status%d body%s", key, c, b)
 		}
 	}
 	own := f.tid

@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v14";
+export const MENU_VERSION = "kn.menu/v15";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -1210,6 +1210,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "route": "/kn/khtc/ky-bao-cao",
             "icon": "task",
             "badge": "extension.khtc_periods.open"
+          },
+          {
+            "key": "tinh.khtc.phieu_cho_ra_soat",
+            "label": "Phiếu số liệu các phòng",
+            "route": "/kn/khtc/phieu-cho-ra-soat",
+            "icon": "task"
           },
           {
             "key": "tinh.khtc.ke_hoach_nam",
