@@ -133,6 +133,8 @@ func (d Draft) Validate() error {
 		return ErrInput{"to_date", "đợt tối đa một năm"}
 	case d.DueAt.IsZero():
 		return ErrInput{"due_at", "hạn nộp bắt buộc"}
+	case d.OwnerRef == nil || *d.OwnerRef == uuid.Nil:
+		return ErrInput{"owner_ref", "người phụ trách đợt bắt buộc"}
 	case d.RemindBeforeHours < 0 || d.RemindBeforeHours > 168:
 		return ErrInput{"remind_before_hours", "0–168 giờ"}
 	}

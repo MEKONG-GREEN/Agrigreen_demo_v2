@@ -36,7 +36,8 @@ func TestPeriodKeyAndState(t *testing.T) {
 }
 
 func TestDraftValidate(t *testing.T) {
-	ok := Draft{Name: "Điều tra tổng đàn 01/10/2026", Field: "chan_nuoi", TemplateCode: "CNTS-DT-TONGDAN", Units: []string{"X1"},
+	owner := uuid.MustParse("01920000-0000-7000-8000-0000000000aa")
+	ok := Draft{OwnerRef: &owner, Name: "Điều tra tổng đàn 01/10/2026", Field: "chan_nuoi", TemplateCode: "CNTS-DT-TONGDAN", Units: []string{"X1"},
 		From: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 10, 10, 0, 0, 0, 0, time.UTC),
 		DueAt: time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC)}
 	ok.Normalize()
@@ -57,6 +58,11 @@ func TestDraftValidate(t *testing.T) {
 	bad.Field = "trong_trot"
 	if err := bad.Validate(); err == nil {
 		t.Fatal("lĩnh vực ngoài danh sách phải lỗi")
+	}
+	bad = ok
+	bad.OwnerRef = nil
+	if err := bad.Validate(); err == nil || err.(ErrInput).Field != "owner_ref" {
+		t.Fatalf("FN-21 B1: thiếu người phụ trách phải lỗi owner_ref: %v", err)
 	}
 	if _, ok := Reason("ngắn"); ok {
 		t.Fatal("lý do < 10 ký tự")

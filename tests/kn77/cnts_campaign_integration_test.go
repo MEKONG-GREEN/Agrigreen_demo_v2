@@ -109,7 +109,7 @@ func TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150(t *testing.T) {
 		t.Fatalf("lũy kế trước đợt: %+v", before)
 	}
 
-	input := map[string]any{"name": "Điều tra sản lượng khai thác 01/10/2026", "goal": "Khảo sát nhanh sau lũ", "field": "thuy_san",
+	input := map[string]any{"owner_ref": ids.New().String(), "name": "Điều tra sản lượng khai thác 01/10/2026", "goal": "Khảo sát nhanh sau lũ", "field": "thuy_san",
 		"template_code": "CNTS-BM17", "scope_mode": "communes", "communes": []string{"X1", "X2"}, "from_date": "2026-10-01",
 		"to_date": "2026-10-05", "due_at": "2026-10-09T03:00:00Z"}
 	var cv campaignView

@@ -35,6 +35,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.POST("/:id/remind", h.remind)
 	g.GET("/:id/results", h.results)
 	g.GET("/:id/results/xlsx", h.resultsXLSX)
+	g.POST("/:id/copy", h.copy)
+	rg.GET("/extension/cnts/campaign-owners", h.owners)
 }
 
 func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
@@ -121,7 +123,7 @@ func (h Handler) view(c *gin.Context, x app.Campaign) gin.H {
 		"from_date": v.From.Format(time.DateOnly), "to_date": v.To.Format(time.DateOnly), "due_at": ts(x.DueAt),
 		"remind_before_hours": v.RemindBeforeHours, "state": x.State, "province_code": v.Province,
 		"updated_by": gin.H{"ref": v.ActorRef.String(), "display": names[v.ActorRef]}, "updated_at": ts(v.RecordedAt),
-		"owner": nil, "forms_period_id": nil, "period_key": nil, "template_version": nil, "progress": nil,
+		"can_manage": x.CanManage, "owner": nil, "forms_period_id": nil, "period_key": nil, "template_version": nil, "progress": nil,
 	}
 	if v.OwnerRef != nil {
 		out["owner"] = gin.H{"ref": v.OwnerRef.String(), "display": names[*v.OwnerRef]}
@@ -241,6 +243,64 @@ func (h Handler) publish(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, h.view(c, x))
+}
+
+type copyDTO struct {
+	Name     string `json:"name"`
+	FromDate string `json:"from_date"`
+	ToDate   string `json:"to_date"`
+	DueAt    string `json:"due_at"`
+	OwnerRef string `json:"owner_ref"`
+}
+
+// copy "Sao chép đợt cũ" (FN-21 luồng phụ): đợt mới (Nháp) mang đối tượng, phạm vi, biểu của đợt nguồn, không mang số liệu.
+func (h Handler) copy(c *gin.Context) {
+	id, ok := pathID(c)
+	if !ok {
+		return
+	}
+	var d copyDTO
+	if !bind(c, &d) {
+		return
+	}
+	due, err := parseTime("due_at", d.DueAt)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	in := app.CopyInput{Name: d.Name, From: d.FromDate, To: d.ToDate, DueAt: due}
+	if d.OwnerRef != "" {
+		o, err := uuid.Parse(d.OwnerRef)
+		if err != nil {
+			httpx.Fail(c, problem.Validation.WithField("owner_ref", "phải là UUID"))
+			return
+		}
+		in.OwnerRef = &o
+	}
+	x, replayed, err := h.Svc.Copy(c.Request.Context(), id, in, idem(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	status := http.StatusCreated
+	if replayed {
+		status = http.StatusOK
+	}
+	c.JSON(status, h.view(c, x))
+}
+
+// owners: cán bộ chọn được làm người phụ trách đợt.
+func (h Handler) owners(c *gin.Context) {
+	os, err := h.Svc.Owners(c.Request.Context())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(os))
+	for _, o := range os {
+		items = append(items, gin.H{"ref": o.Ref.String(), "display": o.Display})
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 type dueDTO struct {

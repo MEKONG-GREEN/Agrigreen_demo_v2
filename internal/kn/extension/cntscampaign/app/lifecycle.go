@@ -278,6 +278,11 @@ func (s *Service) change(ctx context.Context, c caller, id uuid.UUID, act, idem 
 		if cur, err = s.current(ctx, tx, c, id); err != nil {
 			return err
 		}
+		// Ma trận FN-21: mở lại là quyền của Lãnh đạo phòng (kiểm ở Reopen); thao tác khác chỉ cán bộ tổng hợp hoặc người
+		// phụ trách đợt.
+		if act != domain.ActReopened && !c.manages(cur.Version) {
+			return errNotOwner
+		}
 		if !domain.CanApply(cur.State, act) {
 			return ErrState.WithDetail("đợt đang ở trạng thái " + stateLabel(cur.State))
 		}
