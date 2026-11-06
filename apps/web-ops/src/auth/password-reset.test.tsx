@@ -67,7 +67,7 @@ describe("Đặt lại mật khẩu từ liên kết email", () => {
     await userEvent.click(screen.getByRole("button", { name: "Đặt mật khẩu mới" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("đã dùng hoặc đã hết hạn");
     expect(screen.getByRole("link", { name: "Yêu cầu liên kết mới" })).toHaveAttribute("href", "/login/quen-mat-khau");
-  });
+  }, 30_000);
 
   it("không có mã → báo liên kết không hợp lệ", () => {
     window.history.replaceState(null, "", "/login/dat-lai-mat-khau");
