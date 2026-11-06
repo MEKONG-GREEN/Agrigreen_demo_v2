@@ -91,6 +91,10 @@ Bổ sung 02/11/2026 — #179 phần đầu: bảng hệ số FN-19 có danh sá
 | FN-AD-04.02 · Mục IV · P1679 | Mẫu phiếu số liệu KHTC (dùng chung FN-AD-04.06) | `/kn/phong-ban/[dept]/mau-bao-cao` | `apps/web-ops/src/app/kn/[...slug]/page.tsx:1` | Lệch | BRD mô tả thiết kế mẫu đầy đủ; PO đã chốt G1 giữ mẫu nạp sẵn. Ghi khác biệt phạm vi, không tự mở thêm builder hoặc coi UI placeholder là đã đạt BRD đầy đủ. | PO chốt chỉ mẫu seed ở G1; chưa UAT toàn BRD. | Không — PO đã chốt G1 chỉ mẫu seed; builder đầy đủ ngoài phạm vi, vẫn kiểm từng mẫu đã bàn giao. |
 | FN-AD-04.03 · Mục IV · P1709 | Mục lục mẫu báo cáo | `/kn/khtc/mau-bao-cao` | `apps/web-ops/src/app/kn/[...slug]/page.tsx:1` | Thiếu | Mục lục động/biến khóa/preview v2.3 do #31; dev chưa có màn chuyên biệt. Không đổi seeded templates để che thiếu chức năng. | Chưa có UAT. | Có — Thiếu mục lục mẫu báo cáo động/preview theo v2.3; #31. |
 
+### Lát audit kho #227 — chưa hoàn tất quyền/FN/UAT
+
+FN-TW-01.01/FN-PN-03.03: audit append-only cho list, lựa chọn kỳ/lĩnh vực, history có/không bộ lọc, preview và Excel; actor/context/clock/trace thật, commit trước trả dữ liệu, lỗi INSERT/COMMIT fail closed. Metadata access/attempt không khẳng định giao file xong, không lấy 0 thay ngân sách egress. Giữ reader KHTC/Admin/TW-KHTC trong tenant, byte/hash/số và audit Word/ZIP đã có. Bằng chứng HTTP PostgreSQL thật gồm rollback/recovery và Word GET/mixed ZIP POST bị từ chối bằng fresh key, zero data/zero FilePort. Không mở quyền từ lĩnh vực. [Giả định](gia-dinh/ARCHIVE-READ-AUDIT-227.md); phần snapshot/leadership/deny-cache/Word legacy ở #246 sau actual merge #227. Chưa coi toàn FN hoặc UAT/G1 đạt.
+
 ## 5. Báo giá/TTTT — 28 chức năng
 
 | BRD / mục / đoạn gốc | Yêu cầu | Màn | Bằng chứng mã | Trạng thái | Khác biệt / ticket | Khách chấp nhận / UAT | Chặn UAT riêng (đề xuất, chờ PO) |
