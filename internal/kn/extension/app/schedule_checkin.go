@@ -523,9 +523,9 @@ func applyCheckins(a knActor, d *ScheduleDetail, st ScheduleSettings, now time.T
 }
 
 // ScheduleFollowers trả người theo dõi lịch của owner (người duyệt được lịch theo quy tắc của phòng ban, FN-12 BR-04) —
-// người nhận cảnh báo "Chưa check-out" (CNTS v4.0 Mục III.5 dòng 13). Tenant truyền tường minh (job của worker).
+// người nhận cảnh báo "Chưa check-out" (CNTS v4.0 Mục III.5 dòng 13). Tenant truyền tường minh (job của worker); ctx đã mang
+// tenant của job (cntsalert JobTenant) cho tham số theo phòng ban.
 func (s *Service) ScheduleFollowers(ctx context.Context, tid uuid.UUID, dept, province string, owner uuid.UUID, at time.Time) ([]uuid.UUID, error) {
-	ctx = tenant.WithID(ctx, tid)
 	st, err := s.scheduleSettings(ctx, dept, province, at)
 	if err != nil {
 		return nil, err
