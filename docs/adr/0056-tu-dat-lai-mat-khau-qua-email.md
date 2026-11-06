@@ -26,6 +26,6 @@ Mật khẩu chỉ nằm trong Keycloak (realm `agrigreen`). Trang “Quên mậ
 ## Hệ quả
 
 - Web: “Quên mật khẩu?” dẫn tới `/login/quen-mat-khau` (nhập email) và email dẫn tới `/login/dat-lai-mat-khau#token=…`; không còn câu “mật khẩu do quản trị viên đặt lại”.
-- Cấu hình worker: `AG_ACCOUNTS_RESET_URL` (URL trang đặt lại, https), SMTP `AG_SMTP_*` của pf/notify. Thiếu → consumer lỗi, sự kiện vào DLQ (không mất yêu cầu, không gửi giả).
+- Cấu hình worker dùng lại của pf/notify: `AG_WEB_OPS_URL` (liên kết = `<AG_WEB_OPS_URL>/login/dat-lai-mat-khau#token=…`), kênh email `AG_MAILER`/`AG_SMTP_*`. Thiếu → kênh tắt, consumer lỗi, sự kiện giao lại rồi vào DLQ (không mất yêu cầu, không gửi liên kết hỏng).
 - Trang “Quên mật khẩu” gốc của Keycloak vẫn bật (luồng `agrigreen password recovery` có OTP trước khi đặt lại, P0-VPS-OPS); web không dẫn tới đó. Tắt hẳn là quyết định cấu hình realm riêng.
 - Bộ giới hạn theo IP nằm trong bộ nhớ từng bản sao; giới hạn theo tài khoản nằm trong DB nên đúng trên nhiều bản sao.

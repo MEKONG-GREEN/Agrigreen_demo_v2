@@ -44,7 +44,7 @@ void main() {
   }
 
   testWidgets(
-    'đăng nhập (chế độ kiểm thử) → PIN → đồng bộ ngoại tuyến đầu–cuối',
+    'đăng nhập (chế độ kiểm thử) → đồng bộ ngoại tuyến đầu–cuối',
     (tester) async {
       final server = await MockApiServer.start();
       final sk = seedServer(server);
@@ -95,24 +95,16 @@ void main() {
         ),
       );
 
-      // Đăng nhập chế độ kiểm thử → tạo PIN → nhập lại.
+      // Đăng nhập chế độ kiểm thử → vào thẳng (không có PIN — BRD 2.0 FN-CH-00.01, ADR-0056).
       await pumpUntil(tester, find.text('Đăng nhập'));
       await tester.tap(find.text('Đăng nhập'));
-      await pumpUntil(tester, find.text('Tạo mã PIN 6 số'));
-      for (var round = 0; round < 2; round++) {
-        for (final d in ['2', '4', '6', '8', '1', '3']) {
-          await tester.tap(find.text(d));
-          await tester.pump(const Duration(milliseconds: 50));
-        }
-        await tester.pump(const Duration(milliseconds: 300));
-      }
       await pumpUntil(tester, find.byType(HomeScreen));
 
       final container = ProviderScope.containerOf(
         tester.element(find.byType(HomeScreen)),
       );
       final services = container.read(appControllerProvider).services!;
-      // Khóa SQLCipher dạng raw key nằm trong Keystore, không phải PIN.
+      // Khóa SQLCipher dạng raw key nằm trong Keystore.
       expect(await store.read(SecureKeys.dbKey), hasLength(64));
 
       try {

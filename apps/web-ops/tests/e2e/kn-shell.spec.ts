@@ -192,7 +192,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page.locator(".choose-msg[role=alert]")).toContainText("liên hệ quản trị viên");
   });
 
-  test("sai 5 lần → khóa tạm 15 phút; Quên mật khẩu dẫn tới liên hệ quản trị viên", async ({ page }) => {
+  test("sai 5 lần → khóa tạm 15 phút; Quên mật khẩu dẫn tới tự đặt lại qua email", async ({ page }) => {
     await page.goto("/login");
     for (let i = 0; i < 5; i++) await submitLogin(page, "quan.lm@ttknqg.gov.vn", `sai-${i}`);
     await expect(loginAlert(page)).toContainText("tạm khóa 15 phút");
@@ -200,5 +200,8 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(loginAlert(page)).toContainText("tạm khóa 15 phút");
     await page.getByRole("link", { name: "Quên mật khẩu?" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Quên mật khẩu" })).toBeVisible();
+    await page.getByLabel("Email").fill("quan.lm@ttknqg.gov.vn");
+    await page.getByRole("button", { name: "Gửi liên kết đặt lại" }).click();
+    await expect(page.getByRole("status")).toContainText("30 phút");
   });
 });

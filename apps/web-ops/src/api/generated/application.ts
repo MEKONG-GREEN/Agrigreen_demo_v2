@@ -3374,6 +3374,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * BRD 2.0 FN-CH-00.01 "Quên mật khẩu?": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0056) — KHÔNG đăng nhập
+         * @description Luôn 202 cùng một thân cho mọi email đúng cú pháp — không lộ email có tồn tại, tài khoản bị khóa hay đã quá giới hạn. Chỉ tài khoản đang hoạt động, email đã xác minh mới được gửi; tối đa 5 yêu cầu được gửi mỗi giờ cho một tài khoản (yêu cầu vượt vẫn 202, không gửi). Liên kết hiệu lực 30 phút, dùng một lần; email gửi qua outbox ở worker. Giới hạn theo IP (dồn 5, sau đó 1/phút) → 429. Cache-Control no-store.
+         */
+        post: operations["requestPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Đặt mật khẩu mới bằng mã trong liên kết email (dùng một lần, 30 phút) — thu hồi mọi phiên; KHÔNG đăng nhập
+         * @description Mã sai, đã dùng, hết hạn, đang được dùng hoặc tài khoản bị khóa → cùng một mã 410 accounts.reset_link_invalid. Mật khẩu không đạt chính sách realm (≥ 12 ký tự, khác tên đăng nhập, không trùng 5 mật khẩu gần nhất) → 422 accounts.password_policy, liên kết dùng lại được. Thành công: mọi phiên của tài khoản bị thu hồi, liên kết còn mở khác hết dùng; TOTP giữ nguyên (tài khoản bắt MFA vẫn nhập OTP ở lần đăng nhập sau). Cache-Control no-store.
+         */
+        post: operations["confirmPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports/templates": {
         parameters: {
             query?: never;
@@ -33253,6 +33293,77 @@ export interface operations {
             410: components["responses"]["Problem"];
             /** @description metering.egress_quota_exceeded (AG_EGRESS_MODE=enforce) */
             429: components["responses"]["Problem"];
+        };
+    };
+    requestPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã nhận yêu cầu */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "accepted";
+                    };
+                };
+            };
+            /** @description validation_error (email sai cú pháp) | bad_request */
+            400: components["responses"]["Problem"];
+            /** @description rate_limited */
+            429: components["responses"]["Problem"];
+            /** @description accounts.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    confirmPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Mã base64url 86 ký tự (tenant + yêu cầu + bí mật 32 byte; DB chỉ giữ SHA-256) */
+                    token: string;
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã đặt mật khẩu mới */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description validation_error | bad_request */
+            400: components["responses"]["Problem"];
+            /** @description accounts.reset_link_invalid */
+            410: components["responses"]["Problem"];
+            /** @description accounts.password_policy */
+            422: components["responses"]["Problem"];
+            /** @description accounts.dependency_unavailable */
+            503: components["responses"]["Problem"];
         };
     };
     listReportTemplates: {

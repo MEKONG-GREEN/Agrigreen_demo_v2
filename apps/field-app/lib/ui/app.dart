@@ -9,7 +9,6 @@ import 'kn/kn_home_screen.dart';
 import 'providers.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
-import 'screens/pin_screen.dart';
 
 class FieldApp extends StatelessWidget {
   const FieldApp({super.key});
@@ -36,9 +35,10 @@ class _AuthGate extends ConsumerWidget {
       AuthStage.loading => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      AuthStage.needsOnlineLogin => const LoginScreen(),
-      AuthStage.needsPinSetup => const PinScreen(setup: true),
-      AuthStage.locked => const PinScreen(setup: false),
+      // App KN không có PIN (ADR-0056): AuthFlow không bao giờ trả needsPinSetup/locked.
+      AuthStage.needsOnlineLogin ||
+      AuthStage.needsPinSetup ||
+      AuthStage.locked => const LoginScreen(),
       AuthStage.unlocked =>
         st.services == null
             ? const LoginScreen()
