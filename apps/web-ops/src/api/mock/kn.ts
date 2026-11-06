@@ -934,6 +934,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "label": "Lịch tiêm (thực tế)",
                 "route": "/kn/cnts/lich-tiem",
                 "icon": "check"
+              },
+              {
+                "key": "tinh.cnts.so_lieu_xa.ho_chan_nuoi",
+                "label": "Danh sách hộ chăn nuôi",
+                "route": "/kn/cnts/so-lieu-xa/ho-chan-nuoi",
+                "icon": "users"
               }
             ]
           },
@@ -1040,6 +1046,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "key": "xa.cnts.ho_mo_hinh",
             "label": "Hộ mô hình",
             "route": "/kn/cnts/ho-mo-hinh",
+            "icon": "users"
+          },
+          {
+            "key": "xa.cnts.ho_chan_nuoi",
+            "label": "Danh sách hộ chăn nuôi",
+            "route": "/kn/cnts/so-lieu-xa/ho-chan-nuoi",
             "icon": "users"
           },
           {

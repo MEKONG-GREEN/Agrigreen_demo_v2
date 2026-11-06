@@ -148,7 +148,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     expect(groupsOf("kn_xa/chan_nuoi_thuy_san")).toEqual({
       "Điều hành": ["Việc cần làm", "Lịch trực KSGM của tôi", "Lịch công tác"],
       "Báo cáo": ["KSGM hằng ngày", "Nhập liệu tuần chăn nuôi", "Khai thác thủy sản tuần", "Báo cáo công việc tuần", "Báo cáo dịch bệnh"],
-      "Dữ liệu": ["Hộ mô hình", ["Nhật ký sản xuất", ["Thủy sản", "Chăn nuôi"]], "Lịch tiêm phòng", "Bản đồ vùng dịch", "Điểm trình diễn", "Quy trình, văn bản"],
+      "Dữ liệu": ["Hộ mô hình", "Danh sách hộ chăn nuôi", ["Nhật ký sản xuất", ["Thủy sản", "Chăn nuôi"]], "Lịch tiêm phòng", "Bản đồ vùng dịch", "Điểm trình diễn", "Quy trình, văn bản"],
       "Dùng chung": ["Contact"],
     });
     expect(menuOf("kn_xa/chan_nuoi_thuy_san").default_route).toBe("/kn/cnts/bao-cao-ky");
@@ -170,7 +170,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     // W11.45: Báo cáo định kỳ BM-11 có màn.
     expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);
     expect(g["Dữ liệu"]).toEqual([
-      ["Số liệu cấp xã", ["Nhập liệu tuần", "Khai thác thủy sản", "Nhật ký sản xuất", "Lịch tiêm (thực tế)"]], // BF-CN-CATCH #112, BF-CN-XA-DATA #175: đủ màn
+      ["Số liệu cấp xã", ["Nhập liệu tuần", "Khai thác thủy sản", "Nhật ký sản xuất", "Lịch tiêm (thực tế)", "Danh sách hộ chăn nuôi"]], // BF-CN-CATCH #112, BF-CN-XA-DATA #175: đủ màn; #251 FN-10 v4.0
       "Bản đồ vùng dịch",
       ["Dự án KNQG", ["Dự án, điểm trình diễn", "Mẫu biểu dự án"]], // W11.53: Mẫu 01–07 có màn
       "Quy trình, văn bản",
