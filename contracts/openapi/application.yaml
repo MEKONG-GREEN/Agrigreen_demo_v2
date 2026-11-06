@@ -17272,6 +17272,156 @@ paths:
               schema: {type: string, format: binary}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {description: "extension.cnts_bm11_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/livestock-households:
+    get:
+      summary: "Danh sách hộ chăn nuôi trong phạm vi (FN-10, UR-XA-04; Cấp Xã chỉ xã phụ trách — AC-06). Họ tên che bớt, SĐT che một phần"
+      operationId: extensionCntsLivestockHouseholdList
+      tags: [extension]
+      parameters:
+        - {name: commune, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [active, pending_location, deactivated]}}
+        - {name: livestock_type, in: query, required: false, schema: {type: string, enum: [nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep]}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200}}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0, maximum: 100000}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm hộ (H1–H3) — bắt buộc check-in tại nhà hộ (AC-05); trùng họ tên, ấp, xã → 409 trừ khi confirm_distinct. Cấp Xã (xã mình), cán bộ tổng hợp Cấp Tỉnh, Admin"
+      operationId: extensionCntsLivestockHouseholdCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdSave"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả bản đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/livestock-households/{ref}:
+    get:
+      summary: "Chi tiết hộ, vị trí check-in hiện hành, lịch sử thay đổi HCN-09 (họ tên/SĐT cũ → mới chỉ dạng che bớt)"
+      operationId: extensionCntsLivestockHouseholdGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Sửa thông tin hộ (H4, base_version) — không đổi vị trí; hộ đã vô hiệu hóa → 409"
+      operationId: extensionCntsLivestockHouseholdUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdSave"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/livestock-households/{ref}/checkin:
+    post:
+      summary: "Check-in tại nhà hộ: Chờ bổ sung vị trí → Đang dùng (BR-08); hộ Đang dùng → đổi vị trí, bắt buộc lý do (H4)"
+      operationId: extensionCntsLivestockHouseholdCheckin
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdCheckinRequest"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/livestock-households/{ref}/deactivate:
+    post:
+      summary: "Vô hiệu hóa hộ (BR-04) — chỉ cán bộ tổng hợp Cấp Tỉnh, Admin; bắt buộc lý do; không kích hoạt lại"
+      operationId: extensionCntsLivestockHouseholdDeactivate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSStatusChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -27975,3 +28125,13 @@ components:
         excel_rule: {type: string}
       required: [mode, rule, id, key, version, hash, definition, applicable_from, word_key, word_version, word_hash, excel_rule]
       additionalProperties: false
+    CNTSLivestockAnimal: {"type":"object","properties":{"species_code":{"type":"string"},"species_name":{"type":["string","null"]},"head_count":{"type":"integer"}},"required":["species_code","species_name","head_count"],"additionalProperties":false}
+    CNTSLivestockLocation: {"type":"object","properties":{"lat":{"type":"number"},"lon":{"type":"number"},"accuracy_m":{"type":"string"},"mocked":{"type":"boolean"},"captured_at":{"type":"string","format":"date-time"}},"required":["lat","lon","accuracy_m","mocked","captured_at"],"additionalProperties":false}
+    CNTSLivestockHousehold: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"code":{"type":"string"},"version":{"type":"integer"},"status":{"type":"string","enum":["active","pending_location","deactivated"]},"event":{"type":"string","enum":["created","created_pending","updated","checked_in","relocated","deactivated"]},"commune_code":{"type":"string"},"commune_name":{"type":["string","null"]},"hamlet":{"type":["string","null"]},"livestock_type":{"type":"string","enum":["nong_ho","trang_trai_nho","trang_trai_vua","trang_trai_cong_nghiep"]},"animals":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockAnimal"}},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSLivestockLocation"},{"type":"null"}]},"owner_label":{"type":["string","null"]},"owner_masked_phone":{"type":["string","null"]},"can_edit":{"type":"boolean"},"can_deactivate":{"type":"boolean"},"updated_at":{"type":"string","format":"date-time"},"reason":{"type":["string","null"]}},"required":["id","code","version","status","event","commune_code","commune_name","hamlet","livestock_type","animals","location","owner_label","owner_masked_phone","can_edit","can_deactivate","updated_at","reason"],"additionalProperties":false}
+    CNTSLivestockChange: {"type":"object","properties":{"field":{"type":"string","enum":["owner_name","owner_phone","commune_code","hamlet","animals","livestock_type","location","status"]},"old":{"type":"string"},"new":{"type":"string"}},"required":["field","old","new"],"additionalProperties":false}
+    CNTSLivestockHistory: {"type":"object","properties":{"version":{"type":"integer"},"event":{"type":"string","enum":["created","created_pending","updated","checked_in","relocated","deactivated"]},"actor_ref":{"type":"string","format":"uuid"},"actor_name":{"type":["string","null"]},"at":{"type":"string","format":"date-time"},"reason":{"type":["string","null"]},"changes":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockChange"}}},"required":["version","event","actor_ref","actor_name","at","reason","changes"],"additionalProperties":false}
+    CNTSLivestockHouseholdDetail: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"code":{"type":"string"},"version":{"type":"integer"},"status":{"type":"string","enum":["active","pending_location","deactivated"]},"event":{"type":"string","enum":["created","created_pending","updated","checked_in","relocated","deactivated"]},"commune_code":{"type":"string"},"commune_name":{"type":["string","null"]},"hamlet":{"type":["string","null"]},"livestock_type":{"type":"string","enum":["nong_ho","trang_trai_nho","trang_trai_vua","trang_trai_cong_nghiep"]},"animals":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockAnimal"}},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSLivestockLocation"},{"type":"null"}]},"owner_label":{"type":["string","null"]},"owner_masked_phone":{"type":["string","null"]},"can_edit":{"type":"boolean"},"can_deactivate":{"type":"boolean"},"updated_at":{"type":"string","format":"date-time"},"reason":{"type":["string","null"]},"owner_name":{"type":["string","null"]},"updated_by_name":{"type":["string","null"]},"warnings":{"type":"array","items":{"type":"string","enum":["gps_accuracy","mocked_location"]}},"history":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockHistory"}}},"required":["id","code","version","status","event","commune_code","commune_name","hamlet","livestock_type","animals","location","owner_label","owner_masked_phone","can_edit","can_deactivate","updated_at","reason","owner_name","updated_by_name","warnings","history"],"additionalProperties":false}
+    CNTSLivestockHouseholdList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockHousehold"}},"total":{"type":"integer"},"limit":{"type":"integer"},"offset":{"type":"integer"}},"required":["items","total","limit","offset"],"additionalProperties":false}
+    CNTSLivestockCheckin: {"type":"object","properties":{"lat":{"type":"number"},"lon":{"type":"number"},"accuracy_m":{"type":"string","pattern":"^[0-9]{1,8}(\\.[0-9]{1,2})?$"},"mocked":{"type":"boolean"},"captured_at":{"type":"string","format":"date-time"}},"required":["lat","lon","accuracy_m","mocked","captured_at"],"additionalProperties":false}
+    CNTSLivestockHouseholdSave: {"type":"object","properties":{"base_version":{"type":"integer"},"owner_name":{"type":"string","maxLength":200},"owner_phone":{"type":["string","null"],"pattern":"^[0-9]{0,15}$"},"commune_code":{"type":"string"},"hamlet":{"type":"string","maxLength":200},"livestock_type":{"type":"string","enum":["nong_ho","trang_trai_nho","trang_trai_vua","trang_trai_cong_nghiep"]},"animals":{"type":"array","minItems":1,"maxItems":30,"items":{"type":"object","properties":{"species_code":{"type":"string"},"head_count":{"type":"integer","minimum":0}},"required":["species_code","head_count"],"additionalProperties":false}},"checkin":{"$ref":"#/components/schemas/CNTSLivestockCheckin"},"confirm_distinct":{"type":"boolean"}},"required":["commune_code","livestock_type","animals"],"additionalProperties":false}
+    CNTSLivestockHouseholdCheckinRequest: {"type":"object","properties":{"base_version":{"type":"integer"},"checkin":{"$ref":"#/components/schemas/CNTSLivestockCheckin"},"reason":{"type":"string","maxLength":1000}},"required":["base_version","checkin"],"additionalProperties":false}

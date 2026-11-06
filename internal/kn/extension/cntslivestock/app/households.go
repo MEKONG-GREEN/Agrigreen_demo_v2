@@ -324,7 +324,7 @@ func (s *Service) Create(ctx context.Context, in Input) (View, error) {
 	}
 	cr, err := s.Vault.Create(ctx, client.PurposeContact, client.Identity{Kind: client.SubjectHousehold, FullName: name,
 		Phone: in.phone(), AreaCode: in.CommuneCode})
-	if err != nil && !(errors.Is(err, client.ErrDuplicate) && cr.Ref != uuid.Nil) {
+	if err != nil && (!errors.Is(err, client.ErrDuplicate) || cr.Ref == uuid.Nil) {
 		return View{}, err
 	}
 	ref, now := ids.New(), s.now()
