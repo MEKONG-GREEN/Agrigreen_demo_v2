@@ -2144,8 +2144,59 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Check-in tại địa điểm công tác (CNTS CV-07, W11.46) — một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8) */
+        /** Check-in tại địa điểm công tác (CNTS v4.0 CV-07) — bắt buộc ảnh chụp tại chỗ; một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8) */
         post: operations["extCheckinWorkScheduleItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/{id}/items/{item_id}/checkin/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ảnh check-in của mục (CNTS v4.0 CV-07, UR-TINH-18) — người đăng ký lịch và người duyệt được lịch */
+        get: operations["extWorkScheduleCheckinPhoto"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/{id}/items/{item_id}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check-out khi rời địa điểm công tác (CNTS v4.0 CV-08, FN-12 B4b) — sau check-in, bắt buộc ảnh; một mục một check-out, không sửa được; bản ngoại tuyến giữ thời điểm lúc bấm */
+        post: operations["extCheckoutWorkScheduleItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/work-schedules/{id}/items/{item_id}/checkout/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ảnh check-out của mục (CNTS v4.0 CV-08, UR-TINH-18) — người đăng ký lịch và người duyệt được lịch */
+        get: operations["extWorkScheduleCheckoutPhoto"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -14813,6 +14864,79 @@ export interface components {
                 lat: number;
                 lon: number;
             };
+            /** @description Ảnh tại chỗ (CNTS v4.0 CV-07) — tải ở GET …/items/{item_id}/checkin/photo; null = check-in cũ trước v4.0 */
+            photo: null | components["schemas"]["ExtWorkScheduleVisitPhoto"];
+            /** @description Dữ liệu cũ: check-in trước BRD CNTS v4.0, không ảnh — giữ nguyên, không bắt nhập bù */
+            legacy_no_photo: boolean;
+            /** @description Check-out của mục (CV-08); null = chưa check-out */
+            checkout: null | components["schemas"]["ExtWorkScheduleCheckout"];
+        };
+        ExtWorkScheduleCheckout: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            checkin_id: string;
+            /** Format: uuid */
+            item_id: string;
+            /** Format: date */
+            day: string;
+            /**
+             * Format: date-time
+             * @description Giờ thiết bị lúc bấm Check-out (AC-11: giữ khi đồng bộ muộn)
+             */
+            captured_at: string;
+            /**
+             * Format: date-time
+             * @description Thời điểm máy chủ nhận (đồng bộ)
+             */
+            recorded_at: string;
+            accuracy_m: number | null;
+            /** @description Khoảng cách tới địa điểm đã đăng ký (CV-06) */
+            distance_m: number | null;
+            /** @description Cách địa điểm quá ngưỡng (mặc định 500 m) — cảnh báo checkout_far */
+            far: boolean;
+            weak_accuracy: boolean;
+            mock_location: boolean;
+            point_stored: boolean;
+            /** @description Tọa độ — như check-in: chỉ người đăng ký và người duyệt thấy; null khi không lưu, quá hạn lưu hoặc phản hồi từ cache */
+            location: null | {
+                lat: number;
+                lon: number;
+            };
+            photo: components["schemas"]["ExtWorkScheduleVisitPhoto"];
+            /** @description Thời gian ở địa điểm = check-out − check-in, phút (BR-07, AC-12) */
+            stay_minutes: number;
+            /**
+             * Format: date-time
+             * @description Thời điểm máy chủ nhận bản check-out (đồng bộ)
+             */
+            synced_at: string;
+            /** @description Đồng bộ trễ: máy chủ nhận sau ngày công tác (giờ Việt Nam) — BR-08, AC-13 */
+            synced_late: boolean;
+        };
+        ExtWorkScheduleCheckoutResult: {
+            checkout: components["schemas"]["ExtWorkScheduleCheckout"];
+            warnings: components["schemas"]["ExtWorkScheduleWarning"][];
+        };
+        ExtWorkScheduleVisitInput: {
+            lat: number;
+            lon: number;
+            accuracy_m?: number | null;
+            /**
+             * Format: date-time
+             * @description Giờ thiết bị lúc bấm (bản ngoại tuyến gửi muộn tối đa 7 ngày, phải thuộc ngày công tác)
+             */
+            captured_at: string;
+            /** @description Thiết bị báo vị trí giả lập */
+            mock_location?: boolean;
+            device_id?: string | null;
+            /** @description Ảnh chụp tại chỗ đã nén (JPEG/PNG/WebP, ≤ 500 KB), base64 chuẩn — bắt buộc (FN-12, AC-09) */
+            photo: string;
+        };
+        ExtWorkScheduleVisitPhoto: {
+            /** @enum {string} */
+            content_type: "image/jpeg" | "image/png" | "image/webp";
+            size_bytes: number;
         };
         ExtWorkScheduleCheckinResult: {
             checkin: components["schemas"]["ExtWorkScheduleCheckin"];
@@ -15218,7 +15342,7 @@ export interface components {
         };
         ExtWorkScheduleWarning: {
             /** @enum {string} */
-            code: "time_overlap" | "late_registration" | "outside_week" | "checkin_far" | "checkin_no_place" | "checkin_weak_gps" | "checkin_mock_location" | "checkin_missed";
+            code: "time_overlap" | "late_registration" | "outside_week" | "checkin_far" | "checkin_no_place" | "checkin_weak_gps" | "checkin_mock_location" | "checkin_missed" | "checkout_far" | "checkout_weak_gps" | "checkout_mock_location";
             message: string;
             item_ids: string[];
         };
@@ -30819,19 +30943,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    lat: number;
-                    lon: number;
-                    accuracy_m?: number | null;
-                    /**
-                     * Format: date-time
-                     * @description Giờ thiết bị lúc bấm Check-in (bản ngoại tuyến gửi muộn tối đa 7 ngày)
-                     */
-                    captured_at: string;
-                    /** @description Thiết bị báo vị trí giả lập */
-                    mock_location?: boolean;
-                    device_id?: string | null;
-                };
+                "application/json": components["schemas"]["ExtWorkScheduleVisitInput"];
             };
         };
         responses: {
@@ -30857,8 +30969,112 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered | extension.checkin_not_approved */
             409: components["responses"]["Problem"];
-            /** @description validation_failed */
+            /** @description validation_failed (photo: thiếu ảnh, quá 500 KB, không phải JPEG/PNG/WebP) */
             422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable (chưa nối kho tệp) */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extWorkScheduleCheckinPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung ảnh */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.schedule_not_found | extension.visit_photo_not_found (check-in cũ không ảnh) */
+            404: components["responses"]["Problem"];
+        };
+    };
+    extCheckoutWorkScheduleItem: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtWorkScheduleVisitInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleCheckoutResult"];
+                };
+            };
+            /** @description Đã check-out */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtWorkScheduleCheckoutResult"];
+                };
+            };
+            /** @description extension.schedule_not_found | extension.schedule_item_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.checkout_no_checkin | extension.checkout_exists | extension.checkin_disabled | extension.checkin_not_registered | extension.checkin_not_approved */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed (photo; captured_at khác ngày công tác, trước check-in, gửi quá 7 ngày) */
+            422: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable (chưa nối kho tệp) */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extWorkScheduleCheckoutPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung ảnh */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                    "image/webp": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            /** @description extension.schedule_not_found | extension.visit_photo_not_found */
+            404: components["responses"]["Problem"];
         };
     };
     mechListOwners: {

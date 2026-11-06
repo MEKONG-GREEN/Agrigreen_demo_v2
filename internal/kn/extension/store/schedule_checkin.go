@@ -5,6 +5,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,6 +58,43 @@ type Checkin struct {
 	IdemKey      string
 	// Point: tọa độ còn trong hạn lưu (nil = không lưu hoặc đã xóa).
 	Point *domain.GeoPoint
+	// Photo: ảnh tại chỗ (BRD CNTS v4.0 CV-07). nil = dữ liệu cũ trước v4.0, không ảnh (giữ nguyên, không nhập bù).
+	Photo *VisitPhoto
+	// Checkout: check-out của mục (CV-08), nil = chưa check-out. Chỉ CheckinsOf gắn.
+	Checkout *Checkout
+}
+
+// VisitPhoto là ảnh check-in/check-out ở kho đối tượng (sổ chỉ giữ khóa, kiểu, cỡ, SHA-256).
+type VisitPhoto struct {
+	Key         string
+	ContentType string
+	Size        int
+	SHA256      string
+}
+
+// Checkout là một dòng sổ work_schedule_checkout (CNTS v4.0 CV-08) kèm tọa độ nếu bảng có hạn lưu còn giữ.
+type Checkout struct {
+	ID           uuid.UUID
+	ScheduleID   uuid.UUID
+	ItemID       uuid.UUID
+	ItemVersion  int
+	CheckinID    uuid.UUID
+	OwnerRef     uuid.UUID
+	Department   string
+	Day          time.Time
+	CapturedAt   time.Time
+	AccuracyM    *float64
+	DistanceM    *float64
+	Far          bool
+	WeakAccuracy bool
+	Mock         bool
+	PointStored  bool
+	DeviceID     *string
+	Photo        VisitPhoto
+	EventTime    time.Time // thời điểm máy chủ nhận bản check-out (đồng bộ) theo đồng hồ dịch vụ
+	RecordedAt   time.Time
+	IdemKey      string
+	Point        *domain.GeoPoint
 }
 
 // LockCheckinItem tuần tự hóa check-in của một mục.
@@ -65,28 +103,42 @@ func LockCheckinItem(ctx context.Context, tx pgx.Tx, item uuid.UUID) error {
 	return err
 }
 
-// InsertCheckin ghi sự việc check-in; point khác nil → ghi tọa độ vào bảng có hạn lưu tới purgeAfter.
+// InsertCheckin ghi sự việc check-in kèm ảnh (bắt buộc từ CNTS v4.0); point khác nil → ghi tọa độ vào bảng có hạn
+// lưu tới purgeAfter.
 func InsertCheckin(ctx context.Context, tx pgx.Tx, tid uuid.UUID, c Checkin, actor uuid.UUID, point *domain.GeoPoint, purgeAfter time.Time) error {
+	if c.Photo == nil {
+		return errors.New("store: check-in mới phải có ảnh (CNTS v4.0 CV-07)")
+	}
 	_, err := tx.Exec(ctx, `INSERT INTO pf_extension.work_schedule_checkin
 	    (id, tenant_id, stream_key, schedule_id, item_id, item_version, owner_ref, department_code, day, captured_at,
 	     accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, device_id, event_time, actor_ref, idem_key,
-	     rule_version)
-	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::date, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+	     rule_version, photo_key, photo_content_type, photo_size_bytes, photo_sha256)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::date, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+	    $24, $25)`,
 		c.ID, tid, "wcheckin:"+c.ItemID.String(), c.ScheduleID, c.ItemID, c.ItemVersion, c.OwnerRef, c.Department,
 		c.Day.Format(time.DateOnly), c.CapturedAt.UTC(), c.AccuracyM, c.DistanceM, c.Far, c.WeakAccuracy, c.Mock, point != nil,
-		c.DeviceID, c.EventTime.UTC(), actor, c.IdemKey, domain.RuleVersion)
-	if err != nil || point == nil {
+		c.DeviceID, c.EventTime.UTC(), actor, c.IdemKey, domain.RuleVersion, c.Photo.Key, c.Photo.ContentType, c.Photo.Size,
+		c.Photo.SHA256)
+	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO pf_extension.work_schedule_checkin_point (tenant_id, checkin_id, point, captured_at, purge_after)
+	return insertVisitPoint(ctx, tx, tid, c.ID, point, c.CapturedAt, purgeAfter)
+}
+
+// insertVisitPoint ghi tọa độ check-in/check-out (id của sự việc) vào bảng có hạn lưu; point nil → không ghi.
+func insertVisitPoint(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID, point *domain.GeoPoint, at, purgeAfter time.Time) error {
+	if point == nil {
+		return nil
+	}
+	_, err := tx.Exec(ctx, `INSERT INTO pf_extension.work_schedule_checkin_point (tenant_id, checkin_id, point, captured_at, purge_after)
 	  VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326), $5, $6::date)`,
-		tid, c.ID, point.Lon, point.Lat, c.CapturedAt.UTC(), purgeAfter.Format(time.DateOnly))
+		tid, id, point.Lon, point.Lat, at.UTC(), purgeAfter.Format(time.DateOnly))
 	return err
 }
 
 const checkinCols = `c.id, c.schedule_id, c.item_id, c.item_version, c.owner_ref, c.department_code, c.day, c.captured_at,
   c.accuracy_m::float8, c.distance_m::float8, c.far, c.weak_accuracy, c.mock_location, c.point_stored, c.device_id, c.event_time,
-  c.recorded_at, c.idem_key, ST_Y(p.point), ST_X(p.point)`
+  c.recorded_at, c.idem_key, ST_Y(p.point), ST_X(p.point), c.photo_key, c.photo_content_type, c.photo_size_bytes, c.photo_sha256`
 
 const checkinFrom = ` FROM pf_extension.work_schedule_checkin c
   LEFT JOIN pf_extension.work_schedule_checkin_point p ON p.tenant_id = c.tenant_id AND p.checkin_id = c.id`
@@ -97,14 +149,19 @@ func scanCheckins(rows pgx.Rows) ([]Checkin, error) {
 	for rows.Next() {
 		var c Checkin
 		var lat, lon *float64
+		var pKey, pType, pSHA *string
+		var pSize *int
 		if err := rows.Scan(&c.ID, &c.ScheduleID, &c.ItemID, &c.ItemVersion, &c.OwnerRef, &c.Department, &c.Day, &c.CapturedAt,
 			&c.AccuracyM, &c.DistanceM, &c.Far, &c.WeakAccuracy, &c.Mock, &c.PointStored, &c.DeviceID, &c.EventTime, &c.RecordedAt,
-			&c.IdemKey, &lat, &lon); err != nil {
+			&c.IdemKey, &lat, &lon, &pKey, &pType, &pSize, &pSHA); err != nil {
 			return nil, err
 		}
 		c.Day = dateUTC(c.Day)
 		if lat != nil && lon != nil {
 			c.Point = &domain.GeoPoint{Lat: *lat, Lon: *lon}
+		}
+		if pKey != nil && pType != nil && pSize != nil && pSHA != nil {
+			c.Photo = &VisitPhoto{Key: *pKey, ContentType: *pType, Size: *pSize, SHA256: *pSHA}
 		}
 		out = append(out, c)
 	}
@@ -137,7 +194,7 @@ func CheckinByIdem(ctx context.Context, tx pgx.Tx, key string) (*Checkin, error)
 	return &l[0], nil
 }
 
-// CheckinsOf trả check-in của các lịch, khóa theo item_id (mỗi mục một check-in).
+// CheckinsOf trả check-in của các lịch, khóa theo item_id (mỗi mục một check-in), kèm check-out của mục (nếu có).
 func CheckinsOf(ctx context.Context, tx pgx.Tx, schedules []uuid.UUID) (map[uuid.UUID]Checkin, error) {
 	out := map[uuid.UUID]Checkin{}
 	if len(schedules) == 0 {
@@ -149,12 +206,95 @@ func CheckinsOf(ctx context.Context, tx pgx.Tx, schedules []uuid.UUID) (map[uuid
 		return nil, err
 	}
 	l, err := scanCheckins(rows)
+	if err != nil {
+		return nil, err
+	}
 	for _, c := range l {
 		if _, ok := out[c.ItemID]; !ok {
 			out[c.ItemID] = c
 		}
 	}
+	rows, err = tx.Query(ctx, "SELECT "+checkoutCols+checkoutFrom+" WHERE o.schedule_id = ANY ($1::uuid[]) ORDER BY o.seq",
+		uuidStrings(schedules))
+	if err != nil {
+		return nil, err
+	}
+	outs, err := scanCheckouts(rows)
+	for i := range outs {
+		if c, ok := out[outs[i].ItemID]; ok && c.Checkout == nil {
+			c.Checkout = &outs[i]
+			out[c.ItemID] = c
+		}
+	}
 	return out, err
+}
+
+// InsertCheckout ghi sự việc check-out (CV-08); point khác nil → ghi tọa độ vào bảng có hạn lưu tới purgeAfter.
+func InsertCheckout(ctx context.Context, tx pgx.Tx, tid uuid.UUID, o Checkout, actor uuid.UUID, point *domain.GeoPoint, purgeAfter time.Time) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_extension.work_schedule_checkout
+	    (id, tenant_id, stream_key, schedule_id, item_id, item_version, checkin_id, owner_ref, department_code, day, captured_at,
+	     accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, device_id, photo_key, photo_content_type,
+	     photo_size_bytes, photo_sha256, event_time, actor_ref, idem_key, rule_version)
+	  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::date, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+	    $24, $25, $26)`,
+		o.ID, tid, "wcheckout:"+o.ItemID.String(), o.ScheduleID, o.ItemID, o.ItemVersion, o.CheckinID, o.OwnerRef, o.Department,
+		o.Day.Format(time.DateOnly), o.CapturedAt.UTC(), o.AccuracyM, o.DistanceM, o.Far, o.WeakAccuracy, o.Mock, point != nil,
+		o.DeviceID, o.Photo.Key, o.Photo.ContentType, o.Photo.Size, o.Photo.SHA256, o.EventTime.UTC(), actor, o.IdemKey,
+		domain.RuleVersion)
+	if err != nil {
+		return err
+	}
+	return insertVisitPoint(ctx, tx, tid, o.ID, point, o.CapturedAt, purgeAfter)
+}
+
+const checkoutCols = `o.id, o.schedule_id, o.item_id, o.item_version, o.checkin_id, o.owner_ref, o.department_code, o.day,
+  o.captured_at, o.accuracy_m::float8, o.distance_m::float8, o.far, o.weak_accuracy, o.mock_location, o.point_stored, o.device_id,
+  o.photo_key, o.photo_content_type, o.photo_size_bytes, o.photo_sha256, o.event_time, o.recorded_at, o.idem_key,
+  ST_Y(p.point), ST_X(p.point)`
+
+const checkoutFrom = ` FROM pf_extension.work_schedule_checkout o
+  LEFT JOIN pf_extension.work_schedule_checkin_point p ON p.tenant_id = o.tenant_id AND p.checkin_id = o.id`
+
+func scanCheckouts(rows pgx.Rows) ([]Checkout, error) {
+	defer rows.Close()
+	var out []Checkout
+	for rows.Next() {
+		var o Checkout
+		var lat, lon *float64
+		if err := rows.Scan(&o.ID, &o.ScheduleID, &o.ItemID, &o.ItemVersion, &o.CheckinID, &o.OwnerRef, &o.Department, &o.Day,
+			&o.CapturedAt, &o.AccuracyM, &o.DistanceM, &o.Far, &o.WeakAccuracy, &o.Mock, &o.PointStored, &o.DeviceID, &o.Photo.Key,
+			&o.Photo.ContentType, &o.Photo.Size, &o.Photo.SHA256, &o.EventTime, &o.RecordedAt, &o.IdemKey, &lat, &lon); err != nil {
+			return nil, err
+		}
+		o.Day = dateUTC(o.Day)
+		if lat != nil && lon != nil {
+			o.Point = &domain.GeoPoint{Lat: *lat, Lon: *lon}
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+func oneCheckout(ctx context.Context, tx pgx.Tx, where string, arg any) (*Checkout, error) {
+	rows, err := tx.Query(ctx, "SELECT "+checkoutCols+checkoutFrom+" WHERE "+where+" ORDER BY o.seq LIMIT 1", arg)
+	if err != nil {
+		return nil, err
+	}
+	l, err := scanCheckouts(rows)
+	if err != nil || len(l) == 0 {
+		return nil, err
+	}
+	return &l[0], nil
+}
+
+// CheckoutOfItem trả check-out của mục (nil = chưa có).
+func CheckoutOfItem(ctx context.Context, tx pgx.Tx, item uuid.UUID) (*Checkout, error) {
+	return oneCheckout(ctx, tx, "o.item_id = $1", item)
+}
+
+// CheckoutByIdem trả check-out đã ghi với khóa idem (gọi lặp).
+func CheckoutByIdem(ctx context.Context, tx pgx.Tx, key string) (*Checkout, error) {
+	return oneCheckout(ctx, tx, "o.idem_key = $1", key)
 }
 
 // PurgeCheckinPoints gọi pf_extension.purge_checkin_points: xóa một lô tọa độ check-in quá hạn lưu (purge_after < today)

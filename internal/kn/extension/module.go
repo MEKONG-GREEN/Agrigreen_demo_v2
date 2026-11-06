@@ -135,7 +135,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	db = forModule(db)
 	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
-		Plots: d.Plots, Coops: d.Coops,
+		Plots: d.Plots, Coops: d.Coops, Objects: d.Store,
 	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}, objects: d.Store}
 	// Tên người thao tác của sổ vật tư dùng chung danh bạ của vòng đời báo cáo (UseReportCycle nối sau).
 	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}

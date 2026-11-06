@@ -23,9 +23,10 @@ func (m *Module) khtcExtSvc() *extapp.Service {
 	return m.khtcExt
 }
 
-// UseObjectStore thay kho đối tượng của tệp minh chứng (kiểm thử tích hợp dùng kho cục bộ).
+// UseObjectStore thay kho đối tượng của tệp minh chứng KHTC và ảnh check-in/check-out (kiểm thử tích hợp dùng kho cục bộ).
 func (m *Module) UseObjectStore(s objstore.Store) {
 	m.objects = s
+	m.svc.Objects = s // CNTS-V4-CHECKOUT-PHOTO: ảnh check-in/check-out lịch công tác
 	if m.khtcExt != nil {
 		m.khtcExt.Store = s
 	}

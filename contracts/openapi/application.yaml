@@ -3029,7 +3029,7 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
   /v1/extension/work-schedules/{id}/items/{item_id}/checkin:
     post:
-      summary: Check-in tại địa điểm công tác (CNTS CV-07, W11.46) — một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8)
+      summary: Check-in tại địa điểm công tác (CNTS v4.0 CV-07) — bắt buộc ảnh chụp tại chỗ; một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8)
       operationId: extCheckinWorkScheduleItem
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -3041,14 +3041,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [lat, lon, captured_at]
-              properties:
-                lat: {type: number, minimum: 8, maximum: 24}
-                lon: {type: number, minimum: 102, maximum: 118}
-                accuracy_m: {type: [number, "null"], minimum: 0}
-                captured_at: {type: string, format: date-time, description: "Giờ thiết bị lúc bấm Check-in (bản ngoại tuyến gửi muộn tối đa 7 ngày)"}
-                mock_location: {type: boolean, description: "Thiết bị báo vị trí giả lập"}
-                device_id: {type: [string, "null"]}
+              $ref: "#/components/schemas/ExtWorkScheduleVisitInput"
       responses:
         "201":
           description: Đã check-in
@@ -3062,7 +3055,69 @@ paths:
               schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckinResult"}
         "404": {description: "extension.schedule_not_found | extension.schedule_item_not_found", $ref: "#/components/responses/Problem"}
         "409": {description: "extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered | extension.checkin_not_approved", $ref: "#/components/responses/Problem"}
-        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (photo: thiếu ảnh, quá 500 KB, không phải JPEG/PNG/WebP)", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable (chưa nối kho tệp)", $ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/items/{item_id}/checkin/photo:
+    get:
+      summary: Ảnh check-in của mục (CNTS v4.0 CV-07, UR-TINH-18) — người đăng ký lịch và người duyệt được lịch
+      operationId: extWorkScheduleCheckinPhoto
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung ảnh
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.schedule_not_found | extension.visit_photo_not_found (check-in cũ không ảnh)", $ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/items/{item_id}/checkout:
+    post:
+      summary: Check-out khi rời địa điểm công tác (CNTS v4.0 CV-08, FN-12 B4b) — sau check-in, bắt buộc ảnh; một mục một check-out, không sửa được; bản ngoại tuyến giữ thời điểm lúc bấm
+      operationId: extCheckoutWorkScheduleItem
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtWorkScheduleVisitInput"
+      responses:
+        "201":
+          description: Đã check-out
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckoutResult"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckoutResult"}
+        "404": {description: "extension.schedule_not_found | extension.schedule_item_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.checkout_no_checkin | extension.checkout_exists | extension.checkin_disabled | extension.checkin_not_registered | extension.checkin_not_approved", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (photo; captured_at khác ngày công tác, trước check-in, gửi quá 7 ngày)", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable (chưa nối kho tệp)", $ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/items/{item_id}/checkout/photo:
+    get:
+      summary: Ảnh check-out của mục (CNTS v4.0 CV-08, UR-TINH-18) — người đăng ký lịch và người duyệt được lịch
+      operationId: extWorkScheduleCheckoutPhoto
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung ảnh
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.schedule_not_found | extension.visit_photo_not_found", $ref: "#/components/responses/Problem"}
   # Số liệu cân đối/báo cáo/dashboard đọc KẾT QUẢ ĐÃ LƯU theo vụ (FN-10 BR-04), không tính lại.
 
   # Phạm vi không phải toàn vùng: danh sách máy/chủ sở hữu/diện tích phải lọc theo cooperative_ref trong phạm vi.
@@ -19328,7 +19383,7 @@ components:
         source: {type: string, enum: [map, gps]}
     ExtWorkScheduleCheckin:
       type: object
-      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location]
+      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, legacy_no_photo, checkout]
       properties:
         id: {type: string, format: uuid}
         item_id: {type: string, format: uuid}
@@ -19350,6 +19405,69 @@ components:
               properties:
                 lat: {type: number}
                 lon: {type: number}
+        photo:
+          description: "Ảnh tại chỗ (CNTS v4.0 CV-07) — tải ở GET …/items/{item_id}/checkin/photo; null = check-in cũ trước v4.0"
+          oneOf:
+            - type: "null"
+            - {$ref: "#/components/schemas/ExtWorkScheduleVisitPhoto"}
+        legacy_no_photo: {type: boolean, description: "Dữ liệu cũ: check-in trước BRD CNTS v4.0, không ảnh — giữ nguyên, không bắt nhập bù"}
+        checkout:
+          description: "Check-out của mục (CV-08); null = chưa check-out"
+          oneOf:
+            - type: "null"
+            - {$ref: "#/components/schemas/ExtWorkScheduleCheckout"}
+    ExtWorkScheduleCheckout:
+      type: object
+      required: [id, checkin_id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, stay_minutes, synced_at, synced_late]
+      properties:
+        id: {type: string, format: uuid}
+        checkin_id: {type: string, format: uuid}
+        item_id: {type: string, format: uuid}
+        day: {type: string, format: date}
+        captured_at: {type: string, format: date-time, description: "Giờ thiết bị lúc bấm Check-out (AC-11: giữ khi đồng bộ muộn)"}
+        recorded_at: {type: string, format: date-time, description: "Thời điểm máy chủ nhận (đồng bộ)"}
+        accuracy_m: {type: [number, "null"]}
+        distance_m: {type: [number, "null"], description: "Khoảng cách tới địa điểm đã đăng ký (CV-06)"}
+        far: {type: boolean, description: "Cách địa điểm quá ngưỡng (mặc định 500 m) — cảnh báo checkout_far"}
+        weak_accuracy: {type: boolean}
+        mock_location: {type: boolean}
+        point_stored: {type: boolean}
+        location:
+          description: "Tọa độ — như check-in: chỉ người đăng ký và người duyệt thấy; null khi không lưu, quá hạn lưu hoặc phản hồi từ cache"
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [lat, lon]
+              properties:
+                lat: {type: number}
+                lon: {type: number}
+        photo: {$ref: "#/components/schemas/ExtWorkScheduleVisitPhoto"}
+        stay_minutes: {type: integer, description: "Thời gian ở địa điểm = check-out − check-in, phút (BR-07, AC-12)"}
+        synced_at: {type: string, format: date-time, description: "Thời điểm máy chủ nhận bản check-out (đồng bộ)"}
+        synced_late: {type: boolean, description: "Đồng bộ trễ: máy chủ nhận sau ngày công tác (giờ Việt Nam) — BR-08, AC-13"}
+    ExtWorkScheduleCheckoutResult:
+      type: object
+      required: [checkout, warnings]
+      properties:
+        checkout: {$ref: "#/components/schemas/ExtWorkScheduleCheckout"}
+        warnings: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleWarning"}}
+    ExtWorkScheduleVisitInput:
+      type: object
+      required: [lat, lon, captured_at, photo]
+      properties:
+        lat: {type: number, minimum: 8, maximum: 24}
+        lon: {type: number, minimum: 102, maximum: 118}
+        accuracy_m: {type: [number, "null"], minimum: 0}
+        captured_at: {type: string, format: date-time, description: "Giờ thiết bị lúc bấm (bản ngoại tuyến gửi muộn tối đa 7 ngày, phải thuộc ngày công tác)"}
+        mock_location: {type: boolean, description: "Thiết bị báo vị trí giả lập"}
+        device_id: {type: [string, "null"]}
+        photo: {type: string, contentEncoding: base64, description: "Ảnh chụp tại chỗ đã nén (JPEG/PNG/WebP, ≤ 500 KB), base64 chuẩn — bắt buộc (FN-12, AC-09)"}
+    ExtWorkScheduleVisitPhoto:
+      type: object
+      required: [content_type, size_bytes]
+      properties:
+        content_type: {type: string, enum: [image/jpeg, image/png, image/webp]}
+        size_bytes: {type: integer, minimum: 1, maximum: 512000}
     ExtWorkScheduleCheckinResult:
       type: object
       required: [checkin, warnings]
@@ -19706,7 +19824,7 @@ components:
       type: object
       required: [code, message, item_ids]
       properties:
-        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed]}
+        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed, checkout_far, checkout_weak_gps, checkout_mock_location]}
         message: {type: string}
         item_ids: {type: array, items: {type: string, format: uuid}}
     ExtWorkScheduleVersion:
