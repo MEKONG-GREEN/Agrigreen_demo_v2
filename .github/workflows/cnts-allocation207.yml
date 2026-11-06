@@ -1,0 +1,74 @@
+name: CNTS allocation 207 controls
+
+on:
+  push:
+    branches: [codex/cnts207alloc]
+    paths:
+      - internal/kn/extension/cntsknqg/domain/**
+      - .github/workflows/cnts-allocation207.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnts-allocation207-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostics:
+    name: Linux allocation207 (${{ matrix.mode }}, procs=${{ matrix.procs }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [plain, race]
+        procs: [default, "2"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - name: Toolchain and fixed campaign configuration
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          go version
+          go env GOOS GOARCH CGO_ENABLED
+          gcc --version | head -n 1
+          printf 'mode=%s procs=%s\n' "$ALLOCATION_MODE207" "$ALLOCATION_PROCS207"
+      - name: Raw negative controls and all fixed samples
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
+          flags207=()
+          if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
+          go test "${flags207[@]}" -v -count=1 -timeout 5m -tags allocationdiagnostics207 ./internal/kn/extension/cntsknqg/domain -run '^TestAllocationDiagnostics207$'
+      - name: Allocation stack attribution outside the measurement window
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
+          flags207=()
+          if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
+          GODEBUG=memprofilerate=1 go test "${flags207[@]}" -v -count=1 -timeout 5m -tags allocationdiagnostics207 ./internal/kn/extension/cntsknqg/domain -run '^TestAllocationAttribution207$'
+      - name: Original byte guards and complete domain, unchanged budgets
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
+          flags207=()
+          if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
+          go test "${flags207[@]}" -v -count=1 -timeout 5m ./internal/kn/extension/cntsknqg/domain

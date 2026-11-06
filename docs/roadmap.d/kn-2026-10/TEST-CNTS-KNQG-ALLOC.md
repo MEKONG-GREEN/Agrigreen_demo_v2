@@ -1,0 +1,1 @@
+- [ ] **TEST-CNTS-KNQG-ALLOC**: chẩn đoán attribution TotalAlloc bằng control Linux plain/race; giữ byte budget 4/64/16 KiB và hostile cases, chứng minh cold/warm + mutant 1 MiB rồi đủ cổng/CI trước tích hợp. Probe chưa phải hoàn tất gói.
