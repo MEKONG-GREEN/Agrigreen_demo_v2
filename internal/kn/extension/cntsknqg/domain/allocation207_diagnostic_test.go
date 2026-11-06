@@ -12,6 +12,17 @@ import (
 	"testing"
 )
 
+// Retain the old process-wide counter as a diagnostic/control, never a
+// subtraction from the callback byte guard.
+func processAllocatedBytes207(f func()) uint64 {
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	f()
+	runtime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
+}
+
 type allocationSample207 struct {
 	Operation string
 	Iteration int
@@ -52,7 +63,7 @@ func TestAllocationDiagnostics207(t *testing.T) {
 	allocationMetadata207(t)
 	samples := make([]allocationSample207, 0, 288)
 	for i := 0; i < 32; i++ {
-		used := allocs(func() {})
+		used := processAllocatedBytes207(func() {})
 		samples = append(samples, allocationSample207{Operation: "empty", Iteration: i, Bytes: used})
 	}
 	inputs := []string{"1e-100000", "1e100000", "1E-999999999", "9e+2147483647", "+1e-2147483648", strings.Repeat("9", 100000), strings.Repeat("9", 23)}
@@ -60,7 +71,7 @@ func TestAllocationDiagnostics207(t *testing.T) {
 		for _, input := range inputs {
 			for i := 0; i < 16; i++ {
 				var reason string
-				used := allocs(func() { _, reason = cell(kind, nil, input) })
+				used := processAllocatedBytes207(func() { _, reason = cell(kind, nil, input) })
 				samples = append(samples, allocationSample207{Operation: "cell/" + kind, Iteration: i, Input: input, InputLen: len(input), Bytes: used, Reason: reason})
 				if reason == "" {
 					t.Fatalf("hostile input accepted: kind=%s length=%d", kind, len(input))
@@ -72,14 +83,14 @@ func TestAllocationDiagnostics207(t *testing.T) {
 	for i := 0; i < 16; i++ {
 		content := Content{Tables: map[string][]Row{"vat_tu": {{"ten": "Vật tư", "ke_hoach": "1e-100000", "da_cap": "1e100000"}}}}
 		var errs Errors
-		used := allocs(func() { errs = s.Normalize(&content) })
+		used := processAllocatedBytes207(func() { errs = s.Normalize(&content) })
 		samples = append(samples, allocationSample207{Operation: "normalize", Iteration: i, Bytes: used})
 		if len(errs) != 2 {
 			t.Fatalf("Normalize returned %d errors, want2", len(errs))
 		}
 		raw := Content{Tables: map[string][]Row{"vat_tu": {{"ten": "X", "ke_hoach": "1e-100000", "da_cap": "1e100000"}}}}
 		var warnings []string
-		used = allocs(func() { warnings = s.Warnings(raw) })
+		used = processAllocatedBytes207(func() { warnings = s.Warnings(raw) })
 		samples = append(samples, allocationSample207{Operation: "warnings", Iteration: i, Bytes: used})
 		if len(warnings) != 0 {
 			t.Fatalf("Warnings returned %d entries, want0", len(warnings))
@@ -136,10 +147,10 @@ func TestAllocationAttribution207(t *testing.T) {
 	samples := make([]allocationSample207, 0, 64)
 	before := profileSnapshot207()
 	for i := 0; i < 32; i++ {
-		used := allocs(func() {})
+		used := processAllocatedBytes207(func() {})
 		samples = append(samples, allocationSample207{Operation: "profile/empty", Iteration: i, Bytes: used})
 		var reason string
-		used = allocs(func() { _, reason = cell(KindNumber, nil, "1E-999999999") })
+		used = processAllocatedBytes207(func() { _, reason = cell(KindNumber, nil, "1E-999999999") })
 		samples = append(samples, allocationSample207{Operation: "profile/cell", Iteration: i, Input: "1E-999999999", InputLen: len("1E-999999999"), Bytes: used, Reason: reason})
 		if reason == "" {
 			t.Fatal("hostile input accepted")
