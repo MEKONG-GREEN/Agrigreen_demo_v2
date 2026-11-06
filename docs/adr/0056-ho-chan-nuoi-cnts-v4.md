@@ -63,7 +63,7 @@ Lý do tách: hộ mô hình (`cnts_model_household`) gắn điểm trình diễ
 
 ### 5. Vị trí HCN-07: bảng thường, chỉ lấy khi check-in
 
-- Bảng thường `pf_extension.cnts_livestock_household_checkin (id uuid PK, tenant_id, household_ref, location geometry(Point,4326) NOT NULL, gps_accuracy_m numeric(10,2), mocked boolean, captured_at timestamptz, recorded_at, actor_ref, reason text NULL)` — mỗi lần check-in một dòng; ứng dụng chỉ `INSERT`; `DELETE` chỉ khi có yêu cầu xóa dữ liệu cá nhân (vị trí nông hộ là dữ liệu cá nhân — BRD Mục I; QĐ-8 như `cnts_model_point`). Vị trí hiện hành = dòng mà `checkin_ref` của phiên bản hiện hành trỏ tới.
+- Bảng thường `pf_extension.cnts_livestock_household_checkin (id uuid PK, tenant_id, household_ref, location geometry(Point,4326) NOT NULL, gps_accuracy_m numeric(10,2), mocked boolean, captured_at timestamptz, recorded_at, actor_ref, reason text NULL)` — RLS tenant, `r_extension`: `SELECT, INSERT, DELETE`; mỗi lần check-in một dòng; ứng dụng chỉ `INSERT`; `DELETE` chỉ khi có yêu cầu xóa dữ liệu cá nhân (vị trí nông hộ là dữ liệu cá nhân — BRD Mục I; QĐ-8 như `cnts_model_point`). Vị trí hiện hành = dòng mà `checkin_ref` của phiên bản hiện hành trỏ tới.
 - Không có API nhập tọa độ tay (BR-03). Thêm hộ từ danh sách phải kèm check-in trong cùng yêu cầu, thiếu → `422` (AC-05). Không có GPS → không check-in. Sai số > 50 m → cảnh báo theo ngưỡng "Sai số GPS" (FN-13), vẫn lưu. Vị trí giả lập → `mocked = true`, cảnh báo.
 - Đổi vị trí (H4): check-in mới + `reason` → phiên bản `relocated`. Hộ `pending_location`: cán bộ xã phụ trách check-in → phiên bản `checked_in`, trạng thái `active`.
 
