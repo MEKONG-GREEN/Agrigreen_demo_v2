@@ -134,7 +134,11 @@ func (c *ExportFilterCodec) Freeze(_ context.Context, r repport.SourceFreezeRequ
 	if err = c.normalize(&f, !supplied); err != nil {
 		return nil, err
 	}
-	return json.Marshal(f)
+	frozen, err := json.Marshal(f)
+	if err != nil || len(frozen) > maxExportArgs {
+		return nil, badExportFilter()
+	}
+	return frozen, nil
 }
 
 func (c *ExportFilterCodec) normalize(f *FrozenExportFilter, defaultSources bool) error {

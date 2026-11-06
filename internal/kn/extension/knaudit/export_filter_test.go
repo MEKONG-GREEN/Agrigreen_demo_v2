@@ -78,6 +78,7 @@ func TestExportFilterStrictBounds83(t *testing.T) {
 	base := `"from":"2026-11-01T00:00:00Z","to":"2026-11-07T00:00:00Z"`
 	cases := []string{
 		`null`, `[]`, `{}`, `{` + base + `,"from":"2026-11-02T00:00:00Z"}`,
+		`{` + base + `,"\u0066rom":"2026-11-02T00:00:00Z"}`,
 		`{` + base + `,"From":"2026-11-01T00:00:00Z"}`,
 		`{` + base + `,"as_of":"2026-11-07T00:00:00Z"}`,
 		`{` + base + `,"tenant_id":"` + ids.New().String() + `"}`,
@@ -92,6 +93,7 @@ func TestExportFilterStrictBounds83(t *testing.T) {
 		`{` + base + `,"module":"kn.report","sources":["kn.producer"]}`,
 		`{` + base + `,"sources":[{"value":"kn.producer","value":"kn.review_event"}]}`,
 		`{"from":"2026-01-01T00:00:00Z","to":"2026-04-05T00:00:00Z"}`,
+		`{"from":"2026-01-01T00:00:00Z","to":"2026-04-04T00:00:00.000001Z"}`,
 		`{"from":"2026-11-07T00:00:00Z","to":"2026-11-01T00:00:00Z"}`,
 		`{` + base + `} {}`, `{` + base + `,"from":1e100000}`, `{` + base + `,"from":1e-100000}`,
 		`{` + base + `,"actor_ref":"` + strings.Repeat("1", 100000) + `"}`,
@@ -107,6 +109,49 @@ func TestExportFilterStrictBounds83(t *testing.T) {
 	r.SourceArgs = json.RawMessage(`{"from":"2026-01-01T00:00:00Z","to":"2026-04-04T00:00:00Z"}`)
 	if _, err := c.Freeze(context.Background(), r); err != nil {
 		t.Fatalf("exact 93-day interval rejected: %v", err)
+	}
+}
+
+func TestExportFilterSnapshotSchema83(t *testing.T) {
+	c := exportCodec83(t)
+	r := freezeRequest83()
+	raw, err := c.Freeze(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := c.Decode(access83(r, raw))
+	if err != nil || len(f.Sources) != 6 {
+		t.Fatalf("default registry sources: %v", err)
+	}
+	for i := 1; i < len(f.Sources); i++ {
+		if f.Sources[i-1] >= f.Sources[i] {
+			t.Fatal("default sources are not unique and canonical")
+		}
+	}
+	for _, field := range []string{"version", "source", "template_key", "format", "tenant_id", "job_id", "requested_by", "as_of", "from", "to", "actor_ref", "sources"} {
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &object); err != nil {
+			t.Fatal(err)
+		}
+		delete(object, field)
+		bad, err := json.Marshal(object)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = c.Decode(access83(r, bad)); err == nil {
+			t.Errorf("missing metadata/filter field %s accepted", field)
+		}
+	}
+	for i, bad := range []json.RawMessage{
+		append(bytes.Clone(raw), []byte(` {}`)...),
+		append(bytes.Clone(raw[:len(raw)-1]), []byte(`,"payload":"private-marker"}`)...),
+		bytes.ReplaceAll(raw, []byte(`"version":1`), []byte(`"version":null`)),
+		bytes.ReplaceAll(raw, []byte(`"version":1`), []byte(`"version":2`)),
+		bytes.ReplaceAll(raw, []byte(`"version":1`), []byte(`"version":"1"`)),
+	} {
+		if _, err := c.Decode(access83(r, bad)); err == nil || strings.Contains(err.Error(), "private-marker") {
+			t.Errorf("malformed snapshot %d accepted or disclosed payload: %v", i, err)
+		}
 	}
 }
 
