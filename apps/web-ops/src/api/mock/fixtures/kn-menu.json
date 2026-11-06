@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -2086,7 +2086,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -2284,7 +2284,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -2385,7 +2385,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -2469,6 +2469,15 @@
         "route": "/kn/khtc/ky-bao-cao",
         "icon": "task",
         "badge_source": "extension.khtc_periods.open",
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.khtc.phieu_cho_ra_soat",
+        "label": "Phiếu số liệu các phòng",
+        "route": "/kn/khtc/phieu-cho-ra-soat",
+        "icon": "task",
+        "badge_source": null,
         "enabled": true,
         "children": []
        },
@@ -2630,7 +2639,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -2732,7 +2741,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -2860,7 +2869,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -3171,7 +3180,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -3342,7 +3351,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -3434,7 +3443,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -3736,7 +3745,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -3862,7 +3871,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   },
@@ -4664,7 +4673,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v14",
+    "menu_version": "kn.menu/v15",
     "org_ref": null
    }
   }
@@ -4707,5 +4716,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v14"
+ "menu_version": "kn.menu/v15"
 }

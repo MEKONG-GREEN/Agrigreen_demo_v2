@@ -15,7 +15,7 @@ export function KhtcPendingInboxScreen() {
   const pathname = usePathname();
   const context = auth.kn?.context;
   const expiresAt = Date.parse(context?.expires_at ?? "");
-  if (!pathname || auth.status !== "authenticated" || !auth.principal || auth.kn?.status !== "active" || !context || !auth.api || !Number.isFinite(expiresAt) || expiresAt <= Date.now())
+  if (!pathname || auth.status !== "authenticated" || !auth.principal || auth.kn?.status !== "active" || !context || !auth.api || !Number.isFinite(expiresAt))
     return <p role="alert">Chọn ngữ cảnh làm việc còn hiệu lực để xem hộp phiếu.</p>;
   const identity = JSON.stringify([pathname, auth.status, auth.principal, auth.kn.status, context, auth.kn.assignments, auth.kn.support, auth.scopeWarning]);
   return <ApiBoundary key={identity} api={auth.api} expiresAt={expiresAt} />;

@@ -87,6 +87,13 @@ describe("Hộp phiếu chờ native243", () => {
     await act(async()=>{await vi.advanceTimersByTimeAsync(101);});
     expect(screen.queryByText("Tuần đã gửi")).not.toBeInTheDocument();expect(screen.getByRole("alert")).toHaveTextContent("Ngữ cảnh đã hết hạn");
   });
+  it("does not request native data for an already expired session",async()=>{
+    auth.kn.context.expires_at="2026-10-13T02:59:59Z";
+    let calls=0;auth.api=makeApi(async()=>{calls++;return Response.json(page());});
+    render(<KhtcPendingInboxScreen/>);
+    expect(screen.getByRole("alert")).toHaveTextContent("Ngữ cảnh đã hết hạn");
+    expect(calls).toBe(0);expect(screen.queryByText("Tuần đã gửi")).not.toBeInTheDocument();
+  });
   it("rejects malformed, duplicated, unsafe or non-progressing native page facts",async()=>{
     for(const invalid of [{rows:null,next_cursor:null},{rows:[],next_cursor:ids.period},{rows:[row(),row()],next_cursor:null},
       {rows:[{...row(),attempt:1e100}],next_cursor:null},{rows:[{...row(),submission_id:"wrong"}],next_cursor:null},{rows:[{...row(),submitted_at:"invalid"}],next_cursor:null}]){
