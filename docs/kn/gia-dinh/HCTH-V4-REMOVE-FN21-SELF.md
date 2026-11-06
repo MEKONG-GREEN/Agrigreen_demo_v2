@@ -24,7 +24,7 @@ SHA256 bản DOCX: `A2201810F6BCD4DC7E6993D5F36A8618BEA7DCB9F02E98076AAC5B016E32
 Từ worktree, đặt toolchain theo `go.mod`, rồi chạy migration bằng quy trình môi trường hiện hữu. Kiểm DB riêng:
 
 ```powershell
-.\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./internal/kn/hrm/... ./internal/kn/extension/menu/... ./internal/platform/party/...
+.\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./tests/hc30 ./internal/kn/hrm/... ./internal/kn/extension/menu/... ./internal/platform/party/...
 ```
 
 Web:

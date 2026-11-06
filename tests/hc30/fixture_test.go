@@ -20,6 +20,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 	"github.com/gin-gonic/gin"
@@ -75,12 +76,19 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mod.UseRecords(clienttest.New(), unitsStub{{Code: "trong_trot", Name: "Phòng Trồng trọt", Active: true}, {Code: "chan_nuoi", Name: "Phòng Chăn nuôi", Active: true}, {Code: "hcth", Name: "HCTH", Active: true}}, true)
+	vault := clienttest.New()
+	mod.UseRecords(vault, unitsStub{{Code: "trong_trot", Name: "Phòng Trồng trọt", Active: true}, {Code: "chan_nuoi", Name: "Phòng Chăn nuôi", Active: true}, {Code: "hcth", Name: "HCTH", Active: true}}, true)
 	f.add("admin", "admin", "hcth", false, f.tenant)
 	f.add("hcth", "kn_tinh", "hcth", false, f.tenant)
 	f.add("ld_tt", "kn_tinh", "trong_trot", true, f.tenant)
 	f.add("ld_cn", "kn_tinh", "chan_nuoi", true, f.tenant)
 	f.add("other", "admin", "hcth", false, ids.New())
+	mod.UseDocs(&proofFiles{vault: vault, res: mod.FileResolver(), files: map[uuid.UUID]proofFile{}})
+	for _, name := range []string{"admin", "hcth", "ld_tt", "ld_cn"} {
+		p := f.who[name]
+		p.Roles = append(p.Roles, client.RoleRegistrar, client.RoleEvidenceViewer)
+		f.who[name] = p
+	}
 	gin.SetMode(gin.TestMode)
 	f.r = gin.New()
 	f.r.Use(func(c *gin.Context) {

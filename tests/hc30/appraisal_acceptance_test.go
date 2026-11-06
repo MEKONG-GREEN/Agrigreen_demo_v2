@@ -10,10 +10,11 @@ import (
 	"time"
 )
 
-// H11/FN-16 AC-01: a frozen QIII cohort of 470 MS05 (including one commune officer)
-// and 24 MS06; 500 submission attempts = 494 first submissions plus six safe retries.
-func TestHCTHQuarterCohort_W1131(t *testing.T)      { runCohort(t, 494) }
-func TestHCTH500DailySubmitters_W1131(t *testing.T) { runCohort(t, 500) }
+// HC-0 retains frozen cohort/idempotency coverage while removing personal submissions.
+// Managers enter assigned MS05 records and HCTH enters MS06 using verified scans.
+// These are sequential in-process HTTP attempts, not a concurrency or deployed-load claim.
+func TestHCTHQuarterCohort_HC0(t *testing.T)            { runCohort(t, 494) }
+func TestHCTH500ManagementSubmissions_HC0(t *testing.T) { runCohort(t, 500) }
 func runCohort(t *testing.T, count int) {
 	f := newFixture(t)
 	staff := make([]string, count)
@@ -83,11 +84,11 @@ func runCohort(t *testing.T, count int) {
 			t.Fatalf("missing member %s", id)
 		}
 	}
-	// HS-37: the commune officer is visible to its managing unit, not another unit.
+	// FN-16 BR-04: the managing unit sees assigned staff, including the commune officer.
 	for _, tc := range []struct {
 		as string
 		n  int
-	}{{"ld_tt", count - 24}, {"person-000", 1}} {
+	}{{"ld_tt", count - 24}, {"hcth", count}} {
 		v := f.call(tc.as, http.MethodGet, base+"/entries", "", nil, http.StatusOK)
 		if len(v["items"].([]any)) != tc.n {
 			t.Fatalf("scope %s: got%d want%d", tc.as, len(v["items"].([]any)), tc.n)
@@ -95,7 +96,10 @@ func runCohort(t *testing.T, count int) {
 	}
 	f.call("ld_cn", http.MethodGet, base+"/entries", "", nil, http.StatusNotFound)
 	f.call("other", http.MethodGet, base+"/entries", "", nil, http.StatusNotFound)
-	f.call("person-000", http.MethodGet, base+"/entries/"+staff[1], "", nil, http.StatusNotFound)
+	for _, who := range []string{"person-000", "person-001"} {
+		f.call(who, http.MethodGet, base+"/entries", "", nil, http.StatusForbidden)
+		f.call(who, http.MethodGet, base+"/entries/"+staff[0], "", nil, http.StatusForbidden)
+	}
 	// Late staffing changes do not mutate the frozen cohort or the 470/24 split.
 	f.call("hcth", http.MethodPost, "/v1/hrm/staff", "", newStaff("vien_chuc", "Người Ngoài Đợt", "0999000001", ev("unit", "2020-01-01", map[string]any{"unit": "trong_trot"}), ev("position", "2020-01-01", map[string]any{"position": "vien_chuc"})), http.StatusCreated)
 	answers := []answerInput{}
@@ -106,14 +110,27 @@ func runCohort(t *testing.T, count int) {
 		}
 		answers = append(answers, answerInput{Code: fmt.Sprintf("tc_%d", j), Points: points, Note: "Hoàn thành nhiệm vụ"})
 	}
-	change := entryInput{Action: "self_submit", Version: 1, Answers: answers, Reason: "Căn cứ kết quả nhiệm vụ được giao"}
+	change := entryInput{Action: "proxy_self", Version: 1, Answers: answers, Reason: "Lãnh đạo nhập thay từ bản giấy đã đối chiếu"}
+	ms05Proof := f.appraisalProof("trong_trot", staff[:count-24])
+	ms06Proof := f.appraisalProof("hcth", staff[count-24:])
+	for _, who := range []string{"person-000", "person-001"} {
+		f.call(who, http.MethodPost, base+"/entries/"+staff[0], "removed-personal-submit", entryInput{Action: "self_submit", Version: 1, Answers: answers}, http.StatusForbidden)
+	}
+	f.call("hcth", http.MethodPost, base+"/entries/"+staff[0], "removed-management-self", entryInput{Action: "self_submit", Version: 1, Answers: answers}, http.StatusUnprocessableEntity)
+	change.ProxyDocument = &ms06Proof
+	f.call("ld_tt", http.MethodPost, base+"/entries/"+staff[0], "wrong-proof-unit", change, http.StatusNotFound)
 	submitted := make([]string, count)
 	start = time.Now()
 	slowest := time.Duration(0)
 	for i := range 500 {
 		idx := i % count
 		before := time.Now()
-		v := f.call(fmt.Sprintf("person-%03d", idx), http.MethodPost, base+"/entries/"+staff[idx], fmt.Sprintf("submit-%03d", idx), change, http.StatusCreated)
+		actor := "ld_tt"
+		change.ProxyDocument = &ms05Proof
+		if idx >= count-24 {
+			actor, change.ProxyDocument = "hcth", &ms06Proof
+		}
+		v := f.call(actor, http.MethodPost, base+"/entries/"+staff[idx], fmt.Sprintf("submit-%03d", idx), change, http.StatusCreated)
 		if elapsed := time.Since(before); elapsed > slowest {
 			slowest = elapsed
 		}
@@ -126,7 +143,7 @@ func runCohort(t *testing.T, count int) {
 			t.Fatal("retry appended a version")
 		}
 	}
-	t.Logf("500 sequential HTTP submission attempts, %d distinct people, %d retries: total=%s slowest=%s", count, 500-count, time.Since(start), slowest)
+	t.Logf("500 sequential management HTTP attempts, %d assigned records, %d retries: total=%s slowest=%s", count, 500-count, time.Since(start), slowest)
 	entries = f.call("hcth", http.MethodGet, base+"/entries", "", nil, http.StatusOK)["items"].([]any)
 	if len(entries) != count {
 		t.Fatalf("frozen cohort changed: %d", len(entries))

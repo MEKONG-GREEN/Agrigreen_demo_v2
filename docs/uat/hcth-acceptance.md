@@ -13,6 +13,7 @@ Phần dưới chỉ ghi các tiêu chí HC-0 (#256) chạm tới; không chứn
 | FN-21 cũ bị bỏ | Không còn route/handler/service/contract guest-link HCTH; POST đường cũ trả404 | `TestHRMRemovedSelfHTTPHC0`; mock regression |
 | FN-21 cũ; tự đánh giá bị bỏ | Không còn trang `/kn/nhan-su/danh-gia-cua-toi` hoặc hai trang con, menu và alias; cả ba URL trả404 và giữ nguyên URL | E2E HC-0; shell test từ chối cả menu cũ đã cache |
 | Bảo toàn dữ liệu | Migration không thay event/payload/hash cũ; đọc được self_rating/điểm cũ; INSERT self_draft/self_submit bị DB từ chối SQLSTATE42501 | `TestHRMRemovedSelfMigrationPreservesHistoryHC0`, `TestHRMRemovedSelfHTTPHC0`: đếm + chuỗi băm trước/sau |
+| Hồi quy cohort/idempotency HC-0 | 494 hồ sơ (470 MS05/24 MS06), hoặc 500 hồ sơ, vẫn đóng băng; 500 lần nhập thay tuần tự do lãnh đạo/HCTH từ scan đúng quyền; cá nhân/Xã không được tự đọc/nhập | `tests/hc30`: `TestHCTHQuarterCohort_HC0`, `TestHCTH500ManagementSubmissions_HC0`; không phải chứng nhận tải đồng thời/toàn FN |
 | Giao diện còn dùng | HCTH giữ mẫu đóng băng/lịch sử và gửi manager_submit; không có nút/action tự nộp; mock không giả chứng từ | `appraisal.test.tsx`; E2E luồng HCTH hiện có |
 
 ### Phần chưa thuộc nghiệm thu HC-0
@@ -25,7 +26,7 @@ Các FN khác (nâng lương, biểu NB, quyết định, hồ sơ) có tiêu ch
 ### Chạy lại
 
 ```powershell
-.\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./internal/kn/hrm/...
+.\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./tests/hc30 ./internal/kn/hrm/...
 cd apps/web-ops
 npm ci
 npm run check:api

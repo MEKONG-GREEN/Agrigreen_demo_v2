@@ -41,10 +41,11 @@ type answerInput struct {
 	Note   string `json:"note"`
 }
 type entryInput struct {
-	Action  string        `json:"action"`
-	Version int           `json:"version"`
-	Answers []answerInput `json:"answers"`
-	Reason  string        `json:"reason"`
+	Action        string        `json:"action"`
+	Version       int           `json:"version"`
+	Answers       []answerInput `json:"answers"`
+	Reason        string        `json:"reason"`
+	ProxyDocument *uuid.UUID    `json:"proxy_document,omitempty"`
 }
 
 func summaryTemplate(kind string) map[string]any {
