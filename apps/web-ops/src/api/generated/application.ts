@@ -12081,10 +12081,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS; chỉ Cấp Tỉnh CNTS và Admin */
+        /** Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS và các biểu điều tra; chỉ Cấp Tỉnh CNTS và Admin */
         get: operations["extCntsFormDesigns"];
         put?: never;
-        post?: never;
+        /** #192 FN-07: tạo biểu điều tra mới (phiên bản 1) hoặc sao chép biểu có sẵn; cán bộ tổng hợp Cấp Tỉnh CNTS hoặc Admin */
+        post: operations["extCntsFormDesignCreate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -12137,6 +12138,29 @@ export interface paths {
         put?: never;
         /** W11.53 FN-19 B2: lập biểu từ chi tiết dự án KNQG, số liệu điền sẵn (Mẫu 05: thực tế từ nhật ký đã xác thực). Mẫu 01 mỗi dự án × tháng, Mẫu 07 mỗi dự án × năm, Mẫu 05 mỗi điểm một bản hiệu lực */
         post: operations["extensionCntsKnqgCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/form-designs/{code}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        /** #192 FN-07: lịch sử phiên bản của biểu (mới trước); chỉ Cấp Tỉnh CNTS và Admin */
+        get: operations["extCntsFormDesignVersions"];
+        put?: never;
+        /**
+         * #192 FN-07 B1–B2: lưu cấu trúc thành phiên bản mới; mẫu KNQG từ chối (BR-02); chỉ thêm chỉ tiêu (UR-TINH-07)
+         * @description Kỳ đã phát hành giữ phiên bản cũ (BR-01, AC-03). base_version là phiên bản đã đọc; người khác lưu trước → 409.
+         */
+        post: operations["extCntsFormDesignSave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -23286,7 +23310,16 @@ export interface components {
             code: string;
             bm: string;
             title: string;
+            /**
+             * @description report = biểu kỳ của phòng; survey = biểu điều tra (FN-21)
+             * @enum {string}
+             */
+            kind: "report" | "survey";
             period_type: string;
+            /** @description Mẫu cố định theo TTKN Quốc gia — không sửa cấu trúc (FN-07 BR-02) */
+            locked: boolean;
+            /** @description Phiên hiện tại được lưu phiên bản mới cho biểu này */
+            can_edit: boolean;
             due: string;
             /** Format: uuid */
             template_id: string | null;
@@ -23301,6 +23334,33 @@ export interface components {
                 field: string;
                 message: string;
             }[];
+        };
+        CNTSDesignVersion: {
+            /** Format: uuid */
+            template_id: string;
+            version: number;
+            title: string;
+            fields: components["schemas"]["FormsField"][];
+        };
+        CNTSDesignSaved: {
+            code: string;
+            version: components["schemas"]["CNTSDesignVersion"];
+        };
+        CNTSDesignSaveInput: {
+            /** @description Phiên bản đã đọc (0 khi biểu chưa có phiên bản) */
+            base_version: number;
+            title: string;
+            fields: components["schemas"]["FormsField"][];
+        };
+        CNTSDesignCreateInput: {
+            /** @description Mã biểu = CNTS-DT-<hậu tố in hoa> */
+            code_suffix: string;
+            title: string;
+            /** @description Sao chép từ biểu này (bỏ trống = tạo từ fields, vd kết quả kiểm Excel hợp lệ) */
+            source_code?: string;
+            /** @description 0 hoặc bỏ trống = phiên bản mới nhất của biểu nguồn */
+            source_version?: number;
+            fields?: components["schemas"]["FormsField"][];
         };
         KHTCReportSupplement: {
             /** Format: uuid */
@@ -24425,6 +24485,8 @@ export interface components {
             /** @enum {string} */
             field: "chan_nuoi" | "thu_y" | "thuy_san" | "khac";
             template_code: string;
+            /** @description #192 FN-21 B1: phiên bản biểu điều tra đã chọn (FN-07); bỏ trống = mới nhất lúc phát hành */
+            template_version?: number | null;
             /** @enum {string} */
             scope_mode: "province" | "regions" | "communes";
             regions?: string[];
@@ -24606,6 +24668,7 @@ export interface components {
             /** Format: uuid */
             forms_period_id: string | null;
             period_key: string | null;
+            /** @description Phiên bản biểu đã phát hành; Nháp: phiên bản đã chọn (null = mới nhất lúc phát hành) */
             template_version: number | null;
             progress: components["schemas"]["CNTSCampaignProgress"] | null;
             events: components["schemas"]["CNTSCampaignEvent"][];
@@ -52294,6 +52357,37 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extCntsFormDesignCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDesignCreateInput"];
+            };
+        };
+        responses: {
+            /** @description Mã biểu CNTS-DT-<hậu tố> và phiên bản 1 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDesignSaved"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsKnqgSpecs: {
         parameters: {
             query?: never;
@@ -52412,6 +52506,71 @@ export interface operations {
             409: components["responses"]["Problem"];
             /** @description extension.cnts_knqg_invalid | extension.cnts_knqg_project_kind */
             422: components["responses"]["Problem"];
+        };
+    };
+    extCntsFormDesignVersions: {
+        parameters: {
+            query?: {
+                /** @description 0 hoặc bỏ trống = mới nhất; trang sau dùng phiên bản cuối trang */
+                before_version?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Phiên bản giảm dần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSDesignVersion"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extCntsFormDesignSave: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSDesignSaveInput"];
+            };
+        };
+        responses: {
+            /** @description Phiên bản mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSDesignSaved"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     extensionCntsKnqgGet: {

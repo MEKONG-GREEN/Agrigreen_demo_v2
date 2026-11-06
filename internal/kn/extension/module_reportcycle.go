@@ -59,6 +59,12 @@ func (m *Module) CNTSValidator() formsport.Validator { return rcapp.CNTSValidato
 // đó xác thực / yêu cầu điều chỉnh bài nộp.
 func (m *Module) CNTSReviewGuard() formsport.ReviewGuard { return rcapp.CNTSReviewGuard{Svc: m.rc} }
 
+// CNTSDefinitionPolicy (BF-CN-FORM-DESIGN-EDIT #192, FN-07 BR-02, UR-TINH-07) cho profile kn_cnts của cap/forms (cổng #191,
+// Profile.RequireDefinitionPolicy): gốc lắp ráp đăng ký qua forms.Deps.DefinitionPolicies trước khi phục vụ.
+func (m *Module) CNTSDefinitionPolicy() formsport.TemplateDefinitionPolicy {
+	return rcapp.CNTSDefinitionPolicy
+}
+
 // ReportSyncSource cho pf/sync (KN v7.7 P7): chiều xuống report_task, form_layout, report_submission của các xã phụ
 // trách trong ngữ cảnh Cấp Xã — field-app nhập báo cáo ngoại tuyến (N-07).
 func (m *Module) ReportSyncSource() syncport.Source { return rcapp.ReportSync{Svc: m.rc} }

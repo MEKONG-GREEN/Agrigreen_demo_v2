@@ -22,41 +22,16 @@ import (
 )
 
 // MenuQuery là tham số dựng menu.
-type MenuQuery struct {
-	Audience   string    // kn_tw | kn_tinh | kn_xa | admin; rỗng = suy từ ngữ cảnh phiên/vai
-	Department string    // mã phòng ban; rỗng = phòng ban Đang áp dụng duy nhất của đơn vị
-	UnitRef    uuid.UUID // đơn vị (Nút cấp 1/2); Nil = đơn vị của Nút người gọi
-}
+type MenuQuery = port.MenuQuery
 
 // MenuItemView là một mục menu đã giải điều kiện.
-type MenuItemView struct {
-	Key         string
-	Label       string
-	Route       string
-	Icon        string
-	BadgeSource string
-	Enabled     bool
-	Status      string // mục phòng ban của Admin: active | not_open | suspended; mục "Sắp có": coming_soon
-	StatusLabel string
-	Children    []MenuItemView
-}
+type MenuItemView = port.MenuItemView
 
 // MenuGroupView là một nhóm sidebar.
-type MenuGroupView struct {
-	Key   string
-	Label string
-	Items []MenuItemView
-}
+type MenuGroupView = port.MenuGroupView
 
 // MenuView là menu của một phiên.
-type MenuView struct {
-	Version      string
-	Audience     string
-	UnitRef      uuid.UUID
-	Department   *port.Department
-	DefaultRoute string
-	Groups       []MenuGroupView
-}
+type MenuView = port.MenuView
 
 // audiencesOf ánh xạ vai Keycloak hiện có sang đối tượng menu KN. platform_admin được mọi menu
 // (FN-AD-04.07: Admin vào menu mọi cấp để hỗ trợ). P1 thay bằng ngữ cảnh phiên (SessionContext).
