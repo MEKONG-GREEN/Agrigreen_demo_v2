@@ -485,12 +485,18 @@ func applyCheckins(a knActor, d *ScheduleDetail, st ScheduleSettings, now time.T
 	// Tọa độ chỉ cho người đăng ký và người duyệt được (theo dõi check-in, UR-TINH-18).
 	showPoint := d.Schedule.OwnerRef == a.ActorRef || a.canReview(d.Schedule, st) == nil
 	d.Checkins = map[uuid.UUID]store.Checkin{}
-	var missed []uuid.UUID
+	var missed, open []uuid.UUID
 	for _, it := range d.Items {
 		c, ok := m[it.ItemID]
 		if ok {
 			if !showPoint {
 				c.Point = nil
+			}
+			// CNTS v4.0 BR-07: đã check-in, tới 23:59 ngày công tác chưa check-out → nhãn "Chưa check-out" (màn cán bộ xã
+			// và màn theo dõi); check-out đồng bộ trễ (BR-08) gỡ nhãn. Check-in cũ trước v4.0 (không ảnh, chưa có
+			// check-out) không gắn nhãn — không bắt nhập bù (PLAN mục 5).
+			if c.NoCheckout = c.Photo != nil && domain.NoCheckout(c.Day, true, c.Checkout != nil, now, clock.Zone()); c.NoCheckout {
+				open = append(open, it.ItemID)
 			}
 			if c.Checkout != nil {
 				o := *c.Checkout
@@ -511,4 +517,18 @@ func applyCheckins(a knActor, d *ScheduleDetail, st ScheduleSettings, now time.T
 		d.Warnings = append(d.Warnings, ScheduleWarning{Code: "checkin_missed", ItemIDs: missed,
 			Message: "Ngày công tác ngoài cơ quan chưa check-in"})
 	}
+	if len(open) > 0 {
+		d.Warnings = append(d.Warnings, ScheduleWarning{Code: "checkout_missing", ItemIDs: open, Message: "Chưa check-out"})
+	}
+}
+
+// ScheduleFollowers trả người theo dõi lịch của owner (người duyệt được lịch theo quy tắc của phòng ban, FN-12 BR-04) —
+// người nhận cảnh báo "Chưa check-out" (CNTS v4.0 Mục III.5 dòng 13). Tenant truyền tường minh (job của worker).
+func (s *Service) ScheduleFollowers(ctx context.Context, tid uuid.UUID, dept, province string, owner uuid.UUID, at time.Time) ([]uuid.UUID, error) {
+	ctx = tenant.WithID(ctx, tid)
+	st, err := s.scheduleSettings(ctx, dept, province, at)
+	if err != nil {
+		return nil, err
+	}
+	return s.approvers(ctx, tid, dept, province, owner, st)
 }
