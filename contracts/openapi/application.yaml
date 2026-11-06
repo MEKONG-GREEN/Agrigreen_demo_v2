@@ -14991,6 +14991,46 @@ paths:
         "403": {$ref: '#/components/responses/Problem'}
         "422": {$ref: '#/components/responses/Problem'}
         "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/open-period-count:
+    get:
+      summary: Đếm toàn bộ kỳ KHTC chưa đóng/hủy theo tenant và quyền đọc hiện hữu
+      operationId: extensionKhtcOpenPeriodCount
+      tags: [extension]
+      responses:
+        "200":
+          description: Số đếm metadata cùng nguồn với thẻ Kỳ đang mở; không là receipt thao tác native
+          headers:
+            Cache-Control: {schema: {type: string, enum: [no-store]}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCOpenPeriodCount'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/pending-review:
+    get:
+      summary: Phiếu thường niên đã gửi chờ rà soát, phân trang theo nhóm kỳ chưa kết thúc
+      description: Đọc native Progress bằng caller hiện tại. Không gồm kỳ phát sinh; không trả tổng toàn cục. Trang rỗng vẫn có thể có next_cursor. Không suy quyền mutation từ kết quả đọc.
+      operationId: extensionKhtcPendingReview243
+      tags: [extension]
+      parameters:
+        - in: query
+          name: before
+          required: false
+          schema: {type: string, format: uuid, minLength: 36, maxLength: 36}
+      responses:
+        "200":
+          description: Tối đa 25 kỳ thường niên mỗi trang, gồm lần gửi cuối chưa có quyết định; không suy từ nháp hoặc bảng số liệu niêm phong
+          headers:
+            Cache-Control: {schema: {type: string, enum: [no-store]}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCPendingReviewPage243'}
+        "400": {$ref: '#/components/responses/Problem'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
   /v1/kn/machine-profiles/{cooperative_ref}:
     get:
       summary: "TT-10 (BF-SRV-KN-ATTRS): hồ sơ KN riêng — năm sản xuất theo loại máy của HTX (mọi vai KN trong phạm vi)"
@@ -27115,6 +27155,7 @@ components:
           properties:
             exported: {type: integer}
             open: {type: integer}
+            open_all: {type: integer, minimum: 0, description: "Toàn bộ kỳ KHTC chưa đóng/hủy trong phạm vi đọc; không phụ thuộc bộ lọc dữ liệu của dashboard. Thiếu trường ở máy chủ cũ là chưa biết, không thay bằng open đã lọc."}
             sent: {type: integer}
             forms: {type: integer}
             achieved: {type: integer}
@@ -27184,6 +27225,30 @@ components:
         state: {type: string}
         cutoff: {type: string, format: date}
         exported_at: {type: string, format: date-time, nullable: true}
+    KHTCOpenPeriodCount:
+      type: object
+      required: [open_count]
+      properties:
+        open_count: {type: integer, format: int64, minimum: 0}
+    KHTCPendingReviewPage243:
+      type: object
+      required: [rows, next_cursor]
+      properties:
+        rows:
+          type: array
+          items: {$ref: '#/components/schemas/KHTCPendingReviewRow243'}
+        next_cursor: {type: string, format: uuid, nullable: true}
+    KHTCPendingReviewRow243:
+      type: object
+      required: [period_id, period_name, department, department_name, submission_id, attempt, submitted_at]
+      properties:
+        period_id: {type: string, format: uuid}
+        period_name: {type: string}
+        department: {type: string}
+        department_name: {type: string}
+        submission_id: {type: string, format: uuid}
+        attempt: {type: integer, format: int64, minimum: 1}
+        submitted_at: {type: string, format: date-time}
     KHTCReportPeriod: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"type":{"type":"string","enum":["week","month","quarter","year","program","adhoc"]},"year":{"type":"integer"},"name":{"type":"string"},"from":{"type":"string","format":"date-time"},"to":{"type":"string","format":"date-time"},"cutoff":{"type":"string","format":"date-time"},"departments":{"type":"array","items":{"type":"string"}},"no":{"type":["integer","null"]},"scope":{"type":["string","null"]}},"required":["id","type","year","name","from","to","cutoff","departments","no","scope"],"additionalProperties":false}
     KHTCReportPlan: {"type":"object","properties":{"VersionID":{"type":"string","format":"uuid"},"Year":{"type":"integer"},"Version":{"type":"integer"},"DecisionNo":{"type":"string"},"Entries":{"type":["array","null"],"items":{"type":"object","additionalProperties":true}}},"required":["VersionID","Year","Version","DecisionNo","Entries"],"additionalProperties":true}
     KHTCReportSourceRef: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"plan_version_id":{"type":["string","null"],"format":"uuid"},"figures_hash":{"type":"string"},"status_hash":{"type":"string"},"closed":{"type":"boolean"},"at":{"type":"string","format":"date-time"}},"required":["id","version","plan_version_id","figures_hash","status_hash","closed","at"],"additionalProperties":false}

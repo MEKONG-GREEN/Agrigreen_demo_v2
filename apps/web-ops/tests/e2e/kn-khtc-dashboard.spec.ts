@@ -14,7 +14,11 @@ test("Dashboard189 phản ánh kỳ phát sinh vừa mở bằng phiên KHTC th�
  const assignment=main.getByRole("group",{name:"Vai trò và phạm vi"});await assignment.getByRole("combobox",{name:"Vai trò",exact:true}).selectOption("kn_tinh");await assignment.getByRole("checkbox",{name:"trong_trot",exact:true}).uncheck();await assignment.getByRole("checkbox",{name:"ke_hoach_tai_chinh",exact:true}).check();await main.getByLabel("Họ tên").fill("Cán bộ dashboard189");await expect(main.getByLabel("Họ tên")).toHaveValue("Cán bộ dashboard189");await main.getByRole("button",{name:"Lưu",exact:true}).click();await expect(page.getByRole("heading",{level:1,name:"Cán bộ dashboard189"})).toBeVisible();
  await logout(page);await login("0912345689");
  await sidebar(page).getByRole("link",{name:"Trang chủ phòng",exact:true}).click();await expect(page.getByRole("heading",{name:"Trang chủ tổng hợp KHTC",exact:true})).toBeVisible();
+ await expect(page.getByRole("main")).toHaveCount(1);
  const count=page.getByRole("link",{name:/^Kỳ đang mở/}).locator("strong");await expect(count).toHaveText(/^\d+$/);const before=Number(await count.innerText());
+ const periodMenu=sidebar(page).getByRole("link",{name:/^Kỳ báo cáo & phiếu các phòng/});
+ if(before>0)await expect(periodMenu.getByText(String(before),{exact:true})).toBeVisible();
+ else await expect(periodMenu.getByText("0",{exact:true})).toHaveCount(0);
 
  await sidebar(page).getByRole("link",{name:"Báo cáo phát sinh",exact:true}).click();
  await page.getByText("Mở kỳ phát sinh và giao phiếu",{exact:true}).click();await page.getByRole("button",{name:"Mở kỳ",exact:true}).click();
@@ -24,6 +28,11 @@ test("Dashboard189 phản ánh kỳ phát sinh vừa mở bằng phiên KHTC th�
  // Navigate inside the SPA: mock ledger state belongs to this browser session.
  await sidebar(page).getByRole("link",{name:"Trang chủ phòng",exact:true}).click();
  await expect(page.getByRole("heading",{name:"Trang chủ tổng hợp KHTC",exact:true})).toBeVisible();await expect(count).toHaveText(String(before+1));
+ await expect(periodMenu.getByText(String(before+1),{exact:true})).toBeVisible();
  await expect(page.getByRole("table",{name:"Phiếu và nguồn",exact:true})).toContainText("Kỳ dashboard189 vừa mở");
  await page.getByRole("combobox",{name:"Phòng",exact:true}).selectOption("hanh_chinh_tong_hop");const filtered=page.getByRole("table",{name:"Phiếu và nguồn",exact:true}).getByRole("row").filter({hasText:"Kỳ dashboard189 vừa mở"});await expect(filtered).toHaveCount(1);await expect(filtered).toContainText("Hành chính");
+ // The global hot card and menu stay equal while the source table is filtered.
+ await expect(count).toHaveText(String(before+1));
+ await expect(periodMenu.getByText(String(before+1),{exact:true})).toBeVisible();
+ await page.screenshot({path:test.info().outputPath("230-open-badge-dashboard.png"),fullPage:false});
 });

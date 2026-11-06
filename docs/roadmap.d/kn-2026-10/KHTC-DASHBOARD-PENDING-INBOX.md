@@ -1,0 +1,1 @@
+- [ ] KHTC-DASHBOARD-PENDING-INBOX (#243, W11.69-DASHBOARD-AFTER-OPEN-BADGE): hộp phiếu thường niên chờ rà soát từ native, menu/phân trang và đường mở reviewer; chờ Claude review/ticket merge. Badge toàn cục và phần dashboard còn lại: #245; chưa UAT/G1.

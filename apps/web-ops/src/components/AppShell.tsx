@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { unwrap, type ApiClient } from "@/api/client";
 import { useAuth, type KnSessionState } from "@/auth/AuthProvider";
 import { LEVEL_LABEL, roleLabel, type Principal } from "@/auth/principal";
@@ -94,7 +94,18 @@ function TopCrumbs({ base }: { base: Crumb[] }) {
   return <Breadcrumb items={[...base, ...tail]} />;
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+// Each application composes its own shell inside its route layout. The shared
+// root keeps the ordinary shell for other routes, without importing modules.
+export function RootShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  if (pathname === "/kn" || pathname?.startsWith("/kn/")) return <>{children}</>;
+  return <AppShell>{children}</AppShell>;
+}
+
+export function AppShell({ children, SidebarComponent = Sidebar }: {
+  children: ReactNode;
+  SidebarComponent?: ComponentType<ComponentProps<typeof Sidebar>>;
+}) {
   const { status, principal, logout, scopeWarning, kn, selectContext, changePassword, api } = useAuth();
   const pathname = usePathname() ?? "/";
   const router = useRouter();
@@ -149,7 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <a href="#main" className="skip-link">
           Bỏ qua điều hướng
         </a>
-        <Sidebar
+        <SidebarComponent
           menu={menu}
           pathname={pathname}
           badges={kn.badges}

@@ -50,7 +50,10 @@ func (s *Service) Archive(ctx context.Context, q ArchiveQuery) (ArchiveResult, e
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		var e error
 		out.Items, e = store.ArchiveFiltered(ctx, tx, q.scanQuery(), q.fields(), q.Offset, q.Limit+1)
-		return e
+		if e != nil {
+			return e
+		}
+		return s.auditArchive(ctx, tx, c, "read_list", ArchiveSelection{PeriodID: q.PeriodID, Format: "metadata"}, 0, 0, nil)
 	})
 	if err != nil {
 		return ArchiveResult{}, err

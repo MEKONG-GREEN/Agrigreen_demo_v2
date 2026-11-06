@@ -92,6 +92,9 @@ Bổ sung 02/11/2026 — #179 phần đầu: bảng hệ số FN-19 có danh sá
 | FN-AD-04.03 · Mục IV · P1709 | Mục lục mẫu báo cáo | `/kn/khtc/mau-bao-cao` | `apps/web-ops/src/app/kn/[...slug]/page.tsx:1` | Thiếu | Mục lục động/biến khóa/preview v2.3 do #31; dev chưa có màn chuyên biệt. Không đổi seeded templates để che thiếu chức năng. | Chưa có UAT. | Có — Thiếu mục lục mẫu báo cáo động/preview theo v2.3; #31. |
 
 Bổ sung 06/11/2026 — #242 phần đầu FN-TI-02.04 v2.3: lịch sử gửi → chi tiết chỉ đọc từng native submission và so sánh nội dung đã niêm phong; actor/time thật, nhãn hạng mục theo phiên bản kế hoạch đã lưu, DataTable/STT và DetailPage/Log giới hạn đúng dữ kiện. Không dùng phiếu/nguồn hiện hành dựng lại nội dung cũ hoặc kết quả kiểm tra lịch sử. [Phạm vi](gia-dinh/BF-SWEEP-KHTC-AFTER-REVIEWER.md); audit/receipt, báo cáo, Excel gốc và kỳ nhúng còn lại ở #244. Giữ trạng thái Lệch, chưa có UAT khách; chưa chốt chính sách lần cuối P901/P904 hoặc biên tập toàn văn chờ PO #240.
+### Lát audit kho #227 — chưa hoàn tất quyền/FN/UAT
+
+FN-TW-01.01/FN-PN-03.03: audit append-only cho list, lựa chọn kỳ/lĩnh vực, history có/không bộ lọc, preview và Excel; actor/context/clock/trace thật, commit trước trả dữ liệu, lỗi INSERT/COMMIT fail closed. Metadata access/attempt không khẳng định giao file xong, không lấy 0 thay ngân sách egress. Giữ reader KHTC/Admin/TW-KHTC trong tenant, byte/hash/số và audit Word/ZIP đã có. Bằng chứng HTTP PostgreSQL thật gồm rollback/recovery và Word GET/mixed ZIP POST bị từ chối bằng fresh key, zero data/zero FilePort. Không mở quyền từ lĩnh vực. [Giả định](gia-dinh/ARCHIVE-READ-AUDIT-227.md); phần snapshot/leadership/deny-cache/Word legacy ở #246 sau actual merge #227. Chưa coi toàn FN hoặc UAT/G1 đạt.
 
 ## 5. Báo giá/TTTT — 28 chức năng
 
@@ -281,3 +284,6 @@ Các hàng Không thêm chặn riêng và KH AD04.02 nằm nguyên ở §3–5 �
 Kiểm đủ 76 route/biến thể (gồm 9 placeholder); 67 hàng chức năng vẫn giữ nguyên mã, tên và đoạn BRD. Có 35 đề xuất chặn nghiệp vụ riêng; các hàng khác vẫn chịu cổng A/UAT/quyền. Tệp này chỉ là ma trận và đề xuất, không thay quyết định PO hoặc chứng cứ trình duyệt.
 
 Bổ sung 03/11/2026 — #197 phần đầu: tham số nâng bậc/quy đổi FN19 có route chi tiết/thêm phiên bản, Log từ metadata thật, NumberField/validateForm và guard raw ba tỷ lệ native trước Decimal. [Phạm vi và giới hạn](gia-dinh/BF-SWEEP-HCTH-FORMS-REST.md). Sáu màn HCTH còn lại chuyển [#203](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/203); giữ trạng thái Lệch, Q070 và chưa có UAT khách.
+
+
+Bổ sung #243 — FN-TI-02.01/FN-TI-02.04: hộp phiếu thường niên chờ rà soát có menu riêng, đọc lần gửi cuối native theo trang kỳ, không suy từ nháp/bảng niêm phong; mở reviewer hiện hữu và giữ quyền hiện tại. [Phạm vi/giới hạn](gia-dinh/KHTC-DASHBOARD-PENDING-INBOX.md). Badge toàn cục, public batch và phần dashboard còn lại ở #245. Chưa đổi trạng thái toàn FN, chưa UAT khách hoặc G1; kết quả cổng đúng SHA trong issue READY sau khi thực sự đạt.

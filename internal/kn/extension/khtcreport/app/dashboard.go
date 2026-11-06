@@ -25,6 +25,7 @@ type DashboardQuery struct {
 type DashboardCounts struct {
 	Exported int `json:"exported"`
 	Open     int `json:"open"`
+	OpenAll  int `json:"open_all"`
 	Sent     int `json:"sent"`
 	Forms    int `json:"forms"`
 	Achieved int `json:"achieved"`
@@ -95,6 +96,10 @@ func (s *Service) Dashboard(ctx context.Context, q DashboardQuery, periods *pa.S
 	out.ProgressWindow = window
 	if periods == nil {
 		return Dashboard{}, ErrDependency
+	}
+	out.Counts.OpenAll, err = periods.OpenPeriodCount(ctx)
+	if err != nil {
+		return Dashboard{}, err
 	}
 	var details []pa.Detail
 	cursor := uuid.Nil

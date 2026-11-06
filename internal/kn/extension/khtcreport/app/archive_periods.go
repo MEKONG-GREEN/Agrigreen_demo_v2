@@ -28,7 +28,10 @@ func (s *Service) ArchivePeriods(ctx context.Context, q ArchiveQuery) (ArchivePe
 		scan.Search = strings.TrimSpace(q.DocumentSearch)
 		scan.PeriodSearch = strings.TrimSpace(q.Search)
 		out.Items, e = store.ArchivePeriodChoices(ctx, tx, scan, q.fields(), q.Offset, q.Limit+1)
-		return e
+		if e != nil {
+			return e
+		}
+		return s.auditArchive(ctx, tx, c, "read_periods", ArchiveSelection{PeriodID: q.PeriodID, Format: "metadata"}, 0, 0, nil)
 	})
 	if err != nil {
 		return ArchivePeriodsResult{}, err

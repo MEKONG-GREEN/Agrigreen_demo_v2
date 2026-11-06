@@ -13,10 +13,11 @@ vi.mock("next/navigation",()=>({usePathname:()=>route.pathname}));
 const requests: Request[] = [];
 const lastDashboard=()=>requests.filter(r=>r.url.includes("/dashboard")).at(-1)!;
 let sent = 1, canAct = false;
+let openAll: number | undefined = 17;
 let live = false, livePeriod=false;
 let planState: "normal"|"missing"|"filtered_empty"|"valid_empty"|"zero"|"unavailable"|"future"="normal";
-const data = (): Dashboard => ({ year: 2026, quarter: 4, department: "", field: "", as_of: "2026-10-13T03:00:00Z", can_act: canAct, counts: { exported: 2, open: 1, sent, forms: 4, achieved: 1, items: 3, slow: 1 }, progress: { items: 3, achieved: 1, slow: 1, missing: 1, programs: [{ ref: "ct1", name: "Chương trình lúa", items: 3, known: 2, percent: "23.81" }], rows: [] }, progress_period: { id: "p1", name: "Mẫu 5 đến 13/10", type: "program", state: "collecting", cutoff: "2026-10-13", exported_at: null }, reports: [], status: [{ period_id: "p1", period_name: "Tuần 41", department: "trong_trot", name: "Trồng trọt", kind: "form", state: "submitted", at: "2026-10-13T02:00:00Z" }] });
-beforeEach(() => { Object.assign(auth,activeAuth());route.pathname="/kn/khtc/trang-chu";vi.setSystemTime(new Date("2026-10-13T03:00:00Z")); requests.length = 0; sent = 1; canAct = false; live=false;livePeriod=false;planState="normal"; auth.api = createApiClient({ baseUrl: "http://mock", getAccessToken: () => "test", fetch: async (r) => { requests.push(r); if (r.url.includes("/dashboard")) {
+const data = (): Dashboard => ({ year: 2026, quarter: 4, department: "", field: "", as_of: "2026-10-13T03:00:00Z", can_act: canAct, counts: { exported: 2, open: 1, open_all: openAll, sent, forms: 4, achieved: 1, items: 3, slow: 1 }, progress: { items: 3, achieved: 1, slow: 1, missing: 1, programs: [{ ref: "ct1", name: "Chương trình lúa", items: 3, known: 2, percent: "23.81" }], rows: [] }, progress_period: { id: "p1", name: "Mẫu 5 đến 13/10", type: "program", state: "collecting", cutoff: "2026-10-13", exported_at: null }, reports: [], status: [{ period_id: "p1", period_name: "Tuần 41", department: "trong_trot", name: "Trồng trọt", kind: "form", state: "submitted", at: "2026-10-13T02:00:00Z" }] });
+beforeEach(() => { Object.assign(auth,activeAuth());route.pathname="/kn/khtc/trang-chu";vi.setSystemTime(new Date("2026-10-13T03:00:00Z")); requests.length = 0; sent = 1; openAll = 17; canAct = false; live=false;livePeriod=false;planState="normal"; auth.api = createApiClient({ baseUrl: "http://mock", getAccessToken: () => "test", fetch: async (r) => { requests.push(r); if (r.url.includes("/dashboard")) {
         const d=data(); if(live){if(!livePeriod)d.progress_period=null;d.progress_window={year:2026,quarter:4,through_date:"2026-12-31",effective_cutoff:"2026-10-13T03:00:00Z",from_date:"2025-12-31",quantity_to:"2026-10-13",calendar_id:"ke_hoach_tai_chinh",calendar_version:2,plan_version_id:planState==="valid_empty"?"real-plan-version":null};}
         if(planState==="unavailable"&&d.progress_window)d.progress_window.unavailable_reason="native_forms_access_unavailable";
         if(planState==="future"){d.progress_window=null;d.progress_period=null;}
@@ -170,4 +171,16 @@ describe("lifetime202",()=>{
   auth.status="authenticated";auth.kn.status="choose";view.rerender(<KhtcDashboardScreen/>);expect(p.dashboard).toHaveLength(1);
   auth.kn.status="active";view.rerender(<KhtcDashboardScreen/>);await waitFor(()=>expect(p.dashboard).toHaveLength(2));await finish202(p,1,"restored");
  });
+});
+
+it("open230 hot card uses global metadata while filtered open remains separate", async () => {
+ render(<KhtcDashboardScreen />);
+ expect(await screen.findByRole("link", { name: "Kỳ đang mở 17" })).toBeInTheDocument();
+ expect(screen.getByText(/độc lập bộ lọc số liệu/)).toBeInTheDocument();
+});
+it("open230 does not substitute a filtered number when an older server omits open_all", async () => {
+ openAll = undefined;
+ render(<KhtcDashboardScreen />);
+ expect(await screen.findByRole("link", { name: "Kỳ đang mở —" })).toBeInTheDocument();
+ expect(screen.queryByRole("link", { name: "Kỳ đang mở 1" })).not.toBeInTheDocument();
 });

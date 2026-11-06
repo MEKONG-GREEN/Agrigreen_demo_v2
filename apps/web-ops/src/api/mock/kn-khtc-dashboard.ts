@@ -2,6 +2,7 @@ import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
 import { TENANT } from "./personas";
 import { khtcMockStore } from "./kn-khtc-periods";
+import { khtcOpenPeriodCount230 } from "./kn-khtc-open-count230";
 import { khtcDashboardExports } from "./kn-khtc-reports";
 import { khtcReportInputs, khtcReportPlan } from "./kn-khtc-forms";
 import { khtcReportSource } from "./kn-khtc-sources";
@@ -45,9 +46,11 @@ function handle(ctx: Ctx): Response {
     const year = +rawY, quarter = +rawQ, start = `${year}-${String(quarter * 3 - 2).padStart(2, "0")}-01`, end = new Date(Date.UTC(year, quarter * 3, 0)).toISOString().slice(0, 10), today = local.toISOString().slice(0, 10);
     const window = liveWindow(year,quarter,ctx.url.searchParams.get("through_date"),now);
     if (window instanceof Response) return window;
+    const openAll = khtcOpenPeriodCount230(ctx);
+    if (openAll instanceof Response) return openAll;
     const canReadAdhoc = !kc.read_only && (kc.role === "kn_tinh" || kc.role === "admin" && ctx.persona.me.mfa);
     const periods = khtcMockStore().filter(s => (s.adhocTenant ?? TENANT) === ctx.persona.me.tenant_id && s.p.year === year && s.terminal !== "cancelled" && (!department || s.p.departments.some(d => d.code === department)) && (s.p.report_type !== "adhoc" || canReadAdhoc));
-    const out: Dashboard = { year, quarter, department, field, as_of: now.toISOString(), can_act: kc.role === "kn_tinh" && !kc.read_only, counts: { exported: 0, open: 0, sent: 0, forms: 0, achieved: 0, items: 0, slow: 0 }, progress: { items: 0, achieved: 0, slow: 0, missing: 0, programs: [], rows: [] }, progress_period: null, reports: [], status: [] };
+    const out: Dashboard = { year, quarter, department, field, as_of: now.toISOString(), can_act: kc.role === "kn_tinh" && !kc.read_only, counts: { exported: 0, open: 0, open_all: openAll, sent: 0, forms: 0, achieved: 0, items: 0, slow: 0 }, progress: { items: 0, achieved: 0, slow: 0, missing: 0, programs: [], rows: [] }, progress_period: null, reports: [], status: [] };
     out.progress_window = window;
     for (const s of periods) {
         const p = s.p, exports = khtcDashboardExports(p.id);
