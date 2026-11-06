@@ -250,23 +250,49 @@ describe("backend giả lập G5 — quy tắc như app/", () => {
     expect(viewer.code).toBe("forbidden");
   });
 
-  it("khóa API: bí mật chỉ ở phản hồi 201 đầu, gọi lặp cùng Idempotency-Key không có bí mật, mock không giữ bí mật", async () => {
-    const key = newIdempotencyKey();
-    const first = await unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: { "Idempotency-Key": key } } }));
-    expect(first.api_key).toMatch(/^agk_[a-z2-7]{12}_[A-Za-z0-9_-]{43}$/);
-    expect(first.api_key?.startsWith(`agk_${first.key_prefix}_`)).toBe(true);
-    const replay = await unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: { "Idempotency-Key": key } } }));
-    expect(replay.key_id).toBe(first.key_id);
-    expect(replay.api_key).toBeUndefined();
-    const secretPart = first.api_key!.split("_").pop()!;
-    expect(g5MockSnapshot()).not.toContain(secretPart);
-    expect(JSON.stringify(window.sessionStorage)).not.toContain(secretPart);
-    const list = await unwrap(admin("api-admin").GET("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory } } }));
-    expect(JSON.stringify(list)).not.toContain(secretPart);
-    // Đã có 2 khóa hiệu lực → 409 apiclient.too_many_keys.
-    const tooMany = await problemOf(unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: hdr() } })));
-    expect(tooMany.code).toBe("apiclient.too_many_keys");
-  });
+  it.each(["giữa", "gần cuối"] as const)(
+    "khóa API: bí mật chỉ ở phản hồi 201 đầu, replay không có bí mật, không lưu payload đầy đủ có _ ở %s",
+    async (position) => {
+      const originalRandom = crypto.getRandomValues.bind(crypto);
+      let secretDraws = 0;
+      const fixedRandom = (array: Parameters<typeof crypto.getRandomValues>[0]): ReturnType<typeof crypto.getRandomValues> => {
+        if (array instanceof Uint8Array && array.byteLength === 32) {
+          secretDraws++;
+          array.fill(0);
+          if (position === "giữa") array.set([255, 255, 255], 15);
+          else {
+            array[30] = 3;
+            array[31] = 249;
+          }
+          return array;
+        }
+        return originalRandom(array);
+      };
+      const random = vi.spyOn(crypto, "getRandomValues").mockImplementation(fixedRandom);
+      try {
+        const key = newIdempotencyKey();
+        const first = await unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: { "Idempotency-Key": key } } }));
+        expect(/^agk_[a-z2-7]{12}_[A-Za-z0-9_-]{43}$/.test(first.api_key ?? "")).toBe(true);
+        expect(first.api_key?.startsWith(`agk_${first.key_prefix}_`)).toBe(true);
+        const replay = await unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: { "Idempotency-Key": key } } }));
+        expect(replay.key_id).toBe(first.key_id);
+        expect(replay.api_key).toBeUndefined();
+        const secretPart = first.api_key!.slice(`agk_${first.key_prefix}_`.length);
+        expect(g5MockSnapshot().includes(secretPart)).toBe(false);
+        expect(JSON.stringify(window.sessionStorage).includes(secretPart)).toBe(false);
+        const list = await unwrap(admin("api-admin").GET("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory } } }));
+        expect(JSON.stringify(list).includes(secretPart)).toBe(false);
+        expect(secretPart.length).toBe(43);
+        expect(secretPart.includes("_")).toBe(true);
+        // Đã có 2 khóa hiệu lực → 409 apiclient.too_many_keys.
+        const tooMany = await problemOf(unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: hdr() } })));
+        expect(tooMany.code).toBe("apiclient.too_many_keys");
+        expect(secretDraws).toBe(1);
+      } finally {
+        random.mockRestore();
+      }
+    },
+  );
 
   it("bảng kê: kỳ chưa kết thúc → 409; 202 + job → hoàn tất; người yêu cầu không tự duyệt; CSV tất định như domain.StatementCSV", async () => {
     const today = new Date();
