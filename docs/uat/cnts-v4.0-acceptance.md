@@ -29,6 +29,30 @@ go test ./internal/kn/extension/domain/ -run 'VisitPhoto|CheckoutRules'
 cd apps/web-ops; npx vitest run src/kn/schedule/
 cd apps/field-app; flutter test test/work_schedule_checkin_test.dart
 ```
+
+## FN-12/FN-13 — Theo dõi check-in, check-out; cảnh báo "Chưa check-out" (CNTS-V4-CHECKIN-MONITOR #250)
+
+Giả định: [CNTS-V4-CHECKIN-MONITOR](../kn/gia-dinh/CNTS-V4-CHECKIN-MONITOR.md). Giờ giả lập (đồng hồ cố định của kiểm thử), mốc 23:59
+tính theo giờ Việt Nam.
+
+| Tiêu chí BRD v4.0 | Bằng chứng tự động | Trạng thái |
+|---|---|---|
+| FN-12 BR-07: mục đã check-in, tới 23:59 cùng ngày chưa check-out → nhãn "Chưa check-out" ở màn cán bộ xã và màn theo dõi | `TestNoCheckout` (23:58:59 chưa, 23:59 có, mốc 16:59 UTC); `TestWorkScheduleNoCheckout` (`no_checkout` ở chi tiết lịch, `mine` của cán bộ xã, danh sách theo dõi `no_checkout_count`, cảnh báo `checkout_missing`); web `visits.test.tsx`; field-app `CNTS v4.0 BR-07 (#250)` | Đạt |
+| FN-12 AC-10: check-in 08:00, chưa check-out đến 23:59 → sáng hôm sau người theo dõi thấy nhãn | `TestWorkScheduleNoCheckout` (người duyệt đọc lịch lúc 23:59 và sau đó) | Đạt |
+| Mục III.5 dòng 13 / FN-13 BR-04: cảnh báo "Chưa check-out", mức Cần chú ý, gửi người theo dõi lịch cán bộ xã; không tạo trùng | `TestWorkScheduleNoCheckout` (job `extension_cnts_alert` sinh 2 cảnh báo, người nhận = người duyệt được lịch; chạy lại không sinh thêm), `TestTransition` (bảng loại dòng 13) | Đạt |
+| FN-12 BR-08 / AC-13: check-out offline 16:30, đồng bộ 07:10 hôm sau → gỡ nhãn, cảnh báo tự đóng, lịch ghi 16:30 kèm "Đồng bộ trễ" | `TestWorkScheduleNoCheckout` (nhãn gỡ ngay khi đọc; job tự đóng cảnh báo, `auto_closed`, kết quả ghi giờ check-out và giờ đồng bộ) | Đạt (tự đóng trong ≤ 5 phút — chu kỳ job) |
+| UR-TINH-18, Hình 49: màn theo dõi check-in, check-out, thời gian ở địa điểm, ảnh của cán bộ xã; mục chưa check-out hiện nhãn | web `visits.test.tsx` (`<VisitMonitor>`: cột, Đồng bộ trễ, lọc "Chỉ mục Chưa check-out", xem ảnh), `schedule.test.tsx` (tab "Check-in, check-out") | Đạt |
+| Job tìm tenant có check-in bằng vai `ag_ops_jobs` (chỉ cột `tenant_id`, `day`) | `TestWorkScheduleNoCheckout` (`CNTSAlertTenants`) | Đạt |
+| Dữ liệu cũ: check-in trước v4.0 (không ảnh) không gắn nhãn, không sinh cảnh báo — không bắt nhập bù | `TestWorkScheduleNoCheckout` | Đạt |
+
+Cách chạy:
+
+```powershell
+.\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v -run 'WorkScheduleNoCheckout' ./internal/kn/extension/cntscal/handler/
+go test ./internal/kn/extension/domain/ ./internal/kn/extension/cntsalert/domain/
+cd apps/web-ops; npx vitest run src/kn/schedule/
+cd apps/field-app; flutter test test/work_schedule_checkin_test.dart
+```
 # Nghiệm thu CNTS v4.0 (BRD 2.0)
 
 Đối chiếu theo BRD CNTS v4.0 (CR-CNTS-001). Mỗi gói thêm mục của FN mình chạm; kiểm thử tích hợp chạy trên PostgreSQL thật
