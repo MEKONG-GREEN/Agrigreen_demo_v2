@@ -30,6 +30,6 @@ Workflow riêng .github/workflows/cnts-allocation207.yml chạy Go1.26.10 Linux/
 
 `go test -v -count=1 -tags allocationdiagnostics207 ./internal/kn/extension/cntsknqg/domain -run '^TestAllocationDiagnostics207$'`
 
-Để kiểm cold, chạy mỗi subtest /number, /int, /Normalize, /Warnings bằng một lệnh go test -run riêng như workflow. Không cần dependency, migration hoặc lệnh start API/web mới. Bằng chứng Linux/canary của bản sửa và CI đúng SHA vẫn phải đạt trước tự review/gộp.
+Để kiểm cold, chạy mỗi subtest /number, /int, /Normalize, /Warnings bằng một lệnh go test -run riêng như workflow. Không cần dependency, migration hoặc lệnh start API/web mới. Bản sửa tại cc7204d08d67c669312ecb4bd8e7360df7a30a59 đã đạt đủ4job Linux plain/race × default4/2, cold/warm, canary1MiB và exact restore (run42249211057). Cổng tĩnh đủ/lint0; module chạy trên pg-ephemeral23PASS và migration gates8PASS, đều0SKIP. CI đầy đủ đúng head cuối vẫn là cổng bắt buộc trước tự review/gộp.
 
 Nguồn kỹ thuật: [Go1.26.10 MemProfileRate/GC lag](https://github.com/golang/go/blob/go1.26.10/src/runtime/mprof.go), [public allocs profile và full stack output](https://github.com/golang/go/blob/go1.26.10/src/runtime/pprof/pprof.go). Không dùng tài liệu nghiệp vụ cũ làm authority.

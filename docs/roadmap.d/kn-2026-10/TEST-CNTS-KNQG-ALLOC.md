@@ -1,1 +1,1 @@
-- [ ] TEST-CNTS-KNQG-ALLOC: chẩn đoán attribution TotalAlloc bằng control Linux plain/race; giữ byte budget 4/64/16 KiB và hostile cases, chứng minh cold/warm + mutant 1 MiB rồi đủ cổng/CI trước tích hợp. Probe chưa phải hoàn tất gói.
+- [x] TEST-CNTS-KNQG-ALLOC: triển khai đo allocated BYTE theo callback đồng bộ/full stack; giữ4/64/16KiB và22/18/4. Linux plain/race × default/2 đạt4/4 gồm cold/warm, canary1MiB FAIL đúng gate và exact restore PASS; pg-ephemeral23+8PASS/0SKIP. Tích hợp vẫn phải qua CI đúngSHA xanh và ticket.ps1 merge.

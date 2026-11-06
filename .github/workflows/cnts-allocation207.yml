@@ -6,6 +6,8 @@ on:
     paths:
       - internal/kn/extension/cntsknqg/domain/**
       - .github/workflows/cnts-allocation207.yml
+      - docs/kn/gia-dinh/TEST-CNTS-KNQG-ALLOC.md
+      - docs/roadmap.d/kn-2026-10/TEST-CNTS-KNQG-ALLOC.md
   workflow_dispatch:
 
 permissions:
