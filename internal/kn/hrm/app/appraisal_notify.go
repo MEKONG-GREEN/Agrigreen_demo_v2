@@ -68,7 +68,7 @@ func (s *Service) enqueueAppraisalNotice(ctx context.Context, tx pgx.Tx, c appra
 func (s *Service) appraisalEntryNotice(ctx context.Context, tx pgx.Tx, c appraisalActor, p AppraisalPeriod, row store.AppraisalEvent, e domain.AppraisalEntry) error {
 	step := "manager"
 	switch row.Action {
-	case "self_submit", "proxy_self", "reopen":
+	case "proxy_self", "reopen":
 	case "return":
 		step = e.ReturnedTo
 	case "send":
@@ -81,11 +81,7 @@ func (s *Service) appraisalEntryNotice(ctx context.Context, tx pgx.Tx, c apprais
 	n.StaffRef = &staff
 	switch step {
 	case "self":
-		if e.Member.AccountRef != nil {
-			n.Targets = append(n.Targets, *e.Member.AccountRef)
-		} else {
-			appraisalManagerAudience(&n, e.Member) // nhập thay có scan; không giả đã gửi OTP khách
-		}
+		appraisalManagerAudience(&n, e.Member)
 	case "summary":
 		n.Center = true
 	default:
@@ -116,11 +112,7 @@ func (s *Service) remindAppraisal(ctx context.Context, tx pgx.Tx, c appraisalAct
 			if x.Status != domain.AppraisalNotStarted && (x.Status != domain.AppraisalChangeRequested || x.ReturnedTo != "self") {
 				continue
 			}
-			if x.Member.AccountRef != nil {
-				n.Targets = append(n.Targets, *x.Member.AccountRef)
-			} else {
-				appraisalManagerAudience(&n, x.Member)
-			}
+			appraisalManagerAudience(&n, x.Member)
 		case "manager":
 			if x.Status != domain.AppraisalSelfSubmitted && (x.Status != domain.AppraisalChangeRequested || x.ReturnedTo != "manager") {
 				continue

@@ -28,7 +28,6 @@ type AppraisalItem struct {
 	ChangeReason   string                   `json:"change_reason,omitempty"`
 	QuarterResults []AppraisalQuarterResult `json:"quarter_results,omitempty"`
 	Name           string                   `json:"name,omitempty"` // chỉ được ghép trong bộ nhớ, sau audit và ngoài TX
-	CanSelf        bool                     `json:"can_self"`
 	CanManage      bool                     `json:"can_manage"`
 	CanCenter      bool                     `json:"can_center"`
 	SelfLate       bool                     `json:"self_late"`
@@ -40,9 +39,7 @@ func appraisalEntryKey(period, staff uuid.UUID) string { return period.String() 
 func appraisalSubmissionTimes(e *domain.AppraisalEntry, action string, now time.Time) {
 	at := now.UTC()
 	switch action {
-	case "self_draft":
-		e.SelfSubmittedAt = nil
-	case "self_submit", "proxy_self":
+	case "proxy_self":
 		e.SelfSubmittedAt, e.ManagerSubmittedAt = &at, nil
 	case "manager_draft":
 		e.ManagerSubmittedAt = nil
@@ -88,7 +85,6 @@ func appraisalItem(row store.AppraisalEvent, c appraisalActor) (AppraisalItem, e
 		}
 	}
 	a := appraisalAuthority(c)
-	v.CanSelf = c.canRead(e.Member) && domain.CanSelfAppraisal(a, e.Member)
 	v.CanManage = c.canRead(e.Member) && domain.CanManageAppraisal(a, e.Member)
 	v.CanCenter = c.center() && c.scope == domain.ScopeAll && !c.readOnly
 	return v, nil
@@ -286,8 +282,6 @@ func appraisalActionPermission(c appraisalActor, item AppraisalItem, in domain.A
 	a := appraisalAuthority(c)
 	allowed := false
 	switch in.Action {
-	case "self_draft", "self_submit":
-		allowed = domain.CanSelfAppraisal(a, item.Member)
 	case "proxy_self", "manager_draft", "manager_submit", "send":
 		allowed = domain.CanManageAppraisal(a, item.Member)
 	case "return":
@@ -450,19 +444,4 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 	item, err := appraisalItem(saved, c)
 	appraisalLate(&item, resultPeriod, s.Clock.Now())
 	return item, err
-}
-
-func (s *Service) AppraisalGuestLink(ctx context.Context, period, staff uuid.UUID) error {
-	c, err := s.appraisalCaller(ctx)
-	if err != nil {
-		return err
-	}
-	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
-		_, _, e := loadAppraisalItem(ctx, tx, c, period, staff)
-		return e
-	})
-	if err != nil {
-		return err
-	}
-	return port.ErrAppraisalGuestUnavailable // #184: không tạo link, không gửi OTP giả, không nới quyền phiên
 }

@@ -375,7 +375,6 @@ function defaults(group: string): Matrix {
       "docs.view": "unit",
       assessment: "unit",
     });
-  if (group === "tinh" || group === "xa") m.assessment = "self";
   return m;
 }
 const lastPerm = (kind: string, grantee: string) =>
@@ -416,6 +415,7 @@ function caller(ctx: Ctx): Caller | Response {
     Object.assign(m, lastPerm("role", group)?.perms ?? {});
     Object.assign(m, lastPerm("user", ref)?.perms ?? {});
   }
+  if (!["admin", "hcth", "manager"].includes(group)) m.assessment = "none";
   return {
     group,
     unit: kc.internal_unit_code ?? "",
@@ -1315,6 +1315,7 @@ export const hrmStaffRoutes: Route[] = [
             },
           ]);
       }
+      if (b.grantee_kind === "role" && !["hcth", "manager"].includes(b.grantee ?? "") && b.perms?.assessment && b.perms.assessment !== "none") return validation([{field:"assessment",reason:"Chỉ lãnh đạo/HCTH được cấp quyền đánh giá"}]);
       const version = (lastPerm(b.grantee_kind, b.grantee!)?.version ?? 0) + 1;
       STORE.perms.push({
         grantee_kind: b.grantee_kind,

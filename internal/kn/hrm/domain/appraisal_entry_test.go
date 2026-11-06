@@ -17,8 +17,8 @@ func appraisalEntryExample() (AppraisalEntry, AppraisalAuthority, AppraisalAutho
 
 func TestAppraisalScopeUsesSubjectAndHS37_W1126(t *testing.T) {
 	e, self, manager, center := appraisalEntryExample()
-	if !CanReadAppraisal(self, e.Member) || !CanReadAppraisal(manager, e.Member) || !CanReadAppraisal(center, e.Member) {
-		t.Fatal("chủ thể/đơn vị quản lý/HCTH không xem được")
+	if CanReadAppraisal(self, e.Member) || !CanReadAppraisal(manager, e.Member) || !CanReadAppraisal(center, e.Member) {
+		t.Fatal("quyền v4.0: chỉ lãnh đạo được phân công/HCTH xem đánh giá")
 	}
 	wrong := manager
 	wrong.Unit = "cnts"
@@ -63,7 +63,7 @@ func TestAppraisalAuthenticatedFlowAndImmutableClose_W1126(t *testing.T) {
 	e, self, manager, center := appraisalEntryExample()
 	form := appraisalExample()
 	var err error
-	e, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, self, AppraisalEntryChange{Action: "self_submit", Answers: appraisalAnswers(8200), Reason: "Hoàn thành tốt kết quả công việc và tiến độ"})
+	e, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, appraisalTestProxy(manager), appraisalTestProxyInput(8200))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,9 +142,9 @@ func TestAppraisalLocksReadonlyAndProxyProof_W1126(t *testing.T) {
 }
 
 func TestAppraisalReturnRequiresReasonAndAssignment_W1126(t *testing.T) {
-	e, self, manager, center := appraisalEntryExample()
+	e, _, manager, center := appraisalEntryExample()
 	form := appraisalExample()
-	e, err := ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, self, AppraisalEntryChange{Action: "self_submit", Answers: appraisalAnswers(7000)})
+	e, err := ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, appraisalTestProxy(manager), appraisalTestProxyInput(7000))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestAppraisalReturnRequiresReasonAndAssignment_W1126(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	returned, err = ChangeAppraisalEntry(returned, form, AppraisalStepLocks{}, self, AppraisalEntryChange{Action: "self_submit", Answers: appraisalAnswers(7500)})
+	returned, err = ChangeAppraisalEntry(returned, form, AppraisalStepLocks{}, appraisalTestProxy(manager), appraisalTestProxyInput(7500))
 	if err != nil || returned.Self.Total != "75" || returned.Status != AppraisalSelfSubmitted {
 		t.Fatalf("%+v %v", returned, err)
 	}
@@ -185,4 +185,15 @@ func TestAppraisalIndividualReturnDoesNotUnlockOtherEntries_W1126(t *testing.T) 
 		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Không được tự mở phiếu khác"}); err == nil {
 		t.Fatal("mở riêng một phiếu làm mở khóa cả đơn vị")
 	}
+}
+
+// Luồng nhập thay có scan vẫn do lãnh đạo thực hiện trong gói HC-0;
+// bỏ toàn bộ phiếu/điểm và đổi trạng thái thuộc HC-2.
+func appraisalTestProxy(a AppraisalAuthority) AppraisalAuthority {
+	a.ProofVerified = true
+	return a
+}
+func appraisalTestProxyInput(points int64) AppraisalEntryChange {
+	proof := uuid.MustParse("00000000-0000-7000-8000-000000000021")
+	return AppraisalEntryChange{Action: "proxy_self", Answers: appraisalAnswers(points), ProxyDocument: &proof, Reason: "Căn cứ phiếu giấy đã được đối chiếu"}
 }

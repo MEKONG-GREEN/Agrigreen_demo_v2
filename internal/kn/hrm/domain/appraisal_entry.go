@@ -91,14 +91,10 @@ func (a AppraisalAuthority) management(m AppraisalMember) bool {
 
 // CanReadAppraisal không suy quyền từ tên/email hay đơn vị của người gọi do client tự khai.
 func CanReadAppraisal(a AppraisalAuthority, m AppraisalMember) bool {
-	if !slices.Contains([]string{GroupAdmin, GroupHCTH, GroupManager, GroupTinh, GroupXa}, a.Group) || a.Actor == uuid.Nil {
+	if !slices.Contains([]string{GroupAdmin, GroupHCTH, GroupManager}, a.Group) || a.Actor == uuid.Nil {
 		return false
 	}
 	return a.center() || a.self(m) || a.management(m)
-}
-
-func CanSelfAppraisal(a AppraisalAuthority, m AppraisalMember) bool {
-	return !a.ReadOnly && CanReadAppraisal(a, m) && a.self(m)
 }
 
 func CanManageAppraisal(a AppraisalAuthority, m AppraisalMember) bool {
@@ -155,17 +151,15 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 		return e, appraisalInvalid("reason", "nội dung tối đa 2.000 ký tự")
 	}
 	switch in.Action {
-	case "self_draft", "self_submit", "proxy_self":
-		proxy := in.Action == "proxy_self"
-		if (!proxy && !a.self(e.Member)) || (proxy && (!a.management(e.Member) || !a.ProofVerified || in.ProxyDocument == nil)) {
-			return e, appraisalInvalid("action", "chỉ chủ thể tự chấm; nhập thay cần người quản lý và bản scan đã kiểm quyền")
+	case "proxy_self":
+		if !a.management(e.Member) || !a.ProofVerified || in.ProxyDocument == nil {
+			return e, appraisalInvalid("action", "nhập thay cần người quản lý và bản scan đã kiểm quyền")
 		}
 		selfOpen := e.Status == AppraisalNotStarted || (e.Status == AppraisalChangeRequested && e.ReturnedTo == "self")
 		if (locks.Self && !e.Reopened) || !selfOpen {
 			return e, appraisalInvalid("action", "bước tự đánh giá đã khóa hoặc đã nộp")
 		}
-		complete := in.Action != "self_draft"
-		score, err := ScoreAppraisal(form, in.Answers, complete)
+		score, err := ScoreAppraisal(form, in.Answers, true)
 		if err != nil {
 			return e, err
 		}
@@ -179,17 +173,13 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 			}
 		}
 		e.Self, e.SelfRating, e.Reason, e.Note = score, rating, strings.TrimSpace(in.Reason), in.Note
-		if proxy {
-			proof := *in.ProxyDocument
-			e.ProxyDocument = &proof
-		}
-		if complete {
-			e.Status = AppraisalSelfSubmitted
-			e.ReturnedTo = ""
-			e.Manager = AppraisalScoring{}
-			e.CollectiveRating = ""
-			e.OfficialRating = ""
-		}
+		proof := *in.ProxyDocument
+		e.ProxyDocument = &proof
+		e.Status = AppraisalSelfSubmitted
+		e.ReturnedTo = ""
+		e.Manager = AppraisalScoring{}
+		e.CollectiveRating = ""
+		e.OfficialRating = ""
 	case "manager_draft", "manager_submit":
 		if !a.management(e.Member) {
 			return e, appraisalInvalid("action", "chỉ cấp quản lý được phân công; MS06 do HCTH nhập kết quả tập thể")

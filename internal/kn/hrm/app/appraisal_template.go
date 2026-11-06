@@ -53,8 +53,8 @@ func (s *Service) appraisalCaller(ctx context.Context) (appraisalActor, error) {
 	}
 	c := appraisalActor{ref: p.ActorRef, tenant: p.TenantID, unitRef: k.UnitRef, unit: k.InternalUnit,
 		group: s.group(k), manager: k.Manager, readOnly: k.ReadOnly || k.ViewOnly}
-	if c.group == domain.GroupTW || k.Role == "kn_tw" || k.ViewOnly {
-		return c, problem.Forbidden.WithDetail("Cấp TW không tham gia hoặc truy cập phiếu đánh giá")
+	if (c.group != domain.GroupAdmin && c.group != domain.GroupHCTH && c.group != domain.GroupManager) || k.Role == "kn_tw" || k.ViewOnly {
+		return c, problem.Forbidden.WithDetail("đánh giá chỉ dành cho lãnh đạo được phân công, HCTH và Admin")
 	}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		m, e := s.matrixOf(ctx, tx, c.group, c.ref)

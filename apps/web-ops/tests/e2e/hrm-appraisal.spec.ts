@@ -56,3 +56,13 @@ test("HCTH: phát hành mẫu/phiếu → mở đợt → phiếu đóng băng �
  await page.getByRole("button",{name:"Xuất Excel",exact:true}).click();
  await expect(page.getByRole("alert").filter({hasText:/Tệp xuất giả lập chưa sẵn sàng/})).toBeVisible();
 });
+
+test("HC-0: ba URL tự đánh giá đã gỡ trả404, không redirect hoặc giữ trang",async({page})=>{
+ const base="/kn/nhan-su/danh-gia-cua-toi",period="019abcde-0000-7000-8000-000000000001",staff="019abcde-0000-7000-8000-000000000002";
+ for(const path of [base,`${base}/dot/${period}`,`${base}/dot/${period}/phieu/${staff}`]){
+  const response=await page.goto(path);
+  expect(response?.status()).toBe(404);
+  expect(new URL(page.url()).pathname).toBe(path);
+  await expect(page.getByRole("button",{name:"Nộp phiếu tự đánh giá",exact:true})).toHaveCount(0);
+ }
+});

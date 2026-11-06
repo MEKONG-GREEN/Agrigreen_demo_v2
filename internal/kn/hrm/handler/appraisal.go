@@ -30,7 +30,6 @@ func (h Handler) registerAppraisals(rg *gin.RouterGroup) {
 	r.POST("/periods/:period/entries/:staff", h.appraisalChangeEntry)
 	r.GET("/periods/:period/entries/:staff/history", h.appraisalEntryHistory)
 	r.GET("/periods/:period/entries/:staff/versions/:version", h.appraisalEntryVersion)
-	r.POST("/periods/:period/entries/:staff/guest-link", h.appraisalGuestLink)
 	r.GET("/periods/:period/paper/:kind", h.appraisalPaper)
 	r.GET("/periods/:period/exports", h.appraisalExports)
 	r.POST("/periods/:period/exports", h.appraisalExport)
@@ -180,16 +179,4 @@ func (h Handler) appraisalChangeEntry(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, v)
-}
-
-func (h Handler) appraisalGuestLink(c *gin.Context) {
-	period, ok := uuidParam(c, "period", port.ErrAppraisalNotFound)
-	if !ok {
-		return
-	}
-	staff, ok := uuidParam(c, "staff", port.ErrAppraisalNotFound)
-	if !ok {
-		return
-	}
-	httpx.Fail(c, h.Svc.AppraisalGuestLink(c.Request.Context(), period, staff))
 }

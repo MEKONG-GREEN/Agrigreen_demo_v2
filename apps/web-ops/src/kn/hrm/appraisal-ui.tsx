@@ -6,7 +6,6 @@ import { useAction } from "@/kn/cycle/common";
 import { createAppraisalApi } from "./appraisal-api";
 import { APPRAISAL_RATINGS, APPRAISAL_RATING_LABEL, type AppraisalRating } from "./appraisal-form";
 
-export const MINE_BASE = "/kn/nhan-su/danh-gia-cua-toi";
 export const GROUPS = { vien_chuc: "Viên chức", lanh_dao: "Lãnh đạo, quản lý", can_bo_xa: "Cán bộ khuyến nông cấp xã" } as const;
 export function useAppraisalApi() { const { api } = useAuth(); return useMemo(() => createAppraisalApi(api), [api]); }
 /** Khóa theo thao tác + dữ liệu, giữ sau mất phản hồi; không lưu PII ra storage. */

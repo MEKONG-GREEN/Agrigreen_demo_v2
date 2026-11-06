@@ -9855,26 +9855,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/hrm/appraisals/periods/{period}/entries/{staff}/guest-link": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                period: string;
-                staff: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Fail-closed tới khi W10.18 guest OTP (#184) có TTL/one-time/rate-limit/tenant-subject binding */
-        post: operations["hrmAppraisalGuestLink"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/hrm/appraisals/periods/{period}/paper/{kind}": {
         parameters: {
             query?: {
@@ -23024,7 +23004,7 @@ export interface components {
         };
         HrmAppraisalEntryChange: {
             /** @enum {string} */
-            action: "self_draft" | "self_submit" | "proxy_self" | "manager_draft" | "manager_submit" | "send" | "return" | "official" | "reopen";
+            action: "proxy_self" | "manager_draft" | "manager_submit" | "send" | "return" | "official" | "reopen";
             version: number;
             answers?: components["schemas"]["HrmAppraisalAnswer"][];
             self_rating?: components["schemas"]["HrmAppraisalRating"];
@@ -23092,7 +23072,6 @@ export interface components {
             self_submitted_at?: string;
             /** Format: date-time */
             manager_submitted_at?: string;
-            can_self: boolean;
             can_manage: boolean;
             can_center: boolean;
             self_late: boolean;
@@ -46936,24 +46915,6 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
-        };
-    };
-    hrmAppraisalGuestLink: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                period: string;
-                staff: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
-            /** @description hrm.appraisal_guest_unavailable */
-            503: components["responses"]["Problem"];
         };
     };
     hrmAppraisalPaper: {

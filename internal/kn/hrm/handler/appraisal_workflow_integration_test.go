@@ -26,6 +26,8 @@ type appraisalFixture struct {
 func newAppraisalFixture(t *testing.T) appraisalFixture {
 	t.Helper()
 	f := newRecFixture(t, true)
+	ff := withDocs(t, f)
+	f.svc.UseDocs(appraisalProofFiles{ff, f.tid})
 	// Cấp Xã thật luôn có OrgRef của lần gán; fixture hồ sơ cũ không cần vì bị chặn trước truy vấn.
 	xa := f.who["xa"]
 	k := *xa.KN
@@ -102,16 +104,16 @@ func TestHRMAppraisalWorkflowHTTP_W1126(t *testing.T) {
 	for _, tc := range []struct {
 		who   string
 		count int
-	}{{"xa", 1}, {"vc_tt", 1}, {"ld_tt", 2}, {"hcth", 3}, {"admin", 3}} {
+	}{{"ld_tt", 2}, {"hcth", 3}, {"admin", 3}} {
 		v := appraisalCall(t, f, tc.who, http.MethodGet, base+"/entries", "", nil, http.StatusOK)
 		if len(v["items"].([]any)) != tc.count {
 			t.Fatalf("%s thấy sai số phiếu: %v", tc.who, v)
 		}
 	}
 	appraisalCall(t, f, "ld_cn", http.MethodGet, base+"/entries/"+a.staff["xa"], "", nil, http.StatusNotFound)
-	appraisalCall(t, f, "xa", http.MethodGet, base+"/entries/"+a.staff["vc_tt"], "", nil, http.StatusNotFound)
+	appraisalCall(t, f, "xa", http.MethodGet, base+"/entries/"+a.staff["vc_tt"], "", nil, http.StatusForbidden)
 	appraisalCall(t, f, "other", http.MethodGet, base+"/entries", "", nil, http.StatusNotFound)
-	for _, as := range []string{"tw", "viewonly", "realmonly"} {
+	for _, as := range []string{"tw", "viewonly", "realmonly", "xa", "vc_tt"} {
 		appraisalCall(t, f, as, http.MethodGet, base+"/entries", "", nil, http.StatusForbidden)
 	}
 	// Ma trận người dùng phải thắng quyền mặc định HCTH, không tự mở rộng nhờ có vai trung tâm.
@@ -133,32 +135,37 @@ func TestHRMAppraisalWorkflowHTTP_W1126(t *testing.T) {
 	_ = json.Unmarshal(raw, &original)
 	original.Name = "Phiếu đã đổi sau ngày chốt"
 	appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/templates/form/"+original.Code, "form-updated-after-open", app.AppraisalTemplateChange{Status: "published", Version: 1, Form: &original}, http.StatusCreated)
-	detail := appraisalCall(t, f, "xa", http.MethodGet, base+"/entries/"+a.staff["xa"], "", nil, http.StatusOK)
+	detail := appraisalCall(t, f, "ld_tt", http.MethodGet, base+"/entries/"+a.staff["xa"], "", nil, http.StatusOK)
 	if detail["form"].(map[string]any)["id"] != form["id"] || detail["item"].(map[string]any)["self_late"] != true {
 		t.Fatal("mẫu không đóng băng hoặc thiếu cảnh báo muộn")
 	}
 	if len(detail["period"].(map[string]any)["forms"].(map[string]any)) != 0 {
-		t.Fatal("lộ cấu hình nhóm khác cho người tự chấm")
+		t.Fatal("lộ cấu hình nhóm khác cho lãnh đạo được phân công")
 	}
+	proxy := a.proxyInput(t, "xa", a.answers)
 	for _, bad := range []string{"1e100000", "1e-100000", strings.Repeat("9", 100000), "15.01", "-1"} {
-		answers := append([]domain.AppraisalAnswer(nil), a.answers...)
-		answers[0].Points = bad
-		a.change(t, period, "xa", "xa", "bad-entry-points", domain.AppraisalEntryChange{Action: "self_submit", Version: 1, Answers: answers, Reason: "Căn cứ nhiệm vụ được giao"}, http.StatusUnprocessableEntity)
+		badInput := proxy
+		badInput.Answers = append([]domain.AppraisalAnswer(nil), a.answers...)
+		badInput.Answers[0].Points = bad
+		a.change(t, period, "xa", "ld_tt", "bad-entry-points", badInput, http.StatusUnprocessableEntity)
 	}
-	self := domain.AppraisalEntryChange{Action: "self_submit", Version: 1, Answers: a.answers, Reason: "Căn cứ nhiệm vụ được giao"}
-	first := a.change(t, period, "xa", "xa", "submit-xa-first", self, http.StatusCreated)
+	first := a.change(t, period, "xa", "ld_tt", "submit-xa-first", proxy, http.StatusCreated)
 	if first["self_rating"] != "HTXSNV" || first["self"].(map[string]any)["total"] != "82" || first["self_late"] != true {
-		t.Fatalf("điểm/gợi ý/muộn: %v", first)
+		t.Fatalf("điểm/scan/muộn: %v", first)
 	}
-	if replay := a.change(t, period, "xa", "xa", "submit-xa-first", self, http.StatusCreated); replay["id"] != first["id"] {
+	if replay := a.change(t, period, "xa", "ld_tt", "submit-xa-first", proxy, http.StatusCreated); replay["id"] != first["id"] {
 		t.Fatal("replay thêm phiên bản")
 	}
-	a.change(t, period, "xa", "xa", "submit-stale-xa", self, http.StatusConflict)
-	a.change(t, period, "vc_tt", "xa", "submit-another-person", self, http.StatusNotFound)
-	// Quản lý không được dùng đường tự chấm để bỏ bước chứng từ của nhập thay.
-	a.change(t, period, "vc_tt", "ld_tt", "manager-self-bypass", self, http.StatusForbidden)
+	a.change(t, period, "xa", "ld_tt", "submit-stale-xa", proxy, http.StatusConflict)
+	removed := domain.AppraisalEntryChange{Action: "self_submit", Version: 1, Answers: a.answers}
+	a.change(t, period, "vc_tt", "xa", "submit-another-person", removed, http.StatusForbidden)
+	a.change(t, period, "vc_tt", "ld_tt", "manager-self-bypass", removed, http.StatusUnprocessableEntity)
 	for _, who := range []string{"vc_tt", "hcth2"} {
-		a.change(t, period, who, who, "submit-"+who, self, http.StatusCreated)
+		as := "ld_tt"
+		if who == "hcth2" {
+			as = "hcth"
+		}
+		a.change(t, period, who, as, "submit-"+who, a.proxyInput(t, who, a.answers), http.StatusCreated)
 	}
 	for _, who := range []string{"xa", "vc_tt", "hcth2"} {
 		as := "ld_tt"
@@ -198,10 +205,22 @@ func TestHRMAppraisalWorkflowHTTP_W1126(t *testing.T) {
 	if a.detail(t, period, "vc_tt")["status"] != domain.AppraisalClosed {
 		t.Fatal("mở một người làm mở người khác")
 	}
-	h := appraisalCall(t, f, "xa", http.MethodGet, base+"/entries/"+a.staff["xa"]+"/history", "", nil, http.StatusOK)
+	h := appraisalCall(t, f, "hcth", http.MethodGet, base+"/entries/"+a.staff["xa"]+"/history", "", nil, http.StatusOK)
 	if len(h["items"].([]any)) < 8 {
 		t.Fatal("mất lịch sử sửa/chốt/mở lại")
 	}
-	appraisalCall(t, f, "xa", http.MethodGet, base+"/entries/"+a.staff["xa"]+"/history?before="+strings.Repeat("9", 100000), "", nil, http.StatusUnprocessableEntity)
-	appraisalCall(t, f, "hcth", http.MethodPost, base+"/entries/"+a.staff["xa"]+"/guest-link", "guest-unavailable", nil, http.StatusServiceUnavailable)
+	appraisalCall(t, f, "hcth", http.MethodGet, base+"/entries/"+a.staff["xa"]+"/history?before="+strings.Repeat("9", 100000), "", nil, http.StatusUnprocessableEntity)
+	if r := appraisalRequest(f, "hcth", http.MethodPost, base+"/entries/"+a.staff["xa"]+"/guest-link", "guest-removed", nil); r.Code != http.StatusNotFound {
+		t.Fatalf("guest route còn tồn tại: %d", r.Code)
+	}
+}
+
+func (a appraisalFixture) proxyInput(t *testing.T, who string, answers []domain.AppraisalAnswer) domain.AppraisalEntryChange {
+	t.Helper()
+	f := a.f
+	f.call("admin", http.MethodPost, "/v1/hrm/docs/folders/defaults", nil, http.StatusCreated)
+	folder := folderByKey(t, f.call("hcth", http.MethodGet, "/v1/hrm/docs/folders", nil, http.StatusOK), "danh_gia")
+	doc := f.upload("hcth", map[string]any{"folder_id": folder, "title": "Bản giấy đã đối chiếu", "doc_type": "danh_gia", "unit_code": map[string]string{"xa": "trong_trot", "vc_tt": "trong_trot", "hcth2": "hcth"}[who], "staff_ids": []string{a.staff[who]}}, "phieu.pdf", pdf, http.StatusCreated)
+	proof := uuid.MustParse(doc["doc_id"].(string))
+	return domain.AppraisalEntryChange{Action: "proxy_self", Version: 1, Answers: answers, Reason: "Căn cứ bản giấy đã được đối chiếu", ProxyDocument: &proof}
 }

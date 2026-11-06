@@ -1833,12 +1833,6 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
                 "badge": "extension.report_tasks.todo"
               }
             ]
-          },
-          {
-            "key": "xa.hcth.danh_gia",
-            "label": "Đánh giá của tôi",
-            "route": "/kn/nhan-su/danh-gia-cua-toi",
-            "icon": "approve"
           }
         ]
       },

@@ -312,17 +312,6 @@
                     "Children": null
                   }
                 ]
-              },
-              {
-                "Key": "xa.hcth.danh_gia",
-                "Label": "Đánh giá của tôi",
-                "Route": "/kn/nhan-su/danh-gia-cua-toi",
-                "Icon": "approve",
-                "BadgeSource": "",
-                "Requires": null,
-                "ComingSoon": false,
-                "Needs": "",
-                "Children": null
               }
             ]
           },

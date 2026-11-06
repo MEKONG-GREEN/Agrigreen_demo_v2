@@ -320,8 +320,8 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 		}
 		n := appraisalNotice(p, c, "open", "self", saved.ID)
 		for _, entry := range members {
-			if entry.Member.ExcludedReason == "" && entry.Member.AccountRef != nil {
-				n.Targets = append(n.Targets, *entry.Member.AccountRef)
+			if entry.Member.ExcludedReason == "" {
+				appraisalManagerAudience(&n, entry.Member)
 			}
 		}
 		return s.enqueueAppraisalNotice(ctx, tx, c, n)

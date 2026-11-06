@@ -20,7 +20,7 @@ const (
 	PermSensitive Perm = "sensitive.view" // xem/sửa thẻ Thống kê BC Sở (TK-01..06)
 	PermExport    Perm = "export"         // xuất danh sách
 	PermAudit     Perm = "audit.view"     // xem nhật ký xem/xuất của hồ sơ
-	PermAppraisal Perm = "assessment"     // phiếu/đề xuất đánh giá (FN-15–18, FN-21)
+	PermAppraisal Perm = "assessment"     // đề xuất đánh giá của lãnh đạo/HCTH (FN-16–18)
 )
 
 // Perms theo thứ tự hiển thị. W11.24: hai nhóm quyền tài liệu (docs.go — FN-20 "quản lý tài liệu").
@@ -72,8 +72,6 @@ func DefaultMatrix(group string) Matrix {
 		m[PermView], m[PermExport] = ScopeUnit, ScopeUnit
 		m[PermDocView] = ScopeUnit // W11.24 FN-14: lãnh đạo phòng xem tài liệu phòng mình
 		m[PermAppraisal] = ScopeUnit
-	case GroupTinh, GroupXa:
-		m[PermAppraisal] = ScopeSelf
 	}
 	return m
 }
@@ -117,6 +115,9 @@ func ParseMatrix(kind, grantee string, raw []byte) (Matrix, []byte, error) {
 		if !containsScope(Scopes, s) {
 			return nil, nil, invalid("phạm vi %q", v)
 		}
+		if p == PermAppraisal && kind == GranteeRole && grantee != GroupHCTH && grantee != GroupManager && s != ScopeNone {
+			return nil, nil, invalid("HCTH v4.0: chỉ lãnh đạo/HCTH được cấp quyền đánh giá")
+		}
 		if p == PermSensitive {
 			if s != ScopeNone && s != ScopeAll {
 				return nil, nil, invalid("thẻ Thống kê BC Sở: phạm vi none hoặc all")
@@ -141,6 +142,10 @@ func EffectiveMatrix(group string, role, user Matrix) Matrix {
 		for p, s := range src {
 			m[p] = s
 		}
+	}
+	// Quyền cũ vẫn có lịch sử; override không khôi phục capability đã bị bỏ.
+	if group != GroupHCTH && group != GroupManager {
+		m[PermAppraisal] = ScopeNone
 	}
 	return m
 }

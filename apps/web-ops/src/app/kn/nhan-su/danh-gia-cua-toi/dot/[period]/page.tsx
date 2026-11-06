@@ -1,1 +1,0 @@
-"use client"; import { useParams } from "next/navigation"; import { AppraisalPeriodScreen } from "@/kn/hrm/AppraisalListScreens"; export default function Page(){const p=useParams<{period:string}>(); return <AppraisalPeriodScreen period={p.period} mine/>;}

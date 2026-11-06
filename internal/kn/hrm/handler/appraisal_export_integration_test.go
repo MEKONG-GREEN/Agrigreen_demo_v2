@@ -34,11 +34,11 @@ import (
 func (a appraisalFixture) finish(t *testing.T, period string) {
 	t.Helper()
 	for _, who := range []string{"xa", "vc_tt", "hcth2"} {
-		a.change(t, period, who, who, "self-ready-"+period+who, domain.AppraisalEntryChange{Action: "self_submit", Version: 1, Answers: a.answers, Reason: "Căn cứ nhiệm vụ của cá nhân"}, http.StatusCreated)
 		as := "ld_tt"
 		if who == "hcth2" {
 			as = "hcth"
 		}
+		a.change(t, period, who, as, "proxy-ready-"+period+who, a.proxyInput(t, who, a.answers), http.StatusCreated)
 		a.change(t, period, who, as, "manager-ready-"+period+who, domain.AppraisalEntryChange{Action: "manager_submit", Version: 2, Answers: a.answers, CollectiveRating: "HTTNV", Reason: "Căn cứ họp tập thể của đơn vị"}, http.StatusCreated)
 	}
 	appraisalCall(t, a.f, "ld_tt", http.MethodPost, "/v1/hrm/appraisals/periods/"+period, "send-ready-"+period, app.AppraisalPeriodChange{Action: "send", Version: 1, Unit: "trong_trot"}, http.StatusCreated)
@@ -95,18 +95,18 @@ func TestHRMAppraisalExportAndAuditHTTP_W1126(t *testing.T) {
 	a.finish(t, period)
 	var firstVersion string
 	for _, path := range []string{base + "/entries", base + "/entries/" + a.staff["xa"], base + "/entries/" + a.staff["xa"] + "/history"} {
-		before := appraisalAuditCount(t, a, "xa", "self")
-		value := appraisalCall(t, f, "xa", http.MethodGet, path, "", nil, http.StatusOK)
+		before := appraisalAuditCount(t, a, "ld_tt", "unit")
+		value := appraisalCall(t, f, "ld_tt", http.MethodGet, path, "", nil, http.StatusOK)
 		if path == base+"/entries/"+a.staff["xa"] {
 			firstVersion = value["item"].(map[string]any)["id"].(string)
 		}
-		if after := appraisalAuditCount(t, a, "xa", "self"); after != before+1 {
-			t.Fatalf("không audit đúng scope self %s: %d→%d", path, before, after)
+		if after := appraisalAuditCount(t, a, "ld_tt", "unit"); after != before+1 {
+			t.Fatalf("không audit đúng scope unit %s: %d→%d", path, before, after)
 		}
 	}
-	before := appraisalAuditCount(t, a, "xa", "self")
-	appraisalCall(t, f, "xa", http.MethodGet, base+"/entries/"+a.staff["xa"]+"/versions/"+firstVersion, "", nil, http.StatusOK)
-	if appraisalAuditCount(t, a, "xa", "self") != before+1 {
+	before := appraisalAuditCount(t, a, "ld_tt", "unit")
+	appraisalCall(t, f, "ld_tt", http.MethodGet, base+"/entries/"+a.staff["xa"]+"/versions/"+firstVersion, "", nil, http.StatusOK)
+	if appraisalAuditCount(t, a, "ld_tt", "unit") != before+1 {
 		t.Fatal("thiếu audit bản lịch sử")
 	}
 	before = appraisalAuditCount(t, a, "hcth", "all")
@@ -329,14 +329,18 @@ func TestHRMAppraisalProofAndSignedHTTP_W1126(t *testing.T) {
 	body := domain.AppraisalEntryChange{Action: "proxy_self", Version: 1, Answers: a.answers, Reason: "Bản giấy có chữ ký đã đối chiếu", ProxyDocument: &bad}
 	a.change(t, period, "vc_tt", "ld_tt", "proxy-wrong-binding", body, http.StatusNotFound)
 	body.ProxyDocument = &good
-	a.change(t, period, "vc_tt", "xa", "proxy-self-forbidden", body, http.StatusNotFound)
+	a.change(t, period, "vc_tt", "xa", "proxy-self-forbidden", body, http.StatusForbidden)
 	first := a.change(t, period, "vc_tt", "ld_tt", "proxy-good-document", body, http.StatusCreated)
 	replay := a.change(t, period, "vc_tt", "ld_tt", "proxy-good-document", body, http.StatusCreated)
 	if first["id"] != replay["id"] || first["proxy_document"] != good.String() {
 		t.Fatal("nhập thay mất scan/replay")
 	}
 	for _, who := range []string{"xa", "hcth2"} {
-		a.change(t, period, who, who, "self-proof-"+who, domain.AppraisalEntryChange{Action: "self_submit", Version: 1, Answers: a.answers, Reason: "Căn cứ thực hiện nhiệm vụ cá nhân"}, http.StatusCreated)
+		as := "ld_tt"
+		if who == "hcth2" {
+			as = "hcth"
+		}
+		a.change(t, period, who, as, "proxy-proof-"+who, a.proxyInput(t, who, a.answers), http.StatusCreated)
 	}
 	for _, who := range []string{"xa", "vc_tt", "hcth2"} {
 		as := "ld_tt"

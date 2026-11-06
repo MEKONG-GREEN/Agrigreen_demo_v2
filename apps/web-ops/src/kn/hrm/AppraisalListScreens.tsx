@@ -8,13 +8,13 @@ import { PageHeader, StatusPill, DataTable } from "@/components/patterns/list";
 import { LoadState, useLoad } from "@/kn/cycle/common";
 import { APPRAISAL_BASE, APPRAISAL_STATUS, type AppraisalPeriodInput } from "./appraisal-api";
 import { appraisalYear, APPRAISAL_RATING_LABEL } from "./appraisal-form";
-import { GROUPS, MINE_BASE, asISO, useAppraisalAction, useAppraisalApi } from "./appraisal-ui";
+import { GROUPS, asISO, useAppraisalAction, useAppraisalApi } from "./appraisal-ui";
 import { vnDate } from "./staff-api";
 
-export function AppraisalListScreen({ mine = false }: { mine?: boolean }) {
- const api=useAppraisalApi(),access=useLoad(()=>api.access(),[]),periods=useLoad(()=>api.periods(),[]),base=mine?MINE_BASE:APPRAISAL_BASE;
+export function AppraisalListScreen() {
+ const api=useAppraisalApi(),access=useLoad(()=>api.access(),[]),periods=useLoad(()=>api.periods(),[]),base=APPRAISAL_BASE;
  const center=access.data?.perms.assessment==="all"&&["admin","hcth"].includes(access.data.group);
- return <><PageHeader title={mine?"Đánh giá của tôi":"Đợt đánh giá"} actions={center?<><Link className="btn btn-o" href={APPRAISAL_BASE+"/mau"}>Mẫu và phiếu đánh giá</Link><Link className="btn btn-p" href={APPRAISAL_BASE+"/dot/them-moi"}>Mở đợt mới</Link></>:undefined}>Danh sách và chức vụ được chụp tại ngày chốt; kết quả quý và năm được kết luận độc lập.</PageHeader>
+ return <><PageHeader title="Đợt đánh giá" actions={center?<><Link className="btn btn-o" href={APPRAISAL_BASE+"/mau"}>Mẫu và phiếu đánh giá</Link><Link className="btn btn-p" href={APPRAISAL_BASE+"/dot/them-moi"}>Mở đợt mới</Link></>:undefined}>Danh sách và chức vụ được chụp tại ngày chốt; kết quả quý và năm được kết luận độc lập.</PageHeader>
  <LoadState s={periods}>{v=><DataTable caption="Danh sách đợt đánh giá" rows={v.items} rowKey={p=>p.id} empty="Chưa có đợt đánh giá trong phạm vi của bạn." columns={[
  {key:"period",header:"Đợt",cell:p=>p.label},{key:"cutoff",header:"Ngày chốt",cell:p=>vnDate(p.cutoff_on)},
  {key:"self",header:"Hạn tự đánh giá",cell:p=>vnDate(p.self_due_at)},{key:"manager",header:"Hạn cấp quản lý",cell:p=>vnDate(p.manager_due_at)},
@@ -39,9 +39,9 @@ function OpenAppraisal({ onClose, onSaved }: { onClose: () => void; onSaved: () 
     <label><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} /> Xác nhận cảnh báo hồ sơ còn thiếu sau khi đã kiểm danh sách</label>{error ? <p role="alert">{error}</p> : null}<div className="row"><button className="btn btn-p" disabled={act.busy}>Mở đợt và phát hành phiếu</button><button type="button" className="btn btn-o" onClick={onClose}>Đóng</button></div>
   </form></section>;
 }
-export function AppraisalPeriodScreen({ period, mine = false }: { period: string; mine?: boolean }) {
+export function AppraisalPeriodScreen({ period }: { period: string }) {
   const api = useAppraisalApi(), list = useLoad(() => api.periods(), [period]), entries = useLoad(() => api.entries(period), [period]);
-  const [unit, setUnit] = useState(""), [status, setStatus] = useState(""), base = mine ? MINE_BASE : APPRAISAL_BASE;
+  const [unit, setUnit] = useState(""), [status, setStatus] = useState(""), base = APPRAISAL_BASE;
   const p = list.data?.items.find(x => x.id === period);
   return <><Link className="back-link" href={base}>Đợt đánh giá</Link><PageHeader title={p?.label ?? "Phiếu và đề xuất xếp loại"}>Mẫu số 05 theo đơn vị quản lý tại ngày chốt; Mẫu số 06 do HCTH nhập theo kết luận tập thể.</PageHeader>
     <LoadState s={entries}>{v => { const visible = v.items.filter(x => (!unit || x.member.management_unit === unit) && (!status || x.status === status)); return <><div className="row"><label>Đơn vị<select aria-label="Đơn vị" value={unit} onChange={e => setUnit(e.target.value)}><option value="">Tất cả trong phạm vi</option>{[...new Set(v.items.map(x => x.member.management_unit))].map(u => <option key={u}>{u}</option>)}</select></label><label>Trạng thái<select aria-label="Trạng thái" value={status} onChange={e => setStatus(e.target.value)}><option value="">Tất cả</option>{Object.entries(APPRAISAL_STATUS).map(([k,label]) => <option key={k} value={k}>{label}</option>)}</select></label></div>
@@ -51,7 +51,7 @@ export function AppraisalPeriodScreen({ period, mine = false }: { period: string
  {key:"self",header:"Cá nhân",cell:x=>APPRAISAL_RATING_LABEL[x.self_rating]},{key:"collective",header:"Tập thể",cell:x=>APPRAISAL_RATING_LABEL[x.collective_rating]},
  {key:"status",header:"Trạng thái",cell:x=>APPRAISAL_STATUS[x.status]+(x.self_late||x.manager_late?" · Trễ hạn":"")},{key:"actions",header:"Thao tác",cell:x=><Link href={`${base}/dot/${period}/phieu/${x.member.staff_id}`}>Mở phiếu</Link>}
  ]}/></>; }}</LoadState>
-    {p && !mine ? <AppraisalPeriodActions period={p} onChanged={() => { list.reload(); entries.reload(); }} /> : null}
+    {p ? <AppraisalPeriodActions period={p} onChanged={() => { list.reload(); entries.reload(); }} /> : null}
   </>;
 }
 import { AppraisalPeriodActions } from "./AppraisalPeriodActions";

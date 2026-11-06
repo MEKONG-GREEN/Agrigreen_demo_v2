@@ -358,29 +358,31 @@ describe("AppShell: nguồn menu và kiểm hiển thị", () => {
 });
 
 
-describe("HRM canonical links use the existing own appraisal leaf (W11.26)",()=>{
+describe("HRM v4.0: gỡ tự đánh giá, giữ route lãnh đạo/HCTH",()=>{
  const period="019abcde-0000-7000-8000-000000000001",staff="019abcde-0000-7000-8000-000000000002";
  const canonical=`/kn/nhan-su/danh-gia/dot/${period}/phieu/${staff}`;
- const ownTree=():MenuTree=>({version:"test",role:"kn_xa",department_code:"hanh_chinh_tong_hop",groups:[{key:"dieu_hanh",label:"Điều hành",items:[{key:"xa.hcth.danh_gia",label:"Nhãn có thể đổi",icon:"approve",href:"/kn/nhan-su/danh-gia-cua-toi",status:"active"}]}]});
- it("maps exact UUID period/entry to an existing usable own-menu href and breadcrumb",()=>{
-  const tree=ownTree();expect(menuAllows(tree,canonical)).toBe(true);
-  expect(findActive(tree,canonical)?.node.href).toBe("/kn/nhan-su/danh-gia-cua-toi");
-  expect(menuAllows(tree,`/kn/nhan-su/danh-gia/dot/${period}`)).toBe(true);
-  expect(crumbsFor(tree,canonical)).toEqual(["Điều hành","Nhãn có thể đổi"]);
+ const center=():MenuTree=>({version:"test",role:"kn_tinh",department_code:"hanh_chinh_tong_hop",groups:[{key:"dieu_hanh",label:"Điều hành",items:[{key:"tinh.hcth.danh_gia",label:"Đánh giá",icon:"approve",href:"/kn/nhan-su/danh-gia",status:"active"}]}]});
+ it("chỉ ánh xạ URL UUID thực vào lá hiện có, giữ breadcrumb và các màn HCTH",()=>{
+  const tree=center();
+  expect(menuAllows(tree,canonical)).toBe(true);
+  expect(findActive(tree,canonical)?.node.href).toBe("/kn/nhan-su/danh-gia");
+  expect(crumbsFor(tree,canonical)).toEqual(["Điều hành","Đánh giá"]);
+  for(const tail of ["/dot/them-moi","/mau","/mau/them-moi"])expect(menuAllows(tree,"/kn/nhan-su/danh-gia"+tail)).toBe(true);
+  const admin=center();admin.role="admin";admin.department_code=null;expect(menuAllows(admin,canonical)).toBe(true);
  });
- it("denies disabled/missing own leaf, TW, other department, malformed or additional path",()=>{
-  for(const role of ["kn_tw",null] as const){const tree=ownTree();tree.role=role;expect(menuAllows(tree,canonical)).toBe(false);}
-  const other=ownTree();other.department_code="trong_trot";expect(menuAllows(other,canonical)).toBe(false);
-  const disabled=ownTree();disabled.groups[0]!.items[0]!.status="coming_soon";expect(menuAllows(disabled,canonical)).toBe(false);
-  const absent=ownTree();absent.groups[0]!.items[0]!.href="/kn/nhan-su/ho-so";expect(menuAllows(absent,canonical)).toBe(false);
-  for(const path of [canonical+"/extra",canonical+"?x=1",canonical.replace(period,"not-a-uuid"),canonical.replace(staff,"%2F"),"/kn/nhan-su/danh-gia/unknown","/kn/nhan-su/ho-so/new"]){expect(menuAllows(ownTree(),path)).toBe(false);}
-  const center=ownTree();center.role="kn_tinh";center.groups[0]!.items[0]!.href="/kn/nhan-su/danh-gia";
-  expect(menuAllows(center,canonical)).toBe(true);expect(menuAllows(center,canonical+"/extra")).toBe(false);
-  expect(menuAllows(center,"/kn/nhan-su/danh-gia/dot/them-moi")).toBe(true);
-  expect(menuAllows(center,"/kn/nhan-su/danh-gia/mau/them-moi")).toBe(true);
-  expect(menuAllows(ownTree(),"/kn/nhan-su/danh-gia/mau/them-moi")).toBe(false);
-  const admin=structuredClone(center);admin.role="admin";admin.department_code=null;
-  expect(menuAllows(admin,canonical)).toBe(true);admin.groups[0]!.items=[];expect(menuAllows(admin,canonical)).toBe(false);
-
+ it("URL cũ không được mở, kể cả menu cũ đã cache; Cấp Xã không dùng alias trung tâm",()=>{
+  const removed="/kn/nhan-su/danh-gia-cua-toi";
+  for(const role of ["kn_xa","kn_tinh","admin"] as const){
+   const tree=center();tree.role=role;tree.groups[0]!.items[0]!.href=removed;
+   for(const path of [removed,`${removed}/dot/${period}`,`${removed}/dot/${period}/phieu/${staff}`,canonical])expect(menuAllows(tree,path)).toBe(false);
+  }
+  const xa=center();xa.role="kn_xa";expect(menuAllows(xa,canonical)).toBe(false);
+ });
+ it("chặn vai/phòng sai, thiếu menu, URL hỏng và suffix ngoài trang hiện có",()=>{
+  for(const role of ["kn_tw",null] as const){const tree=center();tree.role=role;expect(menuAllows(tree,canonical)).toBe(false);}
+  const other=center();other.department_code="trong_trot";expect(menuAllows(other,canonical)).toBe(false);
+  const disabled=center();disabled.groups[0]!.items[0]!.status="coming_soon";expect(menuAllows(disabled,canonical)).toBe(false);
+  const absent=center();absent.groups[0]!.items=[];expect(menuAllows(absent,canonical)).toBe(false);
+  for(const path of [canonical+"/extra",canonical+"?x=1",canonical.replace(period,"not-a-uuid"),canonical.replace(staff,"%2F"),"/kn/nhan-su/danh-gia/unknown"])expect(menuAllows(center(),path)).toBe(false);
  });
 });

@@ -206,19 +206,6 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
 # @ag-order: 2009
-  /v1/hrm/appraisals/periods/{period}/entries/{staff}/guest-link:
-    parameters:
-      - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
-      - {name: staff, in: path, required: true, schema: {type: string, format: uuid}}
-    post:
-      summary: Fail-closed tới khi W10.18 guest OTP (#184) có TTL/one-time/rate-limit/tenant-subject binding
-      operationId: hrmAppraisalGuestLink
-      tags: [hrm]
-      responses:
-        "403": {$ref: "#/components/responses/Problem"}
-        "404": {$ref: "#/components/responses/Problem"}
-        "503": {description: hrm.appraisal_guest_unavailable, $ref: "#/components/responses/Problem"}
-# @ag-order: 2010
   /v1/hrm/appraisals/periods/{period}/paper/{kind}:
     parameters:
       - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
@@ -391,7 +378,7 @@ components:
       additionalProperties: false
       required: [action, version]
       properties:
-        action: {type: string, enum: [self_draft, self_submit, proxy_self, manager_draft, manager_submit, send, return, official, reopen]}
+        action: {type: string, enum: [proxy_self, manager_draft, manager_submit, send, return, official, reopen]}
         version: {type: integer, minimum: 1}
         answers: {type: array, maxItems: 200, items: {$ref: "#/components/schemas/HrmAppraisalAnswer"}}
         self_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
@@ -405,7 +392,7 @@ components:
 # @ag-order: 2028
     HrmAppraisalItem:
       type: object
-      required: [id, period_id, version, actor_ref, recorded_at, action, member, status, self, manager, self_rating, collective_rating, official_rating, closed_rating, reason, personnel_proposal, note, correction_reason, returned_to, reopened, can_self, can_manage, can_center, self_late, manager_late]
+      required: [id, period_id, version, actor_ref, recorded_at, action, member, status, self, manager, self_rating, collective_rating, official_rating, closed_rating, reason, personnel_proposal, note, correction_reason, returned_to, reopened, can_manage, can_center, self_late, manager_late]
       properties:
         id: {type: string, format: uuid}
         period_id: {type: string, format: uuid}
@@ -449,7 +436,6 @@ components:
         proxy_document: {type: string, format: uuid}
         self_submitted_at: {type: string, format: date-time}
         manager_submitted_at: {type: string, format: date-time}
-        can_self: {type: boolean}
         can_manage: {type: boolean}
         can_center: {type: boolean}
         self_late: {type: boolean}

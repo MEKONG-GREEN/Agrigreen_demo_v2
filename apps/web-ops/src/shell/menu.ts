@@ -46,28 +46,21 @@ function matches(href: string, pathname: string): boolean {
 }
 
 const HRM_APPRAISAL = "/kn/nhan-su/danh-gia";
-const HRM_OWN_APPRAISAL = "/kn/nhan-su/danh-gia-cua-toi";
 const appraisalUUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const appraisalDetail = new RegExp(`^/dot/${appraisalUUID}(?:/phieu/${appraisalUUID})?$`,"i");
 
-// Alias thông báo chỉ đến phiếu UUID và lá tự đánh giá đang dùng trong phòng HCTH.
-// Không dùng nhãn và không cho phép toàn bộ tiền tố HRM; backend kiểm quyền bản chụp lần nữa.
+// Chỉ các trang hiện có được ánh xạ vào lá đánh giá của lãnh đạo/HCTH.
+// Không nhận URL cũ hoặc đường dẫn gần giống; backend kiểm phân công lần nữa.
 function appraisalLink(tree: MenuTree, pathname: string): MenuLink | null | undefined {
- const own = pathname === HRM_OWN_APPRAISAL || pathname.startsWith(HRM_OWN_APPRAISAL + "/");
- const center = pathname === HRM_APPRAISAL || pathname.startsWith(HRM_APPRAISAL + "/");
- if(!own && !center)return undefined;
+ if(!pathname.startsWith(HRM_APPRAISAL))return undefined;
+ if(pathname !== HRM_APPRAISAL && !pathname.startsWith(HRM_APPRAISAL + "/"))return null;
  const admin = tree.role === "admin";
- if(!admin && (tree.department_code !== "hanh_chinh_tong_hop" || (tree.role !== "kn_tinh" && tree.role !== "kn_xa")))return null;
- if(admin && own)return null;
- const base = own ? HRM_OWN_APPRAISAL : HRM_APPRAISAL;
- const tail = pathname.slice(base.length);
+ if(!admin && (tree.department_code !== "hanh_chinh_tong_hop" || tree.role !== "kn_tinh"))return null;
+ const tail = pathname.slice(HRM_APPRAISAL.length);
  const detail = appraisalDetail.test(tail);
- const editor = center && (tree.role === "kn_tinh" || admin) && (tail === "/dot/them-moi" || new RegExp(`^/mau/(?:them-moi|${appraisalUUID})$`,"i").test(tail));
- if(tail !== "" && !(center && tail === "/mau" && (tree.role === "kn_tinh" || admin)) && !detail && !editor)return null;
- const links = menuLinks(tree);
- const direct = links.find(l => l.node.href === base);
- if(direct)return direct;
- return !admin && center && detail ? links.find(l => l.node.href === HRM_OWN_APPRAISAL) ?? null : null;
+ const editor = tail === "/dot/them-moi" || new RegExp(`^/mau/(?:them-moi|${appraisalUUID})$`,"i").test(tail);
+ if(tail !== "" && tail !== "/mau" && !detail && !editor)return null;
+ return menuLinks(tree).find(l => l.node.href === HRM_APPRAISAL) ?? null;
 }
 
 // Historical FN19 pages have department aliases, while module menus use the

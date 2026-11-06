@@ -85,7 +85,7 @@ func appraisalDrafts(ctx context.Context, acc port.Access, dir port.NotifyDirect
 	body := "Đợt đánh giá đã có bước cần thực hiện. Mở phiếu/đề xuất được phân công để kiểm tra."
 	switch p.Action {
 	case "open":
-		body = "Đợt đã mở. Hãy hoàn tất phiếu tự đánh giá được phát hành cho mình."
+		body = "Đợt đã mở. Lãnh đạo/HCTH nhập đề xuất cho người được phân công."
 	case "remind":
 		title = "Nhắc hoàn tất đánh giá " + label
 	case "return", "reopen":
