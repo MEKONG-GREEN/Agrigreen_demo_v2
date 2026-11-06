@@ -1,4 +1,4 @@
-## CNTS-V4-CHECKOUT-PHOTO (#249) — check-in bắt buộc ảnh, check-out kèm ảnh (pf 20261106145523)
+## CNTS-V4-CHECKOUT-PHOTO — Check-in bắt buộc ảnh, check-out kèm ảnh (#249, pf 20261106145523)
 
 Nguồn: BRD CNTS v4.0 (CR-CNTS-001) FN-12 (B4, B4b, luồng ngoại lệ, BR-06, BR-07, BR-08, AC-09, AC-11, AC-12, AC-13),
 UR-XA-05, UR-XA-09 CV-07/CV-08, UR-TINH-18, Mục VIII "Định vị, ảnh", "Làm việc offline"; PLAN-BRD2 mục 5 (check-in cũ

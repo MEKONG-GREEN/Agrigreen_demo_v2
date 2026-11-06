@@ -21,5 +21,6 @@ Dùng lại mã đã có của module: `extension.read_only`, `extension.out_of_
 | 409 | `extension.checkout_no_checkin` | Check-out mục chưa check-in — check-out chỉ sau khi đã check-in (CNTS v4.0 FN-12 B4b) |
 | 409 | `extension.checkout_exists` | Mục công tác đã check-out — check-out không sửa được (BR-06); `checkout_id` trong phần mở rộng |
 | 404 | `extension.visit_photo_not_found` | Không có ảnh check-in/check-out của mục (chưa check-in/check-out, hoặc check-in cũ trước v4.0 không ảnh) |
-| 422 | `validation_failed` (`photo`) | Check-in/check-out thiếu ảnh, ảnh không phải base64, quá 500 KB hoặc không phải JPEG/PNG/WebP (FN-12 AC-09) |
-| 503 | `extension.dependency_unavailable` | Chưa nối kho tệp — không ghi/đọc được ảnh check-in/check-out |
+
+Check-in/check-out (CNTS v4.0 FN-12, #249) thiếu ảnh, ảnh không phải base64, quá 500 KB hoặc không phải JPEG/PNG/WebP →
+`validation_failed` trường `photo` (AC-09); chưa nối kho tệp ảnh → `extension.dependency_unavailable`.

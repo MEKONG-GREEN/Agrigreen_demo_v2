@@ -15,6 +15,8 @@
 -- kiểu, cỡ, SHA-256. Ảnh nén ≤ 500 KB (BRD Mục VIII "Định vị, ảnh").
 -- Vai r_extension: sổ check-out SELECT, INSERT.
 
+SET LOCAL lock_timeout = '5s';
+
 ALTER TABLE pf_extension.work_schedule_checkin
   ADD COLUMN photo_key          text    NULL CHECK (photo_key IS NULL OR char_length(photo_key) BETWEEN 1 AND 400),
   ADD COLUMN photo_content_type text    NULL CHECK (photo_content_type IS NULL OR photo_content_type IN ('image/jpeg', 'image/png', 'image/webp')),
@@ -24,7 +26,8 @@ SELECT shared.register_ledger_columns('pf_extension.work_schedule_checkin',
   ARRAY['photo_key', 'photo_content_type', 'photo_size_bytes', 'photo_sha256']);
 ALTER TABLE pf_extension.work_schedule_checkin ADD CONSTRAINT work_schedule_checkin_photo_all
   CHECK ((photo_key IS NULL) = (photo_content_type IS NULL) AND (photo_key IS NULL) = (photo_size_bytes IS NULL)
-     AND (photo_key IS NULL) = (photo_sha256 IS NULL));
+     AND (photo_key IS NULL) = (photo_sha256 IS NULL)) NOT VALID;
+ALTER TABLE pf_extension.work_schedule_checkin VALIDATE CONSTRAINT work_schedule_checkin_photo_all;
 
 CREATE TABLE pf_extension.work_schedule_checkout (
   id                  uuid          NOT NULL,             -- UUIDv7 — mã check-out
