@@ -29,6 +29,7 @@ type allocationRecord struct {
 	bytes      uint64
 	inCallback bool
 	complete   bool
+	lastFrame  string
 }
 
 type allocationSnapshot map[string]allocationRecord
@@ -89,7 +90,10 @@ func snapshotAllocationBytes(t *testing.T) allocationSnapshot {
 		}
 		record := out[key]
 		record.bytes += allocated
-		record.complete = fn.Name() == "runtime.goexit" || fn.Name() == "runtime.main" || fn.Name() == "runtime.systemstack"
+		// Scheduler frames terminate at mcall on g0; they are complete system
+		// stacks, not truncated application stacks (runtime/stubs.go).
+		record.lastFrame = fn.Name()
+		record.complete = fn.Name() == "runtime.goexit" || fn.Name() == "runtime.main" || fn.Name() == "runtime.systemstack" || fn.Name() == "runtime.mcall"
 		out[key] = record
 		current = key
 	}
@@ -123,7 +127,7 @@ func allocatedBytes(t *testing.T, f func()) uint64 {
 		} else if !record.complete {
 			// A truncated stack could hide the sentinel. Fail closed instead
 			// of silently excluding a deeply nested callback allocation.
-			t.Fatal("allocation attribution ambiguous: new stack is incomplete")
+			t.Fatalf("allocation attribution ambiguous: bytes=%d last=%s stack=%s", delta, record.lastFrame, stack)
 		}
 	}
 	return used
