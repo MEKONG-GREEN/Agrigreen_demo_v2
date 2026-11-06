@@ -58,6 +58,7 @@ function check(i: Input): { field: string; reason: string }[] {
   if (!i.template_code) e.push({ field: "template_code", reason: "bắt buộc" });
   if (i.template_version != null && i.template_version < 1) e.push({ field: "template_version", reason: "phiên bản biểu từ 1 trở lên" });
   if (i.scope_mode === "communes" && !(i.communes ?? []).length) e.push({ field: "communes", reason: "phạm vi không có xã nào" });
+  if (i.scope_mode === "households" && !(i.households ?? []).length) e.push({ field: "households", reason: "chọn ít nhất một hộ chăn nuôi" });
   if (!i.from_date || !i.to_date || i.to_date < i.from_date) e.push({ field: "to_date", reason: "đến ngày ≥ từ ngày" });
   if (!i.due_at) e.push({ field: "due_at", reason: "bắt buộc" });
   if (!i.owner_ref) e.push({ field: "owner_ref", reason: "người phụ trách đợt bắt buộc" });
@@ -66,6 +67,7 @@ function check(i: Input): { field: string; reason: string }[] {
 
 function communesOf(i: Input): string[] {
   if (i.scope_mode === "communes") return [...new Set(i.communes ?? [])];
+  if (i.scope_mode === "households") return ["91307"]; // giả lập: xã của hộ không tra sổ hộ
   return ["91307", "91310", "91313", "91316"]; // tỉnh/khu vực: danh sách xã giả của An Giang
 }
 
@@ -77,7 +79,9 @@ function fromInput(i: Input, w: Who, prev?: Campaign): Campaign {
   const communes = communesOf(i);
   return {
     id: prev?.id ?? uuidv7(), version: (prev?.version ?? 0) + 1, name: i.name.trim(), goal: i.goal ?? null, field: i.field,
-    template_code: i.template_code, scope_mode: i.scope_mode, regions: i.regions ?? [], communes, tasks: communes.length,
+    template_code: i.template_code, scope_mode: i.scope_mode, regions: i.regions ?? [], communes,
+    households: [...new Set(i.households ?? [])].map((ref) => ({ ref, code: "", commune: "91307", status: "active" })),
+    tasks: i.scope_mode === "households" ? new Set(i.households ?? []).size : communes.length,
     from_date: i.from_date, to_date: i.to_date, due_at: i.due_at, remind_before_hours: i.remind_before_hours ?? 0, state: "draft",
     province_code: "91", updated_by: { ref: w.actor, display: "Cán bộ tỉnh (giả lập)" }, updated_at: now(), can_manage: true,
     owner: { ref: i.owner_ref, display: ownerName(i.owner_ref, w) },
@@ -86,9 +90,11 @@ function fromInput(i: Input, w: Who, prev?: Campaign): Campaign {
 }
 
 function progressOf(c: Campaign, closed: boolean): NonNullable<Campaign["progress"]> {
-  const units = c.communes.map((code, i) => {
+  const leaves = c.scope_mode === "households" ? c.households.map((h) => ({ unit: h.ref, household_code: h.code, commune: h.commune }))
+    : c.communes.map((code) => ({ unit: code, household_code: "", commune: code }));
+  const units = leaves.map(({ unit, household_code, commune: code }, i) => {
     const submitted = i % 2 === 0;
-    return { commune: code, commune_name: `Xã ${code}`, region_code: "", region_name: "Chưa gán khu vực",
+    return { unit, household_code, commune: code, commune_name: `Xã ${code}`, region_code: "", region_name: "Chưa gán khu vực",
       status: submitted ? "submitted" : closed ? "missed" : "not_submitted", versions: submitted ? 1 : 0, late: false,
       last_submitted_at: submitted ? now() : null };
   });
@@ -236,7 +242,7 @@ export const cntsCampaignRoutes: Route[] = [
     handler: (ctx) =>
       withCampaign(ctx, (c) => {
         if (c.state === "draft") return stateErr();
-        const rows = (c.progress?.units ?? []).map((u, i) => ({ commune: u.commune, commune_name: u.commune_name, region_name: u.region_name,
+        const rows = (c.progress?.units ?? []).map((u, i) => ({ unit: u.unit, household_code: u.household_code, commune: u.commune, commune_name: u.commune_name, region_name: u.region_name,
           values: u.versions > 0 ? { tong_dan: String(100 + i * 10) } : {}, nil_report: false }));
         const total = rows.reduce((s, r) => s + Number(r.values.tong_dan ?? 0), 0);
         return json({ campaign_id: c.id, basis: c.state === "closed" ? "closed" : "submitted", fields: [{ key: "tong_dan", label: "Tổng đàn", unit: "con" }],
@@ -252,6 +258,7 @@ export const cntsCampaignRoutes: Route[] = [
         const b = body<CopyInput>(ctx);
         const i: Input = { name: b.name?.trim() || src.name, goal: src.goal ?? undefined, field: src.field as Input["field"],
           template_code: src.template_code, template_version: src.template_version, scope_mode: src.scope_mode, regions: src.regions, communes: src.communes,
+          households: src.households.map((h) => h.ref),
           from_date: b.from_date, to_date: b.to_date, due_at: b.due_at, owner_ref: b.owner_ref ?? src.owner?.ref ?? "",
           remind_before_hours: src.remind_before_hours };
         const errs = check(i);

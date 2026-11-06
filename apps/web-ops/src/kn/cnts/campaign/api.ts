@@ -48,6 +48,7 @@ export interface CampaignForm {
   scope_mode: CampaignInput["scope_mode"];
   regions: string;
   communes: string; // mã xã, cách nhau bởi dấu phẩy/khoảng trắng
+  households: string[]; // phạm vi theo hộ (#236): household_ref của hộ chăn nuôi Đang dùng
   from_date: string;
   to_date: string;
   due_at: string; // datetime-local (giờ máy)
@@ -56,8 +57,8 @@ export interface CampaignForm {
 }
 
 export function emptyForm(): CampaignForm {
-  return { name: "", goal: "", field: "chan_nuoi", template_code: "", template_version: "", scope_mode: "communes", regions: "", communes: "", from_date: "", to_date: "",
-    due_at: "", owner_ref: "", remind_before_hours: "24" };
+  return { name: "", goal: "", field: "chan_nuoi", template_code: "", template_version: "", scope_mode: "communes", regions: "", communes: "", households: [],
+    from_date: "", to_date: "", due_at: "", owner_ref: "", remind_before_hours: "24" };
 }
 
 const split = (s: string) => s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
@@ -71,7 +72,7 @@ export function toLocalInput(iso: string): string {
 export function formOf(c: Campaign): CampaignForm {
   return { name: c.name, goal: c.goal ?? "", field: c.field as CampaignInput["field"], template_code: c.template_code,
     template_version: c.template_version ? String(c.template_version) : "", scope_mode: c.scope_mode,
-    regions: c.regions.join(", "), communes: c.scope_mode === "communes" ? c.communes.join(", ") : "", from_date: c.from_date, to_date: c.to_date,
+    regions: c.regions.join(", "), communes: c.scope_mode === "communes" ? c.communes.join(", ") : "", households: c.households.map((h) => h.ref), from_date: c.from_date, to_date: c.to_date,
     due_at: toLocalInput(c.due_at), owner_ref: c.owner?.ref ?? "", remind_before_hours: String(c.remind_before_hours) };
 }
 
@@ -82,6 +83,7 @@ export function formErrors(f: CampaignForm): Record<string, string> {
   if (!f.template_code) e.template_code = "Chọn biểu điều tra";
   if (f.scope_mode === "communes" && split(f.communes).length === 0) e.communes = "Nhập ít nhất một mã xã";
   if (f.scope_mode === "regions" && split(f.regions).length === 0) e.regions = "Nhập ít nhất một khu vực";
+  if (f.scope_mode === "households" && f.households.length === 0) e.households = "Chọn ít nhất một hộ chăn nuôi";
   if (!f.from_date) e.from_date = "Bắt buộc";
   if (!f.to_date) e.to_date = "Bắt buộc";
   else if (f.from_date && f.to_date < f.from_date) e.to_date = "Đến ngày ≥ từ ngày";
@@ -102,6 +104,7 @@ export function payload(f: CampaignForm): CampaignInput {
     scope_mode: f.scope_mode,
     regions: f.scope_mode === "regions" ? split(f.regions) : [],
     communes: f.scope_mode === "communes" ? split(f.communes) : [],
+    households: f.scope_mode === "households" ? [...new Set(f.households)] : [],
     from_date: f.from_date,
     to_date: f.to_date,
     due_at: new Date(f.due_at).toISOString(),

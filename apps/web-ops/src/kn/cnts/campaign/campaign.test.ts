@@ -26,6 +26,10 @@ describe("Chiến dịch điều tra — hàm phía máy khách", () => {
     const p = payload(filled());
     expect(p).toMatchObject({ communes: ["91307", "91310", "91313"], regions: [], field: "chan_nuoi", remind_before_hours: 24 });
     expect(formErrors(filled({ owner_ref: "" })).owner_ref).toBeDefined();
+    // #236 phạm vi theo hộ: bắt buộc ít nhất một hộ; thân request chỉ mang hộ (bỏ trùng), không mang xã.
+    expect(formErrors(filled({ scope_mode: "households" })).households).toBeDefined();
+    expect(payload(filled({ scope_mode: "households", households: ["h1", "h1", "h2"] }))).toMatchObject({ households: ["h1", "h2"], communes: [] });
+    expect(payload(filled()).households).toEqual([]);
     expect(p.owner_ref).toBe("0193a000-0000-7000-8000-00000000c236");
     const cf = { name: " ", from_date: "2026-11-01", to_date: "2026-10-01", due_at: "", owner_ref: "" };
     expect(copyErrors(cf)).toEqual({ to_date: "Đến ngày ≥ từ ngày", due_at: "Bắt buộc" });

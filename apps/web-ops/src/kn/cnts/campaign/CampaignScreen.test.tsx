@@ -8,6 +8,7 @@ import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsCampaigns } from "@/api/mock/kn-cnts-campaign";
 import { createCampaignApi, emptyForm, payload, type FormsTemplate } from "./api";
 import type * as CampaignApiModule from "./api";
+import type * as LivestockApiModule from "@/kn/cnts/livestock/api";
 import { CampaignCreateScreen, CampaignScreen } from "./CampaignScreen";
 
 const nav = vi.hoisted(() => ({ push: vi.fn(), search: "" }));
@@ -33,6 +34,16 @@ vi.mock("./api", async (importOriginal) => {
       templates: async () => [{ code: "CNTS-DT-TONGDAN", title: "Điều tra tổng đàn", version: 1 }] as unknown as FormsTemplate[],
     }),
   };
+});
+
+// Danh sách hộ chăn nuôi (#251) giả: hai hộ Đang dùng cho ô chọn hộ của phạm vi theo hộ.
+const HH = [
+  { id: "0193a000-0000-7000-8000-0000000a0001", code: "HCN0000001", commune_code: "91307", commune_name: "Mỹ Hòa Hưng", hamlet: "Ấp 1", owner_label: "Nguyễn V. A.", status: "active" },
+  { id: "0193a000-0000-7000-8000-0000000a0002", code: "HCN0000002", commune_code: "91310", commune_name: "Bình Đức", hamlet: null, owner_label: "Trần T. B.", status: "active" },
+];
+vi.mock("@/kn/cnts/livestock/api", async (importOriginal) => {
+  const m = await importOriginal<typeof LivestockApiModule>();
+  return { ...m, createLivestockApi: () => ({ list: async () => ({ items: HH, total: HH.length, limit: 20, offset: 0 }) }) };
 });
 
 beforeEach(() => {
@@ -100,5 +111,31 @@ describe("Sao chép đợt cũ (FN-21 luồng phụ)", () => {
     expect(await within(opened).findByText("Điều tra tổng đàn 01/04/2027", { exact: false })).toBeInTheDocument();
     expect(within(opened).queryByText(/Tiến độ:/)).toBeNull();
     expect(within(opened).getByRole("button", { name: "Phát hành" })).toBeInTheDocument();
+  });
+});
+
+describe("Phạm vi theo hộ (FN-21 B1 \"hộ\")", () => {
+  it("chọn hộ chăn nuôi Đang dùng; bắt buộc ít nhất một hộ; đợt lưu danh sách hộ", async () => {
+    const u = userEvent.setup();
+    render(<CampaignCreateScreen />);
+    await u.type(screen.getByLabelText("Tên đợt"), "Điều tra hộ nuôi heo 10/2026");
+    const tpl = screen.getByLabelText("Biểu điều tra") as HTMLSelectElement;
+    await waitFor(() => expect(tpl.options.length).toBeGreaterThan(1));
+    await u.selectOptions(tpl, tpl.options[1]!.value);
+    await u.selectOptions(screen.getByLabelText("Phạm vi"), "households");
+    await u.type(screen.getByLabelText("Từ ngày"), "2026-10-01");
+    await u.type(screen.getByLabelText("Đến ngày"), "2026-10-10");
+    await u.type(screen.getByLabelText("Hạn nộp"), "2026-10-10T17:00");
+    const owner = screen.getByLabelText("Người phụ trách") as HTMLSelectElement;
+    await waitFor(() => expect(owner.options.length).toBe(4));
+    await u.selectOptions(owner, owner.options[1]!.value);
+    await u.click(screen.getByRole("button", { name: "Lưu nháp" }));
+    expect(await screen.findByText("Chọn ít nhất một hộ chăn nuôi")).toBeInTheDocument();
+    await u.click(await screen.findByLabelText("Chọn hộ HCN0000002"));
+    expect(screen.getByText(/đã chọn 1/)).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: "Lưu nháp" }));
+    await waitFor(() => expect(nav.push).toHaveBeenCalledTimes(1));
+    const [created] = await createCampaignApi(api).list();
+    expect(created).toMatchObject({ scope_mode: "households", tasks: 1, households: [{ ref: HH[1]!.id }] });
   });
 });

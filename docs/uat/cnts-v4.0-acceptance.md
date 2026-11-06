@@ -40,7 +40,7 @@ Giả định: [CNTS-CAMPAIGN-SCOPE](../kn/gia-dinh/CNTS-CAMPAIGN-SCOPE.md); n�
 | Luồng phụ "sao chép đợt cũ": đợt Nháp mới mang biểu, phạm vi, người phụ trách; không mang số liệu (kỳ native riêng, 0 bài, kết quả rỗng) | `TestCNTSCampaignOwnerAndCopy_236` ("Sao chép đợt cũ…"); Vitest `CampaignScreen.test.tsx` "Sao chép đợt cũ" | Đạt |
 | Menu "Chiến dịch điều tra › Tạo chiến dịch" chạy thật (không còn "Sắp có") | `kn-menu.contract.test.ts` (UP-10 CNTS Cấp Tỉnh), `TestBuilderMatchesCompatibilitySnapshot`, `TestWebMenuFixture` | Đạt |
 | B2–B5, BR-01…BR-04, AC-01…AC-04 (phát hành, tiến độ theo Khu vực, đóng đợt → Không nộp, tách lũy kế BM-04) | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150`, `TestBFCNTSCampaignCAS_*`, `TestBFCNTSCampaignPool_*` | Đạt (W11.50, #201) |
-| B1 phạm vi "hộ" (chọn hộ chăn nuôi `active` — ADR-0056) | — | Gói #258 (sau #251) |
+| B1 phạm vi "hộ": chỉ hộ chăn nuôi Đang dùng trong phạm vi Nút (hộ Chờ bổ sung vị trí, ngoài Nút, mã lạ → 422); mỗi hộ một việc của cán bộ xã chứa hộ; tiến độ, kết quả, Excel theo hộ; sao chép mang hộ, hộ vô hiệu hóa sau đó không phát hành được | `TestCNTSCampaignHouseholdScope_236`, `TestDraftValidate`; Vitest `CampaignScreen.test.tsx` "Phạm vi theo hộ", `campaign.test.ts` | Đạt |
 
 Cách chạy:
 

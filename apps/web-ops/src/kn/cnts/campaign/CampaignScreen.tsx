@@ -14,6 +14,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, num, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
+import { createLivestockApi, type Household } from "@/kn/cnts/livestock/api";
 import {
   EVENT_LABEL,
   FIELD_LABEL,
@@ -211,6 +212,74 @@ function OwnerSelect({ value, owners, onChange, label = "Người phụ trách",
   );
 }
 
+/** Chọn hộ chăn nuôi Đang dùng cho phạm vi theo hộ (FN-21 B1 "hộ"; FN-10 danh sách hộ — ADR-0056 mục 9). */
+function HouseholdPicker({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
+  const { api } = useAuth();
+  const lapi = useMemo(() => (api ? createLivestockApi(api) : null), [api]);
+  const [commune, setCommune] = useState("");
+  const [page, setPage] = useState(1);
+  const list = useLoad(lapi ? () => lapi.list({ commune: commune.trim(), status: "active", page }) : null, [lapi, commune, page]);
+  const toggle = (h: Household) => onChange(selected.includes(h.id) ? selected.filter((x) => x !== h.id) : [...selected, h.id]);
+  return (
+    <fieldset aria-label="Hộ chăn nuôi tham gia">
+      <legend>
+        Hộ chăn nuôi tham gia <span aria-hidden="true">*</span> — đã chọn {selected.length}
+      </legend>
+      <p className="mute small">Chỉ hộ Đang dùng (đã check-in vị trí). Mỗi hộ là một việc của cán bộ xã chứa hộ.</p>
+      <input className="input" aria-label="Lọc theo mã xã" placeholder="Mã xã (để trống = mọi xã)" value={commune}
+        onChange={(e) => {
+          setCommune(e.target.value);
+          setPage(1);
+        }} />
+      <LoadState s={list}>
+        {(p) =>
+          p.items.length === 0 ? (
+            <p className="mute">Không có hộ Đang dùng.</p>
+          ) : (
+            <>
+              <table className="dt" aria-label="Chọn hộ chăn nuôi">
+                <thead>
+                  <tr>
+                    <th />
+                    <th>Mã hộ</th>
+                    <th>Chủ hộ</th>
+                    <th>Xã</th>
+                    <th>Ấp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {p.items.map((h) => (
+                    <tr key={h.id}>
+                      <td>
+                        <input type="checkbox" aria-label={`Chọn hộ ${h.code}`} checked={selected.includes(h.id)} onChange={() => toggle(h)} />
+                      </td>
+                      <td>{h.code}</td>
+                      <td>{h.owner_label ?? "—"}</td>
+                      <td>{h.commune_name ?? h.commune_code}</td>
+                      <td>{h.hamlet ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="row">
+                <button className="btn btn-sm" disabled={page <= 1} onClick={() => setPage((x) => x - 1)}>
+                  Trang trước
+                </button>
+                <span className="mute small">
+                  Trang {page} · {p.total} hộ
+                </span>
+                <button className="btn btn-sm" disabled={page * p.limit >= p.total} onClick={() => setPage((x) => x + 1)}>
+                  Trang sau
+                </button>
+              </div>
+            </>
+          )
+        }
+      </LoadState>
+    </fieldset>
+  );
+}
+
 function CampaignEditor({ capi, current, templates, owners, onDone }: {
   capi: CampaignApi;
   current: Campaign | null;
@@ -289,8 +358,15 @@ function CampaignEditor({ capi, current, templates, owners, onDone }: {
             <option value="province">Toàn bộ xã của tỉnh</option>
             <option value="regions">Theo khu vực</option>
             <option value="communes">Danh sách xã</option>
+            <option value="households">Danh sách hộ chăn nuôi</option>
           </select>
         </label>
+        {f.scope_mode === "households" ? (
+          <div className="span-2">
+            <HouseholdPicker selected={f.households} onChange={(v) => set("households", v)} />
+            {err("households")}
+          </div>
+        ) : null}
         {f.scope_mode === "communes" ? (
           <label className="span-2">
             Mã xã (cách nhau bởi dấu phẩy)
@@ -454,9 +530,16 @@ function CampaignDetail({ id, capi, writer, owners, onEdit, onChanged, onCopied 
               {c.period_key ? ` · Mã kỳ ${c.period_key}` : ""} · Người phụ trách {c.owner?.display || "—"}
             </p>
             {c.goal ? <p>{c.goal}</p> : null}
+            {c.scope_mode === "households" ? (
+              <p className="small" aria-label="Hộ trong phạm vi">
+                Hộ trong phạm vi:{" "}
+                {c.households.map((h) => `${h.code || h.ref}${h.status && h.status !== "active" ? " (không còn Đang dùng)" : ""}`).join(", ")}
+              </p>
+            ) : null}
             {c.state === "draft" ? (
               <p className="mute">
-                Xem trước: phát hành sẽ sinh <strong>{c.tasks}</strong> việc cho cán bộ xã ({c.communes.length} xã).
+                Xem trước: phát hành sẽ sinh <strong>{c.tasks}</strong> việc cho cán bộ xã ({c.communes.length} xã
+                {c.scope_mode === "households" ? `, ${c.households.length} hộ` : ""}).
               </p>
             ) : null}
             {writer ? (
@@ -578,6 +661,7 @@ function CampaignDetail({ id, capi, writer, owners, onEdit, onChanged, onCopied 
                 <table className="dt" aria-label="Tiến độ theo xã">
                   <thead>
                     <tr>
+                      {c.scope_mode === "households" ? <th>Mã hộ</th> : null}
                       <th>Xã</th>
                       <th>Khu vực</th>
                       <th>Trạng thái</th>
@@ -587,7 +671,8 @@ function CampaignDetail({ id, capi, writer, owners, onEdit, onChanged, onCopied 
                   </thead>
                   <tbody>
                     {c.progress.units.map((u) => (
-                      <tr key={u.commune}>
+                      <tr key={u.unit}>
+                        {c.scope_mode === "households" ? <td>{u.household_code || u.unit}</td> : null}
                         <td>{u.commune_name !== u.commune ? u.commune_name : communeName(u.commune)}</td>
                         <td>{u.region_name}</td>
                         <td>
@@ -609,12 +694,13 @@ function CampaignDetail({ id, capi, writer, owners, onEdit, onChanged, onCopied 
                   <div aria-label="Kết quả tổng hợp">
                     <h3>Kết quả tổng hợp</h3>
                     <p className="mute">
-                      {r.basis === "closed" ? "Số lúc đóng đợt" : "Số đã gửi (chưa đóng đợt)"} · {r.reported}/{r.units} xã có số liệu · Tách khỏi
+                      {r.basis === "closed" ? "Số lúc đóng đợt" : "Số đã gửi (chưa đóng đợt)"} · {r.reported}/{r.units} {c.scope_mode === "households" ? "hộ" : "xã"} có số liệu · Tách khỏi
                       lũy kế báo cáo định kỳ.
                     </p>
                     <table className="dt" aria-label="Bảng kết quả">
                       <thead>
                         <tr>
+                          {c.scope_mode === "households" ? <th>Mã hộ</th> : null}
                           <th>Xã</th>
                           {r.fields.map((f) => (
                             <th key={f.key}>
@@ -626,7 +712,8 @@ function CampaignDetail({ id, capi, writer, owners, onEdit, onChanged, onCopied 
                       </thead>
                       <tbody>
                         {r.rows.map((x) => (
-                          <tr key={x.commune}>
+                          <tr key={x.unit}>
+                            {c.scope_mode === "households" ? <td>{x.household_code || x.unit}</td> : null}
                             <td>{x.commune_name !== x.commune ? x.commune_name : communeName(x.commune)}</td>
                             {r.fields.map((f) => (
                               <td key={f.key}>{num(x.values[f.key], 3)}</td>
@@ -634,7 +721,7 @@ function CampaignDetail({ id, capi, writer, owners, onEdit, onChanged, onCopied 
                           </tr>
                         ))}
                         <tr>
-                          <th>Tổng</th>
+                          <th colSpan={c.scope_mode === "households" ? 2 : 1}>Tổng</th>
                           {r.fields.map((f) => (
                             <th key={f.key}>{num(r.total[f.key], 3)}</th>
                           ))}
