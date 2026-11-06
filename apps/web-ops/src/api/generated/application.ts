@@ -11362,6 +11362,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/campaigns/{id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sao chép đợt cũ (FN-21 luồng phụ): đợt Nháp mới mang biểu, phạm vi, người phụ trách; không mang số liệu */
+        post: operations["extensionCntsCopyCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/model-households/{ref}": {
         parameters: {
             query?: never;
@@ -11374,6 +11391,23 @@ export interface paths {
         put?: never;
         /** Sửa hộ mô hình (base_version; không đổi chủ hộ) */
         post: operations["extensionCntsHouseholdUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/campaign-owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cán bộ chọn được làm người phụ trách đợt điều tra (Cấp Tỉnh Phòng CNTS của tỉnh) */
+        get: operations["extensionCntsCampaignOwners"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -24396,7 +24430,7 @@ export interface components {
             /** Format: date-time */
             due_at: string;
             /** Format: uuid */
-            owner_ref?: string;
+            owner_ref: string;
             remind_before_hours?: number;
         };
         CNTSPoint: {
@@ -24537,6 +24571,7 @@ export interface components {
             active: boolean;
         };
         CNTSCampaign: {
+            can_manage: boolean;
             /** Format: uuid */
             id: string;
             version: number;
@@ -24667,6 +24702,17 @@ export interface components {
             training_note?: string | null;
             supplies_note?: string | null;
             attachment_refs?: string[];
+        };
+        CNTSCampaignCopyInput: {
+            name?: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: uuid */
+            owner_ref?: string;
         };
         CNTSStatusChange: {
             base_version: number;
@@ -50366,6 +50412,50 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionCntsCopyCampaign: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSCampaignCopyInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSCampaign"];
+                };
+            };
+            /** @description Đã tạo đợt Nháp mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSCampaign"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsHouseholdGet: {
         parameters: {
             query?: never;
@@ -50432,6 +50522,35 @@ export interface operations {
             /** @description extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed */
             409: components["responses"]["Problem"];
             /** @description extension.cnts_household_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCampaignOwners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSCampaignActor"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };

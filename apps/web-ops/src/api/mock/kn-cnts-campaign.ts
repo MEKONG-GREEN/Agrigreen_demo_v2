@@ -2,6 +2,8 @@
 // /v1/extension/cnts/campaigns*: Nháp (sửa = phiên bản mới) → Phát hành (Đang thu thập, kỳ adhoc "DT-…") → nhắc, gia hạn có lý
 // do → Đóng đợt (xã chưa gửi = Không nộp) → Mở lại (lý do + thời hạn). Tiến độ/ kết quả là số giả, KHÔNG nối giả lập công
 // việc /v1/forms/tasks (máy chủ thật sinh việc cho xã). Dữ liệu tổng hợp, không phải thật.
+// #236 (BRD CNTS v4.0 FN-21): người phụ trách bắt buộc (chọn từ /v1/extension/cnts/campaign-owners), sao chép đợt cũ
+// (/copy → đợt Nháp mới, không mang số liệu). Giả lập không phân nhóm Cấp Tỉnh: người ghi được coi là cán bộ tổng hợp.
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { json, problem, validation, type Ctx, type Route } from "./http";
@@ -10,6 +12,15 @@ import { knContext } from "./kn";
 type S = components["schemas"];
 type Campaign = S["CNTSCampaign"];
 type Input = S["CNTSCampaignInput"];
+type CopyInput = S["CNTSCampaignCopyInput"];
+
+/** Cán bộ Cấp Tỉnh CNTS giả lập (ngoài người đang đăng nhập) chọn được làm người phụ trách. */
+const OTHER_OWNERS = [
+  { ref: "0193a000-0000-7000-8000-00000000c236", display: "Trần Thị Hoa (giả lập)" },
+  { ref: "0193a000-0000-7000-8000-00000000d236", display: "Lê Văn Nam (giả lập)" },
+];
+const ownerName = (ref: string, w: Who) =>
+  ref === w.actor ? "Cán bộ tỉnh (giả lập)" : (OTHER_OWNERS.find((o) => o.ref === ref)?.display ?? "");
 
 const CAMPAIGNS = new Map<string, Campaign>();
 
@@ -48,6 +59,7 @@ function check(i: Input): { field: string; reason: string }[] {
   if (i.scope_mode === "communes" && !(i.communes ?? []).length) e.push({ field: "communes", reason: "phạm vi không có xã nào" });
   if (!i.from_date || !i.to_date || i.to_date < i.from_date) e.push({ field: "to_date", reason: "đến ngày ≥ từ ngày" });
   if (!i.due_at) e.push({ field: "due_at", reason: "bắt buộc" });
+  if (!i.owner_ref) e.push({ field: "owner_ref", reason: "người phụ trách đợt bắt buộc" });
   return e;
 }
 
@@ -56,13 +68,18 @@ function communesOf(i: Input): string[] {
   return ["91307", "91310", "91313", "91316"]; // tỉnh/khu vực: danh sách xã giả của An Giang
 }
 
+function checkOwner(i: Input, w: Who): Response | null {
+  return ownerName(i.owner_ref, w) ? null : problem(422, "extension.cnts_campaign_owner", "Người phụ trách đợt phải là cán bộ Cấp Tỉnh Phòng CNTS của tỉnh");
+}
+
 function fromInput(i: Input, w: Who, prev?: Campaign): Campaign {
   const communes = communesOf(i);
   return {
     id: prev?.id ?? uuidv7(), version: (prev?.version ?? 0) + 1, name: i.name.trim(), goal: i.goal ?? null, field: i.field,
     template_code: i.template_code, scope_mode: i.scope_mode, regions: i.regions ?? [], communes, tasks: communes.length,
     from_date: i.from_date, to_date: i.to_date, due_at: i.due_at, remind_before_hours: i.remind_before_hours ?? 0, state: "draft",
-    province_code: "91", updated_by: { ref: w.actor, display: "Cán bộ tỉnh (giả lập)" }, updated_at: now(), owner: null,
+    province_code: "91", updated_by: { ref: w.actor, display: "Cán bộ tỉnh (giả lập)" }, updated_at: now(), can_manage: true,
+    owner: { ref: i.owner_ref, display: ownerName(i.owner_ref, w) },
     forms_period_id: null, period_key: null, template_version: null, progress: null, events: [],
   };
 }
@@ -116,6 +133,8 @@ export const cntsCampaignRoutes: Route[] = [
       const i = body<Input>(ctx);
       const errs = check(i);
       if (errs.length) return validation(errs);
+      const bad = checkOwner(i, w);
+      if (bad) return bad;
       const c = fromInput(i, w);
       CAMPAIGNS.set(c.id, c);
       return json(c, 201);
@@ -135,6 +154,8 @@ export const cntsCampaignRoutes: Route[] = [
         const i = body<Input>(ctx);
         const errs = check(i);
         if (errs.length) return validation(errs);
+        const bad = checkOwner(i, w);
+        if (bad) return bad;
         const next = fromInput(i, w, c);
         CAMPAIGNS.set(c.id, next);
         return json(next);
@@ -221,5 +242,34 @@ export const cntsCampaignRoutes: Route[] = [
           rows, total: { tong_dan: String(total) }, units: rows.length, reported: rows.filter((r) => r.values.tong_dan).length,
           separate_from_cumulative: true, period_kind: "adhoc" });
       }),
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/campaigns\/([^/]+)\/copy$/,
+    handler: (ctx) =>
+      withCampaign(ctx, (src, w) => {
+        const b = body<CopyInput>(ctx);
+        const i: Input = { name: b.name?.trim() || src.name, goal: src.goal ?? undefined, field: src.field as Input["field"],
+          template_code: src.template_code, scope_mode: src.scope_mode, regions: src.regions, communes: src.communes,
+          from_date: b.from_date, to_date: b.to_date, due_at: b.due_at, owner_ref: b.owner_ref ?? src.owner?.ref ?? "",
+          remind_before_hours: src.remind_before_hours };
+        const errs = check(i);
+        if (errs.length) return validation(errs);
+        const bad = checkOwner(i, w);
+        if (bad) return bad;
+        const c = fromInput(i, w);
+        CAMPAIGNS.set(c.id, c);
+        return json(c, 201);
+      }),
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/campaign-owners$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      const deny = writer(w);
+      if (deny) return deny;
+      return json({ items: [{ ref: w.actor, display: ownerName(w.actor, w) }, ...OTHER_OWNERS] });
+    },
   },
 ];

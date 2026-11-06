@@ -1,6 +1,8 @@
 // Client Chiến dịch điều tra mở rộng CNTS (W11.50 — BRD CNTS v3.7 FN-21, UR-TINH-26, UR-XA-14): đợt Nháp → Đang thu thập
 // → Đã đóng (/v1/extension/cnts/campaigns*). Đợt phát hành thành một kỳ native kn_cnts loại `adhoc`: cán bộ xã nhập ở màn
 // "Nhập biểu kỳ CNTS" (công việc /v1/forms/tasks). Số liệu đợt tách khỏi lũy kế báo cáo định kỳ.
+// #236 (BRD CNTS v4.0 FN-21): người phụ trách đợt bắt buộc; chỉ cán bộ tổng hợp hoặc người phụ trách quản lý đợt
+// (`can_manage`); sao chép đợt cũ ra đợt Nháp mới (không mang số liệu).
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
 import { newIdempotencyKey } from "@/api/idempotency";
@@ -9,6 +11,8 @@ import { parseProblemResponse } from "@/api/problem";
 type S = components["schemas"];
 export type Campaign = S["CNTSCampaign"];
 export type CampaignInput = S["CNTSCampaignInput"];
+export type CampaignCopyInput = S["CNTSCampaignCopyInput"];
+export type CampaignOwner = S["CNTSCampaignActor"];
 export type CampaignResults = S["CNTSCampaignResults"];
 export type CampaignState = Campaign["state"];
 export type FormsTemplate = S["FormsTemplate"];
@@ -46,12 +50,13 @@ export interface CampaignForm {
   from_date: string;
   to_date: string;
   due_at: string; // datetime-local (giờ máy)
+  owner_ref: string; // người phụ trách đợt
   remind_before_hours: string;
 }
 
 export function emptyForm(): CampaignForm {
   return { name: "", goal: "", field: "chan_nuoi", template_code: "", scope_mode: "communes", regions: "", communes: "", from_date: "", to_date: "",
-    due_at: "", remind_before_hours: "24" };
+    due_at: "", owner_ref: "", remind_before_hours: "24" };
 }
 
 const split = (s: string) => s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
@@ -65,7 +70,7 @@ export function toLocalInput(iso: string): string {
 export function formOf(c: Campaign): CampaignForm {
   return { name: c.name, goal: c.goal ?? "", field: c.field as CampaignInput["field"], template_code: c.template_code, scope_mode: c.scope_mode,
     regions: c.regions.join(", "), communes: c.scope_mode === "communes" ? c.communes.join(", ") : "", from_date: c.from_date, to_date: c.to_date,
-    due_at: toLocalInput(c.due_at), remind_before_hours: String(c.remind_before_hours) };
+    due_at: toLocalInput(c.due_at), owner_ref: c.owner?.ref ?? "", remind_before_hours: String(c.remind_before_hours) };
 }
 
 /** Lỗi phía máy khách (máy chủ kiểm lại). */
@@ -79,6 +84,7 @@ export function formErrors(f: CampaignForm): Record<string, string> {
   if (!f.to_date) e.to_date = "Bắt buộc";
   else if (f.from_date && f.to_date < f.from_date) e.to_date = "Đến ngày ≥ từ ngày";
   if (!f.due_at) e.due_at = "Bắt buộc";
+  if (!f.owner_ref) e.owner_ref = "Chọn người phụ trách";
   const h = Number(f.remind_before_hours || "0");
   if (!Number.isInteger(h) || h < 0 || h > 168) e.remind_before_hours = "0–168 giờ";
   return e;
@@ -96,7 +102,36 @@ export function payload(f: CampaignForm): CampaignInput {
     from_date: f.from_date,
     to_date: f.to_date,
     due_at: new Date(f.due_at).toISOString(),
+    owner_ref: f.owner_ref,
     remind_before_hours: Number(f.remind_before_hours || "0"),
+  };
+}
+
+/** Biểu "Sao chép đợt cũ": thời gian, hạn mới; tên, người phụ trách bỏ trống → giữ của đợt nguồn. */
+export interface CopyForm {
+  name: string;
+  from_date: string;
+  to_date: string;
+  due_at: string; // datetime-local
+  owner_ref: string;
+}
+
+export function copyErrors(f: CopyForm): Record<string, string> {
+  const e: Record<string, string> = {};
+  if (!f.from_date) e.from_date = "Bắt buộc";
+  if (!f.to_date) e.to_date = "Bắt buộc";
+  else if (f.from_date && f.to_date < f.from_date) e.to_date = "Đến ngày ≥ từ ngày";
+  if (!f.due_at) e.due_at = "Bắt buộc";
+  return e;
+}
+
+export function copyPayload(f: CopyForm): CampaignCopyInput {
+  return {
+    ...(f.name.trim() ? { name: f.name.trim() } : {}),
+    from_date: f.from_date,
+    to_date: f.to_date,
+    due_at: new Date(f.due_at).toISOString(),
+    ...(f.owner_ref ? { owner_ref: f.owner_ref } : {}),
   };
 }
 
@@ -126,6 +161,9 @@ export function createCampaignApi(api: ApiClient) {
       if (!res.response.ok || !res.data) throw await parseProblemResponse(res.response);
       return res.data as Blob;
     },
+    copy: (id: string, body: CampaignCopyInput): Promise<Campaign> =>
+      unwrap(api.POST("/v1/extension/cnts/campaigns/{id}/copy", { params: { ...path(id), ...idem() }, body })),
+    owners: async (): Promise<CampaignOwner[]> => (await unwrap(api.GET("/v1/extension/cnts/campaign-owners"))).items,
     templates: async (): Promise<FormsTemplate[]> =>
       (await unwrap(api.GET("/v1/forms/templates", { params: { query: { profile: "kn_cnts" } } }))).items,
   };

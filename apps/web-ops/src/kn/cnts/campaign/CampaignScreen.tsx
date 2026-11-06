@@ -5,7 +5,10 @@
 // → "Phát hành"; theo dõi tiến độ theo Khu vực/xã, nhắc xã chưa nộp, gia hạn (lý do), đóng đợt, mở lại (Lãnh đạo phòng),
 // kết quả tổng hợp + xuất Excel. Cán bộ xã nhập biểu của đợt ở màn "Nhập biểu kỳ CNTS" (UR-XA-14).
 // Số liệu đợt tách khỏi lũy kế báo cáo định kỳ (BR-02) — không vào Phụ lục 2/KSGM và số liệu cho KHTC.
+// #236 (BRD CNTS v4.0 FN-21): người phụ trách đợt bắt buộc, chỉ cán bộ tổng hợp hoặc người phụ trách quản lý đợt; "Sao chép
+// đợt" ra đợt Nháp mới (không mang số liệu); màn riêng "Tạo chiến dịch" (/kn/cnts/chien-dich/tao).
 import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ApiProblem } from "@/api/problem";
 import { useAuth } from "@/auth/AuthProvider";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
@@ -17,6 +20,8 @@ import {
   STATE_LABEL,
   STATE_TONE,
   UNIT_STATUS_LABEL,
+  copyErrors,
+  copyPayload,
   createCampaignApi,
   emptyForm,
   formErrors,
@@ -27,8 +32,12 @@ import {
   type Campaign,
   type CampaignApi,
   type CampaignForm,
+  type CampaignOwner,
+  type CopyForm,
   type FormsTemplate,
 } from "./api";
+
+const LIST_PATH = "/kn/cnts/chien-dich";
 
 const ymd = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
@@ -45,8 +54,9 @@ export function CampaignScreen() {
   const writer = role === "kn_tinh" && !kn.context?.read_only;
   const list = useLoad(capi ? () => capi.list() : null, [capi]);
   const templates = useLoad(capi && writer ? () => capi.templates() : null, [capi, writer]);
+  const owners = useLoad(capi && writer ? () => capi.owners() : null, [capi, writer]);
   const [editing, setEditing] = useState<Campaign | "new" | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(useSearchParams()?.get("dot") ?? null);
 
   if (!capi) return null;
   return (
@@ -73,6 +83,7 @@ export function CampaignScreen() {
           capi={capi}
           current={editing === "new" ? null : editing}
           templates={templates.data ?? []}
+          owners={owners.data ?? []}
           onDone={(c) => {
             setEditing(null);
             list.reload();
@@ -95,6 +106,7 @@ export function CampaignScreen() {
                     <th>Lĩnh vực</th>
                     <th>Thời gian</th>
                     <th>Hạn nộp</th>
+                    <th>Người phụ trách</th>
                     <th>Số xã</th>
                     <th>Tiến độ</th>
                     <th>Trạng thái</th>
@@ -110,6 +122,7 @@ export function CampaignScreen() {
                         {ymd(c.from_date)} – {ymd(c.to_date)}
                       </td>
                       <td>{dt(c.due_at)}</td>
+                      <td>{c.owner?.display || "—"}</td>
                       <td>{c.tasks}</td>
                       <td>{c.progress ? `${c.progress.submitted}/${c.progress.total} (${percent(c)}%)` : "—"}</td>
                       <td>
@@ -135,18 +148,74 @@ export function CampaignScreen() {
           id={open}
           capi={capi}
           writer={writer}
+          owners={owners.data ?? []}
           onEdit={(c) => setEditing(c)}
           onChanged={() => list.reload()}
+          onCopied={(c) => {
+            list.reload();
+            setOpen(c.id);
+          }}
         />
       ) : null}
     </div>
   );
 }
 
-function CampaignEditor({ capi, current, templates, onDone }: {
+/** Màn "Tạo chiến dịch" (menu Chiến dịch điều tra › Tạo chiến dịch): lưu Nháp rồi mở đợt ở màn quản lý để xem trước, phát hành. */
+export function CampaignCreateScreen() {
+  const { api, kn } = useAuth();
+  const router = useRouter();
+  const capi = useMemo(() => (api ? createCampaignApi(api) : null), [api]);
+  const writer = kn.context?.role === "kn_tinh" && !kn.context?.read_only;
+  const templates = useLoad(capi && writer ? () => capi.templates() : null, [capi, writer]);
+  const owners = useLoad(capi && writer ? () => capi.owners() : null, [capi, writer]);
+  if (!capi) return null;
+  return (
+    <div className="page">
+      <PageHeader title="Tạo chiến dịch">
+        <p className="mute">Tạo đợt điều tra ở trạng thái Nháp; xem trước số việc và phát hành ở màn Quản lý chiến dịch.</p>
+      </PageHeader>
+      {writer ? (
+        <CampaignEditor
+          capi={capi}
+          current={null}
+          templates={templates.data ?? []}
+          owners={owners.data ?? []}
+          onDone={(c) => router.push(c ? `${LIST_PATH}?dot=${encodeURIComponent(c.id)}` : LIST_PATH)}
+        />
+      ) : (
+        <p className="mute" role="alert">
+          Chỉ Cấp Tỉnh Phòng Chăn nuôi – Thủy sản (cán bộ tổng hợp; viên chức, chủ nhiệm khi là người phụ trách) tạo đợt điều tra.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function OwnerSelect({ value, owners, onChange, label = "Người phụ trách", optional = false }: {
+  value: string;
+  owners: CampaignOwner[];
+  onChange: (v: string) => void;
+  label?: string;
+  optional?: boolean;
+}) {
+  return (
+    <select className="select" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{optional ? "— Giữ người phụ trách của đợt nguồn —" : "— Chọn người phụ trách —"}</option>
+      {owners.map((o) => (
+        <option key={o.ref} value={o.ref}>
+          {o.display || o.ref}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function CampaignEditor({ capi, current, templates, owners, onDone }: {
   capi: CampaignApi;
   current: Campaign | null;
   templates: FormsTemplate[];
+  owners: CampaignOwner[];
   onDone: (c: Campaign | null) => void;
 }) {
   const [f, setF] = useState<CampaignForm>(current ? formOf(current) : emptyForm());
@@ -239,6 +308,11 @@ function CampaignEditor({ capi, current, templates, onDone }: {
           {err("due_at")}
         </label>
         <label>
+          Người phụ trách <span aria-hidden="true">*</span>
+          <OwnerSelect value={f.owner_ref} owners={owners} onChange={(v) => set("owner_ref", v)} />
+          {err("owner_ref")}
+        </label>
+        <label>
           Nhắc trước hạn (giờ)
           <input className="input" inputMode="numeric" aria-label="Nhắc trước hạn" value={f.remind_before_hours}
             onChange={(e) => set("remind_before_hours", e.target.value)} />
@@ -258,17 +332,89 @@ function CampaignEditor({ capi, current, templates, onDone }: {
   );
 }
 
-function CampaignDetail({ id, capi, writer, onEdit, onChanged }: {
+function CopyPanel({ src, capi, owners, onCopied, onCancel }: {
+  src: Campaign;
+  capi: CampaignApi;
+  owners: CampaignOwner[];
+  onCopied: (c: Campaign) => void;
+  onCancel: () => void;
+}) {
+  const [f, setF] = useState<CopyForm>({ name: "", from_date: "", to_date: "", due_at: "", owner_ref: "" });
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const act = useAction();
+  const set = <K extends keyof CopyForm>(k: K, v: CopyForm[K]) => setF((x) => ({ ...x, [k]: v }));
+  const err = (k: string) => (errs[k] ? <span className="field-error">{errs[k]}</span> : null);
+  const save = async () => {
+    const e = copyErrors(f);
+    setErrs(e);
+    if (Object.keys(e).length) return;
+    try {
+      const c = await act.run(() => capi.copy(src.id, copyPayload(f)));
+      if (c) onCopied(c);
+    } catch (e) {
+      setErrs(problemFields(e));
+    }
+  };
+  return (
+    <div className="card sub" aria-label="Sao chép đợt">
+      <p className="mute">
+        Đợt mới (Nháp) giữ mục tiêu, lĩnh vực, biểu {src.template_code}, phạm vi ({src.communes.length} xã), người phụ trách và giờ nhắc của đợt
+        này; không mang số liệu đã nộp.
+      </p>
+      <div className="form-grid">
+        <label className="span-2">
+          Tên đợt mới
+          <input className="input" aria-label="Tên đợt mới" placeholder={src.name} value={f.name} onChange={(e) => set("name", e.target.value)} />
+          {err("name")}
+        </label>
+        <label>
+          Từ ngày <span aria-hidden="true">*</span>
+          <input className="input" type="date" aria-label="Từ ngày mới" value={f.from_date} onChange={(e) => set("from_date", e.target.value)} />
+          {err("from_date")}
+        </label>
+        <label>
+          Đến ngày <span aria-hidden="true">*</span>
+          <input className="input" type="date" aria-label="Đến ngày mới" value={f.to_date} onChange={(e) => set("to_date", e.target.value)} />
+          {err("to_date")}
+        </label>
+        <label>
+          Hạn nộp <span aria-hidden="true">*</span>
+          <input className="input" type="datetime-local" aria-label="Hạn nộp mới" value={f.due_at} onChange={(e) => set("due_at", e.target.value)} />
+          {err("due_at")}
+        </label>
+        <label>
+          Người phụ trách
+          <OwnerSelect label="Người phụ trách đợt mới" optional value={f.owner_ref} owners={owners} onChange={(v) => set("owner_ref", v)} />
+          {err("owner_ref")}
+        </label>
+      </div>
+      {act.view}
+      <div className="row">
+        <button className="btn btn-primary" disabled={act.busy} onClick={() => void save()}>
+          Tạo đợt sao chép
+        </button>
+        <button className="btn" onClick={onCancel}>
+          Hủy
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CampaignDetail({ id, capi, writer, owners, onEdit, onChanged, onCopied }: {
   id: string;
   capi: CampaignApi;
   writer: boolean;
+  owners: CampaignOwner[];
   onEdit: (c: Campaign) => void;
   onChanged: () => void;
+  onCopied: (c: Campaign) => void;
 }) {
   const d = useLoad(() => capi.get(id), [capi, id]);
   const [showResults, setShowResults] = useState(false);
   const res = useLoad(showResults ? () => capi.results(id) : null, [capi, id, showResults]);
   const [dueMode, setDueMode] = useState<"extend" | "reopen" | null>(null);
+  const [copying, setCopying] = useState(false);
   const [due, setDue] = useState("");
   const [reason, setReason] = useState("");
   const act = useAction();
@@ -292,7 +438,7 @@ function CampaignDetail({ id, capi, writer, onEdit, onChanged }: {
             <p className="mute">
               {FIELD_LABEL[c.field as keyof typeof FIELD_LABEL] ?? c.field} · Biểu {c.template_code}
               {c.template_version ? ` v${c.template_version}` : ""} · {ymd(c.from_date)} – {ymd(c.to_date)} · Hạn nộp {dt(c.due_at)}
-              {c.period_key ? ` · Mã kỳ ${c.period_key}` : ""}
+              {c.period_key ? ` · Mã kỳ ${c.period_key}` : ""} · Người phụ trách {c.owner?.display || "—"}
             </p>
             {c.goal ? <p>{c.goal}</p> : null}
             {c.state === "draft" ? (
@@ -302,7 +448,7 @@ function CampaignDetail({ id, capi, writer, onEdit, onChanged }: {
             ) : null}
             {writer ? (
               <div className="row">
-                {c.state === "draft" ? (
+                {c.can_manage && c.state === "draft" ? (
                   <>
                     <button className="btn" onClick={() => onEdit(c)}>
                       Sửa nháp
@@ -312,7 +458,7 @@ function CampaignDetail({ id, capi, writer, onEdit, onChanged }: {
                     </button>
                   </>
                 ) : null}
-                {c.state === "collecting" ? (
+                {c.can_manage && c.state === "collecting" ? (
                   <>
                     <button className="btn" disabled={act.busy} onClick={() => void run(() => capi.remind(c.id), "Đã nhắc các xã chưa nộp.")}>
                       Nhắc xã chưa nộp
@@ -336,6 +482,9 @@ function CampaignDetail({ id, capi, writer, onEdit, onChanged }: {
                     {showResults ? "Ẩn kết quả" : "Kết quả tổng hợp"}
                   </button>
                 ) : null}
+                <button className="btn btn-o" onClick={() => setCopying((x) => !x)}>
+                  Sao chép đợt
+                </button>
               </div>
             ) : c.state !== "draft" ? (
               <button className="btn btn-o" onClick={() => setShowResults((x) => !x)}>
@@ -367,6 +516,18 @@ function CampaignDetail({ id, capi, writer, onEdit, onChanged }: {
                   </button>
                 </div>
               </div>
+            ) : null}
+            {copying ? (
+              <CopyPanel
+                src={c}
+                capi={capi}
+                owners={owners}
+                onCancel={() => setCopying(false)}
+                onCopied={(n) => {
+                  setCopying(false);
+                  onCopied(n);
+                }}
+              />
             ) : null}
             {act.view}
 

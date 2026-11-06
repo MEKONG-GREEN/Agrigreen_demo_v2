@@ -1,0 +1,12 @@
+## CNTS-CAMPAIGN-SCOPE (#236) — Chiến dịch điều tra: người phụ trách, sao chép đợt, màn Tạo chiến dịch
+
+Căn cứ: BRD CNTS v4.0 FN-21 (luồng chính B1, luồng phụ "sao chép đợt cũ"), ma trận quyền FN-21 (Mục VI), menu "Chiến dịch
+điều tra". Nền W11.50 ([giả định](W11.50.md)) giữ nguyên trừ các dòng dưới.
+
+| Câu hỏi / mục | Lựa chọn | Đổi ở đâu |
+|---|---|---|
+| "Giao người phụ trách" (B1) | `owner_ref` **bắt buộc** khi tạo, sửa nháp, sao chép; phải là cán bộ Cấp Tỉnh Phòng CNTS còn hiệu lực của tỉnh (danh bạ `accport.KNDirectory`, cấp `province`) — sai → 422 `extension.cnts_campaign_owner`. Gốc lắp ráp chưa nối danh bạ → không kiểm theo danh bạ (như các màn KN khác), ô chọn người phụ trách trả 503. Đợt cũ không có người phụ trách giữ nguyên, chỉ cán bộ tổng hợp quản lý | `domain.Draft.Validate`, `app.checkOwner`, `GET /v1/extension/cnts/campaign-owners` |
+| Ma trận quyền FN-21 | Cán bộ tổng hợp (và lần gán chưa khai nhóm Cấp Tỉnh — giữ quyền như trước, cùng cách lịch trực KSGM): CRU mọi đợt của Nút. Viên chức chuyên môn, chủ nhiệm CT/DA: chỉ tạo đợt mình phụ trách và CRU đợt `owner_ref` = mình (sửa nháp, phát hành, nhắc, gia hạn, đóng); không giao đợt cho người khác. Lãnh đạo phòng: chỉ xem + mở lại (giữ W11.50). Ban Giám đốc: chỉ xem. Người không đủ quyền → 403. Phản hồi có `can_manage` để màn ẩn nút | `app.caller.manages`, `app.change`, `app.Update` |
+| Sao chép đợt cũ | `POST /campaigns/{id}/copy`: đợt **Nháp mới** mang mục tiêu, lĩnh vực, biểu, phạm vi (chế độ, khu vực, danh sách xã — toàn tỉnh/khu vực giải lại theo khu vực hiện hành), người phụ trách, giờ nhắc; tên, người phụ trách đổi được, thời gian và hạn nộp bắt buộc nhập mới. **Không** mang kỳ native, sự kiện, tiến độ, số liệu. Sao chép được đợt ở mọi trạng thái. Không lưu liên kết đợt nguồn (BRD không đòi) → không cần migration | `app.Copy` |
+| Màn Tạo chiến dịch | Route `/kn/cnts/chien-dich/tao` dùng chung biểu nhập với "+ Tạo đợt điều tra"; lưu Nháp rồi mở đợt ở màn quản lý (`?dot=<id>`) để xem trước số việc và phát hành. Gỡ "Sắp có" của `tinh.cnts.chien_dich.tao` (sinh lại menu, `kn.menu/v16`) | `CampaignCreateScreen` |
+| Phạm vi theo hộ | **Tách sang #258** (CNTS-CAMPAIGN-HOUSEHOLD): cần sổ `cnts_livestock_household` của #251 (chưa vào dev) để kiểm hộ `active` và xã của hộ — quyết định đơn vị lá của kỳ native phụ thuộc cột xã của sổ hộ, nên không dựng trước bảng phạm vi (migration không sửa lại được) | #258 |
