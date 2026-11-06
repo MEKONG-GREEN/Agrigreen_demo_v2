@@ -234,6 +234,7 @@ class AppServices {
       ids: pf.ids,
       deviceId: deviceId,
       location: pf.location, // W11.46: check-in GPS lịch công tác
+      camera: pf.camera, // CNTS v4.0 FN-12: ảnh check-in/check-out bắt buộc
       syncNow: () async {
         await sync.syncOnce(force: true);
       },
