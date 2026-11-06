@@ -1212,6 +1212,12 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "badge": "extension.khtc_periods.open"
           },
           {
+            "key": "tinh.khtc.phieu_cho_ra_soat",
+            "label": "Phiếu số liệu các phòng",
+            "route": "/kn/khtc/phieu-cho-ra-soat",
+            "icon": "task"
+          },
+          {
             "key": "tinh.khtc.ke_hoach_nam",
             "label": "Kế hoạch năm",
             "route": "/kn/khtc/ke-hoach-nam",

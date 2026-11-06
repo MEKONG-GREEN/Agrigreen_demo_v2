@@ -2,6 +2,7 @@ package adhocintegration_test
 
 import (
 	"encoding/json"
+	forms "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -87,18 +88,30 @@ func TestKHTCPendingInbox243_NativeLatestReviewAndDraftIndependence(t *testing.T
 }
 
 func TestKHTCPendingInbox243_PagesEmptyWindowsAndCurrentAuthority(t *testing.T) {
-	f := newKHTCFormFxWith(t, nil)
+	var probe *pendingProbe243
+	f := newKHTCFormFxWith(t, func(port forms.PeriodControl) forms.PeriodControl {
+		probe = &pendingProbe243{PeriodControl: port}
+		return probe
+	})
 	first := f.open(1, dTT)
 	code, body := f.send(first.ID, dTT, "submit", 0, ttSheet(f.item, "25"))
 	f.ok(code, body, nil)
 	for no := 2; no <= 27; no++ {
 		f.open(no, dTT)
 	}
+	probe.calls = 0
 	out := readInbox243(t, f, "")
 	if len(out.Rows) != 0 || out.Next == nil {
 		t.Fatalf("empty first page must retain next cursor: %+v", out)
 	}
+	if probe.calls != 25 {
+		t.Fatalf("first-page native budget: got%d want25", probe.calls)
+	}
+	probe.calls = 0
 	last := readInbox243(t, f, "?before="+*out.Next)
+	if probe.calls != 2 {
+		t.Fatalf("last-page native budget: got%d want2", probe.calls)
+	}
 	if len(last.Rows) != 1 || last.Rows[0].PeriodID != first.ID || last.Next != nil {
 		t.Fatalf("later pending period lost or page truncation: %+v", last)
 	}

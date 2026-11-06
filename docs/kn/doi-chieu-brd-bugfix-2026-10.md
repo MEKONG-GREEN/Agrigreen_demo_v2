@@ -279,3 +279,6 @@ Các hàng Không thêm chặn riêng và KH AD04.02 nằm nguyên ở §3–5 �
 Kiểm đủ 76 route/biến thể (gồm 9 placeholder); 67 hàng chức năng vẫn giữ nguyên mã, tên và đoạn BRD. Có 35 đề xuất chặn nghiệp vụ riêng; các hàng khác vẫn chịu cổng A/UAT/quyền. Tệp này chỉ là ma trận và đề xuất, không thay quyết định PO hoặc chứng cứ trình duyệt.
 
 Bổ sung 03/11/2026 — #197 phần đầu: tham số nâng bậc/quy đổi FN19 có route chi tiết/thêm phiên bản, Log từ metadata thật, NumberField/validateForm và guard raw ba tỷ lệ native trước Decimal. [Phạm vi và giới hạn](gia-dinh/BF-SWEEP-HCTH-FORMS-REST.md). Sáu màn HCTH còn lại chuyển [#203](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/203); giữ trạng thái Lệch, Q070 và chưa có UAT khách.
+
+
+Bổ sung #243 — FN-TI-02.01/FN-TI-02.04: hộp phiếu thường niên chờ rà soát có menu riêng, đọc lần gửi cuối native theo trang kỳ, không suy từ nháp/bảng niêm phong; mở reviewer hiện hữu và giữ quyền hiện tại. [Phạm vi/giới hạn](gia-dinh/W11.69-DASHBOARD-AFTER-OPEN-BADGE.md). Badge toàn cục, public batch và phần dashboard còn lại ở #245. Chưa đổi trạng thái toàn FN, chưa UAT khách hoặc G1; kết quả cổng đúng SHA trong issue READY sau khi thực sự đạt.

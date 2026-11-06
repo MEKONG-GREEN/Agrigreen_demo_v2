@@ -10793,6 +10793,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/pending-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phiếu thường niên đã gửi chờ rà soát, phân trang theo nhóm kỳ chưa kết thúc
+         * @description Đọc native Progress bằng caller hiện tại. Không gồm kỳ phát sinh; không trả tổng toàn cục. Trang rỗng vẫn có thể có next_cursor. Không suy quyền mutation từ kết quả đọc.
+         */
+        get: operations["extensionKhtcPendingReview243"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/kn/machine-profiles/{cooperative_ref}": {
         parameters: {
             query?: never;
@@ -23387,6 +23407,24 @@ export interface components {
         KHTCOpenPeriodCount: {
             /** Format: int64 */
             open_count: number;
+        };
+        KHTCPendingReviewPage243: {
+            rows: components["schemas"]["KHTCPendingReviewRow243"][];
+            /** Format: uuid */
+            next_cursor: string | null;
+        };
+        KHTCPendingReviewRow243: {
+            /** Format: uuid */
+            period_id: string;
+            period_name: string;
+            department: string;
+            department_name: string;
+            /** Format: uuid */
+            submission_id: string;
+            /** Format: int64 */
+            attempt: number;
+            /** Format: date-time */
+            submitted_at: string;
         };
         KHTCReportPeriod: {
             /** Format: uuid */
@@ -48784,6 +48822,34 @@ export interface operations {
             };
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPendingReview243: {
+        parameters: {
+            query?: {
+                before?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tối đa 25 kỳ thường niên mỗi trang, gồm lần gửi cuối chưa có quyết định; không suy từ nháp hoặc bảng số liệu niêm phong */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPendingReviewPage243"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };
