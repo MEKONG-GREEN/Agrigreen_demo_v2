@@ -222,7 +222,6 @@ couplings:
   - {rule: route-owner, from: "admin.yaml /v1/accounts/users/{id}/assignments/{aid}", to: accounts}
   - {rule: route-owner, from: "admin.yaml /v1/accounts/users/{id}/assignments", to: accounts}
   - {rule: route-owner, from: "admin.yaml /v1/accounts/users/{id}/delegations", to: accounts}
-  - {rule: route-owner, from: "application.yaml /v1/departments/{code}/modules", to: party}
   - {rule: route-owner, from: application.yaml /v1/internal-units, to: accounts}
   - {rule: route-owner, from: "application.yaml /v1/kn/cooperatives/{ref}/households", to: party}
   - {rule: route-owner, from: "application.yaml /v1/kn/cooperatives/{ref}/log", to: party}
@@ -241,7 +240,6 @@ couplings:
   - {rule: route-owner, from: application.yaml /v1/me/context, to: accounts}
   - {rule: route-owner, from: "application.yaml /v1/me/delegations/{id}/revoke", to: accounts}
   - {rule: route-owner, from: application.yaml /v1/me/delegations, to: accounts}
-  - {rule: route-owner, from: application.yaml /v1/menu, to: party}
   - {rule: sql-into-kn, from: internal/platform/metrics/handler/pub_integration_test.go, to: pf_extension.directive_ack}
   - {rule: sql-into-kn, from: internal/platform/metrics/handler/pub_integration_test.go, to: pf_extension.field_report}
   - {rule: sql-into-kn, from: internal/platform/metrics/handler/pub_integration_test.go, to: pf_extension.task_current}

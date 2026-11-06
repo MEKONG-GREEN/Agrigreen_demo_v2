@@ -347,6 +347,69 @@ paths:
                   user_ref: {type: string, format: uuid}
                   phone: {type: string}
         "404": {description: "accounts.staff_not_found | accounts.contact_unavailable", $ref: "#/components/responses/Problem"}
+# @ag-order: 185
+  /v1/public/password-reset:
+    post:
+      summary: "BRD 2.0 FN-CH-00.01 \"Quên mật khẩu?\": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0056) — KHÔNG đăng nhập"
+      description: >-
+        Luôn 202 cùng một thân cho mọi email đúng cú pháp — không lộ email có tồn tại, tài khoản bị khóa hay đã quá giới hạn.
+        Chỉ tài khoản đang hoạt động, email đã xác minh mới được gửi; tối đa 5 yêu cầu được gửi mỗi giờ cho một tài khoản
+        (yêu cầu vượt vẫn 202, không gửi). Liên kết hiệu lực 30 phút, dùng một lần; email gửi qua outbox ở worker. Giới hạn
+        theo IP (dồn 5, sau đó 1/phút) → 429. Cache-Control no-store.
+      operationId: requestPasswordReset
+      tags: [accounts]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: {type: string, format: email, maxLength: 254}
+      responses:
+        "202":
+          description: Đã nhận yêu cầu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, enum: [accepted]}
+        "400": {description: "bad_request (thân không phải JSON)", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (email sai cú pháp)", $ref: "#/components/responses/Problem"}
+        "429": {description: rate_limited, $ref: "#/components/responses/Problem"}
+        "503": {description: accounts.dependency_unavailable, $ref: "#/components/responses/Problem"}
+# @ag-order: 185
+  /v1/public/password-reset/confirm:
+    post:
+      summary: "Đặt mật khẩu mới bằng mã trong liên kết email (dùng một lần, 30 phút) — thu hồi mọi phiên; KHÔNG đăng nhập"
+      description: >-
+        Mã sai, đã dùng, hết hạn, đang được dùng hoặc tài khoản bị khóa → cùng một mã 410 accounts.reset_link_invalid.
+        Mật khẩu không đạt chính sách realm (≥ 12 ký tự, khác tên đăng nhập, không trùng 5 mật khẩu gần nhất) → 422
+        accounts.password_policy, liên kết dùng lại được. Thành công: mọi phiên của tài khoản bị thu hồi, liên kết còn mở khác
+        hết dùng; TOTP giữ nguyên (tài khoản bắt MFA vẫn nhập OTP ở lần đăng nhập sau). Cache-Control no-store.
+      operationId: confirmPasswordReset
+      tags: [accounts]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: {type: string, description: "Mã base64url 86 ký tự (tenant + yêu cầu + bí mật 32 byte; DB chỉ giữ SHA-256)"}
+                password: {type: string, format: password, minLength: 1, maxLength: 256}
+      responses:
+        "204": {description: Đã đặt mật khẩu mới}
+        "400": {description: "bad_request (thân không phải JSON)", $ref: "#/components/responses/Problem"}
+        "410": {description: accounts.reset_link_invalid, $ref: "#/components/responses/Problem"}
+        "422": {description: "accounts.password_policy | validation_failed (mật khẩu rỗng hoặc quá 256 byte)", $ref: "#/components/responses/Problem"}
+        "503": {description: accounts.dependency_unavailable, $ref: "#/components/responses/Problem"}
 components:
   schemas:
 # @ag-order: 549

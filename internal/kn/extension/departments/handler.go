@@ -1,11 +1,12 @@
-// Package departments là bề mặt HTTP danh mục phòng ban (FN-AD-04.03, bước 2 đăng nhập FN-CH-00.01) do chủ KN sở
-// hữu (KNSPLIT-2 #118). pf/party giữ dữ liệu, sổ pf_party.department_event, luật đơn vị/trạng thái/vai và nguồn đếm sử
-// dụng; package này chỉ giữ binding route, đọc request và DTO, gọi qua partyport.DepartmentAdmin.
+// Package departments là bề mặt HTTP danh mục phòng ban (FN-AD-04.03, bước 2 đăng nhập FN-CH-00.01) và menu theo cấu
+// hình (UR-KT-02) do chủ KN sở hữu (KNSPLIT-2 #118, #222). pf/party giữ dữ liệu, sổ pf_party.department_event, luật
+// đơn vị/trạng thái/vai, bảng menu và nguồn đếm sử dụng; package này chỉ giữ binding route, đọc request và DTO, gọi qua
+// partyport.DepartmentAdmin.
 //
 // Admin API (MFA): GET/POST /v1/departments, GET/PUT /v1/departments/{id}, POST /v1/departments/{id}/status|retire,
-// GET /v1/departments/{id}/log. Application API: GET /v1/departments. Đường dẫn, thân JSON, mã lỗi và trạng thái HTTP
-// giữ nguyên như trước khi chuyển (contracts/openapi/modules/extension/departments). Cây module của phòng ban
-// (/v1/departments/{code}/modules), menu và cây tổ chức vẫn ở pf/party.
+// GET /v1/departments/{id}/log, POST /v1/orgs/{ref}/departments/seed. Application API: GET /v1/departments,
+// GET /v1/departments/{code}/modules, GET /v1/menu. Đường dẫn, thân JSON, mã lỗi và trạng thái HTTP giữ nguyên như
+// trước khi chuyển (contracts/openapi/modules/extension/departments). Khu vực và cây tổ chức vẫn ở pf/party.
 package departments
 
 import (
@@ -37,11 +38,14 @@ func (h Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.POST("/departments/:id/status", h.status)
 	rg.POST("/departments/:id/retire", h.retire)
 	rg.GET("/departments/:id/log", h.log)
+	rg.POST("/orgs/:ref/departments/seed", h.seed) // #222
 }
 
 // RegisterApp gắn route Application API (đọc).
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/departments", h.appList)
+	rg.GET("/departments/:code/modules", h.modules) // #222
+	rg.GET("/menu", h.menu)                         // #222
 }
 
 // ---------------------------------------------------------------------------

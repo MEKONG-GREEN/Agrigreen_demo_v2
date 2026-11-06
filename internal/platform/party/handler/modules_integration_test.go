@@ -139,7 +139,7 @@ func TestModuleEnablement(t *testing.T) {
 	}
 
 	// Menu không hiện màn của module đã tắt; màn của module khác giữ nguyên.
-	keys := menuKeys(root.appDo(http.MethodGet, "/v1/menu?audience=admin", nil))
+	keys := menuKeys(root.menu(port.MenuQuery{Audience: port.AudienceAdmin}))
 	for _, gone := range []string{"admin.qt.cong_cu.su_dung_api", "admin.qt.cong_cu.bang_ke", "admin.qt.cong_cu.nhat_ky_xuat"} {
 		if slices.Contains(keys, gone) {
 			t.Fatalf("menu còn %s: %v", gone, keys)
@@ -150,7 +150,7 @@ func TestModuleEnablement(t *testing.T) {
 			t.Fatalf("menu mất %s: %v", kept, keys)
 		}
 	}
-	if keys := menuKeys(other.appDo(http.MethodGet, "/v1/menu?audience=admin", nil)); !slices.Contains(keys, "admin.qt.cong_cu.su_dung_api") {
+	if keys := menuKeys(other.menu(port.MenuQuery{Audience: port.AudienceAdmin})); !slices.Contains(keys, "admin.qt.cong_cu.su_dung_api") {
 		t.Fatalf("menu tenant khác: %v", keys)
 	}
 

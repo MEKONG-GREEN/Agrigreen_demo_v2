@@ -20,7 +20,7 @@ import (
 
 // Mã lỗi của sổ tổ chức, HTX (docs/errors.md). Mã lỗi nông hộ (party.household_*) do pf/cooperative trả (W3.3).
 var (
-	ErrOrgNotFound      = problem.New(http.StatusNotFound, "party.org_not_found", "Không tìm thấy tổ chức")
+	ErrOrgNotFound      = port.ErrOrgMissing
 	ErrOrgCodeTaken     = problem.New(http.StatusConflict, "party.org_code_taken", "Mã tổ chức đã được dùng")
 	ErrTaxCodeTaken     = problem.New(http.StatusConflict, "party.tax_code_taken", "Mã số thuế đã gắn với HTX khác")
 	ErrInvalidHierarchy = problem.New(http.StatusUnprocessableEntity, "party.invalid_hierarchy", "Vị trí trong cây phân cấp không hợp lệ")

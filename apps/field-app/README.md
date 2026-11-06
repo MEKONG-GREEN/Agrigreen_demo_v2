@@ -40,11 +40,10 @@ apps/field-app/lib/
 └── ui/            # Riverpod (MIT) + màn hình
 ```
 
-Quản lý trạng thái dùng Riverpod. `AppController` giữ luồng đăng nhập: đăng nhập trực tuyến → đặt PIN → mở khóa. CSDL chỉ mở khi đã mở khóa.
+Quản lý trạng thái dùng Riverpod. `AppController` giữ luồng đăng nhập: đăng nhập trực tuyến → vào thẳng; phiên ngoại tuyến còn hạn (72 giờ) mở thẳng, bảo vệ bằng khóa màn hình của thiết bị. App KN không có PIN (BRD 2.0 FN-CH-00.01, FN-05 — ADR-0056). Đăng xuất đóng CSDL và xóa token.
 
 Màn hình:
 - đăng nhập;
-- PIN (đặt PIN, mở khóa);
 - trang chủ: trạng thái đồng bộ, số bản ghi chờ, bị từ chối, xung đột, số nhiệm vụ;
 - danh sách thửa;
 - vẽ ranh giới trên bản đồ `flutter_map`: chấm điểm, lấy điểm GPS, cảnh báo chồng lấn;
@@ -163,7 +162,7 @@ Kiểm thử chính (`test/` của app; tệp đánh dấu *lõi* nằm ở `pac
 | *lõi* `tiles_pull_test.dart` | toán tile; giới hạn khung/zoom/diện tích/số tile/dung lượng; tải, đọc lại, tải tiếp, lỗi tile, dừng; pubkey theo lượt; `reset`; `cursor_invalid` |
 | `payload_contract_test.dart` | `field_report`/`evidence` so với fixture JSON rút từ quy tắc Go (`test/fixtures/contract/`); lỗi theo trường như máy chủ; khóa bản ghi bù; biểu mẫu MRV: tải danh mục, đồng ý, 2 ảnh, mất mạng giữa hai ảnh → evidence chỉ tạo khi đủ ảnh |
 | `offline_flow_http_test.dart` | kịch bản tích hợp qua **HTTP thật** tới máy chủ giả `dart:io` (cùng kịch bản với emulator) |
-| `integration_test/app_flow_test.dart` | **emulator** (CI `field-app-emulator`): đăng nhập chế độ kiểm thử → PIN → đăng ký thiết bị + token → pull → vẽ thửa khi mất mạng → có mạng + `sync_now` → push accepted → đồng ý + ảnh mã hóa tải lên (mở bằng khóa hộ, có watermark) → thông báo đẩy → đánh dấu đã đọc → chuông |
+| `integration_test/app_flow_test.dart` | **emulator** (CI `field-app-emulator`): đăng nhập chế độ kiểm thử → đăng ký thiết bị + token → pull → vẽ thửa khi mất mạng → có mạng + `sync_now` → push accepted → đồng ý + ảnh mã hóa tải lên (mở bằng khóa hộ, có watermark) → thông báo đẩy → đánh dấu đã đọc → chuông |
 
 ## Ghi chú bảo mật
 
@@ -172,14 +171,10 @@ Kiểm thử chính (`test/` của app; tệp đánh dấu *lõi* nằm ở `pac
   - Khóa nằm trong `flutter_secure_storage` (Android Keystore). Không bao giờ ở SharedPreferences hay tệp.
   - Bật `PRAGMA secure_delete`.
 - **Kho bí mật:**
-  - Token OIDC, mốc xác thực trực tuyến, băm PIN (PBKDF2-HMAC-SHA256, muối 16 byte, 60 000 vòng) và bộ đếm sai PIN đều nằm trong kho bí mật.
-  - Không lưu PIN rõ.
+  - Token OIDC và mốc xác thực trực tuyến nằm trong kho bí mật. Băm PIN cũ (nếu máy từng đặt PIN trước ADR-0056) giữ nguyên, không còn được đọc.
 - **Phiên ngoại tuyến:**
   - Tối đa 72 giờ kể từ lần xác thực trực tuyến cuối (đăng nhập hoặc làm mới token).
   - Đồng hồ máy bị lùi thì coi như hết hạn.
-- **PIN:**
-  - Sai 5 lần liên tiếp → khóa 15 phút (theo US-ADM).
-  - Sai tổng 10 lần → hủy PIN, bắt buộc đăng nhập trực tuyến.
 - **Thu hồi thiết bị:**
   - Khi gặp `403 sync.device_revoked`, app xóa kho bí mật trước (khóa token và khóa CSDL), rồi xóa tệp CSDL và thư mục ciphertext.
   - Dữ liệu chưa gửi bị mất. Đây là chủ ý theo mục 15.
