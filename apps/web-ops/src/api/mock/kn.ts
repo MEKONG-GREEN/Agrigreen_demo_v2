@@ -2127,8 +2127,7 @@ const KHTC_REPORT: Item = {
       "key": "tinh.bao_cao_khtc.tien_do",
       "label": "Tiến độ các CT của phòng",
       "route": "/kn/bao-cao-khtc/tien-do",
-      "icon": "chart",
-      "soon": true
+      "icon": "chart"
     },
     {
       "key": "tinh.bao_cao_khtc.da_xuat",

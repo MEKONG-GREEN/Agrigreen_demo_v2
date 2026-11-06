@@ -39,9 +39,10 @@ type PNProgress215 struct {
 }
 
 type PNPeriods215 struct {
-	Items     []store.PNPeriod215 `json:"items"`
-	HasMore   bool                `json:"has_more"`
-	NextAfter *uuid.UUID          `json:"next_after"`
+	Department string              `json:"department"`
+	Items      []store.PNPeriod215 `json:"items"`
+	HasMore    bool                `json:"has_more"`
+	NextAfter  *uuid.UUID          `json:"next_after"`
 }
 
 func (s *Service) pnReader215(ctx context.Context, department string) (caller, error) {
@@ -62,7 +63,7 @@ func (s *Service) pnReader215(ctx context.Context, department string) (caller, e
 }
 
 func (s *Service) PNProgressPeriods215(ctx context.Context, department string, year int, after uuid.UUID) (PNPeriods215, error) {
-	out := PNPeriods215{Items: []store.PNPeriod215{}}
+	out := PNPeriods215{Department: department, Items: []store.PNPeriod215{}}
 	c, err := s.pnReader215(ctx, department)
 	if err != nil {
 		return out, err
@@ -77,6 +78,9 @@ func (s *Service) PNProgressPeriods215(ctx context.Context, department string, y
 	})
 	if err != nil {
 		return PNPeriods215{}, err
+	}
+	if out.Items == nil {
+		out.Items = []store.PNPeriod215{}
 	}
 	if len(out.Items) > 50 {
 		out.HasMore = true

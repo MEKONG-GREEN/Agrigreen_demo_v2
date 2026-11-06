@@ -16476,6 +16476,72 @@ paths:
     post: {"summary":"Tải ảnh nhật ký (≤ 500 KB) — máy chủ mã hóa phong bì bằng khóa chủ hộ, lưu qua pf/evidence","operationId":"extensionCntsDiaryPhotoUpload","tags":["extension"],"parameters":[{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"required":true,"content":{"multipart/form-data":{"schema":{"type":"object","required":["file","household_ref","kind"],"properties":{"file":{"type":"string","format":"binary"},"household_ref":{"type":"string","format":"uuid"},"kind":{"type":"string","enum":["weighing","test_kit","flock","other"]},"captured_at":{"type":"string","format":"date-time"},"id":{"type":"string","format":"uuid"}}}}}},"responses":{"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/CNTSDiaryPhoto"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"not_found | extension.cnts_diary_photo_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_photo_no_key","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_photo_invalid","$ref":"#/components/responses/Problem"},"503":{"description":"extension.dependency_unavailable","$ref":"#/components/responses/Problem"}}}
   /v1/extension/cnts/diary-photos/{ref}/content:
     get: {"summary":"Xem ảnh nhật ký — người ghi được, người rà soát được, Admin (mục đích extension.diary)","operationId":"extensionCntsDiaryPhotoContent","tags":["extension"],"parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Nội dung ảnh (Cache-Control no-store)","content":{"image/jpeg":{"schema":{"type":"string","format":"binary"}},"image/png":{"schema":{"type":"string","format":"binary"}},"image/webp":{"schema":{"type":"string","format":"binary"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"description":"not_found | extension.cnts_diary_photo_not_found","$ref":"#/components/responses/Problem"},"409":{"description":"extension.cnts_diary_photo_no_key","$ref":"#/components/responses/Problem"},"422":{"description":"extension.cnts_diary_photo_invalid","$ref":"#/components/responses/Problem"},"503":{"description":"extension.dependency_unavailable","$ref":"#/components/responses/Problem"}}}
+  /v1/extension/khtc/departments/{department}/program-progress/periods:
+    get:
+      operationId: extensionKhtcPNProgressPeriods
+      summary: Các kỳ Mẫu 5 được giao cho phòng trong ngữ cảnh hiện hành
+      tags: [extension]
+      parameters:
+        - {$ref: '#/components/parameters/KHTCPNDepartment'}
+        - {in: query, name: year, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}, description: Bốn chữ số ASCII, không số mũ}
+        - {in: query, name: after, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Trang kỳ của phòng; con trỏ tiếp nếu còn dữ liệu
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCPNPeriodPage'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/departments/{department}/program-progress/{periodID}:
+    get:
+      operationId: extensionKhtcPNProgress
+      summary: Tiến độ phòng từ đúng bản tính Mẫu 5 đã được KHTC chuẩn bị
+      tags: [extension]
+      parameters:
+        - {$ref: '#/components/parameters/KHTCPNDepartment'}
+        - {in: path, name: periodID, required: true, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/KHTCPNSnapshot'}
+        - {$ref: '#/components/parameters/KHTCPNProgram'}
+        - {$ref: '#/components/parameters/KHTCPNLevel'}
+      responses:
+        '200':
+          description: Snapshot có mốc thật hoặc not_prepared rõ ràng, không tự dựng bản Mẫu 5
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCPNProgress'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/departments/{department}/program-progress/{periodID}/excel:
+    get:
+      operationId: extensionKhtcPNProgressExcel
+      summary: Excel chỉ có dòng của phòng, ghim đúng snapshot đang xem
+      description: Tệp tra cứu dẫn xuất, không phải phát hành lại báo cáo hoặc cấp số văn bản. Giữ kiểm quyền hiện hành trước đọc; không đổi snapshot nguồn.
+      tags: [extension]
+      parameters:
+        - {$ref: '#/components/parameters/KHTCPNDepartment'}
+        - {in: path, name: periodID, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: snapshot_id, required: true, schema: {type: string, format: uuid}}
+        - {$ref: '#/components/parameters/KHTCPNProgram'}
+        - {$ref: '#/components/parameters/KHTCPNLevel'}
+      responses:
+        '200':
+          description: Excel theo cùng bộ lọc và snapshot
+          headers:
+            Content-Disposition: {schema: {type: string}}
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
   /v1/extension/khtc/templates:
     get:
       summary: "Năm mẫu báo cáo cố định dành cho Admin"
@@ -17346,6 +17412,15 @@ components:
       required: true
       description: "Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường"
       schema: {type: string, enum: [mrv.evidence, extension.field_support, hr_records]}
+    KHTCPNDepartment:
+      in: path
+      name: department
+      required: true
+      description: Phòng phải khớp trusted current session; không lấy query làm grant
+      schema: {type: string, enum: [trong_trot, chan_nuoi_thuy_san, thong_tin_truyen_thong, hanh_chinh_tong_hop]}
+    KHTCPNSnapshot: {in: query, name: snapshot_id, schema: {type: string, format: uuid}}
+    KHTCPNProgram: {in: query, name: program, schema: {type: string, format: uuid}}
+    KHTCPNLevel: {in: query, name: level, schema: {type: string, enum: [achieved, progressing, slow, qualitative]}}
   responses:
     HrmEventWritten:
       description: Đã ghi dòng quá trình
@@ -27106,6 +27181,65 @@ components:
       required: [open_count]
       properties:
         open_count: {type: integer, format: int64, minimum: 0}
+    KHTCPNPeriod:
+      type: object
+      required: [id, name, year, from, to, cutoff]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        year: {type: integer, minimum: 2000, maximum: 2100}
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        cutoff: {type: string, format: date-time}
+    KHTCPNPeriodPage:
+      type: object
+      required: [department, items, has_more, next_after]
+      properties:
+        department: {type: string}
+        items: {type: array, items: {$ref: '#/components/schemas/KHTCPNPeriod'}}
+        has_more: {type: boolean}
+        next_after: {type: [string, 'null'], format: uuid}
+    KHTCPNSource:
+      type: object
+      required: [id, version, captured_at]
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer, format: int64, minimum: 1}
+        captured_at: {type: string, format: date-time}
+    KHTCPNProgram:
+      type: object
+      required: [ref, name, roman]
+      properties:
+        ref: {type: string, format: uuid}
+        name: {type: string}
+        roman: {type: string}
+    KHTCPNProgressRow:
+      type: object
+      required: [ref, parent_ref, kind, roman, name, unit, planned, year_to_date, percent, level, missing]
+      properties:
+        ref: {type: string, format: uuid}
+        parent_ref: {type: [string, 'null'], format: uuid}
+        kind: {type: string, enum: [program, group, item]}
+        roman: {type: string}
+        name: {type: string}
+        department: {type: string}
+        unit: {type: string}
+        planned: {type: [string, 'null'], maxLength: 96}
+        year_to_date: {type: string, maxLength: 96}
+        percent: {type: [string, 'null'], maxLength: 96}
+        level: {type: string}
+        missing: {type: boolean}
+    KHTCPNProgress:
+      type: object
+      required: [department, period, status, snapshot, programs, rows]
+      properties:
+        department: {type: string}
+        period: {$ref: '#/components/schemas/KHTCPNPeriod'}
+        status: {type: string, enum: [snapshot, not_prepared]}
+        snapshot:
+          anyOf: [{$ref: '#/components/schemas/KHTCPNSource'}, {type: 'null'}]
+        programs: {type: array, items: {$ref: '#/components/schemas/KHTCPNProgram'}}
+        rows: {type: array, maxItems: 10000, items: {$ref: '#/components/schemas/KHTCPNProgressRow'}}
     KHTCReportPeriod: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"type":{"type":"string","enum":["week","month","quarter","year","program","adhoc"]},"year":{"type":"integer"},"name":{"type":"string"},"from":{"type":"string","format":"date-time"},"to":{"type":"string","format":"date-time"},"cutoff":{"type":"string","format":"date-time"},"departments":{"type":"array","items":{"type":"string"}},"no":{"type":["integer","null"]},"scope":{"type":["string","null"]}},"required":["id","type","year","name","from","to","cutoff","departments","no","scope"],"additionalProperties":false}
     KHTCReportPlan: {"type":"object","properties":{"VersionID":{"type":"string","format":"uuid"},"Year":{"type":"integer"},"Version":{"type":"integer"},"DecisionNo":{"type":"string"},"Entries":{"type":["array","null"],"items":{"type":"object","additionalProperties":true}}},"required":["VersionID","Year","Version","DecisionNo","Entries"],"additionalProperties":true}
     KHTCReportSourceRef: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"plan_version_id":{"type":["string","null"],"format":"uuid"},"figures_hash":{"type":"string"},"status_hash":{"type":"string"},"closed":{"type":"boolean"},"at":{"type":"string","format":"date-time"}},"required":["id","version","plan_version_id","figures_hash","status_hash","closed","at"],"additionalProperties":false}

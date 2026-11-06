@@ -1,0 +1,77 @@
+import { expect, test } from "@playwright/test";
+import { MOCK_KN_PASSWORD } from "../../src/api/mock/kn-accounts";
+import { logout, sidebar } from "./helpers";
+import { readFile } from "node:fs/promises";
+
+for (const mobile of [false, true]) test(`215 PN reads the owner's prepared M5 and scoped Excel (${mobile ? "mobile" : "desktop"})`, async ({ page }, testInfo) => {
+  test.setTimeout(240_000);
+  await page.clock.setFixedTime(new Date("2030-06-05T03:00:00Z"));
+  const login = async (identifier: string) => {
+    await page.getByLabel("Email hoặc số điện thoại").fill(identifier);
+    await page.getByLabel("Mật khẩu", { exact: true }).fill(MOCK_KN_PASSWORD);
+    await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
+  };
+  // Prepare through real owner screens; PN never captures or fabricates a draft.
+  await page.goto("/login"); await login("admin.mekong@mekonggreen.vn");
+  await sidebar(page).getByRole("link", { name: "Phòng ban", exact: true }).click();
+  await page.getByLabel("Trạng thái Phòng Kế hoạch - Tài chính", { exact: true }).selectOption("active");
+  await expect(page.getByRole("status").filter({ hasText: "Đã đổi" })).toBeVisible();
+  await sidebar(page).getByRole("link", { name: "Người dùng", exact: true }).click();
+  await page.getByRole("link", { name: "Tạo tài khoản", exact: true }).click();
+  const main = page.getByRole("main");
+  await main.getByLabel("Họ tên").fill("Cán bộ KHTC kiểm thử 215");
+  await main.getByLabel("Email").fill("khtc.pn215@example.test");
+  await main.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912345215");
+  const assignment = main.getByRole("group", { name: "Vai trò và phạm vi" });
+  await assignment.getByRole("combobox", { name: "Vai trò", exact: true }).selectOption("kn_tinh");
+  await assignment.getByRole("checkbox", { name: "trong_trot", exact: true }).uncheck();
+  await assignment.getByRole("checkbox", { name: "ke_hoach_tai_chinh", exact: true }).check();
+  await main.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Cán bộ KHTC kiểm thử 215" })).toBeVisible();
+  await logout(page); await login("0912345215");
+  await expect(page).toHaveURL(/\/kn\/khtc\/ky-bao-cao$/);
+  await page.getByRole("button", { name: "Mở kỳ", exact: true }).click();
+  await page.getByRole("combobox", { name: "Loại báo cáo", exact: true }).selectOption("program");
+  await page.getByLabel("Đến ngày", { exact: true }).fill("2030-06-04");
+  await page.getByLabel("Hạn nộp", { exact: true }).fill("2030-06-07T10:00");
+  await page.getByRole("button", { name: "Xem trước", exact: true }).click();
+  await page.getByRole("button", { name: "Mở kỳ và giao phiếu", exact: true }).click();
+  await expect(page).toHaveURL(/\/ky-bao-cao\/ky\/[^/]+$/);
+  await sidebar(page).getByRole("link", { name: "Báo cáo KHTC", exact: true }).click();
+  await page.getByRole("combobox", { name: "Loại báo cáo", exact: true }).selectOption("program");
+  await page.getByRole("button", { name: /^Đến ngày/ }).first().click();
+  await page.getByRole("button", { name: "Lưu bản soạn", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Đã lưu bản soạn" })).toBeVisible();
+  await page.getByRole("combobox", { name: "Phòng", exact: true }).selectOption("trong_trot");
+  const owner = page.locator("table").filter({ has: page.getByRole("columnheader", { name: "Lũy kế năm", exact: true }) });
+  const cells = await owner.locator("tbody tr").first().locator("td").allTextContents();
+  expect(cells.length).toBe(8);
+  const itemName = cells[0]!.trim().replace(/\s+— Chưa gửi số liệu$/, "");
+  await logout(page); await login("binh.tt@angiang.gov.vn");
+  await page.getByRole("button", { name: /^Cấp Tỉnh/ }).click();
+  await page.getByRole("button", { name: /Phòng Trồng trọt — Vào hệ thống/ }).click();
+  const folder = sidebar(page).getByRole("button", { name: "Báo cáo cho KHTC", exact: true });
+  if (await folder.getAttribute("aria-expanded") !== "true") await folder.click();
+  await sidebar(page).getByRole("link", { name: "Tiến độ các CT của phòng", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tiến độ chương trình của phòng", exact: true })).toBeVisible();
+  await expect(page.getByText("Mẫu 5 v1", { exact: true })).toBeVisible();
+  const table = page.getByRole("table", { name: "Tiến độ chương trình của phòng", exact: true });
+  const row = table.getByRole("row").filter({ has: page.getByRole("cell", { name: itemName, exact: true }) });
+  await expect(row).toBeVisible();
+  const pnCells = await row.locator("td").allTextContents();
+  expect([pnCells[2], pnCells[3], pnCells[4]]).toEqual([cells[1], cells[2], cells[5]]);
+  await expect(table.getByRole("columnheader", { name: "STT", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Lưu|^Gửi/ })).toHaveCount(0);
+  if (mobile) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole("button", { name: "Xuất Excel", exact: true })).toBeVisible();
+    const width = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: innerWidth }));
+    expect(width.page).toBeLessThanOrEqual(width.viewport + 1);
+  }
+  await page.screenshot({ path: testInfo.outputPath(`215-pn-${mobile ? "mobile" : "desktop"}.png`), fullPage: true });
+  const pending = page.waitForEvent("download"); await page.getByRole("button", { name: "Xuất Excel", exact: true }).click();
+  const download = await pending; expect(download.suggestedFilename()).toMatch(/\.xlsx$/);
+  const file = testInfo.outputPath("215-pn.xlsx"); await download.saveAs(file);
+  const bytes = await readFile(file); expect([...bytes.subarray(0, 4)]).toEqual([80, 75, 3, 4]);
+  expect(bytes.toString("utf8")).toContain("Tiến độ phòng");
+});

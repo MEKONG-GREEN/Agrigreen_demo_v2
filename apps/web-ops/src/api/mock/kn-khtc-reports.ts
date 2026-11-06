@@ -400,3 +400,20 @@ function archivePeriods(ctx:Ctx):Response {
  const items:S["KHTCArchivePeriod"][]=khtcMockStore().filter(p=>ids.has(p.p.id)).map(p=>({id:p.p.id,name:p.p.name,report_type:p.p.report_type as S["KHTCArchivePeriod"]["report_type"]})).sort((a,b)=>b.id.localeCompare(a.id));
  return json({items:items.slice(offset,offset+limit),has_more:items.length>offset+limit,offset},200,{"Cache-Control":"no-store"});
 }
+
+// A read-side memo preserves a snapshot already observed by a PN reader while
+// the owner advances its mock draft. Authority is always checked by the route.
+type PNPrepared215 = { id: string; version: number; captured_at: string; rows: Content["data"]["rows"] };
+const PN_PREPARED215 = new Map<string, PNPrepared215>();
+export function khtcPNPrepared215(ctx: Ctx, periodID: string, snapshotID?: string): PNPrepared215 | null {
+ if(!templatePeriod(ctx,periodID))return null;
+ const prefix=ctx.persona.me.tenant_id+":"+periodID+":";
+ const current=STORE.get(periodID)?.detail;
+ if(current?.draft_id && current.version>0 && current.content.data.template==="mau_5") {
+  const key=prefix+current.draft_id;
+  if(!PN_PREPARED215.has(key))PN_PREPARED215.set(key,structuredClone({id:current.draft_id,version:current.version,captured_at:current.content.data.captured_at,rows:current.content.data.rows}));
+  if(!snapshotID)snapshotID=current.draft_id;
+ }
+ const value=snapshotID?PN_PREPARED215.get(prefix+snapshotID):undefined;
+ return value?structuredClone(value):null;
+}

@@ -11810,6 +11810,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/departments/{department}/program-progress/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Các kỳ Mẫu 5 được giao cho phòng trong ngữ cảnh hiện hành */
+        get: operations["extensionKhtcPNProgressPeriods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/departments/{department}/program-progress/{periodID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tiến độ phòng từ đúng bản tính Mẫu 5 đã được KHTC chuẩn bị */
+        get: operations["extensionKhtcPNProgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/departments/{department}/program-progress/{periodID}/excel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Excel chỉ có dòng của phòng, ghim đúng snapshot đang xem
+         * @description Tệp tra cứu dẫn xuất, không phải phát hành lại báo cáo hoặc cấp số văn bản. Giữ kiểm quyền hiện hành trước đọc; không đổi snapshot nguồn.
+         */
+        get: operations["extensionKhtcPNProgressExcel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/templates": {
         parameters: {
             query?: never;
@@ -23388,6 +23442,65 @@ export interface components {
             /** Format: int64 */
             open_count: number;
         };
+        KHTCPNPeriod: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            year: number;
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** Format: date-time */
+            cutoff: string;
+        };
+        KHTCPNPeriodPage: {
+            department: string;
+            items: components["schemas"]["KHTCPNPeriod"][];
+            has_more: boolean;
+            /** Format: uuid */
+            next_after: string | null;
+        };
+        KHTCPNSource: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            version: number;
+            /** Format: date-time */
+            captured_at: string;
+        };
+        KHTCPNProgram: {
+            /** Format: uuid */
+            ref: string;
+            name: string;
+            roman: string;
+        };
+        KHTCPNProgressRow: {
+            /** Format: uuid */
+            ref: string;
+            /** Format: uuid */
+            parent_ref: string | null;
+            /** @enum {string} */
+            kind: "program" | "group" | "item";
+            roman: string;
+            name: string;
+            department?: string;
+            unit: string;
+            planned: string | null;
+            year_to_date: string;
+            percent: string | null;
+            level: string;
+            missing: boolean;
+        };
+        KHTCPNProgress: {
+            department: string;
+            period: components["schemas"]["KHTCPNPeriod"];
+            /** @enum {string} */
+            status: "snapshot" | "not_prepared";
+            snapshot: components["schemas"]["KHTCPNSource"] | null;
+            programs: components["schemas"]["KHTCPNProgram"][];
+            rows: components["schemas"]["KHTCPNProgressRow"][];
+        };
         KHTCReportPeriod: {
             /** Format: uuid */
             id: string;
@@ -26473,6 +26586,11 @@ export interface components {
         DeviceID: string;
         /** @description Mục đích xử lý (R-42); hr_records chỉ dùng cho tệp có chủ thể pf/hrm / hr_folder do module đăng ký, không áp dụng tệp cũ hoặc tệp hiện trường */
         Purpose: "mrv.evidence" | "extension.field_support" | "hr_records";
+        /** @description Phòng phải khớp trusted current session; không lấy query làm grant */
+        KHTCPNDepartment: "trong_trot" | "chan_nuoi_thuy_san" | "thong_tin_truyen_thong" | "hanh_chinh_tong_hop";
+        KHTCPNSnapshot: string;
+        KHTCPNProgram: string;
+        KHTCPNLevel: "achieved" | "progressing" | "slow" | "qualitative";
     };
     requestBodies: never;
     headers: never;
@@ -51605,6 +51723,104 @@ export interface operations {
             /** @description extension.cnts_diary_photo_invalid */
             422: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPNProgressPeriods: {
+        parameters: {
+            query: {
+                /** @description Bốn chữ số ASCII */
+                year: number;
+                after?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Phòng phải khớp trusted current session; không lấy query làm grant */
+                department: components["parameters"]["KHTCPNDepartment"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trang kỳ của phòng; con trỏ tiếp nếu còn dữ liệu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPNPeriodPage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPNProgress: {
+        parameters: {
+            query?: {
+                snapshot_id?: components["parameters"]["KHTCPNSnapshot"];
+                program?: components["parameters"]["KHTCPNProgram"];
+                level?: components["parameters"]["KHTCPNLevel"];
+            };
+            header?: never;
+            path: {
+                /** @description Phòng phải khớp trusted current session; không lấy query làm grant */
+                department: components["parameters"]["KHTCPNDepartment"];
+                periodID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Snapshot có mốc thật hoặc not_prepared rõ ràng, không tự dựng bản Mẫu 5 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCPNProgress"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcPNProgressExcel: {
+        parameters: {
+            query: {
+                snapshot_id: string;
+                program?: components["parameters"]["KHTCPNProgram"];
+                level?: components["parameters"]["KHTCPNLevel"];
+            };
+            header?: never;
+            path: {
+                /** @description Phòng phải khớp trusted current session; không lấy query làm grant */
+                department: components["parameters"]["KHTCPNDepartment"];
+                periodID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Excel theo cùng bộ lọc và snapshot */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };

@@ -225,6 +225,12 @@ Bổ sung KH-FN-TI-02.09 (Mẫu5 cutoff sớm,16/10): `TestKH_M5_ProgramUsesCuto
 - Dashboard và phần archive còn lại nằm ở #166/#167: xem trước/Word/zip, lọc kỳ/lĩnh vực, cấp quyền phòng có số liệu và tên hiển thị người xuất; giữ Q-027/Q-055 theo PO. Chưa nghiệm thu toàn bộ W11.69.
 - W11.69 phần đầu: TW/KHTC vào kho đã xuất từ menu có thể bấm và trang mặc định; Playwright 	ests/e2e/kn-khtc-archive.spec.ts chuẩn bị tài khoản đúng phòng qua UI mock, kiểm bộ lọc có accessible name rõ và không có nút soạn/xuất mới.
 
+### Lát tiến độ phòng #215 (BRD v2.3, chờ review/gộp)
+
+- Tiến độ chỉ xem theo snapshot Mẫu 5 đã chuẩn bị: hiển thị ID/version/mốc thật, lọc chương trình/mức đạt và Excel cùng snapshot. Server chỉ trả hạng mục đúng phòng và nhãn tổ tiên; không mở quyền báo cáo/kho cũ. Chưa có bản lưu thì không tạo hay tự bắt nguồn, không xuất dữ liệu giả.
+- Native HTTP PostgreSQL thật kiểm số so với Mẫu 5 từ phiếu đã gửi, Excel đọc lại, no-draft-on-read, ghim snapshot sau version mới, sai phòng/role/tenant. Domain thử exponent cực lớn/nhỏ, chuỗi số rất dài/công thức trước decimal; web kiểm phân trang, phản hồi sai resource, đổi quyền và phản hồi/Excel muộn.
+- [Giả định](../kn/gia-dinh/PN-PROGRESS-SNAPSHOT-215.md); live/kho/phạm vi snapshot và leadership ở #247, nguồn chung sau actual #215 merge và kho sau actual #227/#246 merge. Các hàng toàn FN-PN-03.03, UAT người dùng và G1 giữ trạng thái chưa nghiệm thu.
+
 ## Lát UI Danh mục theo BRD v2.3 — BF-SWEEP-KHTC #164
 
 Bổ sung riêng FN-AD-04.01 theo DOCX v2.3 ngày 08/10/2026, SHA-256 `15859351f90574bf667190b1a12160465ba03f8ca9e408b94c90d285a3502e25`; không đổi phạm vi hoặc kết quả lịch sử của khung v2.2 trên đây. Cả 7 loại có DataTable/STT, route Thêm/Sửa/Chi tiết với DetailPage + Log thật, lỗi bắt buộc/lỗi máy chủ theo trường và kiểm số trước parser. Kiểm thử: `apps/web-ops/src/kn/khtc/catalog.test.tsx`, E2E `kn-khtc-catalog.spec.ts`, backend `TestFN_AD_04_01_Catalog` giữ nguyên API/quyền. Trạng thái UI: chờ Claude review và khách UAT. [Giả định/phạm vi](../kn/gia-dinh/BF-SWEEP-KHTC.md); các màn KHTC còn lại theo #180, không trùng #163 HCTH. Không thay M1–M7, mẫu giấy hoặc FormGrid.

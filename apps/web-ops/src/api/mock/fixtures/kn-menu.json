@@ -379,9 +379,7 @@
           "route": "/kn/bao-cao-khtc/tien-do",
           "icon": "chart",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
@@ -1102,9 +1100,7 @@
           "route": "/kn/bao-cao-khtc/tien-do",
           "icon": "chart",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
@@ -1916,9 +1912,7 @@
           "route": "/kn/bao-cao-khtc/tien-do",
           "icon": "chart",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
@@ -3066,9 +3060,7 @@
           "route": "/kn/bao-cao-khtc/tien-do",
           "icon": "chart",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {
@@ -3622,9 +3614,7 @@
           "route": "/kn/bao-cao-khtc/tien-do",
           "icon": "chart",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          },
          {

@@ -1,0 +1,36 @@
+{
+  "id": "extension-khtc-pn-progress215",
+  "order": 21500,
+  "tables": {},
+  "replacements": [
+    {
+      "path": [
+        "KHTCReportItem",
+        "Children",
+        2
+      ],
+      "before": {
+        "Key": "tinh.bao_cao_khtc.tien_do",
+        "Label": "Tiến độ các CT của phòng",
+        "Route": "/kn/bao-cao-khtc/tien-do",
+        "Icon": "chart",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": true,
+        "Needs": "",
+        "Children": null
+      },
+      "after": {
+        "Key": "tinh.bao_cao_khtc.tien_do",
+        "Label": "Tiến độ các CT của phòng",
+        "Route": "/kn/bao-cao-khtc/tien-do",
+        "Icon": "chart",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": false,
+        "Needs": "",
+        "Children": null
+      }
+    }
+  ]
+}
