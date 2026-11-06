@@ -413,7 +413,10 @@ func (s *Service) History(ctx context.Context, id uuid.UUID) ([]store.Export, er
 		}
 		var e error
 		out, e = store.ExportHeaders(ctx, tx, id, 100)
-		return e
+		if e != nil {
+			return e
+		}
+		return s.auditArchive(ctx, tx, c, "read_history", ArchiveSelection{PeriodID: id, Format: "metadata"}, 0, 0, nil)
 	})
 	return out, err
 }

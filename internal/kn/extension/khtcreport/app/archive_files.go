@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	templatedomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtctemplate/domain"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 const ArchiveMaxFiles = 10
@@ -27,6 +29,10 @@ type ArchivePreview struct {
 
 // PreviewExport never loads a draft, current source values or a live template.
 func (s *Service) PreviewExport(ctx context.Context, periodID, exportID uuid.UUID) (ArchivePreview, error) {
+	c, err := s.reader(ctx)
+	if err != nil {
+		return ArchivePreview{}, err
+	}
 	x, err := s.Download(ctx, periodID, exportID)
 	if err != nil {
 		return ArchivePreview{}, err
@@ -36,6 +42,15 @@ func (s *Service) PreviewExport(ctx context.Context, periodID, exportID uuid.UUI
 		return ArchivePreview{}, err
 	}
 	x.Content.Data.Rows = domain.SelectRows(x.Content.Data.Rows, x.Filter)
+	// The local renderer has completed, but the response is withheld until the
+	// access ledger commits. No exporter or network port runs in this transaction.
+	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
+		target := store.ArchiveTarget{PeriodID: periodID, ExportID: exportID, Format: "preview"}
+		return s.auditArchive(ctx, tx, c, "preview_attempt", ArchiveSelection{PeriodID: periodID, ExportID: exportID, Format: "preview"}, 0, 1, []store.ArchiveTarget{target})
+	})
+	if err != nil {
+		return ArchivePreview{}, err
+	}
 	return ArchivePreview{ExportID: x.ID, Version: x.Version, Content: x.Content, Document: document}, nil
 }
 
