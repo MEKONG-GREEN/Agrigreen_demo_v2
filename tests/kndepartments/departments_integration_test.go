@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -125,13 +126,87 @@ func TestKNSPLIT2DepartmentCatalogHTTPOnOwner(t *testing.T) {
 		t.Fatalf("tenant khác thấy phòng ban: %s", r.Raw)
 	}
 
-	// Không đăng ký trùng: cây module của phòng ban vẫn do pf/party phục vụ trên Application API.
+	// Không đăng ký trùng: cây module của phòng ban (chủ KN từ #222) không còn phòng ban đã xóa.
 	want(t, root.Do(harness.App, http.MethodGet, "/v1/departments/trong_trot/modules?audience=admin&org_ref="+prov, "", nil), http.StatusNotFound,
-		"phòng ban đã xóa không có cây module (pf/party)")
+		"phòng ban đã xóa không có cây module")
 
 	// Chủ KN: route đi qua cổng bật module pf/extension — tắt pf/extension cho tenant thì danh mục phòng ban đóng 403.
 	want(t, root.Do(harness.Admin, http.MethodPost, "/v1/modules/pf/extension/enablement", "", map[string]any{"enabled": false,
 		"reason": "Kiểm cổng module của chủ KN"}), http.StatusCreated, "tắt pf/extension")
 	wantCode(t, root.Do(harness.Admin, http.MethodGet, "/v1/departments?org_ref="+prov, "", nil), http.StatusForbidden, "module_not_enabled", "module tắt")
 	wantCode(t, root.Do(harness.App, http.MethodGet, "/v1/departments?org_ref="+prov, "", nil), http.StatusForbidden, "module_not_enabled", "module tắt (app)")
+}
+
+// KNSPLIT-2 #222: GET /v1/menu, GET /v1/departments/{code}/modules và POST /v1/orgs/{ref}/departments/seed do chủ KN đăng
+// ký (internal/kn/extension/departments) trên gốc lắp ráp đầy đủ; bảng menu, luật đối tượng/đơn vị và dữ liệu nhúng ở
+// pf/party qua port.DepartmentAdmin. Đường dẫn, tham số (kể cả ?role= cũ), thân JSON, Cache-Control và mã lỗi giữ nguyên.
+func TestKNSPLIT2MenuAndSeedHTTPOnOwner(t *testing.T) {
+	st := harness.New(t)
+	tid := harness.NewTenant()
+	root := st.User(harness.UserSpec{Tenant: tid, Roles: []string{authz.RolePlatformAdmin}, MFA: true})
+	want(t, root.Do(harness.Admin, http.MethodPost, "/v1/masterdata/seed", "", map[string]any{}), http.StatusOK, "seed masterdata")
+	nat := obj(want(t, root.Do(harness.Admin, http.MethodPost, "/v1/orgs", "", map[string]any{"kind": "ttkn_national", "code": "MENU-NAT",
+		"name": "TTKN Quốc gia"}), http.StatusCreated, "Nút TW").Body, "org")["ref"].(string)
+	prov := obj(want(t, root.Do(harness.Admin, http.MethodPost, "/v1/orgs", "", map[string]any{"kind": "ttkn_province", "code": "MENU-AG",
+		"name": "TTKN An Giang", "parent_ref": nat, "admin_unit_code": "91"}), http.StatusCreated, "Nút tỉnh").Body, "org")["ref"].(string)
+	seed := "/v1/orgs/" + prov + "/departments/seed"
+
+	// Nạp 5 phòng ban mặc định: lần đầu tạo đủ, gọi lặp khóa mới không tạo thêm; cùng khóa → phát lại phản hồi gốc.
+	idem := harness.NewIdem()
+	s1 := want(t, root.Do(harness.Admin, http.MethodPost, seed, idem, nil), http.StatusOK, "nạp phòng ban")
+	created, _ := s1.Body["created"].([]any)
+	if len(created) != 5 || s1.Body["existing"] != float64(0) || created[0].(map[string]any)["org_ref"] != prov {
+		t.Fatalf("nạp phòng ban: %s", s1.Raw)
+	}
+	if r := root.Do(harness.Admin, http.MethodPost, seed, idem, nil); string(r.Raw) != string(s1.Raw) || r.Header.Get("Idempotent-Replayed") == "" {
+		t.Fatalf("gọi lặp cùng khóa: %d %v %s", r.Status, r.Header, r.Raw)
+	}
+	if r := want(t, root.Do(harness.Admin, http.MethodPost, seed, "", nil), http.StatusOK, "nạp lặp"); r.Body["existing"] != float64(5) ||
+		len(r.Body["created"].([]any)) != 0 {
+		t.Fatalf("nạp lặp: %s", r.Raw)
+	}
+	wantCode(t, root.Do(harness.Admin, http.MethodPost, "/v1/orgs/khong-phai-uuid/departments/seed", "", nil), http.StatusNotFound,
+		"party.org_not_found", "ref sai")
+	tinh := st.User(harness.UserSpec{Tenant: tid, Org: uuid.MustParse(prov), Roles: []string{port.RoleKNProvinceAdmin}, MFA: true})
+	want(t, tinh.Do(harness.Admin, http.MethodPost, seed, "", nil), http.StatusForbidden, "Cấp Tỉnh không nạp phòng ban")
+	want(t, root.Do(harness.App, http.MethodPost, seed, "", nil), http.StatusNotFound, "Application API không có nạp phòng ban")
+
+	// Menu Admin của đơn vị: nhóm Phòng ban, không lưu đệm.
+	m := want(t, root.Do(harness.App, http.MethodGet, "/v1/menu?org_ref="+prov, "", nil), http.StatusOK, "menu Admin")
+	if m.Header.Get("Cache-Control") != "no-store" || m.Str("audience") != port.AudienceAdmin || m.Str("org_ref") != prov ||
+		!strings.Contains(string(m.Raw), `"key":"phong_ban"`) || m.Str("menu_version") == "" {
+		t.Fatalf("menu Admin: %v %s", m.Header, m.Raw)
+	}
+	// Cấp Tỉnh: menu của vai mình, phòng ban Đang áp dụng duy nhất; xin menu vai khác (kể cả qua ?role= cũ) → 403.
+	mt := want(t, tinh.Do(harness.App, http.MethodGet, "/v1/menu", "", nil), http.StatusOK, "menu Cấp Tỉnh")
+	if mt.Str("audience") != port.AudienceTinh || obj(mt.Body, "department")["code"] != "trong_trot" {
+		t.Fatalf("menu Cấp Tỉnh: %s", mt.Raw)
+	}
+	wantCode(t, tinh.Do(harness.App, http.MethodGet, "/v1/menu?audience=admin", "", nil), http.StatusForbidden, "party.menu_audience_forbidden", "xin menu Admin")
+	wantCode(t, tinh.Do(harness.App, http.MethodGet, "/v1/menu?role=admin", "", nil), http.StatusForbidden, "party.menu_audience_forbidden", "?role= cũ")
+	wantCode(t, tinh.Do(harness.App, http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", "", nil), http.StatusConflict,
+		"party.department_not_open", "phòng ban chưa mở")
+	want(t, tinh.Do(harness.App, http.MethodGet, "/v1/menu?org_ref=khong-phai-uuid", "", nil), http.StatusUnprocessableEntity, "org_ref sai")
+
+	// Cây module của một phòng ban (kể cả phòng ban chưa mở với đối tượng admin).
+	md := want(t, tinh.Do(harness.App, http.MethodGet, "/v1/departments/trong_trot/modules", "", nil), http.StatusOK, "modules Cấp Tỉnh")
+	if md.Header.Get("Cache-Control") != "no-store" || md.Str("audience") != port.AudienceTinh {
+		t.Fatalf("modules Cấp Tỉnh: %v %s", md.Header, md.Raw)
+	}
+	want(t, root.Do(harness.App, http.MethodGet, "/v1/departments/chan_nuoi_thuy_san/modules?role=admin&org_ref="+prov, "", nil), http.StatusOK,
+		"modules Admin phòng ban chưa mở (?role= cũ)")
+	wantCode(t, root.Do(harness.App, http.MethodGet, "/v1/departments/khong_co/modules?audience=admin&org_ref="+prov, "", nil), http.StatusNotFound,
+		"party.department_not_found", "phòng ban không có")
+
+	// Cách ly tenant: tenant khác không thấy phòng ban của đơn vị này.
+	other := st.User(harness.UserSpec{Tenant: harness.NewTenant(), Roles: []string{authz.RolePlatformAdmin}, MFA: true})
+	if r := other.Do(harness.App, http.MethodGet, "/v1/departments/trong_trot/modules?audience=admin&org_ref="+prov, "", nil); r.Status < 400 {
+		t.Fatalf("tenant khác đọc cây module: %d %s", r.Status, r.Raw)
+	}
+
+	// Chủ KN: route đi qua cổng bật module pf/extension (như /v1/departments*, #118).
+	want(t, root.Do(harness.Admin, http.MethodPost, "/v1/modules/pf/extension/enablement", "", map[string]any{"enabled": false,
+		"reason": "Kiểm cổng module của chủ KN"}), http.StatusCreated, "tắt pf/extension")
+	wantCode(t, root.Do(harness.App, http.MethodGet, "/v1/menu?org_ref="+prov, "", nil), http.StatusForbidden, "module_not_enabled", "module tắt (menu)")
+	wantCode(t, root.Do(harness.Admin, http.MethodPost, seed, "", nil), http.StatusForbidden, "module_not_enabled", "module tắt (nạp)")
 }

@@ -20,6 +20,10 @@ import (
 // không có trong tenant người gọi hoặc không phải UUID.
 var ErrDepartmentMissing = problem.New(http.StatusNotFound, "party.department_not_found", "Không tìm thấy phòng ban")
 
+// ErrOrgMissing là lỗi HTTP 404 party.org_not_found (cùng giá trị với lỗi của use case tổ chức): Nút không có trong tenant
+// người gọi hoặc không phải UUID (#222: POST /v1/orgs/{ref}/departments/seed).
+var ErrOrgMissing = problem.New(http.StatusNotFound, "party.org_not_found", "Không tìm thấy tổ chức")
+
 // DepartmentAdmin là cổng quản trị phòng ban. Thao tác ghi và đọc Admin chỉ cho platform_admin/registry_admin;
 // ListDepartments với admin = false cho mọi người đã xác thực (bước 2 đăng nhập, đơn vị mặc định theo Nút người gọi).
 type DepartmentAdmin interface {
@@ -30,6 +34,12 @@ type DepartmentAdmin interface {
 	ChangeDepartmentStatus(ctx context.Context, id uuid.UUID, status, reason, idem string) (DepartmentStatusResult, error)
 	RetireDepartment(ctx context.Context, id uuid.UUID, reason, idem string) (Department, bool, error)
 	DepartmentLog(ctx context.Context, id uuid.UUID, after int64, limit int) ([]ChangeLogEntry, error)
+	// SeedDepartments nạp 5 phòng ban mặc định cho đơn vị (Admin, gọi lặp an toàn) — POST /v1/orgs/{ref}/departments/seed (#222).
+	SeedDepartments(ctx context.Context, unit uuid.UUID, idem string) (DepartmentSeedResult, error)
+	// Menu và DepartmentModules cho mọi người đã xác thực, luật đối tượng/đơn vị ở pf/party — GET /v1/menu,
+	// GET /v1/departments/{code}/modules (#222).
+	Menu(ctx context.Context, q MenuQuery) (MenuView, error)
+	DepartmentModules(ctx context.Context, code string, q MenuQuery) (MenuView, error)
 }
 
 // DepartmentInput là dữ liệu tạo/sửa phòng ban.
