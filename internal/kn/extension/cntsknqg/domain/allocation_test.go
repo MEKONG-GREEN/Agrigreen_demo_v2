@@ -90,10 +90,13 @@ func snapshotAllocationBytes(t *testing.T) allocationSnapshot {
 		}
 		record := out[key]
 		record.bytes += allocated
-		// Scheduler frames terminate at mcall on g0; they are complete system
-		// stacks, not truncated application stacks (runtime/stubs.go).
+		// These are goroutine roots and g0 stack-transition roots in
+		// runtime/stubs.go and asm_amd64.s; an unknown root remains fatal.
 		record.lastFrame = fn.Name()
-		record.complete = fn.Name() == "runtime.goexit" || fn.Name() == "runtime.main" || fn.Name() == "runtime.systemstack" || fn.Name() == "runtime.mcall"
+		switch fn.Name() {
+		case "runtime.goexit", "runtime.main", "runtime.systemstack", "runtime.mcall", "runtime.morestack", "runtime.mstart", "runtime.rt0_go":
+			record.complete = true
+		}
 		out[key] = record
 		current = key
 	}
