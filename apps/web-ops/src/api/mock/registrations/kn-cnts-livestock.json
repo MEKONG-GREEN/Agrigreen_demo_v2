@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-livestock",
+  "source": "./kn-cnts-livestock",
+  "app": [
+    {
+      "export": "cntsLivestockRoutes",
+      "order": 1251
+    }
+  ],
+  "admin": []
+}

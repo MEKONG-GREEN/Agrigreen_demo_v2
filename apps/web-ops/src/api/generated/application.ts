@@ -12596,6 +12596,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/livestock-households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách hộ chăn nuôi trong phạm vi (FN-10, UR-XA-04; Cấp Xã chỉ xã phụ trách — AC-06). Họ tên che bớt, SĐT che một phần */
+        get: operations["extensionCntsLivestockHouseholdList"];
+        put?: never;
+        /** Thêm hộ (H1–H3) — bắt buộc check-in tại nhà hộ (AC-05); trùng họ tên, ấp, xã → 409 trừ khi confirm_distinct. Cấp Xã (xã mình), cán bộ tổng hợp Cấp Tỉnh, Admin */
+        post: operations["extensionCntsLivestockHouseholdCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/livestock-households/{ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chi tiết hộ, vị trí check-in hiện hành, lịch sử thay đổi HCN-09 (họ tên/SĐT cũ → mới chỉ dạng che bớt) */
+        get: operations["extensionCntsLivestockHouseholdGet"];
+        put?: never;
+        /** Sửa thông tin hộ (H4, base_version) — không đổi vị trí; hộ đã vô hiệu hóa → 409 */
+        post: operations["extensionCntsLivestockHouseholdUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/livestock-households/{ref}/checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check-in tại nhà hộ: Chờ bổ sung vị trí → Đang dùng (BR-08); hộ Đang dùng → đổi vị trí, bắt buộc lý do (H4) */
+        post: operations["extensionCntsLivestockHouseholdCheckin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/livestock-households/{ref}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vô hiệu hóa hộ (BR-04) — chỉ cán bộ tổng hợp Cấp Tỉnh, Admin; bắt buộc lý do; không kích hoạt lại */
+        post: operations["extensionCntsLivestockHouseholdDeactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -26682,6 +26752,123 @@ export interface components {
             word_version: number;
             word_hash: string;
             excel_rule: string;
+        };
+        CNTSLivestockAnimal: {
+            species_code: string;
+            species_name: string | null;
+            head_count: number;
+        };
+        CNTSLivestockLocation: {
+            lat: number;
+            lon: number;
+            accuracy_m: string;
+            mocked: boolean;
+            /** Format: date-time */
+            captured_at: string;
+        };
+        CNTSLivestockHousehold: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            version: number;
+            /** @enum {string} */
+            status: "active" | "pending_location" | "deactivated";
+            /** @enum {string} */
+            event: "created" | "created_pending" | "updated" | "checked_in" | "relocated" | "deactivated";
+            commune_code: string;
+            commune_name: string | null;
+            hamlet: string | null;
+            /** @enum {string} */
+            livestock_type: "nong_ho" | "trang_trai_nho" | "trang_trai_vua" | "trang_trai_cong_nghiep";
+            animals: components["schemas"]["CNTSLivestockAnimal"][];
+            location: components["schemas"]["CNTSLivestockLocation"] | null;
+            owner_label: string | null;
+            owner_masked_phone: string | null;
+            can_edit: boolean;
+            can_deactivate: boolean;
+            /** Format: date-time */
+            updated_at: string;
+            reason: string | null;
+        };
+        CNTSLivestockChange: {
+            /** @enum {string} */
+            field: "owner_name" | "owner_phone" | "commune_code" | "hamlet" | "animals" | "livestock_type" | "location" | "status";
+            old: string;
+            new: string;
+        };
+        CNTSLivestockHistory: {
+            version: number;
+            /** @enum {string} */
+            event: "created" | "created_pending" | "updated" | "checked_in" | "relocated" | "deactivated";
+            /** Format: uuid */
+            actor_ref: string;
+            actor_name: string | null;
+            /** Format: date-time */
+            at: string;
+            reason: string | null;
+            changes: components["schemas"]["CNTSLivestockChange"][];
+        };
+        CNTSLivestockHouseholdDetail: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            version: number;
+            /** @enum {string} */
+            status: "active" | "pending_location" | "deactivated";
+            /** @enum {string} */
+            event: "created" | "created_pending" | "updated" | "checked_in" | "relocated" | "deactivated";
+            commune_code: string;
+            commune_name: string | null;
+            hamlet: string | null;
+            /** @enum {string} */
+            livestock_type: "nong_ho" | "trang_trai_nho" | "trang_trai_vua" | "trang_trai_cong_nghiep";
+            animals: components["schemas"]["CNTSLivestockAnimal"][];
+            location: components["schemas"]["CNTSLivestockLocation"] | null;
+            owner_label: string | null;
+            owner_masked_phone: string | null;
+            can_edit: boolean;
+            can_deactivate: boolean;
+            /** Format: date-time */
+            updated_at: string;
+            reason: string | null;
+            owner_name: string | null;
+            updated_by_name: string | null;
+            warnings: ("gps_accuracy" | "mocked_location")[];
+            history: components["schemas"]["CNTSLivestockHistory"][];
+        };
+        CNTSLivestockHouseholdList: {
+            items: components["schemas"]["CNTSLivestockHousehold"][];
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        CNTSLivestockCheckin: {
+            lat: number;
+            lon: number;
+            accuracy_m: string;
+            mocked: boolean;
+            /** Format: date-time */
+            captured_at: string;
+        };
+        CNTSLivestockHouseholdSave: {
+            base_version?: number;
+            owner_name?: string;
+            owner_phone?: string | null;
+            commune_code: string;
+            hamlet?: string;
+            /** @enum {string} */
+            livestock_type: "nong_ho" | "trang_trai_nho" | "trang_trai_vua" | "trang_trai_cong_nghiep";
+            animals: {
+                species_code: string;
+                head_count: number;
+            }[];
+            checkin?: components["schemas"]["CNTSLivestockCheckin"];
+            confirm_distinct?: boolean;
+        };
+        CNTSLivestockHouseholdCheckinRequest: {
+            base_version: number;
+            checkin: components["schemas"]["CNTSLivestockCheckin"];
+            reason?: string;
         };
     };
     responses: {
@@ -53574,6 +53761,239 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description extension.cnts_bm11_not_found | export.run_not_found */
             404: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsLivestockHouseholdList: {
+        parameters: {
+            query?: {
+                commune?: string;
+                status?: "active" | "pending_location" | "deactivated";
+                livestock_type?: "nong_ho" | "trang_trai_nho" | "trang_trai_vua" | "trang_trai_cong_nghiep";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSLivestockHouseholdList"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.out_of_scope | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsLivestockHouseholdCreate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSLivestockHouseholdSave"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp (Idempotency-Key) — trả bản đã ghi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSLivestockHouseholdDetail"];
+                };
+            };
+            /** @description Thành công */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSLivestockHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.out_of_scope | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsLivestockHouseholdGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSLivestockHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.out_of_scope | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsLivestockHouseholdUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSLivestockHouseholdSave"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSLivestockHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.out_of_scope | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsLivestockHouseholdCheckin: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSLivestockHouseholdCheckinRequest"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSLivestockHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.out_of_scope | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsLivestockHouseholdDeactivate: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSStatusChange"];
+            };
+        };
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSLivestockHouseholdDetail"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            /** @description forbidden | extension.out_of_scope | extension.read_only */
+            403: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken */
+            409: components["responses"]["Problem"];
+            /** @description extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
 }

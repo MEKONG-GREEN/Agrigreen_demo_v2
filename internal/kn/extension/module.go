@@ -22,6 +22,8 @@ import (
 	calhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/handler"
 	diaryapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/app"
 	diaryhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/handler"
+	lhapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntslivestock/app"
+	lhhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntslivestock/handler"
 	zmapapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/app"
 	zmaphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/handler"
 	modelapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/app"
@@ -109,6 +111,8 @@ type Module struct {
 	cal *calapp.Service
 	// W11.47 (D4 CN7): CT/DA, điểm trình diễn, hộ mô hình, cấp quyền CNTS (extension/cntsmodel, module_cntsmodel.go).
 	model *modelapp.Service
+	// CNTS-V4-HOUSEHOLD-LIST (#251, ADR-0056): danh sách hộ chăn nuôi (extension/cntslivestock).
+	livestock *lhapp.Service
 	// W11.48 (D4 CN8): nhật ký nuôi BM-08/09/19 (extension/cntsdiary, module_cntsdiary.go).
 	diary *diaryapp.Service
 	// W11.52 (D4 CN12): bản đồ vùng nuôi, vùng dịch (extension/cntsmap, module_cntsmap.go).
@@ -145,6 +149,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.cal = &calapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.model = &modelapp.Service{DB: db, Clock: clk, Units: d.Units, Programs: khtcapp.Ports{Svc: m.khtc},
 		Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.livestock = &lhapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
 		Vaccinations: m.cal, // BF-CN-VACC: NC-11 → ngày tiêm thực tế của lịch BM-07 (quy tắc liên biểu số 7)
 		Names:        func() partyport.ActorNames { return m.rc.Names }}
@@ -192,7 +197,8 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 // vật nuôi). Chưa nối → lập/cập nhật ổ dịch, báo nghi dịch trả 503 extension.dependency_unavailable.
 func (m *Module) UseCNTSCatalogs(c port.CNTSCatalogs) {
 	m.ob.Catalogs, m.cal.Catalogs, m.model.Catalogs, m.zmap.Catalogs = c, c, c, c
-	m.diary.Catalogs = c // BF-CN-CATALOG #170: ngưỡng mặc định theo danh mục chỉ tiêu theo dõi
+	m.livestock.Catalogs = c // #251: vật nuôi HCN-05
+	m.diary.Catalogs = c     // BF-CN-CATALOG #170: ngưỡng mặc định theo danh mục chỉ tiêu theo dõi
 }
 
 // UseXaScopes (W11.46) nối danh sách cán bộ Cấp Xã CNTS kèm phạm vi (pf/accounts) cho lưới lịch trực KSGM BM-03.
@@ -228,6 +234,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
 	modelhandler.Handler{Svc: m.model}.RegisterApp(rg)      // W11.47
+	lhhandler.Handler{Svc: m.livestock}.RegisterApp(rg)     // #251
 	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg)      // W11.48
 	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)        // W11.52
 	m.registerDeptHome(rg)                                  // W11.54
