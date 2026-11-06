@@ -3,6 +3,7 @@ import { problem, type Route } from "./http";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { contextProblem, personaForContext } from "./kn";
 import { supportGuard, supportRecord } from "./kn-admin";
+import { passwordResetMock } from "./password-reset";
 
 // BEGIN GENERATED MOCK ROUTES
 import { orderedRoutes, type RouteRegistration } from "./registry";
@@ -155,6 +156,9 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
   return async function mockFetch(request: Request): Promise<Response> {
     if (opts.latency !== false) await sleep(120 + Math.random() * 220);
     const url = new URL(request.url);
+    // Route công khai (không đăng nhập): tự đặt lại mật khẩu qua email (#255).
+    const pub = opts.surface === "app" ? await passwordResetMock(request, url) : null;
+    if (pub) return pub;
     const tokenPersona = personaFromAuthHeader(request.headers.get("Authorization"));
     if (!tokenPersona) return problem(401, "unauthenticated", "Unauthenticated");
     // KN v7.7: header X-AG-Context chọn vai trò + phạm vi của lần gán (middleware P1 giả lập): lạ/của người khác → 403.

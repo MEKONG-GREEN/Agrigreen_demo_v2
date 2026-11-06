@@ -65,6 +65,7 @@ type inputDTO struct {
 	Goal              string   `json:"goal"`
 	Field             string   `json:"field"`
 	TemplateCode      string   `json:"template_code"`
+	TemplateVersion   *int64   `json:"template_version"`
 	ScopeMode         string   `json:"scope_mode"`
 	Regions           []string `json:"regions"`
 	Communes          []string `json:"communes"`
@@ -88,7 +89,8 @@ func (d inputDTO) input() (app.Input, error) {
 	if err != nil {
 		return app.Input{}, err
 	}
-	in := app.Input{Name: d.Name, Goal: d.Goal, Field: d.Field, TemplateCode: d.TemplateCode, ScopeMode: d.ScopeMode, Regions: d.Regions,
+	in := app.Input{Name: d.Name, Goal: d.Goal, Field: d.Field, TemplateCode: d.TemplateCode, TemplateVersion: d.TemplateVersion,
+		ScopeMode: d.ScopeMode, Regions: d.Regions,
 		Communes: d.Communes, From: d.FromDate, To: d.ToDate, DueAt: due, RemindBeforeHours: d.RemindBeforeHours}
 	if d.OwnerRef != "" {
 		o, err := uuid.Parse(d.OwnerRef)
@@ -123,7 +125,7 @@ func (h Handler) view(c *gin.Context, x app.Campaign) gin.H {
 		"from_date": v.From.Format(time.DateOnly), "to_date": v.To.Format(time.DateOnly), "due_at": ts(x.DueAt),
 		"remind_before_hours": v.RemindBeforeHours, "state": x.State, "province_code": v.Province,
 		"updated_by": gin.H{"ref": v.ActorRef.String(), "display": names[v.ActorRef]}, "updated_at": ts(v.RecordedAt),
-		"can_manage": x.CanManage, "owner": nil, "forms_period_id": nil, "period_key": nil, "template_version": nil, "progress": nil,
+		"can_manage": x.CanManage, "owner": nil, "forms_period_id": nil, "period_key": nil, "template_version": v.TemplateVersion, "progress": nil,
 	}
 	if v.OwnerRef != nil {
 		out["owner"] = gin.H{"ref": v.OwnerRef.String(), "display": names[*v.OwnerRef]}

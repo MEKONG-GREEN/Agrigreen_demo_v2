@@ -37,6 +37,12 @@ type fakeAdmin struct {
 	err      error
 	logs     []partyport.ChangeLogEntry
 	after    int64
+	// #222: menu, cây module phòng ban, nạp phòng ban.
+	query partyport.MenuQuery
+	code  string
+	menu  partyport.MenuView
+	seed  partyport.DepartmentSeedResult
+	unit  uuid.UUID
 }
 
 func (f *fakeAdmin) dept() partyport.Department {
@@ -93,6 +99,21 @@ func (f *fakeAdmin) DepartmentLog(_ context.Context, _ uuid.UUID, after int64, _
 	return f.logs, f.err
 }
 
+func (f *fakeAdmin) SeedDepartments(_ context.Context, u uuid.UUID, idem string) (partyport.DepartmentSeedResult, error) {
+	f.calls, f.unit, f.idem = append(f.calls, "seed"), u, idem
+	return f.seed, f.err
+}
+
+func (f *fakeAdmin) Menu(_ context.Context, q partyport.MenuQuery) (partyport.MenuView, error) {
+	f.calls, f.query = append(f.calls, "menu"), q
+	return f.menu, f.err
+}
+
+func (f *fakeAdmin) DepartmentModules(_ context.Context, code string, q partyport.MenuQuery) (partyport.MenuView, error) {
+	f.calls, f.code, f.query = append(f.calls, "modules"), code, q
+	return f.menu, f.err
+}
+
 type surface struct {
 	srv *httptest.Server
 	e   *gin.Engine
@@ -147,17 +168,17 @@ func routes(e *gin.Engine) []string {
 	return out
 }
 
-// Bảng đăng ký là hợp đồng: đúng 7 thao tác Admin + 1 thao tác Application của danh mục phòng ban, không thêm
-// /departments/:code/modules (còn ở pf/party), menu hay cây tổ chức.
+// Bảng đăng ký là hợp đồng: 7 thao tác Admin của danh mục phòng ban (#118) + nạp phòng ban mặc định (#222); Application:
+// danh sách phòng ban (#118), cây module phòng ban và menu (#222). Khu vực, cây tổ chức ở pf/party.
 func TestRouteMap(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	if got, want := routes(mount(t, nil, true).e), []string{
 		"GET /v1/departments", "GET /v1/departments/:id", "GET /v1/departments/:id/log", "POST /v1/departments",
-		"POST /v1/departments/:id/retire", "POST /v1/departments/:id/status", "PUT /v1/departments/:id",
+		"POST /v1/departments/:id/retire", "POST /v1/departments/:id/status", "POST /v1/orgs/:ref/departments/seed", "PUT /v1/departments/:id",
 	}; !slices.Equal(got, want) {
 		t.Fatalf("Admin routes:\n got %v\nwant %v", got, want)
 	}
-	if got := routes(mount(t, nil, false).e); !slices.Equal(got, []string{"GET /v1/departments"}) {
+	if got, want := routes(mount(t, nil, false).e), []string{"GET /v1/departments", "GET /v1/departments/:code/modules", "GET /v1/menu"}; !slices.Equal(got, want) {
 		t.Fatalf("Application routes: %v", got)
 	}
 }
@@ -173,6 +194,8 @@ func TestUnwiredFailsClosed(t *testing.T) {
 		{adm, http.MethodPut, "/v1/departments/" + dept.String()}, {adm, http.MethodPost, "/v1/departments/" + dept.String() + "/status"},
 		{adm, http.MethodPost, "/v1/departments/" + dept.String() + "/retire"}, {adm, http.MethodGet, "/v1/departments/" + dept.String() + "/log"},
 		{app, http.MethodGet, "/v1/departments"},
+		{adm, http.MethodPost, "/v1/orgs/" + unit.String() + "/departments/seed"}, {app, http.MethodGet, "/v1/menu"},
+		{app, http.MethodGet, "/v1/departments/trong_trot/modules"},
 	} {
 		r := c.s.do(t, c.method, c.path, `{}`)
 		if r.status != http.StatusServiceUnavailable || r.body["code"] != "extension.dependency_unavailable" {

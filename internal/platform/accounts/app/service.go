@@ -10,6 +10,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"slices"
 	"time"
@@ -97,6 +98,19 @@ type Service struct {
 	// DormantDryRun (D24): job accounts_dormant chỉ đếm tài khoản sẽ báo trước / khóa, không ghi gì (chạy thử lần đầu
 	// ở môi trường thật — docs/runbooks/keycloak-mfa-d24.md).
 	DormantDryRun bool
+	// ResetMailer, ResetURL (#255, ADR-0056): kênh email và URL trang đặt lại mật khẩu (AG_WEB_OPS_URL) của consumer
+	// port.PasswordResetConsumer (cmd/worker). Thiếu → consumer lỗi, sự kiện giao lại rồi vào DLQ.
+	ResetMailer ResetMailer
+	ResetURL    string
+	// Log: nhật ký vận hành (không PII, không mã/mật khẩu). Nil → slog.Default().
+	Log *slog.Logger
+}
+
+func (s *Service) log() *slog.Logger {
+	if s.Log != nil {
+		return s.Log
+	}
+	return slog.Default()
 }
 
 // FacilityCatalog là phần cổng danh mục CNTS pf/accounts cần (masterdata/port.CNTSCatalogs thỏa mãn): ref không

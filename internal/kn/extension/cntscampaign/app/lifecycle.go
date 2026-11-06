@@ -615,7 +615,8 @@ func (s *Service) Publish(ctx context.Context, id uuid.UUID, idem string) (Campa
 		if !v.DueAt.After(s.now()) {
 			return step{}, problem.Validation.WithField("due_at", "hạn nộp đã qua — sửa nháp trước khi phát hành")
 		}
-		ref, err := s.Forms.LatestTemplate(ctx, domain.Profile, v.TemplateCode)
+		// #192: đúng phiên bản đã chọn trong Nháp (FN-21 B1), không tự thay bằng phiên bản mới nhất.
+		ref, err := s.template(ctx, v.TemplateCode, v.TemplateVersion)
 		if err != nil {
 			if isNotFound(err) {
 				return step{}, ErrTemplate.WithField("template_code", v.TemplateCode)

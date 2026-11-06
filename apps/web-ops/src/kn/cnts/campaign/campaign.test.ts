@@ -30,6 +30,9 @@ describe("Chiến dịch điều tra — hàm phía máy khách", () => {
     const cf = { name: " ", from_date: "2026-11-01", to_date: "2026-10-01", due_at: "", owner_ref: "" };
     expect(copyErrors(cf)).toEqual({ to_date: "Đến ngày ≥ từ ngày", due_at: "Bắt buộc" });
     expect(copyPayload({ ...cf, to_date: "2026-11-05", due_at: "2026-11-05T17:00" })).not.toHaveProperty("name");
+    // #192 FN-21 B1: phiên bản biểu đã chọn; bỏ trống = mới nhất lúc phát hành.
+    expect(payload(filled({ template_version: "2" })).template_version).toBe(2);
+    expect(payload(filled()).template_version).toBeNull();
     expect(reasonOk("ngắn")).toBe(false);
     expect(reasonOk("Xã mất điện nhiều ngày")).toBe(true);
   });
@@ -40,13 +43,15 @@ describe("Chiến dịch điều tra — backend giả lập /v1/extension/cnts/
 
   it("Nháp → Phát hành → nhắc, gia hạn → Đóng đợt → Mở lại; kết quả tách lũy kế", async () => {
     const tinh = client("kn-binh");
-    const c = await tinh.create(payload(filled()));
-    expect(c).toMatchObject({ state: "draft", version: 1, tasks: 3, forms_period_id: null });
+    const c = await tinh.create(payload(filled({ template_version: "2" })));
+    expect(c).toMatchObject({ state: "draft", version: 1, tasks: 3, forms_period_id: null, template_version: 2 });
+    expect(formOf(c).template_version).toBe("2");
     const v2 = await tinh.update(c.id, payload({ ...formOf(c), name: "Điều tra tổng đàn sau lũ" }));
     expect(v2.version).toBe(2);
     expect(await code(tinh.close(c.id))).toBe("extension.cnts_campaign_state");
     const pub = await tinh.publish(c.id);
     expect(pub.state).toBe("collecting");
+    expect(pub.template_version).toBe(2); // #192: phát hành đúng phiên bản đã chọn
     expect(pub.period_key).toMatch(/^DT-20261001-[0-9a-f]{6}$/);
     expect(percent(pub)).toBeGreaterThan(0);
     expect(await code(tinh.update(c.id, payload(filled())))).toBe("extension.cnts_campaign_state");

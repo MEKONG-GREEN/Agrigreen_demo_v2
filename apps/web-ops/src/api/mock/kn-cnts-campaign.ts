@@ -56,6 +56,7 @@ function check(i: Input): { field: string; reason: string }[] {
   const e: { field: string; reason: string }[] = [];
   if (!i.name?.trim()) e.push({ field: "name", reason: "bắt buộc" });
   if (!i.template_code) e.push({ field: "template_code", reason: "bắt buộc" });
+  if (i.template_version != null && i.template_version < 1) e.push({ field: "template_version", reason: "phiên bản biểu từ 1 trở lên" });
   if (i.scope_mode === "communes" && !(i.communes ?? []).length) e.push({ field: "communes", reason: "phạm vi không có xã nào" });
   if (!i.from_date || !i.to_date || i.to_date < i.from_date) e.push({ field: "to_date", reason: "đến ngày ≥ từ ngày" });
   if (!i.due_at) e.push({ field: "due_at", reason: "bắt buộc" });
@@ -80,7 +81,7 @@ function fromInput(i: Input, w: Who, prev?: Campaign): Campaign {
     from_date: i.from_date, to_date: i.to_date, due_at: i.due_at, remind_before_hours: i.remind_before_hours ?? 0, state: "draft",
     province_code: "91", updated_by: { ref: w.actor, display: "Cán bộ tỉnh (giả lập)" }, updated_at: now(), can_manage: true,
     owner: { ref: i.owner_ref, display: ownerName(i.owner_ref, w) },
-    forms_period_id: null, period_key: null, template_version: null, progress: null, events: [],
+    forms_period_id: null, period_key: null, template_version: i.template_version ?? null, progress: null, events: [],
   };
 }
 
@@ -170,7 +171,7 @@ export const cntsCampaignRoutes: Route[] = [
         c.state = "collecting";
         c.forms_period_id = uuidv7();
         c.period_key = `DT-${c.from_date.replaceAll("-", "")}-${c.id.replaceAll("-", "").slice(-6)}`;
-        c.template_version = 1;
+        c.template_version = c.template_version ?? 1; // #192: giữ phiên bản đã chọn ở Nháp
         c.progress = progressOf(c, false);
         event(c, w, "published", { due_at: c.due_at });
         return json(c);
@@ -250,7 +251,7 @@ export const cntsCampaignRoutes: Route[] = [
       withCampaign(ctx, (src, w) => {
         const b = body<CopyInput>(ctx);
         const i: Input = { name: b.name?.trim() || src.name, goal: src.goal ?? undefined, field: src.field as Input["field"],
-          template_code: src.template_code, scope_mode: src.scope_mode, regions: src.regions, communes: src.communes,
+          template_code: src.template_code, template_version: src.template_version, scope_mode: src.scope_mode, regions: src.regions, communes: src.communes,
           from_date: b.from_date, to_date: b.to_date, due_at: b.due_at, owner_ref: b.owner_ref ?? src.owner?.ref ?? "",
           remind_before_hours: src.remind_before_hours };
         const errs = check(i);

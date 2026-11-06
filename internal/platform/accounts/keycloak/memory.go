@@ -2,6 +2,7 @@ package keycloak
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"slices"
 	"strings"
@@ -18,14 +19,16 @@ import (
 // thuộc tính so khớp chính xác, phân trang first/max theo thứ tự tạo, vai realm
 // phải có trong realm. Chỉ dùng cho kiểm thử và chạy thử tại chỗ.
 type Memory struct {
-	mu      sync.Mutex
-	realm   []string
-	order   []uuid.UUID
-	users   map[uuid.UUID]*memUser
-	sent    []SentEmail
-	links   []IssuedLink
-	logout  map[uuid.UUID]int
-	failFor map[string]error // tên thao tác → lỗi giả
+	mu     sync.Mutex
+	realm  []string
+	order  []uuid.UUID
+	users  map[uuid.UUID]*memUser
+	sent   []SentEmail
+	links  []IssuedLink
+	logout map[uuid.UUID]int
+	// passwords: băm SHA-256 của mật khẩu đã đặt bằng SetPassword (mô phỏng passwordHistory của realm).
+	passwords map[uuid.UUID][32]byte
+	failFor   map[string]error // tên thao tác → lỗi giả
 	// sessions, events: phiên và sự kiện đăng nhập giả lập (RecordLogin, sessions.go).
 	sessions map[uuid.UUID][]port.Session
 	events   map[uuid.UUID][]port.LoginEvent
@@ -61,6 +64,8 @@ type IssuedLink struct {
 var (
 	_ port.Directory   = (*Memory)(nil)
 	_ port.ActionLinks = (*Memory)(nil)
+
+	_ port.PasswordSetter = (*Memory)(nil)
 )
 
 // NewMemory tạo Directory trong bộ nhớ. realmRoles rỗng → mọi vai trong
@@ -70,7 +75,7 @@ func NewMemory(realmRoles ...string) *Memory {
 		realmRoles = append(slices.Clone(port.ManagedRoles), "platform_admin", "offline_access", "cgh_sync", port.RoleFarmer)
 	}
 	return &Memory{
-		realm: realmRoles, users: map[uuid.UUID]*memUser{}, logout: map[uuid.UUID]int{},
+		realm: realmRoles, users: map[uuid.UUID]*memUser{}, logout: map[uuid.UUID]int{}, passwords: map[uuid.UUID][32]byte{},
 		failFor: map[string]error{}, now: time.Now,
 	}
 }
@@ -452,6 +457,36 @@ func (m *Memory) Logout(_ context.Context, id uuid.UUID) error {
 	m.logout[id]++
 	delete(m.sessions, id)
 	return nil
+}
+
+// MinPasswordLen mô phỏng chính sách length(12) của realm agrigreen.
+const MinPasswordLen = 12
+
+// SetPassword thực hiện port.PasswordSetter: mô phỏng chính sách realm (tối thiểu 12 ký tự, không trùng mật khẩu
+// hiện tại) → port.ErrPasswordPolicy.
+func (m *Memory) SetPassword(_ context.Context, id uuid.UUID, password string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.fail("SetPassword"); err != nil {
+		return err
+	}
+	if _, err := m.get(id); err != nil {
+		return err
+	}
+	sum := sha256.Sum256([]byte(password))
+	if prev, ok := m.passwords[id]; len([]rune(password)) < MinPasswordLen || (ok && prev == sum) {
+		return port.ErrPasswordPolicy
+	}
+	m.passwords[id] = sum
+	return nil
+}
+
+// PasswordMatches cho biết mật khẩu hiện tại của người dùng (đặt bằng SetPassword) có phải password.
+func (m *Memory) PasswordMatches(id uuid.UUID, password string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	prev, ok := m.passwords[id]
+	return ok && prev == sha256.Sum256([]byte(password))
 }
 
 // LockByBruteForce giả lập Keycloak khóa tạm tài khoản sau 5 lần sai (kiểm thử GIS US-LOG-01): khóa tự

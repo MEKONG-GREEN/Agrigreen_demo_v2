@@ -36,7 +36,7 @@ func TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN(t *testing.T) {
 	}
 	c, b := f.call(http.MethodGet, path, authz.KNTinh, nil)
 	f.ok(c, b, &list)
-	if len(list.Items) != 5 || list.Items[0].Version != nil {
+	if len(list.Items) != 5 || list.Items[0].Version != nil { // chưa có biểu điều tra
 		t.Fatalf("uninstalled: %s", b)
 	}
 	c, b = f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", authz.KNAdmin, nil)
@@ -52,15 +52,17 @@ func TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN(t *testing.T) {
 			}
 		}
 	}
-	// Admin cài một cấu trúc phiên bản mới qua cổng cap/forms hiện có. Màn phải đọc bản đó, không dựng lại từ builtin.
+	// #192 (FN-07 BR-02): mẫu KNQG BM-04 khóa cấu trúc trên mọi đường — kể cả Admin qua cổng cap/forms chung.
 	fields := []map[string]any{{"key": "design_marker", "label": "Cột phiên bản hai", "type": "text", "required": false}}
-	c, b = f.call(http.MethodPost, "/v1/forms/templates", authz.KNAdmin, map[string]any{"profile": "kn_cnts", "code": "CNTS-BM04", "title": "BM04 phiên bản hai", "fields": fields})
-	f.ok(c, b, nil)
+	c, b = f.call(http.MethodPost, "/v1/forms/templates", authz.KNAdmin, map[string]any{"profile": "kn_cnts", "code": "CNTS-BM04", "title": "BM04 phiên bản hai", "fields": fields, "base_version": 1})
+	if c != http.StatusForbidden {
+		t.Fatalf("KNQG BM-04 phải bị từ chối: %d %s", c, b)
+	}
 	c, b = f.call(http.MethodGet, path, authz.KNTinh, nil)
 	f.ok(c, b, &list)
 	for _, v := range list.Items {
-		if v.Code == "CNTS-BM04" && (*v.Version != 2 || len(v.Fields) != 1 || v.Fields[0].Key != "design_marker" || *v.TemplateID == oldID) {
-			t.Fatalf("installed version must win: %+v", v)
+		if v.Code == "CNTS-BM04" && (*v.Version != 1 || *v.TemplateID != oldID) {
+			t.Fatalf("BM-04 không được đổi phiên bản: %+v", v)
 		}
 	}
 	c, b = f.call(http.MethodGet, "/v1/forms/templates/"+oldID+"?profile=kn_cnts", authz.KNTinh, nil)

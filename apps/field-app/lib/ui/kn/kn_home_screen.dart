@@ -148,8 +148,8 @@ class KnHomeScreen extends ConsumerWidget {
                 case 'sync':
                   await st.services?.sync.syncOnce(force: true);
                   ref.invalidate(knBadgesProvider);
-                case 'lock':
-                  await ref.read(appControllerProvider.notifier).lock();
+                case 'signout':
+                  await ref.read(appControllerProvider.notifier).signOut();
               }
             },
             itemBuilder: (_) => const [
@@ -159,7 +159,7 @@ class KnHomeScreen extends ConsumerWidget {
               ),
               PopupMenuItem(value: 'sync', child: Text('Đồng bộ ngay')),
               PopupMenuItem(value: 'queue', child: Text('Hàng đợi đồng bộ')),
-              PopupMenuItem(value: 'lock', child: Text('Khóa')),
+              PopupMenuItem(value: 'signout', child: Text('Đăng xuất')),
             ],
           ),
         ],

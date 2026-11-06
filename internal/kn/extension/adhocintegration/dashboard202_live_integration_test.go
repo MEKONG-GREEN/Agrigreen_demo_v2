@@ -66,7 +66,8 @@ func TestDashboard202ActualPublicClosedSourcesAndCutoff(t *testing.T) {
 	// Source setup goes through the real KN-owned native Forms profile and
 	// capability ports. No private Forms SQL or fabricated closed figures.
 	pool := pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppPlatform)
-	fm, err := native.New(pool, f.clk, native.Deps{Profiles: extension.FormProfiles()})
+	fm, err := native.New(pool, f.clk, native.Deps{Profiles: extension.FormProfiles(),
+		DefinitionPolicies: map[string]formsport.TemplateDefinitionPolicy{"kn_cnts": f.ext.CNTSDefinitionPolicy()}}) // #192
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +80,7 @@ func TestDashboard202ActualPublicClosedSourcesAndCutoff(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	ref, err := fm.Publisher().DefineTemplate(admin, formsport.TemplateDef{Profile: "kn_cnts", Code: "LIVE202", Title: "Nguồn số đã chốt dashboard202", Fields: json.RawMessage(`[{"key":"amount","label":"Số thực hiện","type":"decimal","required":true}]`)}, "live202.define")
+	ref, err := fm.Publisher().DefineTemplate(admin, formsport.TemplateDef{Profile: "kn_cnts", Code: "LIVE202", Title: "Nguồn số đã chốt dashboard202", Fields: json.RawMessage(`[{"key":"amount","label":"Số thực hiện","type":"decimal","required":true}]`), BaseVersion: new(int64)}, "live202.define")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -343,6 +343,7 @@ func (s *Service) DisplayNames(ctx context.Context, refs []uuid.UUID) map[uuid.U
 type Input struct {
 	Name, Goal, Field string
 	TemplateCode      string
+	TemplateVersion   *int64
 	ScopeMode         string
 	Regions           []string
 	Communes          []string
@@ -370,8 +371,8 @@ func (s *Service) draftOf(ctx context.Context, c caller, in Input) (domain.Draft
 	if err != nil {
 		return domain.Draft{}, err
 	}
-	d := domain.Draft{Name: in.Name, Goal: in.Goal, Field: in.Field, TemplateCode: in.TemplateCode, ScopeMode: in.ScopeMode,
-		Regions: in.Regions, Units: in.Communes, From: from, To: to, DueAt: in.DueAt, OwnerRef: in.OwnerRef,
+	d := domain.Draft{Name: in.Name, Goal: in.Goal, Field: in.Field, TemplateCode: in.TemplateCode, TemplateVersion: in.TemplateVersion,
+		ScopeMode: in.ScopeMode, Regions: in.Regions, Units: in.Communes, From: from, To: to, DueAt: in.DueAt, OwnerRef: in.OwnerRef,
 		RemindBeforeHours: in.RemindBeforeHours}
 	d.Normalize()
 	switch d.ScopeMode {
@@ -415,8 +416,12 @@ func (s *Service) draftOf(ctx context.Context, c caller, in Input) (domain.Draft
 	if err := s.checkOwner(ctx, c, *d.OwnerRef); err != nil {
 		return d, err
 	}
-	if _, err := s.Forms.LatestTemplate(ctx, domain.Profile, d.TemplateCode); isNotFound(err) {
-		return d, ErrTemplate.WithField("template_code", d.TemplateCode)
+	if _, err := s.template(ctx, d.TemplateCode, d.TemplateVersion); isNotFound(err) {
+		field := "template_code"
+		if d.TemplateVersion != nil {
+			field = "template_version"
+		}
+		return d, ErrTemplate.WithField(field, d.TemplateCode)
 	} else if err != nil {
 		return d, err
 	}
@@ -501,9 +506,25 @@ func (s *Service) Owners(ctx context.Context) ([]Owner, error) {
 	return out, nil
 }
 
+// template đọc đúng phiên bản biểu đã chọn (#192, FN-07 BR-01); version nil → phiên bản mới nhất (Nháp ghi trước #192).
+func (s *Service) template(ctx context.Context, code string, version *int64) (formsport.TemplateRef, error) {
+	if version == nil {
+		return s.Forms.LatestTemplate(ctx, domain.Profile, code)
+	}
+	cat, ok := s.Forms.(formsport.TemplateCatalog)
+	if !ok {
+		return formsport.TemplateRef{}, ErrDependency.WithDetail("chưa nối danh mục phiên bản biểu (cap/forms)")
+	}
+	tv, err := cat.TemplateVersion(ctx, domain.Profile, code, *version)
+	if err != nil {
+		return formsport.TemplateRef{}, err
+	}
+	return formsport.TemplateRef{ID: tv.ID, Code: tv.Code, Version: tv.Version, Title: tv.Title, Fields: tv.Fields}, nil
+}
+
 func versionOf(id uuid.UUID, c caller, d domain.Draft, now time.Time) store.Version {
 	v := store.Version{RowID: newID(), CampaignID: id, OrgRef: c.k.OrgRef, Name: d.Name, Field: d.Field, TemplateCode: d.TemplateCode,
-		ScopeMode: d.ScopeMode, Regions: d.Regions, Units: d.Units, From: d.From, To: d.To, DueAt: d.DueAt, OwnerRef: d.OwnerRef,
+		TemplateVersion: d.TemplateVersion, ScopeMode: d.ScopeMode, Regions: d.Regions, Units: d.Units, From: d.From, To: d.To, DueAt: d.DueAt, OwnerRef: d.OwnerRef,
 		RemindBeforeHours: d.RemindBeforeHours, ActorRef: c.p.ActorRef, EventTime: now}
 	if d.Goal != "" {
 		g := d.Goal
@@ -626,7 +647,7 @@ func (s *Service) Copy(ctx context.Context, src uuid.UUID, in CopyInput, idem st
 			return Input{}, err
 		}
 		v := cur.Version
-		out := Input{Name: v.Name, Field: v.Field, TemplateCode: v.TemplateCode, ScopeMode: v.ScopeMode, Regions: v.Regions,
+		out := Input{Name: v.Name, Field: v.Field, TemplateCode: v.TemplateCode, TemplateVersion: v.TemplateVersion, ScopeMode: v.ScopeMode, Regions: v.Regions,
 			Communes: v.Units, From: in.From, To: in.To, DueAt: in.DueAt, OwnerRef: v.OwnerRef, RemindBeforeHours: v.RemindBeforeHours}
 		if v.Goal != nil {
 			out.Goal = *v.Goal
