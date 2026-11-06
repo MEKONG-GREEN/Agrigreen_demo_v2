@@ -453,7 +453,7 @@ func (f *fix) insHousehold(ref uuid.UUID, code, event, status, typ string) {
 	if _, err := f.pool.Exec(context.Background(), `INSERT INTO pf_extension.cnts_livestock_household (id, tenant_id, stream_key,
 	    household_ref, code, event, status, commune_code, person_ref, livestock_type, species_codes, head_counts, checkin_ref, reason,
 	    event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'lhh:' || $3::text, $3, $4, $5, $6, '30001', $7, $8, '{heo}', '{10}', $9, $10, now(), $7, $11, 'kn.cnts.livestock_household/v1')`,
+	  VALUES ($1, $2, 'lhh:' || $3::uuid::text, $3::uuid, $4, $5, $6, '30001', $7, $8, '{heo}', '{10}', $9, $10, now(), $7, $11, 'kn.cnts.livestock_household/v1')`,
 		ids.New(), f.tenant, ref, code, event, status, ids.New(), typ, checkin, reason, "t-"+ids.New().String()); err != nil {
 		f.t.Fatal(err)
 	}
