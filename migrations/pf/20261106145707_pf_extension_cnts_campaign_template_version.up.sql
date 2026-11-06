@@ -7,6 +7,8 @@ SET LOCAL lock_timeout = '5s';
 
 ALTER TABLE pf_extension.cnts_campaign
   ADD COLUMN template_version bigint NULL;
+-- ADR-0012: cột thêm vào sổ đăng ký để verify_chain xác minh được các dòng ghi trước migration này.
+SELECT shared.register_ledger_columns('pf_extension.cnts_campaign', ARRAY['template_version']);
 
 ALTER TABLE pf_extension.cnts_campaign
   ADD CONSTRAINT cnts_campaign_template_version CHECK (template_version IS NULL OR template_version >= 1) NOT VALID;
