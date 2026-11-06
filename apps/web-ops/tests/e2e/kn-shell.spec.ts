@@ -200,7 +200,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(loginAlert(page)).toContainText("tạm khóa 15 phút");
     await page.getByRole("link", { name: "Quên mật khẩu?" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Quên mật khẩu" })).toBeVisible();
-    await page.getByLabel("Email").fill("quan.lm@ttknqg.gov.vn");
+    await page.getByLabel("Email", { exact: true }).fill("quan.lm@ttknqg.gov.vn");
     await page.getByRole("button", { name: "Gửi liên kết đặt lại" }).click();
     await expect(page.getByRole("status")).toContainText("30 phút");
   });

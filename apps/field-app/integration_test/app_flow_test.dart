@@ -43,87 +43,86 @@ void main() {
     }
   }
 
-  testWidgets(
-    'đăng nhập (chế độ kiểm thử) → đồng bộ ngoại tuyến đầu–cuối',
-    (tester) async {
-      final server = await MockApiServer.start();
-      final sk = seedServer(server);
-      final store = FlutterSecureStore();
-      await store.deleteAll();
-      final support = await getApplicationSupportDirectory();
-      final dataDir = Directory(p.join(support.path, 'agrigreen_it'));
-      if (await dataDir.exists()) await dataDir.delete(recursive: true);
-      await dataDir.create(recursive: true);
-      final fcm = FakePushMessaging();
-      final notes = RecordingLocalNotifier();
+  testWidgets('đăng nhập (chế độ kiểm thử) → đồng bộ ngoại tuyến đầu–cuối', (
+    tester,
+  ) async {
+    final server = await MockApiServer.start();
+    final sk = seedServer(server);
+    final store = FlutterSecureStore();
+    await store.deleteAll();
+    final support = await getApplicationSupportDirectory();
+    final dataDir = Directory(p.join(support.path, 'agrigreen_it'));
+    if (await dataDir.exists()) await dataDir.delete(recursive: true);
+    await dataDir.create(recursive: true);
+    final fcm = FakePushMessaging();
+    final notes = RecordingLocalNotifier();
 
-      final pf = AppPlatform(
-        config: AppConfig(
-          apiBaseUrl: server.baseUrl,
-          oidcIssuer: 'http://127.0.0.1/oidc-test-mode',
-          tileUrlTemplate: '${server.baseUrl}/tiles/{z}/{x}/{y}.png',
+    final pf = AppPlatform(
+      config: AppConfig(
+        apiBaseUrl: server.baseUrl,
+        oidcIssuer: 'http://127.0.0.1/oidc-test-mode',
+        tileUrlTemplate: '${server.baseUrl}/tiles/{z}/{x}/{y}.png',
+      ),
+      store: store,
+      clock: const SystemClock(),
+      ids: UuidV7Generator(),
+      opener: const SqlCipherOpener(),
+      dataDir: dataDir,
+      apiFactory: (token, deviceId) => HttpSyncApi(
+        baseUrl: server.baseUrl,
+        accessToken: token,
+        deviceId: deviceId,
+        timeout: const Duration(seconds: 5),
+      ),
+      camera: GeneratedJpegCamera(),
+      location: const FixedLocationSource(
+        LocationResult(
+          GpsStatus.ok,
+          GpsFix(lat: 10.045, lon: 105.77, accuracyM: 5),
         ),
-        store: store,
-        clock: const SystemClock(),
-        ids: UuidV7Generator(),
-        opener: const SqlCipherOpener(),
-        dataDir: dataDir,
-        apiFactory: (token, deviceId) => HttpSyncApi(
-          baseUrl: server.baseUrl,
-          accessToken: token,
-          deviceId: deviceId,
-          timeout: const Duration(seconds: 5),
-        ),
-        camera: GeneratedJpegCamera(),
-        location: const FixedLocationSource(
-          LocationResult(
-            GpsStatus.ok,
-            GpsFix(lat: 10.045, lon: 105.77, accuracyM: 5),
-          ),
-        ),
-        push: fcm,
-        notifier: notes,
+      ),
+      push: fcm,
+      notifier: notes,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          platformProvider.overrideWithValue(pf),
+          oidcProvider.overrideWithValue(TestModeOidc()),
+        ],
+        child: const FieldApp(),
+      ),
+    );
+
+    // Đăng nhập chế độ kiểm thử → vào thẳng (không có PIN — BRD 2.0 FN-CH-00.01, ADR-0056).
+    await pumpUntil(tester, find.text('Đăng nhập'));
+    await tester.tap(find.text('Đăng nhập'));
+    await pumpUntil(tester, find.byType(HomeScreen));
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HomeScreen)),
+    );
+    final services = container.read(appControllerProvider).services!;
+    // Khóa SQLCipher dạng raw key nằm trong Keystore.
+    expect(await store.read(SecureKeys.dbKey), hasLength(64));
+
+    try {
+      await runOfflineFieldScenario(
+        s: services,
+        server: server,
+        householdKey: sk,
+        fcm: fcm,
+        notes: notes,
+        tick: () => tester.pump(const Duration(milliseconds: 100)),
       );
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            platformProvider.overrideWithValue(pf),
-            oidcProvider.overrideWithValue(TestModeOidc()),
-          ],
-          child: const FieldApp(),
-        ),
-      );
-
-      // Đăng nhập chế độ kiểm thử → vào thẳng (không có PIN — BRD 2.0 FN-CH-00.01, ADR-0056).
-      await pumpUntil(tester, find.text('Đăng nhập'));
-      await tester.tap(find.text('Đăng nhập'));
-      await pumpUntil(tester, find.byType(HomeScreen));
-
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(HomeScreen)),
-      );
-      final services = container.read(appControllerProvider).services!;
-      // Khóa SQLCipher dạng raw key nằm trong Keystore.
-      expect(await store.read(SecureKeys.dbKey), hasLength(64));
-
-      try {
-        await runOfflineFieldScenario(
-          s: services,
-          server: server,
-          householdKey: sk,
-          fcm: fcm,
-          notes: notes,
-          tick: () => tester.pump(const Duration(milliseconds: 100)),
-        );
-        // Chuông hiện số chưa đọc; mở hộp thư bằng chạm.
-        container.invalidate(homeSummaryProvider);
-        await tester.pump(const Duration(milliseconds: 500));
-        await tester.tap(find.byIcon(Icons.notifications).first);
-        await pumpUntil(tester, find.text('Tài liệu mới: phòng trừ rầy nâu'));
-      } finally {
-        await server.close();
-      }
-    },
-  );
+      // Chuông hiện số chưa đọc; mở hộp thư bằng chạm.
+      container.invalidate(homeSummaryProvider);
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.byIcon(Icons.notifications).first);
+      await pumpUntil(tester, find.text('Tài liệu mới: phòng trừ rầy nâu'));
+    } finally {
+      await server.close();
+    }
+  });
 }
