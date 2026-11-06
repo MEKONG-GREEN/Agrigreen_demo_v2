@@ -1,4 +1,4 @@
-## CNTS-CAMPAIGN-SCOPE (#236) — Chiến dịch điều tra: người phụ trách, sao chép đợt, màn Tạo chiến dịch
+## CNTS-CAMPAIGN-SCOPE — Chiến dịch điều tra: người phụ trách, sao chép đợt, màn Tạo chiến dịch (#236)
 
 Căn cứ: BRD CNTS v4.0 FN-21 (luồng chính B1, luồng phụ "sao chép đợt cũ"), ma trận quyền FN-21 (Mục VI), menu "Chiến dịch
 điều tra". Nền W11.50 ([giả định](W11.50.md)) giữ nguyên trừ các dòng dưới.

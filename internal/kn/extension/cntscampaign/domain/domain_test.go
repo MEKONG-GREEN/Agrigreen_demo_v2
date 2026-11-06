@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -61,7 +62,8 @@ func TestDraftValidate(t *testing.T) {
 	}
 	bad = ok
 	bad.OwnerRef = nil
-	if err := bad.Validate(); err == nil || err.(ErrInput).Field != "owner_ref" {
+	var ie ErrInput
+	if err := bad.Validate(); !errors.As(err, &ie) || ie.Field != "owner_ref" {
 		t.Fatalf("FN-21 B1: thiếu người phụ trách phải lỗi owner_ref: %v", err)
 	}
 	if _, ok := Reason("ngắn"); ok {
