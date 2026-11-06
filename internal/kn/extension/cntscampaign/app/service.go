@@ -52,6 +52,10 @@ var (
 	// trách; Lãnh đạo phòng chỉ xem và mở lại đợt.
 	errNotOwner = problem.Forbidden.WithDetail("chỉ cán bộ tổng hợp hoặc người phụ trách đợt được tạo, sửa, phát hành, gia hạn, nhắc, đóng đợt")
 	// ErrOwner: người phụ trách không phải cán bộ Cấp Tỉnh Phòng CNTS của tỉnh.
+	// ErrHousehold: hộ của phạm vi theo hộ không có trong danh sách hộ chăn nuôi, không Đang dùng hoặc ngoài phạm vi Nút
+	// (#236, ADR-0056 mục 9: chỉ chọn hộ active).
+	ErrHousehold = problem.New(http.StatusUnprocessableEntity, "extension.cnts_campaign_household",
+		"Hộ chăn nuôi của phạm vi phải đang dùng (đã check-in vị trí) và thuộc xã trong phạm vi của Nút")
 	ErrOwner = problem.New(http.StatusUnprocessableEntity, "extension.cnts_campaign_owner",
 		"Người phụ trách đợt phải là cán bộ Cấp Tỉnh Phòng Chăn nuôi – Thủy sản của tỉnh")
 )
@@ -221,6 +225,8 @@ type Campaign struct {
 	Progress *Progress    // tiến độ (đợt đã phát hành, đọc chi tiết/danh sách)
 	// CanManage: người gọi được sửa, phát hành, gia hạn, nhắc, đóng đợt (ma trận FN-21).
 	CanManage bool
+	// Households: bản hiện hành của các hộ trong phạm vi theo hộ (đọc chi tiết; nil với phạm vi khác).
+	Households []store.Household
 }
 
 func build(v store.Version, es []store.Event) Campaign {
@@ -309,6 +315,19 @@ func (s *Service) get(ctx context.Context, c caller, id uuid.UUID) (Campaign, er
 		return Campaign{}, err
 	}
 	out.CanManage = c.canManage(out.Version)
+	if len(out.Version.Households) > 0 {
+		book, err := s.householdBook(ctx, c, out.Version.Households)
+		if err != nil {
+			return Campaign{}, err
+		}
+		for _, r := range out.Version.Households {
+			h, ok := book[r]
+			if !ok {
+				h = store.Household{Ref: r}
+			}
+			out.Households = append(out.Households, h)
+		}
+	}
 	if out.Period != nil {
 		p, err := s.progress(ctx, c, out, true)
 		if err != nil {
@@ -347,7 +366,8 @@ type Input struct {
 	ScopeMode         string
 	Regions           []string
 	Communes          []string
-	From, To          string // YYYY-MM-DD
+	Households        []uuid.UUID // phạm vi theo hộ: household_ref (ADR-0056)
+	From, To          string      // YYYY-MM-DD
 	DueAt             time.Time
 	OwnerRef          *uuid.UUID
 	RemindBeforeHours int
@@ -372,7 +392,7 @@ func (s *Service) draftOf(ctx context.Context, c caller, in Input) (domain.Draft
 		return domain.Draft{}, err
 	}
 	d := domain.Draft{Name: in.Name, Goal: in.Goal, Field: in.Field, TemplateCode: in.TemplateCode, TemplateVersion: in.TemplateVersion,
-		ScopeMode: in.ScopeMode, Regions: in.Regions, Units: in.Communes, From: from, To: to, DueAt: in.DueAt, OwnerRef: in.OwnerRef,
+		ScopeMode: in.ScopeMode, Regions: in.Regions, Units: in.Communes, Households: in.Households, From: from, To: to, DueAt: in.DueAt, OwnerRef: in.OwnerRef,
 		RemindBeforeHours: in.RemindBeforeHours}
 	d.Normalize()
 	switch d.ScopeMode {
@@ -392,7 +412,22 @@ func (s *Service) draftOf(ctx context.Context, c caller, in Input) (domain.Draft
 			}
 		}
 		sort.Strings(d.Units)
-	case domain.ScopeCommunes:
+	case domain.ScopeCommunes, domain.ScopeHouseholds:
+		if d.ScopeMode == domain.ScopeHouseholds {
+			if len(d.Units) > 0 {
+				return d, problem.Validation.WithField("communes", "phạm vi theo hộ: xã lấy theo hộ đã chọn")
+			}
+			parents, err := s.activeHouseholds(ctx, c, d.Households)
+			if err != nil {
+				return d, err
+			}
+			for _, p := range parents {
+				if !slices.Contains(d.Units, p) {
+					d.Units = append(d.Units, p)
+				}
+			}
+			sort.Strings(d.Units)
+		}
 		if rg := s.regions(); rg != nil && c.province != "" {
 			all, err := rg.CommuneRegions(ctx, c.province)
 			if err != nil {
@@ -460,6 +495,43 @@ func (s *Service) checkOwner(ctx context.Context, c caller, owner uuid.UUID) err
 	return ErrOwner.WithField("owner_ref", owner.String())
 }
 
+// householdBook đọc bản hiện hành của các hộ (sổ hộ chăn nuôi #251).
+func (s *Service) householdBook(ctx context.Context, c caller, refs []uuid.UUID) (map[uuid.UUID]store.Household, error) {
+	var out map[uuid.UUID]store.Household
+	err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+		var e error
+		out, e = store.Households(ctx, tx, refs)
+		return e
+	})
+	return out, err
+}
+
+// activeHouseholds kiểm các hộ của phạm vi theo hộ (ADR-0056 mục 9: chỉ hộ Đang dùng; xã của hộ trong phạm vi Nút) và trả xã
+// của từng hộ (song song refs) — đơn vị cha của kỳ native khi phát hành.
+func (s *Service) activeHouseholds(ctx context.Context, c caller, refs []uuid.UUID) ([]string, error) {
+	book, err := s.householdBook(ctx, c, refs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(refs))
+	for _, r := range refs {
+		h, ok := book[r]
+		switch {
+		case !ok:
+			return nil, ErrHousehold.WithField("households", r.String()+": không có trong danh sách hộ chăn nuôi")
+		case h.Status != householdActive:
+			return nil, ErrHousehold.WithField("households", h.Code+": hộ không ở trạng thái Đang dùng")
+		case !c.k.Scope.Allows(h.Commune):
+			return nil, ErrHousehold.WithField("households", h.Code+": xã "+h.Commune+" ngoài phạm vi của Nút")
+		}
+		out = append(out, h.Commune)
+	}
+	return out, nil
+}
+
+// householdActive là trạng thái "Đang dùng" của sổ hộ chăn nuôi (HCN-08).
+const householdActive = "active"
+
 func (s *Service) directory() accport.KNDirectory {
 	if s.Officers == nil {
 		return nil
@@ -524,7 +596,7 @@ func (s *Service) template(ctx context.Context, code string, version *int64) (fo
 
 func versionOf(id uuid.UUID, c caller, d domain.Draft, now time.Time) store.Version {
 	v := store.Version{RowID: newID(), CampaignID: id, OrgRef: c.k.OrgRef, Name: d.Name, Field: d.Field, TemplateCode: d.TemplateCode,
-		TemplateVersion: d.TemplateVersion, ScopeMode: d.ScopeMode, Regions: d.Regions, Units: d.Units, From: d.From, To: d.To, DueAt: d.DueAt, OwnerRef: d.OwnerRef,
+		TemplateVersion: d.TemplateVersion, ScopeMode: d.ScopeMode, Regions: d.Regions, Units: d.Units, Households: d.Households, From: d.From, To: d.To, DueAt: d.DueAt, OwnerRef: d.OwnerRef,
 		RemindBeforeHours: d.RemindBeforeHours, ActorRef: c.p.ActorRef, EventTime: now}
 	if d.Goal != "" {
 		g := d.Goal
@@ -647,10 +719,13 @@ func (s *Service) Copy(ctx context.Context, src uuid.UUID, in CopyInput, idem st
 			return Input{}, err
 		}
 		v := cur.Version
-		out := Input{Name: v.Name, Field: v.Field, TemplateCode: v.TemplateCode, TemplateVersion: v.TemplateVersion, ScopeMode: v.ScopeMode, Regions: v.Regions,
+		out := Input{Name: v.Name, Field: v.Field, TemplateCode: v.TemplateCode, TemplateVersion: v.TemplateVersion, ScopeMode: v.ScopeMode, Regions: v.Regions, Households: v.Households,
 			Communes: v.Units, From: in.From, To: in.To, DueAt: in.DueAt, OwnerRef: v.OwnerRef, RemindBeforeHours: v.RemindBeforeHours}
 		if v.Goal != nil {
 			out.Goal = *v.Goal
+		}
+		if v.ScopeMode == domain.ScopeHouseholds {
+			out.Communes = nil // xã giải lại theo hộ; hộ đã vô hiệu hóa sau đợt nguồn → 422, bỏ hộ đó khi sửa nháp
 		}
 		if strings.TrimSpace(in.Name) != "" {
 			out.Name = in.Name

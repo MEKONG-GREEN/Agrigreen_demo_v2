@@ -627,9 +627,22 @@ func (s *Service) Publish(ctx context.Context, id uuid.UUID, idem string) (Campa
 		zone := clock.Zone()
 		from := time.Date(v.From.Year(), v.From.Month(), v.From.Day(), 0, 0, 0, 0, zone)
 		to := time.Date(v.To.Year(), v.To.Month(), v.To.Day(), 0, 0, 0, 0, zone)
+		in := formsport.BatchInput{Profile: domain.Profile, TemplateID: ref.ID, UnitKind: formsport.UnitCommune, Units: v.Units}
+		if v.ScopeMode == domain.ScopeHouseholds {
+			// #236: mỗi hộ một việc của cán bộ xã chứa hộ; hộ phải còn Đang dùng lúc phát hành (bị vô hiệu hóa sau khi lưu
+			// nháp → sửa nháp bỏ hộ đó).
+			parents, err := s.activeHouseholds(ctx, c, v.Households)
+			if err != nil {
+				return step{}, err
+			}
+			in.UnitKind, in.Units, in.UnitParents = formsport.UnitHousehold, make([]string, 0, len(v.Households)), parents
+			for _, h := range v.Households {
+				in.Units = append(in.Units, h.String())
+			}
+		}
 		o.publishing = true
-		pub, err := s.Forms.PublishBatch(ctx, formsport.BatchInput{Profile: domain.Profile, TemplateID: ref.ID, UnitKind: formsport.UnitCommune,
-			Units: v.Units, Periods: []formsport.PeriodDef{{Label: v.Name, DueAt: v.DueAt, Kind: domain.PeriodKind, Key: key, From: from, To: to,
+		pub, err := s.Forms.PublishBatch(ctx, formsport.BatchInput{Profile: in.Profile, TemplateID: in.TemplateID, UnitKind: in.UnitKind,
+			Units: in.Units, UnitParents: in.UnitParents, Periods: []formsport.PeriodDef{{Label: v.Name, DueAt: v.DueAt, Kind: domain.PeriodKind, Key: key, From: from, To: to,
 				Rule: domain.PeriodRule}}}, "cnts_campaign:"+v.CampaignID.String())
 		if err != nil {
 			return step{}, err

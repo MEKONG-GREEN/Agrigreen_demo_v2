@@ -17,8 +17,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
 
-// UnitRow là tiến độ của một xã trong đợt.
+// UnitRow là tiến độ của một đơn vị của đợt (xã; phạm vi theo hộ: một hộ, Commune là xã của hộ).
 type UnitRow struct {
+	Unit                 string // mã đơn vị của kỳ native (mã xã hoặc household_ref)
+	Household            string // mã hộ HCN-01 (phạm vi theo hộ)
 	Commune, CommuneName string
 	Region, RegionName   string
 	Status               string // trạng thái hiển thị của cap/forms (not_submitted, overdue, submitted, accepted, returned, missed…)
@@ -98,21 +100,26 @@ func province(c Campaign) string {
 }
 
 // progress đọc tiến độ kỳ native của đợt (người gọi phải thấy kỳ — kiểm ở cap/forms) và gom theo khu vực.
-func (s *Service) progress(ctx context.Context, _ caller, cur Campaign, detail bool) (Progress, error) {
+func (s *Service) progress(ctx context.Context, c caller, cur Campaign, detail bool) (Progress, error) {
 	p, err := s.Control.Progress(ctx, domain.Profile, *cur.Period.FormsPeriodRef)
 	if err != nil {
 		return Progress{}, err
 	}
 	units := make([]string, 0, len(p.Units))
 	for _, u := range p.Units {
-		units = append(units, u.Unit)
+		units = append(units, communeOf(u.Unit, u.Parent))
 	}
 	nb := s.names(ctx, province(cur), units, detail)
+	codes, err := s.householdCodes(ctx, c, cur)
+	if err != nil {
+		return Progress{}, err
+	}
 	out := Progress{PeriodStatus: p.Status}
 	byRegion := map[string]*RegionRow{}
 	var order []string
 	for _, u := range p.Units {
-		code, name := nb.region(u.Unit)
+		cm := communeOf(u.Unit, u.Parent)
+		code, name := nb.region(cm)
 		r := byRegion[code]
 		if r == nil {
 			r = &RegionRow{Code: code, Name: name}
@@ -140,7 +147,7 @@ func (s *Service) progress(ctx context.Context, _ caller, cur Campaign, detail b
 			out.Returned++
 		}
 		if detail {
-			out.Units = append(out.Units, UnitRow{Commune: u.Unit, CommuneName: nb.commune(u.Unit), Region: code, RegionName: name, Status: u.Status,
+			out.Units = append(out.Units, UnitRow{Unit: u.Unit, Household: codes[u.Unit], Commune: cm, CommuneName: nb.commune(cm), Region: code, RegionName: name, Status: u.Status,
 				Versions: u.Versions, Late: u.Late, LastSubmittedAt: u.LastSubmittedAt})
 		}
 	}
@@ -152,8 +159,35 @@ func (s *Service) progress(ctx context.Context, _ caller, cur Campaign, detail b
 		if out.Units[i].Region != out.Units[j].Region {
 			return out.Units[i].Region < out.Units[j].Region
 		}
-		return out.Units[i].Commune < out.Units[j].Commune
+		if out.Units[i].Commune != out.Units[j].Commune {
+			return out.Units[i].Commune < out.Units[j].Commune
+		}
+		return out.Units[i].Household < out.Units[j].Household
 	})
+	return out, nil
+}
+
+// communeOf: xã của đơn vị kỳ native — cha với hộ/cơ sở, chính nó với xã.
+func communeOf(unit, parent string) string {
+	if parent != "" {
+		return parent
+	}
+	return unit
+}
+
+// householdCodes: mã đơn vị kỳ native (household_ref) → mã hộ HCN-01 của đợt phạm vi theo hộ (rỗng với phạm vi khác).
+func (s *Service) householdCodes(ctx context.Context, c caller, cur Campaign) (map[string]string, error) {
+	out := map[string]string{}
+	if len(cur.Version.Households) == 0 {
+		return out, nil
+	}
+	book, err := s.householdBook(ctx, c, cur.Version.Households)
+	if err != nil {
+		return nil, err
+	}
+	for r, h := range book {
+		out[r.String()] = h.Code
+	}
 	return out, nil
 }
 
@@ -166,8 +200,9 @@ type ResultField struct {
 	Key, Label, Unit string
 }
 
-// ResultRow là số liệu của một xã.
+// ResultRow là số liệu của một đơn vị (xã; phạm vi theo hộ: một hộ).
 type ResultRow struct {
+	Unit, Household                  string
 	Commune, CommuneName, RegionName string
 	Values                           map[string]string
 	NilReport                        bool
@@ -244,13 +279,22 @@ func (s *Service) Results(ctx context.Context, cid uuid.UUID) (Results, error) {
 	if cur.State == domain.StateClosed && pf.ClosedNo > 0 {
 		out.Basis, src = "closed", pf.Closed
 	}
-	nb := s.names(ctx, province(cur), pf.Units, true)
+	communes := make([]string, 0, len(pf.Units))
+	for _, u := range pf.Units {
+		communes = append(communes, communeOf(u, pf.Parents[u]))
+	}
+	nb := s.names(ctx, province(cur), communes, true)
+	codes, err := s.householdCodes(ctx, c, cur)
+	if err != nil {
+		return Results{}, err
+	}
 	sum := map[string]decimal.Decimal{}
 	out.Units = len(pf.Units)
 	for _, u := range pf.Units {
 		x, ok := src[u]
-		_, rn := nb.region(u)
-		row := ResultRow{Commune: u, CommuneName: nb.commune(u), RegionName: rn, Values: map[string]string{}}
+		cm := communeOf(u, pf.Parents[u])
+		_, rn := nb.region(cm)
+		row := ResultRow{Unit: u, Household: codes[u], Commune: cm, CommuneName: nb.commune(cm), RegionName: rn, Values: map[string]string{}}
 		if ok && (out.Basis == "closed" || x.Decision != "returned") {
 			out.Reported++
 			row.NilReport = x.NilReport
@@ -305,6 +349,10 @@ func (s *Service) ResultsXLSX(ctx context.Context, id uuid.UUID) ([]byte, string
 		return nil, "", err
 	}
 	head := []any{"Mã xã", "Xã", "Khu vực"}
+	byHousehold := v.ScopeMode == domain.ScopeHouseholds
+	if byHousehold {
+		head = append([]any{"Mã hộ"}, head...) // #236 phạm vi theo hộ: một dòng một hộ
+	}
 	for _, f := range r.Fields {
 		label := f.Label
 		if f.Unit != "" {
@@ -320,6 +368,9 @@ func (s *Service) ResultsXLSX(ctx context.Context, id uuid.UUID) ([]byte, string
 	row := 5
 	for _, rr := range r.Rows {
 		vals := []any{rr.Commune, rr.CommuneName, rr.RegionName}
+		if byHousehold {
+			vals = append([]any{rr.Household}, vals...)
+		}
 		for _, f := range r.Fields {
 			vals = append(vals, numOrBlank(rr.Values[f.Key]))
 		}
@@ -334,7 +385,7 @@ func (s *Service) ResultsXLSX(ctx context.Context, id uuid.UUID) ([]byte, string
 		return nil, "", err
 	}
 	for i, f := range r.Fields {
-		if err := set(i+4, row, numOrBlank(r.Total[f.Key])); err != nil {
+		if err := set(i+len(head)-len(r.Fields)+1, row, numOrBlank(r.Total[f.Key])); err != nil {
 			return nil, "", err
 		}
 	}

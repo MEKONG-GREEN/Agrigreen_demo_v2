@@ -13,6 +13,7 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscampaign/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscampaign/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscampaign/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -69,6 +70,7 @@ type inputDTO struct {
 	ScopeMode         string   `json:"scope_mode"`
 	Regions           []string `json:"regions"`
 	Communes          []string `json:"communes"`
+	Households        []string `json:"households"`
 	FromDate          string   `json:"from_date"`
 	ToDate            string   `json:"to_date"`
 	DueAt             string   `json:"due_at"`
@@ -99,6 +101,13 @@ func (d inputDTO) input() (app.Input, error) {
 		}
 		in.OwnerRef = &o
 	}
+	for _, h := range d.Households {
+		r, err := uuid.Parse(h)
+		if err != nil {
+			return app.Input{}, problem.Validation.WithField("households", "household_ref phải là UUID: "+h)
+		}
+		in.Households = append(in.Households, r)
+	}
 	return in, nil
 }
 
@@ -107,6 +116,29 @@ func strs(xs []string) []string {
 		return []string{}
 	}
 	return xs
+}
+
+// tasks: số việc khi phát hành — mỗi xã, hoặc mỗi hộ với phạm vi theo hộ.
+func tasks(v store.Version) int {
+	if v.ScopeMode == domain.ScopeHouseholds {
+		return len(v.Households)
+	}
+	return len(v.Units)
+}
+
+// households: hộ của phạm vi theo hộ (mã hộ, xã, trạng thái hiện hành — chỉ ở chi tiết; danh sách chỉ có ref).
+func households(x app.Campaign) []gin.H {
+	out := []gin.H{}
+	if len(x.Households) > 0 {
+		for _, h := range x.Households {
+			out = append(out, gin.H{"ref": h.Ref.String(), "code": h.Code, "commune": h.Commune, "status": h.Status})
+		}
+		return out
+	}
+	for _, r := range x.Version.Households {
+		out = append(out, gin.H{"ref": r.String(), "code": "", "commune": "", "status": ""})
+	}
+	return out
 }
 
 func (h Handler) view(c *gin.Context, x app.Campaign) gin.H {
@@ -121,8 +153,9 @@ func (h Handler) view(c *gin.Context, x app.Campaign) gin.H {
 	names := h.Svc.DisplayNames(c.Request.Context(), refs)
 	out := gin.H{
 		"id": v.CampaignID.String(), "version": v.Seq, "name": v.Name, "goal": v.Goal, "field": v.Field, "template_code": v.TemplateCode,
-		"scope_mode": v.ScopeMode, "regions": strs(v.Regions), "communes": strs(v.Units), "tasks": len(v.Units),
-		"from_date": v.From.Format(time.DateOnly), "to_date": v.To.Format(time.DateOnly), "due_at": ts(x.DueAt),
+		"scope_mode": v.ScopeMode, "regions": strs(v.Regions), "communes": strs(v.Units), "tasks": tasks(v),
+		"households": households(x),
+		"from_date":  v.From.Format(time.DateOnly), "to_date": v.To.Format(time.DateOnly), "due_at": ts(x.DueAt),
 		"remind_before_hours": v.RemindBeforeHours, "state": x.State, "province_code": v.Province,
 		"updated_by": gin.H{"ref": v.ActorRef.String(), "display": names[v.ActorRef]}, "updated_at": ts(v.RecordedAt),
 		"can_manage": x.CanManage, "owner": nil, "forms_period_id": nil, "period_key": nil, "template_version": v.TemplateVersion, "progress": nil,
@@ -155,7 +188,7 @@ func (h Handler) view(c *gin.Context, x app.Campaign) gin.H {
 			if u.LastSubmittedAt != nil {
 				last = ts(*u.LastSubmittedAt)
 			}
-			units = append(units, gin.H{"commune": u.Commune, "commune_name": u.CommuneName, "region_code": u.Region, "region_name": u.RegionName,
+			units = append(units, gin.H{"unit": u.Unit, "household_code": u.Household, "commune": u.Commune, "commune_name": u.CommuneName, "region_code": u.Region, "region_name": u.RegionName,
 				"status": u.Status, "versions": u.Versions, "late": u.Late, "last_submitted_at": last})
 		}
 		out["progress"] = gin.H{"period_status": pr.PeriodStatus, "total": pr.Total, "submitted": pr.Submitted, "pending": pr.Pending,
@@ -396,7 +429,7 @@ func (h Handler) results(c *gin.Context) {
 	}
 	rows := make([]gin.H, 0, len(r.Rows))
 	for _, x := range r.Rows {
-		rows = append(rows, gin.H{"commune": x.Commune, "commune_name": x.CommuneName, "region_name": x.RegionName, "values": x.Values,
+		rows = append(rows, gin.H{"unit": x.Unit, "household_code": x.Household, "commune": x.Commune, "commune_name": x.CommuneName, "region_name": x.RegionName, "values": x.Values,
 			"nil_report": x.NilReport})
 	}
 	c.JSON(http.StatusOK, gin.H{"campaign_id": r.Campaign.Version.CampaignID.String(), "basis": r.Basis, "fields": fields, "rows": rows,

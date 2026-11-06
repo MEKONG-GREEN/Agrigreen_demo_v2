@@ -49,11 +49,13 @@ const (
 // Lĩnh vực của đợt.
 var Fields = []string{"chan_nuoi", "thu_y", "thuy_san", "khac"}
 
-// Chế độ phạm vi (UR-TINH-26 "toàn bộ xã, Khu vực, danh sách xã").
+// Chế độ phạm vi (FN-21 B1 "toàn bộ xã, Khu vực, danh sách xã, hộ").
 const (
 	ScopeProvince = "province"
 	ScopeRegions  = "regions"
 	ScopeCommunes = "communes"
+	// ScopeHouseholds: danh sách hộ chăn nuôi Đang dùng (#236, ADR-0056 mục 9) — kỳ native đơn vị lá hộ, cha = xã của hộ.
+	ScopeHouseholds = "households"
 )
 
 // MaxUnits là số xã tối đa của một đợt (AC-01: 102 xã).
@@ -77,7 +79,8 @@ type Draft struct {
 	TemplateVersion   *int64 // phiên bản biểu điều tra đã chọn (FN-21 B1 "biểu và phiên bản"); nil = mới nhất lúc phát hành
 	ScopeMode         string
 	Regions           []string
-	Units             []string // xã đã giải từ phạm vi
+	Units             []string // xã đã giải từ phạm vi (phạm vi theo hộ: các xã chứa hộ)
+	Households        []uuid.UUID
 	From, To          time.Time
 	DueAt             time.Time
 	OwnerRef          *uuid.UUID
@@ -92,6 +95,16 @@ func (d *Draft) Normalize() {
 		d.ScopeMode = ScopeCommunes
 	}
 	d.Regions, d.Units = dedup(d.Regions), dedup(d.Units)
+	hs := make([]uuid.UUID, 0, len(d.Households))
+	for _, h := range d.Households {
+		if h != uuid.Nil && !slices.Contains(hs, h) {
+			hs = append(hs, h)
+		}
+	}
+	if len(hs) == 0 {
+		hs = nil // phạm vi khác: cột households NULL (CHECK cnts_campaign_households)
+	}
+	d.Households = hs
 }
 
 func dedup(xs []string) []string {
@@ -118,8 +131,14 @@ func (d Draft) Validate() error {
 		return ErrInput{"template_code", "mã biểu điều tra (cap/forms) bắt buộc"}
 	case d.TemplateVersion != nil && *d.TemplateVersion < 1:
 		return ErrInput{"template_version", "phiên bản biểu từ 1 trở lên"}
-	case d.ScopeMode != ScopeProvince && d.ScopeMode != ScopeRegions && d.ScopeMode != ScopeCommunes:
-		return ErrInput{"scope_mode", "province | regions | communes"}
+	case d.ScopeMode != ScopeProvince && d.ScopeMode != ScopeRegions && d.ScopeMode != ScopeCommunes && d.ScopeMode != ScopeHouseholds:
+		return ErrInput{"scope_mode", "province | regions | communes | households"}
+	case d.ScopeMode == ScopeHouseholds && len(d.Households) == 0:
+		return ErrInput{"households", "chọn ít nhất một hộ chăn nuôi"}
+	case d.ScopeMode == ScopeHouseholds && len(d.Households) > MaxUnits:
+		return ErrInput{"households", fmt.Sprintf("tối đa %d hộ", MaxUnits)}
+	case d.ScopeMode != ScopeHouseholds && len(d.Households) > 0:
+		return ErrInput{"households", "chỉ dùng với phạm vi theo hộ"}
 	case d.ScopeMode == ScopeRegions && len(d.Regions) == 0:
 		return ErrInput{"regions", "chọn ít nhất một khu vực"}
 	case d.ScopeMode != ScopeRegions && len(d.Regions) > 0:

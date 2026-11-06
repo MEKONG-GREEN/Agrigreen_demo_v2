@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -224,5 +225,157 @@ func TestCNTSCampaignOwnerAndCopy_236(t *testing.T) {
 		}
 		c, b = f.campaignAs(http.MethodPost, base+"/"+ids.New().String()+"/copy", tongHop, accport.GroupTongHop, false, body)
 		f.fail(c, b, "extension.cnts_campaign_not_found")
+	})
+}
+
+// lhh ghi một phiên bản hộ chăn nuôi (sổ #251) thẳng vào DB (DB tính seq, băm) — đầu vào cho phạm vi theo hộ.
+func (f *aggFx) lhh(ref uuid.UUID, code, event, status, commune string) {
+	f.t.Helper()
+	checkin := "NULL"
+	if status == "active" {
+		checkin = "'" + ids.New().String() + "'"
+	}
+	reason := "NULL"
+	if event == "deactivated" {
+		reason = "'Hộ ngừng chăn nuôi'"
+	}
+	sql := fmt.Sprintf(`INSERT INTO pf_extension.cnts_livestock_household (id, tenant_id, stream_key, household_ref, code, event, status,
+	    commune_code, person_ref, livestock_type, species_codes, head_counts, checkin_ref, reason, event_time, actor_ref, idem_key, rule_version)
+	  VALUES ('%s', '%s', 'lhh:%s', '%s', '%s', '%s', '%s', '%s', '%s', 'nong_ho', '{heo}', '{10}', %s, %s, now(), '%s', '%s',
+	    'kn.cnts.livestock_household/v1')`, ids.New(), f.tid, ref, ref, code, event, status, commune, ids.New(), checkin, reason, ids.New(),
+		"t-"+ids.New().String())
+	if _, err := f.adminExec(sql); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+// FN-21 B1 phạm vi "hộ" (ADR-0056 mục 9): chỉ hộ Đang dùng, xã trong phạm vi Nút; phát hành mỗi hộ một việc của cán bộ xã chứa
+// hộ (kỳ native đơn vị lá hộ, cha = xã); tiến độ, kết quả theo hộ; sao chép mang danh sách hộ; hộ vô hiệu hóa sau đó → 422.
+func TestCNTSCampaignHouseholdScope_236(t *testing.T) {
+	tongHop := ids.New()
+	f := newAggFx(t, facilityDir{}, func(fm *forms.Module, kn *extension.Module) {
+		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Conditional: fm.ConditionalControl(), Figures: fm.Figures()})
+	})
+	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", authz.KNAdmin, nil)
+	f.ok(c, b, nil)
+	h1, h2, pending, outside := ids.New(), ids.New(), ids.New(), ids.New()
+	f.lhh(h1, "HCN0000001", "created", "active", "X1")
+	f.lhh(h2, "HCN0000002", "created", "active", "X2")
+	f.lhh(pending, "HCN0000003", "created_pending", "pending_location", "X1")
+	f.lhh(outside, "HCN0000004", "created", "active", "X9")
+
+	const base = "/v1/extension/cnts/campaigns"
+	type hh struct {
+		Ref, Code, Commune, Status string
+	}
+	type view struct {
+		campaignView
+		ScopeMode  string `json:"scope_mode"`
+		Communes   []string
+		Households []hh
+		Progress2  *struct {
+			Units []struct {
+				Unit          string `json:"unit"`
+				HouseholdCode string `json:"household_code"`
+				Commune       string `json:"commune"`
+			} `json:"units"`
+		} `json:"progress"`
+	}
+	input := func(refs ...uuid.UUID) map[string]any {
+		hs := []string{}
+		for _, r := range refs {
+			hs = append(hs, r.String())
+		}
+		return map[string]any{"name": "Điều tra hộ nuôi heo 10/2026", "field": "chan_nuoi", "template_code": "CNTS-BM17",
+			"scope_mode": "households", "households": hs, "from_date": "2026-10-01", "to_date": "2026-10-05",
+			"due_at": "2026-10-09T03:00:00Z", "owner_ref": tongHop.String()}
+	}
+	var cv view
+	t.Run("chỉ hộ Đang dùng, trong phạm vi Nút", func(t *testing.T) {
+		for _, bad := range [][]uuid.UUID{{h1, pending}, {h1, outside}, {ids.New()}} {
+			c, b := f.campaignAs(http.MethodPost, base, tongHop, accport.GroupTongHop, false, input(bad...))
+			f.fail(c, b, "extension.cnts_campaign_household")
+		}
+		c, b := f.campaignAs(http.MethodPost, base, tongHop, accport.GroupTongHop, false, map[string]any{"name": "x", "field": "chan_nuoi",
+			"template_code": "CNTS-BM17", "scope_mode": "households", "households": []string{}, "from_date": "2026-10-01",
+			"to_date": "2026-10-05", "due_at": "2026-10-09T03:00:00Z", "owner_ref": tongHop.String()})
+		f.fail(c, b, "validation_failed")
+		c, b = f.campaignAs(http.MethodPost, base, tongHop, accport.GroupTongHop, false, input(h1, h2, h1))
+		f.ok(c, b, &cv)
+		if c != http.StatusCreated || cv.ScopeMode != "households" || cv.Tasks != 2 || len(cv.Communes) != 2 || len(cv.Households) != 2 ||
+			cv.Households[0].Code != "HCN0000001" || cv.Households[1].Commune != "X2" {
+			t.Fatalf("đợt theo hộ: %d %s", c, b)
+		}
+	})
+
+	t.Run("phát hành: mỗi hộ một việc ở xã chứa hộ; tiến độ, kết quả theo hộ", func(t *testing.T) {
+		c, b := f.campaignAs(http.MethodPost, base+"/"+cv.ID+"/publish", tongHop, accport.GroupTongHop, false, nil)
+		f.ok(c, b, &cv)
+		if cv.FormsPeriodID == nil || cv.Progress2 == nil || len(cv.Progress2.Units) != 2 ||
+			cv.Progress2.Units[0].HouseholdCode != "HCN0000001" || cv.Progress2.Units[0].Commune != "X1" || cv.Progress2.Units[0].Unit != h1.String() {
+			t.Fatalf("phát hành theo hộ: %s", b)
+		}
+		var tasks struct {
+			Items []struct {
+				PeriodID string `json:"period_id"`
+				Unit     string `json:"unit"`
+				UnitKind string `json:"unit_kind"`
+				Parent   string `json:"parent"`
+			} `json:"items"`
+		}
+		c, b = f.call(http.MethodGet, "/v1/forms/tasks?profile=kn_cnts&code=CNTS-BM17", authz.KNXa, nil)
+		f.ok(c, b, &tasks)
+		got := map[string]string{}
+		for _, it := range tasks.Items {
+			if it.PeriodID == *cv.FormsPeriodID {
+				if it.UnitKind != "household" {
+					t.Fatalf("việc theo hộ: %s", b)
+				}
+				got[it.Unit] = it.Parent
+			}
+		}
+		if len(got) != 2 || got[h1.String()] != "X1" || got[h2.String()] != "X2" {
+			t.Fatalf("việc của cán bộ xã: %v — %s", got, b)
+		}
+		f.submit(*cv.FormsPeriodID, h1.String(), catchVals("12", "0", "0", "0"))
+		var r struct {
+			Reported int `json:"reported"`
+			Rows     []struct {
+				HouseholdCode string            `json:"household_code"`
+				Commune       string            `json:"commune"`
+				Values        map[string]string `json:"values"`
+			} `json:"rows"`
+			Total map[string]string `json:"total"`
+		}
+		c, b = f.campaignAs(http.MethodGet, base+"/"+cv.ID+"/results", tongHop, accport.GroupTongHop, false, nil)
+		f.ok(c, b, &r)
+		if r.Reported != 1 || len(r.Rows) != 2 || r.Total["ca"] != "12" {
+			t.Fatalf("kết quả theo hộ: %s", b)
+		}
+		for _, row := range r.Rows {
+			if row.HouseholdCode == "HCN0000001" && (row.Commune != "X1" || row.Values["ca"] != "12") {
+				t.Fatalf("dòng hộ: %s", b)
+			}
+		}
+		c, _ = f.campaignAs(http.MethodGet, base+"/"+cv.ID+"/results/xlsx", tongHop, accport.GroupTongHop, false, nil)
+		if c != http.StatusOK {
+			t.Fatalf("xuất Excel theo hộ: %d", c)
+		}
+	})
+
+	t.Run("sao chép mang danh sách hộ; hộ vô hiệu hóa sau đó không phát hành được", func(t *testing.T) {
+		var cp view
+		c, b := f.campaignAs(http.MethodPost, base+"/"+cv.ID+"/copy", tongHop, accport.GroupTongHop, false,
+			map[string]any{"from_date": "2026-10-20", "to_date": "2026-10-25", "due_at": "2026-10-28T03:00:00Z"})
+		f.ok(c, b, &cp)
+		if cp.ScopeMode != "households" || len(cp.Households) != 2 || cp.Tasks != 2 || cp.FormsPeriodID != nil {
+			t.Fatalf("sao chép theo hộ: %s", b)
+		}
+		f.lhh(h2, "HCN0000002", "deactivated", "deactivated", "X2")
+		c, b = f.campaignAs(http.MethodPost, base+"/"+cp.ID+"/publish", tongHop, accport.GroupTongHop, false, nil)
+		f.fail(c, b, "extension.cnts_campaign_household")
+		c, b = f.campaignAs(http.MethodPost, base+"/"+cv.ID+"/copy", tongHop, accport.GroupTongHop, false,
+			map[string]any{"from_date": "2026-10-20", "to_date": "2026-10-25", "due_at": "2026-10-28T03:00:00Z"})
+		f.fail(c, b, "extension.cnts_campaign_household")
 	})
 }

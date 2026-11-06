@@ -24592,7 +24592,7 @@ export interface components {
             /** @description #192 FN-21 B1: phiên bản biểu điều tra đã chọn (FN-07); bỏ trống = mới nhất lúc phát hành */
             template_version?: number | null;
             /** @enum {string} */
-            scope_mode: "province" | "regions" | "communes";
+            scope_mode: "province" | "regions" | "communes" | "households";
             regions?: string[];
             communes?: string[];
             /** Format: date */
@@ -24604,6 +24604,8 @@ export interface components {
             /** Format: uuid */
             owner_ref: string;
             remind_before_hours?: number;
+            /** @description #236 phạm vi theo hộ (scope_mode=households): household_ref của hộ chăn nuôi Đang dùng (FN-10, ADR-0056) */
+            households?: string[];
         };
         CNTSPoint: {
             lat: number;
@@ -24732,6 +24734,8 @@ export interface components {
                 late: boolean;
                 /** Format: date-time */
                 last_submitted_at: string | null;
+                unit: string;
+                household_code: string;
             }[];
         };
         CNTSKHTCProgram: {
@@ -24752,7 +24756,7 @@ export interface components {
             field: string;
             template_code: string;
             /** @enum {string} */
-            scope_mode: "province" | "regions" | "communes";
+            scope_mode: "province" | "regions" | "communes" | "households";
             regions: string[];
             communes: string[];
             tasks: number;
@@ -24777,6 +24781,14 @@ export interface components {
             template_version: number | null;
             progress: components["schemas"]["CNTSCampaignProgress"] | null;
             events: components["schemas"]["CNTSCampaignEvent"][];
+            /** @description #236 hộ của phạm vi theo hộ (chi tiết có mã hộ, xã, trạng thái hiện hành; danh sách chỉ có ref) */
+            households: {
+                /** Format: uuid */
+                ref: string;
+                code: string;
+                commune: string;
+                status: string;
+            }[];
         };
         CNTSKHTCProgramList: {
             items: components["schemas"]["CNTSKHTCProgram"][];
@@ -24843,6 +24855,8 @@ export interface components {
                     [key: string]: string;
                 };
                 nil_report: boolean;
+                unit: string;
+                household_code: string;
             }[];
             total: {
                 [key: string]: string;

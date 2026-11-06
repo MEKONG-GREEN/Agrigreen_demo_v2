@@ -79,6 +79,29 @@ func TestDraftValidate(t *testing.T) {
 	if err := bad.Validate(); !errors.As(err, &ie) || ie.Field != "owner_ref" {
 		t.Fatalf("FN-21 B1: thiếu người phụ trách phải lỗi owner_ref: %v", err)
 	}
+	// #236 phạm vi theo hộ: bắt buộc ít nhất một hộ; danh sách hộ chỉ dùng với phạm vi theo hộ; bỏ trùng.
+	h := uuid.MustParse("01920000-0000-7000-8000-0000000000bb")
+	hh := ok
+	hh.ScopeMode, hh.Households = ScopeHouseholds, []uuid.UUID{h, h, uuid.Nil}
+	hh.Normalize()
+	if err := hh.Validate(); err != nil || len(hh.Households) != 1 {
+		t.Fatalf("phạm vi theo hộ: %v %v", err, hh.Households)
+	}
+	hh.Households = nil
+	if err := hh.Validate(); !errors.As(err, &ie) || ie.Field != "households" {
+		t.Fatalf("phạm vi theo hộ thiếu hộ: %v", err)
+	}
+	bad = ok
+	bad.Households = []uuid.UUID{h}
+	if err := bad.Validate(); !errors.As(err, &ie) || ie.Field != "households" {
+		t.Fatalf("hộ ngoài phạm vi theo hộ: %v", err)
+	}
+	empty := ok
+	empty.Households = []uuid.UUID{}
+	empty.Normalize()
+	if empty.Households != nil {
+		t.Fatal("phạm vi khác: households phải NULL")
+	}
 	if _, ok := Reason("ngắn"); ok {
 		t.Fatal("lý do < 10 ký tự")
 	}
