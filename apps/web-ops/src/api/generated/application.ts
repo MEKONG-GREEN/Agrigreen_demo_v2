@@ -19719,7 +19719,7 @@ export interface components {
              */
             source?: "gps" | "map" | null;
         };
-        /** @description Nội dung BM-10 (DB-01…DB-13). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại đủ trường (mỗi lần là một phiên bản). Xác nhận tin báo: commune_code, location, source, received_at trống lấy theo tin báo. */
+        /** @description Nội dung BM-10 (DB-01…DB-16, CNTS v4.0). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại đủ trường (mỗi lần là một phiên bản, quy tắc v2). Xác nhận tin báo: commune_code, location, source, received_at trống lấy theo tin báo. DB-04: ít nhất một hộ (household_refs + new_households, tối đa 200); DB-14 lấy theo hộ; DB-15 tự đếm (không nhận từ API — AC-04); DB-16 bắt buộc khi bệnh thuộc nhóm thủy sản (AC-05), không ghi với bệnh khác. household_ref (DB-04 một hộ của dữ liệu cũ v1) không ghi được nữa — gửi khác null → 422. */
         CNTSOutbreakInput: {
             /** @description Phiên bản người nhập đã thấy (bắt buộc khi cập nhật */
             base_version?: number;
@@ -19738,12 +19738,15 @@ export interface components {
              * @enum {string}
              */
             source?: "ubnd_xa" | "nong_ho" | "can_bo";
-            /**
-             * Format: uuid
-             * @description DB-04 hộ (pf/cooperative)
-             */
-            household_ref?: string | null;
-            /** @description DB-04 địa bàn (ấp */
+            /** @description DB-04 hộ chọn trong danh sách hộ chăn nuôi (FN-10), cùng xã với ổ dịch, trạng thái Đang dùng hoặc Chờ bổ sung vị trí (hộ vô hiệu hóa → 422, BR-07). DB-14 chụp loại chăn nuôi của hộ lúc ghi. */
+            household_refs?: string[];
+            /** @description DB-04 hộ chưa có — tạo trong danh sách ở trạng thái Chờ bổ sung vị trí, không cần check-in (FN-10 BR-08) */
+            new_households?: components["schemas"]["CNTSOutbreakNewHousehold"][];
+            /** @description DB-16 diện tích nuôi trồng thủy sản bị ảnh hưởng (ha, ≥ 0, ≤ 2 số lẻ) */
+            aqua_farmed_ha?: string | null;
+            /** @description DB-16 diện tích khai thác thủy sản bị ảnh hưởng (ha, ≥ 0, ≤ 2 số lẻ) */
+            aqua_wild_ha?: string | null;
+            /** @description Địa bàn (ấp */
             locality?: string;
             location?: components["schemas"]["CNTSLocation"] | null;
             /** @description DB-06 */
@@ -19783,7 +19786,56 @@ export interface components {
              */
             captured_at?: string;
         };
+        /** @description Hộ chưa có trong danh sách hộ chăn nuôi, nhập tại DB-04 (HCN-02…HCN-06; xã = xã của ổ dịch) */
+        CNTSOutbreakNewHousehold: {
+            /** @description HCN-02 họ tên chủ hộ / tên trang trại (kho định danh) */
+            owner_name: string;
+            /** @description HCN-03 chỉ chữ số (tùy chọn) */
+            owner_phone?: string;
+            /** @description HCN-04 ấp */
+            hamlet?: string;
+            /**
+             * @description DB-14 do cán bộ chọn
+             * @enum {string}
+             */
+            livestock_type: "nong_ho" | "trang_trai_nho" | "trang_trai_vua" | "trang_trai_cong_nghiep";
+            animals: {
+                species_code: string;
+                head_count: number;
+            }[];
+        };
+        CNTSOutbreakHousehold: {
+            /** Format: uuid */
+            household_ref: string;
+            /** @description Phiên bản hộ đã chụp lúc ghi ổ dịch */
+            household_version: number;
+            /** @description HCN-01 mã hộ */
+            code: string;
+            /**
+             * @description DB-14 (chụp lúc ghi)
+             * @enum {string}
+             */
+            livestock_type: "nong_ho" | "trang_trai_nho" | "trang_trai_vua" | "trang_trai_cong_nghiep";
+            hamlet: string | null;
+            /**
+             * @description Trạng thái hiện hành của hộ
+             * @enum {string}
+             */
+            status: "active" | "pending_location" | "deactivated";
+            /** @description Họ tên che bớt — chỉ ở chi tiết ổ dịch */
+            owner_label: string | null;
+        };
         CNTSOutbreak: {
+            /** @description Dữ liệu cũ (quy tắc v1, một hộ/địa bàn trước CNTS v4.0): không có DB-14…DB-16, DB-15 hiện 1 */
+            legacy: boolean;
+            /** @description DB-04/DB-14 của phiên bản (rỗng ở dữ liệu cũ) */
+            households: components["schemas"]["CNTSOutbreakHousehold"][];
+            /** @description DB-15 số hộ bị ảnh hưởng (tự đếm) */
+            affected_households: number;
+            /** @description DB-16 nuôi trồng (ha) */
+            aqua_farmed_ha: string | null;
+            /** @description DB-16 khai thác (ha) */
+            aqua_wild_ha: string | null;
             /** Format: uuid */
             ref: string;
             version: number;
@@ -19807,7 +19859,10 @@ export interface components {
             source: "ubnd_xa" | "nong_ho" | "can_bo";
             /** Format: uuid */
             suspect_ref: string | null;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description Chỉ ở dữ liệu cũ v1
+             */
             household_ref: string | null;
             locality: string | null;
             location: components["schemas"]["CNTSLocation"] | null;
