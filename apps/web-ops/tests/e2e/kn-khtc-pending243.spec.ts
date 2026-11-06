@@ -40,7 +40,13 @@ test("243 pending inbox: menu, phiếu native chờ, mobile và quyết định 
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("243-pending-desktop.png"), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(heading).toBeVisible();
+  // Wait for the responsive drawer transition, then use the public mobile menu.
+  await expect(sidebar(page)).not.toBeInViewport();
+  await page.getByRole("button", { name: "Mở menu", exact: true }).click();
+  await expect(sidebar(page)).toBeInViewport();
+  await sidebar(page).getByRole("link", { name: "Phiếu số liệu các phòng", exact: true }).click();
+  await expect(sidebar(page)).not.toBeInViewport();
+  await expect(heading).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   const tableWidth = await inbox.evaluate(el => el.getBoundingClientRect().width);
   expect(tableWidth).toBeGreaterThan(300);
@@ -57,6 +63,8 @@ test("243 pending inbox: menu, phiếu native chờ, mobile và quyết định 
   await sidebar(page).getByRole("link", { name: "Phiếu số liệu các phòng", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Chưa có phiếu chờ rà soát trong nhóm kỳ này." })).toBeVisible();
   await expect(inbox.getByRole("row").filter({ hasText: "Phòng Trồng trọt" })).toHaveCount(0);
-  await page.reload();
+  // The offline mock recreates accounts/data on tab reload. Re-read through
+  // the actual UI in this lifetime; durable native facts are verified on PG.
+  await page.getByRole("button", { name: "Làm mới", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Chưa có phiếu chờ rà soát trong nhóm kỳ này." })).toBeVisible();
 });
