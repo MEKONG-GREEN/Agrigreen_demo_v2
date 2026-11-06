@@ -16,8 +16,7 @@ it("pending243 mock uses latest native identity, preserves read-only Admin right
     const initial=await readPending243(api,null,new AbortController().signal);
     const target=initial.rows.find(r=>r.department==="trong_trot")!;expect(target).toBeDefined();
     const sourceBefore=structuredClone(store);
-    const denied=await api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/review",{params:{path:{id:target.period_id,dept:target.department}},
-      headers:{"Idempotency-Key":uuidv7()},body:{decision:"accepted",note:"",expected_submission_id:target.submission_id,base_attempt:target.attempt}});
+    const denied=await api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/review",{params:{path:{id:target.period_id,dept:target.department},header:{"Idempotency-Key":uuidv7()}},body:{decision:"accepted",note:"",expected_submission_id:target.submission_id,base_attempt:target.attempt}});
     expect(denied.response.status).toBe(403);
     expect((await readPending243(api,null,new AbortController().signal)).rows.some(r=>r.submission_id===target.submission_id)).toBe(true);
     expect(store).toEqual(sourceBefore);

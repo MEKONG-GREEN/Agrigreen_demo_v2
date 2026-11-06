@@ -1,4 +1,4 @@
-## W11.69-DASHBOARD-AFTER-OPEN-BADGE — hộp phiếu thường niên chờ rà soát
+## KHTC-DASHBOARD-PENDING-INBOX — hộp phiếu thường niên chờ rà soát
 
 ### Phạm vi và nguồn
 
