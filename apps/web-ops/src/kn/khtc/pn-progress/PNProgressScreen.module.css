@@ -12,3 +12,33 @@
   width: 100%;
   max-width: 100%;
 }
+
+
+.workspace {
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  :global(.shell):has(.workspace) :global(.crumb) {
+    min-width: 0;
+  }
+
+  :global(.shell):has(.workspace) :global(.crumb ol) {
+    display: block;
+  }
+
+  :global(.shell):has(.workspace) :global(.crumb li:not(:last-child)) {
+    display: none;
+  }
+
+  :global(.shell):has(.workspace) :global(.crumb li:last-child) {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.shell):has(.workspace) :global(.crumb li:last-child)::before {
+    content: none;
+  }
+}

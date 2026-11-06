@@ -31,8 +31,8 @@ export function PNProgressScreen({ department: requested }: { department?: strin
   const allowed = auth.status === "authenticated" && !!auth.principal && auth.kn.status === "active" && !!selected
     && ["admin", "kn_tinh"].includes(selected.role) && pnDepartment(department)
     && (selected.role === "admin" || selected.department_code === department);
-  if (!allowed) return <DetailPage title="Tiến độ chương trình của phòng" back={{ href: "/kn/bao-cao-khtc", label: "Báo cáo cho KHTC" }}><p role="alert">Chọn ngữ cảnh phòng chuyên môn phù hợp để xem tiến độ.</p></DetailPage>;
-  return <PNBody key={`${identity}:${department}`} api={auth.api} department={department as PNDepartment} backHref={requested ? `/kn/phong-ban/${department}/bao-cao-khtc` : "/kn/bao-cao-khtc"} />;
+  if (!allowed) return <div className={styles.workspace}><DetailPage title="Tiến độ chương trình của phòng" back={{ href: "/kn/bao-cao-khtc", label: "Báo cáo cho KHTC" }}><p role="alert">Chọn ngữ cảnh phòng chuyên môn phù hợp để xem tiến độ.</p></DetailPage></div>;
+  return <div className={styles.workspace}><PNBody key={`${identity}:${department}`} api={auth.api} department={department as PNDepartment} backHref={requested ? `/kn/phong-ban/${department}/bao-cao-khtc` : "/kn/bao-cao-khtc"} /></div>;
 }
 
 function PNBody({ api, department, backHref }: { api: ApiClient; department: PNDepartment; backHref: string }) {

@@ -71,6 +71,12 @@ for (const mobile of [false, true]) test(`215 PN reads the owner's prepared M5 a
   if (mobile) {
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(sidebar(page)).not.toBeInViewport();
+    const crumb = await page.getByRole("navigation", { name: "Breadcrumb", exact: true }).boundingBox();
+    const back = await page.getByRole("main").getByRole("link", { name: "Báo cáo cho KHTC", exact: true }).boundingBox();
+    expect(crumb).not.toBeNull(); expect(back).not.toBeNull();
+    expect(crumb!.y).toBeGreaterThanOrEqual(0);
+    expect(crumb!.y + crumb!.height).toBeLessThanOrEqual(back!.y);
+
     await expect(page.getByRole("button", { name: "Xuất Excel", exact: true })).toBeVisible();
     const width = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: innerWidth }));
     expect(width.page).toBeLessThanOrEqual(width.viewport + 1);
