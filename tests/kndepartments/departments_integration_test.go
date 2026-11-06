@@ -188,13 +188,15 @@ func TestKNSPLIT2MenuAndSeedHTTPOnOwner(t *testing.T) {
 		"party.department_not_open", "phòng ban chưa mở")
 	want(t, tinh.Do(harness.App, http.MethodGet, "/v1/menu?org_ref=khong-phai-uuid", "", nil), http.StatusUnprocessableEntity, "org_ref sai")
 
-	// Cây module của một phòng ban (kể cả phòng ban chưa mở với đối tượng admin).
+	// Cây module của một phòng ban.
 	md := want(t, tinh.Do(harness.App, http.MethodGet, "/v1/departments/trong_trot/modules", "", nil), http.StatusOK, "modules Cấp Tỉnh")
 	if md.Header.Get("Cache-Control") != "no-store" || md.Str("audience") != port.AudienceTinh {
 		t.Fatalf("modules Cấp Tỉnh: %v %s", md.Header, md.Raw)
 	}
-	want(t, root.Do(harness.App, http.MethodGet, "/v1/departments/chan_nuoi_thuy_san/modules?role=admin&org_ref="+prov, "", nil), http.StatusOK,
-		"modules Admin phòng ban chưa mở (?role= cũ)")
+	if r := want(t, root.Do(harness.App, http.MethodGet, "/v1/departments/trong_trot/modules?role=admin&org_ref="+prov, "", nil), http.StatusOK,
+		"modules Admin (?role= cũ)"); r.Str("audience") != port.AudienceAdmin {
+		t.Fatalf("modules Admin: %s", r.Raw)
+	}
 	wantCode(t, root.Do(harness.App, http.MethodGet, "/v1/departments/khong_co/modules?audience=admin&org_ref="+prov, "", nil), http.StatusNotFound,
 		"party.department_not_found", "phòng ban không có")
 
