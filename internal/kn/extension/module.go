@@ -155,6 +155,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 		Names:        func() partyport.ActorNames { return m.rc.Names }}
 	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.rc.BM11Programs = m.bm11Programs // W11.45: kết quả CT/DA cho Báo cáo phòng BM-11
+	m.rc.BM11Herds = m.bm11Herds       // #253: hộ, trang trại theo loại chăn nuôi cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()
 	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs)
 	m.records = m.newKNRecords(pool, db, clk, d.Units)

@@ -427,7 +427,9 @@ type BM11Content struct {
 	Programs   []BM11Program     `json:"programs"`
 	Sections   map[string]string `json:"sections"`
 	Supplement []BM11Supplement  `json:"supplement"`
-	ComputedAt string            `json:"computed_at"`
+	// Herds: hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07); nil ở báo cáo lập trước v4.0.
+	Herds      *BM11Herds `json:"herds,omitempty"`
+	ComputedAt string     `json:"computed_at"`
 }
 
 // Hash là SHA-256 (hex) của nội dung dạng JSON (khóa map đã sắp).
@@ -490,4 +492,152 @@ func orZeroStr(s string) string {
 		return "0"
 	}
 	return s
+}
+
+// ---------------------------------------------------------------------------
+// Hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07, AC-05; UR-TINH-16; Hình 48)
+// ---------------------------------------------------------------------------
+
+// Loại chăn nuôi HCN-06 (FN-10). Trang trại = trang trại quy mô nhỏ, vừa hoặc công nghiệp (BRD Mục I.6).
+const (
+	BM11HerdHousehold  = "nong_ho"
+	BM11HerdFarmSmall  = "trang_trai_nho"
+	BM11HerdFarmMedium = "trang_trai_vua"
+	BM11HerdFarmLarge  = "trang_trai_cong_nghiep"
+)
+
+// BM11HerdTypes là các loại chăn nuôi theo thứ tự cột.
+var BM11HerdTypes = []Key{{BM11HerdHousehold, "Nông hộ"}, {BM11HerdFarmSmall, "Trang trại nhỏ"}, {BM11HerdFarmMedium, "Trang trại vừa"},
+	{BM11HerdFarmLarge, "Trang trại công nghiệp"}}
+
+// BM11HerdCount là số hộ Đang dùng của một xã theo một loại chăn nuôi (nguồn: danh sách hộ chăn nuôi FN-10).
+type BM11HerdCount struct {
+	Commune, Type string
+	Households    int
+}
+
+// BM11HeadCount là tổng số con (chuỗi thập phân) theo vật nuôi × loại chăn nuôi của hộ Đang dùng.
+type BM11HeadCount struct {
+	Species, Type, Heads string
+}
+
+// BM11Species là tên, thứ tự của một vật nuôi trong danh mục FN-06.
+type BM11Species struct {
+	Name  string
+	Order int
+}
+
+// BM11HerdInput là số đọc từ danh sách hộ chăn nuôi tại lúc lập báo cáo.
+type BM11HerdInput struct {
+	Counts  []BM11HerdCount
+	Heads   []BM11HeadCount
+	Species map[string]BM11Species
+}
+
+// BM11HerdRow là một dòng bảng "Số hộ, trang trại theo loại chăn nuôi": số hộ, số trang trại, số hộ từng loại.
+type BM11HerdRow struct {
+	Commune    string         `json:"commune"` // mã xã; rỗng ở dòng toàn tỉnh
+	Name       string         `json:"name"`
+	Households int            `json:"households"`
+	Farms      int            `json:"farms"`
+	ByType     map[string]int `json:"by_type"` // loại chăn nuôi → số hộ (đủ 4 loại)
+}
+
+// BM11HeadRow là số con của một vật nuôi: ở nông hộ và ở trang trại.
+type BM11HeadRow struct {
+	Species   string `json:"species"`
+	Name      string `json:"name"`
+	Household string `json:"household"`
+	Farm      string `json:"farm"`
+}
+
+// BM11Herds là bảng theo loại chăn nuôi của báo cáo (đóng băng cùng nội dung — hộ đổi loại, vô hiệu hóa sau đó không làm
+// đổi báo cáo đã lập: FN-10 BR-06).
+type BM11Herds struct {
+	Communes      []BM11HerdRow `json:"communes"`
+	Total         BM11HerdRow   `json:"total"`
+	CommunesTotal int           `json:"communes_total"` // N xã của tỉnh (0 = chưa biết)
+	Heads         []BM11HeadRow `json:"heads"`
+}
+
+// BM11Farm cho biết loại chăn nuôi t là trang trại.
+func BM11Farm(t string) bool {
+	return t == BM11HerdFarmSmall || t == BM11HerdFarmMedium || t == BM11HerdFarmLarge
+}
+
+func bm11HerdRow(commune string) BM11HerdRow {
+	r := BM11HerdRow{Commune: commune, ByType: map[string]int{}}
+	for _, k := range BM11HerdTypes {
+		r.ByType[k.Key] = 0
+	}
+	return r
+}
+
+func (r *BM11HerdRow) add(t string, n int) {
+	if _, ok := r.ByType[t]; !ok {
+		return
+	}
+	r.ByType[t] += n
+	r.Households += n
+	if BM11Farm(t) {
+		r.Farms += n
+	}
+}
+
+// BM11HerdsOf dựng bảng theo loại chăn nuôi: mỗi xã có hộ Đang dùng một dòng (theo mã xã), dòng toàn tỉnh cộng các xã; số
+// con theo vật nuôi tách nông hộ / trang trại, sắp theo thứ tự danh mục rồi mã. Số con không phải số thập phân tính 0.
+func BM11HerdsOf(in BM11HerdInput, communesTotal int) BM11Herds {
+	out := BM11Herds{Communes: []BM11HerdRow{}, Total: bm11HerdRow(""), CommunesTotal: communesTotal, Heads: []BM11HeadRow{}}
+	idx := map[string]int{}
+	for _, c := range in.Counts {
+		i, ok := idx[c.Commune]
+		if !ok {
+			i = len(out.Communes)
+			idx[c.Commune] = i
+			out.Communes = append(out.Communes, bm11HerdRow(c.Commune))
+		}
+		out.Communes[i].add(c.Type, c.Households)
+		out.Total.add(c.Type, c.Households)
+	}
+	sort.SliceStable(out.Communes, func(i, j int) bool { return out.Communes[i].Commune < out.Communes[j].Commune })
+	type acc struct{ household, farm decimal.Decimal }
+	heads := map[string]*acc{}
+	for _, h := range in.Heads {
+		d, err := decimal.NewFromString(strings.TrimSpace(h.Heads))
+		if err != nil {
+			d = decimal.Zero
+		}
+		a := heads[h.Species]
+		if a == nil {
+			a = &acc{}
+			heads[h.Species] = a
+		}
+		switch {
+		case h.Type == BM11HerdHousehold:
+			a.household = a.household.Add(d)
+		case BM11Farm(h.Type):
+			a.farm = a.farm.Add(d)
+		}
+	}
+	for code, a := range heads {
+		name := code
+		if sp, ok := in.Species[code]; ok && sp.Name != "" {
+			name = sp.Name
+		}
+		out.Heads = append(out.Heads, BM11HeadRow{Species: code, Name: name, Household: a.household.String(), Farm: a.farm.String()})
+	}
+	order := func(code string) int {
+		if sp, ok := in.Species[code]; ok {
+			return sp.Order
+		}
+		return int(^uint(0) >> 1)
+	}
+	sort.Slice(out.Heads, func(i, j int) bool {
+		oi, oj := order(out.Heads[i].Species), order(out.Heads[j].Species)
+		if oi != oj {
+			return oi < oj
+		}
+		return out.Heads[i].Species < out.Heads[j].Species
+	})
+	return out
 }
