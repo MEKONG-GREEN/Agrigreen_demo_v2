@@ -206,9 +206,13 @@ func TestKNSPLIT2MenuAndSeedHTTPOnOwner(t *testing.T) {
 		t.Fatalf("tenant khác đọc cây module: %d %s", r.Status, r.Raw)
 	}
 
-	// Chủ KN: route đi qua cổng bật module pf/extension (như /v1/departments*, #118).
+	// Tắt pf/extension cho tenant: nạp phòng ban (chủ KN) đóng như /v1/departments* (#118); menu và cây module vẫn phục vụ
+	// (miễn cổng, menu tự lọc mục của module đã tắt — như khi còn ở pf/party).
 	want(t, root.Do(harness.Admin, http.MethodPost, "/v1/modules/pf/extension/enablement", "", map[string]any{"enabled": false,
 		"reason": "Kiểm cổng module của chủ KN"}), http.StatusCreated, "tắt pf/extension")
-	wantCode(t, root.Do(harness.App, http.MethodGet, "/v1/menu?org_ref="+prov, "", nil), http.StatusForbidden, "module_not_enabled", "module tắt (menu)")
 	wantCode(t, root.Do(harness.Admin, http.MethodPost, seed, "", nil), http.StatusForbidden, "module_not_enabled", "module tắt (nạp)")
+	want(t, root.Do(harness.App, http.MethodGet, "/v1/menu?org_ref="+prov, "", nil), http.StatusOK, "module tắt (menu vẫn phục vụ)")
+	if r := tinh.Do(harness.App, http.MethodGet, "/v1/departments/trong_trot/modules", "", nil); r.Code() == "module_not_enabled" {
+		t.Fatalf("module tắt (cây module không qua cổng): %d %s", r.Status, r.Raw)
+	}
 }

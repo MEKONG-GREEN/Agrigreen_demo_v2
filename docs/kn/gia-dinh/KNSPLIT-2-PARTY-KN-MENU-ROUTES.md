@@ -18,9 +18,9 @@ Nguồn: issue #222 (con #118, #53, #47), ADR-0055, `tools/knboundary/boundary.y
 - **Nạp phòng ban dưới /v1/orgs:** giữ đường dẫn, thêm tiền tố hẹp `/v1/orgs/{ref}/departments` vào `kn_shared_route_prefixes` (bề mặt KN do chủ KN phục vụ). `/v1/orgs` còn lại (cây, khu vực, ảnh hưởng, bảo đảm xã) vẫn là primitive của pf/party, ngoài bề mặt KN.
 - **Đổi tên `handler.KN` (mục 4 của #222) chưa làm:** kiểu `KN` còn được `party/handler/kn_collect.go` (`KN.RegisterKNCollect`, /v1/kn/cooperatives*) dùng; đổi tên kiểu hay chuyển khai báo sang tệp khác đều sinh khóa ghép nối kn-symbol-in-shared mới (baseline chỉ được co). Gỡ được khi /v1/kn/cooperatives* rời party.
 
-### Khác biệt có chủ đích
+### Cổng bật module (R-MOD-08)
 
-Như #118: ba route nay đi qua cổng bật module `pf/extension` (per_tenant). Tenant tắt pf/extension nhận 403 `module_not_enabled` ở menu KN, cây module và nạp phòng ban; tenant KN luôn bật pf/extension nên luồng hiện hành không đổi. Có test PG trong `tests/kndepartments`.
+Route của chủ KN đi qua cổng bật module `pf/extension` (per_tenant). Nạp phòng ban đóng 403 `module_not_enabled` khi tenant tắt pf/extension, như `/v1/departments*` (#118). Menu và cây module phòng ban thì KHÔNG được đóng: menu tự lọc mục của module đã tắt và phải chọn được trang còn bật (kn77 `TestKH_FN_CH_00_01_DefaultRouteKHTC`) — trước khi chuyển chúng ở pf/party (luôn bật). Vì vậy `extension.Module.GateExemptRoutes()` khai `/v1/menu`, `/v1/departments/:code/modules` và `assembly.Gated` cho hai route này đi qua không cổng (`TestGatedExemptRoutes`); hành vi HTTP giữ nguyên.
 
 ### Bằng chứng
 

@@ -238,6 +238,12 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	departments.Handler{Svc: m.departments}.RegisterApp(rg) // KNSPLIT-2 #118, #222: GET /v1/departments, /v1/menu, /v1/departments/{code}/modules
 }
 
+// GateExemptRoutes (KNSPLIT-2 #222): menu và cây module phòng ban phục vụ cả khi pf/extension tắt cho tenant — menu
+// tự lọc mục của module đã tắt (R-MOD-08), như khi còn ở pf/party (luôn bật). Gốc lắp ráp đọc qua assembly.Gated.
+func (m *Module) GateExemptRoutes() []string {
+	return []string{"/v1/menu", "/v1/departments/:code/modules"}
+}
+
 // UseDepartmentAdmin (KNSPLIT-2 #118, #222) nối cổng phòng ban của pf/party cho /v1/departments*, /v1/menu và nạp phòng
 // ban mặc định. Chưa nối → các route đó trả 503 extension.dependency_unavailable (đóng).
 func (m *Module) UseDepartmentAdmin(d partyport.DepartmentAdmin) { m.departments = d }
