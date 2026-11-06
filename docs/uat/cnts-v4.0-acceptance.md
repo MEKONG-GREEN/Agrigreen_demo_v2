@@ -29,10 +29,6 @@ go test ./internal/kn/extension/domain/ -run 'VisitPhoto|CheckoutRules'
 cd apps/web-ops; npx vitest run src/kn/schedule/
 cd apps/field-app; flutter test test/work_schedule_checkin_test.dart
 ```
-# Nghiệm thu CNTS v4.0 (BRD 2.0)
-
-Đối chiếu theo BRD CNTS v4.0 (CR-CNTS-001). Mỗi gói thêm mục của FN mình chạm; kiểm thử tích hợp chạy trên PostgreSQL thật
-(pg-ephemeral), kho định danh, danh mục, đơn vị hành chính là bản giả trừ khi ghi khác.
 
 ## FN-10 — Danh sách hộ chăn nuôi (CNTS-V4-HOUSEHOLD-LIST #251)
 
