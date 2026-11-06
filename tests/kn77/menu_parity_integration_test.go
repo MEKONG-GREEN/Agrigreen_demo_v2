@@ -68,6 +68,11 @@ func newMenuParity(t *testing.T, s *agScenario, clk clock.Clock) *menuParity {
 	compat.UseFormAvailability(st.Mods.Reports.FormAvailability())
 	mods := st.Mods
 	mods.Party = compat
+	// KNSPLIT-2 #222: binding /v1/menu, /v1/departments/{code}/modules ở chủ KN, gọi cổng phòng ban của pf/party — bản sao
+	// nông của module KN cho bề mặt compatibility trỏ cổng vào party compat (dịch vụ khác dùng chung).
+	compatKN := *st.Mods.Extension
+	compatKN.UseDepartmentAdmin(compat.DepartmentAdmin())
+	mods.Extension = &compatKN
 	srv := httptest.NewServer(assembly.NewRouter(assembly.Deps{Log: telemetry.NewLogger("compat", io.Discard), Verifier: st.Issuer.Verifier(),
 		Ops: st.PF(dbadmin.AppPlatform), Modules: mods.List()}))
 	t.Cleanup(srv.Close)
