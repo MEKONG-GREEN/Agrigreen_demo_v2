@@ -40,7 +40,7 @@ apps/field-app/lib/
 └── ui/            # Riverpod (MIT) + màn hình
 ```
 
-Quản lý trạng thái dùng Riverpod. `AppController` giữ luồng đăng nhập: đăng nhập trực tuyến → vào thẳng; phiên ngoại tuyến còn hạn (72 giờ) mở thẳng, bảo vệ bằng khóa màn hình của thiết bị. App KN không có PIN (BRD 2.0 FN-CH-00.01, FN-05 — ADR-0056). Đăng xuất đóng CSDL và xóa token.
+Quản lý trạng thái dùng Riverpod. `AppController` giữ luồng đăng nhập: đăng nhập trực tuyến → vào thẳng; phiên ngoại tuyến còn hạn (72 giờ) mở thẳng, bảo vệ bằng khóa màn hình của thiết bị. App KN không có PIN (BRD 2.0 FN-CH-00.01, FN-05 — ADR-0057). Đăng xuất đóng CSDL và xóa token.
 
 Màn hình:
 - đăng nhập;
@@ -171,7 +171,7 @@ Kiểm thử chính (`test/` của app; tệp đánh dấu *lõi* nằm ở `pac
   - Khóa nằm trong `flutter_secure_storage` (Android Keystore). Không bao giờ ở SharedPreferences hay tệp.
   - Bật `PRAGMA secure_delete`.
 - **Kho bí mật:**
-  - Token OIDC và mốc xác thực trực tuyến nằm trong kho bí mật. Băm PIN cũ (nếu máy từng đặt PIN trước ADR-0056) giữ nguyên, không còn được đọc.
+  - Token OIDC và mốc xác thực trực tuyến nằm trong kho bí mật. Băm PIN cũ (nếu máy từng đặt PIN trước ADR-0057) giữ nguyên, không còn được đọc.
 - **Phiên ngoại tuyến:**
   - Tối đa 72 giờ kể từ lần xác thực trực tuyến cuối (đăng nhập hoặc làm mới token).
   - Đồng hồ máy bị lùi thì coi như hết hạn.

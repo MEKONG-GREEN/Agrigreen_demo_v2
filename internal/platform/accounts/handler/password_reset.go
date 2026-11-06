@@ -9,7 +9,7 @@ import (
 )
 
 // Giới hạn theo IP riêng cho yêu cầu liên kết đặt lại (ngoài giới hạn chung của /v1/public): dồn 5, sau đó 1/phút.
-// Trong bộ nhớ từng bản sao; giới hạn 5 yêu cầu/giờ/tài khoản nằm ở DB (ADR-0056).
+// Trong bộ nhớ từng bản sao; giới hạn 5 yêu cầu/giờ/tài khoản nằm ở DB (ADR-0057).
 const (
 	resetPerMinute = 1
 	resetBurst     = 5

@@ -1,6 +1,6 @@
 package domain
 
-// Mã liên kết tự đặt lại mật khẩu (#255, ADR-0056): tenant_id ‖ reset_id ‖ 32 byte ngẫu nhiên, base64url 86 ký tự.
+// Mã liên kết tự đặt lại mật khẩu (#255, ADR-0057): tenant_id ‖ reset_id ‖ 32 byte ngẫu nhiên, base64url 86 ký tự.
 // Tenant đi trong mã để mở đúng giao dịch RLS; DB chỉ giữ SHA-256 của phần bí mật.
 
 import (

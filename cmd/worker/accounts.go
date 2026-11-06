@@ -65,7 +65,7 @@ func accountsOrgStatusConsumer(log *slog.Logger) consumer {
 // resetPagePath là trang web đặt mật khẩu mới (apps/web-ops) mà liên kết trong email trỏ tới.
 const resetPagePath = "/login/dat-lai-mat-khau"
 
-// accountsPasswordResetConsumer gửi email liên kết tự đặt lại mật khẩu (#255, ADR-0056; BRD 2.0 FN-CH-00.01). pf/accounts
+// accountsPasswordResetConsumer gửi email liên kết tự đặt lại mật khẩu (#255, ADR-0057; BRD 2.0 FN-CH-00.01). pf/accounts
 // dựng một lần lúc khởi động consumer trên pool vai app_worker (mỗi giao dịch SET LOCAL ROLE r_accounts): Keycloak
 // Admin (AG_KC_*), kênh email theo người nhận của pf/notify (AG_MAILER/AG_SMTP_*) và AG_WEB_OPS_URL. Thiếu → kênh tắt,
 // gửi lỗi, sự kiện giao lại rồi vào DLQ — không gửi liên kết hỏng.

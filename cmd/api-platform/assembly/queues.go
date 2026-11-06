@@ -38,7 +38,7 @@ func Queues() []Queue {
 		{Name: AuditConsentConsumer, Events: []string{partyport.EventConsentRecorded}},
 		{Name: mrvport.ExportConsumer, Events: []string{mrvport.EventExportRequested}},
 		{Name: accport.OrgStatusConsumer, Events: accounts.OrgStatusEvents},
-		{Name: accport.PasswordResetConsumer, Events: []string{accport.EventPasswordResetRequested}}, // #255 ADR-0056
+		{Name: accport.PasswordResetConsumer, Events: []string{accport.EventPasswordResetRequested}}, // #255 ADR-0057
 		{Name: wwport.BuildConsumer, Events: []string{wwport.EventBuildRequested}},
 		{Name: repport.ExportConsumer, Events: []string{repport.EventExportRequested}},
 		{Name: repport.DeliveryConsumer, Events: []string{repport.EventExportCompleted}},

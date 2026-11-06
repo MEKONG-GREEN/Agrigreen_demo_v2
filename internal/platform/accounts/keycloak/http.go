@@ -644,7 +644,7 @@ func (c *Client) ActionLink(ctx context.Context, id, grantID uuid.UUID, actions 
 	}
 }
 
-// SetPassword đặt mật khẩu cố định (PUT /users/{id}/reset-password, temporary=false — #255 ADR-0056). Keycloak kiểm
+// SetPassword đặt mật khẩu cố định (PUT /users/{id}/reset-password, temporary=false — #255 ADR-0057). Keycloak kiểm
 // chính sách mật khẩu của realm: 400 → port.ErrPasswordPolicy. Mật khẩu chỉ nằm trong thân request, không vào lỗi/log.
 func (c *Client) SetPassword(ctx context.Context, id uuid.UUID, password string) error {
 	cred := map[string]any{"type": "password", "value": password, "temporary": false}
