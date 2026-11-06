@@ -58,6 +58,8 @@ test("HCTH: phát hành mẫu/phiếu → mở đợt → phiếu đóng băng �
 });
 
 test("HC-0: ba URL tự đánh giá đã gỡ trả404, không redirect hoặc giữ trang",async({page})=>{
+ await page.goto("/login");await login(page,"admin.mekong@mekonggreen.vn");
+ await expect(sidebar(page)).toBeVisible();
  const base="/kn/nhan-su/danh-gia-cua-toi",period="019abcde-0000-7000-8000-000000000001",staff="019abcde-0000-7000-8000-000000000002";
  for(const path of [base,`${base}/dot/${period}`,`${base}/dot/${period}/phieu/${staff}`]){
   const response=await page.goto(path);

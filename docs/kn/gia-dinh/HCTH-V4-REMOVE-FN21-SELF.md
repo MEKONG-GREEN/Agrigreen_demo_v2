@@ -13,7 +13,7 @@ SHA256 bản DOCX: `A2201810F6BCD4DC7E6993D5F36A8618BEA7DCB9F02E98076AAC5B016E32
 
 ### Phạm vi và lựa chọn kỹ thuật
 
-1. Không thêm dependency. Gỡ ba trang `danh-gia-cua-toi`, menu và alias; gỡ endpoint/handler/service guest-link HCTH, action `self_draft`/`self_submit` và capability `can_self`.
+1. Không thêm dependency. Gỡ ba trang `danh-gia-cua-toi`, menu và alias. Catch-all riêng của HRM trả404 cho URL không có màn, tránh catch-all giữ chỗ KN dùng chung trả200; gỡ endpoint/handler/service guest-link HCTH, action `self_draft`/`self_submit` và capability `can_self`.
 2. Migration mới chặn INSERT hai action đã bỏ ở DB. Sổ cũ vốn chỉ ghi thêm; không DROP/UPDATE/DELETE và không sửa migration cũ. Lịch sử điểm, payload, chuỗi băm và tham chiếu cũ vẫn đọc được bởi lãnh đạo/HCTH đúng phân công.
 3. Ma trận cũ theo nhóm/người dùng không phục hồi capability của Xã, TW hoặc cán bộ Tỉnh thông thường. Không thay phạm vi các quyền hồ sơ/tài liệu khác. Thông báo bước giấy gửi lãnh đạo/HCTH, không gửi người tự đánh giá đã bị bỏ.
 4. `proxy_self` của lãnh đạo có kiểm scan, các mẫu/điểm/trạng thái cũ và xuất lịch sử vẫn giữ tới HC-2. Việc bỏ toàn bộ phiếu/điểm và đổi trạng thái là phạm vi HC-2; HC-0 không tuyên bố đã hoàn thành FN-16/17/18 toàn phần.
