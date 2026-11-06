@@ -28,3 +28,20 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-HOUSEHOLD-LIST.
 
 Chưa nghiệm thu ở gói này: đếm hộ ở báo cáo định kỳ (FN-16 BR-07, CN-5), lớp trang trại bản đồ (FN-18, CN-6), ô chọn DB-04 và tạo
 hộ từ BM-10 (FN-11, #252).
+
+## FN-16, FN-17 — BM-11 theo loại chăn nuôi, số hộ/trang trại trang chủ (CNTS-V4-BM11-TYPES #253)
+
+Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-BM11-TYPES.md), [ADR-0056](../adr/0056-ho-chan-nuoi-cnts-v4.md) mục 9.
+
+| Tiêu chí BRD | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| FN-16 BR-07, UR-TINH-16 (Hình 48): báo cáo định kỳ có bảng theo loại chăn nuôi — số hộ, số trang trại, số con theo vật nuôi — đếm, cộng từ danh sách hộ chăn nuôi (hộ Đang dùng) lúc lập báo cáo | `TestCNTSBM11_W1145`, `TestBM11HerdsOf_AC05`; vitest `bm11.test.tsx` | G1 |
+| FN-16 AC-05: xã A 12 hộ đang dùng (3 trang trại nhỏ, 1 vừa) → 12 hộ, 4 trang trại; nông hộ 8, nhỏ 3, vừa 1, công nghiệp 0 | `TestCNTSBM11_W1145`, `TestBM11HerdsOf_AC05`; vitest `bm11.test.tsx` | G1 |
+| FN-10 BR-08 (phần báo cáo): hộ Chờ bổ sung vị trí, hộ Vô hiệu hóa không tính vào báo cáo định kỳ | `TestCNTSBM11_W1145` | G1 |
+| FN-10 BR-06: hộ đổi loại sau khi lập không làm đổi báo cáo đã lập; "Làm mới số liệu" khi còn soạn đếm lại | `TestCNTSBM11_W1145` | G1 |
+| FN-16 BR-07: KSGM (BM-01), nhập liệu tuần (BM-04), khai thác (BM-17) vẫn tổng hợp theo xã, không chia theo loại | `TestCNTSBM11_W1145` (số chăn nuôi, thủy sản không đổi) | G1 |
+| UR-TINH-16 xuất Word: bảng theo loại chăn nuôi trong Word BM-11 (mẫu v2), mẫu v1 vẫn dựng được | `TestBM11WordTemplates`, `TestCNTSBM11_W1145` (Word) | G1 |
+| FN-17 (phạm vi gói): trang chủ Phòng CNTS có thẻ số hộ chăn nuôi, số trang trại (hộ Đang dùng, loại hiện hành); bấm mở danh sách hộ; phòng khác không có | `TestFN17_LivestockCounts_253`; vitest `depthome.test.ts` | G1 |
+
+Chưa nghiệm thu ở gói này: lớp trang trại bản đồ (FN-18, CN-6); FN-17 AC-01 (500 người dùng, < 5 giây trên 3G) cần đo tải trên
+môi trường triển khai.

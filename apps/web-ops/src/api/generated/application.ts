@@ -26382,6 +26382,10 @@ export interface components {
                 sent: string;
                 now: string;
             }[];
+            /** @description Hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07) — đếm từ danh sách hộ chăn nuôi (hộ Đang dùng) lúc lập/làm mới báo cáo; null ở báo cáo lập trước v4.0. */
+            herds: components["schemas"]["CNTSBM11Herds"] | null;
+            /** @description Loại chăn nuôi HCN-06 theo thứ tự cột */
+            herd_types: components["schemas"]["CNTSBM11Key"][];
             return_comment: string;
             recipient_list: {
                 /** @enum {string} */
@@ -26414,6 +26418,33 @@ export interface components {
                 word: boolean;
             };
             replayed: boolean;
+        };
+        CNTSBM11HeadRow: {
+            species: string;
+            name: string;
+            /** @description Số con ở nông hộ (thập phân dạng chuỗi) */
+            household: string;
+            /** @description Số con ở trang trại (thập phân dạng chuỗi) */
+            farm: string;
+        };
+        CNTSBM11HerdRow: {
+            /** @description Mã xã; rỗng ở dòng toàn tỉnh */
+            commune: string;
+            name: string;
+            households: number;
+            /** @description Trang trại nhỏ + vừa + công nghiệp */
+            farms: number;
+            /** @description Loại chăn nuôi → số hộ (nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep) */
+            by_type: {
+                [key: string]: number;
+            };
+        };
+        CNTSBM11Herds: {
+            communes: components["schemas"]["CNTSBM11HerdRow"][];
+            total: components["schemas"]["CNTSBM11HerdRow"];
+            /** @description Số xã của tỉnh (0 = chưa biết) */
+            communes_total: number;
+            heads: components["schemas"]["CNTSBM11HeadRow"][];
         };
         CNTSBM11WordRun: {
             /** Format: uuid */
