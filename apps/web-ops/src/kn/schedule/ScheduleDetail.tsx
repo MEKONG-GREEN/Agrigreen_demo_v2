@@ -16,6 +16,7 @@ import { useBreadcrumbTail } from "@/shell/Breadcrumb";
 import type { WorkScheduleApi } from "./api";
 import { diffItems, ITEM_FIELD_LABEL, itemSummary, SESSION_LABEL, type WsDetail, type WsItem } from "./model";
 import { ReasonDialog, ScheduleLog, ScheduleTags, SessionGrid, useCommuneNames, usePreloadCoops } from "./parts";
+import { CheckinVisits } from "./Visits";
 import { dayColumnLabel, vnDeadlineLabel, weekRangeLabel } from "./week";
 
 const VERSION_ACTION: Record<string, string> = { draft_saved: "Lưu nháp", submitted: "Gửi duyệt", amended: "Gửi điều chỉnh" };
@@ -168,39 +169,15 @@ export function ScheduleDetail({ ws, api, id, backHref, readOnly = false }: { ws
               />
             </section>
             {detail.checkin_enabled ? (
-              <section className="lv-block" aria-label="Check-in">
-                <h2>Check-in tại địa điểm</h2>
-                {(detail.checkins ?? []).length === 0 ? (
-                  <p className="mute">Chưa có check-in.</p>
-                ) : (
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Mục</th>
-                        <th>Thời điểm</th>
-                        <th>Cách địa điểm</th>
-                        <th>Sai số GPS</th>
-                        <th>Ghi chú</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(detail.checkins ?? []).map((c) => {
-                        const it = detail.items.find((x) => x.id === c.item_id);
-                        return (
-                          <tr key={c.id}>
-                            <td>{it ? sum(it) : c.item_id.slice(0, 8)}</td>
-                            <td>{formatDateTime(c.captured_at)}</td>
-                            <td>{c.distance_m === null ? "Chưa có tọa độ địa điểm" : `${Math.round(c.distance_m)} m${c.far ? " · xa" : ""}`}</td>
-                            <td>{c.accuracy_m === null ? "—" : `${Math.round(c.accuracy_m)} m${c.weak_accuracy ? " · yếu" : ""}`}</td>
-                            <td>{[c.mock_location ? "vị trí giả lập" : "", c.point_stored && !c.location ? "tọa độ đã hết hạn lưu" : ""].filter(Boolean).join(", ") || "—"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-                {detail.missed_checkin_count ? <p className="mute">{detail.missed_checkin_count} mục công tác ngoài cơ quan đã qua ngày chưa check-in.</p> : null}
-              </section>
+              <CheckinVisits
+                checkins={detail.checkins ?? []}
+                itemLabel={(itemId) => {
+                  const it = detail.items.find((x) => x.id === itemId);
+                  return it ? sum(it) : itemId.slice(0, 8);
+                }}
+                loadPhoto={(itemId, kind) => ws.visitPhoto(id, itemId, kind)}
+                missed={detail.missed_checkin_count}
+              />
             ) : null}
             <section className="lv-block">
               <RelatedTabs

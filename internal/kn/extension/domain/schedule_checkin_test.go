@@ -79,3 +79,46 @@ func TestPlaceNormalizeAndFieldWork(t *testing.T) {
 		t.Fatal("làm việc tại cơ quan không cần check-in")
 	}
 }
+
+func TestVisitPhotoType(t *testing.T) {
+	jpeg := append([]byte{0xFF, 0xD8, 0xFF, 0xE0}, make([]byte, 64)...)
+	if ct, err := VisitPhotoType(jpeg); err != nil || ct != "image/jpeg" {
+		t.Fatalf("JPEG: %q %v", ct, err)
+	}
+	for name, tc := range map[string]struct {
+		b    []byte
+		want error
+	}{
+		"thiếu ảnh (AC-09)": {nil, ErrVisitPhotoRequired},
+		"quá 500 KB":        {append(jpeg, make([]byte, MaxVisitPhotoBytes)...), ErrVisitPhotoSize},
+		"không phải ảnh":    {[]byte("%PDF-1.7 không phải ảnh"), ErrVisitPhotoType},
+	} {
+		if _, err := VisitPhotoType(tc.b); !errors.Is(err, tc.want) {
+			t.Errorf("%s: muốn %v, có %v", name, tc.want, err)
+		}
+	}
+}
+
+func TestCheckoutRules(t *testing.T) {
+	zone := time.FixedZone("ICT", 7*3600)
+	in := time.Date(2026, 10, 6, 8, 0, 0, 0, zone)
+	out := time.Date(2026, 10, 6, 11, 30, 0, 0, zone)
+	// AC-12: check-in 08:00, check-out 11:30 → 3 giờ 30 phút.
+	if m := StayMinutes(in, out); m != 210 {
+		t.Fatalf("thời gian ở địa điểm = %d phút, muốn 210", m)
+	}
+	if err := CheckCheckoutAfter(in, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckCheckoutAfter(out, in); !errors.Is(err, ErrCheckoutBeforeIn) {
+		t.Fatalf("check-out trước check-in: %v", err)
+	}
+	day := time.Date(2026, 10, 6, 0, 0, 0, 0, time.UTC)
+	// AC-13: đồng bộ 07:10 ngày 07/10 → trễ; 23:59 ngày 06/10 → không trễ.
+	if !SyncedLate(day, time.Date(2026, 10, 7, 7, 10, 0, 0, zone), zone) {
+		t.Fatal("đồng bộ ngày hôm sau phải là Đồng bộ trễ")
+	}
+	if SyncedLate(day, time.Date(2026, 10, 6, 23, 59, 0, 0, zone), zone) {
+		t.Fatal("đồng bộ trong ngày công tác không trễ")
+	}
+}
