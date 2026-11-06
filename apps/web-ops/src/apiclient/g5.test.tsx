@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminApiClient, unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
-import { CLIENT_IDS, g5MockSnapshot, resetG5Mock, statementCsv } from "@/api/mock/g5";
+import { CLIENT_IDS, g5MockSnapshot, periodBack, resetG5Mock, statementCsv } from "@/api/mock/g5";
 import { mockAdminFetchNoDelay } from "@/api/mock/handler";
 import { MOCK_PERSONAS, mockToken } from "@/api/mock/personas";
 import { ApiProblem, PROBLEM_MESSAGES, problemMessage } from "@/api/problem";
@@ -69,9 +69,19 @@ vi.mock("@/auth/AuthProvider", async () => {
   };
 });
 
-beforeEach(() => {
+function resetG5At(now: string): void {
+  vi.setSystemTime(new Date(now));
   resetG5Mock();
   auth.persona = "api-admin";
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  resetG5At("2026-10-02T03:00:00.000Z");
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("tiền VND dạng chuỗi thập phân — không float (ADR-0023, R-10)", () => {
@@ -268,13 +278,26 @@ describe("backend giả lập G5 — quy tắc như app/", () => {
     expect(tooMany.code).toBe("apiclient.too_many_keys");
   });
 
-  it("bảng kê: kỳ chưa kết thúc → 409; 202 + job → hoàn tất; người yêu cầu không tự duyệt; CSV tất định như domain.StatementCSV", async () => {
-    const today = new Date();
-    const thisMonth = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`;
+  it.each([
+    ["trước ranh giới tháng VN", "2026-10-31T16:59:59.999Z", "2026-10", "2026-09"],
+    ["đúng ranh giới tháng VN", "2026-10-31T17:00:00.000Z", "2026-11", "2026-10"],
+    ["tháng UTC khác tháng VN", "2026-10-31T18:15:39.606Z", "2026-11", "2026-10"],
+    ["sau ranh giới tháng UTC", "2026-11-01T00:00:00.001Z", "2026-11", "2026-10"],
+    ["trước ranh giới năm VN", "2026-12-31T16:59:59.999Z", "2026-12", "2026-11"],
+    ["đúng ranh giới năm VN", "2026-12-31T17:00:00.000Z", "2027-01", "2026-12"],
+    ["năm UTC khác năm VN", "2026-12-31T23:59:59.999Z", "2027-01", "2026-12"],
+    ["sau ranh giới năm UTC", "2027-01-01T00:00:00.001Z", "2027-01", "2026-12"],
+  ])("bảng kê (%s): kỳ chưa kết thúc → 409; 202 + job → hoàn tất; người yêu cầu không tự duyệt; CSV tất định như domain.StatementCSV", async (_case, now, openPeriod, endedPeriod) => {
+    resetG5At(now);
+    const thisMonth = periodBack(0);
     const notEnded = await problemOf(unwrap(admin("api-admin").POST("/v1/metering/statements", { params: { header: hdr() }, body: { period: thisMonth } })));
-    expect(notEnded.code).toBe("metering.period_not_ended");
+    expect([notEnded.status, notEnded.code]).toEqual([409, "metering.period_not_ended"]);
+    expect(thisMonth).toBe(openPeriod);
     const period = lastEndedPeriod();
-    const job = await unwrap(admin("api-admin").POST("/v1/metering/statements", { params: { header: hdr() }, body: { period, client_id: CLIENT_IDS.verifier } }));
+    expect(period).toBe(endedPeriod);
+    const queued = await admin("api-admin").POST("/v1/metering/statements", { params: { header: hdr() }, body: { period, client_id: CLIENT_IDS.verifier } });
+    expect(queued.response.status).toBe(202);
+    const job = await unwrap(queued);
     expect(job.status).toBe("queued");
     let j = job;
     for (let i = 0; i < 3 && j.status === "queued"; i++) j = await unwrap(admin("api-admin").GET("/v1/metering/statement-jobs/{id}", { params: { path: { id: job.id } } }));
