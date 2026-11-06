@@ -1,4 +1,4 @@
-## CNTS-V4-CHECKOUT-PHOTO — Check-in bắt buộc ảnh, check-out kèm ảnh (#249, pf 20261106145523)
+## CNTS-V4-CHECKOUT-PHOTO — Check-in bắt buộc ảnh, check-out kèm ảnh (#249, pf 20261106191624)
 
 Nguồn: BRD CNTS v4.0 (CR-CNTS-001) FN-12 (B4, B4b, luồng ngoại lệ, BR-06, BR-07, BR-08, AC-09, AC-11, AC-12, AC-13),
 UR-XA-05, UR-XA-09 CV-07/CV-08, UR-TINH-18, Mục VIII "Định vị, ảnh", "Làm việc offline"; PLAN-BRD2 mục 5 (check-in cũ
@@ -6,7 +6,7 @@ không ảnh giữ nguyên, đánh dấu dữ liệu cũ, không bắt nhập b�
 
 | Mục | Phương án đã chọn | Ở đâu |
 |---|---|---|
-| Mô hình dữ liệu | Check-in giữ sổ `work_schedule_checkin` (thêm 4 cột ảnh NULL được, đăng ký `register_ledger_columns` — ADR-0012). Check-out là sổ chỉ ghi thêm riêng `work_schedule_checkout` (chuỗi `wcheckout:<item_id>`, một mục một check-out, `checkin_id` trỏ check-in của mục). Như check-in: sổ không có tọa độ (QĐ-8); tọa độ check-out vào bảng có hạn lưu `work_schedule_checkin_point` với `checkin_id` = id check-out, job cũ xóa khi quá hạn | Migration `20261106145523_pf_extension_cnts_checkout_photo`, `store/schedule_checkin.go` |
+| Mô hình dữ liệu | Check-in giữ sổ `work_schedule_checkin` (thêm 4 cột ảnh NULL được, đăng ký `register_ledger_columns` — ADR-0012). Check-out là sổ chỉ ghi thêm riêng `work_schedule_checkout` (chuỗi `wcheckout:<item_id>`, một mục một check-out, `checkin_id` trỏ check-in của mục). Như check-in: sổ không có tọa độ (QĐ-8); tọa độ check-out vào bảng có hạn lưu `work_schedule_checkin_point` với `checkin_id` = id check-out, job cũ xóa khi quá hạn | Migration `20261106191624_pf_extension_cnts_checkout_photo`, `store/schedule_checkin.go` |
 | Check-in cũ không ảnh | Dòng có `photo_key IS NULL` = dữ liệu trước v4.0: giữ nguyên (không UPDATE, không nhập bù), API trả `legacy_no_photo: true`, web ghi "Dữ liệu cũ — không ảnh", app ghi "dữ liệu cũ, không ảnh". Check-in cũ vẫn check-out được (kèm ảnh) | `TestWorkScheduleCheckinLegacy` |
 | Kịch bản đếm trước/sau và quay lui | Migration chỉ thêm (cột NULL được + sổ mới), không chuyển dữ liệu: số dòng check-in và băm dòng cũ không đổi, `verify_chain` đúng cho chuỗi cũ và mới. Quay lui = chạy lại bản ứng dụng trước #249: câu INSERT cũ (không cột ảnh) vẫn chạy trên lược đồ mới và tạo dòng "dữ liệu cũ"; bảng/cột mới để nguyên (không DROP — CONTEXT §4). Kiểm chứng trên PostgreSQL thật (pg-ephemeral) | `TestWorkScheduleCheckinLegacy`; truy vấn đếm dưới bảng |
 | Lưu ảnh | Dùng lại kho đối tượng của module (`shared/objstore`, cùng kho của ảnh thực địa KNQG, tệp KHTC — `Deps.Store`/`UseObjectStore`), khóa `cnts-visit-photo/<tenant>/<item>/<checkin|checkout>/<sha256>`; sổ chỉ giữ khóa, kiểu, cỡ, SHA-256. Ảnh là hồ sơ công tác của cán bộ (BR-06 "lưu ảnh… không sửa được"): không mã hóa phong bì theo hộ, không có hạn xóa như tọa độ. Ghi ảnh trước giao dịch DB (không I/O ngoài trong giao dịch); yêu cầu bị từ chối sau khi ghi ảnh để lại tệp mồ côi khóa theo băm (như KNQG) | `app.putVisitPhoto` |
