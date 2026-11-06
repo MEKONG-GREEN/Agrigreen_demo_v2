@@ -85,7 +85,7 @@ func TestWebMenuFixture(t *testing.T) {
 			if adHoc {
 				name += "+dot_xuat"
 			}
-			cases = append(cases, webMenuCase{Name: name, Audience: aud, Department: depts[0].Code, AdHoc: adHoc, Menu: menuBody(navigate(v))})
+			cases = append(cases, webMenuCase{Name: name, Audience: aud, Department: depts[0].Code, AdHoc: adHoc, Menu: port.NewMenuDocument(navigate(v))})
 		}
 	}
 	// kn.menu/v3 (W11.06): khuôn riêng của từng phòng ban còn lại (bảng menu không phụ thuộc trạng thái —
@@ -96,10 +96,10 @@ func TestWebMenuFixture(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cases = append(cases, webMenuCase{Name: aud + "/" + d.Code, Audience: aud, Department: d.Code, Menu: menuBody(navigate(v))})
+			cases = append(cases, webMenuCase{Name: aud + "/" + d.Code, Audience: aud, Department: d.Code, Menu: port.NewMenuDocument(navigate(v))})
 		}
 	}
-	cases = append(cases, webMenuCase{Name: "admin", Audience: port.AudienceAdmin, Menu: menuBody(navigate(app.AdminMenu(uuid.Nil, depts)))})
+	cases = append(cases, webMenuCase{Name: "admin", Audience: port.AudienceAdmin, Menu: port.NewMenuDocument(navigate(app.AdminMenu(uuid.Nil, depts)))})
 	defaults := map[string]string{}
 	for _, aud := range port.Audiences {
 		defaults[aud] = domain.DefaultRoute(aud)

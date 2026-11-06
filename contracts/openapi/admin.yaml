@@ -5439,7 +5439,7 @@ paths:
     post:
       summary: "Nạp 5 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng; W11.06, chờ khách Q-051); xóa mã tạm phong_ban_5/6 chưa dùng; chạy lặp an toàn"
       operationId: knSeedDepartments
-      tags: [party]
+      tags: [extension]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}

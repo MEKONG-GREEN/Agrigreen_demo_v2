@@ -475,7 +475,7 @@ paths:
         audience vắng: theo ngữ cảnh phiên (P1) hoặc vai duy nhất của người gọi. platform_admin xem được mọi cấp (FN-AD-04.07).
         audience = admin: mục con của phòng ban trong nhóm "Phòng ban" (enabled = false khi chưa mở).
       operationId: knDepartmentModules
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: code, in: path, required: true, schema: {type: string}}
         - {name: audience, in: query, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}}
@@ -500,7 +500,7 @@ paths:
         phòng ban "/kn/phong-ban/{mã phòng ban}/<màn>"; màn hiện có ngoài /kn giữ đường dẫn cũ. Bản giả lập web
         khớp bảng Go qua ca vàng apps/web-ops/src/api/mock/fixtures/kn-menu.json.
       operationId: knMenu
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: audience, in: query, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}, description: "Vắng = theo ngữ cảnh phiên (X-AG-Context) hoặc vai duy nhất"}
         - {name: role, in: query, deprecated: true, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}, description: "Tên cũ của audience (hợp đồng tạm P6) — nhận một đợt; audience thắng"}

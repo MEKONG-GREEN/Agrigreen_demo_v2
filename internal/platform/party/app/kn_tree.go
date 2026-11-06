@@ -383,14 +383,7 @@ type deptSeedFile struct {
 }
 
 // DeptSeedResult tổng kết một lần nạp phòng ban.
-type DeptSeedResult struct {
-	Created  []port.Department
-	Existing int
-	Status   string
-	// W11.06: mã tạm cũ (phong_ban_5/6) đã xóa / còn giữ trong lần nạp này.
-	LegacyRetired []string
-	LegacyKept    []string
-}
+type DeptSeedResult = port.DepartmentSeedResult
 
 // SeedDepartments khai báo 5 phòng ban mặc định (TTKN An Giang, Phòng Trồng trọt Đang áp dụng — W11.06)
 // cho đơn vị; phòng ban đã có mã giữ nguyên. Đơn vị đã nạp seed v7.7: mã tạm phong_ban_5/6 chưa mở, không
