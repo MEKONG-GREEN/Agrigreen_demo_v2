@@ -14,6 +14,8 @@ import (
 type Deps struct {
 	Profiles   []port.Profile
 	Validators map[string]port.Validator
+	// DefinitionPolicies: chính sách định nghĩa biểu của chủ (profile kn_cnts bắt buộc — #192).
+	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
 }
 type Fixture struct {
 	publisher port.Publisher
@@ -23,7 +25,7 @@ type Fixture struct {
 }
 
 func New(b tenant.Beginner, clk clock.Clock, d Deps) (*Fixture, error) {
-	module, e := native.New(b, clk, native.Deps{Profiles: d.Profiles, Validators: d.Validators})
+	module, e := native.New(b, clk, native.Deps{Profiles: d.Profiles, Validators: d.Validators, DefinitionPolicies: d.DefinitionPolicies})
 	if e != nil {
 		return nil, e
 	}

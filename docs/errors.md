@@ -472,6 +472,8 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 | 422 | `validation_failed` | pf/accounts: lý do khóa/mở khóa dưới 20 ký tự; email/SĐT/tên đăng nhập sai dạng; thiếu vai; vai sai loại tổ chức (`coop_manager` → "Vui lòng chọn HTX liên kết.") |
 | 502 | `accounts.email_failed` | pf/accounts: Keycloak không gửi được email liên kết (SMTP lỗi) khi gửi lại; khi tạo tài khoản thì trả 201 với `activation_email_sent = false` |
 | 503 | `accounts.dependency_unavailable` | pf/accounts: chưa cấu hình `AG_KC_*`, Keycloak không phản hồi hoặc từ chối tài khoản dịch vụ, chưa nối pf/party |
+| 410 | `accounts.reset_link_invalid` | pf/accounts (#255, ADR-0056): `POST /v1/public/password-reset/confirm` — mã sai/bị sửa, đã dùng, hết hạn (30 phút), đang được xác nhận song song hoặc tài khoản đã bị khóa; một mã chung, không phân biệt lý do |
+| 422 | `accounts.password_policy` | pf/accounts (#255): mật khẩu mới không đạt chính sách realm (≥ 12 ký tự, khác tên đăng nhập, không trùng 5 mật khẩu gần nhất); liên kết đặt lại vẫn dùng lại được |
 
 KN v7.7 gói P1 — gán vai trò nhiều vai × Nút × phòng ban × xã (FN-AD-04.04), ngữ cảnh phiên `X-AG-Context` (FN-CH-00.01), chế độ hỗ trợ (FN-AD-04.07):
 

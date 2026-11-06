@@ -1,6 +1,8 @@
-// GIẢ LẬP FN-07 phần xem/kiểm tệp. XLSX chỉ đọc ZIP stored do giả lập sinh; backend thật đọc XLSX nén.
+// GIẢ LẬP FN-07 (#174 xem/kiểm tệp; #192 lưu phiên bản, lịch sử, sao chép/tạo biểu điều tra, khóa mẫu KNQG). XLSX chỉ đọc
+// ZIP stored do giả lập sinh; backend thật đọc XLSX nén. Phiên bản giả lập không đổi kỳ đã phát hành của giả lập biểu kỳ.
 import type { DesignImport, DesignField } from "@/kn/cnts/design/api";
-import { DESIGN_HEADERS } from "@/kn/cnts/design/api";
+import { DESIGN_HEADERS, designFieldErrors } from "@/kn/cnts/design/api";
+import { uuidv7 } from "../idempotency";
 import { parseCsv } from "./admin-ops";
 import { rowsOfXlsx } from "./kn-cnts-cal-xlsx";
 import { cntsDesignMockForms } from "./kn-cnts-periods";
@@ -36,11 +38,81 @@ export function previewDesignRows(rows: string[][]): DesignImport {
   });
   out.valid = out.issues.length === 0; if (!out.valid) out.fields = []; return out;
 }
+const LOCKED = ["CNTS-BM01", "CNTS-BM04", "CNTS-BM05-I", "CNTS-BM05-II"];
+interface Ver { template_id: string; version: number; title: string; fields: DesignField[] }
+const SAVED = new Map<string, Ver[]>(); // mã → phiên bản (cũ trước)
+/** Xóa trạng thái (kiểm thử). */
+export function resetCntsDesign() { SAVED.clear(); }
+function writer(c: Ctx, code: string): boolean {
+  const k = knContext(c.request.headers.get("X-AG-Context") ?? "");
+  if (!k || k.read_only) return false;
+  if (k.role === "admin") return true;
+  return k.role === "kn_tinh" && k.department_code === "chan_nuoi_thuy_san" && (!k.province_group || k.province_group === "tong_hop") &&
+    (code === "CNTS-BM17" || code.startsWith("CNTS-DT-"));
+}
+function versions(code: string): Ver[] {
+  const saved = SAVED.get(code) ?? [];
+  const base = cntsDesignMockForms().find(f => f.code === code);
+  const installed: Ver[] = base?.template_id && base.template_version ? [{ template_id: base.template_id, version: base.template_version, title: `${base.bm} — ${base.title}`, fields: base.fields }] : [];
+  return [...installed, ...saved];
+}
+function view(c: Ctx, code: string) {
+  const base = cntsDesignMockForms().find(f => f.code === code); const vs = versions(code); const last = vs.at(-1); const locked = LOCKED.includes(code);
+  return { code, bm: base?.bm ?? code, title: last?.title ?? base?.title ?? code, kind: base ? "report" : "survey", period_type: base?.period_type ?? "adhoc",
+    due: base?.due ?? "Theo đợt điều tra", locked, can_edit: !locked && writer(c, code), template_id: last?.template_id ?? null, version: last?.version ?? null,
+    fields: last?.fields ?? base?.fields ?? [] };
+}
+function append(code: string, base: number, title: string, fields: DesignField[]) {
+  const vs = versions(code); const cur = vs.at(-1)?.version ?? 0;
+  if (base !== cur) return problem(409, "conflict", `phiên bản hiện hành là ${cur}; đọc lại trước khi lưu`);
+  const v: Ver = { template_id: uuidv7(), version: cur + 1, title, fields };
+  SAVED.set(code, [...(SAVED.get(code) ?? []), v]);
+  return json({ code, version: v }, 201);
+}
 export const cntsDesignRoutes: Route[] = [
   {    
 method: "GET", pattern: /^\/v1\/extension\/cnts\/form-designs$/, handler: c => {
       if (!allowed(c)) return problem(403, "forbidden", "Chỉ Cấp Tỉnh CNTS và Admin được xem thiết kế biểu");
-      return json({ items: cntsDesignMockForms().map(f => ({ code: f.code, bm: f.bm, title: f.title, period_type: f.period_type, due: f.due, template_id: f.template_id, version: f.template_version, fields: f.fields })) });
+      const codes = [...cntsDesignMockForms().map(f => f.code), ...[...SAVED.keys()].filter(x => x.startsWith("CNTS-DT-"))];
+      return json({ items: codes.map(code => view(c, code)) });
+    }  
+},
+  {    
+method: "POST", pattern: /^\/v1\/extension\/cnts\/form-designs$/, handler: c => {
+      if (!allowed(c)) return problem(403, "forbidden", "Chỉ Cấp Tỉnh CNTS và Admin");
+      const b = (c.body ?? {}) as { code_suffix?: string; title?: string; source_code?: string; source_version?: number; fields?: DesignField[] };
+      const suffix = (b.code_suffix ?? "").trim().toUpperCase();
+      if (!/^[A-Z0-9][A-Z0-9-]{0,39}$/.test(suffix)) return validation([{ field: "code_suffix", reason: "Chữ in hoa, số, gạch ngang; 1–40 ký tự" }]);
+      const code = "CNTS-DT-" + suffix;
+      if (!writer(c, code)) return problem(403, "forbidden", "Chỉ cán bộ tổng hợp Cấp Tỉnh CNTS hoặc Admin");
+      if (!b.title?.trim()) return validation([{ field: "title", reason: "Tên biểu cần 1–200 ký tự" }]);
+      let fields = b.fields ?? [];
+      if (b.source_code) {
+        const vs = versions(b.source_code); const src = b.source_version ? vs.find(v => v.version === b.source_version) : vs.at(-1);
+        if (!src) return problem(404, "forms.template_not_found", "Không tìm thấy biểu nguồn"); fields = src.fields;
+      }
+      const errs = designFieldErrors(fields); if (errs.length) return validation([{ field: "fields", reason: errs[0]! }]);
+      if (versions(code).length) return problem(409, "conflict", `Mã biểu ${code} đã có — chọn mã khác`);
+      return append(code, 0, b.title.trim(), fields);
+    }  
+},
+  {    
+method: "GET", pattern: /^\/v1\/extension\/cnts\/form-designs\/([^/]+)\/versions$/, handler: c => {
+      if (!allowed(c)) return problem(403, "forbidden", "Chỉ Cấp Tỉnh CNTS và Admin");
+      return json({ items: [...versions(decodeURIComponent(c.params[0]!))].reverse() });
+    }  
+},
+  {    
+method: "POST", pattern: /^\/v1\/extension\/cnts\/form-designs\/([^/]+)\/versions$/, handler: c => {
+      if (!allowed(c)) return problem(403, "forbidden", "Chỉ Cấp Tỉnh CNTS và Admin");
+      const code = decodeURIComponent(c.params[0]!);
+      if (LOCKED.includes(code)) return problem(403, "forbidden", "Mẫu cố định theo TTKN Quốc gia — không sửa cấu trúc (FN-07 BR-02)");
+      if (!writer(c, code)) return problem(403, "forbidden", "Chỉ cán bộ tổng hợp Cấp Tỉnh CNTS hoặc Admin được lưu phiên bản");
+      const b = (c.body ?? {}) as { base_version?: number; title?: string; fields?: DesignField[] };
+      if (!b.title?.trim()) return validation([{ field: "title", reason: "Tên biểu cần 1–200 ký tự" }]);
+      const errs = designFieldErrors(b.fields ?? [], versions(code).at(-1)?.fields ?? []);
+      if (errs.length) return validation([{ field: "fields", reason: errs[0]! }]);
+      return append(code, b.base_version ?? -1, b.title.trim(), b.fields ?? []);
     }  
 },
   {    

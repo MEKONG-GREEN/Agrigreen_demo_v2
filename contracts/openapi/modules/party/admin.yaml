@@ -320,31 +320,6 @@ paths:
               schema: {$ref: "#/components/schemas/KNLogPage"}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
-# @ag-order: 193
-  /v1/orgs/{ref}/departments/seed:
-    post:
-      summary: "Nạp 5 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng; W11.06, chờ khách Q-051); xóa mã tạm phong_ban_5/6 chưa dùng; chạy lặp an toàn"
-      operationId: knSeedDepartments
-      tags: [party]
-      parameters:
-        - $ref: "#/components/parameters/IdempotencyKey"
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-      responses:
-        "200":
-          description: Kết quả nạp
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [created, existing, status, legacy_retired, legacy_kept]
-                properties:
-                  created: {type: array, items: {$ref: "#/components/schemas/KNDepartment"}}
-                  existing: {type: integer}
-                  status: {type: string}
-                  legacy_retired: {type: array, items: {type: string}, description: "Mã tạm (phong_ban_5/6) đã xóa trong lần nạp này — chưa mở, không có tài khoản/dữ liệu"}
-                  legacy_kept: {type: array, items: {type: string}, description: "Mã tạm còn giữ (đang áp dụng, có tài khoản/dữ liệu hoặc chưa nối nguồn đếm) — Admin xử lý; tra cứu mã cũ vẫn trả dòng này"}
-        "403": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
 # @ag-order: 194
   /v1/regions:
     get:

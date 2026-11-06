@@ -179,7 +179,7 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), waterwayBuildConsumer(), krefConsumer()}, append(reportsConsumers(log), wiredConsumers(log)...)...)
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), accountsPasswordResetConsumer(log), waterwayBuildConsumer(), krefConsumer()}, append(reportsConsumers(log), wiredConsumers(log)...)...)
 }
 
 func allConsumers(log *slog.Logger) []consumer {

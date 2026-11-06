@@ -8,7 +8,7 @@ enum AuthStage {
   /// Cần đăng nhập trực tuyến (lần đầu, quá 72 giờ, sai PIN quá giới hạn, bị xóa).
   needsOnlineLogin,
 
-  /// Vừa đăng nhập trực tuyến, chưa có PIN.
+  /// Vừa đăng nhập trực tuyến, chưa có PIN (chỉ app có PIN).
   needsPinSetup,
 
   /// Có phiên ngoại tuyến hợp lệ — nhập PIN để mở.
@@ -25,10 +25,13 @@ class AuthView {
 }
 
 /// Luồng đăng nhập/mở khóa, không phụ thuộc Flutter để kiểm thử được.
+///
+/// [pins] null: app không có PIN (App KN — BRD 2.0 FN-CH-00.01/FN-05 "Mobile: không có đăng nhập bằng PIN", ADR-0056):
+/// phiên ngoại tuyến hợp lệ (72 giờ từ lần xác thực trực tuyến cuối) mở thẳng, bảo vệ bằng khóa màn hình của thiết bị.
 class AuthFlow {
-  AuthFlow({required this.session, required this.pins});
+  AuthFlow({required this.session, this.pins});
   final SessionService session;
-  final PinService pins;
+  final PinService? pins;
 
   Future<AuthView> start() async {
     switch (await session.offlineState()) {
@@ -45,7 +48,12 @@ class AuthFlow {
           message: 'Thời gian trên máy không hợp lệ. Vui lòng kết nối mạng và đăng nhập lại.',
         );
       case OfflineSessionState.valid:
-        return await pins.isSet()
+        final p = pins;
+        if (p == null) {
+          await session.touch();
+          return const AuthView(AuthStage.unlocked);
+        }
+        return await p.isSet()
             ? const AuthView(AuthStage.locked)
             : const AuthView(AuthStage.needsPinSetup);
     }
@@ -62,12 +70,21 @@ class AuthFlow {
         message: 'Không đăng nhập được. Kiểm tra kết nối mạng.',
       );
     }
-    return await pins.isSet()
+    final p = pins;
+    return p == null || await p.isSet()
         ? const AuthView(AuthStage.unlocked)
         : const AuthView(AuthStage.needsPinSetup);
   }
 
+  /// Đăng xuất: xóa token và mốc xác thực trực tuyến — lần sau phải đăng nhập trực tuyến.
+  Future<AuthView> signOut() async {
+    await session.signOut();
+    return const AuthView(AuthStage.needsOnlineLogin);
+  }
+
   Future<AuthView> setPin(String pin, String confirm) async {
+    final p = pins;
+    if (p == null) return start();
     if (pin != confirm) {
       return const AuthView(
         AuthStage.needsPinSetup,
@@ -78,7 +95,7 @@ class AuthFlow {
       return const AuthView(AuthStage.needsOnlineLogin);
     }
     try {
-      await pins.setPin(pin);
+      await p.setPin(pin);
     } on PinException catch (e) {
       return AuthView(AuthStage.needsPinSetup, message: e.message);
     }
@@ -88,8 +105,9 @@ class AuthFlow {
 
   Future<AuthView> unlock(String pin) async {
     final st = await start();
-    if (st.stage != AuthStage.locked) return st;
-    final r = await pins.verify(pin);
+    final p = pins;
+    if (st.stage != AuthStage.locked || p == null) return st;
+    final r = await p.verify(pin);
     switch (r.check) {
       case PinCheck.ok:
         await session.touch();

@@ -45,6 +45,7 @@ function check(i: Input): { field: string; reason: string }[] {
   const e: { field: string; reason: string }[] = [];
   if (!i.name?.trim()) e.push({ field: "name", reason: "bắt buộc" });
   if (!i.template_code) e.push({ field: "template_code", reason: "bắt buộc" });
+  if (i.template_version != null && i.template_version < 1) e.push({ field: "template_version", reason: "phiên bản biểu từ 1 trở lên" });
   if (i.scope_mode === "communes" && !(i.communes ?? []).length) e.push({ field: "communes", reason: "phạm vi không có xã nào" });
   if (!i.from_date || !i.to_date || i.to_date < i.from_date) e.push({ field: "to_date", reason: "đến ngày ≥ từ ngày" });
   if (!i.due_at) e.push({ field: "due_at", reason: "bắt buộc" });
@@ -63,7 +64,7 @@ function fromInput(i: Input, w: Who, prev?: Campaign): Campaign {
     template_code: i.template_code, scope_mode: i.scope_mode, regions: i.regions ?? [], communes, tasks: communes.length,
     from_date: i.from_date, to_date: i.to_date, due_at: i.due_at, remind_before_hours: i.remind_before_hours ?? 0, state: "draft",
     province_code: "91", updated_by: { ref: w.actor, display: "Cán bộ tỉnh (giả lập)" }, updated_at: now(), owner: null,
-    forms_period_id: null, period_key: null, template_version: null, progress: null, events: [],
+    forms_period_id: null, period_key: null, template_version: i.template_version ?? null, progress: null, events: [],
   };
 }
 
@@ -149,7 +150,7 @@ export const cntsCampaignRoutes: Route[] = [
         c.state = "collecting";
         c.forms_period_id = uuidv7();
         c.period_key = `DT-${c.from_date.replaceAll("-", "")}-${c.id.replaceAll("-", "").slice(-6)}`;
-        c.template_version = 1;
+        c.template_version = c.template_version ?? 1; // #192: giữ phiên bản đã chọn ở Nháp
         c.progress = progressOf(c, false);
         event(c, w, "published", { due_at: c.due_at });
         return json(c);
