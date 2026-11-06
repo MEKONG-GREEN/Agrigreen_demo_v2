@@ -19663,7 +19663,7 @@ components:
         source: {type: string, enum: [map, gps]}
     ExtWorkScheduleCheckin:
       type: object
-      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, legacy_no_photo, checkout]
+      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, legacy_no_photo, checkout, no_checkout]
       properties:
         id: {type: string, format: uuid}
         item_id: {type: string, format: uuid}
@@ -19696,6 +19696,7 @@ components:
           oneOf:
             - type: "null"
             - {$ref: "#/components/schemas/ExtWorkScheduleCheckout"}
+        no_checkout: {type: boolean, description: "Nhãn \"Chưa check-out\" (CNTS v4.0 FN-12 BR-07): đã check-in, tới 23:59 ngày công tác (giờ Việt Nam) chưa check-out; check-out đồng bộ trễ gỡ nhãn (BR-08)"}
     ExtWorkScheduleCheckout:
       type: object
       required: [id, checkin_id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, stay_minutes, synced_at, synced_late]
@@ -20100,11 +20101,12 @@ components:
             checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
             checkin_count: {type: integer}
             missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
+            no_checkout_count: {type: integer, description: "Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07)"}
     ExtWorkScheduleWarning:
       type: object
       required: [code, message, item_ids]
       properties:
-        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed, checkout_far, checkout_weak_gps, checkout_mock_location]}
+        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed, checkout_far, checkout_weak_gps, checkout_mock_location, checkout_missing]}
         message: {type: string}
         item_ids: {type: array, items: {type: string, format: uuid}}
     ExtWorkScheduleVersion:
@@ -20131,6 +20133,7 @@ components:
         checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
         checkin_count: {type: integer}
         missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
+        no_checkout_count: {type: integer, description: "Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07)"}
         can:
           type: object
           required: [edit, submit, approve, request_changes]

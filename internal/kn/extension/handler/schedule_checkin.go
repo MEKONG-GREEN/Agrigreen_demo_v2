@@ -51,7 +51,7 @@ func checkinDTO(c store.Checkin) gin.H {
 	return gin.H{"id": c.ID, "item_id": c.ItemID, "day": c.Day.Format(time.DateOnly), "captured_at": c.CapturedAt.UTC().Format(time.RFC3339),
 		"recorded_at": c.RecordedAt.UTC().Format(time.RFC3339), "accuracy_m": c.AccuracyM, "distance_m": c.DistanceM, "far": c.Far,
 		"weak_accuracy": c.WeakAccuracy, "mock_location": c.Mock, "point_stored": c.PointStored, "location": pointDTO(c.Point),
-		"photo": photoDTO(c.Photo), "legacy_no_photo": c.Photo == nil, "checkout": out}
+		"photo": photoDTO(c.Photo), "legacy_no_photo": c.Photo == nil, "checkout": out, "no_checkout": c.NoCheckout}
 }
 
 // checkoutDTO: check-out (CV-08), thời gian ở địa điểm (BR-07, AC-12), "Đồng bộ trễ" (BR-08, AC-13).
@@ -73,13 +73,16 @@ func addCheckins(m gin.H, d app.ScheduleDetail) {
 			list = append(list, checkinDTO(c))
 		}
 	}
-	missed := 0
+	missed, open := 0, 0
 	for _, w := range d.Warnings {
-		if w.Code == "checkin_missed" {
+		switch w.Code {
+		case "checkin_missed":
 			missed = len(w.ItemIDs)
+		case "checkout_missing":
+			open = len(w.ItemIDs)
 		}
 	}
-	m["checkins"], m["checkin_count"], m["missed_checkin_count"] = list, len(list), missed
+	m["checkins"], m["checkin_count"], m["missed_checkin_count"], m["no_checkout_count"] = list, len(list), missed, open
 }
 
 type checkinReq struct {

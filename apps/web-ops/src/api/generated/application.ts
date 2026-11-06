@@ -15004,6 +15004,8 @@ export interface components {
             legacy_no_photo: boolean;
             /** @description Check-out của mục (CV-08); null = chưa check-out */
             checkout: null | components["schemas"]["ExtWorkScheduleCheckout"];
+            /** @description Nhãn "Chưa check-out" (CNTS v4.0 FN-12 BR-07): đã check-in, tới 23:59 ngày công tác (giờ Việt Nam) chưa check-out; check-out đồng bộ trễ gỡ nhãn (BR-08) */
+            no_checkout: boolean;
         };
         ExtWorkScheduleCheckout: {
             /** Format: uuid */
@@ -15473,10 +15475,12 @@ export interface components {
             checkin_count?: number;
             /** @description Mục công tác ngoài cơ quan đã qua ngày chưa check-in */
             missed_checkin_count?: number;
+            /** @description Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07) */
+            no_checkout_count?: number;
         };
         ExtWorkScheduleWarning: {
             /** @enum {string} */
-            code: "time_overlap" | "late_registration" | "outside_week" | "checkin_far" | "checkin_no_place" | "checkin_weak_gps" | "checkin_mock_location" | "checkin_missed" | "checkout_far" | "checkout_weak_gps" | "checkout_mock_location";
+            code: "time_overlap" | "late_registration" | "outside_week" | "checkin_far" | "checkin_no_place" | "checkin_weak_gps" | "checkin_mock_location" | "checkin_missed" | "checkout_far" | "checkout_weak_gps" | "checkout_mock_location" | "checkout_missing";
             message: string;
             item_ids: string[];
         };
@@ -15505,6 +15509,8 @@ export interface components {
             checkin_count?: number;
             /** @description Mục công tác ngoài cơ quan đã qua ngày chưa check-in */
             missed_checkin_count?: number;
+            /** @description Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07) */
+            no_checkout_count?: number;
             can: {
                 edit: boolean;
                 submit: boolean;
