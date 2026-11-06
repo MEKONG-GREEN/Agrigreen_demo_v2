@@ -118,9 +118,14 @@ func InsertArchiveAccess(ctx context.Context, tx pgx.Tx, tid uuid.UUID, a Archiv
 	if a.Targets == nil {
 		targets = []byte("[]")
 	}
+	rule := "archive-word-v1"
+	switch a.Action {
+	case "read_list", "read_periods", "read_fields", "read_history", "preview_attempt", "excel_attempt":
+		rule = "archive-read-v1"
+	}
 	_, err = tx.Exec(ctx, `INSERT INTO pf_extension.khtc_archive_access
  (context_ref,action,period_id,export_id,run_id,format,expected_bytes,file_count,trace_id,targets,id,tenant_id,stream_key,event_time,actor_ref,idem_key,rule_version)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,'khtc_archive_access:'||$13::uuid::text,$14,$13,'khtc:archive_access:'||$11::uuid::text,'archive-word-v1')`,
-		a.Context, a.Action, a.PeriodID, a.ExportID, a.RunID, a.Format, a.ExpectedBytes, a.FileCount, a.Trace, string(targets), a.ID, tid, a.Actor, a.At.UTC())
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,'khtc_archive_access:'||$13::uuid::text,$14,$13,'khtc:archive_access:'||$11::uuid::text,$15)`,
+		a.Context, a.Action, a.PeriodID, a.ExportID, a.RunID, a.Format, a.ExpectedBytes, a.FileCount, a.Trace, string(targets), a.ID, tid, a.Actor, a.At.UTC(), rule)
 	return err
 }

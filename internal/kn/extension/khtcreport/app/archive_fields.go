@@ -40,7 +40,10 @@ func (s *Service) ArchiveFields(ctx context.Context, q ArchiveQuery) (ArchiveFie
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		var e error
 		out.Items, e = store.ArchiveFieldChoices(ctx, tx, q.scanQuery(), q.fields(), q.After, q.Limit+1)
-		return e
+		if e != nil {
+			return e
+		}
+		return s.auditArchive(ctx, tx, c, "read_fields", ArchiveSelection{PeriodID: q.PeriodID, Format: "metadata"}, 0, 0, nil)
 	})
 	if err != nil {
 		return ArchiveFieldsResult{}, err
@@ -99,7 +102,10 @@ func (s *Service) ArchiveHistory(ctx context.Context, period uuid.UUID, field do
 			return e
 		}
 		out, e = store.ArchiveHistoryFiltered(ctx, tx, store.ArchiveScanQuery{Year: p.Year, PeriodID: period, Versions: true}, field)
-		return e
+		if e != nil {
+			return e
+		}
+		return s.auditArchive(ctx, tx, c, "read_history", ArchiveSelection{PeriodID: period, Format: "metadata"}, 0, 0, nil)
 	})
 	return out, err
 }
@@ -129,13 +135,17 @@ func (s *Service) DownloadArchiveExcel(ctx context.Context, period, export uuid.
 		}
 		count = meta.AllRows
 		body, e = store.ArchiveBody(ctx, tx, period, export)
-		return e
+		if e != nil {
+			return e
+		}
+		if body == nil {
+			return ErrNotFound
+		}
+		target := store.ArchiveTarget{PeriodID: period, ExportID: export, Format: "excel"}
+		return s.auditArchive(ctx, tx, c, "excel_attempt", ArchiveSelection{PeriodID: period, ExportID: export, Format: "excel"}, int64(len(body.Body)), 1, []store.ArchiveTarget{target})
 	})
 	if err != nil {
 		return store.ArchiveStoredBody{}, err
-	}
-	if body == nil {
-		return store.ArchiveStoredBody{}, ErrNotFound
 	}
 	sum := sha256.Sum256(body.Body)
 	if hex.EncodeToString(sum[:]) != body.BodyHash {
