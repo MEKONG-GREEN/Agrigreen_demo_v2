@@ -9937,6 +9937,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/periods/{id}/forms/{dept}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lịch sử gửi của đúng kỳ và phòng qua cổng Forms; không liệt kê bảng niêm phong mồ côi */
+        get: operations["extensionKhtcFormSubmissionHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/forms/{dept}/submissions/{submissionID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nội dung bất biến của đúng lần gửi; không dựng lại số tự tính hoặc kiểm tra từ nguồn hiện hành */
+        get: operations["extensionKhtcFormHistoricalSubmission"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report": {
         parameters: {
             query?: never;
@@ -23198,6 +23232,69 @@ export interface components {
             reviewed_attempt: number;
             /** @enum {string} */
             review_decision: "returned" | "accepted";
+        };
+        KHTCFormHistoryPeriod: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            report_type: string;
+            year: number;
+        };
+        KHTCFormSubmissionHeader: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            attempt: number;
+            /** Format: date-time */
+            submitted_at: string;
+            /** Format: uuid */
+            submitter_ref: string;
+            /** @description Ghi nhận tại lần gửi của Forms; không suy lại theo hạn hiện tại */
+            native_late: boolean;
+            /** @enum {string} */
+            decision: "" | "returned" | "accepted";
+            review_note: string;
+            /** Format: uuid */
+            reviewer_ref: string | null;
+            /** Format: date-time */
+            reviewed_at: string | null;
+        };
+        KHTCFormSubmissionHistory: {
+            period: components["schemas"]["KHTCFormHistoryPeriod"];
+            department: string;
+            department_name: string;
+            items: components["schemas"]["KHTCFormSubmissionHeader"][];
+        };
+        KHTCFormHistoryRow: {
+            /** Format: uuid */
+            entry_ref: string;
+            /** @description Nhãn hạng mục của phiên bản kế hoạch được bảng niêm phong tham chiếu */
+            name: string;
+            unit: string;
+        };
+        KHTCFormHistoryPlan: {
+            /** Format: uuid */
+            version_id: string;
+            version: number;
+            decision_no: string;
+        };
+        KHTCFormSubmissionSnapshot: {
+            period: components["schemas"]["KHTCFormHistoryPeriod"];
+            department: string;
+            department_name: string;
+            submission: components["schemas"]["KHTCFormSubmissionHeader"];
+            /** Format: uuid */
+            sheet_id: string;
+            /** @description SHA256 của nội dung niêm phong; không có nghĩa là receipt của thao tác */
+            content_hash: string;
+            /** Format: uuid */
+            plan_version_ref: string | null;
+            plan: null | components["schemas"]["KHTCFormHistoryPlan"];
+            template_code: string;
+            template_version: number;
+            content: components["schemas"]["KHTCFormContent"];
+            rows: components["schemas"]["KHTCFormHistoryRow"][];
+            sections: components["schemas"]["KHTCFormSection"][];
         };
         CNTSDesignView: {
             code: string;
@@ -47094,6 +47191,65 @@ export interface operations {
             };
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcFormSubmissionHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dept: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Định danh và thông tin gửi/rà soát thực; không phải audit đầy đủ hay receipt của thao tác */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormSubmissionHistory"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_form_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcFormHistoricalSubmission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                dept: string;
+                submissionID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Payload niêm phong đã kiểm native/tenant/phòng/base attempt/người gửi/hash; nhãn theo đúng phiên bản kế hoạch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCFormSubmissionSnapshot"];
+                };
+            };
+            /** @description forbidden */
+            403: components["responses"]["Problem"];
+            /** @description extension.khtc_form_not_found */
+            404: components["responses"]["Problem"];
+            /** @description extension.dependency_unavailable */
+            503: components["responses"]["Problem"];
         };
     };
     extensionKhtcReportGet: {

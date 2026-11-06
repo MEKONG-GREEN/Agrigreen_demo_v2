@@ -1,0 +1,14 @@
+.controls {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.controls > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.controls select {
+  width: 100%;
+  max-width: 100%;
+}

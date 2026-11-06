@@ -11,6 +11,7 @@ import { DataTable, StatusPill, type Column } from "@/components/patterns/list";
 import { formatDateTime } from "@/lib/format";
 import { saveBlob } from "@/lib/files";
 import { useInboxAuthorityKey } from "../inbox/inbox-workspace";
+import styles from "./PNProgressScreen.module.css";
 import { createPNProgressApi, pnDepartment, PN_DEPARTMENTS, type PNDepartment, type PNLevel, type PNPeriod, type PNProgress, type PNProgressApi, type PNRow } from "./api";
 
 const YEARS = Array.from({ length: 101 }, (_, i) => ({ value: String(2000 + i), label: String(2000 + i) }));
@@ -39,7 +40,7 @@ function PNBody({ api, department, backHref }: { api: ApiClient; department: PND
   const [year, setYear] = useState(() => new Intl.DateTimeFormat("en", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric" }).format(new Date()));
   return <DetailPage title="Tiến độ chương trình của phòng" back={{ href: backHref, label: "Báo cáo cho KHTC" }} badge={<StatusPill tone="neutral">Chỉ xem</StatusPill>}>
     <p>{PN_DEPARTMENTS[department]}. Xem số liệu theo bản Mẫu 5 đã được KHTC chuẩn bị; mốc số liệu và phiên bản hiển thị cùng bảng.</p>
-    <div className="row"><SelectField label="Năm kế hoạch" name="year" value={year} onChange={setYear} options={YEARS} required /></div>
+    <div className={`row ${styles.controls}`}><SelectField label="Năm kế hoạch" name="year" value={year} onChange={setYear} options={YEARS} required /></div>
     {year ? <PNYear key={year} client={client} department={department} year={year} /> : <p role="status">Chọn năm kế hoạch.</p>}
   </DetailPage>;
 }
@@ -73,7 +74,7 @@ function PNYear({ client, department, year }: { client: PNProgressApi; departmen
   if (state.loading && !state.items.length) return <p role="status">Đang đọc các kỳ được giao cho phòng…</p>;
   if (!state.items.length) return <p role="status">Chưa có kỳ tiến độ dành cho phòng trong năm này.</p>;
   return <>
-    <div className="row">
+    <div className={`row ${styles.controls}`}>
       <SelectField label="Kỳ báo cáo" name="period" value={period} onChange={setPeriod} options={state.items.map(p => ({ value: p.id, label: p.name }))} required />
       {state.next && <button type="button" className="btn" onClick={() => void more()} disabled={state.loading}>{state.loading ? "Đang đọc…" : "Xem thêm kỳ"}</button>}
     </div>
@@ -88,7 +89,7 @@ function PNPeriodView({ client, department, period }: { client: PNProgressApi; d
   const [nonce, setNonce] = useState(0);
   const snapshot = useRef<string | undefined>(undefined);
   return <>
-    <div className="row">
+    <div className={`row ${styles.controls}`}>
       <SelectField label="Chương trình" name="program" value={program} onChange={setProgram} placeholder="Tất cả chương trình" options={programs.map(p => ({ value: p.ref, label: `${p.roman ? p.roman + ". " : ""}${p.name}` }))} />
       <SelectField label="Mức đạt" name="level" value={level} onChange={v => setLevel(v as PNLevel)} placeholder="Tất cả mức đạt" options={LEVELS} />
       <button type="button" className="btn" onClick={() => { snapshot.current = undefined; setNonce(n => n + 1); }}>Đọc bản Mẫu 5 mới</button>
@@ -136,7 +137,7 @@ function PNSnapshotView({ client, department, period, program, level, snapshot, 
     { key: "percent", header: "% KH", cell: r => r.kind === "item" ? r.missing || r.percent === null ? "—" : r.percent : "" },
   ];
   return <section aria-label="Tiến độ từ Mẫu 5">
-    <div className="row"><StatusPill tone="info">Mẫu 5 v{data.snapshot.version}</StatusPill><span>Mốc số liệu: {formatDateTime(data.snapshot.captured_at)}</span><button type="button" className="btn btn-p" disabled={busy} onClick={() => void download()}>{busy ? "Đang tải…" : "Xuất Excel"}</button></div>
+    <div className={`row ${styles.controls}`}><StatusPill tone="info">Mẫu 5 v{data.snapshot.version}</StatusPill><span>Mốc số liệu: {formatDateTime(data.snapshot.captured_at)}</span><button type="button" className="btn btn-p" disabled={busy} onClick={() => void download()}>{busy ? "Đang tải…" : "Xuất Excel"}</button></div>
     {problem && <ProblemAlert problem={problem} />}
     {data.rows.some(r => r.missing) && <p role="status">Một số hạng mục còn thiếu nguồn đã chốt hoặc phiếu đã gửi; phần trăm chưa đủ dữ liệu hiển thị “—”.</p>}
     <DataTable caption="Tiến độ chương trình của phòng" columns={columns} rows={data.rows.slice((page - 1) * 20, page * 20)} rowKey={r => r.ref} page={page} pageSize={20} total={data.rows.length} onPage={setPage} empty="Chưa có hạng mục phù hợp bộ lọc của phòng." />

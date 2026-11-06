@@ -204,3 +204,29 @@ describe("review241 — đường dẫn, quyền và ghi chú", () => {
     expect(screen.queryByRole("button", { name: "Xác nhận" })).not.toBeInTheDocument();
   });
 });
+
+describe("history242 — điều hướng khỏi ghi chú rà soát", () => {
+  it("giữ ghi chú khi hủy chuyển, chỉ mở lịch sử sau xác nhận bỏ", async () => {
+    render(<KhtcFormReviewScreen />); const note = await screen.findByRole("textbox");
+    fireEvent.change(note, { target: { value: "Ghi chú chưa gửi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lịch sử và so sánh lần gửi" }));
+    expect(calls.push).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Giữ ghi chú" }));
+    expect(note).toHaveValue("Ghi chú chưa gửi");
+    fireEvent.click(screen.getByRole("button", { name: "Lịch sử và so sánh lần gửi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Bỏ ghi chú và chuyển" }));
+    expect(calls.push).toHaveBeenCalledExactlyOnceWith(`/kn/khtc/ra-soat/${A}/lan-gui?department=trong_trot`);
+    expect(calls.review).not.toHaveBeenCalled();
+  });
+  it("không mở lịch sử trong khi quyết định rà soát chưa có kết quả", async () => {
+    const operation = deferred<KhtcFormReviewResult>(); calls.review.mockReturnValueOnce(operation.promise);
+    render(<KhtcFormReviewScreen />);
+    await screen.findByRole("heading", { name: /Kỳ A/ });
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận" }));
+    fireEvent.click(screen.getByRole("button", { name: "Xác nhận lần gửi" }));
+    await waitFor(() => expect(calls.review).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Lịch sử và so sánh lần gửi" })).toBeDisabled();
+    expect(calls.push).not.toHaveBeenCalled();
+    await act(async () => operation.resolve(ack(calls.review.mock.calls[0]![2])));
+  });
+});

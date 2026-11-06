@@ -4,7 +4,8 @@ import { logout, sidebar } from "./helpers";
 import { readFile } from "node:fs/promises";
 
 for (const mobile of [false, true]) test(`215 PN reads the owner's prepared M5 and scoped Excel (${mobile ? "mobile" : "desktop"})`, async ({ page }, testInfo) => {
-  test.setTimeout(240_000);
+  test.setTimeout(180_000);
+  page.setDefaultTimeout(20_000);
   await page.clock.setFixedTime(new Date("2030-06-05T03:00:00Z"));
   const login = async (identifier: string) => {
     await page.getByLabel("Email hoặc số điện thoại").fill(identifier);
@@ -19,6 +20,7 @@ for (const mobile of [false, true]) test(`215 PN reads the owner's prepared M5 a
   await sidebar(page).getByRole("link", { name: "Người dùng", exact: true }).click();
   await page.getByRole("link", { name: "Tạo tài khoản", exact: true }).click();
   const main = page.getByRole("main");
+  await expect(main.getByRole("button", { name: "Lưu", exact: true })).toBeEnabled();
   await main.getByLabel("Email").fill("khtc.pn215@example.test");
   await main.getByLabel("Số điện thoại (tên đăng nhập)").fill("0912345215");
   const assignment = main.getByRole("group", { name: "Vai trò và phạm vi" });
@@ -28,6 +30,8 @@ for (const mobile of [false, true]) test(`215 PN reads the owner's prepared M5 a
   await expect(main.getByRole("button", { name: "Lưu", exact: true })).toBeEnabled();
   await main.getByLabel("Họ tên").fill("Cán bộ KHTC kiểm thử 215");
   await expect(main.getByLabel("Họ tên")).toHaveValue("Cán bộ KHTC kiểm thử 215");
+  await expect(main.getByLabel("Email")).toHaveValue("khtc.pn215@example.test");
+  await expect(main.getByLabel("Số điện thoại (tên đăng nhập)")).toHaveValue("0912345215");
   await main.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Cán bộ KHTC kiểm thử 215" })).toBeVisible();
   await logout(page); await login("0912345215");
@@ -39,7 +43,7 @@ for (const mobile of [false, true]) test(`215 PN reads the owner's prepared M5 a
   await page.getByRole("button", { name: "Xem trước", exact: true }).click();
   await page.getByRole("button", { name: "Mở kỳ và giao phiếu", exact: true }).click();
   await expect(page).toHaveURL(/\/ky-bao-cao\/ky\/[^/]+$/);
-  await sidebar(page).getByRole("link", { name: "Báo cáo KHTC", exact: true }).click();
+  await sidebar(page).getByRole("link", { name: "Soạn báo cáo (Mẫu 1–5)", exact: true }).click();
   await page.getByRole("combobox", { name: "Loại báo cáo", exact: true }).selectOption("program");
   await page.getByRole("button", { name: /^Đến ngày/ }).first().click();
   await page.getByRole("button", { name: "Lưu bản soạn", exact: true }).click();
@@ -55,7 +59,7 @@ for (const mobile of [false, true]) test(`215 PN reads the owner's prepared M5 a
   const folder = sidebar(page).getByRole("button", { name: "Báo cáo cho KHTC", exact: true });
   if (await folder.getAttribute("aria-expanded") !== "true") await folder.click();
   await sidebar(page).getByRole("link", { name: "Tiến độ các CT của phòng", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Tiến độ chương trình của phòng", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Tiến độ chương trình của phòng\s*Chỉ xem$/ })).toBeVisible();
   await expect(page.getByText("Mẫu 5 v1", { exact: true })).toBeVisible();
   const table = page.getByRole("table", { name: "Tiến độ chương trình của phòng", exact: true });
   const row = table.getByRole("row").filter({ has: page.getByRole("cell", { name: itemName, exact: true }) });
@@ -66,6 +70,7 @@ for (const mobile of [false, true]) test(`215 PN reads the owner's prepared M5 a
   await expect(page.getByRole("button", { name: /^Lưu|^Gửi/ })).toHaveCount(0);
   if (mobile) {
     await page.setViewportSize({ width: 390, height: 844 });
+    await expect(sidebar(page)).not.toBeInViewport();
     await expect(page.getByRole("button", { name: "Xuất Excel", exact: true })).toBeVisible();
     const width = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: innerWidth }));
     expect(width.page).toBeLessThanOrEqual(width.viewport + 1);

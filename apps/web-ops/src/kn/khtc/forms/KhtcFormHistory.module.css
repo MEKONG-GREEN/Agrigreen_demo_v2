@@ -1,0 +1,36 @@
+.history {
+  min-width: 0;
+}
+
+.history :global(.detail-main) {
+  min-width: 0;
+}
+
+.history :global(.dt) {
+  min-width: 42rem;
+}
+
+.value {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.changed {
+  background: #fff0b3;
+  color: #463600;
+  border-inline-start: 3px solid #997000;
+  padding: 6px 8px;
+  border-radius: 3px;
+}
+
+.identity {
+  overflow-wrap: anywhere;
+  font-size: 0.85em;
+}
+
+@media (max-width: 720px) {
+  .history :global(.action-bar) {
+    align-items: stretch;
+  }
+}

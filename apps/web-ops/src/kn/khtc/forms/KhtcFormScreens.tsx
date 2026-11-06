@@ -5,7 +5,7 @@
 //    Phòng KHTC thêm ?department=. Hộp phiếu của phòng (W11.11) dẫn tới đây.
 //  - "Phiếu kỳ này" (FN-PN-03.01) là màn của W11.11 (/kn/bao-cao-khtc); /kn/khtc/phieu dùng lại màn đó.
 //  - KhtcFormReviewScreen — /kn/khtc/ra-soat/{period_id}?department=: KHTC rà soát (FN-TI-02.04) — yêu cầu bổ sung (bắt
-//    buộc nội dung), xác nhận, phiếu trước / tiếp theo. "So sánh lần gửi" để sau G1.
+//    buộc nội dung), xác nhận, phiếu trước / tiếp theo. Lịch sử và so sánh nội dung đã gửi có trang chỉ đọc riêng (#242).
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
@@ -22,6 +22,7 @@ import { INBOX_BASE, parseInboxRoute } from "../inbox/inbox-routes";
 import { editorIssues } from "./editor";
 import styles from "./KhtcFormEntry.module.css";
 import { KhtcFormView } from "./KhtcFormView";
+import { historyHref } from "./submission-history";
 import {
   KHTC_DEPT,
   cloneContent,
@@ -202,7 +203,7 @@ function ReviewPeriod({ periodId, requestedDepartment }: { periodId: string; req
 }
 
 type PendingReview = { input: KhtcFormReviewInput; key: string };
-type ReviewNavigation = { department: string } | { back: true };
+type ReviewNavigation = { department: string } | { back: true } | { history: true };
 
 function ReviewSheet({ periodId, department, departments, onDepartment }: {
   periodId: string; department: string; departments: { code: string; name: string }[]; onDepartment: (dept: string) => void;
@@ -247,10 +248,15 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
 
   useEffect(() => { if (confirming || leaving) dialog.current?.focus(); }, [confirming, leaving]);
 
+  const followNavigation = (target: ReviewNavigation) => {
+    if ("back" in target) router.push(backHref);
+    else if ("history" in target) router.push(historyHref({ periodId, department }));
+    else onDepartment(target.department);
+  };
   const navigate = (target: ReviewNavigation) => {
     if (pending || flight.current) return;
     if (dirty) { setConfirming(null); setLeaving(target); return; }
-    if ("back" in target) router.push(backHref); else onDepartment(target.department);
+    followNavigation(target);
   };
   const prepare = (decision: KhtcFormReviewInput["decision"]) => {
     if (!canReview || !latest || pending || flight.current || needsReload) return;
@@ -300,6 +306,7 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
     actions={<>
       <button className="btn" disabled={!!pending || index <= 0} onClick={() => navigate({ department: departments[index - 1]!.code })}>Phiếu trước</button>
       <button className="btn" disabled={!!pending || index < 0 || index >= departments.length - 1} onClick={() => navigate({ department: departments[index + 1]!.code })}>Phiếu tiếp theo</button>
+      <button className="btn" disabled={!!pending || !f.submissions.length} onClick={() => navigate({ history: true })}>Lịch sử và so sánh lần gửi</button>
       {canReview ? <>
         <button className="btn btn-p" disabled={!!pending || !f.can_request_supplement} onClick={() => prepare("returned")}>Yêu cầu bổ sung</button>
         <button className="btn" disabled={!!pending || !f.can_confirm} onClick={() => prepare("accepted")}>Xác nhận</button>
@@ -319,7 +326,7 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
     </section> : null}
     {leaving && !pending ? <section ref={dialog} tabIndex={-1} role="dialog" aria-label="Bỏ ghi chú chưa gửi?" className="alert alert-info">
       <p>Ghi chú của phiếu này chưa được gửi. Bỏ ghi chú để chuyển?</p>
-      <button className="btn" onClick={() => { if ("back" in leaving) router.push(backHref); else onDepartment(leaving.department); }}>Bỏ ghi chú và chuyển</button>
+      <button className="btn" onClick={() => followNavigation(leaving)}>Bỏ ghi chú và chuyển</button>
       <button className="btn btn-p" onClick={() => setLeaving(null)}>Giữ ghi chú</button>
     </section> : null}
     <SelectField label="Phòng được giao phiếu" value={department} disabled={!!pending} options={departments.map(d => ({ value: d.code, label: d.name }))} onChange={dept => { if (dept && dept !== department) navigate({ department: dept }); }} />

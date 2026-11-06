@@ -244,8 +244,14 @@ const PLAN: Record<string, PlanRow[]> = {
   ],
 };
 
+type FrozenSubmission242 = Pick<S["KHTCFormSubmissionSnapshot"], "sheet_id" | "content_hash" | "plan_version_ref" | "plan" | "template_code" | "template_version" | "content" | "rows" | "sections">;
 interface Sub {
  actor?:string;
+ tenant?:string;
+ reviewer?:string;
+ reviewedAt?:string;
+ nativeLate?:boolean;
+ frozen?:FrozenSubmission242;
   id: string;
   attempt: number;
   at: string;
@@ -728,6 +734,9 @@ function save(ctx: Ctx, submit: boolean): Response {
         },
       );
     subsOf(s, dept).unshift({
+      tenant:ctx.persona.me.tenant_id,
+      nativeLate:new Date().toISOString()>s.p.due_at,
+      frozen:freezeHistory242(cur,c),
       actor:ctx.persona.me.actor_ref,
       id: uuidv7(),
       attempt: cur.attempt + 1,
@@ -743,7 +752,45 @@ function save(ctx: Ctx, submit: boolean): Response {
   return json(sheet(s, dept, true, false));
 }
 
+
+function freezeHistory242(current:Sheet,content:Content):FrozenSubmission242 {
+ const id=uuidv7();
+ // Synthetic demo fingerprint only. Native PG tests verify the real SHA256;
+ // the mock never presents it as cryptographic attestation in the UI.
+ return {sheet_id:id,content_hash:id.replace(/-/g,"").repeat(2),
+  template_code:current.template.code,template_version:current.template.version,
+  plan_version_ref:current.grid?current.plan?.version_id??null:null,
+  plan:current.grid&&current.plan?{version_id:current.plan.version_id,version:current.plan.version,decision_no:current.plan.decision_no}:null,
+  rows:current.grid?current.tabs.flatMap(tab=>tab.rows.map(row=>({entry_ref:row.entry_ref,name:row.name,unit:row.unit}))):[],
+  sections:structuredClone(current.template.sections),content:structuredClone(content)};
+}
+function historyHeader242(sub:Sub):S["KHTCFormSubmissionHeader"] {
+ return {id:sub.id,attempt:sub.attempt,submitted_at:sub.at,submitter_ref:sub.actor!,native_late:sub.nativeLate??false,
+  decision:sub.decision,review_note:sub.note,reviewer_ref:sub.reviewer??null,reviewed_at:sub.reviewedAt??null};
+}
+function history242(ctx:Ctx):Response {
+ const uuid=/^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+ if(ctx.url.search || !uuid.test(ctx.params[0]??"") || ctx.params[2]!==undefined&&!uuid.test(ctx.params[2]))return problem(404,"extension.khtc_form_not_found","Không có lần gửi");
+ const kc=knContext(ctx.request.headers.get("X-AG-Context")??"");
+ if(!kc||kc.role==="kn_tw"||kc.role==="kn_xa")return problem(403,"forbidden","Không có quyền đọc lịch sử phiếu");
+ const loaded=load(ctx);if(loaded instanceof Response)return loaded;
+ const {s,dept}=loaded;
+ if(s.p.report_type==="adhoc"&&kc.role==="admin"&&!ctx.persona.amr.includes("otp"))return problem(403,"mfa_required","Cần xác thực nhiều yếu tố");
+ if(s.terminal==="cancelled"&&kc.role==="kn_tinh"&&kc.department_code===dept)return problem(404,"extension.khtc_form_not_found","Không có phiếu");
+ const subs=subsOf(s,dept);
+ if(subs.some(sub=>sub.tenant!==undefined&&sub.tenant!==ctx.persona.me.tenant_id))return problem(404,"extension.khtc_form_not_found","Không có phiếu");
+ // Legacy demo seeds did not record these facts. Do not invent a sender,
+ // review time, or frozen content merely to populate the new history screen.
+ if(subs.some(sub=>!sub.actor||!sub.frozen||sub.decision&&(!sub.reviewer||!sub.reviewedAt)))return problem(503,"extension.dependency_unavailable","Dữ liệu giả lập cũ chưa có định danh lịch sử; dùng phiếu mới để thử luồng");
+ const common={period:{id:s.p.id,name:s.p.name,report_type:s.p.report_type,year:s.p.year},department:dept,department_name:NAMES[dept]??dept};
+ if(!ctx.params[2])return json({...common,items:subs.map(historyHeader242)} satisfies S["KHTCFormSubmissionHistory"],200,{"Cache-Control":"no-store"});
+ const sub=subs.find(row=>row.id===ctx.params[2]);
+ if(!sub?.frozen)return problem(404,"extension.khtc_form_not_found","Không có lần gửi");
+ return json({...common,...structuredClone(sub.frozen),submission:historyHeader242(sub)} satisfies S["KHTCFormSubmissionSnapshot"],200,{"Cache-Control":"no-store"});
+}
+
 export const khtcFormRoutes: Route[] = [
+  {method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/forms\/([a-z_]+)\/submissions(?:\/([^/]+))?$/,handler:history242},
   {
     method: "GET",
     pattern: /^\/v1\/extension\/khtc\/form-templates$/,
@@ -870,6 +917,7 @@ export const khtcFormRoutes: Route[] = [
       if(s.p.report_type==="adhoc" && last.actor===ctx.persona.me.actor_ref)return problem(403,"self_approval_forbidden","Không tự duyệt phiếu đã gửi");
       last.decision = b.decision as "returned" | "accepted";
       last.note = b.note?.trim() ?? "";
+      last.reviewer=ctx.persona.me.actor_ref; last.reviewedAt=new Date().toISOString();
       sync(s, dept);
       return json({ ...sheet(s, dept, false, true), reviewed_submission_id: last.id, reviewed_attempt: last.attempt, review_decision: last.decision } satisfies S["KHTCFormReviewResult"]);
     },
@@ -892,6 +940,6 @@ export function khtcAdhocNativeReturn(s:Stored,dept:string,actor:string):boolean
  if(!last)return false;
  if(last.attempt>=3 || last.decision==="accepted")return problem(409,"extension.khtc_form_not_reviewable","Phiếu đã xác nhận hoặc đủ3 lần gửi");
  if(last.actor===actor)return problem(403,"self_approval_forbidden","Không tự trả phiếu đã gửi");
- last.decision="returned";last.note="Yêu cầu số liệu bổ sung mới";sync(s,dept);return true;
+ last.decision="returned";last.note="Yêu cầu số liệu bổ sung mới";last.reviewer=actor;last.reviewedAt=new Date().toISOString();sync(s,dept);return true;
 }
 export function khtcAdhocSubmitted(s:Stored,dept:string){return structuredClone(subsOf(s,dept));}

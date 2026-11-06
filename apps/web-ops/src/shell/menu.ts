@@ -105,9 +105,11 @@ export function findActive(tree: MenuTree, pathname: string): MenuLink | undefin
   if (best) return best;
   // The detail screens use a historical URL outside their list's prefix. Bind
   // only these exact UUID routes to an existing usable list, never /kn/khtc/*.
-  const detail = /^\/kn\/khtc\/(phieu|ra-soat)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.exec(pathname);
-  if (!detail) return undefined;
-  const parents = detail[1]!.toLowerCase() === "phieu"
+  const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+  const detail = new RegExp(`^/kn/khtc/(phieu|ra-soat)/${uuid}$`, "i").exec(pathname);
+  const history = new RegExp(`^/kn/khtc/ra-soat/${uuid}/lan-gui(?:/${uuid})?$`, "i").test(pathname);
+  if (!detail && !history) return undefined;
+  const parents = detail?.[1]?.toLowerCase() === "phieu"
     ? ["/kn/bao-cao-khtc", "/kn/khtc/ky-bao-cao", "/kn/khtc/bao-cao-phat-sinh"]
     : ["/kn/khtc/ky-bao-cao", "/kn/khtc/bao-cao-phat-sinh"];
   return menuLinks(tree).find((l) => parents.includes(l.node.href!));
