@@ -26,7 +26,7 @@ class AuthView {
 
 /// Luồng đăng nhập/mở khóa, không phụ thuộc Flutter để kiểm thử được.
 ///
-/// [pins] null: app không có PIN (App KN — BRD 2.0 FN-CH-00.01/FN-05 "Mobile: không có đăng nhập bằng PIN", ADR-0056):
+/// [pins] null: app không có PIN (App KN — BRD 2.0 FN-CH-00.01/FN-05 "Mobile: không có đăng nhập bằng PIN", ADR-0057):
 /// phiên ngoại tuyến hợp lệ (72 giờ từ lần xác thực trực tuyến cuối) mở thẳng, bảo vệ bằng khóa màn hình của thiết bị.
 class AuthFlow {
   AuthFlow({required this.session, this.pins});

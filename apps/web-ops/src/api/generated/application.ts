@@ -3435,7 +3435,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * BRD 2.0 FN-CH-00.01 "Quên mật khẩu?": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0056) — KHÔNG đăng nhập
+         * BRD 2.0 FN-CH-00.01 "Quên mật khẩu?": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0057) — KHÔNG đăng nhập
          * @description Luôn 202 cùng một thân cho mọi email đúng cú pháp — không lộ email có tồn tại, tài khoản bị khóa hay đã quá giới hạn. Chỉ tài khoản đang hoạt động, email đã xác minh mới được gửi; tối đa 5 yêu cầu được gửi mỗi giờ cho một tài khoản (yêu cầu vượt vẫn 202, không gửi). Liên kết hiệu lực 30 phút, dùng một lần; email gửi qua outbox ở worker. Giới hạn theo IP (dồn 5, sau đó 1/phút) → 429. Cache-Control no-store.
          */
         post: operations["requestPasswordReset"];

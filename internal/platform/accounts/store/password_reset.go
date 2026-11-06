@@ -1,6 +1,6 @@
 package store
 
-// pf_accounts.password_reset (#255, ADR-0056): yêu cầu tự đặt lại mật khẩu. Không có email, IP hay mã thô.
+// pf_accounts.password_reset (#255, ADR-0057): yêu cầu tự đặt lại mật khẩu. Không có email, IP hay mã thô.
 
 import (
 	"context"

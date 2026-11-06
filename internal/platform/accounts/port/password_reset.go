@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Tự đặt lại mật khẩu qua email (#255 AUTH-V2-RESET-NOPIN, ADR-0056; BRD 2.0 Báo giá v2.0 FN-CH-00.01).
+// Tự đặt lại mật khẩu qua email (#255 AUTH-V2-RESET-NOPIN, ADR-0057; BRD 2.0 Báo giá v2.0 FN-CH-00.01).
 const (
 	// EventPasswordResetRequested: một yêu cầu đặt lại đã được xếp gửi (pf/accounts tự nhận ở cmd/worker).
 	EventPasswordResetRequested = "pf.accounts.password_reset.requested"

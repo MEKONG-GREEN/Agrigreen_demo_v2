@@ -1,6 +1,6 @@
 package app
 
-// Tự đặt lại mật khẩu qua email (#255 AUTH-V2-RESET-NOPIN, ADR-0056; BRD 2.0 Báo giá v2.0 FN-CH-00.01 luồng phụ
+// Tự đặt lại mật khẩu qua email (#255 AUTH-V2-RESET-NOPIN, ADR-0057; BRD 2.0 Báo giá v2.0 FN-CH-00.01 luồng phụ
 // "Quên mật khẩu?": nhập email, nhận liên kết hiệu lực 30 phút, dùng một lần, tối đa 5 yêu cầu mỗi giờ cho một tài
 // khoản, tự đặt mật khẩu mới không qua Admin; tài khoản bắt MFA vẫn phải nhập OTP ở lần đăng nhập sau).
 //

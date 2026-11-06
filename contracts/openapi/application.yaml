@@ -4792,7 +4792,7 @@ paths:
         "429": {description: "metering.egress_quota_exceeded (AG_EGRESS_MODE=enforce)", $ref: "#/components/responses/Problem"}
   /v1/public/password-reset:
     post:
-      summary: "BRD 2.0 FN-CH-00.01 \"Quên mật khẩu?\": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0056) — KHÔNG đăng nhập"
+      summary: "BRD 2.0 FN-CH-00.01 \"Quên mật khẩu?\": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0057) — KHÔNG đăng nhập"
       description: >-
         Luôn 202 cùng một thân cho mọi email đúng cú pháp — không lộ email có tồn tại, tài khoản bị khóa hay đã quá giới hạn.
         Chỉ tài khoản đang hoạt động, email đã xác minh mới được gửi; tối đa 5 yêu cầu được gửi mỗi giờ cho một tài khoản

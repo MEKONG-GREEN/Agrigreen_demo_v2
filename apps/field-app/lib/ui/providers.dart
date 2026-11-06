@@ -62,7 +62,7 @@ final pendingDeepLinkProvider = NotifierProvider<PendingDeepLink, String?>(
   PendingDeepLink.new,
 );
 
-/// App KN không có PIN (BRD 2.0 FN-CH-00.01, FN-05 — ADR-0056): phiên ngoại tuyến 72 giờ mở thẳng, bảo vệ bằng khóa
+/// App KN không có PIN (BRD 2.0 FN-CH-00.01, FN-05 — ADR-0057): phiên ngoại tuyến 72 giờ mở thẳng, bảo vệ bằng khóa
 /// màn hình của thiết bị.
 final authFlowProvider = Provider<AuthFlow>(
   (ref) => AuthFlow(session: ref.watch(sessionServiceProvider)),

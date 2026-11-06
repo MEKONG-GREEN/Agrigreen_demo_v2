@@ -1,4 +1,4 @@
-## AUTH-V2-RESET-NOPIN — Tự đặt lại mật khẩu qua email, bỏ PIN Mobile (#255, [ADR-0056](../../adr/0056-tu-dat-lai-mat-khau-qua-email.md))
+## AUTH-V2-RESET-NOPIN — Tự đặt lại mật khẩu qua email, bỏ PIN Mobile (#255, [ADR-0057](../../adr/0057-tu-dat-lai-mat-khau-qua-email.md))
 
 Căn cứ: BRD 2.0 Báo giá v2.0 FN-CH-00.01 (luồng phụ "Quên mật khẩu?", "Mobile: không có đăng nhập bằng PIN (tạm bỏ)"), HCTH v4.0 FN-05 (luồng phụ "Mobile: không có đăng nhập bằng PIN"). Hai BRD cùng ý; HCTH FN-05 không có mục "Quên mật khẩu?", dùng FN-CH-00.01 (chức năng dùng chung).
 
