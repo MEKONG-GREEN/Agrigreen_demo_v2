@@ -223,7 +223,7 @@ func TestArchive227ExistingAuthorityBeforeAllReadPaths(t *testing.T) {
 	f.tid = ids.New()
 	for _, ep := range archive227Endpoints(p.ID, x.ID, w.ID) {
 		status, body, _ := archive227Request(t, f, ep.method, ep.path, authz.KNTinh, khtcDept, f.khtcUser, ep.body)
-		if status != http.StatusNotFound && !(status == http.StatusOK && !bytes.Contains(body, []byte(x.ID))) {
+		if status != http.StatusNotFound && (status != http.StatusOK || bytes.Contains(body, []byte(x.ID))) {
 			f.tid = own
 			t.Fatalf("cross-tenant %s exposed a saved identity: status=%d", ep.name, status)
 		}
