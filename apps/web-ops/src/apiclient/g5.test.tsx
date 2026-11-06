@@ -297,7 +297,7 @@ describe("backend giả lập G5 — quy tắc như app/", () => {
     expect(period).toBe(endedPeriod);
     const queued = await admin("api-admin").POST("/v1/metering/statements", { params: { header: hdr() }, body: { period, client_id: CLIENT_IDS.verifier } });
     expect(queued.response.status).toBe(202);
-    const job = await unwrap(queued);
+    const job = await unwrap(Promise.resolve(queued));
     expect(job.status).toBe("queued");
     let j = job;
     for (let i = 0; i < 3 && j.status === "queued"; i++) j = await unwrap(admin("api-admin").GET("/v1/metering/statement-jobs/{id}", { params: { path: { id: job.id } } }));
