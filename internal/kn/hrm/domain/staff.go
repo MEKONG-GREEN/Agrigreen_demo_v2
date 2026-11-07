@@ -145,13 +145,14 @@ type Ref struct {
 
 // fieldSpec mô tả một trường của payload.
 type fieldSpec struct {
-	required bool
-	max      int  // độ dài tối đa (rune); 0 = theo loại
-	catalog  Kind // khác rỗng: mã danh mục
-	date     bool // ngày (YYYY-MM-DD | YYYY-MM | YYYY)
-	decimal  bool // số thập phân ≥ 0, 2 chữ số
-	integer  bool // số nguyên 1..99
-	enum     []string
+	required        bool
+	max             int  // độ dài tối đa (rune); 0 = theo loại
+	catalog         Kind // khác rỗng: mã danh mục
+	date            bool // ngày (YYYY-MM-DD | YYYY-MM | YYYY)
+	decimal         bool // số thập phân ≥ 0, 2 chữ số
+	integer         bool // số nguyên 1..99
+	promotionMonths bool // NB-07: số nguyên 1..120, kiểm cú pháp trước parse
+	enum            []string
 }
 
 var eventFields = map[EventKind]map[string]fieldSpec{
@@ -162,8 +163,8 @@ var eventFields = map[EventKind]map[string]fieldSpec{
 		"appointed_on": {date: true}, "decision_no": {max: 50}},
 	EventSecondment: {"to_org": {required: true, max: 200}, "decision_no": {max: 50}},
 	EventGrade: {"grade": {required: true, catalog: KindGrade}, "step": {required: true, integer: true}, "step_since": {date: true},
-		"reserved_coeff": {decimal: true}, "decision_no": {max: 50}},
-	EventStep:   {"step": {required: true, integer: true}, "step_since": {date: true}, "reserved_coeff": {decimal: true}, "decision_no": {max: 50}},
+		"reserved_coeff": {decimal: true}, "decision_no": {max: 50}, "promotion_months": {promotionMonths: true}},
+	EventStep:   {"step": {required: true, integer: true}, "step_since": {date: true}, "reserved_coeff": {decimal: true}, "decision_no": {max: 50}, "promotion_months": {promotionMonths: true}},
 	EventDegree: {"level": {required: true, catalog: KindEducationLevel}, "major": {catalog: KindMajor}, "form": {enum: []string{"chinh_quy", "tai_chuc"}}, "institution": {max: 200}},
 	EventTraining: {"type": {required: true, enum: []string{TrainingPoliticalTheory, TrainingStateMgmt, TrainingForeignLanguage, TrainingIT,
 		TrainingLeadership, TrainingExtension}}, "code": {max: 40}, "level": {catalog: KindLanguageLevel}, "cert": {enum: []string{"degree", "certificate"}}},
@@ -251,6 +252,12 @@ func NormalizeEvent(t StaffType, in EventInput) (Event, []Ref, error) {
 				return Event{}, nil, invalid("%s: số thập phân 0–99,99, tối đa 2 chữ số", k)
 			}
 			v = d.StringFixed(2)
+		case f.promotionMonths:
+			n, ok := ValidPromotionMonths(v)
+			if !ok {
+				return Event{}, nil, invalid("promotion_months: số nguyên 1–120, tối đa 3 chữ số; không dùng số mũ")
+			}
+			v = strconv.Itoa(n)
 		case f.integer:
 			n, err := strconv.Atoi(v)
 			if err != nil || n < 1 || n > 99 {
@@ -348,25 +355,26 @@ func Effective(evs []Event) []Event {
 
 // Snapshot là phép chiếu của hồ sơ tại một ngày (as-of). Rỗng = chưa có sự kiện hiệu lực tới ngày đó.
 type Snapshot struct {
-	At          time.Time
-	Status      string     // "active" (Đang công tác) | "left" (Đã nghỉ việc) | "none" (chưa vào làm)
-	StartedOn   *time.Time // ngày vào làm của lần làm việc hiện hành
-	EndedOn     *time.Time
-	LeaveReason string
-	Unit        string // HS-16
-	Commune     string // cán bộ xã
-	MgmtUnit    string // HS-37
-	Position    string
-	Title       string
-	Allowance   string
-	AppointedOn string
-	Grade       string
-	Step        int
-	StepSince   string // Q-069: ngày xếp bậc hiện tại
-	Reserved    string // Q-069: hệ số bảo lưu
-	Secondments []Event
-	Disciplined bool // đang thi hành kỷ luật tại ngày (cờ — Q-075)
-	TopDegree   string
+	At              time.Time
+	Status          string     // "active" (Đang công tác) | "left" (Đã nghỉ việc) | "none" (chưa vào làm)
+	StartedOn       *time.Time // ngày vào làm của lần làm việc hiện hành
+	EndedOn         *time.Time
+	LeaveReason     string
+	Unit            string // HS-16
+	Commune         string // cán bộ xã
+	MgmtUnit        string // HS-37
+	Position        string
+	Title           string
+	Allowance       string
+	AppointedOn     string
+	Grade           string
+	Step            int
+	StepSince       string // NB-06: ngày hưởng bậc hiện tại
+	PromotionMonths int    // NB-07: thời gian xét của từng người; 0 = chưa khai báo
+	Reserved        string // Q-069: hệ số bảo lưu
+	Secondments     []Event
+	Disciplined     bool // đang thi hành kỷ luật tại ngày (cờ — Q-075)
+	TopDegree       string
 }
 
 // Status của hồ sơ.
@@ -387,6 +395,11 @@ func Project(evs []Event, at time.Time, degreeRank func(level string) int) Snaps
 			continue
 		}
 		p := e.Payload
+		if e.Kind == EventGrade || e.Kind == EventStep {
+			if v, ok := p["promotion_months"]; ok {
+				s.PromotionMonths, _ = ValidPromotionMonths(v)
+			}
+		}
 		switch e.Kind {
 		case EventWorkStart:
 			d := e.ValidFrom

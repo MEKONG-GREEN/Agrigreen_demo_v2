@@ -113,7 +113,7 @@ func snapOut(s domain.Snapshot, coef string, steps int) gin.H {
 	return gin.H{"status": s.Status, "started_on": date(s.StartedOn), "ended_on": date(s.EndedOn), "leave_reason": s.LeaveReason,
 		"unit": s.Unit, "commune": s.Commune, "mgmt_unit": s.MgmtUnit, "position": s.Position, "title": s.Title, "allowance": s.Allowance,
 		"appointed_on": s.AppointedOn, "grade": s.Grade, "step": s.Step, "steps": steps, "coefficient": coef, "step_since": s.StepSince,
-		"reserved_coeff": s.Reserved, "disciplined": s.Disciplined, "top_degree": s.TopDegree, "secondments": sec}
+		"promotion_months": s.PromotionMonths, "reserved_coeff": s.Reserved, "disciplined": s.Disciplined, "top_degree": s.TopDegree, "secondments": sec}
 }
 
 func itemsOutStaff(xs []app.StaffItem) []gin.H {

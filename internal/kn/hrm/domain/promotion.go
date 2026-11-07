@@ -1,21 +1,11 @@
 package domain
 
-// W11.25 (pf 20261021122821) — NÂNG BẬC LƯƠNG (BRD HCTH v3.0 FN-09 danh sách nâng bậc NL01–NL04, FN-10 sổ quyết định).
-//
-// Tính THUẦN (không DB): từ phép chiếu hồ sơ tại ngày xét (ngạch, bậc, mốc xếp bậc = step_since — Q-069), bảng hệ số có
-// hiệu lực (số bậc, thời gian giữ bậc), xếp loại năm, kỷ luật (cờ nhập tay — Q-075), khen thưởng + bảng quy đổi thành
-// tích và tham số nâng bậc có phiên bản (Q-070) → các KỲ NÂNG BẬC của một người:
-//   - NLTX (Mẫu số 1): chưa ở bậc cuối; ngày đến kỳ = mốc xếp bậc + thời gian giữ bậc (+ kéo dài theo kỷ luật trong
-//     thời gian giữ bậc). Điều kiện BR-02: xếp loại các năm xét từ mức tối thiểu trở lên, không đang thi hành kỷ luật.
-//   - NLTH (Mẫu số 2): chỉ khi Phòng HCTH ĐỀ XUẤT từ một thành tích ghi trong hồ sơ (không tự đưa vào); ngày nâng = ngày
-//     đến kỳ NLTX − số tháng quy đổi. Chặn xuất: thành tích đã dùng/không quy đổi/quá số năm, ngày nâng ngoài năm chỉ
-//     tiêu (dạng "dự kiến"), vượt chỉ tiêu (app kiểm).
-//   - TNVK (Mẫu số 4): đang ở bậc cuối; lần đầu sau tnvk_first_months tháng giữ bậc cuối (% khởi điểm), các lần sau mỗi
-//     chu kỳ từ ngày hưởng của quyết định TNVK gần nhất (% + bước tăng). % TNVK không lưu trong hồ sơ (NL04-03).
-// Hệ thống không tính tiền lương (BR-03, BR-04): cột 19 Mẫu số 1 để trống.
+// FN-09 HCTH v4.0: nâng lương thường xuyên từ hồ sơ hiện hành.
+// Loại NLTH/TNVK và bố cục cũ chỉ còn dùng ở FN-10 và khi đọc lại lịch sử xuất.
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +17,7 @@ import (
 // PromoKind là loại nâng bậc.
 type PromoKind string
 
-// Ba loại nâng bậc của FN-09.
+// Ba loại quyết định FN-10; FN-09 chỉ tự nhận diện PromoNLTX.
 const (
 	PromoNLTX PromoKind = "nltx" // nâng bậc thường xuyên — Mẫu số 1 (NL02)
 	PromoNLTH PromoKind = "nlth" // nâng bậc trước thời hạn — Mẫu số 2 (NL03)
@@ -101,7 +91,7 @@ func worse(a, b Cond) Cond {
 // PromoStatus là trạng thái xử lý của một kỳ (FN-09 B1).
 type PromoStatus string
 
-// Bốn trạng thái xử lý.
+// Ba trạng thái xử lý FN-09; PromoListed chỉ để đọc sổ cũ.
 const (
 	PromoPending  PromoStatus = "pending"  // Chưa xử lý
 	PromoListed   PromoStatus = "listed"   // Đã đưa vào danh sách
@@ -110,7 +100,7 @@ const (
 )
 
 // PromoStatuses theo thứ tự.
-var PromoStatuses = []PromoStatus{PromoPending, PromoListed, PromoExported, PromoDecided}
+var PromoStatuses = []PromoStatus{PromoPending, PromoExported, PromoDecided}
 
 // Hành động của sổ promotion_event và trạng thái sau hành động.
 const (
@@ -128,10 +118,10 @@ const (
 func StatusAfter(k PromoKind, act string) (PromoStatus, bool) {
 	switch act {
 	case PromoActInclude, PromoActPropose:
-		return PromoListed, true
+		return PromoPending, true
 	case PromoActExclude:
 		if k == PromoNLTH {
-			return PromoListed, true
+			return PromoPending, true
 		}
 		return PromoPending, true
 	case PromoActWithdraw:
@@ -141,10 +131,7 @@ func StatusAfter(k PromoKind, act string) (PromoStatus, bool) {
 	case PromoActDecide:
 		return PromoDecided, true
 	case PromoActReturn:
-		if k == PromoNLTH {
-			return PromoListed, true
-		}
-		return PromoPending, true
+		return PromoExported, true
 	}
 	return PromoPending, true
 }
@@ -168,7 +155,11 @@ func MonthsEnjoyed(due time.Time) string {
 
 // ValidMonthsEnjoyed kiểm số tháng nhập tay: số ≥ 0, ≤ 12, một chữ số thập phân.
 func ValidMonthsEnjoyed(s string) (string, bool) {
-	d, err := decimal.NewFromString(strings.ReplaceAll(strings.TrimSpace(s), ",", "."))
+	s = strings.ReplaceAll(strings.TrimSpace(s), ",", ".")
+	if len(s) > 4 || !promoDecimalSyntax.MatchString(s) {
+		return "", false
+	}
+	d, err := decimal.NewFromString(s)
 	if err != nil || d.IsNegative() || d.GreaterThan(decimal.NewFromInt(12)) || !d.Equal(d.Round(1)) {
 		return "", false
 	}
@@ -224,31 +215,32 @@ type PromoSubject struct {
 
 // Candidate là một kỳ nâng bậc.
 type Candidate struct {
-	Key         string
-	StaffID     uuid.UUID
-	Kind        PromoKind
-	Due         time.Time // ngày đến kỳ (NLTH: ngày nâng trước hạn)
-	NormalDue   time.Time // NLTH: ngày đến kỳ thường xuyên
-	NextDue     time.Time // thời gian tính nâng bậc / hưởng TNVK lần sau
-	Grade       string
-	Steps       int
-	FromStep    int
-	ToStep      int
-	FromCoeff   decimal.Decimal
-	ToCoeff     decimal.Decimal
-	Diff        decimal.Decimal // hệ số chênh lệch (NL02-12, NL04-07)
-	StepSince   time.Time
-	Reserved    string // HS bảo lưu hiện có (Q-069)
-	EarlyMonths int    // NLTH: số tháng nâng trước hạn
-	Award       *PromoAward
-	PctFrom     *decimal.Decimal // TNVK: % đang hưởng (nil = lần đầu)
-	PctTo       decimal.Decimal
-	PctSince    *time.Time
-	Cond        Cond
-	Why         []string // lý do khác Đủ
-	Basis       []Basis
-	Planned     int      // NLTH: năm dự kiến khi ngày nâng ngoài năm chỉ tiêu (0 = trong năm)
-	Blocked     []string // NLTH: lý do chặn xuất Mẫu số 2
+	Key             string
+	StaffID         uuid.UUID
+	Kind            PromoKind
+	Due             time.Time // ngày đến kỳ (NLTH: ngày nâng trước hạn)
+	NormalDue       time.Time // NLTH: ngày đến kỳ thường xuyên
+	NextDue         time.Time // thời gian tính nâng bậc / hưởng TNVK lần sau
+	Grade           string
+	Steps           int
+	FromStep        int
+	ToStep          int
+	FromCoeff       decimal.Decimal
+	ToCoeff         decimal.Decimal
+	Diff            decimal.Decimal // hệ số chênh lệch (NL02-12, NL04-07)
+	PromotionMonths int
+	StepSince       time.Time
+	Reserved        string // HS bảo lưu hiện có (Q-069)
+	EarlyMonths     int    // NLTH: số tháng nâng trước hạn
+	Award           *PromoAward
+	PctFrom         *decimal.Decimal // TNVK: % đang hưởng (nil = lần đầu)
+	PctTo           decimal.Decimal
+	PctSince        *time.Time
+	Cond            Cond
+	Why             []string // lý do khác Đủ
+	Basis           []Basis
+	Planned         int      // NLTH: năm dự kiến khi ngày nâng ngoài năm chỉ tiêu (0 = trong năm)
+	Blocked         []string // NLTH: lý do chặn xuất Mẫu số 2
 }
 
 // CaseKey dựng khóa kỳ: '<staff>:nltx:b<bậc mới>-<YYYYMMDD>', '<staff>:tnvk:v-<YYYYMMDD>', '<staff>:nlth:<award>'.
@@ -278,194 +270,39 @@ func ParseCaseKey(s string) (uuid.UUID, PromoKind, bool) {
 
 func fmtDay(t time.Time) string { return t.Format("02/01/2006") }
 
-func ratingRank(r string) int {
-	for i, x := range Ratings {
-		if x == r {
-			return i
-		}
+var promoIntegerSyntax = regexp.MustCompile(`^[0-9]{1,3}$`)
+var promoDecimalSyntax = regexp.MustCompile(`^[0-9]+(?:\.[0-9]{1,2})?$`)
+
+// ValidPromotionMonths bounds both syntax and length before converting NB-07.
+func ValidPromotionMonths(s string) (int, bool) {
+	if len(s) > 3 || !promoIntegerSyntax.MatchString(s) {
+		return 0, false
 	}
-	return len(Ratings)
+	n, err := strconv.Atoi(s)
+	return n, err == nil && n >= 1 && n <= 120
 }
 
-// ratingBasis kiểm xếp loại các năm [y−n, y−1] (FN-09 BR-01, BR-02; AC-01).
-func ratingBasis(ratings map[int]string, y int, rules PromotionRules) Basis {
-	var years, vals, bad, miss []string
-	for yr := y - rules.RatingYears; yr < y; yr++ {
-		years = append(years, strconv.Itoa(yr))
-		r := ratings[yr]
-		switch {
-		case r == "":
-			vals = append(vals, "—")
-			miss = append(miss, strconv.Itoa(yr))
-		case ratingRank(r) > ratingRank(rules.MinRating):
-			vals = append(vals, r)
-			bad = append(bad, r+" "+strconv.Itoa(yr))
-		default:
-			vals = append(vals, r)
-		}
-	}
-	b := Basis{Label: "Xếp loại " + strings.Join(years, " · "), Value: strings.Join(vals, " · "), Result: CondOK}
-	switch {
-	case len(bad) > 0:
-		b.Result, b.Note = CondFail, strings.Join(bad, ", ")
-	case len(miss) > 0:
-		b.Result, b.Note = CondReview, "thiếu xếp loại "+strings.Join(miss, ", ")
-	}
-	return b
-}
-
-// disciplineBasis: đang thi hành kỷ luật tại ngày at → Chưa đủ (BR-02). Kỷ luật là cờ nhập tay (Q-075).
-func disciplineBasis(ds []Event, at time.Time) Basis {
-	for _, d := range ds {
-		if !d.ValidFrom.After(at) && (d.ValidTo == nil || !d.ValidTo.Before(at)) {
-			return Basis{Label: "Kỷ luật", Value: "Đang thi hành kỷ luật (" + d.Payload["form"] + ") từ " + fmtDay(d.ValidFrom), Result: CondFail,
-				Note: "đang thi hành kỷ luật"}
-		}
-	}
-	return Basis{Label: "Kỷ luật", Value: "Không có kỷ luật đang thi hành (cờ nhập tay trong hồ sơ)", Result: CondOK}
-}
-
-func (c *Candidate) add(b Basis) {
-	c.Basis = append(c.Basis, b)
-	c.Cond = worse(c.Cond, b.Result)
-	if b.Result != CondOK && b.Note != "" {
-		c.Why = append(c.Why, b.Note)
-	}
-}
-
-// nltxDue: mốc + thời gian giữ bậc + kéo dài theo kỷ luật có hiệu lực trong thời gian giữ bậc (tham số Q-070).
-func nltxDue(since time.Time, hold int, ds []Event, rules PromotionRules) (time.Time, int) {
-	base := AddMonths(since, hold)
-	ext := 0
-	for _, d := range ds {
-		if !d.ValidFrom.Before(since) && d.ValidFrom.Before(base) {
-			ext += rules.DisciplineExtensionMonths[d.Payload["form"]]
-		}
-	}
-	return AddMonths(since, hold+ext), ext
-}
-
-// Compute trả các kỳ nâng bậc của một viên chức đang công tác (rỗng khi thiếu ngạch, bậc, bảng hệ số hoặc mốc xếp bậc).
-// quotaYear là năm chỉ tiêu NLTH (năm của ngày xét).
-func Compute(sub PromoSubject, rules PromotionRules, quotaYear int) []Candidate {
+// Compute only derives FN-09 regular promotion from the person's NB-06/NB-07.
+// Ratings, disciplines, awards and legacy grade hold months never change this result.
+func Compute(sub PromoSubject, _ PromotionRules, _ int) []Candidate {
 	s := sub.Snap
-	if s.Status != StatusActive || s.Grade == "" || s.Step < 1 || len(sub.Coefficients) == 0 || sub.HoldMonths < 1 {
-		return nil
-	}
-	since, _, err := ParseDate(s.StepSince)
-	if err != nil {
-		return nil
-	}
 	steps := len(sub.Coefficients)
-	coeff := func(step int) decimal.Decimal {
-		if step < 1 || step > steps {
-			return decimal.Zero
-		}
-		return sub.Coefficients[step-1]
+	if s.Status != StatusActive || s.Grade == "" || s.Step < 1 || s.Step >= steps || s.PromotionMonths < 1 || s.PromotionMonths > 120 {
+		return nil
 	}
-	base := Candidate{StaffID: sub.StaffID, Grade: s.Grade, Steps: steps, FromStep: s.Step, FromCoeff: coeff(s.Step), StepSince: since,
-		Reserved: s.Reserved, Cond: CondOK}
-	moc := Basis{Label: "Mốc xếp bậc hiện tại", Value: fmtDay(since), Result: CondOK}
-	var out []Candidate
-	if s.Step < steps {
-		due, ext := nltxDue(since, sub.HoldMonths, sub.Disciplines, rules)
-		c := base
-		c.Kind, c.Due, c.NextDue, c.ToStep, c.ToCoeff = PromoNLTX, due, due, s.Step+1, coeff(s.Step+1)
-		c.Diff = c.ToCoeff.Sub(c.FromCoeff)
-		c.Key = CaseKey(sub.StaffID, PromoNLTX, c.ToStep, due, uuid.Nil)
-		c.add(moc)
-		hold := Basis{Label: "Thời gian giữ bậc", Value: fmt.Sprintf("%d tháng (%s → %s)", sub.HoldMonths, fmtDay(since), fmtDay(due)),
-			Result: CondOK}
-		if ext > 0 {
-			hold.Value = fmt.Sprintf("%d tháng + kéo dài %d tháng do kỷ luật (%s → %s)", sub.HoldMonths, ext, fmtDay(since), fmtDay(due))
-		}
-		c.add(hold)
-		c.add(ratingBasis(sub.Ratings, due.Year(), rules))
-		c.add(disciplineBasis(sub.Disciplines, due))
-		out = append(out, c)
-		for _, aid := range sub.Proposals {
-			var aw *PromoAward
-			for i := range sub.Awards {
-				if sub.Awards[i].EventID == aid {
-					aw = &sub.Awards[i]
-				}
-			}
-			if aw != nil {
-				out = append(out, nlth(base, *aw, due, moc, sub, rules, quotaYear))
-			}
-		}
-		return out
+	since, precision, err := ParseDate(s.StepSince)
+	if err != nil || precision != PrecisionDay {
+		return nil
 	}
-	// Bậc cuối → TNVK.
-	c := base
-	c.Kind, c.ToStep, c.ToCoeff = PromoTNVK, s.Step, coeff(s.Step)
-	c.add(moc)
-	c.add(Basis{Label: "Ngạch, bậc", Value: fmt.Sprintf("%s · bậc cuối %d/%d", s.Grade, s.Step, steps), Result: CondOK})
-	if sub.TNVK == nil {
-		c.Due, c.PctTo = AddMonths(since, rules.TNVKFirstMonths), rules.TNVKStartPct
-		c.add(Basis{Label: "Giữ bậc cuối lần đầu", Value: fmt.Sprintf("%d tháng (%s → %s)", rules.TNVKFirstMonths, fmtDay(since), fmtDay(c.Due)),
-			Result: CondOK})
-	} else {
-		p, at := sub.TNVK.Pct, sub.TNVK.Since
-		c.PctFrom, c.PctSince = &p, &at
-		c.Due, c.PctTo = AddMonths(at, rules.TNVKCycleMonths), p.Add(rules.TNVKStepPct)
-		c.add(Basis{Label: "Chu kỳ hưởng TNVK", Value: fmt.Sprintf("%d tháng (%s → %s), đang hưởng %s%%", rules.TNVKCycleMonths, fmtDay(at),
-			fmtDay(c.Due), p.String()), Result: CondOK})
-	}
-	from := decimal.Zero
-	if c.PctFrom != nil {
-		from = *c.PctFrom
-	}
-	c.Diff = c.FromCoeff.Mul(c.PctTo.Sub(from)).Div(decimal.NewFromInt(100)).Round(2)
-	c.NextDue = AddMonths(c.Due, rules.TNVKCycleMonths)
-	c.Key = CaseKey(sub.StaffID, PromoTNVK, 0, c.Due, uuid.Nil)
-	c.add(ratingBasis(sub.Ratings, c.Due.Year(), rules))
-	c.add(disciplineBasis(sub.Disciplines, c.Due))
-	return append(out, c)
-}
-
-// nlth dựng kỳ nâng bậc trước hạn từ một thành tích (NL03): ngày nâng = ngày đến kỳ thường xuyên − số tháng quy đổi.
-func nlth(base Candidate, aw PromoAward, normal time.Time, moc Basis, sub PromoSubject, rules PromotionRules, quotaYear int) Candidate {
-	c := base
-	early := AddMonths(normal, -aw.Months)
-	c.Kind, c.Due, c.NormalDue, c.NextDue, c.EarlyMonths = PromoNLTH, early, normal, early, aw.Months
-	c.ToStep = base.FromStep + 1
-	c.ToCoeff = sub.Coefficients[c.ToStep-1]
+	due := AddMonths(since, s.PromotionMonths)
+	c := Candidate{StaffID: sub.StaffID, Kind: PromoNLTX, Grade: s.Grade, Steps: steps, FromStep: s.Step, ToStep: s.Step + 1,
+		FromCoeff: sub.Coefficients[s.Step-1], ToCoeff: sub.Coefficients[s.Step], StepSince: since, Due: due, NextDue: due,
+		Reserved: s.Reserved, Cond: CondOK, PromotionMonths: s.PromotionMonths}
 	c.Diff = c.ToCoeff.Sub(c.FromCoeff)
-	a := aw
-	c.Award = &a
-	c.Key = CaseKey(sub.StaffID, PromoNLTH, 0, early, aw.EventID)
-	c.add(moc)
-	award := Basis{Label: fmt.Sprintf("Thành tích %d năm gần nhất", rules.AchievementYears), Value: fmt.Sprintf("%s (quy đổi %d tháng)",
-		aw.Label(), aw.Months), Result: CondOK}
-	switch {
-	case aw.Used:
-		award.Result, award.Note = CondFail, "thành tích đã dùng"
-	case aw.Months == 0:
-		award.Result, award.Note = CondFail, "thành tích không thuộc bảng quy đổi"
-	case aw.Year < quotaYear-rules.AchievementYears:
-		award.Result, award.Note = CondFail, fmt.Sprintf("thành tích quá %d năm", rules.AchievementYears)
-	}
-	c.add(award)
-	if award.Result != CondOK {
-		c.Blocked = append(c.Blocked, award.Note)
-	}
-	day := Basis{Label: "Ngày nâng trước hạn", Value: fmt.Sprintf("%s − %d tháng = %s", fmtDay(normal), aw.Months, fmtDay(early)), Result: CondOK}
-	if early.Year() != quotaYear {
-		c.Planned = early.Year()
-		day.Note = fmt.Sprintf("dự kiến năm %d: chưa xuất Mẫu số 2 trước năm chỉ tiêu", early.Year())
-		c.Blocked = append(c.Blocked, fmt.Sprintf("ngày nâng %s ngoài năm chỉ tiêu %d", fmtDay(early), quotaYear))
-	}
-	c.Basis = append(c.Basis, day)
-	c.add(ratingBasis(sub.Ratings, early.Year(), rules))
-	c.add(disciplineBasis(sub.Disciplines, early))
-	return c
-}
-
-// NLTHQuota là chỉ tiêu NLTH của năm: ⌊tỷ lệ % × số viên chức đang công tác⌋ (Q-070: "% số người trong danh sách trả
-// lương" — giả định tạm = viên chức đang công tác tại ngày xét).
-func NLTHQuota(activeVienChuc int, pct decimal.Decimal) int {
-	return int(decimal.NewFromInt(int64(activeVienChuc)).Mul(pct).Div(decimal.NewFromInt(100)).Floor().IntPart())
+	c.Key = CaseKey(sub.StaffID, PromoNLTX, c.ToStep, due, uuid.Nil)
+	c.Basis = []Basis{{Label: "Ngày hưởng bậc hiện tại", Value: fmtDay(since), Result: CondOK},
+		{Label: "Thời gian xét nâng lương", Value: fmt.Sprintf("%d tháng (%s → %s)", s.PromotionMonths, fmtDay(since), fmtDay(due)), Result: CondOK}}
+	return []Candidate{c}
 }
 
 // ConversionMonths tra số tháng quy đổi của hình thức khen thưởng (0 = không thuộc bảng).

@@ -1940,7 +1940,8 @@ components:
         step: {type: integer, minimum: 0}
         steps: {type: integer, minimum: 0, description: "Số bậc của ngạch tại ngày chốt (hiển thị 6/9)"}
         coefficient: {type: string, description: "Hệ số bậc (chuỗi 2 chữ số thập phân); rỗng khi chưa có bảng"}
-        step_since: {type: string, description: "Ngày xếp bậc hiện tại (Q-069)"}
+        step_since: {type: string, description: "Ngày hưởng bậc hiện tại (NB-06)"}
+        promotion_months: {type: integer, minimum: 0, maximum: 120, description: "NB-07 theo từng người; 0 khi chưa khai báo"}
         reserved_coeff: {type: string, description: "Hệ số bảo lưu (Q-069)"}
         disciplined: {type: boolean}
         top_degree: {type: string}
@@ -2008,7 +2009,7 @@ components:
           description: >-
             Trường theo loại (chuỗi). work_end: reason (lý do nghỉ), decision_no. unit: unit | commune + mgmt_unit (cán bộ xã).
             position: position, title, allowance, appointed_on, decision_no. secondment: to_org. grade: grade, step, step_since,
-            reserved_coeff. step: step, step_since, reserved_coeff. degree: level, major, form, institution. training: type, code,
+            reserved_coeff, promotion_months (NB-07, số nguyên 1..120). step: step, step_since, reserved_coeff, promotion_months. degree: level, major, form, institution. training: type, code,
             level, cert. award: form, title, level, decision_no. discipline: form, decision_no.
         reason: {type: string, description: "Lý do 10–500 ký tự — bắt buộc ở replace, bỏ qua ở thêm mới"}
 # @ag-order: 915

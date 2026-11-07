@@ -6,7 +6,7 @@ package app
 // (bậc, hệ số trong hồ sơ là phép chiếu — cập nhật ngay), trạng thái "Đã có quyết định" cho kỳ của người có tên, "trả về
 // bảng theo dõi kèm ghi chú" cho người trong danh sách gốc không có tên (BR-02). Hủy = SỰ KIỆN BÙ: dòng 'cancel'
 // (supersedes dòng issue, lý do) + dòng 'void' cho từng dòng bậc đã ghi (khôi phục bậc, hệ số trước đó) + trạng thái về
-// "Đã xuất danh sách"; quyết định không xóa (BR-03). Tệp quyết định lưu ở Kho tài liệu (FN-14, thư mục hệ thống
+// "Chờ quyết định"; quyết định không xóa (BR-03). Tệp quyết định lưu ở Kho tài liệu (FN-14, thư mục hệ thống
 // "nang_bac") bằng dòng 'attach'.
 
 import (
@@ -140,7 +140,7 @@ func (s *Service) IssueDecision(ctx context.Context, in DecisionInput, idem stri
 		if len(res.Warnings) > 0 && !in.Acknowledge {
 			return port.ErrDecisionWarnings.WithDetail(strings.Join(res.Warnings, "; "))
 		}
-		people, picked, err := s.decisionPeople(ctx, tx, w, kind, exp, in)
+		people, _, err := s.decisionPeople(ctx, tx, w, kind, exp, in)
 		if err != nil {
 			return err
 		}
@@ -184,21 +184,6 @@ func (s *Service) IssueDecision(ctx context.Context, in DecisionInput, idem stri
 			if err := s.promoEvent(ctx, tx, c, store.PromoEvent{StaffID: p.StaffID, CaseKey: p.CaseKey, Kind: string(kind), Action: domain.PromoActDecide,
 				DueOn: &eff, DecisionID: &did, AwardEvent: p.AwardEventID}, stableKey(idem, "promo:decide:"+p.CaseKey)); err != nil {
 				return err
-			}
-		}
-		if exp != nil {
-			for _, it := range exp.Items {
-				if picked[it.CaseKey] {
-					continue
-				}
-				due, _ := time.Parse(time.DateOnly, it.Due)
-				did := res.ID
-				if err := s.promoEvent(ctx, tx, c, store.PromoEvent{StaffID: it.StaffID, CaseKey: it.CaseKey, Kind: string(it.Kind),
-					Action: domain.PromoActReturn, DueOn: &due, DecisionID: &did, AwardEvent: it.AwardEventID,
-					Reason: "Không có tên trong quyết định " + in.No}, stableKey(idem, "promo:return:"+it.CaseKey)); err != nil {
-					return err
-				}
-				res.Returned++
 			}
 		}
 		return nil
@@ -309,7 +294,7 @@ func (s *Service) CancelDecision(ctx context.Context, id uuid.UUID, reason, idem
 	if utf8.RuneCountInString(reason) < 10 || utf8.RuneCountInString(reason) > 500 {
 		return problem.Validation.WithField("reason", "hủy quyết định cần lý do 10–500 ký tự (BR-03)")
 	}
-	return s.writeWorldOpt(ctx, c, s.day(time.Time{}), false, func(tx pgx.Tx, w *promoWorld) error {
+	return s.writeWorld(ctx, c, s.day(time.Time{}), func(tx pgx.Tx, w *promoWorld) error {
 		if err := store.LockDecisions(ctx, tx, c.tenant); err != nil {
 			return err
 		}
@@ -489,7 +474,7 @@ func (s *Service) Decision(ctx context.Context, id uuid.UUID) (DecisionView, err
 }
 
 func (s *Service) decisionViews(ctx context.Context, c rc, only uuid.UUID, f DecisionFilter) ([]DecisionView, error) {
-	w, _, err := s.worldOpt(ctx, c, s.day(time.Time{}), false)
+	w, err := s.world(ctx, c, s.day(time.Time{}))
 	if err != nil {
 		return nil, err
 	}
@@ -629,10 +614,18 @@ func (s *Service) PromotionScan(ctx context.Context, tid uuid.UUID, now time.Tim
 		if err != nil {
 			return err
 		}
-		if w.noRules {
+		r, ok, err := store.RuleAtKnown(ctx, tx, string(domain.RulePromotion), day, nil)
+		if err != nil {
+			return err
+		}
+		if !ok {
 			return port.ErrPromotionRules
 		}
-		for _, m := range w.rules.RemindMonths {
+		rules, err := domain.Promotion(r.Payload)
+		if err != nil {
+			return err
+		}
+		for _, m := range rules.RemindMonths {
 			end := domain.AddMonths(day, m)
 			k := "due_" + strconv.Itoa(m)
 			res.Counts[k] = 0
@@ -674,7 +667,7 @@ func (s *Service) PromotionScan(ctx context.Context, tid uuid.UUID, now time.Tim
 		if err != nil {
 			return err
 		}
-		notice, ok := PromotionDueNotice(w.rules.RemindMonths, res.Counts, prev.Counts, hasPrev)
+		notice, ok := PromotionDueNotice(rules.RemindMonths, res.Counts, prev.Counts, hasPrev)
 		if !ok {
 			return nil
 		}

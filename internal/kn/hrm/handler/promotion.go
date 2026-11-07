@@ -27,11 +27,6 @@ import (
 func (h Handler) registerPromotion(rg *gin.RouterGroup) {
 	rg.GET("/hrm/promotion", h.promoList)
 	rg.GET("/hrm/promotion/cases/:key", h.promoCase)
-	rg.POST("/hrm/promotion/cases/include", h.promoInclude)
-	rg.POST("/hrm/promotion/cases/exclude", h.promoExclude)
-	rg.GET("/hrm/promotion/nlth-pool", h.promoPool)
-	rg.POST("/hrm/promotion/proposals", h.promoPropose)
-	rg.POST("/hrm/promotion/proposals/withdraw", h.promoWithdraw)
 	rg.GET("/hrm/promotion/exports", h.promoExports)
 	rg.POST("/hrm/promotion/exports", h.promoExport)
 	rg.GET("/hrm/promotion/exports/:id", h.promoExportGet)
@@ -78,7 +73,7 @@ func caseOut(v app.CaseView) gin.H {
 	o := gin.H{"key": v.Key, "staff_id": v.StaffID, "code": v.Code, "name": v.Name, "unit": v.Unit, "unit_name": v.UnitName, "kind": v.Kind,
 		"form": v.Kind.Form(), "due": ymd(v.Due), "grade": v.Grade, "grade_name": v.GradeName, "steps": v.Steps, "from_step": v.FromStep,
 		"to_step": v.ToStep, "from_coeff": v.FromCoeff.StringFixed(2), "to_coeff": v.ToCoeff.StringFixed(2), "diff": v.Diff.StringFixed(2),
-		"step_since": optYMD(&v.StepSince), "reserved": v.Reserved, "next_due": optYMD(&v.NextDue), "normal_due": optYMD(&v.NormalDue),
+		"promotion_months": v.PromotionMonths, "step_since": optYMD(&v.StepSince), "reserved": v.Reserved, "next_due": optYMD(&v.NextDue), "normal_due": optYMD(&v.NormalDue),
 		"early_months": v.EarlyMonths, "pct_from": nil, "pct_to": nil, "pct_since": optYMD(v.PctSince), "cond": v.Cond, "why": strs(v.Why),
 		"basis": basisOut(v.Basis), "planned_year": v.Planned, "blocked": strs(v.Blocked), "status": v.Status, "reason": v.Reason,
 		"note": v.Note, "months_enjoyed": v.MonthsEnjoyed, "decision_id": v.DecisionID, "decision_no": v.DecisionNo, "award": nil}
@@ -95,12 +90,42 @@ func caseOut(v app.CaseView) gin.H {
 }
 
 func (h Handler) promoList(c *gin.Context) {
-	d, ok := at(c)
+	number := func(key string, max int) (int, bool) {
+		v := c.Query(key)
+		if v == "" {
+			return 0, true
+		}
+		if len(v) > 4 {
+			httpx.Fail(c, problem.Validation.WithField(key, "số nguyên ngoài phạm vi"))
+			return 0, false
+		}
+		for _, r := range v {
+			if r < '0' || r > '9' {
+				httpx.Fail(c, problem.Validation.WithField(key, "số nguyên"))
+				return 0, false
+			}
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > max {
+			httpx.Fail(c, problem.Validation.WithField(key, "số nguyên ngoài phạm vi"))
+			return 0, false
+		}
+		return n, true
+	}
+	year, ok := number("year", 9999)
 	if !ok {
 		return
 	}
-	win, _ := strconv.Atoi(c.Query("window"))
-	l, err := h.Svc.Promotion(c.Request.Context(), d, win)
+	month, ok := number("month", 12)
+	if !ok {
+		return
+	}
+	status := c.Query("status")
+	if status != "" && status != "pending" && status != "exported" && status != "decided" {
+		httpx.Fail(c, problem.Validation.WithField("status", "pending | exported | decided"))
+		return
+	}
+	l, err := h.Svc.Promotion(c.Request.Context(), year, month, status, c.Query("unit"), c.Query("q"))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -109,22 +134,8 @@ func (h Handler) promoList(c *gin.Context) {
 	for _, v := range l.Items {
 		items = append(items, caseOut(v))
 	}
-	status := gin.H{}
-	for _, s := range domain.PromoStatuses {
-		status[string(s)] = l.Summary.ByStatus[s]
-	}
-	var scan any
-	if l.LastScan != nil {
-		scan = gin.H{"day": ymd(l.LastScan.Day), "counts": l.LastScan.Counts, "recorded_at": l.LastScan.RecordedAt.UTC().Format(time.RFC3339)}
-	}
 	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, gin.H{"as_of": ymd(l.Day), "window": l.Window, "items": items, "missing": briefsOut(l.Missing), "last_scan": scan,
-		"summary": gin.H{"total": l.Summary.Total, "nltx": l.Summary.NLTX, "tnvk": l.Summary.TNVK, "nlth": l.Summary.NLTH, "by_status": status,
-			"by_month": l.Summary.ByMonth, "quota": gin.H{"year": l.Summary.QuotaYear, "total": l.Summary.Quota, "used": l.Summary.QuotaUsed,
-				"pending": l.Summary.QuotaPending}},
-		"rules": gin.H{"min_rating": l.Rules.MinRating, "rating_years": l.Rules.RatingYears, "achievement_years": l.Rules.AchievementYears,
-			"tnvk_start_pct": l.Rules.TNVKStartPct.String(), "tnvk_step_pct": l.Rules.TNVKStepPct.String(), "tnvk_cycle_months": l.Rules.TNVKCycleMonths,
-			"tnvk_first_months": l.Rules.TNVKFirstMonths, "nlth_quota_pct": l.Rules.NLTHQuotaPct.String(), "remind_months": l.Rules.RemindMonths}})
+	c.JSON(http.StatusOK, gin.H{"as_of": ymd(l.Day), "items": items, "missing": briefsOut(l.Missing)})
 }
 
 func ratingOut(r store.RatingRow) gin.H {
@@ -138,11 +149,7 @@ func promoEventOut(e store.PromoEvent) gin.H {
 }
 
 func (h Handler) promoCase(c *gin.Context) {
-	d, ok := at(c)
-	if !ok {
-		return
-	}
-	v, err := h.Svc.PromotionCase(c.Request.Context(), c.Param("key"), d)
+	v, err := h.Svc.PromotionCase(c.Request.Context(), c.Param("key"))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -152,109 +159,9 @@ func (h Handler) promoCase(c *gin.Context) {
 	for _, e := range v.History {
 		hist = append(hist, promoEventOut(e))
 	}
-	rs := make([]gin.H, 0, len(v.Ratings))
-	for _, r := range v.Ratings {
-		rs = append(rs, ratingOut(r))
-	}
-	as := make([]gin.H, 0, len(v.Awards))
-	for _, a := range v.Awards {
-		as = append(as, awardOut(a))
-	}
-	o["history"], o["ratings"], o["awards"] = hist, rs, as
+	o["history"] = hist
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, o)
-}
-
-type keysIn struct {
-	Keys   []string `json:"keys"`
-	Reason string   `json:"reason"`
-}
-
-func (h Handler) promoInclude(c *gin.Context) {
-	var in keysIn
-	if !decode(c, &in) {
-		return
-	}
-	n, err := h.Svc.IncludeCases(c.Request.Context(), in.Keys, in.Reason, idem(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"changed": n})
-}
-
-func (h Handler) promoExclude(c *gin.Context) {
-	var in keysIn
-	if !decode(c, &in) {
-		return
-	}
-	n, err := h.Svc.ExcludeCases(c.Request.Context(), in.Keys, idem(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"changed": n})
-}
-
-func (h Handler) promoPool(c *gin.Context) {
-	win, _ := strconv.Atoi(c.Query("window"))
-	p, err := h.Svc.PromotionPool(c.Request.Context(), win)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	rows := make([]gin.H, 0, len(p.Rows))
-	for _, r := range p.Rows {
-		opts := make([]gin.H, 0, len(r.Options))
-		for _, o := range r.Options {
-			x := o.Candidate
-			opts = append(opts, gin.H{"award": awardOut(o.Award), "key": x.Key, "due": ymd(x.Due), "early_months": x.EarlyMonths, "cond": x.Cond,
-				"why": strs(x.Why), "planned_year": x.Planned})
-		}
-		rows = append(rows, gin.H{"staff_id": r.StaffID, "code": r.Code, "name": r.Name, "unit_name": r.UnitName, "step": r.Step, "steps": r.Steps,
-			"normal_due": optYMD(r.NormalDue), "block": r.Block, "options": opts})
-	}
-	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, gin.H{"as_of": ymd(p.Day), "excluded": p.Excluded, "rows": rows,
-		"quota": gin.H{"year": p.QuotaYear, "total": p.Quota, "used": p.QuotaUsed, "pending": p.QuotaPending}})
-}
-
-type proposeIn struct {
-	Items []struct {
-		StaffID      uuid.UUID `json:"staff_id"`
-		AwardEventID uuid.UUID `json:"award_event_id"`
-	} `json:"items"`
-	Reason string `json:"reason"`
-}
-
-func (h Handler) promoPropose(c *gin.Context) {
-	var in proposeIn
-	if !decode(c, &in) {
-		return
-	}
-	ps := make([]app.Proposal, 0, len(in.Items))
-	for _, x := range in.Items {
-		ps = append(ps, app.Proposal{StaffID: x.StaffID, AwardEventID: x.AwardEventID})
-	}
-	keys, err := h.Svc.ProposeNLTH(c.Request.Context(), ps, in.Reason, idem(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusCreated, gin.H{"keys": strs(keys)})
-}
-
-func (h Handler) promoWithdraw(c *gin.Context) {
-	var in keysIn
-	if !decode(c, &in) {
-		return
-	}
-	n, err := h.Svc.WithdrawNLTH(c.Request.Context(), in.Keys, idem(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"changed": n})
 }
 
 type promoExportIn struct {
@@ -262,7 +169,7 @@ type promoExportIn struct {
 	ReviewMonth   string            `json:"review_month"`
 	PreparerID    *uuid.UUID        `json:"preparer_id"`
 	SignerTitle   string            `json:"signer_title"`
-	TNVKPct       map[string]string `json:"tnvk_pct"`
+	Reserved      map[string]string `json:"reserved"`
 	Months        map[string]string `json:"months"`
 	Notes         map[string]string `json:"notes"`
 	ReservedAfter map[string]string `json:"reserved_after"`
@@ -279,7 +186,7 @@ func (h Handler) promoExport(c *gin.Context) {
 		return
 	}
 	xs, err := h.Svc.ExportPromotion(c.Request.Context(), app.PromoExportInput{Keys: in.Keys, ReviewMonth: m, Preparer: in.PreparerID,
-		SignerTitle: in.SignerTitle, TNVKPct: in.TNVKPct, Months: in.Months, Notes: in.Notes, ReservedAfter: in.ReservedAfter}, idem(c))
+		SignerTitle: in.SignerTitle, Reserved: in.Reserved, Months: in.Months, Notes: in.Notes, ReservedAfter: in.ReservedAfter}, idem(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return

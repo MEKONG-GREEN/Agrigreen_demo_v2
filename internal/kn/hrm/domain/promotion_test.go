@@ -21,7 +21,7 @@ func testRules() PromotionRules {
 }
 
 func sub(step int, since string) PromoSubject {
-	return PromoSubject{StaffID: uuid.New(), Snap: Snapshot{Status: StatusActive, Grade: "01.003", Step: step, StepSince: since},
+	return PromoSubject{StaffID: uuid.New(), Snap: Snapshot{Status: StatusActive, Grade: "01.003", Step: step, StepSince: since, PromotionMonths: 36},
 		Coefficients: coefs("2.34", "0.33", 9), HoldMonths: 36, Ratings: map[int]string{2023: "HTNV", 2024: "HTNV", 2025: "HTTNV"}}
 }
 
@@ -43,63 +43,60 @@ func TestAddMonthsAndKeys_W1125(t *testing.T) {
 	if MonthsEnjoyed(d("2026-11-16")) != "0.5" || MonthsEnjoyed(d("2026-11-01")) != "1" {
 		t.Fatal("số tháng được hưởng")
 	}
-	if NLTHQuota(49, decimal.NewFromInt(10)) != 4 {
-		t.Fatal("chỉ tiêu ⌊10 % × 49⌋")
+}
+
+func TestComputeRegularPersonalMonthsV4(t *testing.T) {
+	for _, tc := range []struct {
+		months int
+		due    string
+	}{{36, "2028-03-01"}, {24, "2027-03-01"}, {1, "2025-04-01"}, {120, "2035-03-01"}} {
+		s := sub(5, "2025-03-01")
+		s.Snap.PromotionMonths = tc.months
+		s.HoldMonths = 99
+		cs := Compute(s, testRules(), 2026)
+		if len(cs) != 1 || !cs[0].Due.Equal(d(tc.due)) || cs[0].Diff.String() != "0.33" || len(cs[0].Basis) != 2 {
+			t.Fatalf("NB07 %d: %+v", tc.months, cs)
+		}
+	}
+	for _, since := range []string{"", "2025", "2025-03"} {
+		s := sub(5, since)
+		if len(Compute(s, testRules(), 2026)) != 0 {
+			t.Fatal("missing full NB06")
+		}
+	}
+	for _, months := range []int{0, -1, 121} {
+		s := sub(5, "2025-03-01")
+		s.Snap.PromotionMonths = months
+		if len(Compute(s, testRules(), 2026)) != 0 {
+			t.Fatal("missing/invalid NB07")
+		}
+	}
+	s := sub(5, "2024-01-31")
+	s.Snap.PromotionMonths = 1
+	if cs := Compute(s, testRules(), 2026); len(cs) != 1 || !cs[0].Due.Equal(d("2024-02-29")) {
+		t.Fatal("end-of-month clamp")
 	}
 }
 
-func TestComputeNLTX_W1125(t *testing.T) {
-	s := sub(5, "2023-11-01")
-	cs := Compute(s, testRules(), 2026)
-	if len(cs) != 1 || cs[0].Kind != PromoNLTX || !cs[0].Due.Equal(d("2026-11-01")) || cs[0].Diff.String() != "0.33" || cs[0].Cond != CondOK {
-		t.Fatalf("NLTX: %+v", cs)
+func TestPromotionNumbersV4(t *testing.T) {
+	for _, raw := range []string{"1e100000", "1e-100000", strings.Repeat("9", 10000), "0", "121", "1.0", "-1"} {
+		if _, ok := ValidPromotionMonths(raw); ok {
+			t.Fatal("NB07 accepted malformed numeric")
+		}
+		_, _, err := NormalizeEvent(StaffVienChuc, EventInput{Kind: EventGrade, ValidFrom: "2025-01-01", Payload: map[string]string{"grade": "01.003", "step": "1", "promotion_months": raw}})
+		if err == nil {
+			t.Fatal("event accepted malformed NB07")
+		}
 	}
-	// AC-01: KHTNV → Chưa đủ; thiếu năm → Cần xem xét.
-	s.Ratings[2024] = "KHTNV"
-	if c := Compute(s, testRules(), 2026)[0]; c.Cond != CondFail || !strings.Contains(strings.Join(c.Why, ","), "KHTNV 2024") {
-		t.Fatalf("KHTNV: %+v", c.Why)
+	for _, raw := range []string{"1", "36", "120"} {
+		if _, ok := ValidPromotionMonths(raw); !ok {
+			t.Fatal(raw)
+		}
 	}
-	delete(s.Ratings, 2024)
-	if c := Compute(s, testRules(), 2026)[0]; c.Cond != CondReview {
-		t.Fatalf("thiếu xếp loại: %v", c.Cond)
-	}
-	// Kỷ luật trong thời gian giữ bậc kéo dài 6 tháng; đang thi hành tại ngày đến kỳ → Chưa đủ.
-	s = sub(5, "2023-11-01")
-	to := d("2027-12-31")
-	s.Disciplines = []Event{{Kind: EventDiscipline, ValidFrom: d("2025-01-01"), ValidTo: &to, Payload: map[string]string{"form": "canh_cao"}}}
-	if c := Compute(s, testRules(), 2026)[0]; !c.Due.Equal(d("2027-05-01")) || c.Cond != CondFail {
-		t.Fatalf("kỷ luật: %v %v", c.Due, c.Cond)
-	}
-	// Thiếu mốc / bảng hệ số → không tính.
-	s = sub(5, "")
-	if len(Compute(s, testRules(), 2026)) != 0 {
-		t.Fatal("thiếu mốc xếp bậc")
-	}
-}
-
-func TestComputeTNVKAndNLTH_W1125(t *testing.T) {
-	s := sub(9, "2023-06-01")
-	c := Compute(s, testRules(), 2026)[0]
-	if c.Kind != PromoTNVK || !c.Due.Equal(d("2026-06-01")) || c.PctTo.String() != "5" || c.Diff.String() != "0.25" {
-		t.Fatalf("TNVK lần đầu: %+v", c)
-	}
-	s.TNVK = &TNVKState{Pct: decimal.NewFromInt(5), Since: d("2026-06-01")}
-	if c := Compute(s, testRules(), 2026)[0]; !c.Due.Equal(d("2027-06-01")) || c.PctTo.String() != "6" || c.PctFrom.String() != "5" {
-		t.Fatalf("TNVK lần sau: %+v", c)
-	}
-	n := sub(3, "2024-02-01")
-	aw := PromoAward{EventID: uuid.New(), Form: "bang_khen_ubnd_tinh", Name: "Bằng khen UBND tỉnh", Year: 2024, Months: 12}
-	n.Awards, n.Proposals = []PromoAward{aw}, []uuid.UUID{aw.EventID}
-	cs := Compute(n, testRules(), 2026)
-	if len(cs) != 2 || cs[1].Kind != PromoNLTH || !cs[1].Due.Equal(d("2026-02-01")) || cs[1].Planned != 0 || len(cs[1].Blocked) != 0 {
-		t.Fatalf("NLTH: %+v", cs)
-	}
-	n.Awards[0].Used = true
-	if c := Compute(n, testRules(), 2026)[1]; c.Cond != CondFail || len(c.Blocked) == 0 {
-		t.Fatalf("thành tích đã dùng: %+v", c)
-	}
-	if c := Compute(n, testRules(), 2025)[1]; c.Planned != 2026 {
-		t.Fatalf("dự kiến năm sau: %+v", c.Planned)
+	for _, raw := range []string{"1e100000", "1e-100000", strings.Repeat("9", 10000)} {
+		if _, ok := ValidMonthsEnjoyed(raw); ok {
+			t.Fatal("months accepted malformed numeric")
+		}
 	}
 }
 

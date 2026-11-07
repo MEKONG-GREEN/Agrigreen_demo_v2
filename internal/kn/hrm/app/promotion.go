@@ -1,16 +1,9 @@
 package app
 
-// W11.25 (pf 20261021122821) — NÂNG BẬC LƯƠNG (BRD HCTH v3.0 FN-09, FN-10). Xem domain/promotion.go cho cách tính.
-//
-// Quyền: Cấp Tỉnh – HCTH, Admin — phạm vi "toàn Trung tâm" của nhóm quyền export (xem/xuất danh sách) và profile.edit
-// (đưa vào danh sách, quyết định) của ma trận FN-20. Ngữ cảnh chỉ xem không ghi.
-//
-// Một "thế giới" (promoWorld) được nạp trong MỘT giao dịch: đầu hồ sơ, sự kiện quá trình, danh mục, bảng hệ số và tham
-// số tại ngày xét, xếp loại năm, sổ trạng thái, sổ quyết định → các kỳ (domain.Compute) + trạng thái xử lý hiện hành.
+// FN-09 HCTH v4.0: hồ sơ hiện hành, chỉ thường xuyên, ba trạng thái.
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
 	"strings"
 	"time"
@@ -78,15 +71,12 @@ func (d decisionState) active() bool { return d.Cancel == nil }
 
 type promoWorld struct {
 	day       time.Time
-	rules     domain.PromotionRules
-	conv      domain.AchievementConversion
 	heads     map[uuid.UUID]store.StaffRow
 	order     []store.StaffRow
 	events    map[uuid.UUID][]domain.Event
 	snaps     map[uuid.UUID]domain.Snapshot
 	scales    map[string]store.ScaleRow
 	cat       domain.Catalog
-	ratings   map[uuid.UUID]map[int]store.RatingRow
 	cases     map[string]*caseState
 	decisions map[uuid.UUID]*decisionState
 	decOrder  []uuid.UUID
@@ -94,35 +84,14 @@ type promoWorld struct {
 	byKey     map[string]domain.Candidate
 	missing   []uuid.UUID // viên chức đang công tác chưa tính được kỳ (thiếu ngạch, bậc, bảng hệ số)
 	activeVC  int
-	quotaYear int
-	quota     int
-	used      int  // người NLTH trong quyết định còn hiệu lực của năm chỉ tiêu
-	noRules   bool // tenant chưa có tham số nâng bậc/bảng quy đổi có hiệu lực — không tính kỳ (sổ quyết định vẫn đọc được)
 }
 
 // loadPromo nạp thế giới tại ngày day trong giao dịch tx. units: danh mục đơn vị nội bộ (tên đơn vị) — nil được.
 func loadPromo(ctx context.Context, tx pgx.Tx, day time.Time, units []domain.UnitRef) (*promoWorld, error) {
 	w := &promoWorld{day: day, heads: map[uuid.UUID]store.StaffRow{}, events: map[uuid.UUID][]domain.Event{},
 		snaps: map[uuid.UUID]domain.Snapshot{}, scales: map[string]store.ScaleRow{}, cases: map[string]*caseState{},
-		decisions: map[uuid.UUID]*decisionState{}, byKey: map[string]domain.Candidate{}, quotaYear: day.Year(),
+		decisions: map[uuid.UUID]*decisionState{}, byKey: map[string]domain.Candidate{},
 		cat: domain.Catalog{Items: map[domain.Kind]map[string]domain.CatItem{}, Units: units}}
-	r, ok, err := store.RuleAtKnown(ctx, tx, string(domain.RulePromotion), day, nil)
-	if err != nil {
-		return nil, err
-	}
-	r2, ok2, err := store.RuleAtKnown(ctx, tx, string(domain.RuleAchievementConversion), day, nil)
-	if err != nil {
-		return nil, err
-	}
-	w.noRules = !ok || !ok2
-	if !w.noRules {
-		if w.rules, err = domain.Promotion(r.Payload); err != nil {
-			return nil, err
-		}
-		if err := json.Unmarshal(r2.Payload, &w.conv); err != nil {
-			return nil, err
-		}
-	}
 	heads, err := store.CurrentStaff(ctx, tx)
 	if err != nil {
 		return nil, err
@@ -158,11 +127,6 @@ func loadPromo(ctx context.Context, tx pgx.Tx, day time.Time, units []domain.Uni
 	for _, x := range sc {
 		w.scales[x.GradeCode] = x
 	}
-	rr, err := store.Ratings(ctx, tx, uuid.Nil)
-	if err != nil {
-		return nil, err
-	}
-	w.ratings = store.EffectiveRatings(rr)
 	pes, err := store.PromoEvents(ctx, tx, uuid.Nil)
 	if err != nil {
 		return nil, err
@@ -178,6 +142,9 @@ func loadPromo(ctx context.Context, tx pgx.Tx, day time.Time, units []domain.Uni
 		cs.Action = e.Action
 		st, alive := domain.StatusAfter(cs.Kind, e.Action)
 		cs.Status, cs.Gone = st, !alive
+		if (e.Action == domain.PromoActReturn || e.Action == domain.PromoActUndecide) && cs.ExportID == nil {
+			cs.Status = domain.PromoPending
+		}
 		switch e.Action {
 		case domain.PromoActInclude, domain.PromoActPropose:
 			cs.Reason, cs.Note = e.Reason, ""
@@ -213,9 +180,7 @@ func loadPromo(ctx context.Context, tx pgx.Tx, day time.Time, units []domain.Uni
 			st.Cancel = &x
 		}
 	}
-	if !w.noRules {
-		w.compute()
-	}
+	w.compute()
 	return w, nil
 }
 
@@ -248,73 +213,31 @@ func (w *promoWorld) tnvkOf(staff uuid.UUID, at time.Time) *domain.TNVKState {
 	return best
 }
 
-// usedAwards: thành tích đã dùng trong quyết định NLTH còn hiệu lực; used: số người NLTH của năm chỉ tiêu.
-func (w *promoWorld) usedAwards() map[uuid.UUID]bool {
-	out := map[uuid.UUID]bool{}
-	w.used = 0
-	for _, id := range w.decOrder {
-		d := w.decisions[id]
-		if !d.active() || d.Issue.Kind != string(domain.PromoNLTH) {
-			continue
-		}
-		for _, p := range d.Issue.People {
-			if p.AwardEventID != nil {
-				out[*p.AwardEventID] = true
-			}
-			if strings.HasPrefix(p.EffectiveOn, time.Date(w.quotaYear, 1, 1, 0, 0, 0, 0, time.UTC).Format("2006")) {
-				w.used++
-			}
-		}
-	}
-	return out
-}
-
-func (w *promoWorld) subject(h store.StaffRow, used map[uuid.UUID]bool) (domain.PromoSubject, bool) {
-	evs := w.events[h.StaffID]
-	snap := domain.Project(evs, w.day, w.rank)
+func (w *promoWorld) subject(h store.StaffRow) (domain.PromoSubject, bool) {
+	snap := domain.Project(w.events[h.StaffID], w.day, w.rank)
 	w.snaps[h.StaffID] = snap
-	sub := domain.PromoSubject{StaffID: h.StaffID, Snap: snap, Ratings: map[int]string{}}
+	sub := domain.PromoSubject{StaffID: h.StaffID, Snap: snap}
 	if h.Type != domain.StaffVienChuc || snap.Status != domain.StatusActive {
 		return sub, false
 	}
 	if sc, ok := w.scales[snap.Grade]; ok {
-		sub.Coefficients, sub.HoldMonths = sc.Coefficients, sc.HoldMonths
+		sub.Coefficients = sc.Coefficients
 	}
-	for y, r := range w.ratings[h.StaffID] {
-		sub.Ratings[y] = r.Rating
-	}
-	for _, e := range domain.Effective(evs) {
-		switch e.Kind {
-		case domain.EventDiscipline:
-			sub.Disciplines = append(sub.Disciplines, e)
-		case domain.EventAward:
-			f := e.Payload["form"]
-			sub.Awards = append(sub.Awards, domain.PromoAward{EventID: e.ID, Form: f, Name: w.cat.Name(domain.KindAwardForm, f),
-				Title: e.Payload["title"], Year: e.ValidFrom.Year(), Months: w.conv.ConversionMonths(f), Used: used[e.ID]})
-		}
-	}
-	sub.TNVK = w.tnvkOf(h.StaffID, w.day)
 	return sub, true
 }
 
 func (w *promoWorld) compute() {
-	used := w.usedAwards()
-	proposals := map[uuid.UUID][]uuid.UUID{}
-	for _, cs := range w.cases {
-		if cs.Kind == domain.PromoNLTH && !cs.Gone && cs.Status != domain.PromoDecided && cs.Award != nil {
-			proposals[cs.Staff] = append(proposals[cs.Staff], *cs.Award)
-		}
-	}
 	for _, h := range w.order {
-		sub, ok := w.subject(h, used)
+		sub, ok := w.subject(h)
 		if !ok {
 			continue
 		}
 		w.activeVC++
-		ps := proposals[h.StaffID]
-		sort.Slice(ps, func(i, j int) bool { return ps[i].String() < ps[j].String() })
-		sub.Proposals = ps
-		cs := domain.Compute(sub, w.rules, w.quotaYear)
+		// Bậc cuối không thuộc FN-09, kể cả khi hồ sơ còn thiếu mốc/NB07.
+		if len(sub.Coefficients) > 0 && sub.Snap.Step >= len(sub.Coefficients) {
+			continue
+		}
+		cs := domain.Compute(sub, domain.PromotionRules{}, 0)
 		if len(cs) == 0 {
 			w.missing = append(w.missing, h.StaffID)
 		}
@@ -323,7 +246,6 @@ func (w *promoWorld) compute() {
 			w.byKey[c.Key] = c
 		}
 	}
-	w.quota = domain.NLTHQuota(w.activeVC, w.rules.NLTHQuotaPct)
 }
 
 func sortedHeads(xs []store.StaffRow) []store.StaffRow {
@@ -334,6 +256,29 @@ func sortedHeads(xs []store.StaffRow) []store.StaffRow {
 
 // status trả trạng thái xử lý của kỳ c (mặc định: NLTX/TNVK "Chưa xử lý", NLTH "Đã đưa vào danh sách").
 func (w *promoWorld) status(c domain.Candidate) (domain.PromoStatus, *caseState) {
+	// A future independent decision exists immediately, before its step event takes effect.
+	for _, id := range w.decOrder {
+		d := w.decisions[id]
+		if !d.active() || d.Issue.Kind != string(domain.PromoNLTX) {
+			continue
+		}
+		for _, p := range d.Issue.People {
+			if p.StaffID != c.StaffID {
+				continue
+			}
+			key := p.CaseKey
+			if key == "" {
+				eff, err := time.Parse(time.DateOnly, p.EffectiveOn)
+				if err != nil {
+					continue
+				}
+				key = domain.CaseKey(p.StaffID, domain.PromoNLTX, p.ToStep, eff, uuid.Nil)
+			}
+			if key == c.Key {
+				return domain.PromoDecided, w.cases[c.Key]
+			}
+		}
+	}
 	if cs, ok := w.cases[c.Key]; ok {
 		return cs.Status, cs
 	}
@@ -341,19 +286,6 @@ func (w *promoWorld) status(c domain.Candidate) (domain.PromoStatus, *caseState)
 		return domain.PromoListed, nil
 	}
 	return domain.PromoPending, nil
-}
-
-// pendingNLTH: kỳ NLTH đang trong danh sách (chưa có quyết định) có ngày nâng trong năm chỉ tiêu.
-func (w *promoWorld) pendingNLTH() int {
-	n := 0
-	for _, c := range w.cands {
-		if c.Kind == domain.PromoNLTH && c.Planned == 0 {
-			if st, _ := w.status(c); st != domain.PromoDecided {
-				n++
-			}
-		}
-	}
-	return n
 }
 
 // --- Dữ liệu ra. ---
@@ -391,7 +323,7 @@ func (w *promoWorld) decidedViews(from, to time.Time, names map[uuid.UUID]string
 	var out []CaseView
 	for _, id := range w.decOrder {
 		d := w.decisions[id]
-		if !d.active() {
+		if !d.active() || d.Issue.Kind != string(domain.PromoNLTX) {
 			continue
 		}
 		for _, p := range d.Issue.People {
@@ -409,6 +341,10 @@ func (w *promoWorld) decidedViews(from, to time.Time, names map[uuid.UUID]string
 			}
 			c := domain.Candidate{Key: key, StaffID: p.StaffID, Kind: k, Due: eff, Grade: p.Grade, FromStep: p.FromStep, ToStep: p.ToStep,
 				Cond: domain.CondOK}
+			previous := domain.Project(w.events[p.StaffID], eff.AddDate(0, 0, -1), nil)
+			c.StepSince, _, _ = domain.ParseDate(previous.StepSince)
+			c.PromotionMonths = previous.PromotionMonths
+			c.NextDue = eff
 			c.FromCoeff, _ = decimal.NewFromString(p.FromCoeff)
 			c.ToCoeff, _ = decimal.NewFromString(p.ToCoeff)
 			if p.PctTo != "" {
@@ -428,24 +364,11 @@ func (w *promoWorld) decidedViews(from, to time.Time, names map[uuid.UUID]string
 	return out
 }
 
-// PromotionSummary là khối chỉ số (FN-09 B1).
-type PromotionSummary struct {
-	Total, NLTX, TNVK, NLTH int
-	ByStatus                map[domain.PromoStatus]int
-	ByMonth                 map[string]int
-	QuotaYear, Quota        int
-	QuotaUsed, QuotaPending int
-}
-
-// PromotionList là màn danh sách nâng bậc.
+// PromotionList has no indicator, quota or achievement/rating block in FN-09 v4.
 type PromotionList struct {
-	Day      time.Time
-	Window   int
-	Summary  PromotionSummary
-	Items    []CaseView
-	Missing  []PersonBrief
-	LastScan *store.ScanRow
-	Rules    domain.PromotionRules
+	Day     time.Time
+	Items   []CaseView
+	Missing []PersonBrief
 }
 
 func (s *Service) unitRefs(ctx context.Context, c rc) ([]domain.UnitRef, error) {
@@ -463,34 +386,15 @@ func (s *Service) unitRefs(ctx context.Context, c rc) ([]domain.UnitRef, error) 
 	return out, nil
 }
 
-// world nạp thế giới cho người gọi (một giao dịch đọc).
-func (s *Service) world(ctx context.Context, c rc, day time.Time) (*promoWorld, *store.ScanRow, error) {
-	return s.worldOpt(ctx, c, day, true)
-}
-
-// worldOpt: needRules = true → tenant chưa có tham số nâng bậc trả hrm.promotion_rules_missing.
-func (s *Service) worldOpt(ctx context.Context, c rc, day time.Time, needRules bool) (*promoWorld, *store.ScanRow, error) {
+// world loads current profile data in one read transaction, with no promotion-rule dependency.
+func (s *Service) world(ctx context.Context, c rc, day time.Time) (*promoWorld, error) {
 	units, err := s.unitRefs(ctx, c)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var w *promoWorld
-	var scan *store.ScanRow
-	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
-		var e error
-		if w, e = loadPromo(ctx, tx, day, units); e != nil {
-			return e
-		}
-		if needRules && w.noRules {
-			return port.ErrPromotionRules
-		}
-		x, ok, e := store.LastScan(ctx, tx)
-		if ok {
-			scan = &x
-		}
-		return e
-	})
-	return w, scan, err
+	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error { var e error; w, e = loadPromo(ctx, tx, day, units); return e })
+	return w, err
 }
 
 // names đọc họ tên (kho định danh, theo lô) của các hồ sơ ids; người xem không có vai kho → nhãn rỗng.
@@ -525,39 +429,20 @@ func (s *Service) names(ctx context.Context, w *promoWorld, ids []uuid.UUID) (ma
 	return out, nil
 }
 
-// Window hợp lệ: 1, 3, 6, 12 tháng tới (FN-09 bước 1: 1, 3, 6 tháng; 12 cho NL01 cả năm).
-func validWindow(m int) int {
-	switch m {
-	case 1, 3, 6, 12:
-		return m
-	}
-	return 3
-}
-
-// Promotion trả màn danh sách nâng bậc tại ngày at (zero = hôm nay), kỳ có ngày đến kỳ ≤ at + window tháng (kể cả quá hạn
-// chưa xử lý) + kỳ đã có quyết định trong 3 tháng gần đây (FN-09 B1, B2; AC-05, AC-06).
-func (s *Service) Promotion(ctx context.Context, at time.Time, window int) (PromotionList, error) {
+// Promotion always projects the current profile. Year/month only select due dates.
+func (s *Service) Promotion(ctx context.Context, year, month int, status, unit, query string) (PromotionList, error) {
 	c, err := s.promoCaller(ctx, false)
 	if err != nil {
 		return PromotionList{}, err
 	}
-	day := s.day(at)
-	w, scan, err := s.world(ctx, c, day)
+	day := s.day(time.Time{})
+	w, err := s.world(ctx, c, day)
 	if err != nil {
 		return PromotionList{}, err
 	}
-	window = validWindow(window)
-	end := domain.AddMonths(day, window)
-	var sel []domain.Candidate
 	var ids []uuid.UUID
 	for _, x := range w.cands {
-		if !x.Due.After(end) {
-			if st, _ := w.status(x); st == domain.PromoDecided {
-				continue
-			}
-			sel = append(sel, x)
-			ids = append(ids, x.StaffID)
-		}
+		ids = append(ids, x.StaffID)
 	}
 	for _, id := range w.decOrder {
 		ids = append(ids, w.decisions[id].Issue.StaffIDs...)
@@ -567,13 +452,25 @@ func (s *Service) Promotion(ctx context.Context, at time.Time, window int) (Prom
 	if err != nil {
 		return PromotionList{}, err
 	}
-	out := PromotionList{Day: day, Window: window, LastScan: scan, Rules: w.rules,
-		Summary: PromotionSummary{ByStatus: map[domain.PromoStatus]int{}, ByMonth: map[string]int{}, QuotaYear: w.quotaYear, Quota: w.quota,
-			QuotaUsed: w.used, QuotaPending: w.pendingNLTH()}}
-	for _, x := range sel {
-		out.Items = append(out.Items, w.view(x, names))
+	out := PromotionList{Day: day}
+	for _, x := range w.cands {
+		if st, _ := w.status(x); st != domain.PromoDecided {
+			out.Items = append(out.Items, w.view(x, names))
+		}
 	}
-	out.Items = append(out.Items, w.decidedViews(domain.AddMonths(day, -3), end, names)...)
+	out.Items = append(out.Items, w.decidedViews(time.Time{}, time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC), names)...)
+	selected := make([]CaseView, 0, len(out.Items))
+	q := strings.ToLower(strings.TrimSpace(query))
+	for _, v := range out.Items {
+		if year > 0 && v.Due.Year() != year || month > 0 && int(v.Due.Month()) != month || status != "" && string(v.Status) != status || unit != "" && v.Unit != unit {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(v.Name), q) {
+			continue
+		}
+		selected = append(selected, v)
+	}
+	out.Items = selected
 	sort.SliceStable(out.Items, func(i, j int) bool {
 		a, b := out.Items[i], out.Items[j]
 		if !a.Due.Equal(b.Due) {
@@ -581,23 +478,8 @@ func (s *Service) Promotion(ctx context.Context, at time.Time, window int) (Prom
 		}
 		return a.Code < b.Code
 	})
-	for _, v := range out.Items {
-		out.Summary.Total++
-		switch v.Kind {
-		case domain.PromoNLTX:
-			out.Summary.NLTX++
-		case domain.PromoTNVK:
-			out.Summary.TNVK++
-		case domain.PromoNLTH:
-			out.Summary.NLTH++
-		}
-		out.Summary.ByStatus[v.Status]++
-		out.Summary.ByMonth[v.Due.Format("2006-01")]++
-	}
 	for _, id := range w.missing {
-		br := PersonBrief{ID: id, Code: w.heads[id].Code, Type: w.heads[id].Type, Name: names[id], Unit: w.snaps[id].Unit,
-			UnitName: w.cat.UnitName(w.snaps[id].Unit)}
-		out.Missing = append(out.Missing, br)
+		out.Missing = append(out.Missing, PersonBrief{ID: id, Code: w.heads[id].Code, Type: w.heads[id].Type, Name: names[id], Unit: w.snaps[id].Unit, UnitName: w.cat.UnitName(w.snaps[id].Unit)})
 	}
 	return out, nil
 }
@@ -606,22 +488,20 @@ func (s *Service) Promotion(ctx context.Context, at time.Time, window int) (Prom
 type CaseDetail struct {
 	CaseView
 	History []store.PromoEvent
-	Ratings []store.RatingRow
-	Awards  []domain.PromoAward
 }
 
 // PromotionCase trả chi tiết kỳ key tại ngày at.
-func (s *Service) PromotionCase(ctx context.Context, key string, at time.Time) (CaseDetail, error) {
+func (s *Service) PromotionCase(ctx context.Context, key string) (CaseDetail, error) {
 	c, err := s.promoCaller(ctx, false)
 	if err != nil {
 		return CaseDetail{}, err
 	}
-	staff, _, ok := domain.ParseCaseKey(key)
-	if !ok {
+	staff, kind, ok := domain.ParseCaseKey(key)
+	if !ok || kind != domain.PromoNLTX {
 		return CaseDetail{}, port.ErrCaseNotFound
 	}
-	day := s.day(at)
-	w, _, err := s.world(ctx, c, day)
+	day := s.day(time.Time{})
+	w, err := s.world(ctx, c, day)
 	if err != nil {
 		return CaseDetail{}, err
 	}
@@ -645,13 +525,6 @@ func (s *Service) PromotionCase(ctx context.Context, key string, at time.Time) (
 	}
 	if cs, ok := w.cases[key]; ok {
 		d.History = cs.Events
-	}
-	for _, r := range w.ratings[staff] {
-		d.Ratings = append(d.Ratings, r)
-	}
-	sort.Slice(d.Ratings, func(i, j int) bool { return d.Ratings[i].Year < d.Ratings[j].Year })
-	if sub, ok := w.subject(w.heads[staff], w.usedAwards()); ok {
-		d.Awards = sub.Awards
 	}
 	return d, nil
 }
