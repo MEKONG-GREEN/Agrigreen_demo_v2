@@ -3802,6 +3802,15 @@
           "children": []
          }
         ]
+       },
+       {
+        "key": "xa.hcth.danh_gia",
+        "label": "Đánh giá của tôi",
+        "route": "/kn/nhan-su/danh-gia-cua-toi",
+        "icon": "approve",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      },
