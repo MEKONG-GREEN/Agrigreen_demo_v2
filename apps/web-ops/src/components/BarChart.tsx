@@ -1,3 +1,5 @@
+import { Decimal, formatDecimalVi } from "@/lib/exactDecimal";
+
 export interface BarDatum {
   key: string;
   label: string;
@@ -6,6 +8,91 @@ export interface BarDatum {
   target?: number;
   muted?: boolean;
   note?: string;
+}
+
+export interface ColumnSeries {
+  key: string;
+  label: string;
+  color: string;
+}
+
+export interface ColumnDatum {
+  key: string;
+  label: string;
+  note: string;
+  values: Record<string, string>;
+}
+
+/** Cột chồng/cột đôi; số tiền giữ nguyên decimal, chỉ tỷ lệ hình học SVG đổi sang Number. */
+export function ColumnChart({ title, unit, data, series, stacked = false }: {
+  title: string;
+  unit: string;
+  data: ColumnDatum[];
+  series: ColumnSeries[];
+  stacked?: boolean;
+}) {
+  const parsed = data.map((d) => series.map((s) => {
+    const raw = d.values[s.key];
+    // Giới hạn trước parse: không exponent, không chuỗi số quá dài từ phản hồi API.
+    return raw && raw.length <= 37 && /^\d{1,30}(?:\.\d{1,6})?$/.test(raw) ? Decimal.parse(raw) : null;
+  }));
+  const invalid = parsed.some((row) => row.some((v) => v === null));
+  const maxima = parsed.map((row) => stacked
+    ? row.reduce<Decimal>((sum, v) => sum.add(v ?? Decimal.ZERO), Decimal.ZERO)
+    : row.reduce<Decimal>((max, v) => v && v.gt(max) ? v : max, Decimal.ZERO));
+  const max = maxima.reduce((a, b) => b.gt(a) ? b : a, Decimal.ZERO);
+  const width = Math.max(640, 100 + data.length * 160);
+  const left = 100, bottom = 240, height = 180;
+  const slot = (width - left - 24) / Math.max(1, data.length);
+  const pixels = (v: Decimal) => max.isZero() ? 0 : Number(v.divRound(max, 8).toString()) * height;
+  return (
+    <figure className="card" style={{ margin: "0 0 16px", padding: 16 }}>
+      <figcaption>
+        <h2 style={{ fontSize: 17, margin: "0 0 8px" }}>{title}</h2>
+        <p className="muted" style={{ margin: "0 0 12px" }}>Đơn vị: {unit}. Số liệu và nhãn Mẫu nhỏ xem tại bảng cùng bộ lọc.</p>
+      </figcaption>
+      <div className="row" style={{ flexWrap: "wrap", gap: 16, marginBottom: 8 }}>
+        {series.map((s) => <span key={s.key}><span aria-hidden="true" style={{ display: "inline-block", width: 12, height: 12, background: s.color, marginRight: 6 }} />{s.label}</span>)}
+      </div>
+      {!data.length ? <p role="status">Không có phiếu đã duyệt phù hợp để vẽ biểu đồ.</p> : invalid ? (
+        <p role="alert">Không thể vẽ biểu đồ do dữ liệu số không hợp lệ. Xem bảng dữ liệu hoặc thử tải lại.</p>
+      ) : (
+        <div className="tbl-wrap" tabIndex={0} role="region" aria-label={`Cuộn biểu đồ ${title}`}>
+          <svg viewBox={`0 0 ${width} 320`} width="100%" role="img" aria-label={title} style={{ display: "block", minWidth: width }}>
+            <desc>{stacked ? "Mỗi cột gồm các khoản chi phí bình quân của một mặt hàng." : "Mỗi cặp cột so sánh giá thành và giá bán bình quân của một mặt hàng trong một vùng."} Bảng dữ liệu bên cạnh biểu đồ cung cấp toàn bộ giá trị.</desc>
+            {[0, 1, 2, 3, 4].filter((i) => !max.isZero() || i === 0).map((i) => {
+              const y = bottom - height * i / 4;
+              const tick = max.mul(Decimal.fromInt(i)).divRound(Decimal.fromInt(4), 0).toString();
+              return <g key={i}>
+                <line x1={left} x2={width - 24} y1={y} y2={y} stroke="#e4ece7" />
+                <text x={left - 8} y={y + 4} textAnchor="end" fontSize={11} fill="#5b6f66">{formatDecimalVi(tick, { maxDecimals: 0, group: true })}</text>
+              </g>;
+            })}
+            {data.map((d, i) => {
+              let offset = 0;
+              const groupWidth = Math.min(80, slot - 24);
+              const x = left + i * slot + (slot - groupWidth) / 2;
+              return <g key={d.key}>
+                {series.map((s, j) => {
+                  const h = pixels(parsed[i]![j]!);
+                  const y = bottom - h - (stacked ? offset : 0);
+                  offset += h;
+                  const barWidth = stacked ? groupWidth : groupWidth / series.length;
+                  return <rect key={s.key} x={x + (stacked ? 0 : j * barWidth)} y={y} width={barWidth} height={h} fill={s.color} stroke="white" strokeWidth={1}>
+                    <title>{`${d.label} · ${s.label}: ${formatDecimalVi(d.values[s.key]!, { maxDecimals: 0, group: true })} ${unit} · ${d.note}`}</title>
+                  </rect>;
+                })}
+                <text x={left + (i + 0.5) * slot} y={bottom + 22} textAnchor="middle" fontSize={12} fill="#33473f">
+                  <title>{d.label}</title>{d.label.length > 22 ? `${d.label.slice(0, 21)}…` : d.label}
+                </text>
+                <text x={left + (i + 0.5) * slot} y={bottom + 42} textAnchor="middle" fontSize={11} fill="#5b6f66">{d.note}</text>
+              </g>;
+            })}
+          </svg>
+        </div>
+      )}
+    </figure>
+  );
 }
 
 /** Biểu đồ thanh ngang SVG thuần, có bảng dữ liệu ẩn cho trình đọc màn hình. */

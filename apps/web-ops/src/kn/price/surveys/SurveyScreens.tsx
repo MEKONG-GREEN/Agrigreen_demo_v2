@@ -11,6 +11,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
+import { Loading } from "@/components/ui";
+import { CostCharts } from "./CostCharts";
 import { PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
 import { formatDateVi } from "@/kn/grid/decimal";
@@ -1156,7 +1158,7 @@ export function CostReportScreen() {
         badge={<StatusPill tone="info">Chỉ xem số tổng hợp</StatusPill>}
         actions={
           r.data?.can_export && r.data.main ? (
-            <button type="button" className="btn" disabled={act.busy} onClick={() => void download(act, () => sa.reportExport(q))}>
+            <button type="button" className="btn" disabled={act.busy || r.loading} onClick={() => void download(act, () => sa.reportExport(q))}>
               Xuất Excel
             </button>
           ) : null
@@ -1176,15 +1178,17 @@ export function CostReportScreen() {
                 <Pick id="cr-round" label="Đợt" all={null} value={q.round ?? d.main.round.id} onChange={set("round")} options={d.rounds.map((x) => ({ code: x.id, name: x.name }))} />
                 <Pick id="cr-compare" label="So sánh với" all="— Không —" value={q.compare ?? ""} onChange={set("compare")} options={d.rounds.filter((x) => x.id !== d.main!.round.id).map((x) => ({ code: x.id, name: x.name }))} />
                 <Pick id="cr-crop" label="Nhóm cây" value={q.crop ?? ""} onChange={set("crop")} options={CROP_REFS} />
+                <Pick id="cr-item" label="Mặt hàng" value={q.item ?? ""} onChange={set("item")} options={d.items} />
                 <Pick id="cr-region" label="Nhóm vùng" value={q.region ?? ""} onChange={set("region")} options={d.regions} />
+                <Pick id="cr-commune" label="Xã" value={q.commune ?? ""} onChange={set("commune")} options={d.communes} />
                 {q.item ? (
                   <button type="button" className="btn" onClick={() => setQ({ ...q, item: undefined })}>
                     Bỏ lọc mặt hàng
                   </button>
                 ) : null}
               </div>
-              <CostBlock b={d.main} onItem={(code) => setQ({ ...q, item: code })} />
-              {d.compare ? (
+              {r.loading ? <Loading /> : <CostBlock b={d.main} onItem={(code) => setQ({ ...q, item: code })} />}
+              {!r.loading && d.compare ? (
                 <>
                   <h2 style={{ fontSize: 16 }}>{`So sánh: ${d.compare.round.name}`}</h2>
                   <CostBlock b={d.compare} />
@@ -1207,6 +1211,7 @@ function CostBlock({ b, onItem }: { b: SurveyCostBlock; onItem?: (code: string) 
         <Kpi label="Giá bán bình quân (đ/kg)" tone="ok" value={money(b.kpis.avg_price)} />
         <Kpi label="Lợi nhuận bình quân / ha" tone="ok" value={money(b.kpis.avg_profit_per_ha)} />
       </div>
+      <CostCharts block={b} />
       <Grid
         caption={`Giá thành theo mặt hàng — ${b.round.name}`}
         head={[
@@ -1254,7 +1259,7 @@ function CostBlock({ b, onItem }: { b: SurveyCostBlock; onItem?: (code: string) 
         head={["Mặt hàng", "Nhóm vùng", "Số phiếu", "Giá thành BQ", "Giá bán BQ"]}
         rows={b.regions}
         rowKey={(x) => `${x.item}:${x.region}`}
-        cells={(x) => [x.item_name, x.region_name, x.n, money(x.avg_cost_per_kg), money(x.avg_price)]}
+        cells={(x) => [x.item_name, x.region_name, <span key="n">{x.n} {x.n < 3 ? <StatusPill tone="warn">Mẫu nhỏ</StatusPill> : null}</span>, money(x.avg_cost_per_kg), money(x.avg_price)]}
       />
       {b.communes.length ? (
         <Grid

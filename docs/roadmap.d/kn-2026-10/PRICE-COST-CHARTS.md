@@ -1,0 +1,4 @@
+- [x] PRICE-COST-CHARTS — FN-TW-01.04 v2 B3: cột chồng sáu khoản chi phí và cột đôi giá thành–giá bán theo từng mặt hàng/vùng, từ aggregate điều tra Đã duyệt của đợt Đã chốt (#218).
+- [x] PRICE-COST-CHARTS — Bộ lọc đợt, nhóm cây, mặt hàng, vùng, xã dùng chung API/bảng/biểu đồ; refs chỉ mã/tên, giữ quyền TW/Tỉnh/Admin và chặn Xã.
+- [x] PRICE-COST-CHARTS — Test native, web, UAT và production browser cho số liệu khác nhau, số 0, mẫu nhỏ, empty/loading/error/retry; xem [phạm vi và cách chạy](../../kn/gia-dinh/PRICE-COST-CHARTS.md).
+- [ ] PRICE-COST-CHARTS — Nhả barrier dev #287/#286/#261/#262, cập nhật hàng surface, kiểm lại nguồn tích hợp/race Linux/CI đúng SHA và tự review/ticket merge theo điều phối. Checkpoint local chưa phải merge-ready.
