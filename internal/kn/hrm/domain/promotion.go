@@ -79,15 +79,6 @@ const (
 	CondFail   Cond = "fail"   // Chưa đủ
 )
 
-// worse trả kết quả xấu hơn.
-func worse(a, b Cond) Cond {
-	rank := map[Cond]int{CondOK: 0, CondReview: 1, CondFail: 2}
-	if rank[b] > rank[a] {
-		return b
-	}
-	return a
-}
-
 // PromoStatus là trạng thái xử lý của một kỳ (FN-09 B1).
 type PromoStatus string
 
@@ -303,14 +294,4 @@ func Compute(sub PromoSubject, _ PromotionRules, _ int) []Candidate {
 	c.Basis = []Basis{{Label: "Ngày hưởng bậc hiện tại", Value: fmtDay(since), Result: CondOK},
 		{Label: "Thời gian xét nâng lương", Value: fmt.Sprintf("%d tháng (%s → %s)", s.PromotionMonths, fmtDay(since), fmtDay(due)), Result: CondOK}}
 	return []Candidate{c}
-}
-
-// ConversionMonths tra số tháng quy đổi của hình thức khen thưởng (0 = không thuộc bảng).
-func (c AchievementConversion) ConversionMonths(form string) int {
-	for _, r := range c.Rules {
-		if r.AwardCode == form {
-			return r.Months
-		}
-	}
-	return 0
 }

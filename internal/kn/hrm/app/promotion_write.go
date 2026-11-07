@@ -67,8 +67,6 @@ func (s *Service) promoEvent(ctx context.Context, tx pgx.Tx, c rc, e store.Promo
 	return classify(err)
 }
 
-func dayPtr(t time.Time) *time.Time { return &t }
-
 // --- Xuất Mẫu số 1 (NL02). ---
 
 // SignerTitles là chức danh người ký hợp lệ.
