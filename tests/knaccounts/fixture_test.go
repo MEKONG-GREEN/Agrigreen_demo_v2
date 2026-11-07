@@ -39,6 +39,8 @@ type fixtureDeps struct {
 	Roles           *accport.RoleCatalog
 	AssignmentRules accport.AssignmentRules
 	Attributes      *accport.AttributeCatalog
+	UnitDelegations accport.UnitDelegationPolicy
+	SessionPolicies accport.SessionPolicies
 	Clock           clock.Clock     // nil = đồng hồ hệ thống
 	AppProbe        gin.HandlerFunc // chạy sau mod.Middleware() của Application API: quan sát ngữ cảnh đã giải ở server
 }
@@ -53,7 +55,7 @@ type fixture struct {
 	depts  *fakeDepartments
 	mod    *accounts.Module
 
-	national, p91, team30292, coop30292, team31120 uuid.UUID
+	national, p91, team30292, coop30292, team31120, mkg uuid.UUID
 }
 
 // newFixture dựng module accounts trên PG thật (vai platform_app, idempotency platform_api) với Keycloak bộ nhớ và
@@ -68,6 +70,7 @@ func newFixture(t *testing.T, d fixtureDeps) *fixture {
 	f.team30292 = pty.add(f.tenant, partyport.OrgExtensionTeam, "30292")
 	f.coop30292 = pty.add(f.tenant, partyport.OrgCooperative, "30292")
 	f.team31120 = pty.add(f.tenant, partyport.OrgExtensionTeam, "31120")
+	f.mkg = pty.add(f.tenant, partyport.OrgMKG, "")
 	f.depts = newFakeDepartments(f)
 	// Phiên chủ KN như gốc lắp ráp (bản tĩnh, không sổ cnts_grant).
 	sessions, err := authz.NewSessionRegistry(extension.SessionProjection())
@@ -80,7 +83,7 @@ func newFixture(t *testing.T, d fixtureDeps) *fixture {
 	}
 	mod := accounts.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clk, accounts.Deps{
 		Directory: f.dir, Scope: pty, Orgs: pty, Roles: d.Roles, AssignmentRules: d.AssignmentRules, Attributes: d.Attributes,
-		Departments: f.depts, Sessions: sessions,
+		Departments: f.depts, Sessions: sessions, UnitDelegations: d.UnitDelegations, SessionPolicies: d.SessionPolicies,
 	})
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	log := telemetry.NewLogger("test", io.Discard)

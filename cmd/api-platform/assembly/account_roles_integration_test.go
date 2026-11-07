@@ -10,11 +10,13 @@ import (
 	"testing"
 
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -28,6 +30,13 @@ func TestBuildAccountRoleOrderThroughHTTP(t *testing.T) {
 	}, clock.System{}, External{Vault: clienttest.New()})
 	if err != nil {
 		t.Fatal(err)
+	}
+	// A compatibility payload without the selected owner session cannot become
+	// authority. This fails if Build forgets to inject UnitDelegations.
+	partial := authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: ids.New(), TenantID: ids.New(),
+		KN: &authz.KNContext{Role: authz.KNAdmin}})
+	if _, err := mods.Accounts.KNPeople().PeopleInScope(partial); err == nil || problem.From(err).Code != problem.Forbidden.Code {
+		t.Fatalf("API bypassed the configured session owner: %v", err)
 	}
 	issuer := authztest.New(t)
 	engine := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)
