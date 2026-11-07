@@ -1,0 +1,3068 @@
+# Bản đồ được duy trì bằng tay theo BRD hiện hành; không phải bằng chứng hoàn thành FN.
+# Chỉ báo cáo chênh lệch; #272 bật chặn sau các gói thu hẹp.
+# Menu: <phòng>:<khóa>, admin/<phòng>:<khóa> khi route thuộc phòng.
+# Web/mobile: khóa chính xác. API: gốc tài nguyên + /** theo ranh giới đoạn.
+version: 1
+mode: report
+catalog:
+  tt:
+    version: "7.7"
+    functions: [FN-CH-00.01, FN-TW-01.01, FN-TW-01.02, FN-TI-02.01, FN-TI-02.02, FN-TI-02.03, FN-TI-02.04, FN-TI-02.05, FN-TI-02.06, FN-TI-02.07, FN-XA-03.01, FN-XA-03.02, FN-XA-03.03, FN-XA-03.04, FN-XA-03.05, FN-XA-03.06, FN-XA-03.07, FN-XA-03.08, FN-AD-04.01, FN-AD-04.02, FN-AD-04.03, FN-AD-04.04, FN-AD-04.05, FN-AD-04.06, FN-AD-04.07]
+  cnts:
+    version: "4.0"
+    functions: [FN-01, FN-02, FN-03, FN-04, FN-05, FN-06, FN-07, FN-08, FN-09, FN-10, FN-11, FN-12, FN-13, FN-14, FN-15, FN-16, FN-17, FN-18, FN-19, FN-20, FN-21]
+  hcth:
+    version: "4.0"
+    functions: [FN-01, FN-02, FN-03, FN-04, FN-05, FN-06, FN-07, FN-08, FN-09, FN-10, FN-11, FN-12, FN-13, FN-14, FN-15, FN-16, FN-17, FN-18, FN-19, FN-20]
+  khtc:
+    version: "2.3"
+    functions: [FN-CH-00.01, FN-TW-01.01, FN-TI-02.01, FN-TI-02.02, FN-TI-02.03, FN-TI-02.04, FN-TI-02.05, FN-TI-02.06, FN-TI-02.07, FN-TI-02.08, FN-TI-02.09, FN-TI-02.10, FN-PN-03.01, FN-PN-03.02, FN-PN-03.03, FN-AD-04.01, FN-AD-04.02, FN-AD-04.03]
+  price:
+    version: "2.0"
+    functions: [FN-CH-00.01, FN-TW-01.01, FN-TW-01.02, FN-TW-01.03, FN-TW-01.04, FN-TI-02.01, FN-TI-02.02, FN-TI-02.03, FN-TI-02.04, FN-TI-02.05, FN-TI-02.06, FN-TI-02.07, FN-TI-02.08, FN-TI-02.09, FN-TI-02.10, FN-TI-02.11, FN-TI-02.12, FN-TI-02.13, FN-XA-03.01, FN-XA-03.02, FN-XA-03.03, FN-XA-03.04, FN-XA-03.05, FN-AD-04.01, FN-AD-04.02, FN-AD-04.03, FN-AD-04.04, FN-AD-04.05, FN-AD-04.06]
+entries:
+  - id: api-cnts-aggregates
+    kind: api
+    keys:
+      - "/v1/extension/cnts/aggregates/**"
+    status: FN
+    fn: [cnts/FN-16]
+
+  - id: api-cnts-alert-assignees
+    kind: api
+    keys:
+      - "/v1/extension/cnts/alert-assignees/**"
+    status: FN
+    fn: [cnts/FN-13]
+
+  - id: api-cnts-alert-config
+    kind: api
+    keys:
+      - "/v1/extension/cnts/alert-config/**"
+    status: FN
+    fn: [cnts/FN-13]
+
+  - id: api-cnts-alerts
+    kind: api
+    keys:
+      - "/v1/extension/cnts/alerts/**"
+    status: FN
+    fn: [cnts/FN-13]
+
+  - id: api-cnts-bm02
+    kind: api
+    keys:
+      - "/v1/extension/cnts/bm02/**"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: api-cnts-bm11
+    kind: api
+    keys:
+      - "/v1/extension/cnts/bm11/**"
+    status: FN
+    fn: [cnts/FN-16]
+
+  - id: api-cnts-bm18
+    kind: api
+    keys:
+      - "/v1/extension/cnts/bm18/**"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: api-cnts-campaign-owners
+    kind: api
+    keys:
+      - "/v1/extension/cnts/campaign-owners/**"
+    status: FN
+    fn: [cnts/FN-21]
+
+  - id: api-cnts-campaigns
+    kind: api
+    keys:
+      - "/v1/extension/cnts/campaigns/**"
+    status: FN
+    fn: [cnts/FN-21]
+
+  - id: api-cnts-demo-sites
+    kind: api
+    keys:
+      - "/v1/extension/cnts/demo-sites/**"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: api-cnts-diary-cycles
+    kind: api
+    keys:
+      - "/v1/extension/cnts/diary-cycles/**"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: api-cnts-diary-entries
+    kind: api
+    keys:
+      - "/v1/extension/cnts/diary-entries/**"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: api-cnts-diary-photos
+    kind: api
+    keys:
+      - "/v1/extension/cnts/diary-photos/**"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: api-cnts-docs
+    kind: api
+    keys:
+      - "/v1/extension/dept-docs/**"
+    status: FN
+    fn: [cnts/FN-20]
+    note: "Chỉ phòng CNTS; menu phòng khác được gắn GỠ riêng."
+
+  - id: api-cnts-duty-rosters
+    kind: api
+    keys:
+      - "/v1/extension/cnts/duty-rosters/**"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: api-cnts-form-designs
+    kind: api
+    keys:
+      - "/v1/extension/cnts/form-designs/**"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: api-cnts-grant-candidates
+    kind: api
+    keys:
+      - "/v1/extension/cnts/grant-candidates/**"
+    status: FN
+    fn: [cnts/FN-14]
+
+  - id: api-cnts-grants
+    kind: api
+    keys:
+      - "/v1/extension/cnts/grants/**"
+    status: FN
+    fn: [cnts/FN-14]
+
+  - id: api-cnts-khtc-programs
+    kind: api
+    keys:
+      - "/v1/extension/cnts/khtc-programs/**"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: api-cnts-knqg-docs
+    kind: api
+    keys:
+      - "/v1/extension/cnts/knqg-docs/**"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: api-cnts-knqg-specs
+    kind: api
+    keys:
+      - "/v1/extension/cnts/knqg-specs/**"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: api-cnts-livestock-households
+    kind: api
+    keys:
+      - "/v1/extension/cnts/livestock-households/**"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: api-cnts-map
+    kind: api
+    keys:
+      - "/v1/extension/cnts/map/**"
+    status: FN
+    fn: [cnts/FN-18]
+
+  - id: api-cnts-model-households
+    kind: api
+    keys:
+      - "/v1/extension/cnts/model-households/**"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: api-cnts-my-duties
+    kind: api
+    keys:
+      - "/v1/extension/cnts/my-duties/**"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: api-cnts-outbreak-points
+    kind: api
+    keys:
+      - "/v1/extension/cnts/outbreak-points/**"
+    status: FN
+    fn: [cnts/FN-11]
+
+  - id: api-cnts-outbreaks
+    kind: api
+    keys:
+      - "/v1/extension/cnts/outbreaks/**"
+    status: FN
+    fn: [cnts/FN-11]
+
+  - id: api-cnts-period-drafts
+    kind: api
+    keys:
+      - "/v1/extension/cnts/period-drafts/**"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: api-cnts-period-forms
+    kind: api
+    keys:
+      - "/v1/extension/cnts/period-forms/**"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: api-cnts-period-reminders
+    kind: api
+    keys:
+      - "/v1/extension/cnts/period-reminders/**"
+    status: FN
+    fn: [cnts/FN-13]
+
+  - id: api-cnts-period-series
+    kind: api
+    keys:
+      - "/v1/extension/cnts/period-series/**"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: api-cnts-period-tracking
+    kind: api
+    keys:
+      - "/v1/extension/cnts/period-tracking/**"
+    status: FN
+    fn: [cnts/FN-13]
+
+  - id: api-cnts-projects
+    kind: api
+    keys:
+      - "/v1/extension/cnts/projects/**"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: api-cnts-shares
+    kind: api
+    keys:
+      - "/v1/extension/cnts/shares/**"
+    status: FN
+    fn: [cnts/FN-16]
+
+  - id: api-cnts-suspects
+    kind: api
+    keys:
+      - "/v1/extension/cnts/suspects/**"
+    status: FN
+    fn: [cnts/FN-11]
+
+  - id: api-cnts-vaccination-batches
+    kind: api
+    keys:
+      - "/v1/extension/cnts/vaccination-batches/**"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: api-cnts-vaccination-matrix
+    kind: api
+    keys:
+      - "/v1/extension/cnts/vaccination-matrix/**"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: api-cnts-weekly-plan
+    kind: api
+    keys:
+      - "/v1/extension/cnts/weekly-plan/**"
+    status: FN
+    fn: [cnts/FN-12]
+
+  - id: api-contact
+    kind: api
+    keys:
+      - "/v1/contacts/access/**"
+      - "/v1/contacts/persons/**"
+      - "/v1/contacts/units/**"
+    status: FN
+    fn: [hcth/FN-13]
+
+  - id: api-department-home
+    kind: api
+    keys:
+      - "/v1/extension/dept-home/**"
+    status: FN
+    fn: [tt/FN-TI-02.01, cnts/FN-17]
+    note: "Giới hạn phòng được theo dõi ở từng khóa menu; không cấp quyền từ bản đồ."
+
+  - id: api-departments
+    kind: api
+    keys:
+      - "/v1/departments/**"
+    status: FN
+    fn: [tt/FN-AD-04.03, tt/FN-AD-04.07, cnts/FN-03, hcth/FN-03]
+
+  - id: api-dependency-accounts
+    kind: api
+    keys:
+      - "/v1/accounts/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-AD-04.04, hcth/FN-05]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-devices
+    kind: api
+    keys:
+      - "/v1/devices/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-XA-03.02, cnts/FN-09]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-exports
+    kind: api
+    keys:
+      - "/v1/exports/**"
+    status: HẠ_TẦNG
+    needs: [khtc/FN-TI-02.05, hcth/FN-12, cnts/FN-11]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-files
+    kind: api
+    keys:
+      - "/v1/files/**"
+    status: HẠ_TẦNG
+    needs: [cnts/FN-10, cnts/FN-12, hcth/FN-14]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-forms
+    kind: api
+    keys:
+      - "/v1/forms/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-AD-04.06, cnts/FN-07, khtc/FN-AD-04.02]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-geo
+    kind: api
+    keys:
+      - "/v1/geo/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-XA-03.05, cnts/FN-18]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-masterdata
+    kind: api
+    keys:
+      - "/v1/masterdata/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-AD-04.01, cnts/FN-06]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-me
+    kind: api
+    keys:
+      - "/v1/me/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-CH-00.01]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-notifications
+    kind: api
+    keys:
+      - "/v1/notifications/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-TI-02.03, price/FN-XA-03.04]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-regions
+    kind: api
+    keys:
+      - "/v1/regions/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-AD-04.01]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-reports
+    kind: api
+    keys:
+      - "/v1/reports/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-TI-02.06, cnts/FN-16]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-dependency-sync
+    kind: api
+    keys:
+      - "/v1/sync/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-XA-03.02, tt/FN-XA-03.05, cnts/FN-09, cnts/FN-10, cnts/FN-12]
+    note: "API hạ tầng dùng chung, được kiểm kê riêng ngoài registry bốn module KN."
+
+  - id: api-external-cooperatives
+    kind: api
+    keys:
+      - "/v1/cooperatives/**"
+      - "/v1/kn/cooperatives/**"
+    status: GỠ
+    package: KN-STANDALONE-5-TT-DATA
+
+  - id: api-hrm-access
+    kind: api
+    keys:
+      - "/v1/hrm/access/**"
+    status: FN
+    fn: [hcth/FN-20]
+
+  - id: api-hrm-appraisals
+    kind: api
+    keys:
+      - "/v1/hrm/appraisals/**"
+    status: FN
+    fn: [hcth/FN-15, hcth/FN-16, hcth/FN-17, hcth/FN-18]
+
+  - id: api-hrm-catalogs
+    kind: api
+    keys:
+      - "/v1/hrm/catalogs/**"
+    status: FN
+    fn: [hcth/FN-19]
+
+  - id: api-hrm-dashboard
+    kind: api
+    keys:
+      - "/v1/hrm/dashboard/**"
+    status: FN
+    fn: [hcth/FN-06]
+
+  - id: api-hrm-defaults
+    kind: api
+    keys:
+      - "/v1/hrm/defaults/**"
+    status: FN
+    fn: [hcth/FN-19]
+
+  - id: api-hrm-docs
+    kind: api
+    keys:
+      - "/v1/hrm/docs/**"
+    status: FN
+    fn: [hcth/FN-14]
+
+  - id: api-hrm-grade-scales
+    kind: api
+    keys:
+      - "/v1/hrm/grade-scales/**"
+    status: FN
+    fn: [hcth/FN-19]
+
+  - id: api-hrm-permissions
+    kind: api
+    keys:
+      - "/v1/hrm/permissions/**"
+    status: FN
+    fn: [hcth/FN-20]
+
+  - id: api-hrm-plans
+    kind: api
+    keys:
+      - "/v1/hrm/plans/**"
+    status: FN
+    fn: [hcth/FN-11]
+
+  - id: api-hrm-promotion
+    kind: api
+    keys:
+      - "/v1/hrm/promotion/**"
+    status: FN
+    fn: [hcth/FN-09, hcth/FN-10]
+
+  - id: api-hrm-report-exports
+    kind: api
+    keys:
+      - "/v1/hrm/report-exports/**"
+    status: FN
+    fn: [hcth/FN-12]
+
+  - id: api-hrm-reports
+    kind: api
+    keys:
+      - "/v1/hrm/reports/**"
+    status: FN
+    fn: [hcth/FN-12]
+
+  - id: api-hrm-rules
+    kind: api
+    keys:
+      - "/v1/hrm/rules/**"
+    status: FN
+    fn: [hcth/FN-19]
+
+  - id: api-hrm-staff
+    kind: api
+    keys:
+      - "/v1/hrm/staff/**"
+    status: FN
+    fn: [hcth/FN-07, hcth/FN-08]
+
+  - id: api-hrm-status
+    kind: api
+    keys:
+      - "/v1/hrm/status/**"
+    status: FN
+    fn: [hcth/FN-05]
+
+  - id: api-hrm-units
+    kind: api
+    keys:
+      - "/v1/hrm/units/**"
+    status: FN
+    fn: [hcth/FN-07]
+
+  - id: api-khtc-adhoc-open-intents
+    kind: api
+    keys:
+      - "/v1/extension/khtc/adhoc-open-intents/**"
+    status: FN
+    fn: [khtc/FN-TI-02.10]
+
+  - id: api-khtc-adhoc-requests
+    kind: api
+    keys:
+      - "/v1/extension/khtc/adhoc-requests/**"
+    status: FN
+    fn: [khtc/FN-TI-02.10]
+
+  - id: api-khtc-dashboard
+    kind: api
+    keys:
+      - "/v1/extension/khtc/dashboard/**"
+    status: FN
+    fn: [khtc/FN-TI-02.01]
+
+  - id: api-khtc-department-forms
+    kind: api
+    keys:
+      - "/v1/extension/khtc/department-forms/**"
+    status: FN
+    fn: [khtc/FN-TI-02.04]
+
+  - id: api-khtc-exported-reports
+    kind: api
+    keys:
+      - "/v1/extension/khtc/exported-reports/**"
+    status: FN
+    fn: [khtc/FN-TW-01.01]
+
+  - id: api-khtc-external
+    kind: api
+    keys:
+      - "/v1/extension/khtc/external/**"
+    status: GỠ
+    package: KN-STANDALONE-7-KHTC
+
+  - id: api-khtc-form-template
+    kind: api
+    keys:
+      - "/v1/extension/khtc/form-template/**"
+    status: FN
+    fn: [khtc/FN-AD-04.02]
+
+  - id: api-khtc-form-templates
+    kind: api
+    keys:
+      - "/v1/extension/khtc/form-templates/**"
+    status: FN
+    fn: [khtc/FN-AD-04.02]
+
+  - id: api-khtc-masterdata
+    kind: api
+    keys:
+      - "/v1/kn/khtc/catalogs/**"
+      - "/v1/kn/khtc/plans/**"
+      - "/v1/kn/khtc/programs/**"
+    status: FN
+    fn: [khtc/FN-AD-04.01, khtc/FN-TI-02.02]
+
+  - id: api-khtc-my-forms
+    kind: api
+    keys:
+      - "/v1/extension/khtc/my-forms/**"
+    status: FN
+    fn: [khtc/FN-PN-03.01, khtc/FN-PN-03.02]
+
+  - id: api-khtc-open-period-count
+    kind: api
+    keys:
+      - "/v1/extension/khtc/open-period-count/**"
+    status: FN
+    fn: [khtc/FN-TI-02.03]
+
+  - id: api-khtc-pending-review
+    kind: api
+    keys:
+      - "/v1/extension/khtc/pending-review/**"
+    status: FN
+    fn: [khtc/FN-TI-02.04]
+
+  - id: api-khtc-periods
+    kind: api
+    keys:
+      - "/v1/extension/khtc/periods/**"
+    status: FN
+    fn: [khtc/FN-TI-02.03, khtc/FN-TI-02.04, khtc/FN-TI-02.05, khtc/FN-TI-02.06, khtc/FN-TI-02.07, khtc/FN-TI-02.08, khtc/FN-TI-02.09, khtc/FN-TI-02.10, khtc/FN-PN-03.01, khtc/FN-PN-03.02]
+
+  - id: api-khtc-templates
+    kind: api
+    keys:
+      - "/v1/extension/khtc/templates/**"
+    status: FN
+    fn: [khtc/FN-AD-04.03]
+
+  - id: api-khtc-weeks
+    kind: api
+    keys:
+      - "/v1/extension/khtc/weeks/**"
+    status: FN
+    fn: [khtc/FN-TI-02.03]
+
+  - id: api-legacy-extension
+    kind: api
+    keys:
+      - "/v1/dashboard/**"
+      - "/v1/extension/dashboard/**"
+      - "/v1/extension/directives/**"
+      - "/v1/extension/field-reports/**"
+      - "/v1/extension/program-progress/**"
+      - "/v1/extension/program-reports/**"
+      - "/v1/extension/roster/**"
+      - "/v1/extension/support-requests/**"
+      - "/v1/extension/tasks/**"
+      - "/v1/support-requests/**"
+    status: GỠ
+    package: KN-STANDALONE-3-LEGACY-EXT-API
+
+  - id: api-machines
+    kind: api
+    keys:
+      - "/v1/kn/machine-counts/**"
+      - "/v1/kn/machine-profiles/**"
+    status: FN
+    fn: [tt/FN-XA-03.04]
+    note: "Thay nguồn ở KN-STANDALONE-5-TT-DATA."
+
+  - id: api-materials
+    kind: api
+    keys:
+      - "/v1/kn/materials/**"
+    status: FN
+    fn: [tt/FN-XA-03.06]
+
+  - id: api-menu
+    kind: api
+    keys:
+      - "/v1/menu/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-AD-04.07, hcth/FN-05, price/FN-CH-00.01]
+
+  - id: api-org-departments
+    kind: api
+    keys:
+      - "/v1/orgs/**"
+    status: FN
+    fn: [tt/FN-AD-04.02, tt/FN-AD-04.03]
+
+  - id: api-plots
+    kind: api
+    keys:
+      - "/v1/kn/plot-profiles/**"
+      - "/v1/kn/plots/**"
+    status: FN
+    fn: [tt/FN-XA-03.05]
+    note: "Thay nguồn ở KN-STANDALONE-5-TT-DATA."
+
+  - id: api-price-admin-units
+    kind: api
+    keys:
+      - "/v1/price/admin-units/**"
+    status: FN
+    fn: [price/FN-AD-04.02]
+
+  - id: api-price-alerts
+    kind: api
+    keys:
+      - "/v1/price/alerts/**"
+    status: FN
+    fn: [price/FN-TI-02.03, price/FN-XA-03.05]
+
+  - id: api-price-assignments
+    kind: api
+    keys:
+      - "/v1/price/assignments/**"
+    status: FN
+    fn: [price/FN-AD-04.01]
+
+  - id: api-price-boards
+    kind: api
+    keys:
+      - "/v1/price/boards/**"
+    status: FN
+    fn: [price/FN-TW-01.01, price/FN-TI-02.05, price/FN-TI-02.06]
+
+  - id: api-price-calendar
+    kind: api
+    keys:
+      - "/v1/price/calendar/**"
+    status: FN
+    fn: [price/FN-AD-04.04, price/FN-AD-04.05]
+
+  - id: api-price-catalog
+    kind: api
+    keys:
+      - "/v1/price/catalog/**"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: api-price-groups
+    kind: api
+    keys:
+      - "/v1/price/groups/**"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: api-price-item-sets
+    kind: api
+    keys:
+      - "/v1/price/item-sets/**"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: api-price-items
+    kind: api
+    keys:
+      - "/v1/price/items/**"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: api-price-officers
+    kind: api
+    keys:
+      - "/v1/price/officers/**"
+    status: FN
+    fn: [price/FN-AD-04.01]
+
+  - id: api-price-point-items
+    kind: api
+    keys:
+      - "/v1/price/point-items/**"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: api-price-points
+    kind: api
+    keys:
+      - "/v1/price/points/**"
+    status: FN
+    fn: [price/FN-AD-04.02]
+
+  - id: api-price-proposals
+    kind: api
+    keys:
+      - "/v1/price/proposals/**"
+    status: FN
+    fn: [price/FN-XA-03.01, price/FN-AD-04.03]
+
+  - id: api-price-regions
+    kind: api
+    keys:
+      - "/v1/price/regions/**"
+    status: FN
+    fn: [price/FN-AD-04.02]
+
+  - id: api-price-reports
+    kind: api
+    keys:
+      - "/v1/price/reports/**"
+    status: FN
+    fn: [price/FN-TW-01.01, price/FN-TW-01.02, price/FN-TW-01.03, price/FN-TI-02.01, price/FN-TI-02.08]
+
+  - id: api-price-status
+    kind: api
+    keys:
+      - "/v1/price/status/**"
+    status: FN
+    fn: [price/FN-CH-00.01]
+
+  - id: api-price-survey-report
+    kind: api
+    keys:
+      - "/v1/price/survey-report/**"
+    status: FN
+    fn: [price/FN-TW-01.04]
+
+  - id: api-price-surveys
+    kind: api
+    keys:
+      - "/v1/price/surveys/**"
+    status: FN
+    fn: [price/FN-TI-02.10, price/FN-TI-02.11, price/FN-TI-02.12]
+
+  - id: api-price-thresholds
+    kind: api
+    keys:
+      - "/v1/price/thresholds/**"
+    status: FN
+    fn: [price/FN-AD-04.06]
+
+  - id: api-price-tickets
+    kind: api
+    keys:
+      - "/v1/price/tickets/**"
+    status: FN
+    fn: [price/FN-TI-02.02, price/FN-TI-02.03, price/FN-TI-02.04, price/FN-TI-02.09, price/FN-XA-03.01, price/FN-XA-03.02, price/FN-XA-03.03, price/FN-XA-03.05]
+
+  - id: api-price-website
+    kind: api
+    keys:
+      - "feed:price_board_daily"
+    status: HOÃN
+    fn: [price/FN-TI-02.07]
+    package: KN-STANDALONE-8-BAOGIA-WEB
+    note: "Định danh feed hiện hữu, không phải route HTTP; giữ dấu vết khi profile KN tắt kết nối."
+
+  - id: api-producer-link
+    kind: api
+    keys:
+      - "/v1/kn/producer-htx-candidates/**"
+    status: HOÃN
+    fn: [tt/FN-XA-03.03]
+    package: KN-STANDALONE-5-TT-DATA
+    note: "Liên kết hệ ngoài hoãn; gói thay nguồn gỡ khỏi bề mặt hiện hành."
+
+  - id: api-producer-records
+    kind: api
+    keys:
+      - "/v1/kn/producer-records/**"
+    status: FN
+    fn: [tt/FN-XA-03.03]
+    note: "KN tự quản; liên kết HTX được hoãn/gỡ trong gói thay nguồn."
+
+  - id: api-schedule-staff
+    kind: api
+    keys:
+      - "/v1/extension/staff/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-TI-02.07, cnts/FN-12]
+
+  - id: api-tt-badges
+    kind: api
+    keys:
+      - "/v1/extension/report-badges/**"
+    status: HẠ_TẦNG
+    needs: [tt/FN-TI-02.03, tt/FN-XA-03.01]
+
+  - id: api-tt-commune-reports
+    kind: api
+    keys:
+      - "/v1/extension/commune-reports/**"
+    status: FN
+    fn: [tt/FN-XA-03.07]
+
+  - id: api-tt-consolidation
+    kind: api
+    keys:
+      - "/v1/extension/consolidations/**"
+    status: FN
+    fn: [tt/FN-TI-02.05]
+
+  - id: api-tt-dashboard
+    kind: api
+    keys:
+      - "/v1/extension/kn-dashboard/**"
+    status: FN
+    fn: [tt/FN-TW-01.01, tt/FN-TI-02.01]
+
+  - id: api-tt-download-links
+    kind: api
+    keys:
+      - "/v1/public/report-links/**"
+    status: FN
+    fn: [tt/FN-TI-02.06]
+
+  - id: api-tt-periods
+    kind: api
+    keys:
+      - "/v1/extension/kn-periods/**"
+    status: FN
+    fn: [tt/FN-TI-02.02, tt/FN-XA-03.01]
+
+  - id: api-tt-publish-forms
+    kind: api
+    keys:
+      - "/v1/extension/report-batches/**"
+    status: FN
+    fn: [tt/FN-TI-02.02]
+
+  - id: api-tt-report-forms
+    kind: api
+    keys:
+      - "/v1/extension/report-forms/**"
+    status: FN
+    fn: [tt/FN-XA-03.02]
+
+  - id: api-tt-review
+    kind: api
+    keys:
+      - "/v1/extension/report-periods/**"
+    status: FN
+    fn: [tt/FN-TI-02.04]
+
+  - id: api-tt-tasks
+    kind: api
+    keys:
+      - "/v1/extension/report-tasks/**"
+    status: FN
+    fn: [tt/FN-XA-03.01, tt/FN-XA-03.02, tt/FN-TI-02.04]
+
+  - id: api-work-schedules
+    kind: api
+    keys:
+      - "/v1/extension/work-schedules/**"
+    status: FN
+    fn: [tt/FN-TI-02.07, tt/FN-XA-03.08, cnts/FN-12]
+    note: "Thay nguồn địa điểm ở KN-STANDALONE-5-TT-DATA."
+
+  - id: menu-admin-co-cau-to-chuc
+    kind: menu
+    keys:
+      - "admin:admin.qt.co_cau"
+    status: FN
+    fn: [tt/FN-AD-04.02]
+
+  - id: menu-admin-copied-tt
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.danh_muc"
+      - "admin/chan_nuoi_thuy_san:admin.pb.du_lieu_bao_cao"
+      - "admin/chan_nuoi_thuy_san:admin.pb.theo_doi_nop"
+      - "admin/chan_nuoi_thuy_san:admin.pb.tong_hop"
+      - "admin/hanh_chinh_tong_hop:admin.pb.danh_muc"
+      - "admin/hanh_chinh_tong_hop:admin.pb.du_lieu_bao_cao"
+      - "admin/hanh_chinh_tong_hop:admin.pb.mau_bao_cao"
+      - "admin/hanh_chinh_tong_hop:admin.pb.theo_doi_nop"
+      - "admin/hanh_chinh_tong_hop:admin.pb.tong_hop"
+      - "admin/hanh_chinh_tong_hop:admin.pb.trang_chu"
+      - "admin/ke_hoach_tai_chinh:admin.pb.danh_muc"
+      - "admin/ke_hoach_tai_chinh:admin.pb.du_lieu_bao_cao"
+      - "admin/ke_hoach_tai_chinh:admin.pb.theo_doi_nop"
+      - "admin/ke_hoach_tai_chinh:admin.pb.tong_hop"
+      - "admin/ke_hoach_tai_chinh:admin.pb.trang_chu"
+      - "admin/thong_tin_truyen_thong:admin.pb.danh_muc"
+      - "admin/thong_tin_truyen_thong:admin.pb.du_lieu_bao_cao"
+      - "admin/thong_tin_truyen_thong:admin.pb.mau_bao_cao"
+      - "admin/thong_tin_truyen_thong:admin.pb.theo_doi_nop"
+      - "admin/thong_tin_truyen_thong:admin.pb.tong_hop"
+      - "admin/thong_tin_truyen_thong:admin.pb.trang_chu"
+    status: GỠ
+    package: KN-STANDALONE-4-TT-MENU-PHONG
+
+  - id: menu-admin-don-vi-hanh-chinh
+    kind: menu
+    keys:
+      - "admin:admin.qt.dvhc"
+    status: FN
+    fn: [tt/FN-AD-04.01]
+
+  - id: menu-admin-home
+    kind: menu
+    keys:
+      - "admin:admin.tong_quan"
+    status: FN
+    fn: [tt/FN-CH-00.01, price/FN-CH-00.01]
+
+  - id: menu-admin-menu-cac-cap
+    kind: menu
+    keys:
+      - "admin:admin.qt.menu_cac_cap"
+    status: FN
+    fn: [tt/FN-AD-04.07]
+
+  - id: menu-admin-nguoi-dung
+    kind: menu
+    keys:
+      - "admin:admin.qt.nguoi_dung"
+    status: FN
+    fn: [tt/FN-AD-04.04]
+
+  - id: menu-admin-phong-ban
+    kind: menu
+    keys:
+      - "admin:admin.qt.phong_ban"
+    status: FN
+    fn: [tt/FN-AD-04.03]
+
+  - id: menu-audit
+    kind: menu
+    keys:
+      - "admin:admin.qt.nhat_ky_he_thong"
+    status: HẠ_TẦNG
+    needs: [tt/FN-AD-04.04, price/FN-AD-04.01]
+    note: "Nhật ký truy cập phục vụ các FN; chưa kết luận hạn lưu trong gói này."
+
+  - id: menu-cnts-ban-do-dich
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.ban_do_dich"
+      - "chan_nuoi_thuy_san:xa.cnts.ban_do_dich"
+    status: FN
+    fn: [cnts/FN-18]
+
+  - id: menu-cnts-bao-cao-dinh-ky
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.bao_cao_dinh_ky"
+    status: FN
+    fn: [cnts/FN-16]
+
+  - id: menu-cnts-bao-cao-ky
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:xa.cnts.ksgm_ngay"
+      - "chan_nuoi_thuy_san:xa.cnts.nhap_lieu_tuan"
+      - "chan_nuoi_thuy_san:xa.cnts.viec_can_lam"
+    status: FN
+    fn: [cnts/FN-08]
+
+  - id: menu-cnts-bieu-ky-cnts
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.cnts_bieu_ky"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: menu-cnts-bieu-mau
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.bieu_mau.phat_hanh"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: menu-cnts-canh-bao
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.bieu_mau.nhac_nho"
+      - "chan_nuoi_thuy_san:tinh.cnts.canh_bao"
+    status: FN
+    fn: [cnts/FN-13]
+
+  - id: menu-cnts-cap-quyen
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.bieu_mau.cap_quyen"
+    status: FN
+    fn: [cnts/FN-14]
+
+  - id: menu-cnts-chien-dich
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.chien_dich.quan_ly"
+      - "chan_nuoi_thuy_san:tinh.cnts.chien_dich.tao"
+    status: FN
+    fn: [cnts/FN-21]
+
+  - id: menu-cnts-cong-viec-tuan
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:xa.cnts.cong_viec_tuan"
+    status: FN
+    fn: [cnts/FN-12]
+
+  - id: menu-cnts-danh-muc-cnts
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.cnts_danh_muc"
+    status: FN
+    fn: [cnts/FN-06]
+
+  - id: menu-cnts-dich-benh
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.dich_benh"
+      - "chan_nuoi_thuy_san:xa.cnts.dich_benh"
+    status: FN
+    fn: [cnts/FN-11]
+
+  - id: menu-cnts-docs
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.van_ban"
+      - "chan_nuoi_thuy_san:tinh.cnts.quy_trinh"
+      - "chan_nuoi_thuy_san:xa.cnts.quy_trinh"
+    status: FN
+    fn: [cnts/FN-20]
+    note: "Chỉ phòng CNTS; menu phòng khác được gắn GỠ riêng."
+
+  - id: menu-cnts-du-an
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.du_an_knqg.du_an"
+      - "chan_nuoi_thuy_san:tw.cnts.du_an_knqg.du_an"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: menu-cnts-du-an-mau-bieu
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.du_an_knqg.mau_bieu"
+      - "chan_nuoi_thuy_san:tw.cnts.du_an_knqg.mau_bieu"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: menu-cnts-form-admin
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.mau_bao_cao"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: menu-cnts-ho-chan-nuoi
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.so_lieu_xa.ho_chan_nuoi"
+      - "chan_nuoi_thuy_san:xa.cnts.ho_chan_nuoi"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: menu-cnts-ho-mo-hinh
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:xa.cnts.diem_trinh_dien"
+      - "chan_nuoi_thuy_san:xa.cnts.ho_mo_hinh"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: menu-cnts-home
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tw.dashboard"
+    status: FN
+    fn: [cnts/FN-17]
+
+  - id: menu-cnts-inbox
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.bao_cao_den"
+      - "ke_hoach_tai_chinh:tinh.bao_cao_den"
+    status: FN
+    fn: [cnts/FN-16]
+
+  - id: menu-cnts-khai-thac-thuy-san
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.so_lieu_xa.khai_thac_thuy_san"
+      - "chan_nuoi_thuy_san:xa.cnts.khai_thac_thuy_san"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: menu-cnts-ksgm
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.ksgm"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: menu-cnts-lich-tiem
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.cnts_lich_tiem"
+      - "chan_nuoi_thuy_san:tinh.cnts.lich.tiem"
+      - "chan_nuoi_thuy_san:tinh.cnts.so_lieu_xa.lich_tiem"
+      - "chan_nuoi_thuy_san:xa.cnts.lich_tiem"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: menu-cnts-lich-truc
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.cnts_lich_truc"
+      - "chan_nuoi_thuy_san:tinh.cnts.lich.truc"
+      - "chan_nuoi_thuy_san:xa.cnts.lich"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: menu-cnts-nhap-lieu-tuan
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.so_lieu_xa.nhap_lieu_tuan"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: menu-cnts-nhat-ky
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.so_lieu_xa.nhat_ky"
+      - "chan_nuoi_thuy_san:xa.cnts.nhat_ky.chan_nuoi"
+      - "chan_nuoi_thuy_san:xa.cnts.nhat_ky.thuy_san"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: menu-cnts-phu-luc-2
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.phu_luc_2"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: menu-cnts-ra-soat-nhat-ky
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.bieu_mau.ra_soat_nhat_ky"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: menu-cnts-thiet-ke-bieu-mau
+    kind: menu
+    keys:
+      - "admin:admin.pb.cnts_form_design"
+      - "chan_nuoi_thuy_san:tinh.cnts.bieu_mau.thiet_ke"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: menu-contact
+    kind: menu
+    keys:
+      - "admin:chung.contact"
+      - "chan_nuoi_thuy_san:chung.contact"
+      - "hanh_chinh_tong_hop:chung.contact"
+      - "ke_hoach_tai_chinh:chung.contact"
+      - "thong_tin_truyen_thong:chung.contact"
+      - "trong_trot:chung.contact"
+    status: FN
+    fn: [hcth/FN-13]
+
+  - id: menu-copied-tt
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tw.bao_cao.hang_vu"
+      - "chan_nuoi_thuy_san:tw.bao_cao.nam"
+      - "chan_nuoi_thuy_san:tw.bao_cao.thang"
+      - "chan_nuoi_thuy_san:tw.bao_cao.tuan"
+      - "hanh_chinh_tong_hop:tinh.bao_cao.tong_hop"
+      - "hanh_chinh_tong_hop:tinh.dashboard"
+      - "hanh_chinh_tong_hop:tinh.nhiem_vu"
+      - "hanh_chinh_tong_hop:tinh.nhiem_vu.phat_hanh"
+      - "hanh_chinh_tong_hop:tinh.nhiem_vu.ra_soat"
+      - "hanh_chinh_tong_hop:tinh.nhiem_vu.trang_thai_nop"
+      - "hanh_chinh_tong_hop:tinh.trang_chu"
+      - "hanh_chinh_tong_hop:tw.bao_cao.hang_vu"
+      - "hanh_chinh_tong_hop:tw.bao_cao.nam"
+      - "hanh_chinh_tong_hop:tw.bao_cao.thang"
+      - "hanh_chinh_tong_hop:tw.bao_cao.tuan"
+      - "hanh_chinh_tong_hop:tw.dashboard"
+      - "hanh_chinh_tong_hop:xa.bao_cao.cua_xa"
+      - "hanh_chinh_tong_hop:xa.bao_cao.hang_vu"
+      - "hanh_chinh_tong_hop:xa.bao_cao.thang"
+      - "hanh_chinh_tong_hop:xa.bao_cao.tuan"
+      - "hanh_chinh_tong_hop:xa.nhiem_vu"
+      - "hanh_chinh_tong_hop:xa.nhiem_vu.cong_viec"
+      - "ke_hoach_tai_chinh:tinh.bao_cao.tong_hop"
+      - "ke_hoach_tai_chinh:tinh.dashboard"
+      - "ke_hoach_tai_chinh:tinh.nhiem_vu"
+      - "ke_hoach_tai_chinh:tinh.nhiem_vu.phat_hanh"
+      - "ke_hoach_tai_chinh:tinh.nhiem_vu.ra_soat"
+      - "ke_hoach_tai_chinh:tinh.nhiem_vu.trang_thai_nop"
+      - "ke_hoach_tai_chinh:tw.bao_cao.hang_vu"
+      - "ke_hoach_tai_chinh:tw.bao_cao.nam"
+      - "ke_hoach_tai_chinh:tw.bao_cao.thang"
+      - "ke_hoach_tai_chinh:tw.bao_cao.tuan"
+      - "ke_hoach_tai_chinh:tw.dashboard"
+      - "ke_hoach_tai_chinh:xa.bao_cao.cua_xa"
+      - "ke_hoach_tai_chinh:xa.bao_cao.hang_vu"
+      - "ke_hoach_tai_chinh:xa.bao_cao.thang"
+      - "ke_hoach_tai_chinh:xa.bao_cao.tuan"
+      - "ke_hoach_tai_chinh:xa.nhiem_vu"
+      - "ke_hoach_tai_chinh:xa.nhiem_vu.cong_viec"
+      - "thong_tin_truyen_thong:tinh.bao_cao.tong_hop"
+      - "thong_tin_truyen_thong:tinh.dashboard"
+      - "thong_tin_truyen_thong:tinh.nhiem_vu"
+      - "thong_tin_truyen_thong:tinh.nhiem_vu.phat_hanh"
+      - "thong_tin_truyen_thong:tinh.nhiem_vu.ra_soat"
+      - "thong_tin_truyen_thong:tinh.nhiem_vu.trang_thai_nop"
+      - "thong_tin_truyen_thong:tinh.trang_chu"
+      - "thong_tin_truyen_thong:tw.bao_cao.hang_vu"
+      - "thong_tin_truyen_thong:tw.bao_cao.nam"
+      - "thong_tin_truyen_thong:tw.bao_cao.thang"
+      - "thong_tin_truyen_thong:tw.bao_cao.tuan"
+      - "thong_tin_truyen_thong:tw.dashboard"
+      - "thong_tin_truyen_thong:xa.bao_cao.cua_xa"
+      - "thong_tin_truyen_thong:xa.bao_cao.hang_vu"
+      - "thong_tin_truyen_thong:xa.bao_cao.thang"
+      - "thong_tin_truyen_thong:xa.bao_cao.tuan"
+      - "thong_tin_truyen_thong:xa.nhiem_vu"
+      - "thong_tin_truyen_thong:xa.nhiem_vu.cong_viec"
+    status: GỠ
+    package: KN-STANDALONE-4-TT-MENU-PHONG
+
+  - id: menu-department-home
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.trang_chu"
+      - "admin/trong_trot:admin.pb.trang_chu"
+      - "chan_nuoi_thuy_san:tinh.trang_chu"
+      - "trong_trot:tinh.trang_chu"
+    status: FN
+    fn: [tt/FN-TI-02.01, cnts/FN-17]
+    note: "Giới hạn phòng được theo dõi ở từng khóa menu; không cấp quyền từ bản đồ."
+
+  - id: menu-document-templates
+    kind: menu
+    keys:
+      - "admin:admin.qt.mau_van_ban"
+    status: HẠ_TẦNG
+    needs: [khtc/FN-AD-04.03, cnts/FN-11, cnts/FN-16, hcth/FN-12]
+
+  - id: menu-hcth-danh-muc-nhan-su
+    kind: menu
+    keys:
+      - "admin/hanh_chinh_tong_hop:admin.pb.hcth_danh_muc"
+    status: FN
+    fn: [hcth/FN-19]
+
+  - id: menu-hcth-phan-quyen-ho-so
+    kind: menu
+    keys:
+      - "admin/hanh_chinh_tong_hop:admin.pb.hcth_phan_quyen"
+    status: FN
+    fn: [hcth/FN-20]
+
+  - id: menu-hcth-thu-muc-tai-lieu
+    kind: menu
+    keys:
+      - "admin/hanh_chinh_tong_hop:admin.pb.hcth_thu_muc"
+    status: FN
+    fn: [hcth/FN-14]
+
+  - id: menu-hrm-appraisal
+    kind: menu
+    keys:
+      - "admin:admin.pb.hcth_danh_gia"
+      - "hanh_chinh_tong_hop:tinh.hcth.danh_gia"
+    status: FN
+    fn: [hcth/FN-15, hcth/FN-16, hcth/FN-17, hcth/FN-18]
+    note: "Các phần cần thu hẹp thuộc gói HCTH v4.0; bản đồ không xác nhận đã đạt nghiệp vụ."
+
+  - id: menu-hrm-bao-cao-so
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.hcth.bao_cao_so"
+    status: FN
+    fn: [hcth/FN-12]
+
+  - id: menu-hrm-cua-phong
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.chung.nhan_su_phong"
+      - "hanh_chinh_tong_hop:tinh.chung.nhan_su_phong"
+      - "ke_hoach_tai_chinh:tinh.chung.nhan_su_phong"
+      - "thong_tin_truyen_thong:tinh.chung.nhan_su_phong"
+      - "trong_trot:tinh.chung.nhan_su_phong"
+    status: FN
+    fn: [hcth/FN-07]
+
+  - id: menu-hrm-danh-muc
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.hcth.danh_muc"
+    status: FN
+    fn: [hcth/FN-19]
+
+  - id: menu-hrm-dashboard
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.chung.dashboard_nhan_su"
+      - "hanh_chinh_tong_hop:tinh.chung.dashboard_nhan_su"
+      - "hanh_chinh_tong_hop:tinh.hcth.dashboard"
+      - "ke_hoach_tai_chinh:tinh.chung.dashboard_nhan_su"
+      - "thong_tin_truyen_thong:tinh.chung.dashboard_nhan_su"
+      - "trong_trot:tinh.chung.dashboard_nhan_su"
+    status: FN
+    fn: [hcth/FN-06]
+
+  - id: menu-hrm-ho-so
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.hcth.ho_so"
+    status: FN
+    fn: [hcth/FN-07]
+
+  - id: menu-hrm-ke-hoach
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.hcth.ke_hoach"
+    status: FN
+    fn: [hcth/FN-11]
+
+  - id: menu-hrm-ke-hoach-phong
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.chung.ke_hoach_phong"
+      - "hanh_chinh_tong_hop:tinh.chung.ke_hoach_phong"
+      - "ke_hoach_tai_chinh:tinh.chung.ke_hoach_phong"
+      - "thong_tin_truyen_thong:tinh.chung.ke_hoach_phong"
+      - "trong_trot:tinh.chung.ke_hoach_phong"
+    status: FN
+    fn: [hcth/FN-11]
+
+  - id: menu-hrm-kho-tai-lieu
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.hcth.kho_tai_lieu"
+    status: FN
+    fn: [hcth/FN-14]
+
+  - id: menu-hrm-nang-bac
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.hcth.nang_bac"
+    status: FN
+    fn: [hcth/FN-09]
+
+  - id: menu-hrm-quyet-dinh-nang-bac
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.hcth.quyet_dinh_nang_bac"
+    status: FN
+    fn: [hcth/FN-10]
+
+  - id: menu-hrm-tai-lieu-phong
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.chung.tai_lieu_phong"
+      - "hanh_chinh_tong_hop:tinh.chung.tai_lieu_phong"
+      - "ke_hoach_tai_chinh:tinh.chung.tai_lieu_phong"
+      - "thong_tin_truyen_thong:tinh.chung.tai_lieu_phong"
+      - "trong_trot:tinh.chung.tai_lieu_phong"
+    status: FN
+    fn: [hcth/FN-14]
+
+  - id: menu-khtc-bao-cao-phat-sinh
+    kind: menu
+    keys:
+      - "admin:admin.pb.khtc_phat_sinh"
+      - "ke_hoach_tai_chinh:tinh.khtc.phat_sinh"
+    status: FN
+    fn: [khtc/FN-TI-02.10]
+
+  - id: menu-khtc-danh-muc-khtc
+    kind: menu
+    keys:
+      - "admin/ke_hoach_tai_chinh:admin.pb.khtc_danh_muc"
+    status: FN
+    fn: [khtc/FN-AD-04.01]
+
+  - id: menu-khtc-department-forms
+    kind: menu
+    keys:
+      - "admin/chan_nuoi_thuy_san:admin.pb.bao_cao_khtc"
+      - "admin/hanh_chinh_tong_hop:admin.pb.bao_cao_khtc"
+      - "admin/ke_hoach_tai_chinh:admin.pb.khtc_bao_cao"
+      - "admin/thong_tin_truyen_thong:admin.pb.bao_cao_khtc"
+      - "admin/trong_trot:admin.pb.bao_cao_khtc"
+      - "chan_nuoi_thuy_san:tinh.bao_cao_khtc.da_gui"
+      - "chan_nuoi_thuy_san:tinh.bao_cao_khtc.da_xuat"
+      - "chan_nuoi_thuy_san:tinh.bao_cao_khtc.phieu_ky_nay"
+      - "chan_nuoi_thuy_san:tinh.bao_cao_khtc.tien_do"
+      - "hanh_chinh_tong_hop:tinh.bao_cao_khtc.da_gui"
+      - "hanh_chinh_tong_hop:tinh.bao_cao_khtc.da_xuat"
+      - "hanh_chinh_tong_hop:tinh.bao_cao_khtc.phieu_ky_nay"
+      - "hanh_chinh_tong_hop:tinh.bao_cao_khtc.tien_do"
+      - "thong_tin_truyen_thong:tinh.bao_cao_khtc.da_gui"
+      - "thong_tin_truyen_thong:tinh.bao_cao_khtc.da_xuat"
+      - "thong_tin_truyen_thong:tinh.bao_cao_khtc.phieu_ky_nay"
+      - "thong_tin_truyen_thong:tinh.bao_cao_khtc.tien_do"
+      - "trong_trot:tinh.bao_cao_khtc.da_gui"
+      - "trong_trot:tinh.bao_cao_khtc.da_xuat"
+      - "trong_trot:tinh.bao_cao_khtc.phieu_ky_nay"
+      - "trong_trot:tinh.bao_cao_khtc.tien_do"
+    status: FN
+    fn: [khtc/FN-PN-03.01, khtc/FN-PN-03.02, khtc/FN-PN-03.03]
+
+  - id: menu-khtc-exported
+    kind: menu
+    keys:
+      - "ke_hoach_tai_chinh:tinh.khtc.da_xuat"
+      - "ke_hoach_tai_chinh:tw.khtc.bao_cao_tinh"
+    status: FN
+    fn: [khtc/FN-TW-01.01]
+
+  - id: menu-khtc-form-admin
+    kind: menu
+    keys:
+      - "admin/ke_hoach_tai_chinh:admin.pb.mau_bao_cao"
+    status: FN
+    fn: [khtc/FN-AD-04.02]
+
+  - id: menu-khtc-ke-hoach-nam
+    kind: menu
+    keys:
+      - "admin/ke_hoach_tai_chinh:admin.pb.khtc_ke_hoach"
+      - "ke_hoach_tai_chinh:tinh.khtc.ke_hoach_nam"
+    status: FN
+    fn: [khtc/FN-TI-02.02]
+
+  - id: menu-khtc-ky-bao-cao
+    kind: menu
+    keys:
+      - "ke_hoach_tai_chinh:tinh.khtc.ky_bao_cao"
+    status: FN
+    fn: [khtc/FN-TI-02.03]
+
+  - id: menu-khtc-muc-luc-mau
+    kind: menu
+    keys:
+      - "admin/ke_hoach_tai_chinh:admin.pb.khtc_muc_luc_mau"
+    status: FN
+    fn: [khtc/FN-AD-04.03]
+
+  - id: menu-khtc-outside
+    kind: menu
+    keys:
+      - "ke_hoach_tai_chinh:tinh.khtc.mau_bao_cao"
+      - "ke_hoach_tai_chinh:tinh.khtc.so_lieu_ngoai"
+    status: GỠ
+    package: KN-STANDALONE-7-KHTC
+
+  - id: menu-khtc-phieu-cho-ra-soat
+    kind: menu
+    keys:
+      - "ke_hoach_tai_chinh:tinh.khtc.phieu_cho_ra_soat"
+    status: FN
+    fn: [khtc/FN-TI-02.04]
+
+  - id: menu-khtc-reports
+    kind: menu
+    keys:
+      - "ke_hoach_tai_chinh:tinh.khtc.bao_cao"
+    status: FN
+    fn: [khtc/FN-TI-02.05, khtc/FN-TI-02.06, khtc/FN-TI-02.07, khtc/FN-TI-02.08, khtc/FN-TI-02.09]
+
+  - id: menu-khtc-tien-do
+    kind: menu
+    keys:
+      - "ke_hoach_tai_chinh:tinh.khtc.tien_do"
+    status: FN
+    fn: [khtc/FN-TI-02.09]
+
+  - id: menu-khtc-trang-chu
+    kind: menu
+    keys:
+      - "ke_hoach_tai_chinh:tinh.khtc.trang_chu"
+    status: FN
+    fn: [khtc/FN-TI-02.01]
+
+  - id: menu-machines
+    kind: menu
+    keys:
+      - "trong_trot:tinh.thu_thap.may_moc"
+      - "trong_trot:xa.thu_thap.may_moc"
+    status: FN
+    fn: [tt/FN-XA-03.04]
+    note: "Thay nguồn ở KN-STANDALONE-5-TT-DATA."
+
+  - id: menu-materials
+    kind: menu
+    keys:
+      - "trong_trot:tinh.thu_thap.vat_tu"
+      - "trong_trot:xa.thu_thap.vat_tu"
+    status: FN
+    fn: [tt/FN-XA-03.06]
+
+  - id: menu-menu-structure
+    kind: menu
+    keys:
+      - "admin:dieu_hanh"
+      - "admin:dung_chung"
+      - "admin:phong_ban"
+      - "admin:phong_ban.chan_nuoi_thuy_san"
+      - "admin:phong_ban.hanh_chinh_tong_hop"
+      - "admin:phong_ban.ke_hoach_tai_chinh"
+      - "admin:phong_ban.thong_tin_truyen_thong"
+      - "admin:phong_ban.trong_trot"
+      - "admin:quan_tri"
+      - "chan_nuoi_thuy_san:bao_cao"
+      - "chan_nuoi_thuy_san:dieu_hanh"
+      - "chan_nuoi_thuy_san:du_lieu"
+      - "chan_nuoi_thuy_san:dung_chung"
+      - "chan_nuoi_thuy_san:tinh.bao_cao_khtc"
+      - "chan_nuoi_thuy_san:tinh.cnts.bieu_mau"
+      - "chan_nuoi_thuy_san:tinh.cnts.chien_dich"
+      - "chan_nuoi_thuy_san:tinh.cnts.du_an_knqg"
+      - "chan_nuoi_thuy_san:tinh.cnts.lich"
+      - "chan_nuoi_thuy_san:tinh.cnts.so_lieu_xa"
+      - "chan_nuoi_thuy_san:tw.cnts.du_an_knqg"
+      - "chan_nuoi_thuy_san:xa.cnts.nhat_ky"
+      - "hanh_chinh_tong_hop:bao_cao"
+      - "hanh_chinh_tong_hop:dieu_hanh"
+      - "hanh_chinh_tong_hop:du_lieu"
+      - "hanh_chinh_tong_hop:dung_chung"
+      - "hanh_chinh_tong_hop:tinh.bao_cao_khtc"
+      - "ke_hoach_tai_chinh:bao_cao"
+      - "ke_hoach_tai_chinh:dieu_hanh"
+      - "ke_hoach_tai_chinh:du_lieu"
+      - "ke_hoach_tai_chinh:dung_chung"
+      - "thong_tin_truyen_thong:bao_cao"
+      - "thong_tin_truyen_thong:dieu_hanh"
+      - "thong_tin_truyen_thong:du_lieu"
+      - "thong_tin_truyen_thong:dung_chung"
+      - "thong_tin_truyen_thong:tinh.bao_cao_khtc"
+      - "trong_trot:bao_cao"
+      - "trong_trot:dieu_hanh"
+      - "trong_trot:du_lieu"
+      - "trong_trot:dung_chung"
+      - "trong_trot:tinh.bao_cao.tong_hop"
+      - "trong_trot:tinh.bao_cao.tong_hop.hang_vu"
+      - "trong_trot:tinh.bao_cao.tong_hop.tuan"
+      - "trong_trot:tinh.bao_cao_khtc"
+      - "trong_trot:tinh.nhiem_vu"
+      - "trong_trot:tinh.thu_thap"
+      - "trong_trot:xa.bao_cao.hang_vu"
+      - "trong_trot:xa.bao_cao.tuan"
+      - "trong_trot:xa.nhiem_vu"
+      - "trong_trot:xa.thu_thap"
+    status: HẠ_TẦNG
+    needs: [tt/FN-AD-04.07, hcth/FN-05, price/FN-CH-00.01]
+
+  - id: menu-non-cnts-docs
+    kind: menu
+    keys:
+      - "admin/hanh_chinh_tong_hop:admin.pb.van_ban"
+      - "admin/ke_hoach_tai_chinh:admin.pb.van_ban"
+      - "admin/thong_tin_truyen_thong:admin.pb.van_ban"
+      - "admin/trong_trot:admin.pb.van_ban"
+      - "hanh_chinh_tong_hop:tinh.van_ban"
+      - "hanh_chinh_tong_hop:xa.van_ban"
+      - "ke_hoach_tai_chinh:tinh.van_ban"
+      - "thong_tin_truyen_thong:tinh.van_ban"
+      - "thong_tin_truyen_thong:xa.van_ban"
+      - "trong_trot:tinh.van_ban"
+      - "trong_trot:xa.van_ban"
+    status: GỠ
+    package: KN-STANDALONE-4-TT-MENU-PHONG
+
+  - id: menu-platform-tools
+    kind: menu
+    keys:
+      - "admin:admin.qt.cong_cu"
+      - "admin:admin.qt.cong_cu.bang_ke"
+      - "admin:admin.qt.cong_cu.giam_sat"
+      - "admin:admin.qt.cong_cu.khach_hang_api"
+      - "admin:admin.qt.cong_cu.mau_xuat"
+      - "admin:admin.qt.cong_cu.nhat_ky_xuat"
+      - "admin:admin.qt.cong_cu.su_dung_api"
+      - "admin:admin.qt.cong_cu.tham_so"
+      - "admin:admin.qt.cong_cu.thiet_bi"
+      - "admin:admin.qt.cong_cu.to_chuc"
+      - "admin:admin.qt.cong_cu.xung_dot"
+    status: GỠ
+    package: KN-STANDALONE-1-ADMIN-TOOLS
+    note: "Gỡ khỏi bề mặt KN; dữ liệu và chủ hệ khác giữ nguyên."
+
+  - id: menu-plots
+    kind: menu
+    keys:
+      - "trong_trot:tinh.thu_thap.thua"
+      - "trong_trot:xa.thu_thap.thua"
+    status: FN
+    fn: [tt/FN-XA-03.05]
+    note: "Thay nguồn ở KN-STANDALONE-5-TT-DATA."
+
+  - id: menu-price-bang-gia
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.bang_gia"
+      - "thong_tin_truyen_thong:tw.bao_gia.bang_gia"
+      - "thong_tin_truyen_thong:xa.bao_gia.bang_gia"
+    status: FN
+    fn: [price/FN-TW-01.01]
+
+  - id: menu-price-bien-dong
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.bien_dong"
+      - "thong_tin_truyen_thong:tw.bao_gia.bien_dong"
+      - "thong_tin_truyen_thong:xa.bao_gia.bien_dong"
+    status: FN
+    fn: [price/FN-TW-01.02]
+
+  - id: menu-price-config
+    kind: menu
+    keys:
+      - "admin/thong_tin_truyen_thong:admin.pb.bao_gia_lich"
+      - "thong_tin_truyen_thong:tinh.bao_gia.cau_hinh"
+    status: FN
+    fn: [price/FN-AD-04.04, price/FN-AD-04.05, price/FN-AD-04.06]
+
+  - id: menu-price-dashboard-vung
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.dashboard"
+      - "thong_tin_truyen_thong:tw.bao_gia.dashboard"
+    status: FN
+    fn: [price/FN-TW-01.03]
+
+  - id: menu-price-de-xuat-mat-hang
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.de_xuat_mat_hang"
+      - "thong_tin_truyen_thong:xa.bao_gia.de_xuat_mat_hang"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: menu-price-gia-thanh
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.gia_thanh"
+      - "thong_tin_truyen_thong:tw.bao_gia.gia_thanh"
+    status: FN
+    fn: [price/FN-TW-01.04]
+
+  - id: menu-price-lich-su
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:xa.bao_gia.lich_su"
+    status: FN
+    fn: [price/FN-XA-03.03]
+
+  - id: menu-price-mat-hang
+    kind: menu
+    keys:
+      - "admin:admin.pb.bao_gia_mat_hang"
+      - "thong_tin_truyen_thong:tinh.bao_gia.mat_hang"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: menu-price-nhap
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:xa.bao_gia.nhap"
+    status: FN
+    fn: [price/FN-XA-03.01]
+
+  - id: menu-price-review
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.kiem_duyet"
+    status: FN
+    fn: [price/FN-TI-02.02, price/FN-TI-02.03, price/FN-TI-02.04, price/FN-TI-02.05, price/FN-TI-02.06, price/FN-TI-02.09]
+
+  - id: menu-price-survey
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.dieu_tra"
+    status: FN
+    fn: [price/FN-TI-02.10, price/FN-TI-02.11, price/FN-TI-02.12]
+
+  - id: menu-price-thong-ke
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.thong_ke"
+    status: FN
+    fn: [price/FN-TI-02.08]
+
+  - id: menu-price-tien-do
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:tinh.bao_gia.tien_do"
+    status: FN
+    fn: [price/FN-TI-02.01]
+
+  - id: menu-price-xa-bao-gia
+    kind: menu
+    keys:
+      - "admin:admin.pb.bao_gia_xa"
+    status: FN
+    fn: [price/FN-AD-04.02]
+
+  - id: menu-price-xac-minh
+    kind: menu
+    keys:
+      - "thong_tin_truyen_thong:xa.bao_gia.xac_minh"
+    status: FN
+    fn: [price/FN-XA-03.05]
+
+  - id: menu-producer-records
+    kind: menu
+    keys:
+      - "trong_trot:tinh.thu_thap.htx"
+      - "trong_trot:xa.thu_thap.htx"
+    status: FN
+    fn: [tt/FN-XA-03.03]
+    note: "KN tự quản; liên kết HTX được hoãn/gỡ trong gói thay nguồn."
+
+  - id: menu-report-template-admin
+    kind: menu
+    keys:
+      - "admin/trong_trot:admin.pb.mau_bao_cao"
+    status: FN
+    fn: [tt/FN-AD-04.06, khtc/FN-AD-04.02, cnts/FN-07]
+    note: "Route dùng chung; khóa menu được phân loại riêng theo phòng."
+
+  - id: menu-tt-adhoc
+    kind: menu
+    keys:
+      - "hanh_chinh_tong_hop:tinh.bao_cao.dot_xuat"
+      - "hanh_chinh_tong_hop:xa.bao_cao.dot_xuat"
+      - "ke_hoach_tai_chinh:tinh.bao_cao.dot_xuat"
+      - "ke_hoach_tai_chinh:xa.bao_cao.dot_xuat"
+      - "thong_tin_truyen_thong:tinh.bao_cao.dot_xuat"
+      - "thong_tin_truyen_thong:xa.bao_cao.dot_xuat"
+      - "trong_trot:tinh.bao_cao.dot_xuat"
+      - "trong_trot:xa.bao_cao.dot_xuat"
+    status: GỠ
+    package: KN-STANDALONE-4-TT-MENU-PHONG
+
+  - id: menu-tt-catalogs
+    kind: menu
+    keys:
+      - "admin/trong_trot:admin.pb.danh_muc"
+    status: FN
+    fn: [tt/FN-AD-04.05]
+
+  - id: menu-tt-collection
+    kind: menu
+    keys:
+      - "admin/trong_trot:admin.pb.thu_thap"
+    status: FN
+    fn: [tt/FN-XA-03.03, tt/FN-XA-03.04, tt/FN-XA-03.05, tt/FN-XA-03.06]
+
+  - id: menu-tt-commune-reports
+    kind: menu
+    keys:
+      - "trong_trot:xa.bao_cao.cua_xa"
+    status: FN
+    fn: [tt/FN-XA-03.07]
+
+  - id: menu-tt-consolidation
+    kind: menu
+    keys:
+      - "admin/trong_trot:admin.pb.tong_hop"
+      - "trong_trot:tinh.bao_cao.tong_hop.hang_vu.v01"
+      - "trong_trot:tinh.bao_cao.tong_hop.hang_vu.v02"
+      - "trong_trot:tinh.bao_cao.tong_hop.hang_vu.v03"
+      - "trong_trot:tinh.bao_cao.tong_hop.hang_vu.v04"
+      - "trong_trot:tinh.bao_cao.tong_hop.hang_vu.v05"
+      - "trong_trot:tinh.bao_cao.tong_hop.hang_vu.v06"
+      - "trong_trot:tinh.bao_cao.tong_hop.nam"
+      - "trong_trot:tinh.bao_cao.tong_hop.thang"
+      - "trong_trot:tinh.bao_cao.tong_hop.tuan.t01"
+      - "trong_trot:tinh.bao_cao.tong_hop.tuan.t03"
+      - "trong_trot:tinh.bao_cao.tong_hop.tuan.t04"
+      - "trong_trot:tinh.bao_cao.tong_hop.tuan.t05"
+      - "trong_trot:tinh.bao_cao.tong_hop.tuan.t06"
+      - "trong_trot:tinh.bao_cao.tong_hop.tuan.t07"
+    status: FN
+    fn: [tt/FN-TI-02.05]
+
+  - id: menu-tt-dashboard
+    kind: menu
+    keys:
+      - "chan_nuoi_thuy_san:tinh.cnts.trang_chu"
+      - "trong_trot:tinh.dashboard"
+      - "trong_trot:tw.dashboard"
+    status: FN
+    fn: [tt/FN-TW-01.01, tt/FN-TI-02.01]
+
+  - id: menu-tt-dispatch
+    kind: menu
+    keys:
+      - "trong_trot:tinh.bao_cao.chi_cuc"
+    status: FN
+    fn: [tt/FN-TI-02.06]
+    note: "Email và link tải giữ; Google Sheet hoãn pha kết nối."
+
+  - id: menu-tt-publish-forms
+    kind: menu
+    keys:
+      - "trong_trot:tinh.nhiem_vu.phat_hanh"
+    status: FN
+    fn: [tt/FN-TI-02.02]
+
+  - id: menu-tt-report-data
+    kind: menu
+    keys:
+      - "admin/trong_trot:admin.pb.du_lieu_bao_cao"
+    status: FN
+    fn: [tt/FN-TI-02.04, tt/FN-XA-03.02]
+
+  - id: menu-tt-reports
+    kind: menu
+    keys:
+      - "trong_trot:tw.bao_cao.hang_vu"
+      - "trong_trot:tw.bao_cao.nam"
+      - "trong_trot:tw.bao_cao.thang"
+      - "trong_trot:tw.bao_cao.tuan"
+      - "trong_trot:xa.bao_cao.hang_vu.v01"
+      - "trong_trot:xa.bao_cao.hang_vu.v02"
+      - "trong_trot:xa.bao_cao.hang_vu.v03"
+      - "trong_trot:xa.bao_cao.hang_vu.v04"
+      - "trong_trot:xa.bao_cao.hang_vu.v05"
+      - "trong_trot:xa.bao_cao.hang_vu.v06"
+      - "trong_trot:xa.bao_cao.thang"
+      - "trong_trot:xa.bao_cao.tuan.t01"
+      - "trong_trot:xa.bao_cao.tuan.t02"
+      - "trong_trot:xa.bao_cao.tuan.t03"
+      - "trong_trot:xa.bao_cao.tuan.t04"
+      - "trong_trot:xa.bao_cao.tuan.t05"
+      - "trong_trot:xa.bao_cao.tuan.t06"
+      - "trong_trot:xa.bao_cao.tuan.t07"
+    status: FN
+    fn: [tt/FN-TW-01.02, tt/FN-XA-03.02, tt/FN-XA-03.07]
+
+  - id: menu-tt-review
+    kind: menu
+    keys:
+      - "trong_trot:tinh.nhiem_vu.ra_soat"
+    status: FN
+    fn: [tt/FN-TI-02.04]
+
+  - id: menu-tt-tasks
+    kind: menu
+    keys:
+      - "trong_trot:xa.nhiem_vu.cong_viec"
+    status: FN
+    fn: [tt/FN-XA-03.01, tt/FN-XA-03.02]
+
+  - id: menu-tt-tracking
+    kind: menu
+    keys:
+      - "admin/trong_trot:admin.pb.theo_doi_nop"
+      - "trong_trot:tinh.nhiem_vu.trang_thai_nop"
+    status: FN
+    fn: [tt/FN-TI-02.03]
+
+  - id: menu-work-schedules
+    kind: menu
+    keys:
+      - "admin:admin.pb.lich_cong_tac"
+      - "chan_nuoi_thuy_san:tinh.cnts.lich.cong_tac_phong"
+      - "chan_nuoi_thuy_san:tinh.cnts.lich.cong_tac_xa"
+      - "chan_nuoi_thuy_san:xa.cnts.lich_cong_tac"
+      - "trong_trot:tinh.nhiem_vu.lich_cong_tac"
+      - "trong_trot:xa.nhiem_vu.lich_cong_tac"
+    status: FN
+    fn: [tt/FN-TI-02.07, tt/FN-XA-03.08, cnts/FN-12]
+    note: "Thay nguồn địa điểm ở KN-STANDALONE-5-TT-DATA."
+
+  - id: mobile-boundary-editor
+    kind: mobile
+    keys:
+      - "BoundaryEditorScreen"
+    status: HẠ_TẦNG
+    needs: [tt/FN-XA-03.05]
+
+  - id: mobile-cnts-catalog
+    kind: mobile
+    keys:
+      - "CntsCatalogScreen"
+    status: FN
+    fn: [cnts/FN-06]
+
+  - id: mobile-cnts-entry
+    kind: mobile
+    keys:
+      - "CntsEntryScreen"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: mobile-cnts-tasks
+    kind: mobile
+    keys:
+      - "CntsTasksScreen"
+    status: FN
+    fn: [cnts/FN-08]
+
+  - id: mobile-legacy-mobile
+    kind: mobile
+    keys:
+      - "BoundaryScreen"
+      - "ConsentScreen"
+      - "DirectiveDetailScreen"
+      - "DirectivesScreen"
+      - "DocumentScreen"
+      - "EvidenceFormScreen"
+      - "FieldReportScreen"
+      - "HomeScreen"
+      - "LibraryScreen"
+      - "NotificationsScreen"
+      - "PlotsScreen"
+      - "RosterScreen"
+      - "TasksScreen"
+    status: GỠ
+    package: KN-STANDALONE-9-FIELD-APP
+    note: "Màn cũ trong bản field-app; không xóa phần dùng chung của hệ khác trong gói bản đồ."
+
+  - id: mobile-machines
+    kind: mobile
+    keys:
+      - "KnMachinesScreen"
+    status: FN
+    fn: [tt/FN-XA-03.04]
+    note: "Thay nguồn ở KN-STANDALONE-5-TT-DATA."
+
+  - id: mobile-materials
+    kind: mobile
+    keys:
+      - "KnMaterialsScreen"
+    status: FN
+    fn: [tt/FN-XA-03.06]
+
+  - id: mobile-mobile-menu
+    kind: mobile
+    keys:
+      - "KnHomeScreen"
+    status: HẠ_TẦNG
+    needs: [tt/FN-CH-00.01, tt/FN-XA-03.01, cnts/FN-08]
+
+  - id: mobile-offline-map-packs
+    kind: mobile
+    keys:
+      - "MapPacksScreen"
+    status: HẠ_TẦNG
+    needs: [tt/FN-XA-03.05]
+
+  - id: mobile-offline-sync
+    kind: mobile
+    keys:
+      - "SyncQueueScreen"
+    status: HẠ_TẦNG
+    needs: [tt/FN-XA-03.02, tt/FN-XA-03.05, cnts/FN-09, cnts/FN-10, cnts/FN-12]
+
+  - id: mobile-plots
+    kind: mobile
+    keys:
+      - "KnPlotsScreen"
+    status: FN
+    fn: [tt/FN-XA-03.05]
+    note: "Thay nguồn ở KN-STANDALONE-5-TT-DATA."
+
+  - id: mobile-producer-records
+    kind: mobile
+    keys:
+      - "KnCooperativeDetailScreen"
+      - "KnCooperativeFormScreen"
+      - "KnCooperativesScreen"
+    status: FN
+    fn: [tt/FN-XA-03.03]
+    note: "KN tự quản; liên kết HTX được hoãn/gỡ trong gói thay nguồn."
+
+  - id: mobile-session
+    kind: mobile
+    keys:
+      - "KnContextPickerScreen"
+      - "LoginScreen"
+    status: HẠ_TẦNG
+    needs: [tt/FN-CH-00.01, hcth/FN-05, price/FN-CH-00.01]
+
+  - id: mobile-tt-commune-reports
+    kind: mobile
+    keys:
+      - "KnCommuneReportsScreen"
+    status: FN
+    fn: [tt/FN-XA-03.07]
+
+  - id: mobile-tt-report-entry
+    kind: mobile
+    keys:
+      - "KnReportEntryScreen"
+    status: FN
+    fn: [tt/FN-XA-03.02]
+
+  - id: mobile-tt-tasks
+    kind: mobile
+    keys:
+      - "KnTasksScreen"
+    status: FN
+    fn: [tt/FN-XA-03.01, tt/FN-XA-03.02]
+
+  - id: mobile-work-schedules
+    kind: mobile
+    keys:
+      - "WorkScheduleItemScreen"
+      - "WorkScheduleScreen"
+    status: FN
+    fn: [tt/FN-TI-02.07, tt/FN-XA-03.08, cnts/FN-12]
+    note: "Thay nguồn địa điểm ở KN-STANDALONE-5-TT-DATA."
+
+  - id: web-admin-co-cau-to-chuc
+    kind: web
+    keys:
+      - "/kn/quan-tri/co-cau-to-chuc"
+    status: FN
+    fn: [tt/FN-AD-04.02]
+
+  - id: web-admin-don-vi-hanh-chinh
+    kind: web
+    keys:
+      - "/kn/quan-tri/don-vi-hanh-chinh"
+    status: FN
+    fn: [tt/FN-AD-04.01]
+
+  - id: web-admin-home
+    kind: web
+    keys:
+      - "/kn/tong-quan"
+    status: FN
+    fn: [tt/FN-CH-00.01, price/FN-CH-00.01]
+
+  - id: web-admin-menu-cac-cap
+    kind: web
+    keys:
+      - "/kn/quan-tri/menu-cac-cap"
+    status: FN
+    fn: [tt/FN-AD-04.07]
+
+  - id: web-admin-nguoi-dung
+    kind: web
+    keys:
+      - "/kn/quan-tri/nguoi-dung"
+      - "/kn/quan-tri/nguoi-dung/[id]"
+      - "/kn/quan-tri/nguoi-dung/[id]/vai-tro/[aid]/phan-quyen"
+      - "/kn/quan-tri/nguoi-dung/[id]/vai-tro/[aid]/sua"
+      - "/kn/quan-tri/nguoi-dung/[id]/vai-tro/them-moi"
+      - "/kn/quan-tri/nguoi-dung/them-moi"
+    status: FN
+    fn: [tt/FN-AD-04.04]
+
+  - id: web-admin-phong-ban
+    kind: web
+    keys:
+      - "/kn/quan-tri/phong-ban"
+    status: FN
+    fn: [tt/FN-AD-04.03]
+
+  - id: web-audit
+    kind: web
+    keys:
+      - "/kn/quan-tri/nhat-ky-he-thong"
+      - "/kn/quan-tri/nhat-ky-he-thong/[id]"
+    status: HẠ_TẦNG
+    needs: [tt/FN-AD-04.04, price/FN-AD-04.01]
+    note: "Nhật ký truy cập phục vụ các FN; chưa kết luận hạn lưu trong gói này."
+
+  - id: web-cnts-ban-do-dich
+    kind: web
+    keys:
+      - "/kn/cnts/ban-do-dich"
+    status: FN
+    fn: [cnts/FN-18]
+
+  - id: web-cnts-bao-cao-dinh-ky
+    kind: web
+    keys:
+      - "/kn/cnts/bao-cao-dinh-ky"
+    status: FN
+    fn: [cnts/FN-16]
+
+  - id: web-cnts-bao-cao-ky
+    kind: web
+    keys:
+      - "/kn/cnts/bao-cao-ky"
+    status: FN
+    fn: [cnts/FN-08]
+
+  - id: web-cnts-bieu-ky-cnts
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/bieu-ky-cnts"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: web-cnts-bieu-mau
+    kind: web
+    keys:
+      - "/kn/cnts/bieu-mau"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: web-cnts-canh-bao
+    kind: web
+    keys:
+      - "/kn/cnts/canh-bao"
+    status: FN
+    fn: [cnts/FN-13]
+
+  - id: web-cnts-cap-quyen
+    kind: web
+    keys:
+      - "/kn/cnts/cap-quyen"
+    status: FN
+    fn: [cnts/FN-14]
+
+  - id: web-cnts-chien-dich
+    kind: web
+    keys:
+      - "/kn/cnts/chien-dich"
+      - "/kn/cnts/chien-dich/tao"
+    status: FN
+    fn: [cnts/FN-21]
+
+  - id: web-cnts-cong-viec-tuan
+    kind: web
+    keys:
+      - "/kn/cnts/cong-viec-tuan"
+    status: FN
+    fn: [cnts/FN-12]
+
+  - id: web-cnts-danh-muc
+    kind: web
+    keys:
+      - "/kn/cnts/danh-muc"
+      - "/kn/cnts/danh-muc/[type]/[code]"
+      - "/kn/cnts/danh-muc/[type]/[code]/sua"
+      - "/kn/cnts/danh-muc/[type]/them-moi"
+    status: FN
+    fn: [cnts/FN-06]
+
+  - id: web-cnts-danh-muc-cnts
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/danh-muc-cnts"
+      - "/kn/phong-ban/[dept]/danh-muc-cnts/[type]/[code]"
+      - "/kn/phong-ban/[dept]/danh-muc-cnts/[type]/[code]/sua"
+      - "/kn/phong-ban/[dept]/danh-muc-cnts/[type]/them-moi"
+    status: FN
+    fn: [cnts/FN-06]
+
+  - id: web-cnts-dich-benh
+    kind: web
+    keys:
+      - "/kn/cnts/dich-benh"
+      - "/kn/cnts/dich-benh/tao-moi"
+    status: FN
+    fn: [cnts/FN-11]
+
+  - id: web-cnts-docs
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/van-ban"
+      - "/kn/van-ban"
+    status: FN
+    fn: [cnts/FN-20]
+    note: "Chỉ phòng CNTS; menu phòng khác được gắn GỠ riêng."
+
+  - id: web-cnts-du-an
+    kind: web
+    keys:
+      - "/kn/cnts/du-an"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: web-cnts-du-an-mau-bieu
+    kind: web
+    keys:
+      - "/kn/cnts/du-an-mau-bieu"
+    status: FN
+    fn: [cnts/FN-19]
+
+  - id: web-cnts-ho-chan-nuoi
+    kind: web
+    keys:
+      - "/kn/cnts/so-lieu-xa/ho-chan-nuoi"
+      - "/kn/cnts/so-lieu-xa/ho-chan-nuoi/[id]"
+      - "/kn/cnts/so-lieu-xa/ho-chan-nuoi/[id]/sua"
+      - "/kn/cnts/so-lieu-xa/ho-chan-nuoi/them-moi"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: web-cnts-ho-mo-hinh
+    kind: web
+    keys:
+      - "/kn/cnts/ho-mo-hinh"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: web-cnts-inbox
+    kind: web
+    keys:
+      - "/kn/bao-cao-den"
+    status: FN
+    fn: [cnts/FN-16]
+
+  - id: web-cnts-khai-thac-thuy-san
+    kind: web
+    keys:
+      - "/kn/cnts/khai-thac-thuy-san"
+      - "/kn/cnts/so-lieu-xa/khai-thac-thuy-san"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: web-cnts-ksgm
+    kind: web
+    keys:
+      - "/kn/cnts/ksgm"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: web-cnts-lich-tiem
+    kind: web
+    keys:
+      - "/kn/cnts/lich-tiem"
+      - "/kn/phong-ban/[dept]/lich-tiem"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: web-cnts-lich-truc
+    kind: web
+    keys:
+      - "/kn/cnts/lich-truc"
+      - "/kn/phong-ban/[dept]/lich-truc"
+    status: FN
+    fn: [cnts/FN-15]
+
+  - id: web-cnts-nhap-lieu-tuan
+    kind: web
+    keys:
+      - "/kn/cnts/so-lieu-xa/nhap-lieu-tuan"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: web-cnts-nhat-ky
+    kind: web
+    keys:
+      - "/kn/cnts/nhat-ky"
+      - "/kn/cnts/so-lieu-xa/nhat-ky"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: web-cnts-phu-luc-2
+    kind: web
+    keys:
+      - "/kn/cnts/phu-luc-2"
+    status: FN
+    fn: [cnts/FN-09]
+
+  - id: web-cnts-ra-soat-nhat-ky
+    kind: web
+    keys:
+      - "/kn/cnts/ra-soat-nhat-ky"
+    status: FN
+    fn: [cnts/FN-10]
+
+  - id: web-cnts-thiet-ke-bieu-mau
+    kind: web
+    keys:
+      - "/kn/cnts/thiet-ke-bieu-mau"
+    status: FN
+    fn: [cnts/FN-07]
+
+  - id: web-contact
+    kind: web
+    keys:
+      - "/kn/dung-chung/contact"
+      - "/kn/dung-chung/contact/[id]"
+    status: FN
+    fn: [hcth/FN-13]
+
+  - id: web-department-home
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/trang-chu"
+      - "/kn/trang-chu"
+    status: FN
+    fn: [tt/FN-TI-02.01, cnts/FN-17]
+    note: "Giới hạn phòng được theo dõi ở từng khóa menu; không cấp quyền từ bản đồ."
+
+  - id: web-document-templates
+    kind: web
+    keys:
+      - "/kn/quan-tri/mau-van-ban"
+    status: HẠ_TẦNG
+    needs: [khtc/FN-AD-04.03, cnts/FN-11, cnts/FN-16, hcth/FN-12]
+
+  - id: web-hcth-danh-muc-nhan-su
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/[kind]"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/[kind]/muc/[code]"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/[kind]/muc/[code]/sua"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/[kind]/them-moi"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/he-so"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/he-so/[grade]"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/he-so/[grade]/them-moi"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/quy-tac/[key]"
+      - "/kn/phong-ban/[dept]/danh-muc-nhan-su/quy-tac/[key]/them-moi"
+    status: FN
+    fn: [hcth/FN-19]
+
+  - id: web-hcth-phan-quyen-ho-so
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/phan-quyen-ho-so"
+    status: FN
+    fn: [hcth/FN-20]
+
+  - id: web-hcth-thu-muc-tai-lieu
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/thu-muc-tai-lieu"
+    status: FN
+    fn: [hcth/FN-14]
+
+  - id: web-hrm-appraisal
+    kind: web
+    keys:
+      - "/kn/nhan-su/danh-gia"
+      - "/kn/nhan-su/danh-gia/dot/[period]"
+      - "/kn/nhan-su/danh-gia/dot/[period]/phieu/[staff]"
+      - "/kn/nhan-su/danh-gia/dot/them-moi"
+      - "/kn/nhan-su/danh-gia/mau"
+      - "/kn/nhan-su/danh-gia/mau/[id]"
+      - "/kn/nhan-su/danh-gia/mau/them-moi"
+    status: FN
+    fn: [hcth/FN-15, hcth/FN-16, hcth/FN-17, hcth/FN-18]
+    note: "Các phần cần thu hẹp thuộc gói HCTH v4.0; bản đồ không xác nhận đã đạt nghiệp vụ."
+
+  - id: web-hrm-bao-cao-so
+    kind: web
+    keys:
+      - "/kn/nhan-su/bao-cao-so"
+      - "/kn/nhan-su/bao-cao-so/[code]"
+    status: FN
+    fn: [hcth/FN-12]
+
+  - id: web-hrm-cua-phong
+    kind: web
+    keys:
+      - "/kn/nhan-su/cua-phong"
+    status: FN
+    fn: [hcth/FN-07]
+
+  - id: web-hrm-danh-muc
+    kind: web
+    keys:
+      - "/kn/nhan-su/danh-muc"
+      - "/kn/nhan-su/danh-muc/[kind]"
+      - "/kn/nhan-su/danh-muc/[kind]/muc/[code]"
+      - "/kn/nhan-su/danh-muc/[kind]/muc/[code]/sua"
+      - "/kn/nhan-su/danh-muc/[kind]/them-moi"
+      - "/kn/nhan-su/danh-muc/he-so"
+      - "/kn/nhan-su/danh-muc/he-so/[grade]"
+      - "/kn/nhan-su/danh-muc/he-so/[grade]/them-moi"
+      - "/kn/nhan-su/danh-muc/quy-tac/[key]"
+      - "/kn/nhan-su/danh-muc/quy-tac/[key]/them-moi"
+    status: FN
+    fn: [hcth/FN-19]
+
+  - id: web-hrm-dashboard
+    kind: web
+    keys:
+      - "/kn/nhan-su/dashboard"
+    status: FN
+    fn: [hcth/FN-06]
+
+  - id: web-hrm-employment
+    kind: web
+    keys:
+      - "/kn/nhan-su/ho-so/thong-tin-lam-viec"
+      - "/kn/nhan-su/ho-so/thong-tin-lam-viec/[id]"
+      - "/kn/nhan-su/ho-so/thong-tin-lam-viec/[id]/sua"
+    status: FN
+    fn: [hcth/FN-08]
+
+  - id: web-hrm-ho-so
+    kind: web
+    keys:
+      - "/kn/nhan-su/ho-so"
+      - "/kn/nhan-su/ho-so/[id]"
+    status: FN
+    fn: [hcth/FN-07]
+
+  - id: web-hrm-ke-hoach
+    kind: web
+    keys:
+      - "/kn/nhan-su/ke-hoach"
+      - "/kn/nhan-su/ke-hoach/[year]/[unit]"
+      - "/kn/nhan-su/ke-hoach/[year]/[unit]/dieu-chinh"
+      - "/kn/nhan-su/ke-hoach/[year]/[unit]/dieu-chinh/[seq]"
+      - "/kn/nhan-su/ke-hoach/[year]/[unit]/dieu-chinh/lich-su"
+    status: FN
+    fn: [hcth/FN-11]
+
+  - id: web-hrm-ke-hoach-phong
+    kind: web
+    keys:
+      - "/kn/nhan-su/ke-hoach-phong"
+    status: FN
+    fn: [hcth/FN-11]
+
+  - id: web-hrm-kho-tai-lieu
+    kind: web
+    keys:
+      - "/kn/nhan-su/kho-tai-lieu"
+      - "/kn/nhan-su/kho-tai-lieu/[id]"
+    status: FN
+    fn: [hcth/FN-14]
+
+  - id: web-hrm-nang-bac
+    kind: web
+    keys:
+      - "/kn/nhan-su/nang-bac"
+      - "/kn/nhan-su/nang-bac/[key]"
+    status: FN
+    fn: [hcth/FN-09]
+
+  - id: web-hrm-quyet-dinh-nang-bac
+    kind: web
+    keys:
+      - "/kn/nhan-su/quyet-dinh-nang-bac"
+      - "/kn/nhan-su/quyet-dinh-nang-bac/[id]"
+    status: FN
+    fn: [hcth/FN-10]
+
+  - id: web-hrm-route-dispatch
+    kind: web
+    keys:
+      - "/kn/nhan-su/[...slug]"
+    status: HẠ_TẦNG
+    needs: [hcth/FN-07, hcth/FN-19]
+
+  - id: web-hrm-tai-lieu-phong
+    kind: web
+    keys:
+      - "/kn/nhan-su/tai-lieu-phong"
+    status: FN
+    fn: [hcth/FN-14]
+
+  - id: web-khtc-bao-cao-phat-sinh
+    kind: web
+    keys:
+      - "/kn/khtc/bao-cao-phat-sinh"
+    status: FN
+    fn: [khtc/FN-TI-02.10]
+
+  - id: web-khtc-danh-muc-khtc
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/danh-muc-khtc"
+      - "/kn/phong-ban/[dept]/danh-muc-khtc/[kind]/muc/[code]"
+      - "/kn/phong-ban/[dept]/danh-muc-khtc/[kind]/muc/[code]/sua"
+      - "/kn/phong-ban/[dept]/danh-muc-khtc/[kind]/them-moi"
+    status: FN
+    fn: [khtc/FN-AD-04.01]
+
+  - id: web-khtc-department-forms
+    kind: web
+    keys:
+      - "/kn/bao-cao-khtc"
+      - "/kn/bao-cao-khtc/da-gui"
+      - "/kn/bao-cao-khtc/phieu/[periodId]"
+      - "/kn/bao-cao-khtc/phieu/[periodId]/lich-su"
+      - "/kn/phong-ban/[dept]/bao-cao-khtc"
+      - "/kn/phong-ban/[dept]/bao-cao-khtc/phieu/[periodId]"
+      - "/kn/phong-ban/[dept]/bao-cao-khtc/phieu/[periodId]/lich-su"
+    status: FN
+    fn: [khtc/FN-PN-03.01, khtc/FN-PN-03.02, khtc/FN-PN-03.03]
+
+  - id: web-khtc-exported
+    kind: web
+    keys:
+      - "/kn/khtc/bao-cao-da-xuat"
+      - "/kn/khtc/bao-cao-da-xuat/[period]/[export]/word"
+    status: FN
+    fn: [khtc/FN-TW-01.01]
+
+  - id: web-khtc-ke-hoach-nam
+    kind: web
+    keys:
+      - "/kn/khtc/ke-hoach-nam"
+      - "/kn/khtc/ke-hoach-nam/chon-chuong-trinh"
+      - "/kn/khtc/ke-hoach-nam/chuong-trinh-moi"
+      - "/kn/khtc/ke-hoach-nam/lich-su"
+      - "/kn/khtc/ke-hoach-nam/luu-phien-ban"
+      - "/kn/khtc/ke-hoach-nam/noi-dung/[ref]"
+      - "/kn/khtc/ke-hoach-nam/noi-dung/[ref]/sua"
+      - "/kn/khtc/ke-hoach-nam/phien-ban/[version]"
+      - "/kn/khtc/ke-hoach-nam/them-noi-dung"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam/chon-chuong-trinh"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam/chuong-trinh-moi"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam/lich-su"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam/luu-phien-ban"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam/noi-dung/[ref]"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam/noi-dung/[ref]/sua"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam/phien-ban/[version]"
+      - "/kn/phong-ban/[dept]/ke-hoach-nam/them-noi-dung"
+    status: FN
+    fn: [khtc/FN-TI-02.02]
+
+  - id: web-khtc-ky-bao-cao
+    kind: web
+    keys:
+      - "/kn/khtc/ky-bao-cao"
+      - "/kn/khtc/ky-bao-cao/ky/[periodId]"
+      - "/kn/khtc/ky-bao-cao/ky/[periodId]/sua-han"
+      - "/kn/khtc/ky-bao-cao/them-moi"
+    status: FN
+    fn: [khtc/FN-TI-02.03]
+
+  - id: web-khtc-muc-luc-mau
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/muc-luc-mau"
+      - "/kn/phong-ban/[dept]/muc-luc-mau/[template]"
+      - "/kn/phong-ban/[dept]/muc-luc-mau/[template]/muc/[item]/sua"
+      - "/kn/phong-ban/[dept]/muc-luc-mau/[template]/muc/them-moi"
+    status: FN
+    fn: [khtc/FN-AD-04.03]
+
+  - id: web-khtc-outside
+    kind: web
+    keys:
+      - "/kn/khtc/so-lieu-ngoai"
+    status: GỠ
+    package: KN-STANDALONE-7-KHTC
+
+  - id: web-khtc-phieu-cho-ra-soat
+    kind: web
+    keys:
+      - "/kn/khtc/phieu-cho-ra-soat"
+    status: FN
+    fn: [khtc/FN-TI-02.04]
+
+  - id: web-khtc-ra-soat
+    kind: web
+    keys:
+      - "/kn/khtc/ra-soat/[periodId]"
+      - "/kn/khtc/ra-soat/[periodId]/lan-gui"
+      - "/kn/khtc/ra-soat/[periodId]/lan-gui/[submissionId]"
+    status: FN
+    fn: [khtc/FN-TI-02.04]
+
+  - id: web-khtc-reports
+    kind: web
+    keys:
+      - "/kn/khtc/bao-cao"
+    status: FN
+    fn: [khtc/FN-TI-02.05, khtc/FN-TI-02.06, khtc/FN-TI-02.07, khtc/FN-TI-02.08, khtc/FN-TI-02.09]
+
+  - id: web-khtc-review-form
+    kind: web
+    keys:
+      - "/kn/khtc/phieu"
+      - "/kn/khtc/phieu/[periodId]"
+    status: FN
+    fn: [khtc/FN-TI-02.04, khtc/FN-PN-03.02]
+
+  - id: web-khtc-tien-do
+    kind: web
+    keys:
+      - "/kn/khtc/tien-do"
+    status: FN
+    fn: [khtc/FN-TI-02.09]
+
+  - id: web-khtc-tien-do-ky
+    kind: web
+    keys:
+      - "/kn/khtc/tien-do-ky/[periodId]"
+    status: FN
+    fn: [khtc/FN-TI-02.03]
+
+  - id: web-khtc-tong-hop
+    kind: web
+    keys:
+      - "/kn/khtc/tong-hop/[periodId]"
+    status: FN
+    fn: [khtc/FN-TI-02.04]
+
+  - id: web-khtc-trang-chu
+    kind: web
+    keys:
+      - "/kn/khtc/trang-chu"
+    status: FN
+    fn: [khtc/FN-TI-02.01]
+
+  - id: web-machines
+    kind: web
+    keys:
+      - "/kn/du-lieu/may-moc"
+    status: FN
+    fn: [tt/FN-XA-03.04]
+    note: "Thay nguồn ở KN-STANDALONE-5-TT-DATA."
+
+  - id: web-materials
+    kind: web
+    keys:
+      - "/kn/du-lieu/vat-tu"
+    status: FN
+    fn: [tt/FN-XA-03.06]
+
+  - id: web-notifications
+    kind: web
+    keys:
+      - "/thong-bao"
+    status: HẠ_TẦNG
+    needs: [tt/FN-TI-02.03, price/FN-XA-03.04]
+
+  - id: web-outside-kn
+    kind: web
+    keys:
+      - "/"
+      - "/ban-do"
+      - "/ban-do-gis"
+      - "/bao-cao"
+      - "/cgh"
+      - "/chi-dao"
+      - "/danh-ba"
+      - "/htx"
+      - "/htx/[id]"
+      - "/htx/dashboard"
+      - "/htx/lich-bao-cao"
+      - "/htx/lo-ruong"
+      - "/htx/mua-vu"
+      - "/htx/nhat-ky"
+      - "/htx/nong-ho"
+      - "/htx/phe-duyet"
+      - "/htx/san-luong"
+      - "/htx/tai-khoan-nong-dan"
+      - "/htx/thu-gom"
+      - "/htx/yeu-cau-ho-tro"
+      - "/mo-phong"
+      - "/mrv"
+      - "/mrv/doi-chieu"
+      - "/nhiem-vu"
+      - "/thu-vien"
+    status: GỠ
+    package: KN-STANDALONE-2-WEB-GATE
+    note: "Trang ngoài /kn được kiểm kê để thu hẹp phiên hoặc bản build KN."
+
+  - id: web-placeholder
+    kind: web
+    keys:
+      - "/kn/[...slug]"
+    status: GỠ
+    package: KN-STANDALONE-2-WEB-GATE
+    note: "Catch-all hiện hữu; theo dõi việc trả 404 cho đường lạ."
+
+  - id: web-platform-tools
+    kind: web
+    keys:
+      - "/dong-bo"
+      - "/quan-tri/bai-viet"
+      - "/quan-tri/ban-do"
+      - "/quan-tri/bang-ke"
+      - "/quan-tri/chi-so"
+      - "/quan-tri/danh-muc"
+      - "/quan-tri/giam-sat-dong-bo"
+      - "/quan-tri/hien-thi"
+      - "/quan-tri/khach-hang-api"
+      - "/quan-tri/kho-hub"
+      - "/quan-tri/mau-bao-cao"
+      - "/quan-tri/mrv-phuong-phap"
+      - "/quan-tri/neo-htx"
+      - "/quan-tri/nhap-nong-ho"
+      - "/quan-tri/nhap-thua"
+      - "/quan-tri/nhat-ky-xuat"
+      - "/quan-tri/quy-trinh"
+      - "/quan-tri/su-dung-api"
+      - "/quan-tri/tai-khoan"
+      - "/quan-tri/tham-so"
+      - "/quan-tri/thuy-he"
+      - "/quan-tri/to-chuc"
+      - "/quan-tri/xung-dot"
+    status: GỠ
+    package: KN-STANDALONE-1-ADMIN-TOOLS
+    note: "Gỡ khỏi bề mặt KN; dữ liệu và chủ hệ khác giữ nguyên."
+
+  - id: web-plots
+    kind: web
+    keys:
+      - "/kn/du-lieu/ve-thua"
+      - "/kn/du-lieu/ve-thua/[id]"
+      - "/kn/du-lieu/ve-thua/them-moi"
+    status: FN
+    fn: [tt/FN-XA-03.05]
+    note: "Thay nguồn ở KN-STANDALONE-5-TT-DATA."
+
+  - id: web-price-bang-gia
+    kind: web
+    keys:
+      - "/kn/bao-gia/bang-gia"
+    status: FN
+    fn: [price/FN-TW-01.01]
+
+  - id: web-price-bien-dong
+    kind: web
+    keys:
+      - "/kn/bao-gia/bien-dong"
+    status: FN
+    fn: [price/FN-TW-01.02]
+
+  - id: web-price-config
+    kind: web
+    keys:
+      - "/kn/bao-gia/cau-hinh"
+      - "/kn/bao-gia/cau-hinh/[...path]"
+      - "/kn/phong-ban/[dept]/bao-gia-lich"
+      - "/kn/phong-ban/[dept]/bao-gia-lich/[...path]"
+    status: FN
+    fn: [price/FN-AD-04.04, price/FN-AD-04.05, price/FN-AD-04.06]
+
+  - id: web-price-dashboard-vung
+    kind: web
+    keys:
+      - "/kn/bao-gia/dashboard-vung"
+    status: FN
+    fn: [price/FN-TW-01.03]
+
+  - id: web-price-de-xuat-mat-hang
+    kind: web
+    keys:
+      - "/kn/bao-gia/de-xuat-mat-hang"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: web-price-gia-thanh
+    kind: web
+    keys:
+      - "/kn/bao-gia/gia-thanh"
+    status: FN
+    fn: [price/FN-TW-01.04]
+
+  - id: web-price-in
+    kind: web
+    keys:
+      - "/kn/bao-gia/in"
+    status: FN
+    fn: [price/FN-XA-03.02]
+
+  - id: web-price-lich-su
+    kind: web
+    keys:
+      - "/kn/bao-gia/lich-su"
+    status: FN
+    fn: [price/FN-XA-03.03]
+
+  - id: web-price-mat-hang
+    kind: web
+    keys:
+      - "/kn/bao-gia/mat-hang"
+      - "/kn/bao-gia/mat-hang/[...path]"
+    status: FN
+    fn: [price/FN-AD-04.03]
+
+  - id: web-price-nhap
+    kind: web
+    keys:
+      - "/kn/bao-gia/nhap"
+    status: FN
+    fn: [price/FN-XA-03.01]
+
+  - id: web-price-review
+    kind: web
+    keys:
+      - "/kn/bao-gia/kiem-duyet"
+      - "/kn/bao-gia/kiem-duyet/[...path]"
+    status: FN
+    fn: [price/FN-TI-02.02, price/FN-TI-02.03, price/FN-TI-02.04, price/FN-TI-02.05, price/FN-TI-02.06, price/FN-TI-02.09]
+
+  - id: web-price-survey
+    kind: web
+    keys:
+      - "/kn/bao-gia/dieu-tra"
+    status: FN
+    fn: [price/FN-TI-02.10, price/FN-TI-02.11, price/FN-TI-02.12]
+
+  - id: web-price-thong-ke
+    kind: web
+    keys:
+      - "/kn/bao-gia/thong-ke"
+    status: FN
+    fn: [price/FN-TI-02.08]
+
+  - id: web-price-tien-do
+    kind: web
+    keys:
+      - "/kn/bao-gia/tien-do"
+    status: FN
+    fn: [price/FN-TI-02.01]
+
+  - id: web-price-xa-bao-gia
+    kind: web
+    keys:
+      - "/kn/bao-gia/xa-bao-gia"
+      - "/kn/bao-gia/xa-bao-gia/[...path]"
+      - "/kn/bao-gia/xa-bao-gia/[code]/phan-cong"
+    status: FN
+    fn: [price/FN-AD-04.02]
+
+  - id: web-price-xac-minh
+    kind: web
+    keys:
+      - "/kn/bao-gia/xac-minh"
+    status: FN
+    fn: [price/FN-XA-03.05]
+
+  - id: web-producer-records
+    kind: web
+    keys:
+      - "/kn/du-lieu/htx"
+      - "/kn/du-lieu/htx/[id]"
+      - "/kn/du-lieu/htx/[id]/sua"
+      - "/kn/du-lieu/htx/[id]/them-nong-ho"
+      - "/kn/du-lieu/htx/nong-ho"
+      - "/kn/du-lieu/htx/nong-ho/[id]"
+      - "/kn/du-lieu/htx/nong-ho/[id]/sua"
+      - "/kn/du-lieu/htx/nong-ho/them-moi"
+      - "/kn/du-lieu/htx/them-moi"
+      - "/kn/du-lieu/htx/to-hop-tac"
+      - "/kn/du-lieu/htx/to-hop-tac/[id]"
+      - "/kn/du-lieu/htx/to-hop-tac/[id]/sua"
+      - "/kn/du-lieu/htx/to-hop-tac/[id]/them-nong-ho"
+      - "/kn/du-lieu/htx/to-hop-tac/them-moi"
+    status: FN
+    fn: [tt/FN-XA-03.03]
+    note: "KN tự quản; liên kết HTX được hoãn/gỡ trong gói thay nguồn."
+
+  - id: web-report-template-admin
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/mau-bao-cao"
+      - "/kn/phong-ban/[dept]/mau-bao-cao/[id]"
+      - "/kn/phong-ban/[dept]/mau-bao-cao/[id]/v/[v]"
+    status: FN
+    fn: [tt/FN-AD-04.06, khtc/FN-AD-04.02, cnts/FN-07]
+    note: "Route dùng chung; khóa menu được phân loại riêng theo phòng."
+
+  - id: web-session
+    kind: web
+    keys:
+      - "/chon-vai-tro"
+      - "/khong-co-quyen"
+      - "/login"
+      - "/login/callback"
+      - "/login/dat-lai-mat-khau"
+      - "/login/lien-he"
+      - "/login/quen-mat-khau"
+      - "/login/silent"
+    status: HẠ_TẦNG
+    needs: [tt/FN-CH-00.01, hcth/FN-05, price/FN-CH-00.01]
+
+  - id: web-tt-adhoc
+    kind: web
+    keys:
+      - "/kn/bao-cao/dot-xuat"
+    status: GỠ
+    package: KN-STANDALONE-4-TT-MENU-PHONG
+
+  - id: web-tt-catalogs
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/danh-muc"
+    status: FN
+    fn: [tt/FN-AD-04.05]
+
+  - id: web-tt-collection
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/thu-thap"
+    status: FN
+    fn: [tt/FN-XA-03.03, tt/FN-XA-03.04, tt/FN-XA-03.05, tt/FN-XA-03.06]
+
+  - id: web-tt-commune-reports
+    kind: web
+    keys:
+      - "/kn/bao-cao/cua-xa"
+    status: FN
+    fn: [tt/FN-XA-03.07]
+
+  - id: web-tt-consolidation
+    kind: web
+    keys:
+      - "/kn/bao-cao/tong-hop"
+      - "/kn/phong-ban/[dept]/tong-hop"
+    status: FN
+    fn: [tt/FN-TI-02.05]
+
+  - id: web-tt-dashboard
+    kind: web
+    keys:
+      - "/kn/dashboard"
+    status: FN
+    fn: [tt/FN-TW-01.01, tt/FN-TI-02.01]
+
+  - id: web-tt-dispatch
+    kind: web
+    keys:
+      - "/kn/bao-cao/chi-cuc"
+    status: FN
+    fn: [tt/FN-TI-02.06]
+    note: "Email và link tải giữ; Google Sheet hoãn pha kết nối."
+
+  - id: web-tt-publish-forms
+    kind: web
+    keys:
+      - "/kn/nhiem-vu/phat-hanh"
+      - "/kn/nhiem-vu/phat-hanh/dot-da-phat-hanh"
+    status: FN
+    fn: [tt/FN-TI-02.02]
+
+  - id: web-tt-report-data
+    kind: web
+    keys:
+      - "/kn/phong-ban/[dept]/du-lieu-bao-cao"
+      - "/kn/phong-ban/[dept]/du-lieu-bao-cao/[id]"
+    status: FN
+    fn: [tt/FN-TI-02.04, tt/FN-XA-03.02]
+
+  - id: web-tt-reports
+    kind: web
+    keys:
+      - "/kn/bao-cao/nam"
+      - "/kn/bao-cao/thang"
+      - "/kn/bao-cao/tuan"
+      - "/kn/bao-cao/vu"
+    status: FN
+    fn: [tt/FN-TW-01.02, tt/FN-XA-03.02, tt/FN-XA-03.07]
+
+  - id: web-tt-review
+    kind: web
+    keys:
+      - "/kn/nhiem-vu/ra-soat"
+      - "/kn/nhiem-vu/ra-soat/[id]"
+    status: FN
+    fn: [tt/FN-TI-02.04]
+
+  - id: web-tt-tasks
+    kind: web
+    keys:
+      - "/kn/nhiem-vu/cong-viec"
+      - "/kn/nhiem-vu/cong-viec/[id]"
+    status: FN
+    fn: [tt/FN-XA-03.01, tt/FN-XA-03.02]
+
+  - id: web-tt-tracking
+    kind: web
+    keys:
+      - "/kn/nhiem-vu/trang-thai-nop"
+      - "/kn/phong-ban/[dept]/theo-doi-nop"
+    status: FN
+    fn: [tt/FN-TI-02.03]
+
+  - id: web-work-schedules
+    kind: web
+    keys:
+      - "/kn/nhiem-vu/lich-cong-tac"
+      - "/kn/nhiem-vu/lich-cong-tac/[id]"
+    status: FN
+    fn: [tt/FN-TI-02.07, tt/FN-XA-03.08, cnts/FN-12]
+    note: "Thay nguồn địa điểm ở KN-STANDALONE-5-TT-DATA."

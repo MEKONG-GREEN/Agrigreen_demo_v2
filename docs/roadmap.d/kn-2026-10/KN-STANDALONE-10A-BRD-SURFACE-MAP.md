@@ -1,0 +1,1 @@
+- [x] KN-STANDALONE-10A-BRD-SURFACE-MAP (#262): lập bản đồ menu theo phòng, route web, nhóm API và màn mobile → FN/HẠ_TẦNG/GỠ/HOÃN; Go/TS so bề mặt thật và chỉ báo cáo chênh lệch; [quy ước và cách chạy](../../kn/gia-dinh/KN-STANDALONE-10A-BRD-SURFACE-MAP.md).
