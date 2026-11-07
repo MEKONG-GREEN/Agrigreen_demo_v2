@@ -9,3 +9,6 @@ Phạm vi HẠ_TẦNG của BRD 2.0; không chứng nhận FN/UAT nghiệp vụ 
 5. Người dùng runtime, wheel optimizer/optcore, hợp đồng consumer và dữ liệu không định danh giữ nguyên. Không push/deploy image canary, không dùng Docker/Compose/PostgreSQL dùng chung trên máy phát triển.
 
 Thao tác kiểm và giới hạn: [giả định gói](../kn/gia-dinh/BF-CI-OPTIMIZER-ZLIB.md).
+
+6. Cổng contact của cùng #287: metadata UUID/hash/derived key hợp lệ chứa `1970` không báo nhầm; PII fixture ở text, unknown/nested/array/number trong DB/log vẫn bị phát hiện (exact và embedded). Kiểm Scan/rows.Err, giữ RLS/tenant/sổ bất biến và negative control thật FAIL → khôi phục byte/hash → PASS; không sửa runtime/auth/migration/vault.
+7. Chứng cứ canary 8bcd99c7 là lịch sử độc lập; phải đối chiếu tất cả input/tool trước khi tái dùng. CI chính mới trên SHA cuối phải đạt cả contact race và optimizer image/matrix; không suy diễn actual CI gốc không có leak từ tái hiện có kiểm soát.
