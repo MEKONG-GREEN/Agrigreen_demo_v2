@@ -134,8 +134,13 @@ func TestTransition(t *testing.T) {
 			t.Errorf("%s + %s = %q, %v; muốn %q", c.cur, c.act, got, err, c.want)
 		}
 	}
-	if len(Kinds) != 13 || Kinds[11].No != 12 || Kinds[11].Level != LevelUrgent {
-		t.Fatal("bảng 12 cảnh báo Mục III.5 + trễ liên tiếp")
+	if len(Kinds) != 14 || Kinds[11].No != 12 || Kinds[11].Level != LevelUrgent {
+		t.Fatal("bảng 13 cảnh báo Mục III.5 (CNTS v4.0) + trễ liên tiếp")
+	}
+	// CNTS v4.0 Mục III.5 dòng 13: Chưa check-out — Cần chú ý, gửi người theo dõi lịch cán bộ xã.
+	if k, ok := KindOf(KindNoCheckout); !ok || k.No != 13 || k.Level != LevelAttention || k.LevelConfigurable ||
+		len(k.Recipients) != 1 || k.Recipients[0] != RecipScheduleFollower {
+		t.Fatalf("dòng 13 Chưa check-out: %+v", k)
 	}
 }
 

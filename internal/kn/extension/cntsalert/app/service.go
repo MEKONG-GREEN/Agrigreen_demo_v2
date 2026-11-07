@@ -90,6 +90,9 @@ type Service struct {
 	Control formsport.PeriodControl
 	// Names (tùy chọn): tên cán bộ cho lịch sử, người xử lý.
 	Names func() partyport.ActorNames
+	// Followers (CNTS v4.0 Mục III.5 dòng 13): người theo dõi lịch cán bộ xã nhận cảnh báo "Chưa check-out". nil → cảnh
+	// báo vẫn sinh, không có người nhận đích danh.
+	Followers FollowersFunc
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

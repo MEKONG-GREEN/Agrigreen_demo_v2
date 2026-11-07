@@ -147,6 +147,43 @@ func DeleteBlind(ctx context.Context, tx pgx.Tx, ref uuid.UUID, kind string) err
 	return err
 }
 
+// Revision là dòng vault.identity_revision (#251): bản mã họ tên/SĐT trước và sau một lần Amend.
+type Revision struct {
+	Ref         uuid.UUID
+	SubjectRef  uuid.UUID
+	PrevNameCT  []byte
+	PrevPhoneCT []byte
+	NextNameCT  []byte
+	NextPhoneCT []byte
+}
+
+// InsertRevision ghi một bản sửa.
+func InsertRevision(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, r Revision, by uuid.UUID) error {
+	_, err := tx.Exec(ctx, `INSERT INTO vault.identity_revision (tenant_id, ref, subject_ref, prev_name_ct, prev_phone_ct,
+	    next_name_ct, next_phone_ct, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		tenantID, r.Ref, r.SubjectRef, r.PrevNameCT, r.PrevPhoneCT, r.NextNameCT, r.NextPhoneCT, by)
+	return err
+}
+
+// Revisions đọc các bản sửa theo mã (mã lạ/đã xóa cùng chủ thể → vắng), sắp theo mã.
+func Revisions(ctx context.Context, tx pgx.Tx, refs []uuid.UUID) ([]Revision, error) {
+	rows, err := tx.Query(ctx, `SELECT ref, subject_ref, prev_name_ct, prev_phone_ct, next_name_ct, next_phone_ct
+	    FROM vault.identity_revision WHERE ref = ANY($1::uuid[]) ORDER BY ref`, refStrs(refs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Revision
+	for rows.Next() {
+		var r Revision
+		if err := rows.Scan(&r.Ref, &r.SubjectRef, &r.PrevNameCT, &r.PrevPhoneCT, &r.NextNameCT, &r.NextPhoneCT); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // Section là dòng vault.section (bản mã, khóa riêng của ngăn đã bọc).
 type Section struct {
 	PayloadCT  []byte
@@ -183,7 +220,8 @@ func PutSection(ctx context.Context, tx pgx.Tx, tenantID, ref uuid.UUID, section
 func Erase(ctx context.Context, tx pgx.Tx, ref uuid.UUID, at time.Time, by uuid.UUID, reason string) error {
 	for _, q := range []string{
 		"DELETE FROM vault.blind_index WHERE subject_ref = $1",
-		"DELETE FROM vault.section WHERE subject_ref = $1", // W11.22, vault 000004
+		"DELETE FROM vault.section WHERE subject_ref = $1",           // W11.22, vault 000004
+		"DELETE FROM vault.identity_revision WHERE subject_ref = $1", // #251, vault 20261106164139
 		"DELETE FROM vault.identity WHERE subject_ref = $1",
 		"DELETE FROM vault.subject_key WHERE subject_ref = $1",
 	} {

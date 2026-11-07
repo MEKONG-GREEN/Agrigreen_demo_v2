@@ -173,12 +173,23 @@ Nguồn và giới hạn: [giả định W11.45](../kn/gia-dinh/W11.45.md) (Q-04
 | ★ Xuất Word theo bố cục bản giấy (tuần A–D, tháng/quý/năm I–III), số `{n}/BC-CNTS` chỉ cho bản đã gửi, xuất lại dùng lại số | `TestCNTSBM11_W1145`, `TestBM11WordTemplates` | G1 |
 | Màn "Báo cáo định kỳ" (Cấp Tỉnh CNTS) và "Báo cáo đến" (HCTH, KHTC); menu | Vitest `bm11.test.tsx`, `kn-menu.contract.test.ts`; `TestWebMenuFixture` | G1 |
 | Email công vụ, thông báo cho phòng nhận, phụ lục kinh phí của báo cáo tháng, cấu hình nơi nhận theo loại trên màn riêng | — | Chưa làm |
-## FN-07 — phần xem/kiểm cấu trúc (#174)
+## FN-07 — Thiết kế & phát hành biểu mẫu (BRD CNTS v4.0; #174, #191, #192)
+
+Căn cứ: BRD CNTS v4.0 FN-07 (B1–B4, luồng phụ "Sao chép biểu; nạp cấu trúc từ Excel", BR-01, BR-02, AC-01…AC-03), UR-TINH-07,
+ma trận quyền FN-07 (Admin CRUD; Cấp Tỉnh "Cán bộ tổng hợp" CRU; viên chức, lãnh đạo phòng chỉ xem), FN-21 B1 "biểu và phiên bản".
 
 | Tiêu chí | Bằng chứng tự động | Phạm vi |
 |---|---|---|
-| Cấp Tỉnh CNTS/Admin xem cấu trúc đúng phiên bản đã cài; chưa cài hiện tham khảo, Xã/TW/phòng khác 403 | `TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN` (PG thật), `design.test.ts`, `CntsDesignScreen.test.tsx` | Phần đầu |
-| Kiểm XLSX/CSV theo dòng/header/type/cờ/giới hạn; có lỗi trả fields rỗng, công thức bị từ chối, kể cả tệp hợp lệ không ghi template | Test PG trên + `TestParseCNTSDesign` (1e±100000, 100k chữ số, trùng mã/choice/500 dòng); E2E `kn-cnts-design.spec.ts` | Phần đầu |
-| Menu mở màn thật, xem trước theo schema, file lỗi không có thao tác Lưu giả | Component/Vitest/E2E trên, menu golden | Phần đầu |
+| Cấp Tỉnh CNTS/Admin xem cấu trúc đúng phiên bản đã cài (biểu kỳ và biểu điều tra, không có danh sách mã cố định); Xã/TW/phòng khác 403 | `TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN`, `TestCNTSDesignEdit_FN07_192` (PG thật), `design.test.ts`, `CntsDesignScreen.test.tsx` | G1 |
+| Kiểm XLSX/CSV theo dòng/header/type/cờ/giới hạn; có lỗi trả fields rỗng, công thức bị từ chối, kiểm tệp không ghi | Test PG trên + `TestParseCNTSDesign` (1e±100000, 100k chữ số, trùng mã/choice/500 dòng) | G1 |
+| ★ B1–B2: sửa cấu trúc và lưu thành phiên bản mới với `base_version`; lưu chồng trên bản đã cũ → 409, không ghi; lịch sử phiên bản | `TestCNTSDesignEdit_FN07_192` (AC-03, lịch sử), `CntsDesignScreen.test.tsx` | G1 |
+| ★ AC-03, BR-01: sửa cấu trúc BM-17 không đổi kỳ/bài đã nộp (kỳ cũ giữ `template_id` phiên bản 1 và số liệu); kỳ phát hành sau dùng phiên bản mới; cài lại biểu chuẩn không ghi đè phiên bản Cấp Tỉnh | `TestCNTSDesignEdit_FN07_192` | G1 |
+| ★ BR-02: mẫu KNQG (BM-01, BM-04, BM-05 I/II) từ chối thay cấu trúc qua API KN, REST `/v1/forms/templates` và `Publisher.DefineTemplate` — kể cả Admin; chỉ cài đúng cấu trúc chuẩn | `TestCNTSDesignEdit_FN07_192`, `TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN`, `TestCNTSDesignEditRules` | G1 |
+| ★ UR-TINH-07 "mẫu đang có dữ liệu chỉ thêm cột, không xóa": xóa/đổi kiểu chỉ tiêu bị chặn (API KN 422, cổng chung 403) | `TestCNTSDesignEdit_FN07_192`, `TestCNTSDesignEditRules`, `design.test.ts` | G1 |
+| ★ Ma trận quyền: chỉ Admin và cán bộ tổng hợp Cấp Tỉnh CNTS lưu phiên bản; viên chức, lãnh đạo phòng, TW, Xã 403, không ghi | `TestCNTSDesignEdit_FN07_192` | G1 |
+| ★ Luồng phụ: sao chép biểu (kể cả mẫu KNQG) thành biểu điều tra `CNTS-DT-<mã>` phiên bản 1; tạo biểu điều tra từ kết quả kiểm Excel hợp lệ bằng thao tác lưu tường minh; mã trùng 409; cấu trúc sai 422, không ghi | `TestCNTSDesignEdit_FN07_192`, `design.test.ts`, `CntsDesignScreen.test.tsx` | G1 |
+| ★ FN-21 B1: đợt điều tra chọn biểu và phiên bản; phát hành dùng đúng `template_id` của phiên bản đã chọn dù đã có phiên bản mới hơn; kết quả đợt theo phiên bản đã phát hành; phiên bản không có → 422 | `TestCNTSDesignEdit_FN07_192`, `TestDraftValidate`, `campaign.test.ts` | G1 |
+| B3–B4, AC-01, AC-02: phát hành đợt theo kỳ/nhóm xã, người phụ trách, xem trước số việc | Mục BF-CN-PUBLISH (UR-TINH-08) ở trên | G1 |
+| Mẫu nhật ký động (chỉ tiêu, tần suất, bắt buộc GPS/ảnh, chủ nhiệm chỉ chương trình mình), loại "lịch", biểu kỳ báo cáo mã mới | — | Gói con BF-CN-FORM-DESIGN-EDIT-DIARY (tách từ #192) |
 
-Chưa nghiệm thu toàn bộ FN-07/AC-03: sửa/sao chép/lưu version, khóa KNQG qua mọi API, chọn phiên bản khi phát hành, nhật ký động/GPS/ảnh, biểu điều tra cho chiến dịch. Còn #191/#192 (child của #174). Không đổi hàng FN-07 thành Đủ vì chỉ có phần xem/kiểm tệp.
+Giới hạn: quy tắc "chỉ thêm cột" áp cho mọi mẫu đã có phiên bản (cổng chung không có phép đọc "mẫu đã có dữ liệu" theo mã), chặt hơn câu chữ UR-TINH-07. Danh sách cột tiêm phòng BM-04 theo kỳ hiệu lực thuộc danh mục FN-06, không sửa qua FN-07 vì BM-04 là mẫu KNQG.

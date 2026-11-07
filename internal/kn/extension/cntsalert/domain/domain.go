@@ -76,6 +76,7 @@ const (
 	KindVaccineOverdue = "vaccine_overdue" // 11 Mũi tiêm quá hạn (BM-07; quy tắc liên biểu số 7)
 	KindOutbreak       = "outbreak"        // 12 Ổ dịch mới (BM-10), báo nghi dịch đã xác nhận
 	KindLateStreak     = "late_streak"     // trễ nộp liên tiếp (UR-TINH-08, FN-13 AC-06)
+	KindNoCheckout     = "no_checkout"     // 13 Chưa check-out (CNTS v4.0 FN-12 BR-07/BR-08)
 )
 
 // Người nhận theo bảng Mục III.5 (giải ra tài khoản ở tầng ứng dụng).
@@ -88,6 +89,9 @@ const (
 	RecipProgramLead = "program_lead" // chủ nhiệm chương trình (W11.47/W11.48)
 	RecipSiteOfficer = "site_officer" // cán bộ theo dõi điểm (W11.47/W11.48)
 	RecipFarmer      = "farmer"       // nông hộ (W11.55)
+	// RecipScheduleFollower: người theo dõi lịch cán bộ xã — người duyệt được lịch (FN-12 BR-04: người theo dõi được
+	// phân công hoặc Lãnh đạo phòng, theo quy tắc duyệt của phòng ban).
+	RecipScheduleFollower = "schedule_follower"
 )
 
 // KindInfo mô tả một loại cảnh báo.
@@ -120,6 +124,7 @@ var Kinds = []KindInfo{
 	{KindVaccineOverdue, 11, "Mũi tiêm quá hạn", LevelAttention, false, []string{RecipSiteOfficer, RecipFarmer}, "schedule"},
 	{KindOutbreak, 12, "Ổ dịch mới", LevelUrgent, false, []string{RecipManager, RecipProvince, RecipProgramLead}, "outbreak"},
 	{KindLateStreak, 0, "Trễ nộp liên tiếp", LevelAttention, false, []string{RecipFormOwner, RecipManager}, "job"},
+	{KindNoCheckout, 13, "Chưa check-out", LevelAttention, false, []string{RecipScheduleFollower}, "schedule"},
 }
 
 // KindOf trả mô tả loại (ok = false nếu không biết).

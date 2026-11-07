@@ -32,6 +32,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
 
 // Mã lỗi (docs/errors/pf-extension-cnts-outbreak.md).
@@ -67,6 +68,9 @@ type Service struct {
 	Names func() partyport.ActorNames
 	// Exporter (tùy chọn, BF-CN-OUTBREAK): xuất Word BM-10 qua pf/export. nil → route Word trả 503.
 	Exporter exportport.Exporter
+	// Vault: kho định danh — họ tên, SĐT chủ hộ nhập mới tại DB-04 (FN-10 BR-08), nhãn che bớt chủ hộ ở chi tiết, Word.
+	// nil → nhập hộ mới trả 503; đọc không có nhãn.
+	Vault client.Client
 }
 
 func newID() uuid.UUID { return ids.New() }
@@ -254,19 +258,47 @@ func codeList(s string) []string {
 }
 
 // checkCatalogs kiểm bệnh, vật nuôi theo ngày diễn biến; bệnh có danh sách loài thì loài phải thuộc danh sách.
-// Trả mục bệnh (cờ notifiable).
-func (s *Service) checkCatalogs(ctx context.Context, base *problem.Problem, disease, species string, on time.Time) (mdport.CatalogItem, error) {
+// Trả mục bệnh (cờ notifiable) và bệnh có thuộc nhóm thủy sản không (DB-16).
+func (s *Service) checkCatalogs(ctx context.Context, base *problem.Problem, disease, species string, on time.Time) (mdport.CatalogItem, bool, error) {
 	d, err := s.catalogItem(ctx, base, "disease_code", port.CatalogCNTSDisease, disease, on)
 	if err != nil {
-		return d, err
+		return d, false, err
 	}
-	if _, err := s.catalogItem(ctx, base, "species_code", port.CatalogCNTSSpecies, species, on); err != nil {
-		return d, err
+	sp, err := s.catalogItem(ctx, base, "species_code", port.CatalogCNTSSpecies, species, on)
+	if err != nil {
+		return d, false, err
 	}
-	if sp := codeList(d.Attrs[port.AttrSpecies]); len(sp) > 0 && !slices.Contains(sp, species) {
-		return d, base.WithField("species_code", "bệnh "+d.Name+" không áp dụng cho vật nuôi này (danh mục bệnh)")
+	list := codeList(d.Attrs[port.AttrSpecies])
+	if len(list) > 0 && !slices.Contains(list, species) {
+		return d, false, base.WithField("species_code", "bệnh "+d.Name+" không áp dụng cho vật nuôi này (danh mục bệnh)")
 	}
-	return d, nil
+	aquatic, err := s.aquatic(ctx, list, sp, on)
+	return d, aquatic, err
+}
+
+// aquatic: bệnh thuộc nhóm thủy sản (UR-XA-10 "danh mục bệnh, FN-06") khi một loài trong danh sách loài của bệnh có nhóm
+// thuy_san (attrs.group của cnts_species); bệnh chưa khai danh sách loài thì xét nhóm của vật nuôi ổ dịch.
+func (s *Service) aquatic(ctx context.Context, list []string, species mdport.CatalogItem, on time.Time) (bool, error) {
+	if len(list) == 0 {
+		return species.Attrs[domain.AttrSpeciesGroup] == domain.GroupAquatic, nil
+	}
+	for _, code := range list {
+		if code == species.Code {
+			if species.Attrs[domain.AttrSpeciesGroup] == domain.GroupAquatic {
+				return true, nil
+			}
+			continue
+		}
+		it, err := s.Catalogs.ItemAt(ctx, port.CatalogCNTSSpecies, code, on)
+		switch {
+		case errors.Is(err, mdport.ErrCatalogItemNotFound), errors.Is(err, mdport.ErrNotEffective):
+		case err != nil:
+			return false, err
+		case it.Attrs[domain.AttrSpeciesGroup] == domain.GroupAquatic:
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // emitReported ghi sự kiện ổ dịch mới (cảnh báo Khẩn W11.43, lớp bản đồ W11.52).
@@ -275,7 +307,7 @@ func emitReported(ctx context.Context, tx pgx.Tx, c caller, r store.OutbreakRow,
 		OutbreakRef: r.Ref, VersionID: r.ID, CommuneCode: r.CommuneCode, DiseaseCode: r.DiseaseCode, SpeciesCode: r.SpeciesCode,
 		Notifiable: disease.Attrs["notifiable"] == "true", SuspectRef: r.SuspectRef, ReceivedAt: r.ReceivedAt.UTC().Format(time.RFC3339),
 		ReportedAt: r.EventTime.UTC().Format(time.RFC3339), ReporterRef: r.ActorRef, Department: DeptCNTS, HerdSize: r.HerdSize,
-		Dead: r.Dead, AsOf: r.AsOf.Format(time.DateOnly), RuleVersion: domain.RuleVersion,
+		Dead: r.Dead, AsOf: r.AsOf.Format(time.DateOnly), RuleVersion: r.RuleVersion,
 	}
 	if unit.ParentCode != "" {
 		pc := unit.ParentCode

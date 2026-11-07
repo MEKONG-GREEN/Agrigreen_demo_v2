@@ -90,6 +90,10 @@ func newAggFxPool(t *testing.T, pool *pgxpool.Pool, facs facilityDir, wire ...fu
 		t.Fatal(err)
 	}
 	kn := extension.New(pool, clk, extension.Deps{Orgs: provinceOrgs{}})
+	// #192: như gốc lắp ráp — profile kn_cnts bắt buộc chính sách định nghĩa biểu của chủ KN.
+	if err := fm.UseDefinitionPolicy(platformasm.KNCNTSProfile.Name, kn.CNTSDefinitionPolicy()); err != nil {
+		t.Fatal(err)
+	}
 	kn.UseFormsPublisher(fm.Publisher())
 	kn.UseFormsFigures(fm.Figures())
 	for _, w := range wire {

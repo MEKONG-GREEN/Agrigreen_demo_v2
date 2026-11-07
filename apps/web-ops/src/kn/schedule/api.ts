@@ -88,6 +88,16 @@ export function createWorkScheduleApi(api: ApiClient) {
     bulkApprove: (ids: string[], key?: string): Promise<BulkApproveResult> =>
       unwrap(api.POST("/v1/extension/work-schedules/bulk-approve", { params: idem(key), body: { ids } })),
 
+    /** Ảnh check-in / check-out của mục (CNTS v4.0 CV-07/CV-08) — người đăng ký, người duyệt lịch. */
+    async visitPhoto(id: string, itemId: string, kind: "checkin" | "checkout"): Promise<Blob> {
+      const res =
+        kind === "checkin"
+          ? await api.GET("/v1/extension/work-schedules/{id}/items/{item_id}/checkin/photo", { params: { path: { id, item_id: itemId } }, parseAs: "blob" })
+          : await api.GET("/v1/extension/work-schedules/{id}/items/{item_id}/checkout/photo", { params: { path: { id, item_id: itemId } }, parseAs: "blob" });
+      if (!res.response.ok || !res.data) throw await parseProblemResponse(res.response);
+      return res.data as Blob;
+    },
+
     /** Xuất Excel/PDF (GET …/export?format=xlsx|pdf) — trả tệp và tên tệp từ Content-Disposition. */
     async exportFile(q: { week_start: string; status?: WsStatus; commune_code?: string; format: "xlsx" | "pdf" }): Promise<{ blob: Blob; name: string }> {
       const res = await api.GET("/v1/extension/work-schedules/export", { params: { query: q }, parseAs: "blob" });

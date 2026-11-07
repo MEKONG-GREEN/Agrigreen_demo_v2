@@ -399,7 +399,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/CNTSBM11Summary"
         - type: object
-          required: [version, content_hash, basis, communes, coverage, groups, lines, fishery, programs, sections, supplement, return_comment, recipient_list, history, can, replayed]
+          required: [version, content_hash, basis, communes, coverage, groups, lines, fishery, programs, sections, supplement, herds, herd_types, return_comment, recipient_list, history, can, replayed]
           properties:
             version: {type: integer, format: int64}
             content_hash: {type: string}
@@ -446,6 +446,12 @@ components:
                   unit: {type: string}
                   sent: {type: string}
                   now: {type: string}
+            herds:
+              description: "Hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07) — đếm từ danh sách hộ chăn nuôi (hộ Đang dùng) lúc lập/làm mới báo cáo; null ở báo cáo lập trước v4.0."
+              oneOf:
+                - $ref: "#/components/schemas/CNTSBM11Herds"
+                - type: "null"
+            herd_types: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Key"}, description: "Loại chăn nuôi HCN-06 theo thứ tự cột"}
             return_comment: {type: string}
             recipient_list:
               type: array
@@ -484,6 +490,34 @@ components:
                 receive: {type: boolean}
                 word: {type: boolean}
             replayed: {type: boolean}
+# @ag-order: 31473
+    CNTSBM11HerdRow:
+      type: object
+      required: [commune, name, households, farms, by_type]
+      properties:
+        commune: {type: string, description: "Mã xã; rỗng ở dòng toàn tỉnh"}
+        name: {type: string}
+        households: {type: integer}
+        farms: {type: integer, description: "Trang trại nhỏ + vừa + công nghiệp"}
+        by_type: {type: object, additionalProperties: {type: integer}, description: "Loại chăn nuôi → số hộ (nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep)"}
+# @ag-order: 31473
+    CNTSBM11HeadRow:
+      type: object
+      required: [species, name, household, farm]
+      properties:
+        species: {type: string}
+        name: {type: string}
+        household: {type: string, description: "Số con ở nông hộ (thập phân dạng chuỗi)"}
+        farm: {type: string, description: "Số con ở trang trại (thập phân dạng chuỗi)"}
+# @ag-order: 31473
+    CNTSBM11Herds:
+      type: object
+      required: [communes, total, communes_total, heads]
+      properties:
+        communes: {type: array, items: {$ref: "#/components/schemas/CNTSBM11HerdRow"}}
+        total: {$ref: "#/components/schemas/CNTSBM11HerdRow"}
+        communes_total: {type: integer, description: "Số xã của tỉnh (0 = chưa biết)"}
+        heads: {type: array, items: {$ref: "#/components/schemas/CNTSBM11HeadRow"}}
 # @ag-order: 31474
     CNTSBM11WordRun:
       type: object

@@ -209,7 +209,8 @@ func (s *Service) Results(ctx context.Context, cid uuid.UUID) (Results, error) {
 		return Results{}, ErrDependency.WithDetail("chưa nối số liệu kỳ native (cap/forms)")
 	}
 	v := cur.Version
-	ref, err := s.Forms.LatestTemplate(ctx, domain.Profile, v.TemplateCode)
+	// #192 (FN-07 BR-01): cột kết quả theo phiên bản biểu ĐÃ PHÁT HÀNH của đợt, không theo phiên bản mới hơn.
+	ref, err := s.template(ctx, v.TemplateCode, cur.Period.TemplateVersion)
 	if err != nil {
 		return Results{}, err
 	}

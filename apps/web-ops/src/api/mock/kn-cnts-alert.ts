@@ -33,6 +33,7 @@ const KIND_TABLE: Cfg["kinds"][number]["kind"][] = [
   { code: "vaccine_overdue", no: 11, label: "Mũi tiêm quá hạn", default_level: "attention", level_configurable: false, recipients: ["site_officer", "farmer"], source: "schedule" },
   { code: "outbreak", no: 12, label: "Ổ dịch mới", default_level: "urgent", level_configurable: false, recipients: ["manager", "province", "program_lead"], source: "outbreak" },
   { code: "late_streak", no: 0, label: "Trễ nộp liên tiếp", default_level: "attention", level_configurable: false, recipients: ["form_owner", "manager"], source: "job" },
+  { code: "no_checkout", no: 13, label: "Chưa check-out", default_level: "attention", level_configurable: false, recipients: ["schedule_follower"], source: "schedule" },
 ];
 const FORM_TABLE = [
   ["CNTS-BM01", "BM-01 Kiểm soát giết mổ hằng ngày"],

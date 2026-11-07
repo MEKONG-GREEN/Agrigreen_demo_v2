@@ -45,6 +45,9 @@ func FormProfiles() []formsport.Profile {
 		UnitKinds:         []string{formsport.UnitCommune, formsport.UnitFacility, formsport.UnitHousehold},
 		Departments:       []string{partyport.DeptChanNuoiThuySan},
 		RequireLateReason: true,
+		// #192 (FN-07 BR-02, UR-TINH-07): mọi phiên bản biểu kn_cnts đi qua Module.CNTSDefinitionPolicy (khóa mẫu KNQG,
+		// cán bộ tổng hợp Cấp Tỉnh, chỉ thêm chỉ tiêu); thiếu đăng ký → từ chối, không rơi về DefineBy.
+		RequireDefinitionPolicy: true,
 	}
 
 	// KNKHTCProfile là cấu hình cap/forms của phiếu "Báo cáo cho KHTC" (W11.05, BRD KHTC v2.2): đơn vị lá là PHÒNG BAN.

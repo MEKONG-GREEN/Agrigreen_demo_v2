@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:agrigreen_mobile/application/auth_flow.dart';
 import 'package:agrigreen_mobile/application/push_coordinator.dart';
 import 'package:agrigreen_mobile/data/auth/oidc_client.dart';
-import 'package:agrigreen_mobile/data/auth/pin_service.dart';
 import 'package:agrigreen_mobile/data/auth/session_service.dart';
 import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
 import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
@@ -31,17 +30,6 @@ final sessionServiceProvider = Provider<SessionService>((ref) {
     clock: pf.clock,
     oidc: ref.watch(oidcProvider),
     offlineMax: pf.config.offlineSessionMax,
-  );
-});
-
-final pinServiceProvider = Provider<PinService>((ref) {
-  final pf = ref.watch(platformProvider);
-  return PinService(
-    store: pf.store,
-    clock: pf.clock,
-    maxAttempts: pf.config.pinMaxAttempts,
-    lockout: pf.config.pinLockout,
-    hardLimit: pf.config.pinHardLimit,
   );
 });
 
@@ -74,11 +62,10 @@ final pendingDeepLinkProvider = NotifierProvider<PendingDeepLink, String?>(
   PendingDeepLink.new,
 );
 
+/// App KN không có PIN (BRD 2.0 FN-CH-00.01, FN-05 — ADR-0057): phiên ngoại tuyến 72 giờ mở thẳng, bảo vệ bằng khóa
+/// màn hình của thiết bị.
 final authFlowProvider = Provider<AuthFlow>(
-  (ref) => AuthFlow(
-    session: ref.watch(sessionServiceProvider),
-    pins: ref.watch(pinServiceProvider),
-  ),
+  (ref) => AuthFlow(session: ref.watch(sessionServiceProvider)),
 );
 
 class AppState {
@@ -237,16 +224,13 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> loginOnline() => _busy(_flow.loginOnline);
-  Future<void> setPin(String pin, String confirm) =>
-      _busy(() => _flow.setPin(pin, confirm));
-  Future<void> unlock(String pin) => _busy(() => _flow.unlock(pin));
 
-  /// Khóa màn hình: đóng CSDL, về màn PIN.
-  Future<void> lock() async {
+  /// Đăng xuất (menu tài khoản — FN-CH-00.01): đóng CSDL, xóa token, về màn đăng nhập trực tuyến.
+  Future<void> signOut() async {
     _stopAutoSync();
     _push.detach();
     await state.services?.close();
-    state = const AppState(AuthView(AuthStage.locked));
+    state = AppState(await _flow.signOut());
   }
 
   void _onWiped() {

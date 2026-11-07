@@ -16,7 +16,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
+	lhdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntslivestock/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/domain"
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
@@ -28,11 +30,12 @@ import (
 const (
 	WordOwner       = "pf/extension"
 	WordTemplateKey = "cnts.bm10"
-	WordVersion     = 1
+	WordVersion     = 2 // #252: DB-04 nhiều hộ, DB-14…DB-16 (CNTS v4.0)
 	WordSeries      = "BC-TTKN"
 	VarNumber       = "so_van_ban"
 	VarPlaceDate    = "dia_danh_ngay"
 	listProgress    = "dien_bien"
+	listHouseholds  = "ho"
 )
 
 // WordSubject là đối tượng của lịch sử Word và số văn bản trong pf/export: một ổ dịch nhận một số.
@@ -50,7 +53,8 @@ func WordTemplate() doctpl.Template {
 		Vars: []doctpl.Var{
 			v(VarNumber, "Số văn bản", false), v(VarPlaceDate, "Địa danh, ngày", true), v("benh", "Bệnh (DB-01)", true),
 			v("xa", "Xã/phường", true), v("tiep_nhan", "Thời điểm tiếp nhận (DB-02)", true), v("nguon_tin", "Nguồn tin (DB-03)", true),
-			v("dia_ban", "Hộ chăn nuôi, địa chỉ (DB-04)", true), v("vi_tri", "Vị trí ổ dịch (DB-05)", true),
+			v("dia_ban", "Địa bàn (ấp, khu vực)", true), v("so_ho", "Số hộ bị ảnh hưởng (DB-15)", true),
+			v("thuy_san", "Diện tích thủy sản bị ảnh hưởng (DB-16)", false), v("vi_tri", "Vị trí ổ dịch (DB-05)", true),
 			v("vat_nuoi", "Vật nuôi", true), v("quy_mo", "Quy mô đàn (DB-06)", true), v("ngay_tuoi", "Ngày tuổi", false),
 			v("so_chet", "Số con chết (DB-07)", true), v("trieu_chung", "Triệu chứng (DB-08)", true),
 			v("xet_nghiem", "Lấy mẫu, xét nghiệm (DB-09)", false), v("tieu_huy", "Tiêu hủy (DB-10)", true),
@@ -58,7 +62,8 @@ func WordTemplate() doctpl.Template {
 			v("phong_chong", "Phòng chống, kiến nghị (DB-12)", false), v("trang_thai", "Trạng thái", true),
 			v("dien_bien_den", "Diễn biến đến ngày", true), v("phien_ban", "Phiên bản", true),
 		},
-		Lists: []doctpl.List{{Key: listProgress, Label: "Diễn biến", Fields: []string{"ngay", "su_viec", "so_chet", "tieu_huy", "ghi_chu"}}},
+		Lists: []doctpl.List{{Key: listProgress, Label: "Diễn biến", Fields: []string{"ngay", "su_viec", "so_chet", "tieu_huy", "ghi_chu"}},
+			{Key: listHouseholds, Label: "Hộ chăn nuôi bị ảnh hưởng (DB-04, DB-14)", Fields: []string{"ma", "chu_ho", "dia_chi", "loai"}}},
 		Body: []doctpl.Block{
 			{Kind: doctpl.KindColumns, Split: 3900,
 				Left: []doctpl.Line{{Text: "SỞ NÔNG NGHIỆP VÀ MÔI TRƯỜNG"}, {Text: "TRUNG TÂM KHUYẾN NÔNG", Bold: true}, {Text: "Số: {so_van_ban}"}},
@@ -71,7 +76,14 @@ func WordTemplate() doctpl.Template {
 			{Kind: doctpl.KindSection, Key: "tinh_hinh", Text: "1. Tình hình dịch bệnh, xử lý ổ dịch, nhận định tình hình", Blocks: []doctpl.Block{
 				h("1.1 Tình hình dịch bệnh"),
 				p("Nguồn tin: {nguon_tin}. Thời điểm tiếp nhận thông tin bệnh: {tiep_nhan}."),
-				p("Hộ chăn nuôi, địa chỉ: {dia_ban}. Vị trí ổ dịch: {vi_tri}."),
+				p("Số hộ bị ảnh hưởng: {so_ho} hộ. Địa bàn: {dia_ban}. Vị trí ổ dịch: {vi_tri}."),
+				{Kind: doctpl.KindTable, Each: listHouseholds, EmptyText: "Báo cáo trước CNTS v4.0: chưa có danh sách hộ.", Columns: []doctpl.Column{
+					{Header: "Mã hộ", Value: "{ho.ma}", Width: 1500},
+					{Header: "Chủ hộ / trang trại", Value: "{ho.chu_ho}", Width: 2800},
+					{Header: "Ấp, khu phố", Value: "{ho.dia_chi}", Width: 2600},
+					{Header: "Loại chăn nuôi", Value: "{ho.loai}", Width: 2100},
+				}},
+				pIf("thuy_san", "Diện tích thủy sản bị ảnh hưởng: {thuy_san}."),
 				p("Quy mô đàn {vat_nuoi} tại thời điểm phát hiện: {quy_mo} con{ngay_tuoi}."),
 				p("Số con chết: {so_chet} con."),
 				p("Triệu chứng: {trieu_chung}."),
@@ -155,14 +167,28 @@ func WordData(vs []OutbreakView, commune string) doctpl.Data {
 	if o.ChemicalLiters != nil {
 		chem = o.ChemicalLiters.String()
 	}
+	aqua := ""
+	if o.AquaFarmedHa != nil || o.AquaWildHa != nil {
+		ha := func(d *decimal.Decimal) string {
+			if d == nil {
+				return "0"
+			}
+			return d.String()
+		}
+		aqua = "nuôi trồng " + ha(o.AquaFarmedHa) + " ha, khai thác " + ha(o.AquaWildHa) + " ha"
+	}
 	d := doctpl.Data{Vars: map[string]string{
 		VarNumber: "", VarPlaceDate: "", "benh": o.DiseaseName, "xa": commune,
 		"tiep_nhan": o.ReceivedAt.In(clock.Zone()).Format("15:04 ngày 02/01/2006"), "nguon_tin": or(sourceVI[o.Source], o.Source),
-		"dia_ban": or(o.Locality, "—"), "vi_tri": vi, "vat_nuoi": strings.ToLower(o.SpeciesName), "quy_mo": strconv.FormatInt(o.HerdSize, 10),
+		"dia_ban": or(o.Locality, "—"), "so_ho": strconv.FormatInt(o.Affected, 10), "thuy_san": aqua, "vi_tri": vi, "vat_nuoi": strings.ToLower(o.SpeciesName), "quy_mo": strconv.FormatInt(o.HerdSize, 10),
 		"ngay_tuoi": age, "so_chet": strconv.FormatInt(o.Dead, 10), "trieu_chung": o.Symptoms, "xet_nghiem": strings.Join(lab, ", "),
 		"tieu_huy": culled, "hoa_chat": chem, "vung_dem": o.BufferNote, "phong_chong": o.PreventionNote,
 		"trang_thai": statusVI[o.Status], "dien_bien_den": o.AsOf.Format("02/01/2006"), "phien_ban": strconv.FormatInt(o.Seq, 10),
-	}, Lists: map[string][]doctpl.Item{listProgress: {}}}
+	}, Lists: map[string][]doctpl.Item{listProgress: {}, listHouseholds: {}}}
+	for _, h := range o.Households {
+		d.Lists[listHouseholds] = append(d.Lists[listHouseholds], doctpl.Item{"ma": h.Code, "chu_ho": or(h.OwnerLabel, "—"),
+			"dia_chi": or(h.Hamlet, "—"), "loai": or(lhdomain.TypeLabels[h.LivestockType], h.LivestockType)})
+	}
 	// Diễn biến: cũ trước.
 	for i := len(vs) - 1; i >= 0; i-- {
 		x := vs[i]
@@ -192,7 +218,11 @@ func (s *Service) ExportWord(ctx context.Context, ref uuid.UUID, idem string) (e
 	if err != nil {
 		return exportport.Run{}, err
 	}
-	vs := s.obViews(ctx, rs)
+	vs, err := s.obViews(ctx, c.p.TenantID, rs)
+	if err != nil {
+		return exportport.Run{}, err
+	}
+	s.ownerLabels(ctx, vs[:1])
 	commune, place := "xã "+rs[0].CommuneCode, ""
 	if s.Units != nil {
 		at := s.now()
