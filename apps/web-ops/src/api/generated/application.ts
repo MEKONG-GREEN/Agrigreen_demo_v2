@@ -21558,6 +21558,10 @@ export interface components {
             main: components["schemas"]["PriceSurveyCostBlock"] | null;
             compare: components["schemas"]["PriceSurveyCostBlock"] | null;
             regions: components["schemas"]["PriceRef"][];
+            /** @description Mặt hàng có phiếu đã duyệt trong các đợt đang xem; không thay đổi khi lọc */
+            items: components["schemas"]["PriceRef"][];
+            /** @description Xã có phiếu đã duyệt trong các đợt đang xem; không dữ liệu cá nhân */
+            communes: components["schemas"]["PriceRef"][];
             can_export: boolean;
         };
         PriceSurveyCostRow: {

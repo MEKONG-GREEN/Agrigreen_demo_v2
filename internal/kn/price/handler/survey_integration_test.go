@@ -635,3 +635,78 @@ func TestBG_FN_TW_01_04_CostMedianNoPII(t *testing.T) {
 		t.Fatalf("so sánh hai đợt: %v", v)
 	}
 }
+
+// #218: mỗi khoản và mỗi vùng có số liệu khác nhau; phát hiện trung bình có trọng số sai hoặc lấy giá ngoài điều tra.
+func TestBG218CostChartsAggregatesAndFilters(t *testing.T) {
+	e := newSurveyEnv(t)
+	round := e.newRound(heThu(nil))
+	base := "/v1/price/surveys/" + round
+	row := func(commune, crop, item, farmer, phone, area, output, price string, costs []string) string {
+		cells := []string{"20/08/2026 10:00", "", commune, crop, item, farmer, phone, area, output, price}
+		return strings.Join(append(append(cells, costs...), ""), ",") + "\n"
+	}
+	e.importFile(round, surveyHeader+
+		row("Núi Cấm", "Lúa", "Lúa OM 18", "Hộ Một", "0908000001", "2", "1000", "8000", []string{"100", "300", "500", "700", "900", "1100"})+
+		row("Núi Cấm", "Lúa", "Lúa OM 18", "Hộ Hai", "0908000002", "1", "10", "100", []string{"300", "500", "700", "900", "1100", "1300"})+
+		row("Hà Tiên", "Lúa", "Lúa OM 18", "Hộ Ba", "0908000003", "1", "100", "200", []string{"200", "400", "600", "800", "1000", "1200"})+
+		row("Hà Tiên", "Cây ăn trái", "Xoài keo", "Hộ Bốn", "0908000004", "1", "100", "600", []string{"0", "0", "0", "0", "0", "0"}), nil)
+	e.call("tinh", http.MethodPost, base+"/forms/approve-unflagged", nil, http.StatusOK)
+	e.call("tinh", http.MethodPost, base+"/actions", map[string]any{"op": "close"}, http.StatusOK)
+	url := "/v1/price/survey-report?round=" + round
+	v := e.call("tw", http.MethodGet, url+"&crop=lua", nil, http.StatusOK)
+	main := v["main"].(map[string]any)
+	rows := listOf(main["rows"])
+	if len(rows) != 1 {
+		t.Fatalf("lọc nhóm cây: %v", main)
+	}
+	r := rows[0].(map[string]any)
+	if fmt.Sprint(r["n"]) != "3" || r["avg_total_cost"] != "4200" || r["avg_cost_per_kg"] != "175" || r["avg_price"] != "2767" {
+		t.Fatalf("trung bình cộng từng phiếu: %v", r)
+	}
+	costs := r["avg_costs"].(map[string]any)
+	for key, want := range map[string]string{"seed": "200", "fertilizer": "400", "pesticide": "600", "labor": "800", "machine": "1000", "other": "1200"} {
+		if costs[key] != want {
+			t.Fatalf("khoản %s: %v, muốn %s", key, costs[key], want)
+		}
+	}
+	regions := listOf(main["regions"])
+	if len(regions) != 2 {
+		t.Fatalf("hai vùng: %v", regions)
+	}
+	for _, x := range regions {
+		g := x.(map[string]any)
+		wantCost, wantPrice, wantN := "242", "4050", "2"
+		if g["region"] == "kien_giang" {
+			wantCost, wantPrice, wantN = "42", "200", "1"
+		}
+		if g["avg_cost_per_kg"] != wantCost || g["avg_price"] != wantPrice || fmt.Sprint(g["n"]) != wantN {
+			t.Fatalf("bình quân theo vùng: %v", g)
+		}
+	}
+	// Mọi bộ lọc tác động cùng một tập nguồn cho bảng, cơ cấu và so sánh vùng.
+	v = e.call("tw", http.MethodGet, url+"&crop=lua&item="+e.items["Lúa OM 18"]+"&region=kien_giang&commune=C3", nil, http.StatusOK)
+	main = v["main"].(map[string]any)
+	r = listOf(main["rows"])[0].(map[string]any)
+	if r["small_sample"] != true || r["avg_cost_per_kg"] != "42" || r["avg_costs"].(map[string]any)["seed"] != "200" || len(listOf(main["regions"])) != 1 {
+		t.Fatalf("lọc chung biểu đồ/bảng: %v", main)
+	}
+	if len(listOf(v["items"])) != 2 || len(listOf(v["communes"])) != 2 {
+		t.Fatalf("lựa chọn lọc không mất khi thu hẹp dữ liệu: %v", v)
+	}
+	v = e.call("tw", http.MethodGet, url+"&item="+e.items["Xoài keo"], nil, http.StatusOK)
+	r = listOf(v["main"].(map[string]any)["rows"])[0].(map[string]any)
+	if r["avg_total_cost"] != "0" || r["avg_cost_per_kg"] != "0" || r["small_sample"] != true {
+		t.Fatalf("chi phí bằng 0: %v", r)
+	}
+	v = e.call("tw", http.MethodGet, url+"&commune=C2", nil, http.StatusOK)
+	main = v["main"].(map[string]any)
+	if len(listOf(main["rows"])) != 0 || len(listOf(main["regions"])) != 0 || fmt.Sprint(main["kpis"].(map[string]any)["forms"]) != "0" {
+		t.Fatalf("bộ lọc rỗng: %v", main)
+	}
+	for _, role := range []string{"admin", "tinh"} {
+		e.raw(role, httptest.NewRequest(http.MethodGet, url, nil), http.StatusOK)
+		e.raw(role, httptest.NewRequest(http.MethodGet, "/v1/price/survey-report/export?round="+round, nil), http.StatusOK)
+	}
+	e.call("xa", http.MethodGet, url, nil, http.StatusForbidden)
+	e.call("tw", http.MethodGet, "/v1/price/survey-report/export?round="+round, nil, http.StatusForbidden)
+}

@@ -407,7 +407,7 @@ function cost(round: Round, url: URL): S["PriceSurveyCostBlock"] {
   refresh(round.id);
   const fs = FORMS.filter(
     (f) => f.round === round.id && f.status === "approved" && (!q("crop") || f.crop === q("crop")) && (!q("item") || f.item === q("item")) &&
-      (!q("region") || COMMUNES[f.commune]!.region === q("region")),
+      (!q("region") || COMMUNES[f.commune]!.region === q("region")) && (!q("commune") || f.commune === q("commune")),
   );
   const avg = (vs: Decimal[]) => (vs.length ? vs.reduce((a, b) => a.add(b), Decimal.fromInt(0)).divRound(Decimal.fromInt(vs.length), 0).toString() : "0");
   const med = (vs: Decimal[]) => {
@@ -723,11 +723,14 @@ export const priceSurveyRoutes: Route[] = [
       const closed = ROUNDS.filter((r) => r.status === "closed");
       const main = closed.find((r) => r.id === ctx.url.searchParams.get("round")) ?? closed[0];
       const cmp = closed.find((r) => r.id === ctx.url.searchParams.get("compare") && r.id !== main?.id);
+      const selected = FORMS.filter((f) => f.status === "approved" && (f.round === main?.id || f.round === cmp?.id));
       return json({
         rounds: closed.map(summary),
         main: main ? cost(main, ctx.url) : null,
         compare: cmp ? cost(cmp, ctx.url) : null,
         regions: Object.entries(REGIONS).map(([code, name]) => ({ code, name })),
+        items: [...new Set(selected.map((f) => f.item))].map((code) => ({ code, name: ITEMS[code]!.name })),
+        communes: [...new Set(selected.map((f) => f.commune))].map((code) => ({ code, name: COMMUNES[code]!.name })),
         can_export: role !== "kn_tw",
       });
     },

@@ -698,7 +698,7 @@ func (h SurveyHandler) report(c *gin.Context) {
 		rounds = append(rounds, roundOut(r))
 	}
 	c.JSON(http.StatusOK, gin.H{"rounds": rounds, "main": blockOut(v.Main), "compare": blockOut(v.Compare), "regions": refsOut(v.Regions),
-		"can_export": v.CanExport})
+		"items": refsOut(v.Items), "communes": refsOut(v.Communes), "can_export": v.CanExport})
 }
 
 func (h SurveyHandler) reportExport(c *gin.Context) {

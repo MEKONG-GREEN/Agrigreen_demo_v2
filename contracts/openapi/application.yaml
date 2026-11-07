@@ -25650,7 +25650,7 @@ components:
               median_cost_per_kg: {type: string}
     PriceSurveyCostReport:
       type: object
-      required: [rounds, main, compare, regions, can_export]
+      required: [rounds, main, compare, regions, items, communes, can_export]
       properties:
         rounds: {type: array, items: {$ref: "#/components/schemas/PriceSurveyRound"}}
         main:
@@ -25662,6 +25662,8 @@ components:
             - $ref: "#/components/schemas/PriceSurveyCostBlock"
             - type: "null"
         regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
+        items: {type: array, items: {$ref: "#/components/schemas/PriceRef"}, description: Mặt hàng có phiếu đã duyệt trong các đợt đang xem; không thay đổi khi lọc}
+        communes: {type: array, items: {$ref: "#/components/schemas/PriceRef"}, description: Xã có phiếu đã duyệt trong các đợt đang xem; không dữ liệu cá nhân}
         can_export: {type: boolean}
     PriceSurveyCostRow:
       type: object

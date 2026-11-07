@@ -1,6 +1,6 @@
 package app
 
-// Báo cáo giá thành sản xuất theo vụ (W11.78; BRD Báo giá v1.3 FN-TW-01.04, CT-05):
+// Báo cáo giá thành sản xuất theo vụ (BRD Báo giá v2.0 FN-TW-01.04, CT-05):
 //   - BR-01: chỉ phiếu Đã duyệt của đợt Đã chốt (phiếu Loại, Đã xóa không tính — AC-02).
 //   - BR-02: bình quân = trung bình cộng các phiếu; thêm trung vị cho giá bán và giá thành (AC-01: 5.274, 5.580, 5.384 →
 //     bình quân 5.413, trung vị 5.384). Mặt hàng dưới 3 phiếu gắn nhãn "Mẫu nhỏ" (Q-083 — giả định tạm của prototype; ngưỡng
@@ -93,6 +93,8 @@ type CostReport struct {
 	Main      *CostBlock
 	Compare   *CostBlock
 	Regions   []Ref
+	Items     []Ref // lựa chọn lọc từ phiếu đã duyệt của các đợt đang xem
+	Communes  []Ref
 	CanExport bool
 }
 
@@ -150,6 +152,28 @@ func (s *SurveyService) Cost(ctx context.Context, profile string, f CostFilter) 
 			}
 			c := cc.block(cc.rounds[i], f)
 			out.Compare = &c
+		}
+		selected := []uuid.UUID{main.RoundID}
+		if out.Compare != nil {
+			selected = append(selected, out.Compare.Round.ID)
+		}
+		items, communes := map[string]string{}, map[string]string{}
+		for _, round := range selected {
+			for _, fm := range cc.forms[round] {
+				if fm.Status == domain.FormApproved {
+					items[fm.Item] = itemLabel(cc.states[fm.Item])
+					communes[fm.Commune] = nameOr(cc.names, fm.Commune)
+				}
+			}
+		}
+		for code, name := range items {
+			out.Items = append(out.Items, Ref{Code: code, Name: name})
+		}
+		for code, name := range communes {
+			out.Communes = append(out.Communes, Ref{Code: code, Name: name})
+		}
+		for _, refs := range [][]Ref{out.Items, out.Communes} {
+			slices.SortFunc(refs, func(x, y Ref) int { return strings.Compare(x.Name, y.Name) })
 		}
 		return nil
 	})
