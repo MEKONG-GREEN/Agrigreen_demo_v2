@@ -219,11 +219,41 @@ func TestHRMPromotionHTTPV4(t *testing.T) {
 	did := dec["id"].(string)
 	f.multipartFile("hcth", "/v1/hrm/promotion/decisions/"+did+"/file", "540.pdf", pdf, http.StatusCreated)
 	f.call("hcth", http.MethodPost, "/v1/hrm/promotion/decisions/"+did+"/cancel", map[string]any{"reason": "Nhập sai số quyết định"}, http.StatusOK)
+	if got := byStaff(items(f.call("hcth", http.MethodGet, "/v1/hrm/promotion", nil, http.StatusOK), "items"), a, "nltx"); got == nil || got["key"] != key || got["status"] != "exported" {
+		t.Fatalf("canceled exported decision must replay to waiting: %v", got)
+	}
 	// Independent regular decision updates status even before export.
-	f.call("hcth", http.MethodPost, "/v1/hrm/promotion/decisions", map[string]any{"kind": "nltx", "decision_no": "541/QĐ", "decided_on": "2026-02-01", "issuer": "Sở NN&MT", "people": []any{map[string]any{"staff_id": e, "to_step": 3, "effective_on": "2026-02-28"}}}, http.StatusCreated)
+	direct := f.call("hcth", http.MethodPost, "/v1/hrm/promotion/decisions", map[string]any{"kind": "nltx", "decision_no": "541/QĐ", "decided_on": "2026-02-01", "issuer": "Sở NN&MT", "people": []any{map[string]any{"staff_id": e, "to_step": 3, "effective_on": "2026-02-28"}}}, http.StatusCreated)
 	decidedRows = items(f.call("hcth", http.MethodGet, "/v1/hrm/promotion?status=decided", nil, http.StatusOK), "items")
 	if len(decidedRows) != 1 || decidedRows[0]["staff_id"] != e {
 		t.Fatalf("direct decided: %v", decidedRows)
+	}
+	directID := direct["id"].(string)
+	f.call("hcth", http.MethodPost, "/v1/hrm/promotion/decisions/"+directID+"/cancel", map[string]any{"reason": "Kiểm thử hủy quyết định độc lập"}, http.StatusOK)
+	// Historical independent decisions may have a keyed Undecide event, without
+	// any export. Replay must preserve pending rather than invent export history.
+	legacyUndecideID := ids.New()
+	eKey := byStaff(xs, e, "nltx")["key"].(string)
+	if err := db.WithModuleTenantTx(t.Context(), f.svc.DB, app.DBModule, f.tid, func(tx pgx.Tx) error {
+		did := uuid.MustParse(directID)
+		_, err := store.InsertPromoEvent(t.Context(), tx, f.tid, store.PromoEvent{ID: legacyUndecideID, StaffID: uuid.MustParse(e), CaseKey: eKey,
+			Kind: "nltx", Action: domain.PromoActUndecide, DecisionID: &did, Reason: "Legacy independent decision canceled", Actor: f.who["hcth"].ActorRef}, f.svc.Clock.Now(), "legacy:undecide:"+eKey)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var hashBefore, hashAfter string
+	if err := admin.QueryRow(t.Context(), "SELECT row_hash::text FROM pf_hrm.promotion_event WHERE id=$1", legacyUndecideID).Scan(&hashBefore); err != nil {
+		t.Fatal(err)
+	}
+	if got := byStaff(items(f.call("hcth", http.MethodGet, "/v1/hrm/promotion", nil, http.StatusOK), "items"), e, "nltx"); got == nil || got["key"] != eKey || got["status"] != "pending" {
+		t.Fatalf("canceled independent decision without export must replay to pending: %v", got)
+	}
+	if got := items(f.call("hcth", http.MethodGet, "/v1/hrm/promotion?status=decided", nil, http.StatusOK), "items"); len(got) != 0 {
+		t.Fatalf("canceled decisions still override active status: %v", got)
+	}
+	if err := admin.QueryRow(t.Context(), "SELECT row_hash::text FROM pf_hrm.promotion_event WHERE id=$1", legacyUndecideID).Scan(&hashAfter); err != nil || hashAfter != hashBefore {
+		t.Fatalf("projection mutated legacy Undecide ledger: %s -> %s (%v)", hashBefore, hashAfter, err)
 	}
 	f.call("hcth", http.MethodPost, "/v1/hrm/promotion/decisions", map[string]any{"kind": "nltx", "decision_no": "QĐ-future", "decided_on": "2026-10-01", "issuer": "Sở NN&MT", "people": []any{map[string]any{"staff_id": a, "to_step": 6, "effective_on": "2026-11-01"}}}, http.StatusCreated)
 	futureRows := items(f.call("hcth", http.MethodGet, "/v1/hrm/promotion?year=2026&month=11", nil, http.StatusOK), "items")
