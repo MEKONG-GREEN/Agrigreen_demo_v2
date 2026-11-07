@@ -49,5 +49,5 @@ func testOwnerSession(ctx context.Context) (port.SessionContext, error) {
 	if err != nil {
 		return port.SessionContext{}, err
 	}
-	return port.SessionContext{Role: k.Role, ReadOnly: k.ReadOnly(), Duties: k.Duties}, nil
+	return port.SessionContext{Role: k.Role, Department: k.Department, Support: k.Support != nil, ReadOnly: k.ReadOnly(), Duties: k.Duties}, nil
 }

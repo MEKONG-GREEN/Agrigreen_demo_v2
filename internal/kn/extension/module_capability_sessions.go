@@ -16,7 +16,7 @@ func PriceSession(ctx context.Context) (priceport.SessionContext, error) {
 	if err != nil {
 		return priceport.SessionContext{}, err
 	}
-	return priceport.SessionContext{Role: k.Role, ReadOnly: k.ReadOnly(), Duties: k.Duties}, nil
+	return priceport.SessionContext{Role: k.Role, Department: k.Department, Support: k.Support != nil, ReadOnly: k.ReadOnly(), Duties: k.Duties}, nil
 }
 
 // HRMSession supplies HRM's group, department and internal-unit policy inputs.

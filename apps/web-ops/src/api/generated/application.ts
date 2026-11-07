@@ -10042,6 +10042,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/weekly-programs/{program}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** FN-TI-02.13 — báo cáo tuần của chương trình; Cấp Xã/TW nhận dữ liệu rỗng */
+        get: operations["priceWeeklyProgram"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/weekly-programs/{program}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Lưu/chốt/tạo tuần/điều chỉnh/thêm/xóa bằng version CAS; đã chốt chỉ xem */
+        post: operations["priceWeeklyWrite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/weekly-programs/{program}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Xuất Excel đúng kỳ và biểu mẫu hai tầng tiêu đề */
+        get: operations["priceWeeklyExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/weekly-programs/{program}/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải mẫu đầy đủ hạng mục hiện có, để trống số liệu tuần và lũy kế */
+        get: operations["priceWeeklyTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/weekly-programs/{program}/imports/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xem trước từng dòng Excel/CSV; bỏ qua lũy kế; ô trống giữ nguyên */
+        post: operations["priceWeeklyPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/weekly-programs/{program}/imports/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi các dòng hợp lệ; dòng lỗi vẫn tải được; CAS và mã băm tệp */
+        post: operations["priceWeeklyImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/weekly-programs/{program}/imports/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tải các dòng lỗi của lần nhập đã ghi nhận */
+        get: operations["priceWeeklyIssues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report": {
         parameters: {
             query?: never;
@@ -23908,6 +24027,30 @@ export interface components {
             no: number | null;
             scope: string | null;
         };
+        PriceWeeklyRow: {
+            /** Format: uuid */
+            id: string;
+            parent_id: string;
+            name: string;
+            group: boolean;
+            plan: string;
+            adjusted_plan: string | null;
+            plan_reason: string;
+            opening_progress: string;
+            opening_money: string;
+            progress: string;
+            money: string;
+            progress_set: boolean;
+            money_set: boolean;
+            money_override: string | null;
+            evaluation: string;
+            note: string;
+            number: string;
+            cumulative_progress: string;
+            cumulative_money: string;
+            rate: string | null;
+            achieved: boolean;
+        };
         KHTCReportPlan: {
             /** Format: uuid */
             VersionID: string;
@@ -23920,6 +24063,18 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        PriceWeeklySummary: {
+            /** Format: uuid */
+            id: string;
+            number: number;
+            key: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @enum {string} */
+            status: "draft" | "closed";
+        };
         KHTCReportSourceRef: {
             /** Format: uuid */
             id: string;
@@ -23931,6 +24086,13 @@ export interface components {
             closed: boolean;
             /** Format: date-time */
             at: string;
+        };
+        PriceWeeklyIssue: {
+            line: number;
+            name: string;
+            /** @enum {string} */
+            status: "valid" | "overwrite" | "error";
+            errors: string[];
         };
         KHTCReportSourceMetric: {
             key: string;
@@ -23953,6 +24115,23 @@ export interface components {
                 figures_hash: string | null;
             }[];
             text?: string;
+        };
+        PriceWeeklyReport: {
+            /** Format: uuid */
+            id: string;
+            number: number;
+            key: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** @enum {string} */
+            status: "draft" | "closed";
+            rows: components["schemas"]["PriceWeeklyRow"][];
+            import_issues: components["schemas"]["PriceWeeklyIssue"][];
+            item_count: number;
+            achieved: number;
+            total_money: string;
         };
         KHTCReportSourceValue: {
             Cumulative: string | null;
@@ -23983,6 +24162,15 @@ export interface components {
                 [key: string]: unknown;
             }[] | null;
         };
+        PriceWeeklyAudit: {
+            version: number;
+            week_id: string;
+            /** @enum {string} */
+            action: "initialize" | "save" | "close" | "new" | "adjust" | "add" | "delete" | "import";
+            actor: string;
+            /** Format: date-time */
+            at: string;
+        };
         KHTCReportSubmission: {
             /** Format: uuid */
             period_id: string;
@@ -24000,6 +24188,15 @@ export interface components {
             sheet_id: string;
             hash: string;
             decision: string;
+        };
+        PriceWeeklyView: {
+            program: string;
+            title: string;
+            plan_year: number;
+            version: number;
+            reports: components["schemas"]["PriceWeeklySummary"][];
+            report: components["schemas"]["PriceWeeklyReport"] | null;
+            log: components["schemas"]["PriceWeeklyAudit"][];
         };
         KHTCReportRow: {
             /** Format: uuid */
@@ -24029,6 +24226,15 @@ export interface components {
             source_key: string;
             communes: string[];
         };
+        PriceWeeklyPatch: {
+            id: string;
+            progress?: string;
+            money?: string;
+            money_override?: string;
+            clear_override?: boolean;
+            evaluation?: string;
+            note?: string;
+        };
         KHTCReportData: {
             period: components["schemas"]["KHTCReportPeriod"];
             /** @enum {string} */
@@ -24051,6 +24257,12 @@ export interface components {
             captured_at: string;
             supplements?: components["schemas"]["KHTCReportSupplement"][];
         };
+        PriceWeeklyNewItem: {
+            name: string;
+            plan?: string;
+            parent_id?: string;
+            children?: components["schemas"]["PriceWeeklyNewItem"][];
+        };
         KHTCReportAdminField: {
             system: string;
             override: string | null;
@@ -24059,6 +24271,18 @@ export interface components {
             /** Format: date-time */
             at: string | null;
             system_changed: boolean;
+        };
+        PriceWeeklyCommand: {
+            version: number;
+            week_id: string;
+            /** @enum {string} */
+            action: "save" | "close" | "new" | "adjust" | "add" | "delete";
+            rows?: components["schemas"]["PriceWeeklyPatch"][];
+            item?: components["schemas"]["PriceWeeklyNewItem"];
+            item_id?: string;
+            plan?: string;
+            reason?: string;
+            confirm?: boolean;
         };
         KHTCReportContent: {
             data: components["schemas"]["KHTCReportData"];
@@ -24072,10 +24296,27 @@ export interface components {
             template_snapshot?: components["schemas"]["KHTCFixedTemplateSnapshot"];
             readonly template_terminal?: string;
         };
+        PriceWeeklyPreview: {
+            version: number;
+            week_id: string;
+            sha256: string;
+            rows: components["schemas"]["PriceWeeklyIssue"][];
+            valid_rows: number;
+            overwrite_rows: number;
+            error_rows: number;
+        };
         KHTCReportSection: {
             key: string;
             title: string;
             editable: boolean;
+        };
+        PriceWeeklyImportInput: {
+            /** Format: binary */
+            file: string;
+            version: number;
+            week_id: string;
+            sha256?: string;
+            confirm_overwrite?: boolean;
         };
         KHTCReportFinal: {
             /** Format: uuid */
@@ -47872,6 +48113,245 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
+        };
+    };
+    priceWeeklyProgram: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                week_id?: string;
+            };
+            header?: never;
+            path: {
+                program: "information" | "training";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Báo cáo tuần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWeeklyView"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceWeeklyWrite: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                program: "information" | "training";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceWeeklyCommand"];
+            };
+        };
+        responses: {
+            /** @description Báo cáo tuần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWeeklyView"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceWeeklyExport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                week_id?: string;
+            };
+            header?: never;
+            path: {
+                program: "information" | "training";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Excel .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceWeeklyTemplate: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                week_id?: string;
+            };
+            header?: never;
+            path: {
+                program: "information" | "training";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Excel .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceWeeklyPreview: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                program: "information" | "training";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["PriceWeeklyImportInput"];
+            };
+        };
+        responses: {
+            /** @description Báo cáo tuần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWeeklyPreview"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceWeeklyImport: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                program: "information" | "training";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["PriceWeeklyImportInput"];
+            };
+        };
+        responses: {
+            /** @description Báo cáo tuần */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceWeeklyView"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceWeeklyIssues: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+                week_id?: string;
+            };
+            header?: never;
+            path: {
+                program: "information" | "training";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Excel .xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
     extensionKhtcReportGet: {

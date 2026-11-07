@@ -33,7 +33,7 @@ func WeeklyCatalog(program string) []WeeklyCatalogItem {
 		return nil
 	}
 	return []WeeklyCatalogItem{
-		{"info_ag", "", "Tuyên truyền với Báo và PTTTH An Giang", ""},
+		{"info_ag", "", "Tuyên truyền với Báo và PTTH An Giang", ""},
 		{"info_tv", "info_ag", "Truyền hình (chuyên mục)", "28"},
 		{"info_sea", "info_ag", "Câu chuyện kinh tế biển (câu chuyện)", "4"},
 		{"info_summary", "info_ag", "Video clip phóng sự tổng kết (clip)", "1"},
@@ -98,6 +98,8 @@ type WeeklyItem struct {
 	OpeningMoney    decimal.Decimal  `json:"opening_money"`
 	Progress        decimal.Decimal  `json:"progress"`
 	Money           decimal.Decimal  `json:"money"`
+	ProgressSet     bool             `json:"progress_set"`
+	MoneySet        bool             `json:"money_set"`
 	MoneyOverride   *decimal.Decimal `json:"money_override"`
 	Evaluation      string           `json:"evaluation"`
 	Note            string           `json:"note"`
@@ -125,7 +127,7 @@ func (i WeeklyItem) Cumulative() (progress, money decimal.Decimal, rate *decimal
 
 // HasData is used before converting a leaf into a group or confirming deletion.
 func (i WeeklyItem) HasData() bool {
-	return !i.Progress.IsZero() || !i.Money.IsZero() || !i.OpeningProgress.IsZero() || !i.OpeningMoney.IsZero() ||
+	return i.ProgressSet || i.MoneySet || !i.Progress.IsZero() || !i.Money.IsZero() || !i.OpeningProgress.IsZero() || !i.OpeningMoney.IsZero() ||
 		i.MoneyOverride != nil || i.Evaluation != "" || i.Note != ""
 }
 
@@ -145,7 +147,7 @@ type WeeklyReport struct {
 	From         string        `json:"from"`
 	To           string        `json:"to"`
 	Status       string        `json:"status"`
-	Items        []WeeklyItem  `json:"items"`
+	Items        []WeeklyItem  `json:"items,omitempty"`
 	ImportIssues []WeeklyIssue `json:"import_issues"`
 }
 
@@ -230,14 +232,16 @@ func ApplyWeeklyPatches(report *WeeklyReport, deleted map[string]bool, program s
 		for _, number := range []struct {
 			input  *string
 			target *decimal.Decimal
+			set    *bool
 			money  bool
-		}{{patch.Progress, &item.Progress, false}, {patch.Money, &item.Money, true}} {
+		}{{patch.Progress, &item.Progress, &item.ProgressSet, false}, {patch.Money, &item.Money, &item.MoneySet, true}} {
 			if number.input != nil {
 				value, err := ParseWeeklyNumber(*number.input, number.money)
 				if err != nil {
 					return fmt.Errorf("%s: %w", item.Name, err)
 				}
 				*number.target = value
+				*number.set = true
 			}
 		}
 		if patch.MoneyOverride != nil && patch.ClearOverride {

@@ -32,6 +32,9 @@ func LockWeekly(ctx context.Context, tx pgx.Tx, tid uuid.UUID, profile, program 
 
 // LoadWeekly loads the latest snapshot, or the result of an already authorized idempotent command.
 func LoadWeekly(ctx context.Context, tx pgx.Tx, profile, program, idem string) (WeeklyRecord, error) {
+	if idem != "" {
+		idem = "weekly:" + profile + ":" + program + ":" + idem
+	}
 	var r WeeklyRecord
 	var raw []byte
 	err := tx.QueryRow(ctx, `SELECT seq,payload,week_id::text,action,actor_ref,event_time,request_hash
@@ -49,6 +52,7 @@ func LoadWeekly(ctx context.Context, tx pgx.Tx, profile, program, idem string) (
 
 // InsertWeekly appends an audited snapshot through the shared ledger trigger.
 func InsertWeekly(ctx context.Context, tx pgx.Tx, tid uuid.UUID, profile, program, weekID, action, idem string, actor uuid.UUID, at time.Time, hash []byte, book domain.WeeklyBook) (WeeklyRecord, error) {
+	idem = "weekly:" + profile + ":" + program + ":" + idem
 	r := WeeklyRecord{Book: book, WeekID: weekID, Action: action, Actor: actor, At: at, Hash: hash}
 	raw, err := json.Marshal(book)
 	if err != nil {
@@ -57,7 +61,7 @@ func InsertWeekly(ctx context.Context, tx pgx.Tx, tid uuid.UUID, profile, progra
 	err = tx.QueryRow(ctx, `INSERT INTO pf_price.weekly_program
 	 (id,tenant_id,stream_key,profile,program,week_id,action,payload,request_hash,event_time,actor_ref,idem_key,rule_version)
 	 VALUES ($1,$2,'weekly:' || $3 || ':' || $4,$3,$4,$5,$6,$7,$8,$9,$10,$11,'price.weekly.v2') RETURNING seq`,
-		ids.New(), tid, profile, program, weekID, action, raw, hash, at.UTC(), actor, idem).Scan(&r.Seq)
+		ids.New(), tid, profile, program, weekID, action, string(raw), hash, at.UTC(), actor, idem).Scan(&r.Seq)
 	return r, err
 }
 

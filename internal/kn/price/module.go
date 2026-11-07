@@ -59,6 +59,7 @@ type Module struct {
 	items   *app.ItemService   // W11.73 mặt hàng theo thời kỳ
 	tickets *app.TicketService // W11.75 phiếu báo giá + xác minh
 	survey  *app.SurveyService // W11.78 điều tra giá thành
+	weekly  *app.WeeklyService // FN-TI-02.13 chương trình khuyến nông
 }
 
 // New tạo module trên pool b — vai đăng nhập của đơn vị (app_platform), là thành viên r_price. Cấu hình bên dùng sai → lỗi.
@@ -72,6 +73,7 @@ func New(b tenant.Beginner, clk clock.Clock, profiles []port.Profile) (*Module, 
 	}
 	svc.Reminders = app.PointReminders{S: svc} // W11.72: nhắc cán bộ Xã phụ trách từng xã báo giá
 	m := &Module{svc: svc, items: app.NewItemService(svc), tickets: app.NewTicketService(svc)}
+	m.weekly = app.NewWeeklyService(m.tickets)
 	m.survey = app.NewSurveyService(m.tickets) // W11.78: dùng chung điểm kiểm soát xuất của báo cáo giá
 	// W11.75: "đã gửi phiếu" cho nhắc lần 2 / ngưng xã (W11.72), "đã có giá / đã có phiếu gửi" cho mặt hàng (W11.73).
 	svc.Points.Submitted = m.tickets.Submitted
@@ -154,7 +156,8 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.TicketHandler{Svc: m.tickets}.RegisterApp(rg) // W11.75
 	handler.BoardHandler{Svc: m.tickets}.RegisterApp(rg)  // W11.76
 	handler.ReportHandler{Svc: m.tickets}.RegisterApp(rg) // W11.77
-	handler.SurveyHandler{Svc: m.survey}.RegisterApp(rg)  // W11.78
+	handler.WeeklyHandler{Svc: m.weekly}.RegisterApp(rg)
+	handler.SurveyHandler{Svc: m.survey}.RegisterApp(rg) // W11.78
 }
 
 // RegisterAdmin: không có route Admin API.

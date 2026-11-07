@@ -7,9 +7,11 @@ import (
 // SessionContext is the minimum authorization snapshot supplied by the session
 // owner. It cannot override the authenticated actor, tenant, realm roles or MFA.
 type SessionContext struct {
-	Role     string
-	ReadOnly bool
-	Duties   []string
+	Department string
+	Support    bool
+	Role       string
+	ReadOnly   bool
+	Duties     []string
 }
 
 // SessionResolver reads a server-bound owner session. A configured resolver must

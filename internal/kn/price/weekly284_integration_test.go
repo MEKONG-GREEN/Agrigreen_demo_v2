@@ -39,6 +39,8 @@ func TestWeeklyProgramModule284(t *testing.T) {
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		if w.Code != http.StatusOK {
+			_, cause := mod.weekly.Read(authz.WithPrincipal(context.Background(), p), "kn", program, "")
+			t.Logf("weekly service failure: %v", cause)
 			t.Fatalf("FN-TI-02.13 %s first draft: HTTP %d want 200: %s", program, w.Code, w.Body.String())
 		}
 	}
