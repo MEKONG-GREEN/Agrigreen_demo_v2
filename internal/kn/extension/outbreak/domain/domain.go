@@ -16,8 +16,14 @@ import (
 	extdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
 )
 
-// RuleVersion ghi vào rule_version của mọi dòng sổ dịch bệnh.
-const RuleVersion = "kn.cnts.outbreak/v1"
+// Phiên bản quy tắc của sổ dịch bệnh (ADR-0056 mục 7–8).
+const (
+	// RuleVersionV1: ổ dịch một hộ/địa bàn (W11.49) — dữ liệu cũ, chỉ đọc (API trả legacy = true). Báo nghi dịch vẫn v1.
+	RuleVersionV1 = "kn.cnts.outbreak/v1"
+	// RuleVersion: ổ dịch nhiều hộ (CNTS v4.0 FN-11 BR-03, #252) — DB-04 chọn hộ trong danh sách hộ chăn nuôi (bảng con
+	// cnts_outbreak_household), DB-14 chụp theo hộ, DB-15 tự đếm, DB-16 diện tích thủy sản. Mọi phiên bản ổ dịch mới.
+	RuleVersion = "kn.cnts.outbreak/v2"
+)
 
 // Sự việc của chuỗi ổ dịch.
 const (
@@ -73,6 +79,14 @@ const (
 	MaxLocality    = 300
 	MaxLabName     = 300
 	MaxReason      = 1000
+	// MaxHouseholds: số hộ tối đa của một phiên bản ổ dịch (DB-04, bảng con position 1–200).
+	MaxHouseholds = 200
+)
+
+// Nhóm vật nuôi của danh mục cnts_species (FN-06): bệnh thuộc nhóm thủy sản khi loài của bệnh có attrs.group = thuy_san.
+const (
+	AttrSpeciesGroup = "group"
+	GroupAquatic     = "thuy_san"
 )
 
 // Point là tọa độ WGS84 (độ thập phân, chuỗi để không qua float).
@@ -121,6 +135,11 @@ type Outbreak struct {
 	AsOf           time.Time // ngày diễn biến (ngày nghiệp vụ, UTC 00:00)
 	ProgressNote   string
 	CapturedAt     *time.Time
+	// AffectedHouseholds là DB-15 (số hộ ở DB-04) — dịch vụ đếm, không nhận từ API (AC-04). nil ở dữ liệu cũ v1.
+	AffectedHouseholds *int64
+	// AquaFarmedHa, AquaWildHa là DB-16: diện tích thủy sản bị ảnh hưởng (ha) — nuôi trồng, khai thác.
+	AquaFarmedHa *decimal.Decimal
+	AquaWildHa   *decimal.Decimal
 }
 
 // FieldError là lỗi của một trường.
@@ -240,7 +259,12 @@ func NormalizeOutbreak(o *Outbreak, now time.Time, today time.Time) Errors {
 	if !one(o.Source, Sources) {
 		es.add("source", "UBND xã, nông hộ báo hoặc cán bộ phát hiện (DB-03)")
 	}
-	text(&es, "locality", &o.Locality, MaxLocality, o.HouseholdRef == nil)
+	// DB-04 v2: hộ chọn trong danh sách hộ chăn nuôi (kiểm ở ứng dụng); địa bàn chỉ là ghi chú tùy chọn. household_ref cũ
+	// (v1) không ghi được nữa.
+	if o.HouseholdRef != nil {
+		es.add("household_ref", "dữ liệu cũ — chọn hộ trong danh sách hộ chăn nuôi (DB-04)")
+	}
+	text(&es, "locality", &o.Locality, MaxLocality, false)
 	location(&es, o.Location, o.GPSAccuracyM, true)
 	if o.Location != nil && !one(o.LocationSource, LocationSources) {
 		es.add("location_source", "gps hoặc map")
@@ -276,6 +300,69 @@ func NormalizeOutbreak(o *Outbreak, now time.Time, today time.Time) Errors {
 		es.add("as_of", "bắt buộc")
 	} else if o.AsOf.After(today) {
 		es.add("as_of", "ngày diễn biến ở tương lai")
+	}
+	return es
+}
+
+var haRe = regexp.MustCompile(`^[0-9]{1,10}(\.[0-9]{1,2})?$`)
+
+// ParseHectares đọc diện tích DB-16 (ha): số thập phân thường ≥ 0, ≤ 10 chữ số phần nguyên, ≤ 2 chữ số lẻ — kiểm cú pháp
+// và độ dài TRƯỚC khi parse (chặn "1e100000", chuỗi rất dài). Rỗng → nil.
+func ParseHectares(s string) (*decimal.Decimal, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, true
+	}
+	if len(s) > 13 || !haRe.MatchString(s) {
+		return nil, false
+	}
+	d, err := decimal.NewFromString(s)
+	if err != nil {
+		return nil, false
+	}
+	return &d, true
+}
+
+// CheckAqua kiểm DB-16 theo nhóm bệnh (UR-XA-10, FN-11 AC-05): bệnh nhóm thủy sản → bắt buộc ghi riêng nuôi trồng và
+// khai thác (0 được); bệnh khác → không ghi.
+func CheckAqua(o *Outbreak, aquatic bool) Errors {
+	var es Errors
+	switch {
+	case aquatic:
+		if o.AquaFarmedHa == nil {
+			es.add("aqua_farmed_ha", "bắt buộc khi bệnh thuộc nhóm thủy sản (DB-16, nuôi trồng)")
+		}
+		if o.AquaWildHa == nil {
+			es.add("aqua_wild_ha", "bắt buộc khi bệnh thuộc nhóm thủy sản (DB-16, khai thác)")
+		}
+	default:
+		if o.AquaFarmedHa != nil {
+			es.add("aqua_farmed_ha", "chỉ ghi khi bệnh thuộc nhóm thủy sản (DB-16)")
+		}
+		if o.AquaWildHa != nil {
+			es.add("aqua_wild_ha", "chỉ ghi khi bệnh thuộc nhóm thủy sản (DB-16)")
+		}
+	}
+	return es
+}
+
+// CheckHouseholds kiểm DB-04/DB-15 (UR-XA-10): ít nhất một hộ (chọn trong danh sách hoặc nhập mới), tối đa
+// MaxHouseholds, hộ chọn không lặp.
+func CheckHouseholds(selected []uuid.UUID, added int) Errors {
+	var es Errors
+	switch n := len(selected) + added; {
+	case n == 0:
+		es.add("households", "chọn ít nhất một hộ chăn nuôi hoặc nhập hộ chưa có (DB-04, DB-15 ≥ 1)")
+	case n > MaxHouseholds:
+		es.add("households", "tối đa "+strconv.Itoa(MaxHouseholds)+" hộ mỗi ổ dịch")
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, r := range selected {
+		if r == uuid.Nil || seen[r] {
+			es.add("households", "mã hộ trống hoặc bị lặp")
+			break
+		}
+		seen[r] = true
 	}
 	return es
 }

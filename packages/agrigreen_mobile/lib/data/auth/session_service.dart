@@ -121,6 +121,12 @@ class SessionService {
   Future<DateTime?> offlineExpiresAt() async =>
       (await lastOnlineAuthAt())?.add(offlineMax);
 
+  /// Đăng xuất: xóa token và mốc xác thực trực tuyến (offlineState → never); giữ dữ liệu trên máy.
+  Future<void> signOut() async {
+    await lockTokens();
+    await _store.delete(SecureKeys.lastOnlineAuthAt);
+  }
+
   /// Khóa token: xóa access/refresh/id token (giữ PIN, dữ liệu).
   Future<void> lockTokens() async {
     await _store.delete(SecureKeys.accessToken);

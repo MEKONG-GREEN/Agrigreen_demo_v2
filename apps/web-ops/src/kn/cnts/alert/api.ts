@@ -42,6 +42,7 @@ export const RECIPIENT_LABEL: Record<string, string> = {
   program_lead: "Chủ nhiệm",
   site_officer: "Cán bộ theo dõi điểm",
   farmer: "Nông hộ",
+  schedule_follower: "Người theo dõi lịch cán bộ xã",
 };
 
 /** Bộ lọc trạng thái của danh sách (tab). */

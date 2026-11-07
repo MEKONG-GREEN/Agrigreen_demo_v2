@@ -78,7 +78,9 @@ type Service struct {
 	FormsControl formsport.PeriodControl
 	// W11.45: Báo cáo phòng BM-11 — kết quả CT/DA của phòng (W11.47, nối ở module) và xuất Word qua pf/export (W10.17).
 	BM11Programs BM11ProgramSource
-	Exporter     exportport.Exporter
+	// CNTS-V4-BM11-TYPES (#253): số hộ, trang trại theo loại chăn nuôi từ danh sách hộ chăn nuôi (nối ở module).
+	BM11Herds BM11HerdSource
+	Exporter  exportport.Exporter
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

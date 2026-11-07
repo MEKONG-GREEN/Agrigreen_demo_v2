@@ -475,7 +475,7 @@ paths:
         audience vắng: theo ngữ cảnh phiên (P1) hoặc vai duy nhất của người gọi. platform_admin xem được mọi cấp (FN-AD-04.07).
         audience = admin: mục con của phòng ban trong nhóm "Phòng ban" (enabled = false khi chưa mở).
       operationId: knDepartmentModules
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: code, in: path, required: true, schema: {type: string}}
         - {name: audience, in: query, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}}
@@ -500,7 +500,7 @@ paths:
         phòng ban "/kn/phong-ban/{mã phòng ban}/<màn>"; màn hiện có ngoài /kn giữ đường dẫn cũ. Bản giả lập web
         khớp bảng Go qua ca vàng apps/web-ops/src/api/mock/fixtures/kn-menu.json.
       operationId: knMenu
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: audience, in: query, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}, description: "Vắng = theo ngữ cảnh phiên (X-AG-Context) hoặc vai duy nhất"}
         - {name: role, in: query, deprecated: true, schema: {type: string, enum: [kn_tw, kn_tinh, kn_xa, admin]}, description: "Tên cũ của audience (hợp đồng tạm P6) — nhận một đợt; audience thắng"}
@@ -3029,7 +3029,7 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
   /v1/extension/work-schedules/{id}/items/{item_id}/checkin:
     post:
-      summary: Check-in tại địa điểm công tác (CNTS CV-07, W11.46) — một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8)
+      summary: Check-in tại địa điểm công tác (CNTS v4.0 CV-07) — bắt buộc ảnh chụp tại chỗ; một mục một check-in, không sửa được; tọa độ lưu ở bảng có hạn lưu (QĐ-8)
       operationId: extCheckinWorkScheduleItem
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -3041,14 +3041,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [lat, lon, captured_at]
-              properties:
-                lat: {type: number, minimum: 8, maximum: 24}
-                lon: {type: number, minimum: 102, maximum: 118}
-                accuracy_m: {type: [number, "null"], minimum: 0}
-                captured_at: {type: string, format: date-time, description: "Giờ thiết bị lúc bấm Check-in (bản ngoại tuyến gửi muộn tối đa 7 ngày)"}
-                mock_location: {type: boolean, description: "Thiết bị báo vị trí giả lập"}
-                device_id: {type: [string, "null"]}
+              $ref: "#/components/schemas/ExtWorkScheduleVisitInput"
       responses:
         "201":
           description: Đã check-in
@@ -3062,7 +3055,69 @@ paths:
               schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckinResult"}
         "404": {description: "extension.schedule_not_found | extension.schedule_item_not_found", $ref: "#/components/responses/Problem"}
         "409": {description: "extension.checkin_exists | extension.checkin_disabled | extension.checkin_not_registered | extension.checkin_not_approved", $ref: "#/components/responses/Problem"}
-        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (photo: thiếu ảnh, quá 500 KB, không phải JPEG/PNG/WebP)", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable (chưa nối kho tệp)", $ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/items/{item_id}/checkin/photo:
+    get:
+      summary: Ảnh check-in của mục (CNTS v4.0 CV-07, UR-TINH-18) — người đăng ký lịch và người duyệt được lịch
+      operationId: extWorkScheduleCheckinPhoto
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung ảnh
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.schedule_not_found | extension.visit_photo_not_found (check-in cũ không ảnh)", $ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/items/{item_id}/checkout:
+    post:
+      summary: Check-out khi rời địa điểm công tác (CNTS v4.0 CV-08, FN-12 B4b) — sau check-in, bắt buộc ảnh; một mục một check-out, không sửa được; bản ngoại tuyến giữ thời điểm lúc bấm
+      operationId: extCheckoutWorkScheduleItem
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtWorkScheduleVisitInput"
+      responses:
+        "201":
+          description: Đã check-out
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckoutResult"}
+        "200":
+          description: Gọi lặp cùng Idempotency-Key
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ExtWorkScheduleCheckoutResult"}
+        "404": {description: "extension.schedule_not_found | extension.schedule_item_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.checkout_no_checkin | extension.checkout_exists | extension.checkin_disabled | extension.checkin_not_registered | extension.checkin_not_approved", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (photo; captured_at khác ngày công tác, trước check-in, gửi quá 7 ngày)", $ref: "#/components/responses/Problem"}
+        "503": {description: "extension.dependency_unavailable (chưa nối kho tệp)", $ref: "#/components/responses/Problem"}
+  /v1/extension/work-schedules/{id}/items/{item_id}/checkout/photo:
+    get:
+      summary: Ảnh check-out của mục (CNTS v4.0 CV-08, UR-TINH-18) — người đăng ký lịch và người duyệt được lịch
+      operationId: extWorkScheduleCheckoutPhoto
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: item_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung ảnh
+          content:
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {description: "extension.schedule_not_found | extension.visit_photo_not_found", $ref: "#/components/responses/Problem"}
   # Số liệu cân đối/báo cáo/dashboard đọc KẾT QUẢ ĐÃ LƯU theo vụ (FN-10 BR-04), không tính lại.
 
   # Phạm vi không phải toàn vùng: danh sách máy/chủ sở hữu/diện tích phải lọc theo cooperative_ref trong phạm vi.
@@ -4735,6 +4790,67 @@ paths:
         "404": {description: "reports.link_not_found", $ref: "#/components/responses/Problem"}
         "410": {description: "reports.link_expired | reports.link_revoked", $ref: "#/components/responses/Problem"}
         "429": {description: "metering.egress_quota_exceeded (AG_EGRESS_MODE=enforce)", $ref: "#/components/responses/Problem"}
+  /v1/public/password-reset:
+    post:
+      summary: "BRD 2.0 FN-CH-00.01 \"Quên mật khẩu?\": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0057) — KHÔNG đăng nhập"
+      description: >-
+        Luôn 202 cùng một thân cho mọi email đúng cú pháp — không lộ email có tồn tại, tài khoản bị khóa hay đã quá giới hạn.
+        Chỉ tài khoản đang hoạt động, email đã xác minh mới được gửi; tối đa 5 yêu cầu được gửi mỗi giờ cho một tài khoản
+        (yêu cầu vượt vẫn 202, không gửi). Liên kết hiệu lực 30 phút, dùng một lần; email gửi qua outbox ở worker. Giới hạn
+        theo IP (dồn 5, sau đó 1/phút) → 429. Cache-Control no-store.
+      operationId: requestPasswordReset
+      tags: [accounts]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: {type: string, format: email, maxLength: 254}
+      responses:
+        "202":
+          description: Đã nhận yêu cầu
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: {type: string, enum: [accepted]}
+        "400": {description: "bad_request (thân không phải JSON)", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (email sai cú pháp)", $ref: "#/components/responses/Problem"}
+        "429": {description: rate_limited, $ref: "#/components/responses/Problem"}
+        "503": {description: accounts.dependency_unavailable, $ref: "#/components/responses/Problem"}
+  /v1/public/password-reset/confirm:
+    post:
+      summary: "Đặt mật khẩu mới bằng mã trong liên kết email (dùng một lần, 30 phút) — thu hồi mọi phiên; KHÔNG đăng nhập"
+      description: >-
+        Mã sai, đã dùng, hết hạn, đang được dùng hoặc tài khoản bị khóa → cùng một mã 410 accounts.reset_link_invalid.
+        Mật khẩu không đạt chính sách realm (≥ 12 ký tự, khác tên đăng nhập, không trùng 5 mật khẩu gần nhất) → 422
+        accounts.password_policy, liên kết dùng lại được. Thành công: mọi phiên của tài khoản bị thu hồi, liên kết còn mở khác
+        hết dùng; TOTP giữ nguyên (tài khoản bắt MFA vẫn nhập OTP ở lần đăng nhập sau). Cache-Control no-store.
+      operationId: confirmPasswordReset
+      tags: [accounts]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: {type: string, description: "Mã base64url 86 ký tự (tenant + yêu cầu + bí mật 32 byte; DB chỉ giữ SHA-256)"}
+                password: {type: string, format: password, minLength: 1, maxLength: 256}
+      responses:
+        "204": {description: Đã đặt mật khẩu mới}
+        "400": {description: "bad_request (thân không phải JSON)", $ref: "#/components/responses/Problem"}
+        "410": {description: accounts.reset_link_invalid, $ref: "#/components/responses/Problem"}
+        "422": {description: "accounts.password_policy | validation_failed (mật khẩu rỗng hoặc quá 256 byte)", $ref: "#/components/responses/Problem"}
+        "503": {description: accounts.dependency_unavailable, $ref: "#/components/responses/Problem"}
   /v1/reports/templates:
     get:
       summary: Mẫu báo cáo đang dùng mà vai của người gọi được xuất (mẫu hệ thống = phiên bản 0)
@@ -16655,7 +16771,7 @@ paths:
         "404": {description: "extension.cnts_outbreak_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/form-designs:
     get:
-      summary: Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS; chỉ Cấp Tỉnh CNTS và Admin
+      summary: Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS và các biểu điều tra; chỉ Cấp Tỉnh CNTS và Admin
       operationId: extCntsFormDesigns
       tags: [extension]
       responses:
@@ -16669,6 +16785,28 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/CNTSDesignView"}}
         "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "#192 FN-07: tạo biểu điều tra mới (phiên bản 1) hoặc sao chép biểu có sẵn; cán bộ tổng hợp Cấp Tỉnh CNTS hoặc Admin"
+      operationId: extCntsFormDesignCreate
+      tags: [extension]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSDesignCreateInput"}
+      responses:
+        "201":
+          description: Mã biểu CNTS-DT-<hậu tố> và phiên bản 1
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDesignSaved"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/knqg-specs:
     get:
@@ -16751,6 +16889,53 @@ paths:
         "404": {description: extension.cnts_knqg_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: "extension.cnts_knqg_exists | extension.cnts_project_closed", $ref: "#/components/responses/Problem"}
         "422": {description: "extension.cnts_knqg_invalid | extension.cnts_knqg_project_kind", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/form-designs/{code}/versions:
+    parameters:
+      - {name: code, in: path, required: true, schema: {type: string, pattern: "^[A-Z0-9][A-Z0-9._-]{0,63}$"}}
+    get:
+      summary: "#192 FN-07: lịch sử phiên bản của biểu (mới trước); chỉ Cấp Tỉnh CNTS và Admin"
+      operationId: extCntsFormDesignVersions
+      tags: [extension]
+      parameters:
+        - {name: before_version, in: query, required: false, schema: {type: integer, minimum: 0}, description: "0 hoặc bỏ trống = mới nhất; trang sau dùng phiên bản cuối trang"}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Phiên bản giảm dần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSDesignVersion"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "#192 FN-07 B1–B2: lưu cấu trúc thành phiên bản mới; mẫu KNQG từ chối (BR-02); chỉ thêm chỉ tiêu (UR-TINH-07)"
+      description: Kỳ đã phát hành giữ phiên bản cũ (BR-01, AC-03). base_version là phiên bản đã đọc; người khác lưu trước → 409.
+      operationId: extCntsFormDesignSave
+      tags: [extension]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSDesignSaveInput"}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDesignSaved"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/cnts/knqg-docs/{ref}:
     get:
       summary: "W11.53: chi tiết biểu — nội dung, thao tác được phép, cảnh báo (quy tắc 11), nội dung còn thiếu, điều kiện gửi Mẫu 07 (quy tắc 10), lịch sử phiên bản"
@@ -17260,6 +17445,156 @@ paths:
               schema: {type: string, format: binary}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {description: "extension.cnts_bm11_not_found | export.run_not_found", $ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/livestock-households:
+    get:
+      summary: "Danh sách hộ chăn nuôi trong phạm vi (FN-10, UR-XA-04; Cấp Xã chỉ xã phụ trách — AC-06). Họ tên che bớt, SĐT che một phần"
+      operationId: extensionCntsLivestockHouseholdList
+      tags: [extension]
+      parameters:
+        - {name: commune, in: query, required: false, schema: {type: string}}
+        - {name: status, in: query, required: false, schema: {type: string, enum: [active, pending_location, deactivated]}}
+        - {name: livestock_type, in: query, required: false, schema: {type: string, enum: [nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep]}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200}}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0, maximum: 100000}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdList"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Thêm hộ (H1–H3) — bắt buộc check-in tại nhà hộ (AC-05); trùng họ tên, ấp, xã → 409 trừ khi confirm_distinct. Cấp Xã (xã mình), cán bộ tổng hợp Cấp Tỉnh, Admin"
+      operationId: extensionCntsLivestockHouseholdCreate
+      tags: [extension]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdSave"}
+      responses:
+        "200":
+          description: Gọi lặp (Idempotency-Key) — trả bản đã ghi
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "201":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/livestock-households/{ref}:
+    get:
+      summary: "Chi tiết hộ, vị trí check-in hiện hành, lịch sử thay đổi HCN-09 (họ tên/SĐT cũ → mới chỉ dạng che bớt)"
+      operationId: extensionCntsLivestockHouseholdGet
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "Sửa thông tin hộ (H4, base_version) — không đổi vị trí; hộ đã vô hiệu hóa → 409"
+      operationId: extensionCntsLivestockHouseholdUpdate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdSave"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/livestock-households/{ref}/checkin:
+    post:
+      summary: "Check-in tại nhà hộ: Chờ bổ sung vị trí → Đang dùng (BR-08); hộ Đang dùng → đổi vị trí, bắt buộc lý do (H4)"
+      operationId: extensionCntsLivestockHouseholdCheckin
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdCheckinRequest"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/cnts/livestock-households/{ref}/deactivate:
+    post:
+      summary: "Vô hiệu hóa hộ (BR-04) — chỉ cán bộ tổng hợp Cấp Tỉnh, Admin; bắt buộc lý do; không kích hoạt lại"
+      operationId: extensionCntsLivestockHouseholdDeactivate
+      tags: [extension]
+      parameters:
+        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CNTSStatusChange"}
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CNTSLivestockHouseholdDetail"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | extension.out_of_scope | extension.read_only", $ref: "#/components/responses/Problem"}
+        "404": {description: "extension.cnts_livestock_household_not_found", $ref: "#/components/responses/Problem"}
+        "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
+        "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes:
     oidc:
@@ -19316,7 +19651,7 @@ components:
         source: {type: string, enum: [map, gps]}
     ExtWorkScheduleCheckin:
       type: object
-      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location]
+      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, legacy_no_photo, checkout, no_checkout]
       properties:
         id: {type: string, format: uuid}
         item_id: {type: string, format: uuid}
@@ -19338,6 +19673,70 @@ components:
               properties:
                 lat: {type: number}
                 lon: {type: number}
+        photo:
+          description: "Ảnh tại chỗ (CNTS v4.0 CV-07) — tải ở GET …/items/{item_id}/checkin/photo; null = check-in cũ trước v4.0"
+          oneOf:
+            - type: "null"
+            - {$ref: "#/components/schemas/ExtWorkScheduleVisitPhoto"}
+        legacy_no_photo: {type: boolean, description: "Dữ liệu cũ: check-in trước BRD CNTS v4.0, không ảnh — giữ nguyên, không bắt nhập bù"}
+        checkout:
+          description: "Check-out của mục (CV-08); null = chưa check-out"
+          oneOf:
+            - type: "null"
+            - {$ref: "#/components/schemas/ExtWorkScheduleCheckout"}
+        no_checkout: {type: boolean, description: "Nhãn \"Chưa check-out\" (CNTS v4.0 FN-12 BR-07): đã check-in, tới 23:59 ngày công tác (giờ Việt Nam) chưa check-out; check-out đồng bộ trễ gỡ nhãn (BR-08)"}
+    ExtWorkScheduleCheckout:
+      type: object
+      required: [id, checkin_id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, stay_minutes, synced_at, synced_late]
+      properties:
+        id: {type: string, format: uuid}
+        checkin_id: {type: string, format: uuid}
+        item_id: {type: string, format: uuid}
+        day: {type: string, format: date}
+        captured_at: {type: string, format: date-time, description: "Giờ thiết bị lúc bấm Check-out (AC-11: giữ khi đồng bộ muộn)"}
+        recorded_at: {type: string, format: date-time, description: "Thời điểm máy chủ nhận (đồng bộ)"}
+        accuracy_m: {type: [number, "null"]}
+        distance_m: {type: [number, "null"], description: "Khoảng cách tới địa điểm đã đăng ký (CV-06)"}
+        far: {type: boolean, description: "Cách địa điểm quá ngưỡng (mặc định 500 m) — cảnh báo checkout_far"}
+        weak_accuracy: {type: boolean}
+        mock_location: {type: boolean}
+        point_stored: {type: boolean}
+        location:
+          description: "Tọa độ — như check-in: chỉ người đăng ký và người duyệt thấy; null khi không lưu, quá hạn lưu hoặc phản hồi từ cache"
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [lat, lon]
+              properties:
+                lat: {type: number}
+                lon: {type: number}
+        photo: {$ref: "#/components/schemas/ExtWorkScheduleVisitPhoto"}
+        stay_minutes: {type: integer, description: "Thời gian ở địa điểm = check-out − check-in, phút (BR-07, AC-12)"}
+        synced_at: {type: string, format: date-time, description: "Thời điểm máy chủ nhận bản check-out (đồng bộ)"}
+        synced_late: {type: boolean, description: "Đồng bộ trễ: máy chủ nhận sau ngày công tác (giờ Việt Nam) — BR-08, AC-13"}
+    ExtWorkScheduleCheckoutResult:
+      type: object
+      required: [checkout, warnings]
+      properties:
+        checkout: {$ref: "#/components/schemas/ExtWorkScheduleCheckout"}
+        warnings: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleWarning"}}
+    ExtWorkScheduleVisitInput:
+      type: object
+      required: [lat, lon, captured_at, photo]
+      properties:
+        lat: {type: number, minimum: 8, maximum: 24}
+        lon: {type: number, minimum: 102, maximum: 118}
+        accuracy_m: {type: [number, "null"], minimum: 0}
+        captured_at: {type: string, format: date-time, description: "Giờ thiết bị lúc bấm (bản ngoại tuyến gửi muộn tối đa 7 ngày, phải thuộc ngày công tác)"}
+        mock_location: {type: boolean, description: "Thiết bị báo vị trí giả lập"}
+        device_id: {type: [string, "null"]}
+        photo: {type: string, contentEncoding: base64, description: "Ảnh chụp tại chỗ đã nén (JPEG/PNG/WebP, ≤ 500 KB), base64 chuẩn — bắt buộc (FN-12, AC-09)"}
+    ExtWorkScheduleVisitPhoto:
+      type: object
+      required: [content_type, size_bytes]
+      properties:
+        content_type: {type: string, enum: [image/jpeg, image/png, image/webp]}
+        size_bytes: {type: integer, minimum: 1, maximum: 512000}
     ExtWorkScheduleCheckinResult:
       type: object
       required: [checkin, warnings]
@@ -19690,11 +20089,12 @@ components:
             checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
             checkin_count: {type: integer}
             missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
+            no_checkout_count: {type: integer, description: "Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07)"}
     ExtWorkScheduleWarning:
       type: object
       required: [code, message, item_ids]
       properties:
-        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed]}
+        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed, checkout_far, checkout_weak_gps, checkout_mock_location, checkout_missing]}
         message: {type: string}
         item_ids: {type: array, items: {type: string, format: uuid}}
     ExtWorkScheduleVersion:
@@ -19721,6 +20121,7 @@ components:
         checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
         checkin_count: {type: integer}
         missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
+        no_checkout_count: {type: integer, description: "Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07)"}
         can:
           type: object
           required: [edit, submit, approve, request_changes]
@@ -23570,8 +23971,11 @@ components:
     CNTSOutbreakInput:
       type: object
       description: >-
-        Nội dung BM-10 (DB-01…DB-13). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại đủ trường
-        (mỗi lần là một phiên bản). Xác nhận tin báo: commune_code, location, source, received_at trống lấy theo tin báo.
+        Nội dung BM-10 (DB-01…DB-16, CNTS v4.0). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại
+        đủ trường (mỗi lần là một phiên bản, quy tắc v2). Xác nhận tin báo: commune_code, location, source, received_at trống
+        lấy theo tin báo. DB-04: ít nhất một hộ (household_refs + new_households, tối đa 200); DB-14 lấy theo hộ; DB-15 tự đếm
+        (không nhận từ API — AC-04); DB-16 bắt buộc khi bệnh thuộc nhóm thủy sản (AC-05), không ghi với bệnh khác.
+        household_ref (DB-04 một hộ của dữ liệu cũ v1) không ghi được nữa — gửi khác null → 422.
       properties:
         base_version: {type: integer, description: Phiên bản người nhập đã thấy (bắt buộc khi cập nhật, xác nhận tin báo)}
         commune_code: {type: string}
@@ -23579,8 +23983,21 @@ components:
         species_code: {type: string, description: Mã danh mục cnts_species}
         received_at: {type: string, format: date-time, description: DB-02}
         source: {type: string, enum: [ubnd_xa, nong_ho, can_bo], description: DB-03}
-        household_ref: {type: [string, "null"], format: uuid, description: DB-04 hộ (pf/cooperative)}
-        locality: {type: string, description: DB-04 địa bàn (ấp, khu vực) — không ghi họ tên, số điện thoại; bắt buộc khi không có household_ref}
+        household_refs:
+          type: array
+          maxItems: 200
+          items: {type: string, format: uuid}
+          description: >-
+            DB-04 hộ chọn trong danh sách hộ chăn nuôi (FN-10), cùng xã với ổ dịch, trạng thái Đang dùng hoặc Chờ bổ sung vị trí
+            (hộ vô hiệu hóa → 422, BR-07). DB-14 chụp loại chăn nuôi của hộ lúc ghi.
+        new_households:
+          type: array
+          maxItems: 200
+          items: {$ref: "#/components/schemas/CNTSOutbreakNewHousehold"}
+          description: DB-04 hộ chưa có — tạo trong danh sách ở trạng thái Chờ bổ sung vị trí, không cần check-in (FN-10 BR-08)
+        aqua_farmed_ha: {type: [string, "null"], description: "DB-16 diện tích nuôi trồng thủy sản bị ảnh hưởng (ha, ≥ 0, ≤ 2 số lẻ)"}
+        aqua_wild_ha: {type: [string, "null"], description: "DB-16 diện tích khai thác thủy sản bị ảnh hưởng (ha, ≥ 0, ≤ 2 số lẻ)"}
+        locality: {type: string, description: Địa bàn (ấp, khu vực) — ghi chú tùy chọn; không ghi họ tên, số điện thoại}
         location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
         herd_size: {type: integer, minimum: 1, description: DB-06}
         herd_age_days: {type: [integer, "null"]}
@@ -23598,13 +24015,49 @@ components:
         as_of: {type: string, format: date, description: Ngày diễn biến (mặc định ngày tiếp nhận ở bản 1, hôm nay ở bản sau); không lùi}
         progress_note: {type: string, description: Diễn biến của lần cập nhật}
         captured_at: {type: string, format: date-time, description: Giờ thiết bị của bản ngoại tuyến}
+    CNTSOutbreakNewHousehold:
+      type: object
+      required: [owner_name, livestock_type, animals]
+      description: Hộ chưa có trong danh sách hộ chăn nuôi, nhập tại DB-04 (HCN-02…HCN-06; xã = xã của ổ dịch)
+      properties:
+        owner_name: {type: string, maxLength: 200, description: HCN-02 họ tên chủ hộ / tên trang trại (kho định danh)}
+        owner_phone: {type: string, description: HCN-03 chỉ chữ số (tùy chọn)}
+        hamlet: {type: string, maxLength: 200, description: HCN-04 ấp, khu phố}
+        livestock_type: {type: string, enum: [nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep], description: DB-14 do cán bộ chọn}
+        animals:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items:
+            type: object
+            required: [species_code, head_count]
+            properties:
+              species_code: {type: string}
+              head_count: {type: integer, minimum: 0}
+    CNTSOutbreakHousehold:
+      type: object
+      required: [household_ref, household_version, code, livestock_type, hamlet, status, owner_label]
+      properties:
+        household_ref: {type: string, format: uuid}
+        household_version: {type: integer, description: Phiên bản hộ đã chụp lúc ghi ổ dịch}
+        code: {type: string, description: HCN-01 mã hộ}
+        livestock_type: {type: string, enum: [nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep], description: DB-14 (chụp lúc ghi)}
+        hamlet: {type: [string, "null"]}
+        status: {type: string, enum: [active, pending_location, deactivated], description: Trạng thái hiện hành của hộ}
+        owner_label: {type: [string, "null"], description: Họ tên che bớt — chỉ ở chi tiết ổ dịch}
     CNTSOutbreak:
       type: object
       required: [ref, version, version_id, event, status, commune_code, disease_code, disease_name, species_code, species_name,
         received_at, source, suspect_ref, household_ref, locality, location, herd_size, herd_age_days, dead, symptoms, sample_date,
         lab_name, lab_result, culled_head, culled_kg, chemical_liters, buffer_note, prevention_note, attachment_refs, as_of,
-        progress_note, status_reason, captured_at, recorded_at, actor]
+        progress_note, status_reason, captured_at, recorded_at, actor, legacy, households, affected_households, aqua_farmed_ha,
+        aqua_wild_ha]
       properties:
+        legacy: {type: boolean, description: "Dữ liệu cũ (quy tắc v1, một hộ/địa bàn trước CNTS v4.0): không có DB-14…DB-16, DB-15 hiện 1"}
+        households: {type: array, items: {$ref: "#/components/schemas/CNTSOutbreakHousehold"}, description: DB-04/DB-14 của phiên bản (rỗng ở dữ liệu cũ)}
+        affected_households: {type: integer, description: DB-15 số hộ bị ảnh hưởng (tự đếm)}
+        aqua_farmed_ha: {type: [string, "null"], description: DB-16 nuôi trồng (ha)}
+        aqua_wild_ha: {type: [string, "null"], description: DB-16 khai thác (ha)}
         ref: {type: string, format: uuid}
         version: {type: integer}
         version_id: {type: string, format: uuid}
@@ -23618,7 +24071,7 @@ components:
         received_at: {type: string, format: date-time}
         source: {type: string, enum: [ubnd_xa, nong_ho, can_bo]}
         suspect_ref: {type: [string, "null"], format: uuid}
-        household_ref: {type: [string, "null"], format: uuid}
+        household_ref: {type: [string, "null"], format: uuid, description: Chỉ ở dữ liệu cũ v1}
         locality: {type: [string, "null"]}
         location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
         herd_size: {type: integer}
@@ -26989,12 +27442,15 @@ components:
 
     CNTSDesignView:
       type: object
-      required: [code, bm, title, period_type, due, template_id, version, fields]
+      required: [code, bm, title, kind, period_type, due, locked, can_edit, template_id, version, fields]
       properties:
         code: {type: string}
         bm: {type: string}
         title: {type: string}
+        kind: {type: string, enum: [report, survey], description: "report = biểu kỳ của phòng; survey = biểu điều tra (FN-21)"}
         period_type: {type: string}
+        locked: {type: boolean, description: "Mẫu cố định theo TTKN Quốc gia — không sửa cấu trúc (FN-07 BR-02)"}
+        can_edit: {type: boolean, description: "Phiên hiện tại được lưu phiên bản mới cho biểu này"}
         due: {type: string}
         template_id: {type: [string, "null"], format: uuid}
         version: {type: [integer, "null"]}
@@ -27014,6 +27470,38 @@ components:
               line: {type: integer}
               field: {type: string}
               message: {type: string}
+    CNTSDesignVersion:
+      type: object
+      required: [template_id, version, title, fields]
+      properties:
+        template_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        title: {type: string}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+    CNTSDesignSaved:
+      type: object
+      required: [code, version]
+      properties:
+        code: {type: string}
+        version: {$ref: "#/components/schemas/CNTSDesignVersion"}
+    CNTSDesignSaveInput:
+      type: object
+      required: [base_version, title, fields]
+      properties:
+        base_version: {type: integer, minimum: 0, description: "Phiên bản đã đọc (0 khi biểu chưa có phiên bản)"}
+        title: {type: string, minLength: 1, maxLength: 200}
+        fields: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
+      additionalProperties: false
+    CNTSDesignCreateInput:
+      type: object
+      required: [code_suffix, title]
+      properties:
+        code_suffix: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9-]{0,39}$", description: "Mã biểu = CNTS-DT-<hậu tố in hoa>"}
+        title: {type: string, minLength: 1, maxLength: 200}
+        source_code: {type: string, description: "Sao chép từ biểu này (bỏ trống = tạo từ fields, vd kết quả kiểm Excel hợp lệ)"}
+        source_version: {type: integer, minimum: 0, description: "0 hoặc bỏ trống = phiên bản mới nhất của biểu nguồn"}
+        fields: {type: array, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
+      additionalProperties: false
     KHTCReportSupplement:
       type: object
       required: [id, department, instruction, state, due_at, native_submission_ref, return_applied]
@@ -27424,7 +27912,7 @@ components:
       properties:
         reason: {type: string, minLength: 10, maxLength: 1000}
         base_version: {type: integer}
-    CNTSCampaignInput: {"type":"object","required":["name","field","template_code","scope_mode","from_date","to_date","due_at"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"goal":{"type":"string","maxLength":2000},"field":{"type":"string","enum":["chan_nuoi","thu_y","thuy_san","khac"]},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"owner_ref":{"type":"string","format":"uuid"},"remind_before_hours":{"type":"integer","minimum":0,"maximum":168}},"additionalProperties":false}
+    CNTSCampaignInput: {"type":"object","required":["name","field","template_code","scope_mode","from_date","to_date","due_at"],"properties":{"name":{"type":"string","minLength":1,"maxLength":200},"goal":{"type":"string","maxLength":2000},"field":{"type":"string","enum":["chan_nuoi","thu_y","thuy_san","khac"]},"template_code":{"type":"string"},"template_version":{"type":["integer","null"],"minimum":1,"description":"#192 FN-21 B1: phiên bản biểu điều tra đã chọn (FN-07); bỏ trống = mới nhất lúc phát hành"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"owner_ref":{"type":"string","format":"uuid"},"remind_before_hours":{"type":"integer","minimum":0,"maximum":168}},"additionalProperties":false}
     CNTSPoint: {"type":"object","properties":{"lat":{"type":"number"},"lng":{"type":"number"},"source":{"type":"string","enum":["gps","map"]}},"required":["lat","lng","source"],"additionalProperties":false}
     CNTSCampaignDueInput: {"type":"object","required":["due_at","reason"],"properties":{"due_at":{"type":"string","format":"date-time"},"reason":{"type":"string","minLength":10,"maxLength":500}},"additionalProperties":false}
     CNTSProjectVersion: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"actor_display":{"type":["string","null"]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","actor_display"],"additionalProperties":false}
@@ -27434,7 +27922,7 @@ components:
     CNTSProjectList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSProject"}},"can_create":{"type":"boolean"}},"required":["items","can_create"],"additionalProperties":false}
     CNTSCampaignProgress: {"type":"object","required":["period_status","total","submitted","pending","overdue","missed","returned","regions","units"],"properties":{"period_status":{"type":"string"},"total":{"type":"integer"},"submitted":{"type":"integer"},"pending":{"type":"integer"},"overdue":{"type":"integer"},"missed":{"type":"integer"},"returned":{"type":"integer"},"regions":{"type":"array","items":{"type":"object","required":["code","name","total","submitted","pending","overdue","missed"],"properties":{"code":{"type":"string"},"name":{"type":"string"},"total":{"type":"integer"},"submitted":{"type":"integer"},"pending":{"type":"integer"},"overdue":{"type":"integer"},"missed":{"type":"integer"}},"additionalProperties":false}},"units":{"type":"array","items":{"type":"object","required":["commune","commune_name","region_code","region_name","status","versions","late","last_submitted_at"],"properties":{"commune":{"type":"string"},"commune_name":{"type":"string"},"region_code":{"type":"string"},"region_name":{"type":"string"},"status":{"type":"string"},"versions":{"type":"integer"},"late":{"type":"boolean"},"last_submitted_at":{"type":["string","null"],"format":"date-time"}},"additionalProperties":false}}},"additionalProperties":false}
     CNTSKHTCProgram: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string"},"active":{"type":"boolean"}},"required":["ref","code","name","kind","active"],"additionalProperties":false}
-    CNTSCampaign: {"type":"object","required":["id","version","name","goal","field","template_code","scope_mode","regions","communes","tasks","from_date","to_date","due_at","remind_before_hours","state","province_code","updated_by","updated_at","owner","forms_period_id","period_key","template_version","progress","events"],"properties":{"id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"name":{"type":"string"},"goal":{"type":["string","null"]},"field":{"type":"string"},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"tasks":{"type":"integer"},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"remind_before_hours":{"type":"integer"},"state":{"type":"string","enum":["draft","collecting","closed"]},"province_code":{"type":["string","null"]},"updated_by":{"$ref":"#/components/schemas/CNTSCampaignActor"},"updated_at":{"type":"string","format":"date-time"},"owner":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignActor"},{"type":"null"}]},"forms_period_id":{"type":["string","null"],"format":"uuid"},"period_key":{"type":["string","null"]},"template_version":{"type":["integer","null"]},"progress":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignProgress"},{"type":"null"}]},"events":{"type":"array","items":{"$ref":"#/components/schemas/CNTSCampaignEvent"}}},"additionalProperties":false}
+    CNTSCampaign: {"type":"object","required":["id","version","name","goal","field","template_code","scope_mode","regions","communes","tasks","from_date","to_date","due_at","remind_before_hours","state","province_code","updated_by","updated_at","owner","forms_period_id","period_key","template_version","progress","events"],"properties":{"id":{"type":"string","format":"uuid"},"version":{"type":"integer"},"name":{"type":"string"},"goal":{"type":["string","null"]},"field":{"type":"string"},"template_code":{"type":"string"},"scope_mode":{"type":"string","enum":["province","regions","communes"]},"regions":{"type":"array","items":{"type":"string"}},"communes":{"type":"array","items":{"type":"string"}},"tasks":{"type":"integer"},"from_date":{"type":"string","format":"date"},"to_date":{"type":"string","format":"date"},"due_at":{"type":"string","format":"date-time"},"remind_before_hours":{"type":"integer"},"state":{"type":"string","enum":["draft","collecting","closed"]},"province_code":{"type":["string","null"]},"updated_by":{"$ref":"#/components/schemas/CNTSCampaignActor"},"updated_at":{"type":"string","format":"date-time"},"owner":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignActor"},{"type":"null"}]},"forms_period_id":{"type":["string","null"],"format":"uuid"},"period_key":{"type":["string","null"]},"template_version":{"type":["integer","null"],"description":"Phiên bản biểu đã phát hành; Nháp: phiên bản đã chọn (null = mới nhất lúc phát hành)"},"progress":{"oneOf":[{"$ref":"#/components/schemas/CNTSCampaignProgress"},{"type":"null"}]},"events":{"type":"array","items":{"$ref":"#/components/schemas/CNTSCampaignEvent"}}},"additionalProperties":false}
     CNTSKHTCProgramList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSKHTCProgram"}}},"required":["items"],"additionalProperties":false}
     CNTSCampaignRemindResult: {"type":"object","required":["campaign","reminded"],"properties":{"campaign":{"$ref":"#/components/schemas/CNTSCampaign"},"reminded":{"type":"integer"}},"additionalProperties":false}
     CNTSProjectDetail: {"type":"object","properties":{"ref":{"type":"string","format":"uuid"},"event":{"type":"string","enum":["created","updated","closed","reopened"]},"province_code":{"type":"string"},"code":{"type":"string"},"name":{"type":"string"},"kind":{"type":"string","enum":["tinh","knqg","hop_tac"]},"basis":{"type":["string","null"]},"scale_note":{"type":["string","null"]},"start_date":{"type":"string","format":"date"},"end_date":{"type":["string","null"],"format":"date"},"budget":{"type":["string","null"]},"manager_ref":{"type":"string","format":"uuid"},"program_ref":{"type":["string","null"],"format":"uuid"},"training_note":{"type":["string","null"]},"supplies_note":{"type":["string","null"]},"attachment_refs":{"type":"array","items":{"type":"string","format":"uuid"}},"status_reason":{"type":["string","null"]},"version":{"type":"integer"},"updated_at":{"type":"string","format":"date-time"},"updated_by":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["active","closed"]},"site_count":{"type":"integer"},"household_count":{"type":"integer"},"can_edit":{"type":"boolean"},"manager_display":{"type":["string","null"]},"sites":{"type":"array","items":{"$ref":"#/components/schemas/CNTSSite"}},"versions":{"type":"array","items":{"$ref":"#/components/schemas/CNTSProjectVersion"}},"program":{"anyOf":[{"$ref":"#/components/schemas/CNTSKHTCProgram"},{"type":"null"}]}},"required":["ref","event","province_code","code","name","kind","basis","scale_note","start_date","end_date","budget","manager_ref","program_ref","training_note","supplies_note","attachment_refs","status_reason","version","updated_at","updated_by","status","site_count","household_count","can_edit","manager_display","sites","versions","program"],"additionalProperties":false}
@@ -27823,7 +28311,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/CNTSBM11Summary"
         - type: object
-          required: [version, content_hash, basis, communes, coverage, groups, lines, fishery, programs, sections, supplement, return_comment, recipient_list, history, can, replayed]
+          required: [version, content_hash, basis, communes, coverage, groups, lines, fishery, programs, sections, supplement, herds, herd_types, return_comment, recipient_list, history, can, replayed]
           properties:
             version: {type: integer, format: int64}
             content_hash: {type: string}
@@ -27870,6 +28358,12 @@ components:
                   unit: {type: string}
                   sent: {type: string}
                   now: {type: string}
+            herds:
+              description: "Hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07) — đếm từ danh sách hộ chăn nuôi (hộ Đang dùng) lúc lập/làm mới báo cáo; null ở báo cáo lập trước v4.0."
+              oneOf:
+                - $ref: "#/components/schemas/CNTSBM11Herds"
+                - type: "null"
+            herd_types: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Key"}, description: "Loại chăn nuôi HCN-06 theo thứ tự cột"}
             return_comment: {type: string}
             recipient_list:
               type: array
@@ -27908,6 +28402,31 @@ components:
                 receive: {type: boolean}
                 word: {type: boolean}
             replayed: {type: boolean}
+    CNTSBM11HeadRow:
+      type: object
+      required: [species, name, household, farm]
+      properties:
+        species: {type: string}
+        name: {type: string}
+        household: {type: string, description: "Số con ở nông hộ (thập phân dạng chuỗi)"}
+        farm: {type: string, description: "Số con ở trang trại (thập phân dạng chuỗi)"}
+    CNTSBM11HerdRow:
+      type: object
+      required: [commune, name, households, farms, by_type]
+      properties:
+        commune: {type: string, description: "Mã xã; rỗng ở dòng toàn tỉnh"}
+        name: {type: string}
+        households: {type: integer}
+        farms: {type: integer, description: "Trang trại nhỏ + vừa + công nghiệp"}
+        by_type: {type: object, additionalProperties: {type: integer}, description: "Loại chăn nuôi → số hộ (nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep)"}
+    CNTSBM11Herds:
+      type: object
+      required: [communes, total, communes_total, heads]
+      properties:
+        communes: {type: array, items: {$ref: "#/components/schemas/CNTSBM11HerdRow"}}
+        total: {$ref: "#/components/schemas/CNTSBM11HerdRow"}
+        communes_total: {type: integer, description: "Số xã của tỉnh (0 = chưa biết)"}
+        heads: {type: array, items: {$ref: "#/components/schemas/CNTSBM11HeadRow"}}
     CNTSBM11WordRun:
       type: object
       required: [id, seq, template, template_version, doc_number, doc_number_auto, file_name, body_hash, size, actor_ref, at]
@@ -27962,3 +28481,13 @@ components:
         excel_rule: {type: string}
       required: [mode, rule, id, key, version, hash, definition, applicable_from, word_key, word_version, word_hash, excel_rule]
       additionalProperties: false
+    CNTSLivestockAnimal: {"type":"object","properties":{"species_code":{"type":"string"},"species_name":{"type":["string","null"]},"head_count":{"type":"integer"}},"required":["species_code","species_name","head_count"],"additionalProperties":false}
+    CNTSLivestockLocation: {"type":"object","properties":{"lat":{"type":"number"},"lon":{"type":"number"},"accuracy_m":{"type":"string"},"mocked":{"type":"boolean"},"captured_at":{"type":"string","format":"date-time"}},"required":["lat","lon","accuracy_m","mocked","captured_at"],"additionalProperties":false}
+    CNTSLivestockHousehold: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"code":{"type":"string"},"version":{"type":"integer"},"status":{"type":"string","enum":["active","pending_location","deactivated"]},"event":{"type":"string","enum":["created","created_pending","updated","checked_in","relocated","deactivated"]},"commune_code":{"type":"string"},"commune_name":{"type":["string","null"]},"hamlet":{"type":["string","null"]},"livestock_type":{"type":"string","enum":["nong_ho","trang_trai_nho","trang_trai_vua","trang_trai_cong_nghiep"]},"animals":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockAnimal"}},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSLivestockLocation"},{"type":"null"}]},"owner_label":{"type":["string","null"]},"owner_masked_phone":{"type":["string","null"]},"can_edit":{"type":"boolean"},"can_deactivate":{"type":"boolean"},"updated_at":{"type":"string","format":"date-time"},"reason":{"type":["string","null"]}},"required":["id","code","version","status","event","commune_code","commune_name","hamlet","livestock_type","animals","location","owner_label","owner_masked_phone","can_edit","can_deactivate","updated_at","reason"],"additionalProperties":false}
+    CNTSLivestockChange: {"type":"object","properties":{"field":{"type":"string","enum":["owner_name","owner_phone","commune_code","hamlet","animals","livestock_type","location","status"]},"old":{"type":"string"},"new":{"type":"string"}},"required":["field","old","new"],"additionalProperties":false}
+    CNTSLivestockHistory: {"type":"object","properties":{"version":{"type":"integer"},"event":{"type":"string","enum":["created","created_pending","updated","checked_in","relocated","deactivated"]},"actor_ref":{"type":"string","format":"uuid"},"actor_name":{"type":["string","null"]},"at":{"type":"string","format":"date-time"},"reason":{"type":["string","null"]},"changes":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockChange"}}},"required":["version","event","actor_ref","actor_name","at","reason","changes"],"additionalProperties":false}
+    CNTSLivestockHouseholdDetail: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"code":{"type":"string"},"version":{"type":"integer"},"status":{"type":"string","enum":["active","pending_location","deactivated"]},"event":{"type":"string","enum":["created","created_pending","updated","checked_in","relocated","deactivated"]},"commune_code":{"type":"string"},"commune_name":{"type":["string","null"]},"hamlet":{"type":["string","null"]},"livestock_type":{"type":"string","enum":["nong_ho","trang_trai_nho","trang_trai_vua","trang_trai_cong_nghiep"]},"animals":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockAnimal"}},"location":{"anyOf":[{"$ref":"#/components/schemas/CNTSLivestockLocation"},{"type":"null"}]},"owner_label":{"type":["string","null"]},"owner_masked_phone":{"type":["string","null"]},"can_edit":{"type":"boolean"},"can_deactivate":{"type":"boolean"},"updated_at":{"type":"string","format":"date-time"},"reason":{"type":["string","null"]},"owner_name":{"type":["string","null"]},"updated_by_name":{"type":["string","null"]},"warnings":{"type":"array","items":{"type":"string","enum":["gps_accuracy","mocked_location"]}},"history":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockHistory"}}},"required":["id","code","version","status","event","commune_code","commune_name","hamlet","livestock_type","animals","location","owner_label","owner_masked_phone","can_edit","can_deactivate","updated_at","reason","owner_name","updated_by_name","warnings","history"],"additionalProperties":false}
+    CNTSLivestockHouseholdList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/CNTSLivestockHousehold"}},"total":{"type":"integer"},"limit":{"type":"integer"},"offset":{"type":"integer"}},"required":["items","total","limit","offset"],"additionalProperties":false}
+    CNTSLivestockCheckin: {"type":"object","properties":{"lat":{"type":"number"},"lon":{"type":"number"},"accuracy_m":{"type":"string","pattern":"^[0-9]{1,8}(\\.[0-9]{1,2})?$"},"mocked":{"type":"boolean"},"captured_at":{"type":"string","format":"date-time"}},"required":["lat","lon","accuracy_m","mocked","captured_at"],"additionalProperties":false}
+    CNTSLivestockHouseholdSave: {"type":"object","properties":{"base_version":{"type":"integer"},"owner_name":{"type":"string","maxLength":200},"owner_phone":{"type":["string","null"],"pattern":"^[0-9]{0,15}$"},"commune_code":{"type":"string"},"hamlet":{"type":"string","maxLength":200},"livestock_type":{"type":"string","enum":["nong_ho","trang_trai_nho","trang_trai_vua","trang_trai_cong_nghiep"]},"animals":{"type":"array","minItems":1,"maxItems":30,"items":{"type":"object","properties":{"species_code":{"type":"string"},"head_count":{"type":"integer","minimum":0}},"required":["species_code","head_count"],"additionalProperties":false}},"checkin":{"$ref":"#/components/schemas/CNTSLivestockCheckin"},"confirm_distinct":{"type":"boolean"}},"required":["commune_code","livestock_type","animals"],"additionalProperties":false}
+    CNTSLivestockHouseholdCheckinRequest: {"type":"object","properties":{"base_version":{"type":"integer"},"checkin":{"$ref":"#/components/schemas/CNTSLivestockCheckin"},"reason":{"type":"string","maxLength":1000}},"required":["base_version","checkin"],"additionalProperties":false}

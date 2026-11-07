@@ -2,7 +2,8 @@ package handler_test
 
 // W11.49 (D4 CN9, BRD CNTS v3.7 FN-11, UR-XA-10): Báo cáo dịch bệnh BM-10 có phiên bản diễn biến và báo nghi dịch trên
 // PostgreSQL thật qua module pf/extension (vai extension_app). Ngữ cảnh phiên KN giả lập bằng middleware X-AG-Context
-// (như extension/khtc); danh mục CNTS và đơn vị hành chính là bản giả.
+// (như extension/khtc); danh mục CNTS, đơn vị hành chính, kho định danh là bản giả.
+// CNTS-V4-OUTBREAK-MULTI (#252, CNTS v4.0): DB-04 chọn hộ trong danh sách hộ chăn nuôi (#251) — hộ tạo qua API danh sách.
 
 import (
 	"bytes"
@@ -34,6 +35,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -59,15 +61,18 @@ func (units) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUn
 func (units) Descendants(context.Context, string, time.Time) ([]string, error) { return nil, nil }
 func (units) Current(context.Context, string, time.Time) ([]string, error)     { return nil, nil }
 
-// catalogs: bệnh dtlcp (heo), cum (gà), vật nuôi heo, ga.
+// catalogs: bệnh dtlcp (heo), cum (gà), ahpnd (tôm — nhóm thủy sản), dom_trang (chưa khai loài); vật nuôi heo, ga, tom.
 type catalogs struct{ port.CNTSCatalogs }
 
 var items = map[string]mdport.CatalogItem{
 	"cnts_disease:dtlcp": {Catalog: "cnts_disease", Code: "dtlcp", Name: "Dịch tả lợn châu Phi", Active: true,
 		Attrs: map[string]string{"species": "heo", "notifiable": "true"}},
-	"cnts_disease:cum": {Catalog: "cnts_disease", Code: "cum", Name: "Cúm gia cầm", Active: true, Attrs: map[string]string{"species": "ga"}},
-	"cnts_species:heo": {Catalog: "cnts_species", Code: "heo", Name: "Heo", Active: true},
-	"cnts_species:ga":  {Catalog: "cnts_species", Code: "ga", Name: "Gà", Active: true},
+	"cnts_disease:cum":       {Catalog: "cnts_disease", Code: "cum", Name: "Cúm gia cầm", Active: true, Attrs: map[string]string{"species": "ga"}},
+	"cnts_disease:ahpnd":     {Catalog: "cnts_disease", Code: "ahpnd", Name: "Hoại tử gan tụy cấp", Active: true, Attrs: map[string]string{"species": "tom"}},
+	"cnts_disease:dom_trang": {Catalog: "cnts_disease", Code: "dom_trang", Name: "Đốm trắng", Active: true},
+	"cnts_species:heo":       {Catalog: "cnts_species", Code: "heo", Name: "Heo", Active: true, Attrs: map[string]string{"group": "gia_suc"}},
+	"cnts_species:ga":        {Catalog: "cnts_species", Code: "ga", Name: "Gà", Active: true, Attrs: map[string]string{"group": "gia_cam"}},
+	"cnts_species:tom":       {Catalog: "cnts_species", Code: "tom", Name: "Tôm", Active: true, Attrs: map[string]string{"group": "thuy_san"}},
 }
 
 func (catalogs) ItemAt(_ context.Context, catalog, code string, _ time.Time) (mdport.CatalogItem, error) {
@@ -95,14 +100,16 @@ type fix struct {
 	tenant uuid.UUID
 	mu     sync.Mutex
 	ctxs   map[uuid.UUID]*authz.KNContext
+	vault  *clienttest.Fake
 }
 
 func newFix(t *testing.T) *fix {
 	env := pgtest.Get(t)
-	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}}
+	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, vault: clienttest.New()}
 	f.pool = env.AdminPool(t, migrations.PF)
 	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}})
 	mod.UseCNTSCatalogs(catalogs{})
+	mod.UseCNTSModelVault(f.vault)
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 4<<20)
 	mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.knMiddleware(), idempotency.Middleware(ops)))
@@ -136,7 +143,9 @@ func (f *fix) knMiddleware() gin.HandlerFunc {
 			return
 		}
 		p.SelectedSession = &selected
-		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+		scope, _ := json.Marshal(cp)
+		ctx := idempotency.WithAuthorizationScope(c.Request.Context(), scope)
+		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, p))
 		c.Next()
 	}
 }
@@ -240,6 +249,17 @@ func report() map[string]any {
 	}
 }
 
+// hh thêm một hộ Đang dùng vào danh sách hộ chăn nuôi (#251, kèm check-in) và trả household_ref.
+func hh(t *testing.T, u user, name, commune, typ string) string {
+	t.Helper()
+	b := map[string]any{"owner_name": name, "commune_code": commune, "hamlet": "Ấp " + name, "livestock_type": typ,
+		"animals": []any{map[string]any{"species_code": "heo", "head_count": 50}},
+		"checkin": map[string]any{"lat": 10.3712, "lon": 105.4321, "accuracy_m": "8", "mocked": false, "captured_at": t0.Format(time.RFC3339)}}
+	return str(want(t, u.post("/v1/extension/cnts/livestock-households", b), http.StatusCreated, "", "thêm hộ "+name), "id")
+}
+
+func refs(rs ...string) []string { return rs }
+
 func with(m map[string]any, kv ...any) map[string]any {
 	out := map[string]any{}
 	for k, v := range m {
@@ -261,29 +281,31 @@ func TestFN11_OutbreakVersions(t *testing.T) {
 	tw := f.user(authz.KNContext{Role: authz.KNTW, Department: cnts, Scope: authz.Scope{All: true}})
 	khac := f.user(authz.KNContext{Role: authz.KNXa, Department: "trong_trot", Communes: []string{"30001"}, Scope: authz.Scope{Units: []string{"30001"}}})
 	const p = "/v1/extension/cnts/outbreaks"
+	h1 := hh(t, xa1, "Nguyễn Văn Một", "30001", "nong_ho")
+	rep := with(report(), "household_refs", refs(h1))
 
-	want(t, xa1.post(p, with(report(), "location", nil)), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "AC-02 thiếu vị trí")
-	want(t, xa1.post(p, with(report(), "dead", 121)), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "DB-07 > DB-06")
-	want(t, xa1.post(p, with(report(), "culled_head", 200)), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "DB-10 > DB-06")
-	want(t, xa1.post(p, with(report(), "location", map[string]any{"lat": "0", "lon": "0", "source": "gps"})), http.StatusUnprocessableEntity,
+	want(t, xa1.post(p, with(rep, "location", nil)), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "AC-02 thiếu vị trí")
+	want(t, xa1.post(p, with(rep, "dead", 121)), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "DB-07 > DB-06")
+	want(t, xa1.post(p, with(rep, "culled_head", 200)), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "DB-10 > DB-06")
+	want(t, xa1.post(p, with(rep, "location", map[string]any{"lat": "0", "lon": "0", "source": "gps"})), http.StatusUnprocessableEntity,
 		"extension.cnts_outbreak_invalid", "tọa độ 0,0")
-	want(t, xa1.post(p, with(report(), "disease_code", "khong_co")), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "bệnh ngoài danh mục")
-	want(t, xa1.post(p, with(report(), "species_code", "ga")), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "bệnh không áp dụng cho loài")
-	want(t, xa1.post(p, with(report(), "symptoms", "Gọi 0912345678")), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "PII")
-	want(t, xa1.post(p, with(report(), "locality", "", "household_ref", nil)), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "DB-04")
-	want(t, xa1.post(p, with(report(), "commune_code", "30002")), http.StatusForbidden, "extension.out_of_scope", "xã ngoài phân công")
-	want(t, tinh.post(p, report()), http.StatusForbidden, "", "Cấp Tỉnh chỉ xem")
-	want(t, khac.post(p, report()), http.StatusForbidden, "", "phòng khác")
+	want(t, xa1.post(p, with(rep, "disease_code", "khong_co")), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "bệnh ngoài danh mục")
+	want(t, xa1.post(p, with(rep, "species_code", "ga")), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "bệnh không áp dụng cho loài")
+	want(t, xa1.post(p, with(rep, "symptoms", "Gọi 0912345678")), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "PII")
+	want(t, xa1.post(p, report()), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "DB-04 không có hộ")
+	want(t, xa1.post(p, with(rep, "commune_code", "30002")), http.StatusForbidden, "extension.out_of_scope", "xã ngoài phân công")
+	want(t, tinh.post(p, rep), http.StatusForbidden, "", "Cấp Tỉnh chỉ xem")
+	want(t, khac.post(p, rep), http.StatusForbidden, "", "phòng khác")
 	want(t, tw.get(p), http.StatusForbidden, "", "Cấp TW không có FN-11")
 
 	k := key()
-	ob := want(t, xa1.postK(p, k, report()), http.StatusCreated, "", "lập BM-10")
+	ob := want(t, xa1.postK(p, k, rep), http.StatusCreated, "", "lập BM-10")
 	ref := str(ob, "ref")
 	if str(ob, "status") != "reported" || num(ob, "version") != "1" || str(ob, "as_of") != "2027-10-12" || str(ob, "disease_name") != "Dịch tả lợn châu Phi" ||
 		str(obj(ob, "location"), "lat") != "10.25341" || str(ob, "chemical_liters") != "20.5" {
 		t.Fatalf("bản 1: %v", ob)
 	}
-	again := xa1.postK(p, k, report()) // middleware Idempotency-Key phát lại phản hồi đã lưu
+	again := xa1.postK(p, k, rep) // middleware Idempotency-Key phát lại phản hồi đã lưu
 	if again.status/100 != 2 || str(again.body, "ref") != ref {
 		t.Fatalf("gửi lại phải trả cùng ổ dịch: %v", again)
 	}
@@ -303,7 +325,7 @@ func TestFN11_OutbreakVersions(t *testing.T) {
 	}
 
 	// Diễn biến: khóa lạc quan, ngày không lùi, đủ trường mỗi phiên bản.
-	up := with(report(), "dead", 30, "culled_head", 90, "culled_kg", "6300.5", "as_of", "2027-10-13", "progress_note", "Thêm 25 con chết, tiêu hủy 90 con")
+	up := with(rep, "dead", 30, "culled_head", 90, "culled_kg", "6300.5", "as_of", "2027-10-13", "progress_note", "Thêm 25 con chết, tiêu hủy 90 con")
 	want(t, xa1.post(p+"/"+ref+"/progress", up), http.StatusUnprocessableEntity, "validation_failed", "thiếu base_version")
 	want(t, xa1.post(p+"/"+ref+"/progress", with(up, "base_version", 2)), http.StatusConflict, "extension.cnts_outbreak_version_conflict", "sai phiên bản")
 	want(t, xa1.post(p+"/"+ref+"/progress", with(up, "base_version", 1, "as_of", "2027-10-11")), http.StatusUnprocessableEntity,
@@ -364,7 +386,7 @@ func TestFN11_SuspectConfirmDismiss(t *testing.T) {
 	}
 
 	body := map[string]any{"base_version": 1, "disease_code": "dtlcp", "species_code": "heo", "herd_size": 40, "dead": 2,
-		"symptoms": "Sốt, xuất huyết", "locality": "Ấp 3"}
+		"symptoms": "Sốt, xuất huyết", "locality": "Ấp 3", "household_refs": refs(hh(t, xa1, "Lê Văn Ba", "30001", "nong_ho"))}
 	want(t, xa1.post(p+"/"+str(s1, "ref")+"/confirm", body), http.StatusUnprocessableEntity, "extension.cnts_outbreak_invalid", "xác nhận thiếu vị trí")
 	ob := want(t, xa1.post(p+"/"+str(s2, "ref")+"/confirm", body), http.StatusCreated, "", "xác nhận → ổ dịch")
 	if str(ob, "suspect_ref") != str(s2, "ref") || str(ob, "source") != "nong_ho" || str(obj(ob, "location"), "lat") != "10.1" ||

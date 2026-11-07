@@ -74,6 +74,7 @@ func (e ErrInput) Error() string { return e.Field + ": " + e.Msg }
 type Draft struct {
 	Name, Goal, Field string
 	TemplateCode      string
+	TemplateVersion   *int64 // phiên bản biểu điều tra đã chọn (FN-21 B1 "biểu và phiên bản"); nil = mới nhất lúc phát hành
 	ScopeMode         string
 	Regions           []string
 	Units             []string // xã đã giải từ phạm vi
@@ -115,6 +116,8 @@ func (d Draft) Validate() error {
 		return ErrInput{"field", strings.Join(Fields, " | ")}
 	case !reCode.MatchString(d.TemplateCode):
 		return ErrInput{"template_code", "mã biểu điều tra (cap/forms) bắt buộc"}
+	case d.TemplateVersion != nil && *d.TemplateVersion < 1:
+		return ErrInput{"template_version", "phiên bản biểu từ 1 trở lên"}
 	case d.ScopeMode != ScopeProvince && d.ScopeMode != ScopeRegions && d.ScopeMode != ScopeCommunes:
 		return ErrInput{"scope_mode", "province | regions | communes"}
 	case d.ScopeMode == ScopeRegions && len(d.Regions) == 0:

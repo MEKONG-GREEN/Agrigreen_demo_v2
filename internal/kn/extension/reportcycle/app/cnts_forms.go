@@ -71,23 +71,28 @@ func sameFields(raw json.RawMessage, fs []domain.CNTSField) bool {
 	return string(a) == string(b)
 }
 
-// InstallCNTSForms cài (phiên bản mới) các biểu chưa có hoặc khác định nghĩa chuẩn của gói — Admin KN /
-// reports_admin (define_by của profile kn_cnts). Biểu đã cài đúng định nghĩa giữ nguyên.
+// InstallCNTSForms cài các biểu chưa có — Admin KN (chính sách định nghĩa kn_cnts, #192). Mẫu KNQG (BR-02) đã cài khác
+// cấu trúc chuẩn thì cài lại đúng chuẩn; biểu Cấp Tỉnh được sửa (BM-17) đã cài thì giữ phiên bản Cấp Tỉnh đã lưu (FN-07),
+// không ghi đè bằng cấu trúc mã nguồn. Biểu đã cài đúng định nghĩa giữ nguyên.
 func (s *Service) InstallCNTSForms(ctx context.Context, idem string) ([]CNTSFormView, error) {
 	views, err := s.CNTSForms(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for i, v := range views {
-		if v.Current {
+		if v.Current || (v.Installed != nil && !domain.CNTSLocked(v.Form.Code)) {
 			continue
 		}
 		raw, err := json.Marshal(v.Form.Fields)
 		if err != nil {
 			return nil, err
 		}
+		var base int64
+		if v.Installed != nil {
+			base = v.Installed.Version
+		}
 		ref, err := s.FormsNative.DefineTemplate(ctx, formsport.TemplateDef{Profile: domain.ProfileCNTS, Code: v.Form.Code,
-			Title: v.Form.BM + " — " + v.Form.Title, Fields: raw}, idemOr(idem, v.Form.Code))
+			Title: v.Form.BM + " — " + v.Form.Title, Fields: raw, BaseVersion: &base}, idemOr(idem, v.Form.Code))
 		if err != nil {
 			return nil, err
 		}

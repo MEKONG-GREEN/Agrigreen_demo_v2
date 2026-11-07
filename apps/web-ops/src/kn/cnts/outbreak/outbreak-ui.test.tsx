@@ -4,9 +4,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createApiClient, type ApiClient } from "@/api/client";
+import { createApiClient, unwrap, type ApiClient } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
 import { resetKnAdmin } from "@/api/mock/kn-admin";
+import { resetCntsLivestock } from "@/api/mock/kn-cnts-livestock";
 import { resetCntsOutbreaks } from "@/api/mock/kn-cnts-outbreak";
 import { createKnAdminApi } from "@/kn/cycle/api";
 import { OutbreakCreateScreen } from "./OutbreakCreateScreen";
@@ -41,6 +42,7 @@ beforeEach(async () => {
   calls.length = 0;
   resetKnAdmin();
   resetCntsOutbreaks();
+  resetCntsLivestock();
   const adminCtx = await contextOf("kn-admin", "asg-admin", null);
   const adm = createKnAdminApi({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-admin", getContextId: () => adminCtx, fetch: mockAdminFetchNoDelay });
   const cn = (await adm.departments()).items.find((d) => d.code === "chan_nuoi_thuy_san")!;
@@ -60,7 +62,8 @@ beforeEach(async () => {
 
 const report = (patch = {}) =>
   payload({ ...emptyForm("91301"), disease_code: "ASF", species_code: "HEO", received_at: "2026-10-12T08:30", source: "can_bo", locality: "Ấp Hòa Thuận A",
-    lat: "10.25341", lon: "105.9721", herd_size: "120", dead: "5", symptoms: "Sốt cao", ...patch });
+    lat: "10.25341", lon: "105.9721", herd_size: "120", dead: "5", symptoms: "Sốt cao",
+    new_households: [{ owner_name: "Hộ Một", owner_phone: "", hamlet: "", livestock_type: "nong_ho" as const, species_code: "HEO", head_count: "10" }], ...patch });
 
 describe("hàm thuần UP-07", () => {
   it("thẻ thống kê, mã ổ dịch, tìm kiếm không dấu", () => {
@@ -105,6 +108,33 @@ describe("Danh sách ổ dịch (UP-07)", () => {
   });
 });
 
+describe("BM-10 CNTS v4.0 (#252): DB-04 chọn nhiều hộ, DB-15 tự đếm, DB-16 bệnh thủy sản", () => {
+  it("chọn 3 hộ trong danh sách → DB-15 = 3 (AC-04); bệnh thủy sản hiện DB-16 bắt buộc (AC-05); chi tiết hiện hộ, dữ liệu cũ", async () => {
+    const u = userEvent.setup();
+    const names = ["Lê Văn Một", "Lê Văn Hai", "Lê Văn Ba"];
+    for (const [i, n] of names.entries())
+      await unwrap(auth.api!.POST("/v1/extension/cnts/livestock-households", {
+        params: { header: { "Idempotency-Key": `hh-${i}-${Math.random()}` } },
+        body: { owner_name: n, commune_code: "91301", hamlet: `Ấp ${i}`, livestock_type: i === 2 ? "trang_trai_vua" : "nong_ho",
+          animals: [{ species_code: "HEO", head_count: 10 }], checkin: { lat: 10.37, lon: 105.43, accuracy_m: "8", mocked: false, captured_at: new Date().toISOString() } },
+      }));
+    render(<OutbreakCreateScreen />);
+    const pick = await screen.findByRole("list", { name: "Chọn hộ trong danh sách" });
+    await waitFor(() => expect(within(pick).getAllByRole("checkbox")).toHaveLength(3));
+    expect(within(pick).getByText(/Trang trại vừa/)).toBeInTheDocument();
+    for (const c of within(pick).getAllByRole("checkbox")) await u.click(c);
+    expect(screen.getByText(/DB-15 Số hộ bị ảnh hưởng/)).toHaveTextContent("3");
+    expect(screen.queryByRole("group", { name: /DB-16/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("option", { name: /Hoại tử gan tụy/ })).toBeInTheDocument());
+    await u.selectOptions(screen.getByLabelText("Bệnh"), "AHPND");
+    await u.selectOptions(screen.getByLabelText("Vật nuôi"), "TOM_THE");
+    expect(screen.getByRole("group", { name: /DB-16/ })).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: "Gửi Cấp Tỉnh" }));
+    expect(await screen.findAllByText(/Bắt buộc khi bệnh thuộc nhóm thủy sản \(DB-16\)/)).toHaveLength(2);
+    expect(calls.filter((c) => c.startsWith("POST") && c.includes("/outbreaks"))).toHaveLength(0);
+  });
+});
+
 describe("Trang tạo ổ dịch (UP-08)", () => {
   it("3 phần, ô số mặc định 0, thiếu * → lỗi, gửi xong có Xuất Word + bản đồ", async () => {
     const u = userEvent.setup();
@@ -121,7 +151,14 @@ describe("Trang tạo ổ dịch (UP-08)", () => {
     await u.selectOptions(screen.getByLabelText("Vật nuôi"), "HEO");
     await u.type(screen.getByLabelText(/DB-02/), "2026-10-12T08:30");
     await u.selectOptions(screen.getByLabelText("Nguồn tin"), "can_bo");
-    await u.type(screen.getByLabelText(/DB-04/), "Ấp Hòa Thuận A");
+    await u.type(screen.getByLabelText(/Địa bàn \(ấp, khu vực\)/), "Ấp Hòa Thuận A");
+    // DB-04 (#252): nhập hộ chưa có → DB-15 tự đếm 1.
+    await u.click(screen.getByRole("button", { name: "Nhập hộ chưa có" }));
+    await u.type(screen.getByLabelText(/Họ tên chủ hộ/), "Nguyễn Văn Hộ");
+    await u.selectOptions(screen.getByLabelText(/DB-14 Loại chăn nuôi/), "trang_trai_nho");
+    await u.selectOptions(screen.getByLabelText(/Vật nuôi của hộ/), "HEO");
+    await u.type(screen.getByLabelText(/Số con của hộ/), "40");
+    expect(screen.getByText(/DB-15 Số hộ bị ảnh hưởng/)).toHaveTextContent("1");
     await u.type(screen.getByLabelText("Vĩ độ"), "10.25341");
     await u.type(screen.getByLabelText("Kinh độ"), "105.9721");
     await u.clear(screen.getByLabelText(/DB-06 Quy mô đàn/));

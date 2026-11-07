@@ -38,6 +38,8 @@ type CNTSAlertDeps struct {
 func (m *Module) UseCNTSAlerts(d CNTSAlertDeps) {
 	m.alert.Feed = d.Feed
 	m.svc.PlanFeed = d.Feed // BF-CN-WEEKLY: kế hoạch tuần BM-05 Phần II → Lịch công tác
+	// CNTS v4.0 Mục III.5 dòng 13: người theo dõi lịch cán bộ xã nhận cảnh báo "Chưa check-out".
+	m.alert.Followers = m.svc.ScheduleFollowers
 	if d.Directory != nil || d.Holders != nil {
 		m.alert.Dir = alertDirectory{dir: d.Directory, holders: d.Holders}
 	}
@@ -60,8 +62,9 @@ func (m *Module) CNTSAlertJobs(tenants alertapp.TenantLister, log *slog.Logger) 
 				if err != nil {
 					outcome = "error"
 				}
-				log.Info("cảnh báo CNTS: quá hạn xử lý, nhắc nộp, trễ liên tiếp, mũi tiêm quá hạn", "event", "job."+JobCNTSAlert, "overdue", r.Overdue,
-					"reminders", r.Reminders, "streaks", r.Streaks, "vaccines", r.Vaccines, "outcome", outcome)
+				log.Info("cảnh báo CNTS: quá hạn xử lý, nhắc nộp, trễ liên tiếp, mũi tiêm quá hạn, chưa check-out", "event", "job."+JobCNTSAlert,
+					"overdue", r.Overdue, "reminders", r.Reminders, "streaks", r.Streaks, "vaccines", r.Vaccines, "no_checkouts", r.NoCheckouts,
+					"outcome", outcome)
 			}
 			return err
 		},

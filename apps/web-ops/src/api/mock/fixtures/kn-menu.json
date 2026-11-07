@@ -1983,6 +1983,15 @@
           "badge_source": null,
           "enabled": true,
           "children": []
+         },
+         {
+          "key": "tinh.cnts.so_lieu_xa.ho_chan_nuoi",
+          "label": "Danh sách hộ chăn nuôi",
+          "route": "/kn/cnts/so-lieu-xa/ho-chan-nuoi",
+          "icon": "users",
+          "badge_source": null,
+          "enabled": true,
+          "children": []
          }
         ]
        },
@@ -2197,6 +2206,15 @@
         "key": "xa.cnts.ho_mo_hinh",
         "label": "Hộ mô hình",
         "route": "/kn/cnts/ho-mo-hinh",
+        "icon": "users",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "xa.cnts.ho_chan_nuoi",
+        "label": "Danh sách hộ chăn nuôi",
+        "route": "/kn/cnts/so-lieu-xa/ho-chan-nuoi",
         "icon": "users",
         "badge_source": null,
         "enabled": true,

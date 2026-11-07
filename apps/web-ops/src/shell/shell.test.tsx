@@ -293,7 +293,7 @@ describe("<LoginCard> (Hình 3a)", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Sai tài khoản hoặc mật khẩu.Kiểm tra lại thông tin. Còn 4 lần thử.");
     rerender(<LoginCard mode="password" error={{ kind: "locked", minutes: 15 }} onSubmit={() => undefined} />);
     expect(screen.getByRole("alert")).toHaveTextContent("tạm khóa 15 phút");
-    expect(screen.getByRole("link", { name: "Quên mật khẩu?" })).toHaveAttribute("href", "/login/lien-he?ly-do=quen-mat-khau");
+    expect(screen.getByRole("link", { name: "Quên mật khẩu?" })).toHaveAttribute("href", "/login/quen-mat-khau");
     expect(screen.getByRole("link", { name: "Liên hệ quản trị viên" })).toHaveAttribute("href", "/login/lien-he");
   });
 

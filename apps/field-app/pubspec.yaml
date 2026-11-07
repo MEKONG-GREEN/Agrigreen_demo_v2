@@ -23,6 +23,8 @@ dependencies:
   path_provider: ^2.1.6
   path: ^1.9.1
   firebase_messaging: ^16.7.0
+  # CNTS v4.0 FN-12: nén ảnh check-in/check-out ≤ 500 KB trong bộ nhớ (MIT; đã có qua agrigreen_mobile).
+  image: ^4.10.1
 
 dev_dependencies:
   flutter_test:
@@ -34,7 +36,6 @@ dev_dependencies:
   # Chỉ kiểm thử import trực tiếp (bản chạy nhận qua agrigreen_mobile).
   crypto: ^3.0.7
   http: ^1.6.0
-  image: ^4.10.1
   pinenacl: ^0.6.0
 
 flutter:
