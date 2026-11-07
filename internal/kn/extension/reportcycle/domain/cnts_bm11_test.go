@@ -138,3 +138,37 @@ func TestBM11DiffAndText(t *testing.T) {
 		t.Fatal("đoạn viết quá dài phải bị chặn")
 	}
 }
+
+// CNTS v4.0 FN-16 AC-05: xã A có 12 hộ đang dùng, 3 trang trại nhỏ, 1 trang trại vừa → 12 hộ, 4 trang trại; nông hộ 8,
+// nhỏ 3, vừa 1, công nghiệp 0. Dòng toàn tỉnh cộng các xã; số con tách nông hộ / trang trại theo thứ tự danh mục.
+func TestBM11HerdsOf_AC05(t *testing.T) {
+	in := BM11HerdInput{
+		Counts: []BM11HerdCount{{"XA", BM11HerdHousehold, 8}, {"XA", BM11HerdFarmSmall, 3}, {"XA", BM11HerdFarmMedium, 1},
+			{"XB", BM11HerdFarmLarge, 1}, {"XB", BM11HerdHousehold, 2}},
+		Heads: []BM11HeadCount{{"heo", BM11HerdHousehold, "212"}, {"heo", BM11HerdFarmSmall, "1000"}, {"heo", BM11HerdFarmLarge, "460"},
+			{"ga", BM11HerdHousehold, "1150"}, {"vit", BM11HerdFarmMedium, "400"}, {"la", BM11HerdHousehold, "x"}},
+		Species: map[string]BM11Species{"heo": {"Heo", 1}, "ga": {"Gà", 3}, "vit": {"Vịt", 4}},
+	}
+	h := BM11HerdsOf(in, 102)
+	if len(h.Communes) != 2 || h.Communes[0].Commune != "XA" || h.CommunesTotal != 102 {
+		t.Fatalf("dòng xã: %+v", h.Communes)
+	}
+	a := h.Communes[0]
+	if a.Households != 12 || a.Farms != 4 || a.ByType[BM11HerdHousehold] != 8 || a.ByType[BM11HerdFarmSmall] != 3 ||
+		a.ByType[BM11HerdFarmMedium] != 1 || a.ByType[BM11HerdFarmLarge] != 0 {
+		t.Fatalf("AC-05 xã A: %+v", a)
+	}
+	if h.Total.Households != 15 || h.Total.Farms != 5 || h.Total.ByType[BM11HerdFarmLarge] != 1 {
+		t.Fatalf("toàn tỉnh: %+v", h.Total)
+	}
+	got := make([]string, 0, len(h.Heads))
+	for _, r := range h.Heads {
+		got = append(got, r.Name+":"+r.Household+"/"+r.Farm)
+	}
+	if want := []string{"Heo:212/1460", "Gà:1150/0", "Vịt:0/400", "la:0/0"}; !slices.Equal(got, want) {
+		t.Fatalf("số con: %v, muốn %v", got, want)
+	}
+	if e := BM11HerdsOf(BM11HerdInput{}, 0); len(e.Communes) != 0 || e.Total.Households != 0 || len(e.Total.ByType) != 4 || e.Heads == nil {
+		t.Fatalf("rỗng: %+v", e)
+	}
+}

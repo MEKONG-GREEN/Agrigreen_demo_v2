@@ -1,12 +1,12 @@
 ### pf/extension (`dom/extension` — Báo cáo dịch bệnh BM-10, báo nghi dịch, W11.49)
 
 Dùng lại mã đã có của module: `extension.read_only` (ngữ cảnh chỉ xem), `extension.out_of_scope` (xã ngoài phân công),
-`extension.support_reason_required`, `extension.dependency_unavailable` (chưa nối danh mục CNTS hoặc đơn vị hành chính).
+`extension.support_reason_required`, `extension.dependency_unavailable` (chưa nối danh mục CNTS hoặc đơn vị hành chính; #252: nhập hộ mới tại DB-04 khi chưa nối kho định danh). Sai cú pháp DB-16 (không phải số thập phân thường, quá 2 số lẻ) → `validation_failed`.
 
 | HTTP | code | Khi nào |
 |---|---|---|
 | 404 | `extension.cnts_outbreak_not_found` | Ổ dịch không có, hoặc thuộc xã ngoài phạm vi người gọi |
-| 422 | `extension.cnts_outbreak_invalid` | Nội dung BM-10 sai (lỗi từng trường): thiếu vị trí DB-05, số con chết/tiêu hủy > quy mô đàn, bệnh/vật nuôi không có hoặc không dùng tại ngày diễn biến, bệnh không áp dụng cho vật nuôi, có số điện thoại/CCCD trong văn bản, ngày diễn biến lùi, đổi xã, thiếu lý do kết thúc/mở lại |
+| 422 | `extension.cnts_outbreak_invalid` | Nội dung BM-10 sai (lỗi từng trường): thiếu vị trí DB-05, số con chết/tiêu hủy > quy mô đàn, bệnh/vật nuôi không có hoặc không dùng tại ngày diễn biến, bệnh không áp dụng cho vật nuôi, có số điện thoại/CCCD trong văn bản, ngày diễn biến lùi, đổi xã, thiếu lý do kết thúc/mở lại. CNTS v4.0 (#252): DB-04 không có hộ nào (`households`), quá 200 hộ, hộ lặp; hộ chọn không có trong danh sách hộ chăn nuôi, đã vô hiệu hóa (FN-10 BR-07) hoặc thuộc xã khác (`households[i]`); hộ nhập mới sai HCN-02…HCN-06 (`new_households[i].*`); thiếu DB-16 khi bệnh thuộc nhóm thủy sản hoặc ghi DB-16 với bệnh khác (`aqua_farmed_ha`, `aqua_wild_ha`); gửi `household_ref` (dữ liệu cũ v1) |
 | 409 | `extension.cnts_outbreak_version_conflict` | `base_version` khác phiên bản hiện hành của ổ dịch — đã có người cập nhật (khóa lạc quan) |
 | 409 | `extension.cnts_outbreak_closed` | Cập nhật diễn biến hoặc kết thúc ổ dịch đã kết thúc |
 | 409 | `extension.cnts_outbreak_not_closed` | Mở lại ổ dịch chưa kết thúc |

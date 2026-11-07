@@ -18,3 +18,9 @@ Dùng lại mã đã có của module: `extension.read_only`, `extension.out_of_
 | 409 | `extension.checkin_not_registered` | Lịch còn Nháp — gửi lịch trước khi check-in |
 | 409 | `extension.checkin_not_approved` | Lịch đã gửi nhưng chưa có bản nào được duyệt — chỉ check-in theo lịch đã duyệt (log bug TT-07/CN-06, 23/10/2026). Đang có điều chỉnh chờ duyệt lại thì check-in theo bản đã duyệt trước đó |
 | 404 | `extension.schedule_item_not_found` | Không có mục trong phiên bản hiện hành của lịch |
+| 409 | `extension.checkout_no_checkin` | Check-out mục chưa check-in — check-out chỉ sau khi đã check-in (CNTS v4.0 FN-12 B4b) |
+| 409 | `extension.checkout_exists` | Mục công tác đã check-out — check-out không sửa được (BR-06); `checkout_id` trong phần mở rộng |
+| 404 | `extension.visit_photo_not_found` | Không có ảnh check-in/check-out của mục (chưa check-in/check-out, hoặc check-in cũ trước v4.0 không ảnh) |
+
+Check-in/check-out (CNTS v4.0 FN-12, #249) thiếu ảnh, ảnh không phải base64, quá 500 KB hoặc không phải JPEG/PNG/WebP →
+`validation_failed` trường `photo` (AC-09); chưa nối kho tệp ảnh → `extension.dependency_unavailable`.

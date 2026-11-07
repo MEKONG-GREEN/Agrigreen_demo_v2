@@ -1,0 +1,323 @@
+{
+  "id": "extension-cnts-livestock",
+  "order": 120,
+  "tables": {},
+  "replacements": [
+    {
+      "path": [
+        "deptMenus",
+        "chan_nuoi_thuy_san",
+        "kn_tinh",
+        2,
+        "Items",
+        0,
+        "Children"
+      ],
+      "before": [
+        {
+          "Key": "tinh.cnts.so_lieu_xa.nhap_lieu_tuan",
+          "Label": "Nhập liệu tuần",
+          "Route": "/kn/cnts/so-lieu-xa/nhap-lieu-tuan",
+          "Icon": "table",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.cnts.so_lieu_xa.khai_thac_thuy_san",
+          "Label": "Khai thác thủy sản",
+          "Route": "/kn/cnts/so-lieu-xa/khai-thac-thuy-san",
+          "Icon": "water",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.cnts.so_lieu_xa.nhat_ky",
+          "Label": "Nhật ký sản xuất",
+          "Route": "/kn/cnts/so-lieu-xa/nhat-ky",
+          "Icon": "journal",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.cnts.so_lieu_xa.lich_tiem",
+          "Label": "Lịch tiêm (thực tế)",
+          "Route": "/kn/cnts/lich-tiem",
+          "Icon": "check",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ],
+      "after": [
+        {
+          "Key": "tinh.cnts.so_lieu_xa.nhap_lieu_tuan",
+          "Label": "Nhập liệu tuần",
+          "Route": "/kn/cnts/so-lieu-xa/nhap-lieu-tuan",
+          "Icon": "table",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.cnts.so_lieu_xa.khai_thac_thuy_san",
+          "Label": "Khai thác thủy sản",
+          "Route": "/kn/cnts/so-lieu-xa/khai-thac-thuy-san",
+          "Icon": "water",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.cnts.so_lieu_xa.nhat_ky",
+          "Label": "Nhật ký sản xuất",
+          "Route": "/kn/cnts/so-lieu-xa/nhat-ky",
+          "Icon": "journal",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.cnts.so_lieu_xa.lich_tiem",
+          "Label": "Lịch tiêm (thực tế)",
+          "Route": "/kn/cnts/lich-tiem",
+          "Icon": "check",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "tinh.cnts.so_lieu_xa.ho_chan_nuoi",
+          "Label": "Danh sách hộ chăn nuôi",
+          "Route": "/kn/cnts/so-lieu-xa/ho-chan-nuoi",
+          "Icon": "users",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ]
+    },
+    {
+      "path": [
+        "deptMenus",
+        "chan_nuoi_thuy_san",
+        "kn_xa",
+        2,
+        "Items"
+      ],
+      "before": [
+        {
+          "Key": "xa.cnts.ho_mo_hinh",
+          "Label": "Hộ mô hình",
+          "Route": "/kn/cnts/ho-mo-hinh",
+          "Icon": "users",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.nhat_ky",
+          "Label": "Nhật ký sản xuất",
+          "Route": "",
+          "Icon": "journal",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": [
+            {
+              "Key": "xa.cnts.nhat_ky.thuy_san",
+              "Label": "Thủy sản",
+              "Route": "/kn/cnts/nhat-ky",
+              "Icon": "water",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
+            },
+            {
+              "Key": "xa.cnts.nhat_ky.chan_nuoi",
+              "Label": "Chăn nuôi",
+              "Route": "/kn/cnts/nhat-ky",
+              "Icon": "sprout",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
+            }
+          ]
+        },
+        {
+          "Key": "xa.cnts.lich_tiem",
+          "Label": "Lịch tiêm phòng",
+          "Route": "/kn/cnts/lich-tiem",
+          "Icon": "check",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.ban_do_dich",
+          "Label": "Bản đồ vùng dịch",
+          "Route": "/kn/cnts/ban-do-dich",
+          "Icon": "map",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.diem_trinh_dien",
+          "Label": "Điểm trình diễn",
+          "Route": "/kn/cnts/ho-mo-hinh",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.quy_trinh",
+          "Label": "Quy trình, văn bản",
+          "Route": "/kn/van-ban",
+          "Icon": "sop",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ],
+      "after": [
+        {
+          "Key": "xa.cnts.ho_mo_hinh",
+          "Label": "Hộ mô hình",
+          "Route": "/kn/cnts/ho-mo-hinh",
+          "Icon": "users",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.ho_chan_nuoi",
+          "Label": "Danh sách hộ chăn nuôi",
+          "Route": "/kn/cnts/so-lieu-xa/ho-chan-nuoi",
+          "Icon": "users",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.nhat_ky",
+          "Label": "Nhật ký sản xuất",
+          "Route": "",
+          "Icon": "journal",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": [
+            {
+              "Key": "xa.cnts.nhat_ky.thuy_san",
+              "Label": "Thủy sản",
+              "Route": "/kn/cnts/nhat-ky",
+              "Icon": "water",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
+            },
+            {
+              "Key": "xa.cnts.nhat_ky.chan_nuoi",
+              "Label": "Chăn nuôi",
+              "Route": "/kn/cnts/nhat-ky",
+              "Icon": "sprout",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
+            }
+          ]
+        },
+        {
+          "Key": "xa.cnts.lich_tiem",
+          "Label": "Lịch tiêm phòng",
+          "Route": "/kn/cnts/lich-tiem",
+          "Icon": "check",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.ban_do_dich",
+          "Label": "Bản đồ vùng dịch",
+          "Route": "/kn/cnts/ban-do-dich",
+          "Icon": "map",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.diem_trinh_dien",
+          "Label": "Điểm trình diễn",
+          "Route": "/kn/cnts/ho-mo-hinh",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        },
+        {
+          "Key": "xa.cnts.quy_trinh",
+          "Label": "Quy trình, văn bản",
+          "Route": "/kn/van-ban",
+          "Icon": "sop",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
+        }
+      ]
+    }
+  ]
+}

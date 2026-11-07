@@ -295,6 +295,8 @@ type Counts struct {
 	AlertsOpen       int // CNTS: cảnh báo chưa đóng
 	AlertsOverdue    int // CNTS: cảnh báo quá hạn xử lý
 	OutbreaksActive  int // CNTS: ổ dịch chưa kết thúc
+	Households       int // CNTS: hộ chăn nuôi Đang dùng (danh sách hộ FN-10, bản hiện hành)
+	Farms            int // CNTS: trong đó trang trại (quy mô nhỏ, vừa, công nghiệp)
 	TasksOpen        int // Trồng trọt: nhiệm vụ hỗ trợ đang mở
 	TasksOverdue     int // Trồng trọt: nhiệm vụ quá hạn SLA
 	FieldReportsWeek int // Trồng trọt: báo cáo hiện trường 7 ngày qua
@@ -321,6 +323,13 @@ func CountsFor(ctx context.Context, tx pgx.Tx, dept string, week, now time.Time)
 		if err := tx.QueryRow(ctx, `SELECT count(*)::int FROM (
 		    SELECT DISTINCT ON (outbreak_ref) event FROM pf_extension.cnts_outbreak ORDER BY outbreak_ref, seq DESC) o
 		  WHERE event <> 'closed'`).Scan(&c.OutbreaksActive); err != nil {
+			return c, err
+		}
+		// CNTS-V4-BM11-TYPES (#253): số hộ, trang trại Đang dùng của danh sách hộ chăn nuôi (ADR-0056 mục 9).
+		if err := tx.QueryRow(ctx, `SELECT count(*)::int, count(*) FILTER (WHERE livestock_type <> 'nong_ho')::int FROM (
+		    SELECT DISTINCT ON (household_ref) status, livestock_type FROM pf_extension.cnts_livestock_household
+		    ORDER BY household_ref, seq DESC) h
+		  WHERE status = 'active'`).Scan(&c.Households, &c.Farms); err != nil {
 			return c, err
 		}
 	case "trong_trot":

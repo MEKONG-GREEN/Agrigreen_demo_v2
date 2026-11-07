@@ -286,6 +286,9 @@ class WsCheckin {
     this.distanceM,
     this.far = false,
     this.pending = false,
+    this.legacyNoPhoto = false,
+    this.checkout,
+    this.noCheckout = false,
   });
   final DateTime capturedAt;
   final double? distanceM;
@@ -294,12 +297,37 @@ class WsCheckin {
   /// Đang chờ đồng bộ (bấm khi mất mạng).
   final bool pending;
 
+  /// Check-in cũ trước BRD CNTS v4.0, không ảnh — giữ nguyên, không nhập bù.
+  final bool legacyNoPhoto;
+
+  /// Check-out của mục (CNTS v4.0 CV-08), null = chưa check-out.
+  final WsCheckout? checkout;
+
+  /// Nhãn "Chưa check-out" (CNTS v4.0 BR-07): máy chủ tính lúc 23:59 ngày công tác giờ Việt Nam.
+  final bool noCheckout;
+
+  WsCheckin withCheckout(WsCheckout? o) => WsCheckin(
+    capturedAt: capturedAt,
+    distanceM: distanceM,
+    far: far,
+    pending: pending,
+    legacyNoPhoto: legacyNoPhoto,
+    checkout: o,
+    noCheckout: o == null && noCheckout,
+  );
+
   String get label {
-    if (pending) return 'Đã check-in (chờ đồng bộ)';
+    final out = checkout != null
+        ? ' · ${checkout!.label}'
+        : noCheckout
+        ? ' · Chưa check-out'
+        : '';
+    if (pending) return 'Đã check-in (chờ đồng bộ)$out';
     final d = distanceM == null
         ? ''
         : ' · cách địa điểm ${distanceM!.round()} m';
-    return '${far ? 'Check-in xa địa điểm' : 'Đã check-in'}$d';
+    final old = legacyNoPhoto ? ' · dữ liệu cũ, không ảnh' : '';
+    return '${far ? 'Check-in xa địa điểm' : 'Đã check-in'}$d$old$out';
   }
 
   static WsCheckin? fromJson(Map<String, Object?> j) {
@@ -308,12 +336,66 @@ class WsCheckin {
         : null;
     if (at == null) return null;
     final d = j['distance_m'];
+    final o = j['checkout'];
     return WsCheckin(
       capturedAt: at,
       distanceM: d is num ? d.toDouble() : null,
       far: j['far'] == true,
+      legacyNoPhoto: j['legacy_no_photo'] == true,
+      noCheckout: j['no_checkout'] == true,
+      checkout: o is Map
+          ? WsCheckout.fromJson(o.cast<String, Object?>())
+          : null,
     );
   }
+}
+
+/// Check-out khi rời địa điểm (BRD CNTS v4.0 FN-12 CV-08): thời gian ở địa điểm
+/// (BR-07), "Đồng bộ trễ" khi máy chủ nhận sau ngày công tác (BR-08).
+class WsCheckout {
+  const WsCheckout({
+    required this.capturedAt,
+    this.far = false,
+    this.stayMinutes,
+    this.syncedLate = false,
+    this.pending = false,
+  });
+  final DateTime capturedAt;
+  final bool far;
+  final int? stayMinutes;
+  final bool syncedLate;
+
+  /// Đang chờ đồng bộ (bấm khi mất mạng — giữ thời điểm lúc bấm, AC-11).
+  final bool pending;
+
+  String get label {
+    if (pending) return 'Đã check-out (chờ đồng bộ)';
+    final stay = stayMinutes == null ? '' : ' · ở ${stayLabel(stayMinutes!)}';
+    final late = syncedLate ? ' · Đồng bộ trễ' : '';
+    return '${far ? 'Check-out xa địa điểm' : 'Đã check-out'}$stay$late';
+  }
+
+  static WsCheckout? fromJson(Map<String, Object?> j) {
+    final at = j['captured_at'] is String
+        ? DateTime.tryParse(j['captured_at']! as String)
+        : null;
+    if (at == null) return null;
+    final m = j['stay_minutes'];
+    return WsCheckout(
+      capturedAt: at,
+      far: j['far'] == true,
+      stayMinutes: m is num ? m.toInt() : null,
+      syncedLate: j['synced_late'] == true,
+    );
+  }
+}
+
+/// Thời gian ở địa điểm (BR-07, AC-12): 210 → "3 giờ 30 phút".
+String stayLabel(int minutes) {
+  final m = minutes < 0 ? 0 : minutes;
+  final h = m ~/ 60, r = m % 60;
+  if (h == 0) return '$r phút';
+  return r == 0 ? '$h giờ' : '$h giờ $r phút';
 }
 
 /// Lỗi kiểm dữ liệu của một mục (giống quy tắc máy chủ, 422).
