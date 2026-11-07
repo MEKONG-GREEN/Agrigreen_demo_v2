@@ -1,0 +1,17 @@
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.toolbar input { max-width: 100%; width: 170px; }
+.weekdays, .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.weekdays { text-align: center; margin-bottom: 6px; }
+.days { list-style: none; margin: 0; padding: 0; }
+.day { min-width: 0; min-height: 125px; border: 1px solid var(--line, #d8dfd9); border-radius: 6px; padding: 7px; overflow-wrap: anywhere; }
+.outside { background: var(--surface-2, #f3f5f3); color: var(--muted); }
+.entry { margin-top: 7px; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+.entry button { max-width: 100%; white-space: normal; text-align: left; }
+.entry label { display: flex; align-items: center; gap: 5px; }
+.month { margin: 0; font-size: 1.1rem; }
+@media (max-width: 700px) {
+  .weekdays, .padding { display: none; }
+  .days { grid-template-columns: minmax(0, 1fr); }
+  .day { min-height: 0; }
+  .entry { flex-direction: row; flex-wrap: wrap; align-items: center; }
+}

@@ -3,6 +3,11 @@
 // Cấp Xã — FN-XA-03.05 Phản hồi yêu cầu xác minh giá, FN-XA-03.03 Lịch sử báo giá của xã (BRD Báo giá v1.3; W11.75).
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/auth/AuthProvider";
+import { HistoryCalendar, historyPrintable } from "./HistoryCalendar";
+import { historyFilters, historyHref, historyRangeProblem, shiftHistoryMonth, type HistoryFilters } from "./history-routes";
+import historyStyles from "./HistoryCalendar.module.css";
 import { Dialog } from "@/components/Dialog";
 import { DataTable, PageHeader, StatusPill, type Column } from "@/components/patterns/list";
 import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
@@ -158,83 +163,60 @@ function RespondDialog({ row, onClose, onDone }: { row: PriceAlertRow; onClose: 
   );
 }
 
-/** Lịch sử báo giá của xã (danh sách theo ngày, in phiếu lẻ / hàng loạt). */
+/** Lịch sử chỉ đọc; lịch chính thức và trạng thái do API history cung cấp (FN-XA-03.03 v2). */
 export function HistoryScreen() {
+  const auth = useAuth();
+  const search = useSearchParams();
+  const filters = historyFilters(search, vnToday());
+  const scope = `${auth.principal?.tenantId}:${auth.principal?.subject}:${auth.kn.context?.context_id}:${auth.kn.context?.role}`;
+  return <HistoryContent key={`${scope}:${filters.from}:${filters.to}:${filters.point}`} filters={filters} />;
+}
+
+function HistoryContent({ filters: f }: { filters: HistoryFilters }) {
   const ta = usePriceTicketApi();
-  const today = vnToday();
-  const [from, setFrom] = useState(daysAgo(today, 30));
-  const [to, setTo] = useState(today);
+  const router = useRouter();
   const [sel, setSel] = useState<string[]>([]);
   const [open, setOpen] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const list = useLoad(() => ta.history({ from, to }), [from, to]);
-  const printable = (r: PriceHistoryRow) => !!r.ticket && r.view !== "missed" && r.view !== "deleted";
-  const cols: Column<PriceHistoryRow>[] = [
-    {
-      key: "sel",
-      header: "Chọn",
-      cell: (r) => (
-        <input
-          type="checkbox"
-          aria-label={`Chọn phiếu ngày ${formatDateVi(r.day)}`}
-          disabled={!printable(r)}
-          checked={!!r.ticket && sel.includes(r.ticket.id)}
-          onChange={(e) => r.ticket && setSel(e.target.checked ? [...sel, r.ticket.id] : sel.filter((x) => x !== r.ticket!.id))}
-        />
-      ),
-    },
-    { key: "day", header: "Ngày báo giá", cell: (r) => formatDateVi(r.day) },
-    { key: "pt", header: "Xã", cell: (r) => r.point.name },
-    { key: "n", header: "Có giá / Không có hàng", cell: (r) => `${r.priced} / ${r.no_goods}` },
-    { key: "adj", header: "Hiệu chỉnh", cell: (r) => (r.adjusted ? `${r.adjusted} dòng` : "—") },
-    { key: "st", header: "Trạng thái", cell: (r) => <StatusPill tone={TICKET_VIEW_TONE[r.view]}>{TICKET_VIEW_LABEL[r.view]}</StatusPill> },
-    {
-      key: "act",
-      header: "",
-      cell: (r) =>
-        r.ticket ? (
-          <button type="button" className="btn" onClick={() => setOpen(r.ticket!.id)}>
-            Xem
-          </button>
-        ) : null,
-    },
+  const [page, setPage] = useState({ status: f.status, value: 1 });
+  const invalid = historyRangeProblem(f);
+  const list = useLoad(invalid ? null : () => ta.history({ from: f.from, to: f.to, point: f.point || undefined }), [ta]);
+  const rows = (list.data?.rows ?? []).filter(r => !f.status || r.view === f.status);
+  const selected = sel.filter(id => rows.some(r => r.ticket?.id === id && historyPrintable(r)));
+  const navigate = (change: Partial<HistoryFilters>) => router.push(historyHref({ ...f, ...change }), { scroll: false });
+  const select = (r: PriceHistoryRow, checked: boolean) => r.ticket && setSel(ids => checked ? [...new Set([...ids, r.ticket!.id])] : ids.filter(id => id !== r.ticket!.id));
+  const columns: Column<PriceHistoryRow>[] = [
+    { key: "sel", header: "Chọn", cell: r => <input type="checkbox" aria-label={`Chọn phiếu ngày ${formatDateVi(r.day)} — ${TICKET_VIEW_LABEL[r.view]}`} disabled={!historyPrintable(r)} checked={!!r.ticket && selected.includes(r.ticket.id)} onChange={e => select(r, e.target.checked)} /> },
+    { key: "day", header: "Ngày báo giá", cell: r => formatDateVi(r.day) },
+    { key: "pt", header: "Xã", cell: r => r.point.name },
+    { key: "n", header: "Mặt hàng cập nhật (Có giá / Không có hàng)", cell: r => `${r.priced + r.no_goods} (${r.priced} / ${r.no_goods})` },
+    { key: "adj", header: "Hiệu chỉnh", cell: r => r.adjusted ? `${r.adjusted} dòng` : "—" },
+    { key: "st", header: "Trạng thái", cell: r => <StatusPill tone={TICKET_VIEW_TONE[r.view]}>{TICKET_VIEW_LABEL[r.view]}</StatusPill> },
+    { key: "act", header: "", cell: r => r.ticket ? <button type="button" className="btn" aria-label={`Xem phiếu ngày ${formatDateVi(r.day)} — ${TICKET_VIEW_LABEL[r.view]}`} onClick={() => setOpen(r.ticket!.id)}>Xem</button> : null },
   ];
-  return (
-    <>
-      <PageHeader
-        title="Lịch sử báo giá"
-        actions={
-          <Link className={`btn btn-primary${sel.length ? "" : " disabled"}`} aria-disabled={!sel.length} href={sel.length ? `/kn/bao-gia/in?${sel.map((s) => `ticket=${s}`).join("&")}` : "#"}>
-            In phiếu ({sel.length})
-          </Link>
-        }
-      >
-        Phiếu báo giá của xã theo ngày (tối đa 12 tháng). Phiếu Không nộp, Đã xóa không in được.
-      </PageHeader>
-      <div className="row" style={{ marginBottom: 10 }}>
-        <label htmlFor="pb-from">Từ ngày</label>
-        <input id="pb-from" type="date" className="input" style={{ width: 170 }} value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} />
-        <label htmlFor="pb-to">Đến ngày</label>
-        <input id="pb-to" type="date" className="input" style={{ width: 170 }} value={to} onChange={(e) => e.target.value && setTo(e.target.value)} />
-      </div>
-      <LoadState s={list}>
-        {(d) => (
-          <DataTable
-            caption="Lịch sử báo giá"
-            columns={cols}
-            rows={d.rows.slice((page - 1) * 31, page * 31)}
-            rowKey={(r) => `${r.day}:${r.ticket?.id ?? "none"}`}
-            page={page}
-            pageSize={31}
-            total={d.rows.length}
-            onPage={setPage}
-            empty="Không có phiếu."
-          />
-        )}
-      </LoadState>
-      {open ? <TicketView id={open} onClose={() => setOpen(null)} /> : null}
-    </>
-  );
+  const currentPage = page.status === f.status ? Math.min(page.value, Math.max(1, Math.ceil(rows.length / 31))) : 1;
+  return <>
+    <PageHeader title="Lịch sử báo giá" actions={selected.length ? <Link className="btn btn-primary" href={`/kn/bao-gia/in?${new URLSearchParams(selected.map(id => ["ticket", id]))}`}>In phiếu ({selected.length})</Link> : <button type="button" className="btn btn-primary" disabled>In phiếu (0)</button>}>
+      Phiếu báo giá của xã theo ngày (tối đa 12 tháng). Phiếu Không nộp, Đã xóa không in được.
+    </PageHeader>
+    <div className={historyStyles.toolbar} role="group" aria-label="Cách xem lịch sử báo giá">
+      <button type="button" className="btn" aria-pressed={f.view === "list"} onClick={() => navigate({ view: "list" })}>Danh sách</button>
+      <button type="button" className="btn" aria-pressed={f.view === "calendar"} onClick={() => navigate({ view: "calendar" })}>Lịch</button>
+    </div>
+    <div className={historyStyles.toolbar}>
+      <label htmlFor="pb-from">Từ ngày</label><input id="pb-from" type="date" className="input" value={f.from} aria-invalid={!!invalid} onChange={e => e.target.value && navigate({ from: e.target.value })} />
+      <label htmlFor="pb-to">Đến ngày</label><input id="pb-to" type="date" className="input" value={f.to} aria-invalid={!!invalid} onChange={e => e.target.value && navigate({ to: e.target.value })} />
+      <label htmlFor="pb-status">Trạng thái</label><select id="pb-status" className="input" value={f.status} onChange={e => navigate({ status: e.target.value as HistoryFilters["status"] })}><option value="">Tất cả</option>{Object.entries(TICKET_VIEW_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+    </div>
+    {invalid ? <p role="alert">{invalid}</p> : <>
+      {f.view === "calendar" && <div className={historyStyles.toolbar}>
+        <button type="button" className="btn" aria-label="Tháng trước" disabled={f.month <= f.from.slice(0, 7)} onClick={() => navigate({ month: shiftHistoryMonth(f.month, -1) })}>‹</button>
+        <h2 className={historyStyles.month} aria-live="polite">Tháng {f.month.slice(5)}/{f.month.slice(0, 4)}</h2>
+        <button type="button" className="btn" aria-label="Tháng sau" disabled={f.month >= f.to.slice(0, 7)} onClick={() => navigate({ month: shiftHistoryMonth(f.month, 1) })}>›</button>
+      </div>}
+      <LoadState s={list}>{() => f.view === "calendar" ? <HistoryCalendar filters={f} today={vnToday()} rows={rows} selected={selected} onSelect={select} onOpen={setOpen} /> : <DataTable caption="Lịch sử báo giá" columns={columns} rows={rows.slice((currentPage - 1) * 31, currentPage * 31)} rowKey={r => `${r.day}:${r.ticket?.id ?? r.point.code}`} page={currentPage} pageSize={31} total={rows.length} onPage={value => setPage({ status: f.status, value })} empty="Không có phiếu phù hợp." />}</LoadState>
+    </>}
+    {open && <TicketView id={open} onClose={() => setOpen(null)} />}
+  </>;
 }
 
 /** Chi tiết phiếu (chỉ xem) — hiệu chỉnh của Cấp Tỉnh, trao đổi xác minh. */
