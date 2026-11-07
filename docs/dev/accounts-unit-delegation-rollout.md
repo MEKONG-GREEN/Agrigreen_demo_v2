@@ -4,7 +4,7 @@ Gói `KNSPLIT-2-ACCOUNTS-POLICY-ROLLOUT` nối hợp đồng `accounts/port.Unit
 
 ## Thứ tự triển khai
 
-1. **Dependency/cấu trúc:** không thêm thư viện. Thêm `app/unit_delegation.go`; `accounts.Deps` và `app.Service` nhận `UnitDelegations`. API assembly và cả năm đường worker qua `workerAccounts` cấu hình factory owner. Cấu hình định nghĩa sai dừng khởi tạo.
+1. **Dependency/cấu trúc:** không thêm thư viện. Thêm `app/unit_delegation.go`; `accounts.Deps` và `app.Service` nhận `UnitDelegations`. API assembly và mọi đường khởi tạo worker qua `workerAccounts` cấu hình factory owner, gồm consumer đặt lại mật khẩu của AUTH-1. Cấu hình định nghĩa sai dừng khởi tạo.
 2. **Data:** không migration. Giữ `internal_unit_event`/`internal_unit`, `delegation_event`/`delegation_current`, sổ chỉ ghi thêm, RLS tenant và khóa idempotency hiện hành.
 3. **Service:** owner cung cấp loại đơn vị, loại có phòng ban, loại tổ chức, seed/trạng thái, quyền, thời hạn, vai người nhận, quyết định cấp/thu hồi và phạm vi nhân sự. Shared giữ kiểm mã/tên/thời gian/lý do, tenant, người giao, lần gán người nhận đang hiệu lực cùng đơn vị/phòng phủ toàn bộ hạn, truy vấn người hiện hành và ledger. Mọi lời gọi provider/port được thực hiện ngoài transaction; transaction chỉ dùng giá trị đã lấy và store accounts.
 4. **API:** `kind_label`/`kinds`, `power_label`/`powers` và `delegation_max_days` dùng cùng định nghĩa với service. Giữ route, DTO, kiểm Admin/MFA và mã lỗi. Provider xử lý phiên chủ do middleware giải; không chọn policy từ header, role realm hay dữ liệu client.
