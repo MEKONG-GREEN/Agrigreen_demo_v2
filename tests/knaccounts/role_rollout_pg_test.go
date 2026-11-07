@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 )
 
@@ -17,7 +18,11 @@ func TestProductionRoleCatalogHTTPParityOnPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, after := observeRoleCatalog(t, nil), observeRoleCatalog(t, roles)
+	policy, err := extension.UnitDelegationPolicy()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, after := observeRoleCatalog(t, nil), observeRoleCatalogWithDeps(t, fixtureDeps{Roles: roles, UnitDelegations: policy})
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("production role rollout changed create/grant/assignment/import/MFA behavior")
 	}

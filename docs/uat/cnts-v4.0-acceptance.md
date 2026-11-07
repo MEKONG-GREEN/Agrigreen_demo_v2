@@ -84,6 +84,27 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-HOUSEHOLD-LIST.
 Chưa nghiệm thu ở gói này: đếm hộ ở báo cáo định kỳ (FN-16 BR-07, CN-5), lớp trang trại bản đồ (FN-18, CN-6), ô chọn DB-04 và tạo
 hộ từ BM-10 (FN-11, #252).
 
+## FN-21 — Chiến dịch điều tra mở rộng: người phụ trách, sao chép đợt, Tạo chiến dịch (CNTS-CAMPAIGN-SCOPE #236)
+
+Giả định: [CNTS-CAMPAIGN-SCOPE](../kn/gia-dinh/CNTS-CAMPAIGN-SCOPE.md); nền W11.50 ([cnts-v3.7-acceptance.md](cnts-v3.7-acceptance.md) mục FN-21).
+
+| Tiêu chí BRD v4.0 | Bằng chứng tự động | Trạng thái |
+|---|---|---|
+| B1 "+ Tạo đợt điều tra": người phụ trách bắt buộc, là cán bộ Cấp Tỉnh CNTS của tỉnh (cán bộ Cấp Xã, mã lạ → 422) | `TestCNTSCampaignOwnerAndCopy_236` (B1), `TestDraftValidate`; Vitest `CampaignScreen.test.tsx` "Tạo chiến dịch", `campaign.test.ts` #236 | Đạt |
+| Ma trận quyền FN-21: cán bộ tổng hợp CRU (tạo, phát hành, theo dõi, đóng); viên chức, chủ nhiệm CRU khi là người phụ trách; Lãnh đạo phòng xem + mở lại; người không được giao bị từ chối 403 khi sửa, phát hành, nhắc, gia hạn, đóng | `TestCNTSCampaignOwnerAndCopy_236` ("Người không phụ trách đợt bị từ chối 403…") | Đạt |
+| Luồng phụ "sao chép đợt cũ": đợt Nháp mới mang biểu, phạm vi, người phụ trách; không mang số liệu (kỳ native riêng, 0 bài, kết quả rỗng) | `TestCNTSCampaignOwnerAndCopy_236` ("Sao chép đợt cũ…"); Vitest `CampaignScreen.test.tsx` "Sao chép đợt cũ" | Đạt |
+| Menu "Chiến dịch điều tra › Tạo chiến dịch" chạy thật (không còn "Sắp có") | `kn-menu.contract.test.ts` (UP-10 CNTS Cấp Tỉnh), `TestBuilderMatchesCompatibilitySnapshot`, `TestWebMenuFixture` | Đạt |
+| B2–B5, BR-01…BR-04, AC-01…AC-04 (phát hành, tiến độ theo Khu vực, đóng đợt → Không nộp, tách lũy kế BM-04) | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150`, `TestBFCNTSCampaignCAS_*`, `TestBFCNTSCampaignPool_*` | Đạt (W11.50, #201) |
+| B1 phạm vi "hộ": chỉ hộ chăn nuôi Đang dùng trong phạm vi Nút (hộ Chờ bổ sung vị trí, ngoài Nút, mã lạ → 422); mỗi hộ một việc của cán bộ xã chứa hộ; tiến độ, kết quả, Excel theo hộ; sao chép mang hộ, hộ vô hiệu hóa sau đó không phát hành được | `TestCNTSCampaignHouseholdScope_236`, `TestDraftValidate`; Vitest `CampaignScreen.test.tsx` "Phạm vi theo hộ", `campaign.test.ts` | Đạt |
+
+Cách chạy:
+
+```powershell
+.\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v -run 'CNTSCampaign' ./tests/kn77/
+go test ./internal/kn/extension/cntscampaign/... ./internal/kn/extension/menu/...
+cd apps/web-ops; npx vitest run src/kn/cnts/campaign/ src/api/mock/kn-menu.contract.test.ts
+```
+
 ## FN-16, FN-17 — BM-11 theo loại chăn nuôi, số hộ/trang trại trang chủ (CNTS-V4-BM11-TYPES #253)
 
 Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-BM11-TYPES.md), [ADR-0056](../adr/0056-ho-chan-nuoi-cnts-v4.md) mục 9.
@@ -124,3 +145,18 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-OUTBREAK-MULTI.
 
 Chưa nghiệm thu ở gói này: vùng dịch hiện số hộ, diện tích thủy sản bị ảnh hưởng và lớp trang trại trên bản đồ (FN-18 BR-02, CN-6
 #254 — dùng `affected_households`, `aqua_*` của phiên bản mới nhất).
+
+## FN-18 — Lớp trang trại, số hộ/diện tích bị ảnh hưởng của vùng dịch (CNTS-V4-FARM-LAYER #254)
+
+Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-FARM-LAYER.md), [ADR-0056](../adr/0056-ho-chan-nuoi-cnts-v4.md) mục 8–9.
+
+| Tiêu chí BRD | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| Mô tả FN-18 "Lớp trang trại": hộ chăn nuôi Đang dùng loại trang trại (HCN-06) có vị trí check-in hiện hành (HCN-07); bật/tắt lớp, bấm xem chi tiết (B1, B2) | `TestCNTSMap_FarmLayerAndImpact_FN18`; vitest `map.test.ts` | G1 |
+| FN-10 BR-08, BR-07: hộ Chờ bổ sung vị trí, hộ vô hiệu hóa, nông hộ không vào lớp trang trại; hộ đổi vị trí (H4) hiện ở vị trí check-in mới | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
+| Mục I.8.1: đối tượng trang trại không mang họ tên, SĐT chủ hộ | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
+| BR-02: vùng dịch, vùng bị uy hiếp, vùng đệm hiện số hộ bị ảnh hưởng (DB-15) và diện tích thủy sản bị ảnh hưởng nuôi trồng, khai thác (DB-16) của ổ dịch trong vùng; vùng chăn nuôi không có | `TestCNTSMap_FarmLayerAndImpact_FN18`, `TestImpactOf`; vitest `map.test.ts` | G1 |
+| FN-11 BR-03: lấy số của lần cập nhật diễn biến mới nhất, không cộng dồn; ổ dịch cũ một hộ tính 1 hộ | `TestCNTSMap_FarmLayerAndImpact_FN18`, `TestImpactOf` | G1 |
+| AC-03: chọn ngày cũ thấy số ảnh hưởng theo diễn biến của ngày đó | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
+| AC-02: Cấp Xã chỉ thấy trang trại và số ảnh hưởng từ ổ dịch xã mình; tenant khác không thấy | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
+| Trang trại, số ảnh hưởng trong vùng (đối tượng trong vùng đệm 3 km/10 km, khoảng cách tới tâm) | `TestCNTSMap_FarmLayerAndImpact_FN18`; vitest `map.test.ts` | G1 |

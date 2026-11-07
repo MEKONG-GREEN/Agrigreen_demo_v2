@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -1835,9 +1835,7 @@
           "route": "/kn/cnts/chien-dich/tao",
           "icon": "megaphone",
           "badge_source": null,
-          "enabled": false,
-          "status": "coming_soon",
-          "status_label": "Sắp có",
+          "enabled": true,
           "children": []
          }
         ]
@@ -2095,7 +2093,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -2302,7 +2300,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -2403,7 +2401,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -2657,7 +2655,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -2759,7 +2757,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -2887,7 +2885,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -3198,7 +3196,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -3369,7 +3367,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -3461,7 +3459,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -3763,7 +3761,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -3880,7 +3878,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   },
@@ -4682,7 +4680,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v15",
+    "menu_version": "kn.menu/v16",
     "org_ref": null
    }
   }
@@ -4725,5 +4723,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v15"
+ "menu_version": "kn.menu/v16"
 }

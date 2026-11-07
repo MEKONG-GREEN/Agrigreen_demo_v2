@@ -286,7 +286,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	acc := accounts.New(unit, clk, accounts.Deps{Roles: accountRoles, Attributes: accountAttributes, AssignmentRules: extension.AssignmentRules(), Sessions: sessionRegistry, Navigation: pty.ContextNavigation(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+	accountUnitDelegations, err := extension.UnitDelegationPolicy()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	acc := accounts.New(unit, clk, accounts.Deps{Roles: accountRoles, Attributes: accountAttributes, AssignmentRules: extension.AssignmentRules(), UnitDelegations: accountUnitDelegations, Sessions: sessionRegistry, Navigation: pty.ContextNavigation(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
 		SessionPolicies: extension.AccountSessionPolicies(pty.Departments()), // #60: nhật ký hỗ trợ + đơn vị mặc định do chủ KN chiếu
 
 		Households: coop.PartyHouseholds(), Vault: ext.Vault, Params: md.Params(),

@@ -47,10 +47,19 @@ type internalUnitDTO struct {
 	UpdatedAt      string  `json:"updated_at"`
 }
 
-func toInternalUnitDTO(u port.InternalUnit) internalUnitDTO {
+func toInternalUnitDTO(u port.InternalUnit, kinds []port.CatalogItem) internalUnitDTO {
 	return internalUnitDTO{ID: u.ID.String(), OrgRef: u.OrgRef.String(), Code: u.Code, Kind: u.Kind,
-		KindLabel: port.CatalogLabel(port.InternalUnitKinds, u.Kind), Name: u.Name, DepartmentCode: strPtr(u.DepartmentCode),
+		KindLabel: port.CatalogLabel(kinds, u.Kind), Name: u.Name, DepartmentCode: strPtr(u.DepartmentCode),
 		SortOrder: u.SortOrder, Active: u.Active, UpdatedAt: rfc(u.UpdatedAt)}
+}
+
+func (h Handler) internalUnitResponse(c *gin.Context, status int, u port.InternalUnit) {
+	definition, err := h.Svc.InternalUnitDefinition()
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(status, toInternalUnitDTO(u, definition.Kinds))
 }
 
 func optQueryRef(c *gin.Context, name string) (uuid.UUID, bool) {
@@ -77,10 +86,15 @@ func (h Handler) listInternalUnits(c *gin.Context) {
 		return
 	}
 	items := make([]internalUnitDTO, 0, len(us))
-	for _, u := range us {
-		items = append(items, toInternalUnitDTO(u))
+	definition, err := h.Svc.InternalUnitDefinition()
+	if err != nil {
+		httpx.Fail(c, err)
+		return
 	}
-	c.JSON(http.StatusOK, gin.H{"org_ref": resolved.String(), "items": items, "kinds": catalogDTO(port.InternalUnitKinds)})
+	for _, u := range us {
+		items = append(items, toInternalUnitDTO(u, definition.Kinds))
+	}
+	c.JSON(http.StatusOK, gin.H{"org_ref": resolved.String(), "items": items, "kinds": catalogDTO(definition.Kinds)})
 }
 
 type internalUnitReq struct {
@@ -115,7 +129,7 @@ func (h Handler) createInternalUnit(c *gin.Context) {
 		status = http.StatusOK
 	}
 	c.Header("Location", "/v1/accounts/internal-units/"+u.ID.String())
-	c.JSON(status, toInternalUnitDTO(u))
+	h.internalUnitResponse(c, status, u)
 }
 
 func (h Handler) updateInternalUnit(c *gin.Context) {
@@ -132,7 +146,7 @@ func (h Handler) updateInternalUnit(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, toInternalUnitDTO(u))
+	h.internalUnitResponse(c, http.StatusOK, u)
 }
 
 func (h Handler) setInternalUnitActive(active bool) gin.HandlerFunc {
@@ -150,7 +164,7 @@ func (h Handler) setInternalUnitActive(active bool) gin.HandlerFunc {
 			httpx.Fail(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, toInternalUnitDTO(u))
+		h.internalUnitResponse(c, http.StatusOK, u)
 	}
 }
 
@@ -214,8 +228,13 @@ func (h Handler) seedInternalUnits(c *gin.Context) {
 		return
 	}
 	items := make([]internalUnitDTO, 0, len(res.Created))
+	definition, err := h.Svc.InternalUnitDefinition()
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
 	for _, u := range res.Created {
-		items = append(items, toInternalUnitDTO(u))
+		items = append(items, toInternalUnitDTO(u, definition.Kinds))
 	}
 	c.JSON(http.StatusOK, gin.H{"created": items, "existing": res.Existing, "status": res.Status})
 }

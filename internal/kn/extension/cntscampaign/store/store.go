@@ -16,19 +16,22 @@ import (
 
 // Version là một phiên bản nội dung đợt.
 type Version struct {
-	RowID             uuid.UUID
-	CampaignID        uuid.UUID
-	Seq               int64
-	OrgRef            uuid.UUID
-	Province          *string
-	Name              string
-	Goal              *string
-	Field             string
-	TemplateCode      string
-	TemplateVersion   *int64 // phiên bản biểu đã chọn (#192); nil = Nháp ghi trước #192 → mới nhất lúc phát hành
-	ScopeMode         string
-	Regions           []string
-	Units             []string
+	RowID           uuid.UUID
+	CampaignID      uuid.UUID
+	Seq             int64
+	OrgRef          uuid.UUID
+	Province        *string
+	Name            string
+	Goal            *string
+	Field           string
+	TemplateCode    string
+	TemplateVersion *int64 // phiên bản biểu đã chọn (#192); nil = Nháp ghi trước #192 → mới nhất lúc phát hành
+	ScopeMode       string
+	Regions         []string
+	Units           []string
+	// Households: phạm vi theo hộ (#236) — household_ref của sổ hộ chăn nuôi (#251); nil với phạm vi khác. Units khi đó là các
+	// xã chứa hộ.
+	Households        []uuid.UUID
 	From, To          time.Time
 	DueAt             time.Time
 	OwnerRef          *uuid.UUID
@@ -39,13 +42,25 @@ type Version struct {
 }
 
 const versionCols = `id, campaign_id, seq, org_ref, province_code, name, goal, field, template_code, template_version, scope_mode,
-  regions, units, period_from, period_to, due_at, owner_ref, remind_before_hours, actor_ref, event_time, recorded_at`
+  regions, units, period_from, period_to, due_at, owner_ref, remind_before_hours, actor_ref, event_time, recorded_at, households`
 
 func scanVersion(row pgx.Row) (Version, error) {
 	var v Version
+	var hs []string
 	err := row.Scan(&v.RowID, &v.CampaignID, &v.Seq, &v.OrgRef, &v.Province, &v.Name, &v.Goal, &v.Field, &v.TemplateCode, &v.TemplateVersion, &v.ScopeMode,
-		&v.Regions, &v.Units, &v.From, &v.To, &v.DueAt, &v.OwnerRef, &v.RemindBeforeHours, &v.ActorRef, &v.EventTime, &v.RecordedAt)
-	return v, err
+		&v.Regions, &v.Units, &v.From, &v.To, &v.DueAt, &v.OwnerRef, &v.RemindBeforeHours, &v.ActorRef, &v.EventTime, &v.RecordedAt,
+		&hs)
+	if err != nil {
+		return v, err
+	}
+	for _, h := range hs {
+		r, err := uuid.Parse(h)
+		if err != nil {
+			return v, err
+		}
+		v.Households = append(v.Households, r)
+	}
+	return v, nil
 }
 
 func dateOnly(t time.Time) string { return t.Format(time.DateOnly) }
@@ -55,15 +70,50 @@ func InsertVersion(ctx context.Context, tx pgx.Tx, tid uuid.UUID, v *Version, id
 	if v.Regions == nil {
 		v.Regions = []string{}
 	}
+	var hs []string // NULL với phạm vi không theo hộ
+	if v.Households != nil {
+		hs = strIDs(v.Households)
+	}
 	return tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_campaign (id, tenant_id, stream_key, campaign_id, org_ref, province_code, name,
 	    goal, field, template_code, scope_mode, regions, units, period_from, period_to, due_at, owner_ref, remind_before_hours,
-	    event_time, actor_ref, idem_key, rule_version, template_version)
+	    event_time, actor_ref, idem_key, rule_version, template_version, households)
 	  VALUES ($1, $2, 'cnts_campaign:' || $3::uuid::text, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::date, $14::date, $15, $16, $17,
-	    $18, $19, $20, $21, $22)
+	    $18, $19, $20, $21, $22, $23::uuid[])
 	  RETURNING seq, recorded_at`,
 		v.RowID, tid, v.CampaignID, v.OrgRef, v.Province, v.Name, v.Goal, v.Field, v.TemplateCode, v.ScopeMode, v.Regions, v.Units,
 		dateOnly(v.From), dateOnly(v.To), v.DueAt.UTC(), v.OwnerRef, v.RemindBeforeHours, v.EventTime.UTC(), v.ActorRef, idem,
-		domain.RuleVersion, v.TemplateVersion).Scan(&v.Seq, &v.RecordedAt)
+		domain.RuleVersion, v.TemplateVersion, hs).Scan(&v.Seq, &v.RecordedAt)
+}
+
+// Household là bản hiện hành của một hộ chăn nuôi (sổ pf_extension.cnts_livestock_household — #251, ADR-0056 mục 9: bên đọc
+// cùng module đọc thẳng bảng theo household_ref).
+type Household struct {
+	Ref     uuid.UUID
+	Code    string // HCN-01
+	Status  string // active | pending_location | deactivated
+	Commune string // HCN-04 xã
+}
+
+// Households đọc bản hiện hành của các hộ refs (hộ không có trong tenant không có trong kết quả).
+func Households(ctx context.Context, tx pgx.Tx, refs []uuid.UUID) (map[uuid.UUID]Household, error) {
+	out := map[uuid.UUID]Household{}
+	if len(refs) == 0 {
+		return out, nil
+	}
+	rows, err := tx.Query(ctx, `SELECT DISTINCT ON (household_ref) household_ref, code, status, commune_code
+	  FROM pf_extension.cnts_livestock_household WHERE household_ref = ANY ($1::uuid[]) ORDER BY household_ref, seq DESC`, strIDs(refs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var h Household
+		if err := rows.Scan(&h.Ref, &h.Code, &h.Status, &h.Commune); err != nil {
+			return nil, err
+		}
+		out[h.Ref] = h
+	}
+	return out, rows.Err()
 }
 
 // VersionByIdem đọc phiên bản đã ghi với khóa idempotent (nil nếu chưa có).

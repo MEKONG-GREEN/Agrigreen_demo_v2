@@ -272,7 +272,7 @@ func TestCNTSDesignEdit_FN07_192(t *testing.T) {
 	})
 
 	t.Run("FN-21: đợt điều tra phát hành đúng phiên bản biểu đã chọn", func(t *testing.T) {
-		in := map[string]any{"name": "Điều tra tổng đàn 10/2026", "goal": "Tổng đàn", "field": "chan_nuoi", "template_code": "CNTS-DT-TONGDAN",
+		in := map[string]any{"owner_ref": ids.New().String(), "name": "Điều tra tổng đàn 10/2026", "goal": "Tổng đàn", "field": "chan_nuoi", "template_code": "CNTS-DT-TONGDAN",
 			"template_version": 9, "scope_mode": "communes", "communes": []string{"X1", "X2"}, "from_date": "2026-10-08", "to_date": "2026-10-10",
 			"due_at": "2026-10-12T03:00:00Z"}
 		c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns", authz.KNTinh, false, in)

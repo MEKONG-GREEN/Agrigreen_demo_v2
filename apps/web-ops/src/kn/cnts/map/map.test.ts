@@ -11,6 +11,8 @@ import {
   draftToGeometry,
   geometryFromGeoJSON,
   geometryToDraft,
+  impactText,
+  sumImpact,
   zoneErrors,
   zonesGeoJSON,
   type Zone,
@@ -49,6 +51,17 @@ describe("hình học bản đồ CNTS (W11.52)", () => {
     expect(addDays("2027-10-13", -13)).toBe("2027-09-30");
   });
 
+  it("số hộ, diện tích thủy sản bị ảnh hưởng của vùng (FN-18 BR-02)", () => {
+    const i = sumImpact([
+      { affected_households: 3, aqua_farmed_ha: "2.00", aqua_wild_ha: "0.50" },
+      { affected_households: 1, aqua_farmed_ha: null, aqua_wild_ha: null },
+      { affected_households: 4, aqua_farmed_ha: "0.75", aqua_wild_ha: null },
+    ]);
+    expect(i).toEqual({ outbreak_count: 3, affected_households: 8, aqua_farmed_ha: "2.75", aqua_wild_ha: "0.50" });
+    expect(impactText(i)).toContain("8 hộ bị ảnh hưởng (3 ổ dịch)");
+    expect(impactText(sumImpact([]))).toBe("0 hộ bị ảnh hưởng (0 ổ dịch)");
+  });
+
   it("xuất GeoJSON", () => {
     const z = { ref: "r", version: 1, kind: "vung_dem", name: "Đệm", communes: ["91301"], effective_on: "2027-10-10", radius_m: 10000, area_ha: "1",
       outbreak_ref: null, status: "active", geometry: circlePolygon([105, 10], 100) } as unknown as Zone;
@@ -70,6 +83,10 @@ describe("giả lập /v1/extension/cnts/map", () => {
     const inside = await mapi.contents(threat.ref, day);
     expect(inside.outbreak_count).toBe(1);
     expect(inside.site_count).toBe(1);
+    expect(inside.farm_count).toBe(1);
+    expect(inside.impact?.affected_households).toBe(3);
+    expect(l.farms.map((f) => f.code)).toEqual(["HCN0000001", "HCN0000002"]);
+    expect(l.zone_impacts.map((z) => z.zone_ref).sort()).toEqual(l.zones.filter((z) => z.kind === "vung_dich" || z.kind === "vung_uy_hiep").map((z) => z.ref).sort());
     const fish = l.zones.find((z) => z.kind === "vung_thuy_san")!;
     const body = { kind: fish.kind, name: fish.name, communes: fish.communes, draw_mode: "polygon" as const, geometry: fish.geometry, reason: "Điều chỉnh ranh" };
     await expect(mapi.updateZone(fish.ref, { ...body, base_version: 9 })).rejects.toThrow();
