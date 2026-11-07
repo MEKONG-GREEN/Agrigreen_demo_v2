@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2093,7 +2093,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2300,7 +2300,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2401,7 +2401,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2558,17 +2558,6 @@
         "children": []
        },
        {
-        "key": "tinh.khtc.mau_bao_cao",
-        "label": "Mẫu báo cáo KHTC",
-        "route": "/kn/khtc/mau-bao-cao",
-        "icon": "table",
-        "badge_source": null,
-        "enabled": false,
-        "status": "coming_soon",
-        "status_label": "Sắp có",
-        "children": []
-       },
-       {
         "key": "tinh.khtc.phat_sinh",
         "label": "Báo cáo phát sinh",
         "route": "/kn/khtc/bao-cao-phat-sinh",
@@ -2583,15 +2572,6 @@
       "key": "du_lieu",
       "label": "Dữ liệu",
       "items": [
-       {
-        "key": "tinh.khtc.so_lieu_ngoai",
-        "label": "Số liệu nguồn ngoài",
-        "route": "/kn/khtc/so-lieu-ngoai",
-        "icon": "database",
-        "badge_source": null,
-        "enabled": true,
-        "children": []
-       },
        {
         "key": "tinh.van_ban",
         "label": "Quy trình, văn bản",
@@ -2655,7 +2635,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2757,7 +2737,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2885,7 +2865,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3196,7 +3176,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3367,7 +3347,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3459,7 +3439,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3761,7 +3741,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3878,7 +3858,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -4680,7 +4660,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   }
@@ -4723,5 +4703,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v16"
+ "menu_version": "kn.menu/v17"
 }

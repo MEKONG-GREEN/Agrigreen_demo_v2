@@ -59,11 +59,11 @@ func (m *Module) deptOfficers(ctx context.Context, tid uuid.UUID, dept string) (
 	return out, nil
 }
 
-// deptClosed đọc closed_figures/v1 lúc gọi (cổng xác nhận HTX nối sau New).
+// deptClosed đọc closed_figures/v1 lúc gọi.
 type deptClosed struct{ m *Module }
 
 func (d deptClosed) ClosedFigures(ctx context.Context, tid uuid.UUID, q port.ClosedFiguresQuery) ([]port.ClosedFigure, error) {
-	return closedfig.Reader{DB: d.m.rc.DB, HTX: d.m.htx}.ClosedFigures(ctx, tid, q)
+	return closedfig.Reader{DB: d.m.rc.DB}.ClosedFigures(ctx, tid, q)
 }
 
 func (m *Module) registerDeptHome(rg *gin.RouterGroup) {

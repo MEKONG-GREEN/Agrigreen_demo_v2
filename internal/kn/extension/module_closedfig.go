@@ -11,24 +11,19 @@ import (
 
 // ClosedFigures là bộ đọc "số liệu đã chốt" thống nhất của KHTC (ADR-0053, gói PFPUB) trên họ hợp đồng
 // closed_figures/v1 (pf_extension_pub + pf_forms_pub), bằng vai r_extension của module.
-func (m *Module) ClosedFigures() port.ClosedFigures { return closedfig.Reader{DB: m.rc.DB, HTX: m.htx} }
+func (m *Module) ClosedFigures() port.ClosedFigures { return closedfig.Reader{DB: m.rc.DB} }
 
 // KHTCSources là port duy nhất phía KHTC (ADR-0053 §7): số đã chốt của Trồng trọt, CNTS, Báo giá theo từng kỳ KHTC.
-func (m *Module) KHTCSources() port.KHTCSources { return closedfig.Reader{DB: m.rc.DB, HTX: m.htx} }
-
-// UseHTXConfirmations nối cổng trạng thái xác nhận HTX từ publication v1 (gốc lắp ráp nối NewPublishedHTXData).
-// Chưa nối → dòng HTX trong số đã chốt là "Chưa xác nhận".
-func (m *Module) UseHTXConfirmations(h port.HTXConfirmations) { m.htx = h }
+func (m *Module) KHTCSources() port.KHTCSources { return closedfig.Reader{DB: m.rc.DB} }
 
 // KHTCSourceCrosswalk là bộ quy đổi kỳ nguồn cho Kỳ KHTC (W11.62, ADR-0053 §7): mở kỳ lấy kỳ nguồn quy vào kỳ, "Đủ dữ
-// liệu" lấy cờ chốt từng kỳ nguồn. Lịch KHTC theo D8 (CalendarAt của phòng ke_hoach_tai_chinh tại ngày đầu kỳ); cổng
-// xác nhận HTX đọc lúc gọi (nối trước hay sau đều được).
+// liệu" lấy cờ chốt từng kỳ nguồn. Lịch KHTC theo D8 (CalendarAt của phòng ke_hoach_tai_chinh tại ngày đầu kỳ).
 func (m *Module) KHTCSourceCrosswalk() port.KHTCSourceCrosswalk { return khtcCrosswalk{m} }
 
 type khtcCrosswalk struct{ m *Module }
 
 func (c khtcCrosswalk) impl() closedfig.KHTCCrosswalk {
-	return closedfig.KHTCCrosswalk{R: closedfig.Reader{DB: c.m.rc.DB, HTX: c.m.htx}, RuleTag: func(ctx context.Context, day time.Time) string {
+	return closedfig.KHTCCrosswalk{R: closedfig.Reader{DB: c.m.rc.DB}, RuleTag: func(ctx context.Context, day time.Time) string {
 		return c.m.rc.CalendarAt(ctx, partyport.DeptKeHoachTaiChinh, day).Rule.Tag()
 	}}
 }

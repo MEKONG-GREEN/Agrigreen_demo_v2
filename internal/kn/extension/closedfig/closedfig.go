@@ -20,8 +20,6 @@ import (
 // Reader đọc họ hợp đồng closed_figures/v1.
 type Reader struct {
 	DB tenant.Beginner // pool của module (đã bọc db.ForModule)
-	// HTX: cổng trạng thái xác nhận HTX (D2); nil → dòng HTX là "Chưa xác nhận" (htx.go).
-	HTX port.HTXConfirmations
 }
 
 var (
@@ -63,7 +61,7 @@ func (r Reader) ClosedFigures(ctx context.Context, tid uuid.UUID, q port.ClosedF
 	if err != nil {
 		return nil, err
 	}
-	return out, applyHTX(ctx, r.HTX, out)
+	return out, nil
 }
 
 // readFamily đọc họ closed_figures/v1 (hai view) trong giao dịch tx của tenant.

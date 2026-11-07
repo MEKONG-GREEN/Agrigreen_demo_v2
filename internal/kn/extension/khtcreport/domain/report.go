@@ -122,14 +122,14 @@ type Section struct {
 	Editable bool   `json:"editable"`
 }
 
-// ExternalEvidence là tệp minh chứng của một số liệu nguồn ngoài (chỉ siêu dữ liệu).
+// ExternalEvidence giữ siêu dữ liệu minh chứng trong payload lịch sử trước KN-STANDALONE-7.
 type ExternalEvidence struct {
 	ID       uuid.UUID `json:"id"`
 	FileName string    `json:"file_name"`
 }
 
-// ExternalFigure là một ô "Nhập ngoài" (W11.67, BR-DL-19): giá trị hiệu lực của chỉ tiêu nguồn ngoài trong kỳ, khóa như ô
-// số trên bản soạn; "Nguồn dữ liệu" hiện cơ quan, văn bản/kênh, ngày, tệp minh chứng. Chỉ sửa tại Số liệu nguồn ngoài.
+// ExternalFigure chỉ giải mã số liệu nguồn ngoài trong payload đã lưu trước KN-STANDALONE-7.
+// Luồng soạn mới không đọc hay thêm số liệu này; giữ trường để băm và tệp lịch sử không đổi.
 type ExternalFigure struct {
 	EntryID     uuid.UUID          `json:"entry_id"`
 	Version     int64              `json:"version"`
@@ -169,12 +169,12 @@ type Data struct {
 	Provisional []string                     `json:"provisional"`
 	InputHash   string                       `json:"input_hash"`
 	CapturedAt  time.Time                    `json:"captured_at"`
-	// External: ô Nhập ngoài của kỳ (W11.67). Rỗng thì bỏ khỏi JSON và khỏi băm — bản soạn cũ không đổi băm.
+	// External chỉ có trong payload lịch sử; không đổi tên/thứ tự trường hay quy tắc omitempty.
 	External []ExternalFigure `json:"external,omitempty"`
 }
 
-// WithExternal gắn số liệu nguồn ngoài của kỳ vào dữ liệu đã dựng và đưa chúng vào băm đầu vào: đổi giá trị, nguồn hay
-// minh chứng sau khi xuất → "Nguồn đã thay đổi" (BR-DL-04). Không có số liệu → giữ nguyên băm của Compose.
+// WithExternal giữ thuật toán băm lịch sử để kiểm tra payload đã đóng băng.
+// Không dùng trong luồng tạo hay cập nhật số liệu mới (KN-STANDALONE-7).
 func WithExternal(data Data, figures []ExternalFigure) (Data, error) {
 	if len(figures) == 0 {
 		data.External = nil

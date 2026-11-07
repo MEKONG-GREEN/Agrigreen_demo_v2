@@ -295,7 +295,7 @@ func writeFormTexts(w *workbook, data domain.Data, hcth bool) {
 	}
 }
 
-// writeExternal ghi các ô Nhập ngoài (W11.67, BR-DL-19) kèm nguồn: cơ quan, văn bản/kênh, ngày, tệp minh chứng.
+// writeExternal giữ nguyên bố cục của payload lịch sử trước KN-STANDALONE-7; bản soạn mới không có External.
 func writeExternal(w *workbook, figures []domain.ExternalFigure) {
 	if len(figures) == 0 {
 		return

@@ -10435,24 +10435,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/extension/khtc/external/indicators": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Danh mục chỉ tiêu nguồn ngoài (FN-TI-02.11) */
-        get: operations["extensionKhtcExternalIndicators"];
-        put?: never;
-        /** Thêm chỉ tiêu nguồn ngoài ngay trên màn (tên, ĐVT, nhóm; mã tự sinh nếu bỏ trống) */
-        post: operations["extensionKhtcExternalIndicatorCreate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/exports/runs": {
         parameters: {
             query?: never;
@@ -10481,24 +10463,6 @@ export interface paths {
         put?: never;
         /** Lãnh đạo phòng lưu giới thiệu, chức năng nhiệm vụ (phiên bản mới, khóa lạc quan) */
         post: operations["extensionDeptHomeProfileSave"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/extension/khtc/external/figures": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Số liệu nguồn ngoài hiệu lực theo năm, kỳ, cơ quan cung cấp, tìm chỉ tiêu */
-        get: operations["extensionKhtcExternalFigures"];
-        put?: never;
-        /** Thêm số liệu / Sửa (nguồn bắt buộc; đã có giá trị → xác nhận ghi đè hoặc base_version, lý do ≥ 10 ký tự) */
-        post: operations["extensionKhtcExternalFigureSave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10539,23 +10503,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/extension/khtc/external/figures/withdraw": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Rút số liệu nhập nhầm (bản ghi bù, lý do bắt buộc) */
-        post: operations["extensionKhtcExternalFigureWithdraw"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/extension/dept-docs/folders": {
         parameters: {
             query?: never;
@@ -10568,23 +10515,6 @@ export interface paths {
         put?: never;
         /** Tạo thư mục (Cấp Tỉnh, Admin) */
         post: operations["extensionDeptDocFolderCreate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/extension/khtc/external/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lịch sử nhập/sửa: giá trị cũ → mới, lý do, người, thời điểm */
-        get: operations["extensionKhtcExternalHistory"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -10608,23 +10538,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/extension/khtc/external/template": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tải mẫu Excel: trang nhập, danh mục chỉ tiêu, kỳ còn mở */
-        get: operations["extensionKhtcExternalTemplate"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/extension/dept-docs/folders/{ref}/hide": {
         parameters: {
             query?: never;
@@ -10642,23 +10555,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/extension/khtc/external/imports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Nạp Excel tổng hợp — bước 1: kiểm từng dòng, chưa ghi số liệu */
-        post: operations["extensionKhtcExternalImportStage"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/extension/dept-docs/folders/{ref}/restore": {
         parameters: {
             query?: never;
@@ -10670,23 +10566,6 @@ export interface paths {
         put?: never;
         /** Hiện lại thư mục (Lãnh đạo phòng) */
         post: operations["extensionDeptDocFolderRestore"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/extension/khtc/external/imports/{importID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Đọc kết quả một lần nạp */
-        get: operations["extensionKhtcExternalImportGet"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -10711,23 +10590,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/extension/khtc/external/imports/{importID}/commit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Nạp Excel tổng hợp — bước 2 Hoàn tất: kiểm lại, ghi dòng hợp lệ; dòng trùng chỉ ghi khi xác nhận ghi đè */
-        post: operations["extensionKhtcExternalImportCommit"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/extension/dept-docs/{ref}": {
         parameters: {
             query?: never;
@@ -10745,23 +10607,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/extension/khtc/external/evidence": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Tải tệp minh chứng (PDF, ảnh, Word, Excel, email; tối đa 15 MB) vào kho đối tượng */
-        post: operations["extensionKhtcExternalEvidenceUpload"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/extension/dept-docs/{ref}/update": {
         parameters: {
             query?: never;
@@ -10773,23 +10618,6 @@ export interface paths {
         put?: never;
         /** Sửa thuộc tính, chuyển thư mục (giữ tệp) */
         post: operations["extensionDeptDocUpdate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/extension/khtc/external/evidence/{evidenceID}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tải tệp minh chứng (Nguồn dữ liệu) */
-        get: operations["extensionKhtcExternalEvidenceDownload"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -24044,7 +23872,7 @@ export interface components {
                 };
             };
             provisional: string[];
-            /** @description Ô Nhập ngoài (W11.67); không có thì bỏ trường */
+            /** @description Chỉ đọc trong payload lịch sử trước KN-STANDALONE-7; bản soạn mới không có trường này */
             external?: components["schemas"]["KHTCReportExternalFigure"][];
             input_hash: string;
             /** Format: date-time */
@@ -24186,16 +24014,6 @@ export interface components {
             ref: string;
             display: string | null;
         };
-        KHTCExternalIndicator: {
-            /** Format: uuid */
-            id: string;
-            code: string;
-            name: string;
-            unit: string;
-            group: string;
-            /** Format: date-time */
-            created_at: string;
-        };
         ExportTemplate: {
             key: string;
             title: string;
@@ -24223,9 +24041,6 @@ export interface components {
             recorded_at: string;
             actor: components["schemas"]["DeptActor"];
         };
-        KHTCExternalIndicatorList: {
-            items: components["schemas"]["KHTCExternalIndicator"][];
-        };
         ExportTemplateList: {
             items: components["schemas"]["ExportTemplate"][];
         };
@@ -24234,12 +24049,6 @@ export interface components {
             duties?: string;
             /** @description 0 khi chưa có bản nào */
             base_version: number;
-        };
-        KHTCExternalIndicatorInput: {
-            code?: string;
-            name: string;
-            unit?: string;
-            group?: string;
         };
         ExportRun: {
             /** Format: uuid */
@@ -24263,13 +24072,6 @@ export interface components {
         DeptProfileList: {
             items: components["schemas"]["DeptProfile"][];
         };
-        KHTCExternalEvidenceRef: {
-            /** Format: uuid */
-            id: string;
-            file_name: string;
-            content_type: string;
-            size: number;
-        };
         ExportRunList: {
             items: components["schemas"]["ExportRun"][];
         };
@@ -24279,37 +24081,6 @@ export interface components {
             value: number;
             /** @enum {string} */
             tone: "neutral" | "ok" | "warn" | "bad" | "info";
-        };
-        KHTCExternalFigure: {
-            /** Format: uuid */
-            entry_id: string;
-            version: number;
-            /** Format: uuid */
-            period_id: string;
-            period_name: string;
-            period_type: string;
-            year: number;
-            closed: boolean;
-            /** Format: uuid */
-            indicator_id: string;
-            code: string;
-            name: string;
-            group: string;
-            /** @description Số thập phân dạng chuỗi */
-            value: string;
-            unit: string;
-            agency: string;
-            document: string;
-            /** Format: date */
-            source_date: string;
-            evidence: components["schemas"]["KHTCExternalEvidenceRef"][];
-            used_in: string;
-            /** Format: uuid */
-            actor_ref: string;
-            actor_name: string;
-            /** Format: date-time */
-            at: string;
-            editable: boolean;
         };
         DeptClosedPeriod: {
             form_code: string;
@@ -24324,30 +24095,10 @@ export interface components {
             /** Format: date-time */
             closed_at: string | null;
         };
-        KHTCExternalFigureList: {
-            items: components["schemas"]["KHTCExternalFigure"][];
-        };
         DeptOfficer: {
             actor: components["schemas"]["DeptActor"];
             mgmt_level: string | null;
             leader: boolean;
-        };
-        KHTCExternalFigureInput: {
-            /** Format: uuid */
-            period_id: string;
-            /** Format: uuid */
-            indicator_id: string;
-            /** @description Số thập phân, dấu chấm thập phân; tối đa 4 chữ số lẻ */
-            value: string;
-            unit?: string;
-            agency?: string;
-            document?: string;
-            /** @description YYYY-MM-DD hoặc DD/MM/YYYY */
-            source_date?: string;
-            evidence_ids?: string[];
-            reason?: string;
-            overwrite?: boolean;
-            base_version?: number | null;
         };
         DeptPrice: {
             /** Format: date */
@@ -24357,42 +24108,10 @@ export interface components {
             tickets: number;
             week_days_approved: number;
         };
-        KHTCExternalWithdraw: {
-            /** Format: uuid */
-            period_id: string;
-            /** Format: uuid */
-            indicator_id: string;
-            base_version: number;
-            reason: string;
-        };
         DeptLibraryStats: {
             total: number;
             expired: number;
             new_30d: number;
-        };
-        KHTCExternalHistoryItem: {
-            /** Format: uuid */
-            entry_id: string;
-            version: number;
-            /** @enum {string} */
-            action: "set" | "withdraw";
-            /** Format: uuid */
-            period_id: string;
-            period_name: string;
-            /** Format: uuid */
-            indicator_id: string;
-            indicator_name: string;
-            old_value: string | null;
-            new_value: string | null;
-            unit: string;
-            reason: string;
-            /** Format: uuid */
-            import_id: string | null;
-            /** Format: uuid */
-            actor_ref: string;
-            actor_name: string;
-            /** Format: date-time */
-            at: string;
         };
         DeptHome: {
             department_code: string;
@@ -24408,9 +24127,6 @@ export interface components {
             officers: components["schemas"]["DeptOfficer"][];
             library: components["schemas"]["DeptLibraryStats"];
             latest_docs: components["schemas"]["DeptDoc"][];
-        };
-        KHTCExternalHistoryList: {
-            items: components["schemas"]["KHTCExternalHistoryItem"][];
         };
         DeptDocFolder: {
             /** Format: uuid */
@@ -24429,73 +24145,21 @@ export interface components {
             /** Format: date-time */
             recorded_at: string;
         };
-        KHTCExternalImportRow: {
-            line: number;
-            indicator: string;
-            period: string;
-            value: string;
-            unit: string;
-            agency: string;
-            document: string;
-            source_date: string;
-            /** @enum {string} */
-            status: "ok" | "overwrite" | "error";
-            errors: string[];
-            /** Format: uuid */
-            indicator_id: string | null;
-            indicator_name: string;
-            /** Format: uuid */
-            period_id: string | null;
-            period_name: string;
-            normalized_value: string;
-            current_value: string | null;
-        };
         DeptDocFolderList: {
             department_code: string;
             can_write: boolean;
             can_manage: boolean;
             items: components["schemas"]["DeptDocFolder"][];
         };
-        KHTCExternalImport: {
-            /** Format: uuid */
-            import_id: string;
-            year: number;
-            file_name: string;
-            /** @enum {string} */
-            status: "staged" | "committed";
-            result: {
-                rows: components["schemas"]["KHTCExternalImportRow"][];
-                valid: number;
-                overwrites: number;
-                errors: number;
-            };
-            recorded: number;
-            skipped: number;
-            overwrite: boolean;
-        };
         DeptDocFolderInput: {
             /** Format: uuid */
             parent_ref?: string | null;
             name: string;
         };
-        KHTCExternalCommit: {
-            overwrite?: boolean;
-            reason?: string;
-        };
         DeptDocFolderChange: {
             name?: string;
             reason?: string;
             base_version: number;
-        };
-        KHTCExternalEvidence: {
-            /** Format: uuid */
-            id: string;
-            file_name: string;
-            content_type: string;
-            size: number;
-            sha256: string;
-            /** Format: date-time */
-            created_at: string;
         };
         DeptDocFile: {
             version: number;
@@ -48707,61 +48371,6 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
-    extensionKhtcExternalIndicators: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Thành công */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalIndicatorList"];
-                };
-            };
-            401: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
-            503: components["responses"]["Problem"];
-        };
-    };
-    extensionKhtcExternalIndicatorCreate: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KHTCExternalIndicatorInput"];
-            };
-        };
-        responses: {
-            /** @description Đã thêm */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalIndicator"];
-                };
-            };
-            400: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
-            /** @description extension.khtc_ext_indicator_duplicate */
-            409: components["responses"]["Problem"];
-            /** @description extension.khtc_ext_invalid */
-            422: components["responses"]["Problem"];
-        };
-    };
     exportRunsList: {
         parameters: {
             query?: {
@@ -48825,68 +48434,6 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
-    extensionKhtcExternalFigures: {
-        parameters: {
-            query: {
-                year: number;
-                period_id?: string;
-                agency?: string;
-                q?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Thành công */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalFigureList"];
-                };
-            };
-            400: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
-        };
-    };
-    extensionKhtcExternalFigureSave: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KHTCExternalFigureInput"];
-            };
-        };
-        responses: {
-            /** @description Đã ghi phiên bản mới */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalFigure"];
-                };
-            };
-            400: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
-            /** @description extension.khtc_ext_not_found */
-            404: components["responses"]["Problem"];
-            /** @description extension.khtc_ext_duplicate | extension.khtc_ext_conflict | extension.khtc_ext_period_closed | extension.khtc_report_final */
-            409: components["responses"]["Problem"];
-            /** @description extension.khtc_ext_invalid */
-            422: components["responses"]["Problem"];
-        };
-    };
     exportRunDownload: {
         parameters: {
             query?: never;
@@ -48941,35 +48488,6 @@ export interface operations {
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
-        };
-    };
-    extensionKhtcExternalFigureWithdraw: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KHTCExternalWithdraw"];
-            };
-        };
-        responses: {
-            /** @description Đã rút */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
-            409: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
         };
     };
     extensionDeptDocFolders: {
@@ -49039,31 +48557,6 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
-    extensionKhtcExternalHistory: {
-        parameters: {
-            query: {
-                year: number;
-                period_id?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Thành công */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalHistoryList"];
-                };
-            };
-            400: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
-        };
-    };
     extensionDeptDocFolderRename: {
         parameters: {
             query?: {
@@ -49100,30 +48593,6 @@ export interface operations {
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
-        };
-    };
-    extensionKhtcExternalTemplate: {
-        parameters: {
-            query: {
-                year: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Tệp .xlsx */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
-                };
-            };
-            400: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
         };
     };
     extensionDeptDocFolderHide: {
@@ -49164,41 +48633,6 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
-    extensionKhtcExternalImportStage: {
-        parameters: {
-            query: {
-                year: number;
-                file_name?: string;
-            };
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
-                "text/csv": string;
-            };
-        };
-        responses: {
-            /** @description Kết quả kiểm */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalImport"];
-                };
-            };
-            400: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
-            413: components["responses"]["Problem"];
-            /** @description extension.khtc_ext_import_invalid */
-            422: components["responses"]["Problem"];
-        };
-    };
     extensionDeptDocFolderRestore: {
         parameters: {
             query?: {
@@ -49235,30 +48669,6 @@ export interface operations {
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
-        };
-    };
-    extensionKhtcExternalImportGet: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                importID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Thành công */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalImport"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
         };
     };
     extensionDeptDocList: {
@@ -49339,40 +48749,6 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
-    extensionKhtcExternalImportCommit: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                importID: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["KHTCExternalCommit"];
-            };
-        };
-        responses: {
-            /** @description Đã hoàn tất */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalImport"];
-                };
-            };
-            400: components["responses"]["Problem"];
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
-            /** @description extension.khtc_ext_import_committed | extension.khtc_ext_period_closed */
-            409: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
-        };
-    };
     extensionDeptDocGet: {
         parameters: {
             query?: {
@@ -49401,48 +48777,6 @@ export interface operations {
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
-            503: components["responses"]["Problem"];
-        };
-    };
-    extensionKhtcExternalEvidenceUpload: {
-        parameters: {
-            query: {
-                file_name: string;
-            };
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/octet-stream": string;
-            };
-        };
-        responses: {
-            /** @description Gọi lặp cùng khóa — bản đã có */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalEvidence"];
-                };
-            };
-            /** @description Đã lưu */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KHTCExternalEvidence"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            413: components["responses"]["Problem"];
-            /** @description extension.khtc_ext_evidence_invalid */
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
@@ -49482,31 +48816,6 @@ export interface operations {
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
-            503: components["responses"]["Problem"];
-        };
-    };
-    extensionKhtcExternalEvidenceDownload: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                evidenceID: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Nội dung tệp */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/octet-stream": string;
-                };
-            };
-            403: components["responses"]["Problem"];
-            404: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };
     };

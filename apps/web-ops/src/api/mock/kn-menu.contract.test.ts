@@ -199,7 +199,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "dieu_hanh:tinh.hcth.ke_hoach" /* W11.27 */, "bao_cao:tinh.hcth.bao_cao_so",
         "du_lieu:tinh.hcth.ho_so", "du_lieu:tinh.hcth.kho_tai_lieu", "du_lieu:tinh.hcth.danh_muc"]),
     );
-    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài" /* W11.67 có màn */, "Quy trình, văn bản"]);
+    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Quy trình, văn bản"]);
     expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành", "Mặt hàng", "Quy trình, văn bản"]); // BG-ITEM-PROPOSAL: danh mục đã có màn; đề xuất ở Điều hành
     // W11.53 (UR-QG-01): TW xem dự án KNQG và mẫu biểu, xác nhận/trả lại Mẫu 07.
     expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual([["Dự án KNQG", ["Dự án tại An Giang", "Mẫu biểu, nghiệm thu năm (07)"]]]);

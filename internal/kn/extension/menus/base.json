@@ -1406,17 +1406,6 @@
                 "ComingSoon": false,
                 "Needs": "",
                 "Children": null
-              },
-              {
-                "Key": "tinh.khtc.mau_bao_cao",
-                "Label": "Mẫu báo cáo KHTC",
-                "Route": "/kn/khtc/mau-bao-cao",
-                "Icon": "table",
-                "BadgeSource": "",
-                "Requires": null,
-                "ComingSoon": true,
-                "Needs": "",
-                "Children": null
               }
             ]
           },
@@ -1424,17 +1413,6 @@
             "Key": "du_lieu",
             "Label": "Dữ liệu",
             "Items": [
-              {
-                "Key": "tinh.khtc.so_lieu_ngoai",
-                "Label": "Số liệu nguồn ngoài",
-                "Route": "/kn/khtc/so-lieu-ngoai",
-                "Icon": "database",
-                "BadgeSource": "",
-                "Requires": null,
-                "ComingSoon": true,
-                "Needs": "",
-                "Children": null
-              },
               {
                 "Key": "tinh.van_ban",
                 "Label": "Quy trình, văn bản",

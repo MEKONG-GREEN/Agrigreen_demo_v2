@@ -118,9 +118,6 @@ func (r Reader) Periods(ctx context.Context, tid uuid.UUID, q port.KHTCQuery) ([
 	if err != nil {
 		return nil, err
 	}
-	if err := applyHTXAt(ctx, r.HTX, figs, q.ConfirmationAt); err != nil {
-		return nil, err
-	}
 	var keep []port.ClosedFigure
 	for _, f := range figs {
 		if wants(q.Departments, f.DepartmentCode) {

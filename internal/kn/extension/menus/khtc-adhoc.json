@@ -99,17 +99,6 @@
           "ComingSoon": false,
           "Needs": "",
           "Children": null
-        },
-        {
-          "Key": "tinh.khtc.mau_bao_cao",
-          "Label": "Mẫu báo cáo KHTC",
-          "Route": "/kn/khtc/mau-bao-cao",
-          "Icon": "table",
-          "BadgeSource": "",
-          "Requires": null,
-          "ComingSoon": true,
-          "Needs": "",
-          "Children": null
         }
       ],
       "after": [
@@ -179,17 +168,6 @@
           "BadgeSource": "",
           "Requires": null,
           "ComingSoon": false,
-          "Needs": "",
-          "Children": null
-        },
-        {
-          "Key": "tinh.khtc.mau_bao_cao",
-          "Label": "Mẫu báo cáo KHTC",
-          "Route": "/kn/khtc/mau-bao-cao",
-          "Icon": "table",
-          "BadgeSource": "",
-          "Requires": null,
-          "ComingSoon": true,
           "Needs": "",
           "Children": null
         },

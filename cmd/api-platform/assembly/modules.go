@@ -208,8 +208,6 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UseActorNames(kn.StaffNames())           // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
 	kn.UseDepartmentAdmin(pty.DepartmentAdmin()) // KNSPLIT-2 #118: /v1/departments* do chủ KN đăng ký, dữ liệu ở pf/party
 
-	// PFPUB/D2 (ADR-0053 §8): nhãn "Chưa xác nhận" của dòng HTX trong số đã chốt cho KHTC.
-	kn.UseHTXConfirmations(knHTXData)
 	kn.UseDeptLibrary(store) // W11.54: tệp kho văn bản phòng ở kho đối tượng
 
 	mech := mechanization.New(unit, clk, mechanization.Deps{

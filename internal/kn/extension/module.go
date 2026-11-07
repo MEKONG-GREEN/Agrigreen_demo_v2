@@ -93,8 +93,6 @@ type Module struct {
 	khtc *khtcapp.Service
 
 	khtcPeriods *khtcPeriodService // W11.62: Kỳ KHTC (extension/khtcperiod, module_khtc.go)
-	// PFPUB/D2: trạng thái xác nhận HTX cho số liệu đã chốt (module_closedfig.go).
-	htx port.HTXConfirmations
 	// W11.49 (D4 CN9): Báo cáo dịch bệnh BM-10, báo nghi dịch (extension/outbreak).
 	ob *obapp.Service
 	// W11.64: bộ đọc nguồn module của Kỳ KHTC (extension/khtcsource, module_khtcsource.go).
@@ -103,8 +101,6 @@ type Module struct {
 	khtcForms     *khtcFormService
 	khtcReports   *khtcReportService
 	khtcTemplates *khtcTemplateService // W11.65: five fixed report authoring/publication ledgers.
-	khtcExt       *khtcExternalService // W11.67: số liệu nguồn ngoài (extension/khtcext, module_khtcext.go)
-	objects       objstore.Store
 	// W11.43 (D4 CN3): quy tắc liên biểu + 12 cảnh báo CNTS, vòng đời cảnh báo, nhắc nộp theo biểu (module_cntsalert.go).
 	alert *alertapp.Service
 	// W11.46 (D4 CN6): lịch trực KSGM BM-03, lịch tiêm phòng BM-07 (extension/cntscal).
@@ -140,7 +136,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
 		Plots: d.Plots, Coops: d.Coops, Objects: d.Store,
-	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}, objects: d.Store}
+	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}}
 	// Tên người thao tác của sổ vật tư dùng chung danh bạ của vòng đời báo cáo (UseReportCycle nối sau).
 	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.khtc = &khtcapp.Service{DB: db, Clock: clk, Names: func() partyport.ActorNames { return m.rc.Names }}
@@ -231,7 +227,6 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerKHTCReports(rg)                          // W11.66
 	m.registerKHTCTemplates(rg)                        // W11.65
 	m.registerKHTCSources(rg)                          // W11.64
-	m.registerKHTCExternal(rg)                         // W11.67
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
 	modelhandler.Handler{Svc: m.model}.RegisterApp(rg)      // W11.47
