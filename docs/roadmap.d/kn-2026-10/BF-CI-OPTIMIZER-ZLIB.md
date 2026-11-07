@@ -1,0 +1,1 @@
+- [x] BF-CI-OPTIMIZER-ZLIB (#287): nâng `zlib1g` đã vá DSA-6613-1 trong base chung build/runtime optimizer, giữ cổng APT và scanner; thêm canary âm/khôi phục image, không đổi nghiệp vụ KN. [Phạm vi và cách kiểm](../../kn/gia-dinh/BF-CI-OPTIMIZER-ZLIB.md). Việc triển khai/gộp chỉ được xác nhận bằng CI đúng SHA và issue.
