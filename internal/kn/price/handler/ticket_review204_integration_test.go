@@ -33,6 +33,9 @@ type review204Env struct {
 	who     map[string]authz.Principal
 	ticket  string
 	version any
+	lease   string
+	tickets *app.TicketService
+	pool    *pgxpool.Pool
 }
 
 func newReview204(t *testing.T, withAlert ...bool) *review204Env {
@@ -79,6 +82,7 @@ func newReview204(t *testing.T, withAlert ...bool) *review204Env {
 		TicketHandler{Svc: tickets}.RegisterApp(g)
 		return r
 	}
+	e.tickets, e.pool = tickets, pool
 	e.r = router(false)
 	e.call("admin", "POST", "/v1/price/catalog/defaults", nil, "", 201)
 	seedCommunes(t, tid, "2025-07-01", "", "R204A", "R204B")
@@ -107,6 +111,8 @@ func newReview204(t *testing.T, withAlert ...bool) *review204Env {
 	e.version = sh["ticket"].(map[string]any)["version"]
 	clk.Advance(2 * time.Hour)
 	e.r = router(true)
+	e.lease = ids.New().String()
+	e.call("tinh", "POST", "/v1/price/tickets/"+e.ticket+"/edit-lease/acquire", map[string]any{"handle_id": e.lease}, "", 200)
 	return e
 }
 func (e *review204Env) raw(as, method, path string, body any, key string) *httptest.ResponseRecorder {
@@ -143,7 +149,7 @@ func (e *review204Env) counts() [3]int64 {
 	return n
 }
 func (e *review204Env) correction(lo, hi string) map[string]any {
-	return map[string]any{"version": e.version, "reason": "Đối chiếu phiếu204", "lines": []map[string]any{{"item_code": "MH00001", "min": lo, "max": hi}}}
+	return map[string]any{"edit_lease": e.lease, "version": e.version, "reason": "Đối chiếu phiếu204", "lines": []map[string]any{{"item_code": "MH00001", "min": lo, "max": hi}}}
 }
 
 func TestPriceReview204NativeRejectExponent(t *testing.T) {
@@ -249,14 +255,14 @@ func TestPriceReview204LifecycleAndReplay(t *testing.T) {
 	if !found {
 		t.Fatalf("missing correction %v", lines)
 	}
-	badDay := map[string]any{"version": 2, "day": "2026-10-09", "reason": "Ngày tương lai"}
+	badDay := map[string]any{"edit_lease": e.lease, "version": 2, "day": "2026-10-09", "reason": "Ngày tương lai"}
 	blockedDay := e.call("tinh", "POST", path+"/redate", badDay, "", 409)
 	if blockedDay["code"] != "price.ticket_not_locked" || after != e.counts() {
 		t.Fatalf("target reviewGate must deny unlocked date409 before quote/existence checks, without append: %v", blockedDay)
 	}
-	moved := e.call("tinh", "POST", path+"/redate", map[string]any{"version": 2, "day": "2026-10-07", "reason": "Sửa nhầm ngày"}, "", 201)
+	moved := e.call("tinh", "POST", path+"/redate", map[string]any{"edit_lease": e.lease, "version": 2, "day": "2026-10-07", "reason": "Sửa nhầm ngày"}, "", 201)
 	version := moved["ticket"].(map[string]any)["version"]
-	del := map[string]any{"version": version, "reason": "Phiếu sai204"}
+	del := map[string]any{"edit_lease": e.lease, "version": version, "reason": "Phiếu sai204"}
 	e.call("tinh", "POST", path+"/delete", del, "review204-delete-replay", 201)
 	deleted := e.counts()
 	e.call("tinh", "POST", path+"/delete", del, "review204-delete-replay", 201)

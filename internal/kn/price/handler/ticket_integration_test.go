@@ -66,6 +66,7 @@ func TestPriceTicketsHTTP_W1175(t *testing.T) {
 	ItemHandler{Svc: items}.RegisterApp(g)
 	TicketHandler{Svc: tickets}.RegisterApp(g)
 	raw := func(as, method, path string, body any) *httptest.ResponseRecorder {
+		body = legacyEditBody237(t, r, as, method, path, body)
 		t.Helper()
 		var buf string
 		if body != nil {

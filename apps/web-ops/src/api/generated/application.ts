@@ -10042,6 +10042,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/tickets/{id}/edit-lease": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên sửa phiếu — read (FN-TI-02.04 BR-06/AC-02); chỉ trả tên người giữ trong phạm vi phiếu đã được phép xem */
+        get: operations["priceEditLeaseRead"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/{id}/edit-lease/acquire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phiên sửa phiếu — acquire (FN-TI-02.04 BR-06/AC-02); chỉ trả tên người giữ trong phạm vi phiếu đã được phép xem */
+        post: operations["priceEditLeaseAcquire"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/{id}/edit-lease/renew": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phiên sửa phiếu — renew (FN-TI-02.04 BR-06/AC-02); chỉ trả tên người giữ trong phạm vi phiếu đã được phép xem */
+        post: operations["priceEditLeaseRenew"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/price/tickets/{id}/edit-lease/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Phiên sửa phiếu — release (FN-TI-02.04 BR-06/AC-02); chỉ trả tên người giữ trong phạm vi phiếu đã được phép xem */
+        post: operations["priceEditLeaseRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report": {
         parameters: {
             query?: never;
@@ -21114,6 +21182,11 @@ export interface components {
             lines: components["schemas"]["PriceLineInput"][];
         };
         PriceCorrectInput: {
+            /**
+             * Format: uuid
+             * @description Handle còn hạn của chính tab đã chiếm phiên sửa
+             */
+            edit_lease: string;
             version: number;
             reason: string;
             lines: {
@@ -21123,12 +21196,22 @@ export interface components {
             }[];
         };
         PriceRedateInput: {
+            /**
+             * Format: uuid
+             * @description Handle còn hạn của chính tab đã chiếm phiên sửa
+             */
+            edit_lease: string;
             version: number;
             /** Format: date */
             day: string;
             reason: string;
         };
         PriceDeleteInput: {
+            /**
+             * Format: uuid
+             * @description Handle còn hạn của chính tab đã chiếm phiên sửa
+             */
+            edit_lease: string;
             version: number;
             reason: string;
         };
@@ -23629,6 +23712,32 @@ export interface components {
             /** @description 0 hoặc bỏ trống = phiên bản mới nhất của biểu nguồn */
             source_version?: number;
             fields?: components["schemas"]["FormsField"][];
+        };
+        PriceEditLeaseInput: {
+            /**
+             * Format: uuid
+             * @description UUID riêng cho mỗi lần mở tab sửa; renew/release dùng đúng handle đó
+             */
+            handle_id: string;
+        };
+        PriceEditLease: {
+            held: boolean;
+            /** @description Người giữ là cùng người dùng; mỗi tab vẫn cần acquire handle riêng */
+            mine: boolean;
+            /** @description Tên đọc qua cổng định danh có audit sau kiểm quyền xem phiếu */
+            holder_name: string | null;
+            /** Format: date-time */
+            expires_at: string | null;
+            /**
+             * Format: uuid
+             * @description Chỉ acquire/renew thành công trả handle của chính tab gửi
+             */
+            handle_id: string | null;
+            /**
+             * Format: date-time
+             * @description Giờ máy chủ để tính hạn khóa trên trình duyệt
+             */
+            now: string;
         };
         KHTCReportSupplement: {
             /** Format: uuid */
@@ -44063,7 +44172,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description price.point_not_found */
             404: components["responses"]["Problem"];
-            /** @description price.ticket_locked | price.ticket_stale | price.ticket_exists | price.board_approved | conflict */
+            /** @description price.edit_lease_lost | price.ticket_locked | price.ticket_stale | price.ticket_exists | price.board_approved | conflict */
             409: components["responses"]["Problem"];
             /** @description validation_failed | price.price_invalid | price.ticket_incomplete | price.not_quote_day | price.point_inactive */
             422: components["responses"]["Problem"];
@@ -44100,7 +44209,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description price.point_not_found */
             404: components["responses"]["Problem"];
-            /** @description price.ticket_not_locked | price.ticket_exists | price.ticket_stale | price.board_approved */
+            /** @description price.edit_lease_lost | price.ticket_not_locked | price.ticket_exists | price.ticket_stale | price.board_approved */
             409: components["responses"]["Problem"];
             /** @description validation_failed | price.reason_required | price.price_invalid | price.ticket_incomplete | price.not_quote_day */
             422: components["responses"]["Problem"];
@@ -44295,7 +44404,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description price.ticket_not_found */
             404: components["responses"]["Problem"];
-            /** @description price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict */
+            /** @description price.edit_lease_lost | price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict */
             409: components["responses"]["Problem"];
             /** @description validation_failed | price.reason_required | price.price_invalid */
             422: components["responses"]["Problem"];
@@ -44334,7 +44443,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description price.ticket_not_found */
             404: components["responses"]["Problem"];
-            /** @description price.ticket_exists | price.ticket_not_locked | price.ticket_stale | price.board_approved */
+            /** @description price.ticket_exists | price.edit_lease_lost | price.ticket_not_locked | price.ticket_stale | price.board_approved */
             409: components["responses"]["Problem"];
             /** @description validation_failed | price.reason_required | price.not_quote_day | price.point_inactive */
             422: components["responses"]["Problem"];
@@ -44373,7 +44482,7 @@ export interface operations {
             403: components["responses"]["Problem"];
             /** @description price.ticket_not_found */
             404: components["responses"]["Problem"];
-            /** @description price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict */
+            /** @description price.edit_lease_lost | price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict */
             409: components["responses"]["Problem"];
             /** @description validation_failed | price.reason_required */
             422: components["responses"]["Problem"];
@@ -47872,6 +47981,156 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
+        };
+    };
+    priceEditLeaseRead: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trạng thái phiên sửa; acquire có mine=false khi người khác giữ, không trả handle của họ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceEditLease"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.edit_lease_lost | price.ticket_not_locked | price.board_approved | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceEditLeaseAcquire: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceEditLeaseInput"];
+            };
+        };
+        responses: {
+            /** @description Trạng thái phiên sửa; acquire có mine=false khi người khác giữ, không trả handle của họ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceEditLease"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.edit_lease_lost | price.ticket_not_locked | price.board_approved | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceEditLeaseRenew: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceEditLeaseInput"];
+            };
+        };
+        responses: {
+            /** @description Trạng thái phiên sửa; acquire có mine=false khi người khác giữ, không trả handle của họ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceEditLease"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.edit_lease_lost | price.ticket_not_locked | price.board_approved | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
+        };
+    };
+    priceEditLeaseRelease: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceEditLeaseInput"];
+            };
+        };
+        responses: {
+            /** @description Trạng thái phiên sửa; acquire có mine=false khi người khác giữ, không trả handle của họ */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceEditLease"];
+                };
+            };
+            /** @description forbidden | price.point_not_assigned | price.point_not_handled */
+            403: components["responses"]["Problem"];
+            /** @description price.ticket_not_found */
+            404: components["responses"]["Problem"];
+            /** @description price.edit_lease_lost | price.ticket_not_locked | price.board_approved | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
         };
     };
     extensionKhtcReportGet: {

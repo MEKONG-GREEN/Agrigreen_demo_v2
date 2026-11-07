@@ -34,6 +34,7 @@ func (h TicketHandler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/price/tickets/print", h.print)
 	rg.GET("/price/tickets/:id", h.ticket)
 	rg.GET("/price/tickets/:id/log", h.log)
+	h.registerEditLease(rg)
 	rg.POST("/price/tickets/:id/correct", h.correct)
 	rg.POST("/price/tickets/:id/redate", h.redate)
 	rg.POST("/price/tickets/:id/delete", h.remove)
@@ -406,6 +407,7 @@ type adjReq struct {
 }
 
 type correctReq struct {
+	Handle  string   `json:"edit_lease"`
 	Version int64    `json:"version"`
 	Reason  string   `json:"reason"`
 	Lines   []adjReq `json:"lines"`
@@ -434,11 +436,12 @@ func (h TicketHandler) correct(c *gin.Context) {
 		}
 		adj = append(adj, app.Adjustment{ItemCode: l.ItemCode, Min: *lo, Max: *hi})
 	}
-	sh, err := h.Svc.Correct(c.Request.Context(), c.Query("profile"), id, req.Version, req.Reason, adj, idem(c))
+	sh, err := h.Svc.Correct(c.Request.Context(), c.Query("profile"), id, req.Version, req.Reason, adj, editHandle(req.Handle), idem(c))
 	h.replySheet(c, http.StatusCreated, sh, err)
 }
 
 type redateReq struct {
+	Handle  string `json:"edit_lease"`
 	Version int64  `json:"version"`
 	Day     string `json:"day"`
 	Reason  string `json:"reason"`
@@ -458,11 +461,12 @@ func (h TicketHandler) redate(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	sh, err := h.Svc.Redate(c.Request.Context(), c.Query("profile"), id, req.Version, d, req.Reason, idem(c))
+	sh, err := h.Svc.Redate(c.Request.Context(), c.Query("profile"), id, req.Version, d, req.Reason, editHandle(req.Handle), idem(c))
 	h.replySheet(c, http.StatusCreated, sh, err)
 }
 
 type deleteReq struct {
+	Handle  string `json:"edit_lease"`
 	Version int64  `json:"version"`
 	Reason  string `json:"reason"`
 }
@@ -476,7 +480,7 @@ func (h TicketHandler) remove(c *gin.Context) {
 	if !bind(c, &req) {
 		return
 	}
-	sh, err := h.Svc.Delete(c.Request.Context(), c.Query("profile"), id, req.Version, req.Reason, idem(c))
+	sh, err := h.Svc.Delete(c.Request.Context(), c.Query("profile"), id, req.Version, req.Reason, editHandle(req.Handle), idem(c))
 	h.replySheet(c, http.StatusCreated, sh, err)
 }
 

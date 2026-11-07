@@ -1,0 +1,1 @@
+- [ ] PRICE-TICKET-EDIT-LEASE (#237): FN-TI-02.04 v2 BR-06/AC-02 — lease server theo tenant/phiếu/người, handle mỗi tab; chặn đồng thời giá/ngày/xóa, scoped holder name, expiry/renew/release, giữ CAS/idempotency/quyền hiện hữu. Local preparation; chỉ tự review và tích hợp sau đủ cổng/CI đúng SHA và barrier điều phối được nhả.

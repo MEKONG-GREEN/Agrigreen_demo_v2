@@ -128,7 +128,9 @@ describe("phiếu báo giá — backend giả lập theo hợp đồng /v1/price
     expect(resp.view).toBe("responded");
     expect(resp.reply?.proposed_min).toBe("9000");
     // Hiệu chỉnh bằng giá Xã đề xuất → Đã hiệu chỉnh; phiếu in vẫn giá Xã gửi.
-    const fixed = await tinh.ta.correct(resp.ticket_id, { version: resp.ticket_version, reason: "Dùng giá Xã đề xuất", lines: [{ item_code: resp.item_code, min: "9000", max: "10000" }] });
+    const lease = "0192a5a0-0000-7000-8000-000000000237";
+    await tinh.ta.acquireLease(resp.ticket_id, lease);
+    const fixed = await tinh.ta.correct(resp.ticket_id, { edit_lease: lease, version: resp.ticket_version, reason: "Dùng giá Xã đề xuất", lines: [{ item_code: resp.item_code, min: "9000", max: "10000" }] });
     expect(fixed.lines[0]!.adj_min).toBe("9000");
     expect(fixed.lines[0]!.alert?.view).toBe("adjusted");
     expect(fixed.lines[0]!.min).toBe("1");

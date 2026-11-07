@@ -15,6 +15,7 @@ provides:
     - Boards
     - Calendar
     - Catalog
+    - EditHolderNames
     - Items
     - Officers
     - Points

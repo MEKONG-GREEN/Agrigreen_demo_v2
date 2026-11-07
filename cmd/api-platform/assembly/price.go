@@ -90,6 +90,15 @@ type PriceOfficers struct {
 	Names       partyport.ActorNames
 }
 
+// EditHolderName resolves only the holder of an already-authorized ticket via the audited party/vault port.
+func (o PriceOfficers) EditHolderName(ctx context.Context, ref uuid.UUID) (string, error) {
+	if o.Names == nil {
+		return "", nil
+	}
+	names, err := o.Names.DisplayNames(ctx, []uuid.UUID{ref})
+	return names[ref], err
+}
+
 // Officers trả cán bộ cấp level (XA | TINH) của phòng ban prof.Department, sắp theo tên.
 func (o PriceOfficers) Officers(ctx context.Context, prof priceport.Profile, level string) ([]priceport.Officer, error) {
 	role := authz.KNXa

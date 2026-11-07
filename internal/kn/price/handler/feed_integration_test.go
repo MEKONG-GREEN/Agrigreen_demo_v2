@@ -64,6 +64,7 @@ func TestPricePublicFeed_W1181(t *testing.T) {
 	TicketHandler{Svc: tickets}.RegisterApp(g)
 	BoardHandler{Svc: tickets}.RegisterApp(g)
 	call := func(as, method, path string, body any, want int) map[string]any {
+		body = legacyEditBody237(t, r, as, method, path, body)
 		t.Helper()
 		b, _ := json.Marshal(body)
 		req := httptest.NewRequest(method, path, strings.NewReader(string(b)))

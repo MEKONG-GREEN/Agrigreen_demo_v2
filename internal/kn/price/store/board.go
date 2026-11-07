@@ -42,6 +42,13 @@ func LockBoard(ctx context.Context, tx pgx.Tx, tid uuid.UUID, profile string, da
 	return err
 }
 
+// LockBoardForEdit keeps the board state stable until a ticket edit commits.
+func LockBoardForEdit(ctx context.Context, tx pgx.Tx, tid uuid.UUID, profile string, day time.Time) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock_shared(hashtextextended('pf_price.board:' || $1::text || ':' || $2 || ':' || $3, 0))`,
+		tid, profile, dateOnly(day))
+	return err
+}
+
 const boardCols = `board_date, seq, action, status, coalesce(base_status, ''), lock_until, board_version, approved_at,
   coalesce(reason, ''), actor_ref, event_time, recorded_at`
 

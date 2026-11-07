@@ -779,6 +779,17 @@ func (s *TicketService) SaveEntry(ctx context.Context, profile string, in EntryI
 // khi gửi. Trả phiếu đã ghi.
 func (s *TicketService) writeEntry(ctx context.Context, tx pgx.Tx, sc *sheetCtx, p port.Point, day time.Time, cur *store.Ticket,
 	in EntryInput, source, idem string) (store.Ticket, error) {
+	// Existing drafts are also writable by proxy entry. That path shares the point lock
+	// and must not bypass another person's FN-TI-02.04 edit/delete lease.
+	if cur != nil {
+		lease, err := store.LoadEditLease(ctx, tx, cur.ID, s.Clock.Now())
+		if err != nil {
+			return store.Ticket{}, err
+		}
+		if lease != nil && lease.Holder != sc.c.ref {
+			return store.Ticket{}, port.ErrEditLeaseLost
+		}
+	}
 	cat, err := loadDayCat(ctx, tx, day)
 	if err != nil {
 		return store.Ticket{}, err

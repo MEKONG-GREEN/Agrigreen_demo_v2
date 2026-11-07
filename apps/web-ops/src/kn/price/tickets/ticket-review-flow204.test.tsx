@@ -11,6 +11,9 @@ import { resetPricePoints } from "@/api/mock/kn-price-points";
 import { resetPriceTickets } from "@/api/mock/kn-price-tickets";
 import { createPriceTicketApi, lineInput, type PriceSheet } from "./api";
 import { draftsOf, fillFromRef } from "./SheetLines";
+import { TicketEditLease } from "./TicketEditLease";
+import { ApiProblem } from "@/api/problem";
+import type { PriceTicketApi } from "./api";
 import { TicketReviewWorkspace } from "./TicketReviewWorkspace";
 const nav=vi.hoisted(()=>({query:"day=2026-10-12&mine=false&tab=alerts",push:vi.fn(),replace:vi.fn()}));
 vi.mock("next/navigation",()=>({useSearchParams:()=>new URLSearchParams(nav.query),usePathname:()=>"/kn/bao-gia/kiem-duyet",useRouter:()=>({push:nav.push,replace:nav.replace})}));
@@ -40,13 +43,13 @@ describe("204 route workspace using actual typed client + native mock contract (
  it("details/log use ticket ID; filter-preserving routes and cancel never write",async()=>{
   const fetcher=vi.fn(mockFetchNoDelay),f=await fixture(fetcher);render(<TicketReviewWorkspace path={["phieu",f.id]} />);
   expect(await screen.findByRole("heading",{name:"Chi tiết phiếu báo giá"})).toBeInTheDocument();expect(await screen.findByRole("heading",{name:"Nhật ký phiếu"})).toBeInTheDocument();
-  expect(screen.getByRole("link",{name:"Hiệu chỉnh"})).toHaveAttribute("href",`/kn/bao-gia/kiem-duyet/phieu/${f.id}/hieu-chinh?day=2026-10-12&mine=false&tab=alerts`);expect(screen.queryByRole("dialog")).not.toBeInTheDocument();expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST")).toHaveLength(0);
+  expect(screen.getByRole("link",{name:"Hiệu chỉnh"})).toHaveAttribute("href",`/kn/bao-gia/kiem-duyet/phieu/${f.id}/hieu-chinh?day=2026-10-12&mine=false&tab=alerts`);expect(screen.queryByRole("dialog")).not.toBeInTheDocument();expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST" && !new URL((a[0] as Request).url).pathname.includes("/edit-lease/"))).toHaveLength(0);
  });
  it("rejects both hostile fields before API; required reason/pair; cancel is a link",async()=>{
   const fetcher=vi.fn(mockFetchNoDelay),f=await fixture(fetcher);render(<TicketReviewWorkspace path={correctPath(f.id)} />);await screen.findByRole("button",{name:"Lưu"});
   fireEvent.click(screen.getByRole("button",{name:"Lưu"}));expect(await screen.findByText("Chọn ít nhất một dòng để hiệu chỉnh.")).toBeInTheDocument();
   for(const side of ["lo","hi"] as const)for(const bad of ["1e100000","1e-100000","9".repeat(100000)]){fill(f.sheet);fireEvent.change(inputs(f.sheet)[side],{target:{value:bad}});fireEvent.click(screen.getByRole("button",{name:"Lưu"}));expect(inputs(f.sheet)[side]).toHaveAttribute("aria-invalid","true");}
-  expect(screen.getByRole("link",{name:"Hủy"})).toHaveAttribute("href",expect.stringContaining(`/phieu/${f.id}?`));expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST")).toHaveLength(0);
+  expect(screen.getByRole("link",{name:"Hủy"})).toHaveAttribute("href",expect.stringContaining(`/phieu/${f.id}?`));expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST" && !new URL((a[0] as Request).url).pathname.includes("/edit-lease/"))).toHaveLength(0);
  });
  it("lost ACK retries same normalized body/key and appends only once",async()=>{
   let lost=true;const requests:Request[]=[];const f=await fixture(async(input,init)=>{const req=input instanceof Request?input:new Request(input,init);if(req.method==="POST"&&req.url.endsWith("/correct")){requests.push(req.clone());const response=await mockFetchNoDelay(req);if(lost){lost=false;throw new TypeError("lost ACK after commit");}return response;}return mockFetchNoDelay(req);});
@@ -73,8 +76,8 @@ describe("204 route workspace using actual typed client + native mock contract (
  it("Admin without MFA cannot Save/POST even when backend can.correct=true",async()=>{
   const fetcher=vi.fn(mockFetchNoDelay),f=await fixture(fetcher);expect(f.sheet.can.correct).toBe(true);state.role="admin";state.mfa=false;
   render(<TicketReviewWorkspace path={correctPath(f.id)} />);await screen.findByRole("heading",{name:"Hiệu chỉnh phiếu báo giá"});
-  const save=screen.queryByRole("button",{name:"Lưu"});if(save){fill(f.sheet);fireEvent.click(save);await waitFor(()=>expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST")).toHaveLength(1));}
-  expect(screen.queryByRole("button",{name:"Lưu"})).not.toBeInTheDocument();expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST")).toHaveLength(0);
+  const save=screen.queryByRole("button",{name:"Lưu"});if(save){fill(f.sheet);fireEvent.click(save);await waitFor(()=>expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST" && !new URL((a[0] as Request).url).pathname.includes("/edit-lease/"))).toHaveLength(1));}
+  expect(screen.queryByRole("button",{name:"Lưu"})).not.toBeInTheDocument();expect(fetcher.mock.calls.filter(a=>(a[0] as Request).method==="POST" && !new URL((a[0] as Request).url).pathname.includes("/edit-lease/"))).toHaveLength(0);
  });
 
  it("reason input permits 500 Unicode runes without a UTF-16 maxlength",async()=>{
@@ -92,4 +95,69 @@ describe("204 route workspace using actual typed client + native mock contract (
   act(()=>window.dispatchEvent(new PopStateEvent("popstate")));nav.query="day=2026-10-13&mine=false&tab=alerts";v.rerender(<TicketReviewWorkspace />);await waitFor(()=>expect(screen.getByRole("checkbox",{name:"Chỉ xã được phân công"})).not.toBeChecked());expect(screen.getByLabelText("Ngày báo giá",{exact:true})).toHaveValue("2026-10-13");
  });
 
+});
+
+
+describe("237 explicit edit leases through typed client and editor",()=>{
+ it("shows another authorized holder by name and read-only prices; direct edits are blocked until release",async()=>{
+  const f=await fixture();const dept=KN_DEPARTMENTS.find(d=>d.code==="thong_tin_truyen_thong")!;
+  KN_ACCOUNTS.find(a=>a.id==="kn-an")!.assignments.find(a=>a.assignment_id==="asg-an-tinh")!.departments.push(dept);
+  const other=await client("kn-an","asg-an-tinh"),h="0192a5a0-0000-7000-8000-000000000237";
+  await other.ta.acquireLease(f.id,h);
+  render(<TicketReviewWorkspace path={correctPath(f.id)} />);
+  expect(await screen.findByText(/Chỉ xem — Đang sửa bởi Nguyễn Văn An/)).toBeInTheDocument();
+  expect(screen.queryByRole("button",{name:"Lưu"})).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Lý do",{exact:false})).not.toBeInTheDocument();
+  await expect(f.ta.correct(f.id,{edit_lease:h,version:f.sheet.ticket!.version,reason:"Thử ghi trực tiếp",lines:[{item_code:f.sheet.lines[0]!.item_code,min:"1",max:"9000"}]})).rejects.toMatchObject({problem:{code:"price.edit_lease_lost"}});
+  await expect(f.ta.redate(f.id,{edit_lease:h,version:f.sheet.ticket!.version,reason:"Thử đổi ngày",day:"2026-10-01"})).rejects.toMatchObject({problem:{code:"price.edit_lease_lost"}});
+  await expect(f.ta.remove(f.id,{edit_lease:h,version:f.sheet.ticket!.version,reason:"Thử xóa"})).rejects.toMatchObject({problem:{code:"price.edit_lease_lost"}});
+  await other.ta.releaseLease(f.id,h);fireEvent.click(screen.getByRole("button",{name:"Thử lấy quyền sửa lại"}));
+  expect(await screen.findByRole("button",{name:"Lưu"})).toBeInTheDocument();
+ });
+ it("same actor joins two tabs; closing one keeps the other, expiry rejects old handle and permits takeover",async()=>{
+  const f=await fixture(),a="0192a5a0-0000-7000-8000-000000000231",b="0192a5a0-0000-7000-8000-000000000232";
+  expect((await f.ta.acquireLease(f.id,a)).mine).toBe(true);expect((await f.ta.acquireLease(f.id,b)).mine).toBe(true);
+  await f.ta.releaseLease(f.id,a);expect((await f.ta.renewLease(f.id,b)).mine).toBe(true);
+  expect((await f.ta.editLease(f.id)).handle_id).toBeNull();
+  vi.setSystemTime(new Date("2026-10-12T05:03:01Z"));
+  await expect(f.ta.renewLease(f.id,b)).rejects.toMatchObject({problem:{code:"price.edit_lease_lost"}});
+  expect((await f.ta.acquireLease(f.id,"0192a5a0-0000-7000-8000-000000000233")).mine).toBe(true);
+  await f.ta.releaseLease(f.id,b);expect((await f.ta.editLease(f.id)).held).toBe(true);
+ });
+ it("a renewal rejection immediately disables the form and cleanup releases only its own handle",async()=>{
+  vi.useFakeTimers();const release=vi.fn(async()=>({}));const renew=vi.fn(async()=>{throw new ApiProblem({type:"about:blank",status:409,title:"Hết phiên",code:"price.edit_lease_lost"});});
+  let handle="";
+  const ta={acquireLease:vi.fn(async(_id:string,h:string)=>{handle=h;return {held:true,mine:true,holder_name:"Tên thử",handle_id:h,now:"2026-10-12T05:00:00Z",expires_at:"2026-10-12T05:02:00Z"};}),renewLease:renew,releaseLease:release} as unknown as PriceTicketApi;
+  const v=render(<TicketEditLease id="ticket237" ta={ta} readOnlyView={<p>Giá chỉ xem</p>}>{h=><button>Lưu {h}</button>}</TicketEditLease>);
+  await act(async()=>{await Promise.resolve();});expect(screen.getByRole("button",{name:/Lưu/})).toBeInTheDocument();
+  await act(async()=>{vi.advanceTimersByTime(30_000);await Promise.resolve();});
+  expect(renew).toHaveBeenCalledWith("ticket237",handle);expect(screen.queryByRole("button",{name:/Lưu/})).not.toBeInTheDocument();expect(screen.getByText("Giá chỉ xem")).toBeInTheDocument();
+  v.unmount();expect(release).toHaveBeenCalledWith("ticket237",handle);
+ });
+ it("a late acquire after unmount is released and never opens the previous editor",async()=>{
+  let resolve:((value:unknown)=>void)|undefined;const held=new Promise<unknown>(r=>{resolve=r;});const release=vi.fn(async()=>({}));let handle="";
+  const ta={acquireLease:vi.fn((_id:string,h:string)=>{handle=h;return held;}),releaseLease:release} as unknown as PriceTicketApi;
+  const v=render(<TicketEditLease id="ticket237" ta={ta} readOnlyView={null}>{()=> <button>Lưu muộn</button>}</TicketEditLease>);v.unmount();
+  await act(async()=>{resolve?.({held:true,mine:true,handle_id:handle,now:"2026-10-12T05:00:00Z",expires_at:"2026-10-12T05:02:00Z"});await held;});
+  expect(screen.queryByRole("button",{name:"Lưu muộn"})).not.toBeInTheDocument();expect(release).toHaveBeenCalledTimes(2);expect(release).toHaveBeenLastCalledWith("ticket237",handle);
+ });
+});
+
+
+it("237: proxy of an existing draft cannot bypass another actor's edit lease; new and same-person workflows stay available",async()=>{
+ const f=await fixture(),dept=KN_DEPARTMENTS.find(d=>d.code==="thong_tin_truyen_thong")!;
+ KN_ACCOUNTS.find(a=>a.id==="kn-an")!.assignments.find(a=>a.assignment_id==="asg-an-tinh")!.departments.push(dept);
+ const other=await client("kn-an","asg-an-tinh");
+ const draft=await f.ta.proxy({point:"XBG0002",day:f.sheet.day,version:0,submit:false,reason:"Nháp nhập thay237",lines:[]});
+ const id=draft.ticket!.id,h="0192a5a0-0000-7000-8000-000000000239";
+ await f.ta.acquireLease(id,h);
+ const body={point:draft.point.code,day:draft.day,version:draft.ticket!.version,submit:false,reason:"Thử cập nhật nháp237",lines:[{item_code:draft.lines[0]!.item_code,min:"9000",max:"9000",no_goods:false,note:"Đối chiếu237"}]};
+ const before=await f.ta.log(id);
+ await expect(other.ta.proxy(body)).rejects.toMatchObject({problem:{code:"price.edit_lease_lost"}});
+ expect((await f.ta.log(id)).ticket).toHaveLength(before.ticket.length);
+ const own=await f.ta.proxy(body);await f.ta.releaseLease(id,h);
+ const after=await other.ta.proxy({...body,version:own.ticket!.version});expect(after.ticket!.id).toBe(id);
+ await f.ta.acquireLease(id,"0192a5a0-0000-7000-8000-000000000240");
+ vi.setSystemTime(new Date("2026-10-12T05:03:00Z"));
+ expect((await other.ta.proxy({...body,version:after.ticket!.version})).ticket!.id).toBe(id);
 });

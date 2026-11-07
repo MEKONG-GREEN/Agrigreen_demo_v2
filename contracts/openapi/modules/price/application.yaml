@@ -1052,7 +1052,7 @@ paths:
               schema: {$ref: "#/components/schemas/PriceSheet"}
         "403": {description: forbidden | price.point_not_assigned, $ref: "#/components/responses/Problem"}
         "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
-        "409": {description: price.ticket_locked | price.ticket_stale | price.ticket_exists | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "409": {description: price.edit_lease_lost | price.ticket_locked | price.ticket_stale | price.ticket_exists | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.price_invalid | price.ticket_incomplete | price.not_quote_day | price.point_inactive, $ref: "#/components/responses/Problem"}
 # @ag-order: 442
   /v1/price/tickets/proxy:
@@ -1076,7 +1076,7 @@ paths:
               schema: {$ref: "#/components/schemas/PriceSheet"}
         "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
         "404": {description: price.point_not_found, $ref: "#/components/responses/Problem"}
-        "409": {description: price.ticket_not_locked | price.ticket_exists | price.ticket_stale | price.board_approved, $ref: "#/components/responses/Problem"}
+        "409": {description: price.edit_lease_lost | price.ticket_not_locked | price.ticket_exists | price.ticket_stale | price.board_approved, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.reason_required | price.price_invalid | price.ticket_incomplete | price.not_quote_day, $ref: "#/components/responses/Problem"}
 # @ag-order: 443
   /v1/price/tickets/history:
@@ -1199,7 +1199,7 @@ paths:
               schema: {$ref: "#/components/schemas/PriceSheet"}
         "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
         "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
-        "409": {description: price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "409": {description: price.edit_lease_lost | price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.reason_required | price.price_invalid, $ref: "#/components/responses/Problem"}
 # @ag-order: 449
   /v1/price/tickets/{id}/redate:
@@ -1224,7 +1224,7 @@ paths:
               schema: {$ref: "#/components/schemas/PriceSheet"}
         "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
         "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
-        "409": {description: price.ticket_exists | price.ticket_not_locked | price.ticket_stale | price.board_approved, $ref: "#/components/responses/Problem"}
+        "409": {description: price.ticket_exists | price.edit_lease_lost | price.ticket_not_locked | price.ticket_stale | price.board_approved, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.reason_required | price.not_quote_day | price.point_inactive, $ref: "#/components/responses/Problem"}
 # @ag-order: 450
   /v1/price/tickets/{id}/delete:
@@ -1249,7 +1249,7 @@ paths:
               schema: {$ref: "#/components/schemas/PriceSheet"}
         "403": {description: forbidden | price.point_not_handled, $ref: "#/components/responses/Problem"}
         "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
-        "409": {description: price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "409": {description: price.edit_lease_lost | price.ticket_not_locked | price.ticket_stale | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed | price.reason_required, $ref: "#/components/responses/Problem"}
 # @ag-order: 451
   /v1/price/alerts:
@@ -2152,6 +2152,100 @@ paths:
               schema: {type: string, format: binary}
         "403": {description: forbidden, $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 7000
+  /v1/price/tickets/{id}/edit-lease:
+    get:
+      summary: Phiên sửa phiếu — read (FN-TI-02.04 BR-06/AC-02); chỉ trả tên người giữ trong phạm vi phiếu đã được phép xem
+      operationId: priceEditLeaseRead
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Trạng thái phiên sửa; acquire có mine=false khi người khác giữ, không trả handle của họ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceEditLease"}
+        "403": {description: forbidden | price.point_not_assigned | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.edit_lease_lost | price.ticket_not_locked | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 7001
+  /v1/price/tickets/{id}/edit-lease/acquire:
+    post:
+      summary: Phiên sửa phiếu — acquire (FN-TI-02.04 BR-06/AC-02); chỉ trả tên người giữ trong phạm vi phiếu đã được phép xem
+      operationId: priceEditLeaseAcquire
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceEditLeaseInput"}
+      responses:
+        "200":
+          description: Trạng thái phiên sửa; acquire có mine=false khi người khác giữ, không trả handle của họ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceEditLease"}
+        "403": {description: forbidden | price.point_not_assigned | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.edit_lease_lost | price.ticket_not_locked | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 7002
+  /v1/price/tickets/{id}/edit-lease/renew:
+    post:
+      summary: Phiên sửa phiếu — renew (FN-TI-02.04 BR-06/AC-02); chỉ trả tên người giữ trong phạm vi phiếu đã được phép xem
+      operationId: priceEditLeaseRenew
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceEditLeaseInput"}
+      responses:
+        "200":
+          description: Trạng thái phiên sửa; acquire có mine=false khi người khác giữ, không trả handle của họ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceEditLease"}
+        "403": {description: forbidden | price.point_not_assigned | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.edit_lease_lost | price.ticket_not_locked | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
+# @ag-order: 7003
+  /v1/price/tickets/{id}/edit-lease/release:
+    post:
+      summary: Phiên sửa phiếu — release (FN-TI-02.04 BR-06/AC-02); chỉ trả tên người giữ trong phạm vi phiếu đã được phép xem
+      operationId: priceEditLeaseRelease
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceEditLeaseInput"}
+      responses:
+        "200":
+          description: Trạng thái phiên sửa; acquire có mine=false khi người khác giữ, không trả handle của họ
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceEditLease"}
+        "403": {description: forbidden | price.point_not_assigned | price.point_not_handled, $ref: "#/components/responses/Problem"}
+        "404": {description: price.ticket_not_found, $ref: "#/components/responses/Problem"}
+        "409": {description: price.edit_lease_lost | price.ticket_not_locked | price.board_approved | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
 components:
   parameters:
 # @ag-order: 498
@@ -2944,8 +3038,9 @@ components:
 # @ag-order: 1031
     PriceCorrectInput:
       type: object
-      required: [version, reason, lines]
+      required: [edit_lease, version, reason, lines]
       properties:
+        edit_lease: {type: string, format: uuid, description: Handle còn hạn của chính tab đã chiếm phiên sửa}
         version: {type: integer, minimum: 1}
         reason: {type: string, minLength: 1, maxLength: 500}
         lines:
@@ -2961,16 +3056,18 @@ components:
 # @ag-order: 1032
     PriceRedateInput:
       type: object
-      required: [version, day, reason]
+      required: [edit_lease, version, day, reason]
       properties:
+        edit_lease: {type: string, format: uuid, description: Handle còn hạn của chính tab đã chiếm phiên sửa}
         version: {type: integer, minimum: 1}
         day: {type: string, format: date}
         reason: {type: string, minLength: 1, maxLength: 500}
 # @ag-order: 1033
     PriceDeleteInput:
       type: object
-      required: [version, reason]
+      required: [edit_lease, version, reason]
       properties:
+        edit_lease: {type: string, format: uuid, description: Handle còn hạn của chính tab đã chiếm phiên sửa}
         version: {type: integer, minimum: 1}
         reason: {type: string, minLength: 1, maxLength: 500}
 # @ag-order: 1034
@@ -3832,3 +3929,21 @@ components:
             - type: "null"
         regions: {type: array, items: {$ref: "#/components/schemas/PriceRef"}}
         can_export: {type: boolean}
+
+# @ag-order: 7004
+    PriceEditLeaseInput:
+      type: object
+      required: [handle_id]
+      properties:
+        handle_id: {type: string, format: uuid, description: UUID riêng cho mỗi lần mở tab sửa; renew/release dùng đúng handle đó}
+# @ag-order: 7005
+    PriceEditLease:
+      type: object
+      required: [held, mine, holder_name, expires_at, handle_id, now]
+      properties:
+        held: {type: boolean}
+        mine: {type: boolean, description: Người giữ là cùng người dùng; mỗi tab vẫn cần acquire handle riêng}
+        holder_name: {type: [string, "null"], description: Tên đọc qua cổng định danh có audit sau kiểm quyền xem phiếu}
+        expires_at: {type: [string, "null"], format: date-time}
+        handle_id: {type: [string, "null"], format: uuid, description: Chỉ acquire/renew thành công trả handle của chính tab gửi}
+        now: {type: string, format: date-time, description: Giờ máy chủ để tính hạn khóa trên trình duyệt}

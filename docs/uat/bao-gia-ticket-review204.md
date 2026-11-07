@@ -1,6 +1,6 @@
 # UAT riêng lát phiếu Cấp Tỉnh #204
 
-Nguồn BRD Báo giá v1.3: FN-TI-02.02 AC-01/02/03, FN-TI-02.04 AC-01/03/04/05. Không sửa ma trận tổng thể hoặc tự công nhận toàn FN/BRD. AC-02 editor-presence/lease còn gap#210 vì API chỉ có optimistic version, không có người đang giữ form.
+Nguồn BRD Báo giá v1.3: FN-TI-02.02 AC-01/02/03, FN-TI-02.04 AC-01/03/04/05. Không sửa ma trận tổng thể hoặc tự công nhận toàn FN/BRD. Lát #204 chỉ có optimistic version. Gói #237 bổ sung lease theo FN-TI-02.04 BR-06/AC-02 của **BRD v2.0**; ca mới và phạm vi tại [nghiệm thu Báo giá](bao-gia-acceptance.md).
 
 | Ca | Kết quả cần chứng minh | Bằng chứng |
 |---|---|---|

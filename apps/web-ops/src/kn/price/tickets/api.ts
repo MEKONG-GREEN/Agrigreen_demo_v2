@@ -9,6 +9,7 @@ import { filenameFromDisposition } from "@/lib/files";
 
 type S = components["schemas"];
 export type PriceSheet = S["PriceSheet"];
+export type PriceEditLease = S["PriceEditLease"];
 export type PriceSheetLine = S["PriceSheetLine"];
 export type PriceTicketDay = S["PriceTicketDay"];
 export type PriceTicketRow = S["PriceTicketRow"];
@@ -207,6 +208,10 @@ export function createPriceTicketApi(api: ApiClient) {
     sheet: (q: { point?: string; day?: string }): Promise<PriceSheet> =>
       unwrap(api.GET("/v1/price/tickets/sheet", { params: { query: q } })),
     ticket: (id: string): Promise<PriceSheet> => unwrap(api.GET("/v1/price/tickets/{id}", { params: { path: { id } } })),
+    editLease: (id: string): Promise<PriceEditLease> => unwrap(api.GET("/v1/price/tickets/{id}/edit-lease", { params: { path: { id } } })),
+    acquireLease: (id: string, handle_id: string): Promise<PriceEditLease> => unwrap(api.POST("/v1/price/tickets/{id}/edit-lease/acquire", { params: { path: { id }, header: header() }, body: { handle_id } })),
+    renewLease: (id: string, handle_id: string): Promise<PriceEditLease> => unwrap(api.POST("/v1/price/tickets/{id}/edit-lease/renew", { params: { path: { id }, header: header() }, body: { handle_id } })),
+    releaseLease: (id: string, handle_id: string): Promise<PriceEditLease> => unwrap(api.POST("/v1/price/tickets/{id}/edit-lease/release", { params: { path: { id }, header: header() }, body: { handle_id } })),
     log: (id: string): Promise<PriceTicketLog> => unwrap(api.GET("/v1/price/tickets/{id}/log", { params: { path: { id } } })),
     save: (body: PriceEntryInput): Promise<PriceSheet> =>
       unwrap(api.POST("/v1/price/tickets/sheet", { params: { header: header() }, body })),

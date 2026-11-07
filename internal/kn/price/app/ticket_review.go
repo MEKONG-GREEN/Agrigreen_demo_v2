@@ -38,6 +38,9 @@ func (s *TicketService) reviewGate(ctx context.Context, tx pgx.Tx, sc *sheetCtx,
 	if !plan.Locked(sc.now) {
 		return plan, port.ErrTicketNotLocked.WithDetail(day.Format(time.DateOnly))
 	}
+	if err := store.LockBoardForEdit(ctx, tx, sc.c.tenant, sc.prof.Name, day); err != nil {
+		return plan, err
+	}
 	b, err := s.board(ctx, tx, day)
 	if err != nil {
 		return plan, err
@@ -118,7 +121,7 @@ type Adjustment struct {
 }
 
 // ticketOp nạp phiếu id dưới khóa của xã, kiểm phiên bản đã đọc và điều kiện sau giờ khóa; trả phiếu, xã.
-func (s *TicketService) ticketOp(ctx context.Context, tx pgx.Tx, sc *sheetCtx, id uuid.UUID, version int64) (store.Ticket, port.Point, error) {
+func (s *TicketService) ticketOp(ctx context.Context, tx pgx.Tx, sc *sheetCtx, id uuid.UUID, version int64, handle uuid.UUID) (store.Ticket, port.Point, error) {
 	t, err := ticketByID(ctx, tx, id)
 	if err != nil {
 		return t, port.Point{}, err
@@ -129,6 +132,11 @@ func (s *TicketService) ticketOp(ctx context.Context, tx pgx.Tx, sc *sheetCtx, i
 	if t, err = ticketByID(ctx, tx, id); err != nil { // đọc lại dưới khóa
 		return t, port.Point{}, err
 	}
+	sc.ps, err = loadPointSnap(ctx, tx)
+	if err != nil {
+		return t, port.Point{}, err
+	}
+	sc.now = s.Clock.Now()
 	if !domain.Live(t.Status) {
 		return t, port.Point{}, problem.Conflict.WithDetail("phiếu đã xóa")
 	}
@@ -140,6 +148,9 @@ func (s *TicketService) ticketOp(ctx context.Context, tx pgx.Tx, sc *sheetCtx, i
 		return t, p, port.ErrPointNotFound.WithDetail("xã báo giá " + t.PointCode)
 	}
 	if _, err := s.reviewGate(ctx, tx, sc, p, t.Day); err != nil {
+		return t, p, err
+	}
+	if err := s.requireEditLease(ctx, tx, sc, id, handle); err != nil {
 		return t, p, err
 	}
 	return t, p, nil
@@ -156,7 +167,7 @@ func writeHeader(ctx context.Context, tx pgx.Tx, sc *sheetCtx, t store.Ticket, o
 // Correct: Cấp Tỉnh hiệu chỉnh giá thấp nhất / cao nhất của các dòng (FN-TI-02.04 B2, B4): lý do bắt buộc; lưu cả giá Xã
 // gửi và giá hiệu chỉnh (BR-05); cảnh báo của dòng chuyển "Đã hiệu chỉnh". Bảng giá và giá tham chiếu dùng giá hiệu chỉnh.
 func (s *TicketService) Correct(ctx context.Context, profile string, id uuid.UUID, version int64, reason string, adj []Adjustment,
-	idem string) (Sheet, error) {
+	handle uuid.UUID, idem string) (Sheet, error) {
 	prof, c, err := s.resolve(ctx, profile)
 	if err != nil {
 		return Sheet{}, err
@@ -177,7 +188,7 @@ func (s *TicketService) Correct(ctx context.Context, profile string, id uuid.UUI
 		if err != nil {
 			return err
 		}
-		t, p, err := s.ticketOp(ctx, tx, sc, id, version)
+		t, p, err := s.ticketOp(ctx, tx, sc, id, version, handle)
 		if err != nil {
 			return err
 		}
@@ -252,8 +263,8 @@ func (s *TicketService) Correct(ctx context.Context, profile string, id uuid.UUI
 
 // Redate: Cấp Tỉnh sửa ngày phiếu nhập nhầm ngày (FN-TI-02.04 B3): lý do bắt buộc; chặn ngày xã đã có phiếu (không tính
 // Đã xóa — AC-04), ngày đã duyệt, ngày không phải ngày báo giá, ngày tương lai / chưa qua giờ khóa.
-func (s *TicketService) Redate(ctx context.Context, profile string, id uuid.UUID, version int64, newDay time.Time, reason,
-	idem string) (Sheet, error) {
+func (s *TicketService) Redate(ctx context.Context, profile string, id uuid.UUID, version int64, newDay time.Time, reason string,
+	handle uuid.UUID, idem string) (Sheet, error) {
 	prof, c, err := s.resolve(ctx, profile)
 	if err != nil {
 		return Sheet{}, err
@@ -275,7 +286,7 @@ func (s *TicketService) Redate(ctx context.Context, profile string, id uuid.UUID
 		if err != nil {
 			return err
 		}
-		t, _, err := s.ticketOp(ctx, tx, sc, id, version)
+		t, _, err := s.ticketOp(ctx, tx, sc, id, version, handle)
 		if err != nil {
 			return err
 		}
@@ -313,7 +324,7 @@ func (s *TicketService) Redate(ctx context.Context, profile string, id uuid.UUID
 
 // Delete: Cấp Tỉnh xóa mềm phiếu sai / trùng (FN-TI-02.04 luồng phụ; BR-04): lý do bắt buộc; phiếu "Đã xóa" không tính
 // vào bảng giá, thống kê; vẫn xem được ở lịch sử.
-func (s *TicketService) Delete(ctx context.Context, profile string, id uuid.UUID, version int64, reason, idem string) (Sheet, error) {
+func (s *TicketService) Delete(ctx context.Context, profile string, id uuid.UUID, version int64, reason string, handle uuid.UUID, idem string) (Sheet, error) {
 	prof, c, err := s.resolve(ctx, profile)
 	if err != nil {
 		return Sheet{}, err
@@ -331,7 +342,7 @@ func (s *TicketService) Delete(ctx context.Context, profile string, id uuid.UUID
 		if err != nil {
 			return err
 		}
-		t, _, err := s.ticketOp(ctx, tx, sc, id, version)
+		t, _, err := s.ticketOp(ctx, tx, sc, id, version, handle)
 		if err != nil {
 			return err
 		}

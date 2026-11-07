@@ -720,6 +720,9 @@ func (s *Service) AssignOfficer(ctx context.Context, profile, code, role string,
 	}
 	var res WriteResult
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
+		if err := store.LockPointTickets(ctx, tx, c.tenant, code); err != nil {
+			return err
+		}
 		from, err := s.pointFrom(ctx, tx, validFrom)
 		if err != nil {
 			return err

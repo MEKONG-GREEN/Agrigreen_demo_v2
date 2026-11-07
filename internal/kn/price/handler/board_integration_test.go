@@ -68,6 +68,7 @@ func TestPriceBoardsHTTP_W1176(t *testing.T) {
 	TicketHandler{Svc: tickets}.RegisterApp(g)
 	BoardHandler{Svc: tickets}.RegisterApp(g)
 	call := func(as, method, path string, body any, want int) map[string]any {
+		body = legacyEditBody237(t, r, as, method, path, body)
 		t.Helper()
 		var buf string
 		if body != nil {

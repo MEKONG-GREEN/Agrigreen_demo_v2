@@ -35,7 +35,7 @@ async function openReview(page: Page) {
 test("204: actual route detail → correct → Log, filter-preserving cancel and soft delete", async ({ page }) => {
   test.setTimeout(180_000);
   await page.clock.setFixedTime(new Date("2026-11-05T06:00:00Z"));
-  const posts: string[] = []; page.on("request", r => { if (r.method() === "POST" && /\/price\/tickets\//.test(r.url())) posts.push(r.url()); });
+  const posts: string[] = []; page.on("request", r => { if (r.method() === "POST" && /\/price\/tickets\//.test(r.url()) && !r.url().includes("/edit-lease/")) posts.push(r.url()); });
   await openReview(page);
   await expect(page.getByRole("complementary", { name: "Nhật ký phiếu" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveCSS("font-family", /Noto Serif/);
@@ -76,7 +76,7 @@ test("204: actual route detail → correct → Log, filter-preserving cancel and
 });
 test("204: delete cancel and real logout do not write or retain form access", async ({ page }) => {
   test.setTimeout(150_000);await page.clock.setFixedTime(new Date("2026-11-05T06:00:00Z"));await openReview(page);
-  let writes=0;page.on("request",r=>{if(r.method()==="POST"&&/\/price\/tickets\//.test(r.url()))writes++;});
+  let writes=0;page.on("request",r=>{if(r.method()==="POST"&&/\/price\/tickets\//.test(r.url())&&!r.url().includes("/edit-lease/"))writes++;});
   await page.getByRole("link",{name:"Xóa phiếu",exact:true}).click();await page.getByRole("textbox",{name:/^Lý do/}).fill("Không lưu nội dung này");await page.getByRole("link",{name:"Hủy",exact:true}).click();expect(writes).toBe(0);
   // Cancel must be committed before Back can restore its previous history entry.
   // Next correctly discards a still-pending push when a restore preempts it.

@@ -11,6 +11,7 @@
 import type { components } from "../generated/application";
 import { Decimal } from "@/kn/grid/decimal";
 import { json, problem, type Ctx, type Route } from "./http";
+import { mockHasEditLease, mockLeaseOp, mockLeaseState, resetPriceEditLeases } from "./kn-price-ticket-lease";
 import { knContext } from "./kn";
 import { addDay, mockPointItems, vnToday } from "./kn-price-items";
 import { mockBoardState } from "./kn-price-boards";
@@ -137,6 +138,7 @@ export function mockDayBoardSource(day: string): {
 
 /** Đặt lại trạng thái giả lập (kiểm thử). */
 export function resetPriceTickets(): void {
+  resetPriceEditLeases();
   TICKETS = [];
   seeded = false;
   nextId = 1;
@@ -320,6 +322,10 @@ function writeEntry(ctx: Ctx, role: Role, proxy: boolean): Response {
   let t = liveTicket(b.point, day);
   if (proxy && t && sent(t)) return problem(409, "price.ticket_exists", "xã đã có phiếu đã gửi");
   if ((t ? last(t.heads).version : 0) !== b.version) return problem(409, "price.ticket_stale", "Phiếu đã được người khác cập nhật");
+  if (t) {
+    const lease = mockLeaseState(ctx, t.id);
+    if (lease.held && !lease.mine) return problem(409, "price.edit_lease_lost", "Phiếu đang được người khác sửa");
+  }
   const items = mockPointItems(b.point, day);
   const at = new Date().toISOString();
   const actor = proxy ? ACTOR : MOCK_XA_OFFICER;
@@ -395,12 +401,13 @@ function opTicket(ctx: Ctx, role: Role, op: "correct" | "redate" | "delete"): Re
   const t = ticketById(ctx.params[0]);
   if (!t) return problem(404, "price.ticket_not_found", "Không có phiếu báo giá này");
   const h = last(t.heads);
-  const b = ctx.body as { version: number; reason: string; day?: string; lines?: S["PriceCorrectInput"]["lines"] };
+  const b = ctx.body as { edit_lease?: string; version: number; reason: string; day?: string; lines?: S["PriceCorrectInput"]["lines"] };
   if (!(b.reason ?? "").trim()) return problem(422, "price.reason_required", "lý do");
   if (h.version !== b.version) return problem(409, "price.ticket_stale", "Phiếu đã được người khác cập nhật");
   if (!locked(h.day)) return problem(409, "price.ticket_not_locked", h.day);
   const bs = mockBoardState(h.day); // W11.76: chỉ sửa khi Chưa duyệt / Đang mở duyệt
   if (bs !== "open" && bs !== "reopened") return problem(409, "price.board_approved", h.day);
+  if (!mockHasEditLease(ctx, t.id, b.edit_lease)) return problem(409, "price.edit_lease_lost", "Phiên sửa đã hết hạn hoặc phiếu đang được người khác sửa");
   const at = new Date().toISOString();
   const nh: HeadVer = { ...h, version: h.version + 1, op, reason: b.reason.trim(), actor_ref: ACTOR, at };
   if (op === "delete") nh.status = "deleted";
@@ -617,6 +624,27 @@ export const priceTicketRoutes: Route[] = [
       } satisfies S["PriceTicketLog"]);
     },
   },
+  { method: "GET", pattern: /^\/v1\/price\/tickets\/([^/]+)\/edit-lease$/, handler: ctx => {
+    const role = roleOf(ctx); if (role instanceof Response) return role;
+    const t = ticketById(ctx.params[0]); if (!t) return problem(404, "price.ticket_not_found", "Không có phiếu báo giá này");
+    const visible = sheet(role, t.point, last(t.heads).day, t); if (visible instanceof Response) return visible;
+    return json(mockLeaseState(ctx, t.id));
+  } },
+  ...(["acquire", "renew", "release"] as const).map((action): Route => ({ method: "POST", pattern: new RegExp(`^/v1/price/tickets/([^/]+)/edit-lease/${action}$`), handler: ctx => {
+    const role = roleOf(ctx); if (role instanceof Response) return role;
+    const t = ticketById(ctx.params[0]); if (!t) return problem(404, "price.ticket_not_found", "Không có phiếu báo giá này");
+    const visible = sheet(role, t.point, last(t.heads).day, t); if (visible instanceof Response) return visible;
+    const handle = (ctx.body as { handle_id?: string }).handle_id;
+    if (!handle || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle)) return problem(422, "validation_failed", "handle_id phải là UUID");
+    if (action !== "release") {
+      if (!handles(role)) return problem(403, "forbidden", "Chỉ Cấp Tỉnh hoặc Admin");
+      if (!locked(last(t.heads).day)) return problem(409, "price.ticket_not_locked", "Chưa khóa nhập");
+      if (last(t.heads).status === "deleted") return problem(409, "conflict", "Phiếu đã xóa");
+      const board = mockBoardState(last(t.heads).day); if (board !== "open" && board !== "reopened") return problem(409, "price.board_approved", "Bảng giá không cho sửa");
+      if (action === "renew" && !mockHasEditLease(ctx, t.id, handle)) return problem(409, "price.edit_lease_lost", "Phiên sửa đã hết hạn");
+    }
+    return json(mockLeaseOp(ctx, t.id, handle, action));
+  } })),
   ...(["correct", "redate", "delete"] as const).map(
     (op): Route => ({
       method: "POST",
