@@ -49,7 +49,19 @@ test("PRICE-COST-CHARTS: đăng nhập TW/Tỉnh, hai biểu đồ cùng lọc, 
   await expect(cost).toContainText("5.384.000 đồng/phiếu");
   await expect(page.getByRole("table", { name: /Giá thành theo mặt hàng/ })).toContainText("5.384");
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: info.outputPath("218-charts-mobile.png"), fullPage: true });
+  const closeMenu = page.getByRole("button", { name: "Đóng menu", exact: true });
+  if (await closeMenu.isVisible()) await closeMenu.click();
+  await expect(page.getByRole("button", { name: "Mở menu", exact: true })).toBeVisible();
+  // Resize có transition ngăn kéo: chờ menu thực sự ra ngoài viewport trước ảnh mobile.
+  await expect.poll(() => sidebar(page).evaluate((el) => el.getBoundingClientRect().right)).toBeLessThanOrEqual(0);
+  const chartScroll = page.getByRole("region", { name: /Cuộn biểu đồ Cơ cấu chi phí/ });
+  await chartScroll.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => chartScroll.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  await page.keyboard.press("ArrowLeft");
+  await expect.poll(() => chartScroll.evaluate((el) => el.scrollLeft)).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("218-charts-mobile.png"), fullPage: true, animations: "disabled" });
   await page.getByLabel("Xã", { exact: true }).selectOption("30280");
   await expect(page.getByText("Không có phiếu đã duyệt phù hợp để vẽ biểu đồ.")).toHaveCount(2);
   await expect(cost).toHaveCount(0);
