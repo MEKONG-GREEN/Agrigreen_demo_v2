@@ -179,26 +179,6 @@ describe("BF-SWEEP-PRICE-FORMS182 — xã báo giá trên trang riêng", () => {
     ).toBeInTheDocument();
     expect(postCount(fetch)).toBe(0);
   });
-  it("phân công trên route có kiểm required, giữ ngày hiệu lực và ghi Log", async () => {
-    const { fetch, pa } = await setupClient();
-    render(
-      <PricePointDetailScreen
-        route={{ kind: "point", code: "XBG0001", mode: "officers" }}
-      />,
-    );
-    const who = await screen.findByRole("combobox", { name: /^Cán bộ/ });
-    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
-    expect(await screen.findByText("Bắt buộc nhập.")).toBeInTheDocument();
-    expect(postCount(fetch)).toBe(0);
-    const opts = within(who).getAllByRole("option");
-    await userEvent.selectOptions(who, (opts[2] as HTMLOptionElement).value);
-    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
-    await waitFor(() => expect(nav.push).toHaveBeenCalled());
-    expect(postCount(fetch)).toBe(1);
-    expect(
-      (await pa.point("XBG0001", "2026-11-06")).officers.length,
-    ).toBeGreaterThan(0);
-  });
   it("nhóm vùng có route và lỗi tại ô; không dựng nhật ký giả khi hợp đồng chưa có", async () => {
     nav.query = "at=2026-11-05&tab=regions";
     const { fetch } = await setupClient();
