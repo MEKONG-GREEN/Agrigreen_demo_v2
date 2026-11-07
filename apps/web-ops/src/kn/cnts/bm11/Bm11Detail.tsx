@@ -2,14 +2,15 @@
 
 // Chi tiết Báo cáo phòng BM-11 (W11.45): bố cục theo báo cáo giấy của phòng — thủy sản (khai thác, nuôi trồng, lũy kế), bảng
 // chăn nuôi (tổng đàn, tiêm phòng, hóa chất, KSGM), kết quả chương trình/dự án, phần viết theo mục; "Tổng hợp từ n/N xã" + xã
-// chưa nộp; số liệu kỳ trước nộp bổ sung. Phần tự động không sửa tay (BR-01). Thao tác theo quyền máy chủ trả về (`can`).
+// chưa nộp; số liệu kỳ trước nộp bổ sung; hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07, Hình 48). Phần tự động
+// không sửa tay (BR-01). Thao tác theo quyền máy chủ trả về (`can`).
 import { useState } from "react";
 import { StatusPill } from "@/components/patterns/list";
 import { TextField } from "@/components/form";
 import { dt, num, type useAction } from "@/kn/cycle/common";
 import { saveBlob } from "@/lib/files";
 import { ReasonDialog } from "../ReasonDialog";
-import { changedTexts, EVENT_LABEL, MAX_TEXT, RECIPIENT_LABEL, STATUS_LABEL, TYPE_LABEL, type Bm11, type Bm11Api } from "./api";
+import { changedTexts, EVENT_LABEL, herdTotalLabel, MAX_TEXT, RECIPIENT_LABEL, STATUS_LABEL, TYPE_LABEL, type Bm11, type Bm11Api } from "./api";
 
 export function Bm11Detail({ v, bapi, act, onChange }: {
   v: Bm11;
@@ -121,6 +122,48 @@ export function Bm11Detail({ v, bapi, act, onChange }: {
             ])}
           </tbody>
         </table>
+      </section>
+
+      <section className="card sec" aria-label="Hộ, trang trại theo loại chăn nuôi">
+        <h2>Hộ, trang trại theo loại chăn nuôi</h2>
+        {v.herds ? (
+          <>
+            <p className="muted">
+              Đếm, cộng từ danh sách hộ chăn nuôi, hộ Đang dùng tại thời điểm lập báo cáo. Số liệu KSGM (BM-01), nhập liệu tuần (BM-04), khai thác
+              thủy sản (BM-17) vẫn tổng hợp theo xã, không chia theo loại chăn nuôi.
+            </p>
+            <table className="dt" aria-label="Số hộ, trang trại theo loại chăn nuôi">
+              <thead>
+                <tr>
+                  <th>Xã</th><th className="num">Tổng số hộ</th><th className="num">Số trang trại</th>
+                  {v.herd_types.map((t) => <th key={t.key} className="num">{t.label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {[...v.herds.communes.map((r) => ({ r, name: r.name || r.commune, total: false })),
+                  { r: v.herds.total, name: herdTotalLabel(v.herds), total: true }].map(({ r, name, total }) => (
+                  <tr key={total ? "_total" : r.commune}>
+                    <td>{total ? <strong>{name}</strong> : name}</td>
+                    <td className="num">{num(String(r.households), 0)}</td>
+                    <td className="num">{num(String(r.farms), 0)}</td>
+                    {v.herd_types.map((t) => <td key={t.key} className="num">{num(String(r.by_type[t.key] ?? 0), 0)}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <table className="dt" aria-label="Số con theo vật nuôi và loại chăn nuôi">
+              <thead><tr><th>Vật nuôi</th><th className="num">Nông hộ</th><th className="num">Trang trại</th></tr></thead>
+              <tbody>
+                {v.herds.heads.length ? v.herds.heads.map((x) => (
+                  <tr key={x.species}><td>{x.name}</td><td className="num">{num(x.household, 0)}</td><td className="num">{num(x.farm, 0)}</td></tr>
+                )) : <tr><td colSpan={3}>Chưa có vật nuôi.</td></tr>}
+              </tbody>
+            </table>
+            <p className="muted">Báo cáo giữ số liệu tại thời điểm lập; hộ đổi loại, vô hiệu hóa sau đó không làm đổi báo cáo (làm mới số liệu để đếm lại khi còn soạn).</p>
+          </>
+        ) : (
+          <p className="muted">Báo cáo lập trước CNTS v4.0 — không có bảng theo loại chăn nuôi.</p>
+        )}
       </section>
 
       {v.supplement.length ? (

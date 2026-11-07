@@ -23,6 +23,8 @@ export interface LoginCardProps {
 }
 
 const HELP_HREF = "/login/lien-he";
+/** Tự đặt lại mật khẩu qua email (BRD 2.0 FN-CH-00.01, #255). */
+const FORGOT_HREF = "/login/quen-mat-khau";
 
 /** Thẻ "Đăng nhập" (Hình 3a): email/SĐT, mật khẩu + "Hiện", Ghi nhớ, Quên mật khẩu, banner lỗi, Liên hệ quản trị viên. */
 export function LoginCard({ mode, busy, error, initialIdentifier = "", initialRemember = false, onSubmit }: LoginCardProps) {
@@ -103,7 +105,7 @@ export function LoginCard({ mode, busy, error, initialIdentifier = "", initialRe
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
           Ghi nhớ đăng nhập
         </label>
-        <Link href={`${HELP_HREF}?ly-do=quen-mat-khau`}>Quên mật khẩu?</Link>
+        <Link href={FORGOT_HREF}>Quên mật khẩu?</Link>
       </div>
       <button type="submit" className="btn btn-p btn-block" disabled={busy}>
         {busy ? "Đang đăng nhập…" : "Đăng nhập"}

@@ -24,6 +24,7 @@ provides:
     - KNPeople
     - MailDirectory
     - OTPAdmin
+    - PasswordSetter
     - ProfileUpdater
     - RecipientDirectory
     - RoleHolders
@@ -37,6 +38,7 @@ provides:
     - pf.accounts.assignment.changed/v1
     - pf.accounts.assignment.granted/v1
     - pf.accounts.assignment.revoked/v1
+    - pf.accounts.password_reset.requested/v1
     - pf.accounts.user.created/v1
     - pf.accounts.user.dormant_warning/v1
     - pf.accounts.user.locked/v1

@@ -18,11 +18,13 @@ type Batch = S["CNTSVaccinationBatchCore"];
 
 const ROSTERS = new Map<string, Roster[]>(); // tháng → phiên bản
 const BATCHES = new Map<string, Batch[]>(); // ref → phiên bản
+const CHECKINS = new Map<string, S["ExtWorkScheduleCheckin"]>(); // CNTS v4.0: item_id → check-in (kèm check-out) giả lập
 
 /** Xóa trạng thái (kiểm thử). */
 export function resetCntsCal() {
   ROSTERS.clear();
   BATCHES.clear();
+  CHECKINS.clear();
 }
 
 const OFFICER = "0190f1c4-7d3e-7000-8000-00000000a0c1";
@@ -422,13 +424,37 @@ export const cntsCalRoutes: Route[] = [
     method: "POST",
     pattern: /^\/v1\/extension\/work-schedules\/([^/]+)\/items\/([^/]+)\/checkin$/,
     handler: (ctx) => {
-      const b = (ctx.body ?? {}) as { lat: number; lon: number; accuracy_m?: number | null; captured_at: string; mock_location?: boolean };
+      const b = (ctx.body ?? {}) as { lat: number; lon: number; accuracy_m?: number | null; captured_at: string; mock_location?: boolean; photo?: string };
+      // CNTS v4.0 FN-12: check-in bắt buộc ảnh.
+      if (!b.photo) return validation([{ field: "photo", reason: "bắt buộc chụp ảnh tại chỗ" }]);
       const checkin: S["ExtWorkScheduleCheckin"] = {
         id: uuidv7(), item_id: ctx.params[1]!, day: b.captured_at.slice(0, 10), captured_at: b.captured_at, recorded_at: new Date().toISOString(),
         accuracy_m: b.accuracy_m ?? null, distance_m: null, far: false, weak_accuracy: (b.accuracy_m ?? 0) > 50, mock_location: !!b.mock_location,
-        point_stored: true, location: { lat: b.lat, lon: b.lon },
+        point_stored: true, location: { lat: b.lat, lon: b.lon }, photo: { content_type: "image/jpeg", size_bytes: Math.ceil((b.photo.length * 3) / 4) },
+        legacy_no_photo: false, checkout: null, no_checkout: false,
       };
+      CHECKINS.set(checkin.item_id, checkin);
       return json({ checkin, warnings: [{ code: "checkin_no_place", message: "Mục chưa có địa điểm trên bản đồ — không tính được khoảng cách", item_ids: [checkin.item_id] }] }, 201);
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/work-schedules\/([^/]+)\/items\/([^/]+)\/checkout$/,
+    handler: (ctx) => {
+      const b = (ctx.body ?? {}) as { lat: number; lon: number; accuracy_m?: number | null; captured_at: string; mock_location?: boolean; photo?: string };
+      const ci = CHECKINS.get(ctx.params[1]!);
+      if (!ci) return problem(409, "extension.checkout_no_checkin", "Chưa check-in mục công tác — check-out chỉ sau khi đã check-in");
+      if (ci.checkout) return problem(409, "extension.checkout_exists", "Mục công tác đã check-out (check-out không sửa được)");
+      if (!b.photo) return validation([{ field: "photo", reason: "bắt buộc chụp ảnh tại chỗ" }]);
+      const now = new Date().toISOString();
+      const checkout: S["ExtWorkScheduleCheckout"] = {
+        id: uuidv7(), checkin_id: ci.id, item_id: ci.item_id, day: ci.day, captured_at: b.captured_at, recorded_at: now, synced_at: now,
+        accuracy_m: b.accuracy_m ?? null, distance_m: null, far: false, weak_accuracy: (b.accuracy_m ?? 0) > 50, mock_location: !!b.mock_location,
+        point_stored: true, location: { lat: b.lat, lon: b.lon }, photo: { content_type: "image/jpeg", size_bytes: Math.ceil((b.photo.length * 3) / 4) },
+        stay_minutes: Math.max(0, Math.floor((Date.parse(b.captured_at) - Date.parse(ci.captured_at)) / 60_000)), synced_late: false,
+      };
+      CHECKINS.set(ci.item_id, { ...ci, checkout });
+      return json({ checkout, warnings: [] }, 201);
     },
   },
 ];

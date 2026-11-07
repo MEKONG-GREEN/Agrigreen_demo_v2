@@ -564,6 +564,8 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
     ["VIT", "Vịt", { group: "gia_cam", unit: "con", herd_column: "true", order: "5" }],
     ["GA", "Gà", { group: "gia_cam", unit: "con", herd_column: "true", order: "6" }],
     ["CHO_MEO", "Chó, mèo", { group: "thu_cung", unit: "con", herd_column: "true", order: "7" }],
+    // #252: loài thủy sản cho bệnh nhóm thủy sản (BM-10 DB-16) — không là cột tổng đàn BM-04.
+    ["TOM_THE", "Tôm thẻ chân trắng", { group: "thuy_san", unit: "con", herd_column: "false", order: "20" }],
   ]),
   // BF-CN-CATALOG #170: giống, bệnh, vaccine, loại mô hình, quy trình cho mẫu BM-07 (gà chuyên trứng, vịt xiêm) như dữ liệu nền.
   cnts_breed: cat("cnts_breed", [
@@ -580,6 +582,7 @@ export const CATALOGS: Record<CatalogName, CatalogItem[]> = {
     ["VIEM_GAN_VIT", "Viêm gan vịt", { species: "VIT" }],
     ["DICH_TA_VIT", "Dịch tả vịt", { species: "VIT" }],
     ["IB", "Viêm phế quản truyền nhiễm (IB)", { species: "GA" }],
+    ["AHPND", "Hoại tử gan tụy cấp (tôm)", { species: "TOM_THE" }],
   ]),
   cnts_vaccine: cat("cnts_vaccine", [
     ["VX_ASF", "Tả heo Châu Phi", { diseases: "ASF", species: "HEO", report_group: "heo", order: "1" }],

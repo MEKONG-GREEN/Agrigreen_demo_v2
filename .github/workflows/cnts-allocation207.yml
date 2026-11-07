@@ -1,0 +1,150 @@
+name: CNTS allocation 207 controls
+
+on:
+  push:
+    branches: [codex/cnts207alloc]
+    paths:
+      - internal/kn/extension/cntsknqg/domain/**
+      - .github/workflows/cnts-allocation207.yml
+      - docs/kn/gia-dinh/TEST-CNTS-KNQG-ALLOC.md
+      - docs/roadmap.d/kn-2026-10/TEST-CNTS-KNQG-ALLOC.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cnts-allocation207-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostics:
+    name: Linux allocation207 (${{ matrix.mode }}, procs=${{ matrix.procs }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [plain, race]
+        procs: [default, "2"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+      - name: Toolchain and fixed campaign configuration
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          go version
+          go env GOOS GOARCH CGO_ENABLED
+          gcc --version | head -n 1
+          printf 'mode=%s procs=%s\n' "$ALLOCATION_MODE207" "$ALLOCATION_PROCS207"
+      - name: Raw negative controls and all fixed samples
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
+          flags207=()
+          if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
+          go test "${flags207[@]}" -v -count=1 -timeout 10m -tags allocationdiagnostics207 ./internal/kn/extension/cntsknqg/domain -run '^TestAllocationDiagnostics207$'
+      - name: Allocation stack attribution outside the measurement window
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
+          flags207=()
+          if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
+          GODEBUG=memprofilerate=1 go test "${flags207[@]}" -v -count=1 -timeout 10m -tags allocationdiagnostics207 ./internal/kn/extension/cntsknqg/domain -run '^TestAllocationAttribution207$'
+      - name: Byte guards and complete domain, unchanged budgets
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
+          flags207=()
+          if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
+          go test "${flags207[@]}" -v -count=1 -timeout 10m ./internal/kn/extension/cntsknqg/domain
+      - name: Fresh process first calls and repeated calls for each entry
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
+          flags207=()
+          if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
+          selectors207=(
+            '^TestAllocationByteMeasurement$'
+            '^TestCellNumberRejectsExponentWithinBudget$/number$'
+            '^TestCellNumberRejectsExponentWithinBudget$/int$'
+            '^TestNormalizeAndWarningsRejectExponentWithinBudget$/Normalize$'
+            '^TestNormalizeAndWarningsRejectExponentWithinBudget$/Warnings$'
+          )
+          for selector207 in "${selectors207[@]}"; do
+            printf 'fresh-process selector=%s\n' "$selector207"
+            go test "${flags207[@]}" -v -count=1 -timeout 10m ./internal/kn/extension/cntsknqg/domain -run "$selector207"
+          done
+      - name: Controlled 1 MiB regression must fail every byte guard, then exact restore
+        env:
+          ALLOCATION_MODE207: ${{ matrix.mode }}
+          ALLOCATION_PROCS207: ${{ matrix.procs }}
+        run: |
+          export GOTOOLCHAIN=go1.26.10
+          if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
+          flags207=()
+          if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
+          source207=internal/kn/extension/cntsknqg/domain/domain.go
+          original207="$RUNNER_TEMP/domain207-original.go"
+          cp "$source207" "$original207"
+          trap 'cp "$original207" "$source207"' EXIT
+          python3 - "$source207" <<'PY'
+          import pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          original = path.read_bytes()
+          anchor = b'func scanPlainNumber(s string) (intPart, frac string, ok bool) {'
+          if original.count(anchor) != 1:
+              raise SystemExit("mutation anchor is not unique")
+          replacement = b'var allocation207Canary []byte\n\n' + anchor + b'\n\tallocation207Canary = make([]byte, 1<<20)'
+          path.write_bytes(original.replace(anchor, replacement, 1))
+          PY
+          selectors207=(
+            '^TestCellNumberRejectsExponentWithinBudget$/number$'
+            '^TestCellNumberRejectsExponentWithinBudget$/int$'
+            '^TestNormalizeAndWarningsRejectExponentWithinBudget$/Normalize$'
+            '^TestNormalizeAndWarningsRejectExponentWithinBudget$/Warnings$'
+          )
+          for index207 in "${!selectors207[@]}"; do
+            selector207="${selectors207[$index207]}"
+            log207="$RUNNER_TEMP/mutant207-$index207.log"
+            printf 'mutant selector=%s\n' "$selector207"
+            if go test "${flags207[@]}" -v -count=1 -timeout 10m ./internal/kn/extension/cntsknqg/domain -run "$selector207" >"$log207" 2>&1; then
+              cat "$log207"
+              echo '1 MiB mutant unexpectedly passed'
+              exit 1
+            fi
+            cat "$log207"
+            python3 - "$log207" <<'PY'
+          import pathlib, re, sys
+          text = pathlib.Path(sys.argv[1]).read_text()
+          observed = [int(value) for value in re.findall(r'cấp phát (\d+) byte', text)]
+          if "--- FAIL:" not in text or not any(value >= 1 << 20 for value in observed):
+              raise SystemExit("expected allocation-budget failure was not observed")
+          print("MUTANT207 expected byte-budget FAIL:", observed)
+          PY
+          done
+          cp "$original207" "$source207"
+          cmp "$source207" "$original207"
+          trap - EXIT
+          git diff --exit-code -- "$source207"
+          go test "${flags207[@]}" -v -count=1 -timeout 10m ./internal/kn/extension/cntsknqg/domain
+          test -z "$(git status --porcelain)"
