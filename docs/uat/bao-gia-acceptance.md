@@ -21,3 +21,22 @@ Playwright kiểm luồng browser trên build mock. Đây là ba loại bằng c
 Lệnh chạy: từ gốc worktree dùng `scripts/pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./internal/kn/price/... ./migrations`;
 trong `apps/web-ops` dùng `npm ci`, `npx vitest run src/kn/price/points`, `npm run build:mock` và
 `npx playwright test tests/e2e/price-points182.spec.ts`. Ghi kết quả trên issue đúng SHA sau đủ CI/cổng; chỉ ticket merge vào dev.
+
+
+## KN độc lập — FN-TI-02.07 hoãn pha kết nối (#268)
+
+BRD Báo giá v2.0 Function .07 (UR-TI-07, BR-01–03) kết hợp quyết định D2 đã duyệt.
+
+| Ca | Thao tác | Kết quả |
+|---|---|---|
+| BG268-01 | Cấp Tỉnh/Admin, bảng giá Đã duyệt: bấm Đăng lên website | Chưa kết nối, có thời điểm ghi yêu cầu; board/version/băm không đổi; không báo đã đăng |
+| BG268-02 | Thử lại cùng Idempotency-Key | Chỉ một dòng attempt; không outbox hoặc mạng |
+| BG268-03 | Vai TW/Xã, phiên chỉ xem; bảng giá chưa duyệt/đang mở duyệt hoặc seq cũ | 403 hoặc 409, không ghi attempt |
+| BG268-04 | Gọi PublicBoardFeed của profile deferred, kể cả profile rỗng chọn mặc định | 403 trước DB; worker không đăng ký nguồn KN, không snapshot rỗng/retract |
+| BG268-05 | Gateway có DisabledFeeds price_board_daily; đọc feed, snapshot, checksum đã lưu | 403 không payload/URL; header/query không vượt policy, dữ liệu cũ giữ nguyên |
+| BG268-06 | Gateway map nil và feed HTX/MKG khác trong map chặn giá | Feed/snapshot/checksum hợp lệ vẫn hoạt động; hợp đồng dữ liệu không đổi |
+| BG268-07 | Tenant khác, thử UPDATE/DELETE sổ attempt | 0 hàng qua RLS; sổ không ghi sửa/xóa; audit chỉ metadata theo hợp đồng log |
+
+Gateway policy ở BG268-05 là cấu hình tường minh trong test. S10 chịu trách nhiệm
+nối profile KN; shared gateway mặc định không bị tuyên bố đã tắt trong gói này.
+Cách chạy và mapping tệp/bước: [gói #268](../kn/gia-dinh/KN-STANDALONE-8-BAOGIA-WEB.md).

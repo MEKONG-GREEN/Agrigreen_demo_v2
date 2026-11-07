@@ -48,6 +48,9 @@ type Profile struct {
 	Schedule ScheduleDefaults
 	// Board: duyệt / mở duyệt bảng giá ngày (W11.76, port/board.go).
 	Board BoardSettings
+	// WebsiteDeferred disables this consumer's external publication until its
+	// connection phase. The composition root owns it; request headers cannot change it.
+	WebsiteDeferred bool
 }
 
 // Unit là một đơn vị tính đang hiệu lực (phiên bản mới nhất có valid_from ≤ ngày hỏi).

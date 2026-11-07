@@ -69,7 +69,7 @@ func (s *Service) BuildAll(ctx context.Context) ([]BuildResult, error) {
 	}
 	// W11.81: feed tham chiếu của dữ liệu đã công bố (price_board_daily) — chỉ khi gốc lắp ráp đã nối nguồn + đơn vị công bố.
 	for _, f := range PublishedFeeds {
-		if s.PublishedSources[f] == nil || len(s.Publishers[f]) == 0 {
+		if s.DisabledFeeds[f] || s.PublishedSources[f] == nil || len(s.Publishers[f]) == 0 {
 			continue
 		}
 		r, err := s.BuildPublished(ctx, f)

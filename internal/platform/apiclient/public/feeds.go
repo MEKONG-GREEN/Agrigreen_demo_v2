@@ -66,6 +66,9 @@ func (s *Server) feedAccess(c *gin.Context, caller port.Caller, name string, ver
 	if err != nil {
 		return feedTarget{}, err
 	}
+	if s.d.DisabledFeeds[ct.Name] {
+		return feedTarget{}, port.ErrFeedDisabled
+	}
 	switch {
 	case ct.Servable(true):
 	case s.d.Production || !s.d.AllowUnapproved || !ct.Servable(false):

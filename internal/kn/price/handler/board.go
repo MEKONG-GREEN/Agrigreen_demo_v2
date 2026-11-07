@@ -23,6 +23,7 @@ type BoardHandler struct{ Svc *app.TicketService }
 func (h BoardHandler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/price/boards", h.list)
 	rg.GET("/price/boards/:day", h.get)
+	rg.POST("/price/boards/:day/website", h.op(h.Svc.RequestWebsite))
 	rg.POST("/price/boards/:day/lock", h.op(h.Svc.LockBoard))
 	rg.POST("/price/boards/:day/unlock", h.op(h.Svc.UnlockBoard))
 	rg.POST("/price/boards/:day/approve", h.op(h.Svc.ApproveBoard))
@@ -72,6 +73,12 @@ type boardSummaryDTO struct {
 	OpenAlerts int `json:"open_alerts"`
 }
 
+type boardWebsiteDTO struct {
+	Status      string  `json:"status"`
+	Version     int     `json:"version"`
+	RequestedAt *string `json:"requested_at"`
+}
+
 type boardDTO struct {
 	Day          string             `json:"day"`
 	Quote        bool               `json:"quote"`
@@ -91,6 +98,7 @@ type boardDTO struct {
 	Can          map[string]bool    `json:"can"`
 	Blockers     []string           `json:"blockers"`
 	ReopenDays   int                `json:"reopen_days"`
+	Website      *boardWebsiteDTO   `json:"website"`
 }
 
 func lineDTOs(rows []app.BoardLineView) []boardLineDTO {
@@ -107,7 +115,10 @@ func boardDTOOf(v app.BoardView) boardDTO {
 	out := boardDTO{Day: v.Day.Format(time.DateOnly), Quote: v.Plan.Quote, LockAt: lock, Locked: v.Locked, Now: ts(v.Now), State: v.State,
 		Seq: v.Board.Seq, Version: v.Board.Version, LockedBy: uuidPtr(v.LockedBy), LockedByName: strPtr(v.LockedByName),
 		Preview: []boardLineDTO{}, Log: []boardLogDTO{}, Blockers: v.Blockers, ReopenDays: v.ReopenDays,
-		Can: map[string]bool{"approve": v.Can.Approve, "unlock": v.Can.Unlock, "reopen": v.Can.Reopen, "cancel_reopen": v.Can.CancelReopen}}
+		Can: map[string]bool{"approve": v.Can.Approve, "unlock": v.Can.Unlock, "reopen": v.Can.Reopen, "cancel_reopen": v.Can.CancelReopen, "website": v.Can.Website}}
+	if v.Website != nil {
+		out.Website = &boardWebsiteDTO{Status: v.Website.Status, Version: v.Website.Version, RequestedAt: tsPtr(v.Website.RequestedAt)}
+	}
 	if out.Blockers == nil {
 		out.Blockers = []string{}
 	}

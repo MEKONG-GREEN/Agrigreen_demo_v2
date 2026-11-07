@@ -10042,6 +10042,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price/boards/{day}/website": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-TI-02.07 hoãn theo D2 — chỉ ghi nhận website chưa kết nối; không gửi hoặc xếp hàng đăng */
+        post: operations["priceRequestWebsite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/report": {
         parameters: {
             query?: never;
@@ -21249,10 +21266,25 @@ export interface components {
                 unlock: boolean;
                 reopen: boolean;
                 cancel_reopen: boolean;
+                /** @description Chỉ ghi nhận yêu cầu chưa kết nối trên bảng giá đã duyệt */
+                website: boolean;
             };
             /** @description Lý do chưa duyệt được */
             blockers: string[];
             reopen_days: number;
+            website: {
+                /**
+                 * @description Chưa kết nối; không phải kết quả giao lên website
+                 * @enum {string}
+                 */
+                status: "not_connected";
+                version: number;
+                /**
+                 * Format: date-time
+                 * @description Thời điểm ghi yêu cầu trong KN; không phải thời điểm đăng
+                 */
+                requested_at: string | null;
+            } | null;
         };
         PriceRef: {
             code: string;
@@ -47872,6 +47904,45 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description extension.dependency_unavailable */
             503: components["responses"]["Problem"];
+        };
+    };
+    priceRequestWebsite: {
+        parameters: {
+            query?: {
+                /** @description Bên dùng của cap/price (cấu hình gốc lắp ráp; KN = kn). Vắng → profile đầu tiên. */
+                profile?: components["parameters"]["PriceProfile"];
+            };
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceBoardOp"];
+            };
+        };
+        responses: {
+            /** @description Đã ghi nhật ký yêu cầu; website vẫn chưa kết nối */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceBoard"];
+                };
+            };
+            /** @description Chỉ Cấp Tỉnh hoặc Admin trong phiên có quyền ghi */
+            403: components["responses"]["Problem"];
+            /** @description Profile không hoãn website */
+            404: components["responses"]["Problem"];
+            /** @description price.board_state | price.board_stale | conflict */
+            409: components["responses"]["Problem"];
+            /** @description validation_failed */
+            422: components["responses"]["Problem"];
         };
     };
     extensionKhtcReportGet: {

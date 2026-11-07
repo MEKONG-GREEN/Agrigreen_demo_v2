@@ -8,6 +8,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/cmd/api-platform/assembly"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price"
+	priceport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient"
 	apiclientport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative"
@@ -18,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // apiclientFeedJobs dựng job feed của cổng tích hợp (W5.3, ADR-0033 §2, ADR-0035): dựng tập dữ liệu
@@ -69,17 +71,30 @@ func apiclientFeedJobs(ctx context.Context, direct string, closeFn *func(), log 
 	mod.UseBilateral(coop.BilateralLedger())
 	// W11.81 (BRD Báo giá FN-TI-02.07): bảng giá ngày ĐÃ DUYỆT (pf/price, r_price) cho feed price_board_daily — chỉ khi
 	// có đơn vị công bố (AG_INTEGRATION_PRICE_PUBLISHERS); thay API công khai của prototype.
-	pubs, err := apiclient.PricePublishersFromEnv()
-	if err != nil {
+	if err := wirePricePublishedFeed(mod, pool, clk, assembly.PriceProfiles()); err != nil {
 		return nil, err
 	}
-	if len(pubs) > 0 {
-		pm, err := price.New(pool, clk, assembly.PriceProfiles())
-		if err != nil {
-			return nil, err
-		}
-		mod.UsePublishedFeedSources(map[string]apiclientport.PublishedSource{apiclientport.FeedPriceBoardDaily: pm.PublicBoardFeed("")},
-			map[string][]apiclientport.Publisher{apiclientport.FeedPriceBoardDaily: pubs})
-	}
 	return mod.FeedJobs(interval, log), nil
+}
+
+// Resolve the server-owned consumer policy before publisher parsing or source
+// registration. Returning empty records would retract previously published data.
+func wirePricePublishedFeed(mod *apiclient.Module, pool tenant.Beginner, clk clock.Clock, profiles []priceport.Profile) error {
+	if len(profiles) == 0 || profiles[0].WebsiteDeferred {
+		return nil
+	}
+	pubs, err := apiclient.PricePublishersFromEnv()
+	if err != nil {
+		return err
+	}
+	if len(pubs) == 0 {
+		return nil
+	}
+	pm, err := price.New(pool, clk, profiles)
+	if err != nil {
+		return err
+	}
+	mod.UsePublishedFeedSources(map[string]apiclientport.PublishedSource{apiclientport.FeedPriceBoardDaily: pm.PublicBoardFeed(profiles[0].Name)},
+		map[string][]apiclientport.Publisher{apiclientport.FeedPriceBoardDaily: pubs})
+	return nil
 }

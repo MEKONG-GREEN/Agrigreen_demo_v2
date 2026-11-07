@@ -148,6 +148,21 @@ export function BoardPanel({ day, nonce, onChanged }: { day: string; nonce: numb
                   {b.published.week_key ? ` — tuần ${b.published.week_key}` : ""}.
                 </p>
               ) : null}
+              {b.website?.status === "not_connected" ? (
+                <div className="row" aria-label="Đăng website" style={{ gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  <StatusPill tone="warn">Website: Chưa kết nối</StatusPill>
+                  {b.summary ? (
+                    <button type="button" className="btn" disabled={!b.can.website || act.busy}
+                      onClick={async () => {
+                        await act.run(() => ta.requestWebsite(day, { seq: b.seq }), "");
+                        setOwn((n) => n + 1);
+                      }}>
+                      Đăng lên website
+                    </button>
+                  ) : null}
+                  {b.website.requested_at ? <span>Đã ghi yêu cầu cho v{b.website.version} lúc {vnTime(b.website.requested_at)}. Website chưa kết nối.</span> : null}
+                </div>
+              ) : null}
               {act.view}
               {dialog === "preview" ? (
                 <Dialog

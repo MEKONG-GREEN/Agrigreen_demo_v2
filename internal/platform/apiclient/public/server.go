@@ -97,6 +97,7 @@ type Deps struct {
 	// AllowUnapproved (W5.3, AG_GATEWAY_FEED_ALLOW_PROPOSED=1): phục vụ feed có hợp đồng tích hợp chưa approved —
 	// CHỈ có tác dụng khi Production = false.
 	AllowUnapproved bool
+	DisabledFeeds   map[string]bool // same policy for feed, snapshot and checksum routes
 }
 
 // Server là Public API đã nối.

@@ -155,6 +155,9 @@ type pendingSnapshot struct {
 // lại: phiên bản chỉ trỏ tới ảnh chụp khi số phiên bản và băm SHA-256 khớp (dữ liệu nguồn không đổi giữa hai lần).
 // Lệch → dựng lại, tối đa snapshotAttempts lần; ảnh chụp bỏ dở là đối tượng mồ côi vô hại (như lần dựng lỗi).
 func (s *Service) publish(ctx context.Context, in publishInput) (BuildResult, error) {
+	if s.DisabledFeeds[in.contract.Name] {
+		return BuildResult{}, port.ErrFeedDisabled
+	}
 	c := in.contract
 	var prep *preparedSnapshot
 	for attempt := 1; ; attempt++ {
@@ -356,6 +359,9 @@ type FeedPage struct {
 // ReadFeed đọc tối đa limit mục sau cursor after (nil = từ đầu phần còn giữ) của phiên bản hợp đồng c.
 func (s *Service) ReadFeed(ctx context.Context, c *integration.Contract, partition string, after *int64, limit int) (FeedPage, error) {
 	var p FeedPage
+	if s.DisabledFeeds[c.Name] {
+		return p, port.ErrFeedDisabled
+	}
 	versioned := c.Delivery != nil && c.Delivery.DatasetVersioned
 	err := s.operatorTx(ctx, func(tx pgx.Tx) error {
 		head, err := store.GetFeedHead(ctx, tx, c.Name, partition)
@@ -415,6 +421,9 @@ type SnapshotLink struct {
 
 // SnapshotURL cấp URL ký (port.SnapshotURLTTL) cho ảnh chụp phiên bản version của dataset.
 func (s *Service) SnapshotURL(ctx context.Context, dataset string, version int64) (SnapshotLink, error) {
+	if s.DisabledFeeds[dataset] {
+		return SnapshotLink{}, port.ErrFeedDisabled
+	}
 	var v *store.DatasetVersion
 	if err := s.operatorTx(ctx, func(tx pgx.Tx) error {
 		var err error

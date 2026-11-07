@@ -44,6 +44,9 @@ func (f PublicFeed) PublishedRecords(ctx context.Context, dataset string, publis
 	if !ok {
 		return nil, port.ErrProfileNotFound
 	}
+	if prof.WebsiteDeferred {
+		return nil, port.ErrWebsiteNotConnected
+	}
 	now := f.T.Clock.Now()
 	to := domain.BusinessDay(now)
 	var out []json.RawMessage

@@ -26,6 +26,9 @@ type PublicBoardFeed interface {
 	PublishedRecords(ctx context.Context, dataset string, publisher uuid.UUID, publisherCode string) ([]json.RawMessage, error)
 }
 
+// ErrWebsiteNotConnected: the configured consumer cannot publish outside KN.
+var ErrWebsiteNotConnected = problem.New(http.StatusForbidden, "price.website_not_connected", "Website chưa kết nối")
+
 // ErrUnknownPublicDataset: pf/price không có tập dữ liệu công khai tên này, hoặc mã tỉnh của đơn vị công bố sai dạng.
 var ErrUnknownPublicDataset = problem.New(http.StatusNotFound, "price.unknown_public_dataset",
 	"pf/price không có tập dữ liệu công khai này hoặc mã đơn vị công bố sai dạng")

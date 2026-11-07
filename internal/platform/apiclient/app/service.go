@@ -77,6 +77,7 @@ type Service struct {
 	// price_board_daily) và các đơn vị công bố của từng feed (EnvPricePublishers) — BuildPublished.
 	PublishedSources map[string]port.PublishedSource
 	Publishers       map[string][]port.Publisher
+	DisabledFeeds    map[string]bool // disabled datasets cannot be built, read or signed
 	Log              *slog.Logger
 }
 

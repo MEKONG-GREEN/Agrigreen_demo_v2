@@ -10,6 +10,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
@@ -17,6 +19,9 @@ import (
 
 // FeedPriceBoardDaily là tập bảng giá ngày đã duyệt (hợp đồng contracts/integration/feeds/price_board_daily.v1.json).
 const FeedPriceBoardDaily = "price_board_daily"
+
+// ErrFeedDisabled prevents serving a dataset disabled by the composition root.
+var ErrFeedDisabled = problem.New(http.StatusForbidden, "apiclient.feed_disabled", "Feed chưa kết nối")
 
 // EnvPricePublishers: đơn vị công bố bảng giá, dạng "<mã tỉnh 2 số>=<tenant UUID>[,…]" (vd "89=0199…"). Rỗng → không dựng
 // price_board_daily.

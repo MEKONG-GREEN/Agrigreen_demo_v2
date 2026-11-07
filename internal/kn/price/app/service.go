@@ -82,7 +82,8 @@ type caller struct {
 	manage      bool
 	// steward: Quản trị nghiệp vụ báo giá (W11.72) — vai quản trị (ManageBy) hoặc Cấp Tỉnh có cờ nhiệm vụ
 	// Profile.StewardDuty trên lần gán (KNContext.HasDuty — W11.07; ngữ cảnh chỉ xem không mang cờ).
-	steward bool
+	steward  bool
+	readOnly bool // owner session denies write actions, including disconnected acknowledgements
 }
 
 // resolve tìm profile rồi dùng bộ giải phiên đã cấu hình; nil chỉ dùng vai realm của cấu hình native.
@@ -108,6 +109,7 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, calle
 			return prof, c, err
 		}
 		roles = []string{session.Role}
+		c.readOnly = session.ReadOnly
 	}
 	for _, r := range roles {
 		if l, ok := prof.Roles[r]; ok && c.level == "" {

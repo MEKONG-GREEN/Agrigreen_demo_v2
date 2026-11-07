@@ -44,6 +44,7 @@ type Config struct {
 	// AllowUnapproved (W5.3): AG_GATEWAY_FEED_ALLOW_PROPOSED=1 — phục vụ feed có hợp đồng chưa approved, chỉ ngoài
 	// production (gateway.Run từ chối khởi động nếu đặt ở production).
 	AllowUnapproved bool
+	DisabledFeeds   map[string]bool // KN deployment wiring is owned by S10; nil keeps shared feeds
 	// EgressMode: AG_EGRESS_MODE cho pf/metering. Public API luôn đóng khi lỗi qua Ledger.Record,
 	// không phụ thuộc chế độ (ADR-0022 mục 1, ADR-0024).
 	EgressMode meter.Mode
@@ -133,7 +134,7 @@ func Build(ctx context.Context, open PoolOpener, cfg Config) (*apiclient.Module,
 		return nil, apiclient.PublicDeps{}, err
 	}
 	mod := apiclient.New(apPool, cfg.Clock, apiclient.Deps{Peppers: cfg.Peppers, OperatorTenant: cfg.Operator, Store: cfg.Store, Sandbox: cfg.Sandbox,
-		Log: cfg.Log})
+		Log: cfg.Log, DisabledFeeds: cfg.DisabledFeeds})
 	ports, err := integrationPorts(ctx, open, cfg, mod.Plans())
 	if err != nil {
 		return nil, apiclient.PublicDeps{}, err
@@ -161,5 +162,5 @@ func Assemble(cfg Config, ports Ports, pools []*pgxpool.Pool) (apiclient.PublicD
 	return apiclient.PublicDeps{Limiter: apiclient.NewRateLimiter(cfg.Replicas),
 		Ledger: ports.Ledger, Quotas: ports.Quotas, Usage: ports.Usage, Grants: ports.Grants, Reads: ports.Reads, Params: ports.Params,
 		Collection: ports.Collection, Hubs: ports.Hubs, MRV: ports.MRV, Bilateral: ports.Bilateral, OperatorTenant: cfg.Operator, Production: cfg.Production,
-		AllowUnapproved: cfg.AllowUnapproved && !cfg.Production, Sandbox: cfg.Sandbox, Clock: cfg.Clock, Log: cfg.Log, Ready: ready}, nil
+		AllowUnapproved: cfg.AllowUnapproved && !cfg.Production, DisabledFeeds: cfg.DisabledFeeds, Sandbox: cfg.Sandbox, Clock: cfg.Clock, Log: cfg.Log, Ready: ready}, nil
 }

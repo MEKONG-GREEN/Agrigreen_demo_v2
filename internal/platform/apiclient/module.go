@@ -58,8 +58,9 @@ type Deps struct {
 	// Collection: nguồn collection_volume (pf/cropcycle — đợt G5-1 S/D nối).
 	Collection port.CollectionVolumeSource
 	// Sandbox: môi trường thử của đối tác (W5.8, SandboxFromEnv) — khóa agks_.
-	Sandbox bool
-	Log     *slog.Logger
+	Sandbox       bool
+	DisabledFeeds map[string]bool // server-owned deployment policy; nil preserves shared gateway feeds
+	Log           *slog.Logger
 }
 
 // Module là pf/apiclient đã nối.
@@ -73,7 +74,7 @@ type Module struct {
 func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 	db = forModule(db)
 	return &Module{svc: &app.Service{DB: db, Clock: clk, Peppers: deps.Peppers, OperatorTenant: deps.OperatorTenant, Store: deps.Store,
-		Collection: deps.Collection, Sandbox: deps.Sandbox, Log: deps.Log}}
+		Collection: deps.Collection, Sandbox: deps.Sandbox, DisabledFeeds: deps.DisabledFeeds, Log: deps.Log}}
 }
 
 // PeppersFromEnv đọc AG_APIKEY_PEPPER_V<n> / AG_APIKEY_PEPPER_CURRENT của tiến trình. Không đặt →
@@ -109,6 +110,9 @@ func (m *Module) Plans() port.Plans { return m.svc }
 // PublicRouter dựng Gin engine của Public API (cmd/api-public). Svc/Auth/Plans/Limiter rỗng → lấy
 // từ module.
 func (m *Module) PublicRouter(d PublicDeps) *gin.Engine {
+	if d.DisabledFeeds == nil {
+		d.DisabledFeeds = m.svc.DisabledFeeds
+	}
 	if d.Svc == nil {
 		d.Svc = m.svc
 	}

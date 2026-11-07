@@ -29,11 +29,12 @@ import (
 // (W11.07 qtnv_bao_gia) cấu hình lịch, ngưỡng, mặt hàng (W11.72).
 // Department là giả định (mã phòng ban của tenant chưa chốt — Q-02; docs/kn/gia-dinh-brd-2026-10.md).
 var KNPriceProfile = priceport.Profile{
-	Session:    extension.PriceSession,
-	Name:       "kn",
-	Department: "thong_tin_truyen_thong",
-	Roles:      map[string]string{authz.KNTW: "TW", authz.KNTinh: "TINH", authz.KNXa: "XA"},
-	ManageBy:   []string{authz.KNAdmin},
+	Session:         extension.PriceSession,
+	Name:            "kn",
+	WebsiteDeferred: true, // D2: FN-TI-02.07 waits for the connection phase (#238).
+	Department:      "thong_tin_truyen_thong",
+	Roles:           map[string]string{authz.KNTW: "TW", authz.KNTinh: "TINH", authz.KNXa: "XA"},
+	ManageBy:        []string{authz.KNAdmin},
 	// W11.72: cờ QTNV báo giá trên lần gán Cấp Tỉnh (KNContext.HasDuty — W11.07).
 	StewardDuty: authz.DutyPriceAdmin,
 	// W11.74 (BRD FN-AD-04.04…06): lịch T2–T6 (Q-086 chưa trả lời — giữ mẫu BRD), khóa 12:00, hạn phản hồi 13:30;

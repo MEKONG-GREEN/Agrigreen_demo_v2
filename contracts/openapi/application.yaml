@@ -13956,6 +13956,30 @@ paths:
         "404": {description: extension.khtc_form_not_found, $ref: "#/components/responses/Problem"}
         "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
 
+  /v1/price/boards/{day}/website:
+    post:
+      summary: "FN-TI-02.07 hoãn theo D2 — chỉ ghi nhận website chưa kết nối; không gửi hoặc xếp hàng đăng"
+      operationId: priceRequestWebsite
+      tags: [price]
+      parameters:
+        - $ref: "#/components/parameters/PriceProfile"
+        - {name: day, in: path, required: true, schema: {type: string, format: date}}
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PriceBoardOp"}
+      responses:
+        "201":
+          description: "Đã ghi nhật ký yêu cầu; website vẫn chưa kết nối"
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PriceBoard"}
+        "403": {description: Chỉ Cấp Tỉnh hoặc Admin trong phiên có quyền ghi, $ref: "#/components/responses/Problem"}
+        "404": {description: Profile không hoãn website, $ref: "#/components/responses/Problem"}
+        "409": {description: price.board_state | price.board_stale | conflict, $ref: "#/components/responses/Problem"}
+        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   /v1/extension/khtc/periods/{id}/report:
     get:
       summary: "Bản soạn Mẫu 1–5, ô số chỉ đọc và mốc dữ liệu"
@@ -25282,7 +25306,7 @@ components:
         at: {type: string, format: date-time}
     PriceBoard:
       type: object
-      required: [day, quote, lock_at, locked, now, state, seq, version, locked_by, locked_by_name, lock_until, summary, preview, published, log, can, blockers, reopen_days]
+      required: [day, quote, lock_at, locked, now, state, seq, version, locked_by, locked_by_name, lock_until, summary, preview, published, log, can, blockers, reopen_days, website]
       properties:
         day: {type: string, format: date}
         quote: {type: boolean}
@@ -25301,14 +25325,26 @@ components:
         log: {type: array, items: {$ref: "#/components/schemas/PriceBoardLog"}}
         can:
           type: object
-          required: [approve, unlock, reopen, cancel_reopen]
+          required: [approve, unlock, reopen, cancel_reopen, website]
           properties:
             approve: {type: boolean}
             unlock: {type: boolean}
             reopen: {type: boolean}
             cancel_reopen: {type: boolean}
+            website: {type: boolean, description: Chỉ ghi nhận yêu cầu chưa kết nối trên bảng giá đã duyệt}
         blockers: {type: array, items: {type: string}, description: Lý do chưa duyệt được}
         reopen_days: {type: integer}
+        website:
+          oneOf:
+            - type: object
+              required: [status, version, requested_at]
+              properties:
+                status: {type: string, enum: [not_connected], description: Chưa kết nối; không phải kết quả giao lên website}
+                version: {type: integer}
+                requested_at: {type: [string, "null"], format: date-time, description: Thời điểm ghi yêu cầu trong KN; không phải thời điểm đăng}
+              additionalProperties: false
+            - {type: "null"}
+
     # --- pf/price W11.77: báo cáo giá ---
     PriceRef:
       type: object

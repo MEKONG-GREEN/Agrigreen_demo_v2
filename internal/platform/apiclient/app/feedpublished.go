@@ -22,6 +22,9 @@ var PublishedFeeds = []string{port.FeedPriceBoardDaily}
 
 // BuildPublished dựng một phiên bản của feed tham chiếu dataset từ mọi đơn vị công bố.
 func (s *Service) BuildPublished(ctx context.Context, dataset string) (BuildResult, error) {
+	if s.DisabledFeeds[dataset] {
+		return BuildResult{}, port.ErrFeedDisabled
+	}
 	c, err := FeedContract(dataset, 0)
 	if err != nil {
 		return BuildResult{}, err

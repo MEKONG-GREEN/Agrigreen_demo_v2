@@ -104,6 +104,7 @@ type BoardCan struct {
 	Unlock       bool // hủy khóa "Đang duyệt" của mình
 	Reopen       bool
 	CancelReopen bool
+	Website      bool // local disconnected acknowledgement, never a send
 }
 
 // BoardView là bảng giá của một ngày ở màn Kiểm duyệt & công bố.
@@ -125,6 +126,7 @@ type BoardView struct {
 	Can          BoardCan
 	Blockers     []string // lý do chưa duyệt được (hiển thị cạnh nút vô hiệu)
 	ReopenDays   int
+	Website      *domain.WebsiteStatus
 	Full         bool // người gọi xem được xem trước / nhật ký
 	// points: dòng giá theo xã của số liệu hiện tại (W11.77 — chụp vào board_point lúc duyệt); không trả ra ngoài.
 	points []port.PriceLine
@@ -180,6 +182,14 @@ func (s *TicketService) boardRead(ctx context.Context, tx pgx.Tx, prof port.Prof
 		for _, h := range hist {
 			v.Log = append(v.Log, BoardLogEntry{Board: h})
 		}
+	}
+	if prof.WebsiteDeferred {
+		website, err := store.WebsiteStatus(ctx, tx, prof.Name, day, b.Version)
+		if err != nil {
+			return v, nil, err
+		}
+		v.Website = &website
+		v.Can.Website = websiteRequester(c) && v.State == domain.BoardApproved
 	}
 	can := approver(prof, c)
 	v.Blockers = boardBlockers(v)

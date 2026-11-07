@@ -36,10 +36,12 @@ interface BoardVer {
 const ME = "0190c0de-0000-7000-8000-0000000071a1";
 const LOCK_MS = 10 * 60_000;
 let BOARDS = new Map<string, BoardVer[]>();
+let WEBSITE = new Map<string, { version: number; requested_at: string }>();
 
 /** Đặt lại trạng thái giả lập (kiểm thử). */
 export function resetPriceBoards(): void {
   BOARDS = new Map();
+  WEBSITE = new Map();
 }
 
 /** Trạng thái nhìn của bảng giá ngày (phiếu giả lập dùng để chặn sửa / nhãn Đã duyệt). */
@@ -114,6 +116,7 @@ function dto(role: Role, day: string): S["PriceBoard"] {
   }
   const approve = [...vs].reverse().find((v) => v.action === "approve" && v.version === cur?.version);
   const lockedBy = state === "approving" ? cur!.actor_ref : null;
+  const website = WEBSITE.get(day);
   const can = role === "kn_tinh";
   return {
     day,
@@ -147,9 +150,15 @@ function dto(role: Role, day: string): S["PriceBoard"] {
       unlock: can && state === "approving" && lockedBy === ME,
       reopen: can && state === "approved" && day >= addDay(vnToday(), -30),
       cancel_reopen: can && state === "reopened",
+      website: full && state === "approved",
     },
     blockers,
     reopen_days: 30,
+    website: {
+      status: "not_connected",
+      version: cur?.version ?? 0,
+      requested_at: website && website.version === cur?.version ? website.requested_at : null,
+    },
   };
 }
 
@@ -217,7 +226,21 @@ function write(ctx: Ctx, action: BoardVer["action"]): Response {
   return json(dto("kn_tinh", day), 201);
 }
 
+function requestWebsite(ctx: Ctx): Response {
+  const role = roleOf(ctx);
+  if (role instanceof Response) return role;
+  if (role !== "kn_tinh" && role !== "admin") return problem(403, "forbidden", "Chỉ Cấp Tỉnh hoặc Admin");
+  const day = ctx.params[0]!;
+  const board = dto(role, day);
+  const body = (ctx.body ?? {}) as S["PriceBoardOp"];
+  if (board.seq !== body.seq) return problem(409, "price.board_stale", "Tải lại bảng giá");
+  if (board.state !== "approved") return problem(409, "price.board_state", "Chỉ bảng giá đã duyệt");
+  WEBSITE.set(day, { version: board.version, requested_at: new Date().toISOString() });
+  return json(dto(role, day), 201);
+}
+
 export const priceBoardRoutes: Route[] = [
+  { method: "POST", pattern: /^\/v1\/price\/boards\/(\d{4}-\d{2}-\d{2})\/website$/, handler: requestWebsite },
   {
     method: "GET",
     pattern: /^\/v1\/price\/boards$/,

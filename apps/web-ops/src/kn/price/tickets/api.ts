@@ -250,6 +250,9 @@ export function createPriceTicketApi(api: ApiClient) {
           return unwrap(api.POST("/v1/price/boards/{day}/cancel-reopen", opts));
       }
     },
+    /** D2: acknowledge a disconnected website locally; this never publishes. */
+    requestWebsite: (day: string, body: S["PriceBoardOp"]): Promise<PriceBoard> =>
+      unwrap(api.POST("/v1/price/boards/{day}/website", { params: { header: header(), path: { day } }, body })),
     /** Excel chi tiết báo giá của ngày (Cấp Tỉnh). */
     exportDay: async (q: { day?: string; region?: string; mine?: boolean }): Promise<{ blob: Blob; name: string }> => {
       const res = await api.GET("/v1/price/tickets/export", { params: { query: q }, parseAs: "blob" });

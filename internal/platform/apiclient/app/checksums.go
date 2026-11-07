@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/port"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/apiclient/store"
@@ -19,6 +20,9 @@ type ChecksumPage struct {
 // DatasetChecksums đọc tối đa limit phiên bản của dataset từ phiên bản from (≥ 1) ở tenant đơn vị vận hành.
 func (s *Service) DatasetChecksums(ctx context.Context, dataset string, from int64, limit int) (ChecksumPage, error) {
 	var p ChecksumPage
+	if s.DisabledFeeds[dataset] {
+		return p, port.ErrFeedDisabled
+	}
 	if from < 1 {
 		from = 1
 	}
