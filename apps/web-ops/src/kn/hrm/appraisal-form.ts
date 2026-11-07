@@ -71,3 +71,13 @@ export function appraisalYear(raw: string): number | null {
   if (raw < "2020" || raw > "2100") return null;
   return Number(raw);
 }
+
+/** DG04–08: kiểm ký tự trước gửi, không có chấm điểm hay gợi ý xếp loại. */
+export function validateAppraisalProposal(self: AppraisalRating, collective: AppraisalRating, reason: string) {
+  const errors: Record<string, string> = {};
+  if (!APPRAISAL_RATINGS.some(r => r === self)) errors.self_rating = "Chọn mức cá nhân tự đề xuất.";
+  if (!APPRAISAL_RATINGS.some(r => r === collective)) errors.collective_rating = "Chọn mức tập thể đề xuất.";
+  if ([...reason].length > 2000) errors.reason = "Tóm tắt căn cứ tối đa 2.000 ký tự.";
+  else if ([self, collective].some(r => r === "HTXSNV" || r === "KHTNV") && !reason.trim()) errors.reason = "Căn cứ bắt buộc khi cá nhân hoặc tập thể đề xuất HTXSNV/KHTNV.";
+  return errors;
+}

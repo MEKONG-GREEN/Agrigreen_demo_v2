@@ -508,6 +508,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.de_xuat_xep_loai",
+        "label": "Đề xuất xếp loại",
+        "route": "/kn/nhan-su/danh-gia",
+        "icon": "approve",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -1228,6 +1237,15 @@
         "label": "Tài liệu của phòng",
         "route": "/kn/nhan-su/tai-lieu-phong",
         "icon": "library",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.de_xuat_xep_loai",
+        "label": "Đề xuất xếp loại",
+        "route": "/kn/nhan-su/danh-gia",
+        "icon": "approve",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -2089,6 +2107,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.de_xuat_xep_loai",
+        "label": "Đề xuất xếp loại",
+        "route": "/kn/nhan-su/danh-gia",
+        "icon": "approve",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -2651,6 +2678,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "tinh.chung.de_xuat_xep_loai",
+        "label": "Đề xuất xếp loại",
+        "route": "/kn/nhan-su/danh-gia",
+        "icon": "approve",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      }
@@ -3189,6 +3225,15 @@
         "label": "Tài liệu của phòng",
         "route": "/kn/nhan-su/tai-lieu-phong",
         "icon": "library",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.de_xuat_xep_loai",
+        "label": "Đề xuất xếp loại",
+        "route": "/kn/nhan-su/danh-gia",
+        "icon": "approve",
         "badge_source": null,
         "enabled": true,
         "children": []
@@ -3754,6 +3799,15 @@
         "label": "Tài liệu của phòng",
         "route": "/kn/nhan-su/tai-lieu-phong",
         "icon": "library",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chung.de_xuat_xep_loai",
+        "label": "Đề xuất xếp loại",
+        "route": "/kn/nhan-su/danh-gia",
+        "icon": "approve",
         "badge_source": null,
         "enabled": true,
         "children": []

@@ -53,32 +53,6 @@ func Ratings(ctx context.Context, tx pgx.Tx, staffID uuid.UUID) ([]RatingRow, er
 	return pgx.CollectRows(rows, scanRating)
 }
 
-// LockRating dùng chung cho nhập/chỉnh kết quả năm và chốt đợt đánh giá, trước đọc dòng bị thay.
-func LockRating(ctx context.Context, tx pgx.Tx, tenant, staff uuid.UUID) error {
-	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('pf_hrm.rating:' || $1::text || ':' || $2::text, 0))`, tenant, staff)
-	return err
-}
-
-// InsertRating ghi một dòng xếp loại (thêm, thay — supersedes + lý do, hoặc hủy).
-func InsertRating(ctx context.Context, tx pgx.Tx, tid uuid.UUID, x RatingRow, at time.Time, idem string) (int64, error) {
-	action := "add"
-	var rating, reason *string
-	if x.Void {
-		action = "void"
-	} else {
-		rating = &x.Rating
-	}
-	if x.Supersedes != nil {
-		reason = &x.Reason
-	}
-	var seq int64
-	err := tx.QueryRow(ctx, `INSERT INTO pf_hrm.annual_rating (id, tenant_id, stream_key, staff_id, year, rating, source, action,
-	    supersedes_id, correction_reason, event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'rating:' || $3::uuid::text, $3::uuid, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING seq`,
-		x.ID, tid, x.StaffID, x.Year, rating, x.Source, action, x.Supersedes, reason, at.UTC(), x.Actor, idem, domain.RuleVersion).Scan(&seq)
-	return seq, err
-}
-
 // EffectiveRatings chiếu sổ xếp loại: bỏ dòng hủy và dòng đã bị thay; mỗi (hồ sơ, năm) lấy dòng hiệu lực mới nhất.
 func EffectiveRatings(rows []RatingRow) map[uuid.UUID]map[int]RatingRow {
 	dead := map[uuid.UUID]bool{}

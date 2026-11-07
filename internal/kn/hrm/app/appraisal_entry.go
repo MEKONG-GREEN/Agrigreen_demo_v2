@@ -18,6 +18,7 @@ import (
 )
 
 type AppraisalItem struct {
+	LegacyReadOnly bool `json:"legacy_read_only"`
 	domain.AppraisalEntry
 	ID             uuid.UUID                `json:"id"`
 	PeriodID       uuid.UUID                `json:"period_id"`
@@ -34,22 +35,22 @@ type AppraisalItem struct {
 	ManagerLate    bool                     `json:"manager_late"`
 }
 
+func appraisalReadOnly(item *AppraisalItem, legacy bool) {
+	item.LegacyReadOnly = legacy
+	if legacy {
+		item.CanManage, item.CanCenter = false, false
+	}
+}
+
 func appraisalEntryKey(period, staff uuid.UUID) string { return period.String() + ":" + staff.String() }
 
 func appraisalSubmissionTimes(e *domain.AppraisalEntry, action string, now time.Time) {
 	at := now.UTC()
 	switch action {
-	case "proxy_self":
-		e.SelfSubmittedAt, e.ManagerSubmittedAt = &at, nil
-	case "manager_draft":
-		e.ManagerSubmittedAt = nil
 	case "manager_submit":
 		e.ManagerSubmittedAt = &at
 	case "reopen", "return":
 		e.ManagerSubmittedAt = nil
-		if e.ReturnedTo == "self" {
-			e.SelfSubmittedAt = nil
-		}
 	}
 }
 
@@ -57,14 +58,9 @@ func appraisalLate(item *AppraisalItem, p AppraisalPeriod, now time.Time) {
 	if item.Member.ExcludedReason != "" {
 		return
 	}
-	if item.SelfSubmittedAt != nil {
-		item.SelfLate = item.SelfSubmittedAt.After(p.SelfDueAt)
-	} else if item.Status == domain.AppraisalNotStarted || (item.Status == domain.AppraisalChangeRequested && item.ReturnedTo == "self") {
-		item.SelfLate = now.After(p.SelfDueAt)
-	}
 	if item.ManagerSubmittedAt != nil {
 		item.ManagerLate = item.ManagerSubmittedAt.After(p.ManagerDueAt)
-	} else if item.Status == domain.AppraisalSelfSubmitted || (item.Status == domain.AppraisalChangeRequested && item.ReturnedTo == "manager") {
+	} else if item.Status == domain.AppraisalNotStarted || item.Status == domain.AppraisalChangeRequested {
 		item.ManagerLate = now.After(p.ManagerDueAt)
 	}
 }
@@ -102,6 +98,13 @@ func loadAppraisalPeriod(ctx context.Context, tx pgx.Tx, id uuid.UUID) (Appraisa
 }
 
 func loadAppraisalItem(ctx context.Context, tx pgx.Tx, c appraisalActor, period, staff uuid.UUID) (store.AppraisalEvent, AppraisalItem, error) {
+	p, err := loadAppraisalPeriod(ctx, tx, period)
+	if err != nil {
+		return store.AppraisalEvent{}, AppraisalItem{}, err
+	}
+	if !c.onPeriod(p) {
+		return store.AppraisalEvent{}, AppraisalItem{}, port.ErrAppraisalNotFound
+	}
 	r, ok, err := store.AppraisalLatest(ctx, tx, "entry", appraisalEntryKey(period, staff))
 	if err != nil {
 		return r, AppraisalItem{}, err
@@ -113,6 +116,7 @@ func loadAppraisalItem(ctx context.Context, tx pgx.Tx, c appraisalActor, period,
 	if err != nil {
 		return r, e, err
 	}
+	appraisalReadOnly(&e, p.WorkflowVersion != AppraisalProposalV4)
 	if !c.canRead(e.Member) {
 		return r, e, port.ErrAppraisalNotFound
 	}
@@ -133,7 +137,10 @@ func (s *Service) AppraisalEntries(ctx context.Context, period uuid.UUID) ([]App
 		if e != nil {
 			return e
 		}
-		rows, e := store.AppraisalEntrySummaries(ctx, tx, period, false)
+		if !c.onPeriod(p) {
+			return port.ErrAppraisalNotFound
+		}
+		rows, e := store.AppraisalEntrySummaries(ctx, tx, period, true)
 		if e != nil {
 			return e
 		}
@@ -143,6 +150,7 @@ func (s *Service) AppraisalEntries(ctx context.Context, period uuid.UUID) ([]App
 			if e != nil {
 				return e
 			}
+			appraisalReadOnly(&v, p.WorkflowVersion != AppraisalProposalV4)
 			if c.canRead(v.Member) {
 				appraisalLate(&v, p, s.Clock.Now())
 				out = append(out, v)
@@ -232,6 +240,7 @@ func (s *Service) AppraisalEntryDetail(ctx context.Context, period, staff uuid.U
 			if e != nil {
 				return e
 			}
+			appraisalReadOnly(&it, v.Item.LegacyReadOnly)
 			v.History = append(v.History, it)
 		}
 		if !c.center() || c.scope != domain.ScopeAll {
@@ -252,8 +261,8 @@ func (s *Service) AppraisalEntryDetail(ctx context.Context, period, staff uuid.U
 	return v, err
 }
 
-// verifiedAppraisalDocument đọc quyền/tệp ngoài TX ghi. Không nhận ProofVerified hay staff binding từ client.
-func (s *Service) verifiedAppraisalDocument(ctx context.Context, c appraisalActor, id, staff uuid.UUID, signed bool) (store.DocRow, error) {
+// verifiedAppraisalSignedDocument kiểm quyền và chủ thể tệp ký ngoài TX ghi.
+func (s *Service) verifiedAppraisalSignedDocument(ctx context.Context, c appraisalActor, id uuid.UUID) (store.DocRow, error) {
 	if !s.docsReady() {
 		return store.DocRow{}, port.ErrDocsUnavailable
 	}
@@ -263,7 +272,7 @@ func (s *Service) verifiedAppraisalDocument(ctx context.Context, c appraisalActo
 	}
 	if doc.Status != "active" || doc.DocType != domain.DocDanhGia || doc.FileRef == uuid.Nil ||
 		(doc.ContentType != "application/pdf" && !strings.HasPrefix(doc.ContentType, "image/")) ||
-		(!signed && !slices.Contains(doc.StaffIDs, staff)) || (signed && !doc.CanManage) {
+		!doc.CanManage {
 		return store.DocRow{}, problem.Validation.WithField("document_ref", "cần bản scan đánh giá đang dùng, đúng hồ sơ và quyền tài liệu")
 	}
 	opened, err := s.Docs.Files.Open(ctx, doc.FileRef, string(client.PurposeHRRecords))
@@ -282,13 +291,10 @@ func appraisalActionPermission(c appraisalActor, item AppraisalItem, in domain.A
 	a := appraisalAuthority(c)
 	allowed := false
 	switch in.Action {
-	case "proxy_self", "manager_draft", "manager_submit", "send":
+	case "manager_submit", "send":
 		allowed = domain.CanManageAppraisal(a, item.Member)
 	case "return":
-		allowed = domain.CanManageAppraisal(a, item.Member)
-		if in.ReturnTo == "manager" {
-			allowed = c.center() && c.scope == domain.ScopeAll && !c.readOnly
-		}
+		allowed = c.center() && c.scope == domain.ScopeAll && !c.readOnly
 	case "official", "reopen":
 		allowed = c.center() && c.scope == domain.ScopeAll && !c.readOnly
 	default:
@@ -347,6 +353,9 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 		if e != nil {
 			return e
 		}
+		if resultPeriod.WorkflowVersion != AppraisalProposalV4 {
+			return port.ErrAppraisalBlocked.WithDetail("đợt và phiếu cũ chỉ được đọc")
+		}
 		if !ok && in.Version != item.Version {
 			return port.ErrAppraisalConflict.WithDetail("phiếu đã đổi; tải lại trước khi kiểm bản scan")
 		}
@@ -362,17 +371,6 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 		item, e := appraisalItem(*replay, c)
 		appraisalLate(&item, resultPeriod, s.Clock.Now())
 		return item, e
-	}
-	var proof *store.DocRow
-	if in.Action == "proxy_self" {
-		if in.ProxyDocument == nil || *in.ProxyDocument == uuid.Nil {
-			return AppraisalItem{}, problem.Validation.WithField("proxy_document", "nhập thay cần bản scan")
-		}
-		doc, e := s.verifiedAppraisalDocument(ctx, c, *in.ProxyDocument, staff, false)
-		if e != nil {
-			return AppraisalItem{}, e
-		}
-		proof = &doc
 	}
 	var saved store.AppraisalEvent
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
@@ -411,18 +409,11 @@ func (s *Service) ChangeAppraisalEntry(ctx context.Context, period, staff uuid.U
 			return e
 		}
 		a := appraisalAuthority(c)
-		if proof != nil {
-			if e = checkAppraisalDocument(ctx, tx, *proof); e != nil {
-				return e
-			}
-			a.ProofVerified = true
+		if p.WorkflowVersion != AppraisalProposalV4 {
+			return port.ErrAppraisalBlocked.WithDetail("đợt và phiếu cũ chỉ được đọc")
 		}
-		form := p.Forms[current.Member.Group]
-		if form.Form == nil {
-			return port.ErrAppraisalBlocked.WithDetail("đợt thiếu phiên bản phiếu")
-		}
-		next, e := domain.ChangeAppraisalEntry(current.AppraisalEntry, *form.Form,
-			domain.AppraisalStepLocks{Self: p.SelfLocked, Manager: p.ManagerLocked, Closed: p.Closed}, a, in)
+		next, e := domain.ChangeAppraisalEntry(current.AppraisalEntry,
+			domain.AppraisalStepLocks{Closed: p.Closed}, a, in)
 		if e != nil {
 			return appraisalValidation(e)
 		}

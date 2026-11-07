@@ -36,8 +36,7 @@ func newAppraisalFixture(t *testing.T) appraisalFixture {
 	f.who["xa"] = xa
 	f.call("admin", http.MethodPost, "/v1/hrm/defaults", nil, http.StatusCreated)
 	a := appraisalFixture{f: f, staff: map[string]string{}, input: app.AppraisalPeriodInput{Year: 2026, Quarter: 3, CutoffOn: "2026-09-30",
-		SelfDueAt: "2026-10-05T16:59:59Z", ManagerDueAt: "2026-10-20T16:59:59Z", SummaryDueAt: "2026-10-25T16:59:59Z",
-		Forms: map[string]uuid.UUID{}, Summaries: map[string]uuid.UUID{}}}
+		ManagerDueAt: "2026-10-20T16:59:59Z", Groups: []string{domain.AppraisalCivil, domain.AppraisalLeader, domain.AppraisalCommune}, Summaries: map[string]uuid.UUID{}}}
 	for i, x := range []struct{ who, typ, unit, position string }{{"xa", "can_bo_xa", "trong_trot", "vien_chuc"}, {"vc_tt", "vien_chuc", "trong_trot", "vien_chuc"}, {"hcth2", "vien_chuc", "hcth", "truong_phong"}} {
 		unit := map[string]any{"unit": x.unit}
 		if x.typ == "can_bo_xa" {
@@ -57,16 +56,6 @@ func newAppraisalFixture(t *testing.T) appraisalFixture {
 		v := appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/templates/summary/"+strings.ToLower(kind), "summary-"+kind,
 			app.AppraisalTemplateChange{Status: "published", Summary: &s}, http.StatusCreated)
 		a.input.Summaries[kind] = uuid.MustParse(v["id"].(string))
-	}
-	for _, group := range []string{domain.AppraisalCivil, domain.AppraisalLeader, domain.AppraisalCommune} {
-		form := domain.AppraisalForm{Code: "phieu_" + group, Name: "Phiếu đánh giá", Group: group,
-			Bands: []domain.AppraisalBand{{Minimum: "81", Rating: "HTXSNV"}, {Minimum: "63", Rating: "HTTNV"}, {Minimum: "45", Rating: "HTNV"}, {Minimum: "0", Rating: "KHTNV"}}}
-		for i := range 6 {
-			form.Criteria = append(form.Criteria, domain.AppraisalCriterion{Code: fmt.Sprintf("tc_%d", i), Title: fmt.Sprintf("Tiêu chí %d", i+1), Maximum: "15"})
-		}
-		v := appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/templates/form/"+form.Code, "form-"+group,
-			app.AppraisalTemplateChange{Status: "published", Form: &form}, http.StatusCreated)
-		a.input.Forms[group] = uuid.MustParse(v["id"].(string))
 	}
 	for i := range 6 {
 		points := "15"
@@ -92,6 +81,7 @@ func (a appraisalFixture) change(t *testing.T, period, staff, as, key string, in
 	return appraisalCall(t, a.f, as, http.MethodPost, "/v1/hrm/appraisals/periods/"+period+"/entries/"+a.staff[staff], key, in, want)
 }
 
+// HC-2 thay assertions điểm bằng các cột DG04–10 của FN17/18.
 func TestHRMAppraisalWorkflowHTTP_W1126(t *testing.T) {
 	a := newAppraisalFixture(t)
 	f := a.f
@@ -99,128 +89,110 @@ func TestHRMAppraisalWorkflowHTTP_W1126(t *testing.T) {
 	base := "/v1/hrm/appraisals/periods/" + period
 	appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/periods", "open-q3-duplicate", a.input, http.StatusConflict)
 	if a.open(t, "open-q3-first") != period {
-		t.Fatal("replay mở đợt tạo mã khác")
+		t.Fatal("retry mở đợt đổi mã")
 	}
 	for _, tc := range []struct {
 		who   string
 		count int
 	}{{"ld_tt", 2}, {"hcth", 3}, {"admin", 3}} {
-		v := appraisalCall(t, f, tc.who, http.MethodGet, base+"/entries", "", nil, http.StatusOK)
-		if len(v["items"].([]any)) != tc.count {
-			t.Fatalf("%s thấy sai số phiếu: %v", tc.who, v)
+		if n := len(appraisalCall(t, f, tc.who, http.MethodGet, base+"/entries", "", nil, http.StatusOK)["items"].([]any)); n != tc.count {
+			t.Fatalf("%s thấy %d", tc.who, n)
 		}
 	}
 	appraisalCall(t, f, "ld_cn", http.MethodGet, base+"/entries/"+a.staff["xa"], "", nil, http.StatusNotFound)
-	appraisalCall(t, f, "xa", http.MethodGet, base+"/entries/"+a.staff["vc_tt"], "", nil, http.StatusForbidden)
 	appraisalCall(t, f, "other", http.MethodGet, base+"/entries", "", nil, http.StatusNotFound)
-	for _, as := range []string{"tw", "viewonly", "realmonly", "xa", "vc_tt"} {
-		appraisalCall(t, f, as, http.MethodGet, base+"/entries", "", nil, http.StatusForbidden)
+	for _, who := range []string{"tw", "viewonly", "realmonly", "xa", "vc_tt"} {
+		appraisalCall(t, f, who, http.MethodGet, base+"/entries", "", nil, http.StatusForbidden)
 	}
-	// Ma trận người dùng phải thắng quyền mặc định HCTH, không tự mở rộng nhờ có vai trung tâm.
+	foreign := f.who["hcth"]
+	node := *foreign.KN
+	node.UnitRef = uuid.New()
+	foreign.KN = &node
+	f.who["other_org"] = foreign
+	for _, path := range []string{base + "/exports", base + "/paper/MS05", base + "/entries/" + a.staff["xa"] + "/history"} {
+		appraisalCall(t, f, "other_org", http.MethodGet, path, "", nil, http.StatusNotFound)
+	}
+	appraisalCall(t, f, "other_org", http.MethodPost, "/v1/hrm/appraisals/periods", "open-q3-first", a.input, http.StatusNotFound)
+	appraisalCall(t, f, "other_org", http.MethodGet, base+"/entries", "", nil, http.StatusNotFound)
+	appraisalCall(t, f, "other_org", http.MethodGet, base+"/entries/"+a.staff["xa"], "", nil, http.StatusNotFound)
+	if xs := appraisalCall(t, f, "other_org", http.MethodGet, "/v1/hrm/appraisals/periods", "", nil, http.StatusOK)["items"].([]any); len(xs) != 0 {
+		t.Fatal("lộ đợt nút khác")
+	}
 	permission := func(scope string) {
 		f.call("admin", http.MethodPost, "/v1/hrm/permissions", map[string]any{"grantee_kind": "user", "grantee": f.who["hcth2"].ActorRef.String(), "perms": map[string]any{"assessment": scope}}, http.StatusCreated)
 	}
 	permission("self")
-	if xs := appraisalCall(t, f, "hcth2", http.MethodGet, base+"/entries", "", nil, http.StatusOK)["items"].([]any); len(xs) != 1 {
-		t.Fatal("HCTH self thấy người khác")
+	if n := len(appraisalCall(t, f, "hcth2", http.MethodGet, base+"/entries", "", nil, http.StatusOK)["items"].([]any)); n != 1 {
+		t.Fatal("override self bị mở rộng")
 	}
-	appraisalCall(t, f, "hcth2", http.MethodGet, base+"/entries/"+a.staff["xa"], "", nil, http.StatusNotFound)
 	permission("none")
 	appraisalCall(t, f, "hcth2", http.MethodGet, base+"/entries", "", nil, http.StatusForbidden)
 	permission("all")
-	// Phiếu của đợt giữ phiên bản đã phát hành, dù HCTH đã sửa mẫu mới.
-	form := appraisalCall(t, f, "hcth", http.MethodGet, base+"/entries/"+a.staff["xa"], "", nil, http.StatusOK)["form"].(map[string]any)
-	var original domain.AppraisalForm
-	raw, _ := json.Marshal(form["form"])
-	_ = json.Unmarshal(raw, &original)
-	original.Name = "Phiếu đã đổi sau ngày chốt"
-	appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/templates/form/"+original.Code, "form-updated-after-open", app.AppraisalTemplateChange{Status: "published", Version: 1, Form: &original}, http.StatusCreated)
-	detail := appraisalCall(t, f, "ld_tt", http.MethodGet, base+"/entries/"+a.staff["xa"], "", nil, http.StatusOK)
-	if detail["form"].(map[string]any)["id"] != form["id"] || detail["item"].(map[string]any)["self_late"] != true {
-		t.Fatal("mẫu không đóng băng hoặc thiếu cảnh báo muộn")
+	save := domain.AppraisalEntryChange{Action: "manager_submit", Version: 1, SelfRating: "HTXSNV", CollectiveRating: "HTTNV", Reason: "Căn cứ bản tự đề xuất và biên bản tập thể", PersonnelProposal: "Tiếp tục phân công nhiệm vụ", Note: "Đề xuất của đơn vị"}
+	bad := save
+	bad.Reason = ""
+	a.change(t, period, "xa", "ld_tt", "missing-basis", bad, http.StatusUnprocessableEntity)
+	bad = save
+	bad.SelfRating = ""
+	a.change(t, period, "xa", "ld_tt", "missing-self-rating", bad, http.StatusUnprocessableEntity)
+	bad = save
+	bad.CollectiveRating = ""
+	a.change(t, period, "xa", "ld_tt", "missing-collective-rating", bad, http.StatusUnprocessableEntity)
+	appraisalCall(t, f, "ld_tt", http.MethodPost, base+"/entries/"+a.staff["xa"], "removed-scores", map[string]any{"action": "manager_submit", "version": 1, "answers": a.answers}, http.StatusUnprocessableEntity)
+	a.change(t, period, "hcth2", "ld_tt", "manager-no-ms06", save, http.StatusNotFound)
+	first := a.change(t, period, "xa", "ld_tt", "proposal-xa-first", save, http.StatusCreated)
+	if first["status"] != "entered" || first["self_rating"] != "HTXSNV" || first["manager"].(map[string]any)["total"] != "" {
+		t.Fatalf("DG04–10: %v", first)
 	}
-	if len(detail["period"].(map[string]any)["forms"].(map[string]any)) != 0 {
-		t.Fatal("lộ cấu hình nhóm khác cho lãnh đạo được phân công")
+	if again := a.change(t, period, "xa", "ld_tt", "proposal-xa-first", save, http.StatusCreated); again["id"] != first["id"] {
+		t.Fatal("retry thêm bản")
 	}
-	proxy := a.proxyInput(t, "xa", a.answers)
-	for _, bad := range []string{"1e100000", "1e-100000", strings.Repeat("9", 100000), "15.01", "-1"} {
-		badInput := proxy
-		badInput.Answers = append([]domain.AppraisalAnswer(nil), a.answers...)
-		badInput.Answers[0].Points = bad
-		a.change(t, period, "xa", "ld_tt", "bad-entry-points", badInput, http.StatusUnprocessableEntity)
+	a.change(t, period, "xa", "ld_tt", "proposal-stale", save, http.StatusConflict)
+	n, hash := appraisalEntryFingerprint(t, a)
+	appraisalCall(t, f, "ld_tt", http.MethodPost, base, "send-incomplete-unit", app.AppraisalPeriodChange{Action: "send", Version: 1, Unit: "trong_trot"}, http.StatusUnprocessableEntity)
+	if after, h := appraisalEntryFingerprint(t, a); after != n || h != hash {
+		t.Fatal("gửi thiếu đã ghi từng phần")
 	}
-	first := a.change(t, period, "xa", "ld_tt", "submit-xa-first", proxy, http.StatusCreated)
-	if first["self_rating"] != "HTXSNV" || first["self"].(map[string]any)["total"] != "82" || first["self_late"] != true {
-		t.Fatalf("điểm/scan/muộn: %v", first)
-	}
-	if replay := a.change(t, period, "xa", "ld_tt", "submit-xa-first", proxy, http.StatusCreated); replay["id"] != first["id"] {
-		t.Fatal("replay thêm phiên bản")
-	}
-	a.change(t, period, "xa", "ld_tt", "submit-stale-xa", proxy, http.StatusConflict)
-	removed := domain.AppraisalEntryChange{Action: "self_submit", Version: 1, Answers: a.answers}
-	a.change(t, period, "vc_tt", "xa", "submit-another-person", removed, http.StatusForbidden)
-	a.change(t, period, "vc_tt", "ld_tt", "manager-self-bypass", removed, http.StatusUnprocessableEntity)
 	for _, who := range []string{"vc_tt", "hcth2"} {
 		as := "ld_tt"
 		if who == "hcth2" {
 			as = "hcth"
 		}
-		a.change(t, period, who, as, "submit-"+who, a.proxyInput(t, who, a.answers), http.StatusCreated)
+		a.change(t, period, who, as, "proposal-"+who, save, http.StatusCreated)
 	}
-	for _, who := range []string{"xa", "vc_tt", "hcth2"} {
-		as := "ld_tt"
-		if who == "hcth2" {
-			as = "hcth"
-		}
-		a.change(t, period, who, as, "manager-"+who, domain.AppraisalEntryChange{Action: "manager_submit", Version: 2, Answers: a.answers, CollectiveRating: "HTTNV", Reason: "Căn cứ họp tập thể đề xuất"}, http.StatusCreated)
-	}
-	// Gửi đơn vị giữ cả hai bản chấm; MS06 chỉ HCTH được gửi.
-	p := appraisalCall(t, f, "ld_tt", http.MethodPost, base, "send-unit-tt", app.AppraisalPeriodChange{Action: "send", Version: 1, Unit: "trong_trot"}, http.StatusCreated)
-	if p["version"] != json.Number("2") {
-		t.Fatal(p)
-	}
-	a.change(t, period, "hcth2", "hcth", "send-ms06", domain.AppraisalEntryChange{Action: "send", Version: 3}, http.StatusCreated)
-	if item := a.detail(t, period, "xa"); len(item["manager"].(map[string]any)["answers"].([]any)) != 6 {
-		t.Fatal("gửi đơn vị làm mất phiếu điểm")
-	}
-	a.change(t, period, "xa", "hcth", "official-result", domain.AppraisalEntryChange{Action: "official", Version: 4, OfficialRating: "HTNV", Reason: "Kết luận chính thức của Giám đốc"}, http.StatusCreated)
+	appraisalCall(t, f, "ld_tt", http.MethodPost, base, "send-unit-tt", app.AppraisalPeriodChange{Action: "send", Version: 1, Unit: "trong_trot"}, http.StatusCreated)
+	a.change(t, period, "hcth2", "hcth", "send-ms06", domain.AppraisalEntryChange{Action: "send", Version: 2}, http.StatusCreated)
+	save.Version = 3
+	a.change(t, period, "xa", "ld_tt", "sent-no-direct-edit", save, http.StatusUnprocessableEntity)
+	a.change(t, period, "xa", "hcth", "official-result", domain.AppraisalEntryChange{Action: "official", Version: 3, OfficialRating: "HTNV"}, http.StatusCreated)
 	appraisalCall(t, f, "hcth", http.MethodPost, base, "close-no-warning-ack", app.AppraisalPeriodChange{Action: "close", Version: 2}, http.StatusUnprocessableEntity)
 	appraisalCall(t, f, "hcth", http.MethodPost, base, "close-q3", app.AppraisalPeriodChange{Action: "close", Version: 2, AcknowledgeUnsigned: true}, http.StatusCreated)
 	if a.detail(t, period, "xa")["closed_rating"] != "HTNV" || a.detail(t, period, "vc_tt")["closed_rating"] != "HTTNV" {
-		t.Fatal("chốt không dùng official→collective")
+		t.Fatal("chốt không dùng DG09→DG05")
+	}
+	result := appraisalCall(t, f, "hcth", http.MethodGet, "/v1/hrm/staff/"+a.staff["xa"]+"/appraisal-results", "", nil, http.StatusOK)["items"].([]any)
+	if len(result) != 1 || result[0].(map[string]any)["rating"] != "HTNV" {
+		t.Fatal("kết quả quý chưa vào hồ sơ")
 	}
 	var ratings int
 	err := db.WithModuleTenantTx(context.Background(), f.svc.DB, app.DBModule, f.tid, func(tx pgx.Tx) error {
 		return tx.QueryRow(context.Background(), "SELECT count(*) FROM pf_hrm.annual_rating").Scan(&ratings)
 	})
 	if err != nil || ratings != 0 {
-		t.Fatalf("kết luận quý tự biến thành kết luận năm: %d %v", ratings, err)
+		t.Fatalf("kết quả ghi salary ledger: %d %v", ratings, err)
 	}
-	closed := a.detail(t, period, "xa")
-	version, _ := closed["version"].(json.Number).Int64()
+	version, _ := a.detail(t, period, "xa")["version"].(json.Number).Int64()
 	a.change(t, period, "xa", "hcth", "reopen-one", domain.AppraisalEntryChange{Action: "reopen", Version: version, Reason: "Điều chỉnh kết luận của riêng cán bộ"}, http.StatusCreated)
-	a.change(t, period, "xa", "ld_tt", "correct-one", domain.AppraisalEntryChange{Action: "manager_submit", Version: version + 1, Answers: a.answers, CollectiveRating: "HTTNV", Reason: "Căn cứ biên bản điều chỉnh mới"}, http.StatusCreated)
+	save.Version = version + 1
+	a.change(t, period, "xa", "ld_tt", "correct-one", save, http.StatusCreated)
 	a.change(t, period, "xa", "ld_tt", "resend-one", domain.AppraisalEntryChange{Action: "send", Version: version + 2}, http.StatusCreated)
 	appraisalCall(t, f, "hcth", http.MethodPost, base, "reclose-one", app.AppraisalPeriodChange{Action: "close", Version: 3, AcknowledgeUnsigned: true}, http.StatusCreated)
 	if a.detail(t, period, "vc_tt")["status"] != domain.AppraisalClosed {
-		t.Fatal("mở một người làm mở người khác")
+		t.Fatal("mở một người mở người khác")
 	}
 	h := appraisalCall(t, f, "hcth", http.MethodGet, base+"/entries/"+a.staff["xa"]+"/history", "", nil, http.StatusOK)
 	if len(h["items"].([]any)) < 8 {
 		t.Fatal("mất lịch sử sửa/chốt/mở lại")
 	}
 	appraisalCall(t, f, "hcth", http.MethodGet, base+"/entries/"+a.staff["xa"]+"/history?before="+strings.Repeat("9", 100000), "", nil, http.StatusUnprocessableEntity)
-	if r := appraisalRequest(f, "hcth", http.MethodPost, base+"/entries/"+a.staff["xa"]+"/guest-link", "guest-removed", nil); r.Code != http.StatusNotFound {
-		t.Fatalf("guest route còn tồn tại: %d", r.Code)
-	}
-}
-
-func (a appraisalFixture) proxyInput(t *testing.T, who string, answers []domain.AppraisalAnswer) domain.AppraisalEntryChange {
-	t.Helper()
-	f := a.f
-	f.call("admin", http.MethodPost, "/v1/hrm/docs/folders/defaults", nil, http.StatusCreated)
-	folder := folderByKey(t, f.call("hcth", http.MethodGet, "/v1/hrm/docs/folders", nil, http.StatusOK), "danh_gia")
-	doc := f.upload("hcth", map[string]any{"folder_id": folder, "title": "Bản giấy đã đối chiếu", "doc_type": "danh_gia", "unit_code": map[string]string{"xa": "trong_trot", "vc_tt": "trong_trot", "hcth2": "hcth"}[who], "staff_ids": []string{a.staff[who]}}, "phieu.pdf", pdf, http.StatusCreated)
-	proof := uuid.MustParse(doc["doc_id"].(string))
-	return domain.AppraisalEntryChange{Action: "proxy_self", Version: 1, Answers: answers, Reason: "Căn cứ bản giấy đã được đối chiếu", ProxyDocument: &proof}
 }

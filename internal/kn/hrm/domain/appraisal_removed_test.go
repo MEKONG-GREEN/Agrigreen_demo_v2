@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"github.com/google/uuid"
 	"testing"
 )
 
@@ -27,16 +26,13 @@ func TestAppraisalRemovedSelfCapabilityHC0(t *testing.T) {
 		actor := self
 		actor.Group, actor.Manager, actor.Unit = group, true, entry.Member.ManagementUnit
 		for _, action := range []string{"self_draft", "self_submit"} {
-			if _, err := ChangeAppraisalEntry(entry, appraisalExample(), AppraisalStepLocks{}, actor,
-				AppraisalEntryChange{Action: action, Answers: appraisalAnswers(7000)}); err == nil {
+			if _, err := ChangeAppraisalEntry(entry, AppraisalStepLocks{}, actor,
+				AppraisalEntryChange{Action: action}); err == nil {
 				t.Errorf("vai %s còn ghi được %s", group, action)
 			}
 		}
 	}
-	proof := uuid.New()
-	manager.ProofVerified = true
-	if _, err := ChangeAppraisalEntry(entry, appraisalExample(), AppraisalStepLocks{}, manager,
-		AppraisalEntryChange{Action: "proxy_self", Answers: appraisalAnswers(7000), ProxyDocument: &proof}); err != nil {
-		t.Fatalf("nhập thay của lãnh đạo có chứng từ còn thuộc gói HC-2: %v", err)
+	if _, err := ChangeAppraisalEntry(entry, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "proxy_self"}); err == nil {
+		t.Fatal("HC-2 vẫn cho nhập phiếu giấy")
 	}
 }

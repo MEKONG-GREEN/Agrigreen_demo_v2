@@ -147,7 +147,8 @@ describe("kho tài liệu nhân sự — backend giả lập theo hợp đồng 
   });
 
   it("Cấp Tỉnh ngoài HCTH không thấy (ma trận FN-20); quyền thư mục mở cho nhóm; gốc chỉ Admin", async () => {
-    const tt = await clientFor("kn-binh", "asg-binh-tinh");
+    // Cá nhân thường: Bình là Trưởng phòng trong phân công seed.
+    const tt = await clientFor("kn-an", "asg-an-tinh");
     expect((await tt.da.tree()).items).toHaveLength(0);
     expect((await tt.da.list({})).total).toBe(0);
     expect(await problemCode(tt.da.createFolder({ name: "Gốc" }))).toBe(

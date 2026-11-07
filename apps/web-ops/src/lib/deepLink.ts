@@ -67,7 +67,7 @@ export function deepLinkHref(deepLink: string | null | undefined, kind?: string 
     const [period, marker, staff, extra] = path.slice(`${APPRAISALS}/dot/`.length).split("/");
     if (period && STRICT_UUID.test(period)) {
       if (!marker) return `${APPRAISALS}/dot/${period.toLowerCase()}`;
-      if (marker === "phieu" && staff && STRICT_UUID.test(staff) && extra === undefined) return `${APPRAISALS}/dot/${period.toLowerCase()}/phieu/${staff.toLowerCase()}`;
+      if ((marker === "de-xuat" || marker === "phieu") && staff && STRICT_UUID.test(staff) && extra === undefined) return `${APPRAISALS}/dot/${period.toLowerCase()}/de-xuat/${staff.toLowerCase()}`;
     }
   }
   if (path) {

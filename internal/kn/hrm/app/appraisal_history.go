@@ -31,7 +31,8 @@ func (s *Service) AppraisalHistory(ctx context.Context, period, staff uuid.UUID,
 	}
 	v := AppraisalHistoryPage{Items: []AppraisalItem{}}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
-		if _, _, e := loadAppraisalItem(ctx, tx, c, period, staff); e != nil {
+		_, current, e := loadAppraisalItem(ctx, tx, c, period, staff)
+		if e != nil {
 			return e
 		}
 		rows, e := store.AppraisalEntryHistory(ctx, tx, appraisalEntryKey(period, staff), before)
@@ -44,6 +45,7 @@ func (s *Service) AppraisalHistory(ctx context.Context, period, staff uuid.UUID,
 			if e != nil {
 				return e
 			}
+			appraisalReadOnly(&item, current.LegacyReadOnly)
 			v.Items = append(v.Items, item)
 			v.NextBefore = row.Seq
 		}
@@ -63,7 +65,8 @@ func (s *Service) AppraisalEntryVersion(ctx context.Context, period, staff, vers
 	}
 	var v AppraisalItem
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
-		if _, _, e := loadAppraisalItem(ctx, tx, c, period, staff); e != nil {
+		_, current, e := loadAppraisalItem(ctx, tx, c, period, staff)
+		if e != nil {
 			return e
 		}
 		row, ok, e := store.AppraisalVersion(ctx, tx, version)
@@ -77,6 +80,7 @@ func (s *Service) AppraisalEntryVersion(ctx context.Context, period, staff, vers
 		if e != nil {
 			return e
 		}
+		appraisalReadOnly(&v, current.LegacyReadOnly)
 		return store.InsertAppraisalAccess(ctx, tx, c.tenant, store.Access{ID: ids.New(), Action: "view", StaffID: &staff, ItemCount: 1,
 			Scope: string(c.scope), Actor: c.ref, Query: map[string]string{"appraisal_version": version.String()}}, s.Clock.Now())
 	})

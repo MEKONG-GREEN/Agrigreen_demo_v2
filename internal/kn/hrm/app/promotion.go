@@ -22,7 +22,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/hrm/store"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 )
@@ -657,64 +656,6 @@ func (s *Service) PromotionCase(ctx context.Context, key string, at time.Time) (
 }
 
 // --- Xếp loại năm. ---
-
-// RatingInput là một xếp loại năm cần ghi (rating rỗng = hủy xếp loại của năm).
-type RatingInput struct {
-	Year   int
-	Rating string
-	Source string
-	Reason string
-}
-
-// SetRating ghi xếp loại năm của một viên chức (nguồn chuyển đổi ban đầu hoặc nhập tay; FN-18 W11.26 ghi nguồn
-// 'evaluation'). Đã có xếp loại của năm → dòng mới THAY dòng cũ, cần lý do ≥ 10 ký tự.
-func (s *Service) SetRating(ctx context.Context, id uuid.UUID, in RatingInput, idem string) (store.RatingRow, error) {
-	c, err := s.recCaller(ctx)
-	if err != nil {
-		return store.RatingRow{}, err
-	}
-	if err := c.need(domain.PermEdit, true); err != nil {
-		return store.RatingRow{}, err
-	}
-	if in.Year < 1990 || in.Year > 2100 {
-		return store.RatingRow{}, problem.Validation.WithField("year", "năm 1990–2100")
-	}
-	if in.Rating != "" && !contains(domain.Ratings, in.Rating) {
-		return store.RatingRow{}, problem.Validation.WithField("rating", "HTXSNV | HTTNV | HTNV | KHTNV")
-	}
-	if in.Source == "" {
-		in.Source = "manual"
-	}
-	if in.Source != "manual" && in.Source != "conversion" {
-		return store.RatingRow{}, problem.Validation.WithField("source", "manual | conversion")
-	}
-	in.Reason = strings.TrimSpace(in.Reason)
-	row := store.RatingRow{ID: ids.New(), StaffID: id, Year: in.Year, Rating: in.Rating, Source: in.Source, Void: in.Rating == "", Actor: c.ref}
-	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
-		if _, e := s.editable(ctx, tx, c, id, domain.PermEdit); e != nil {
-			return e
-		}
-		if e := store.LockRating(ctx, tx, c.tenant, id); e != nil {
-			return e
-		}
-		rows, e := store.Ratings(ctx, tx, id)
-		if e != nil {
-			return e
-		}
-		if cur, ok := store.EffectiveRatings(rows)[id][in.Year]; ok {
-			if len([]rune(in.Reason)) < 10 || len([]rune(in.Reason)) > 500 {
-				return problem.Validation.WithField("reason", "sửa/hủy xếp loại đã có cần lý do 10–500 ký tự")
-			}
-			row.Supersedes, row.Reason = &cur.ID, in.Reason
-		} else if row.Void {
-			return problem.Validation.WithField("rating", "năm này chưa có xếp loại để hủy")
-		}
-		var e2 error
-		row.Seq, e2 = store.InsertRating(ctx, tx, c.tenant, row, s.Clock.Now(), stableKey(idem, "rating:"+id.String()))
-		return classify(e2)
-	})
-	return row, err
-}
 
 // Ratings trả xếp loại hiệu lực + lịch sử của một hồ sơ (cần quyền xem hồ sơ đó).
 func (s *Service) Ratings(ctx context.Context, id uuid.UUID) ([]store.RatingRow, error) {

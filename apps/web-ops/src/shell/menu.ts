@@ -47,7 +47,7 @@ function matches(href: string, pathname: string): boolean {
 
 const HRM_APPRAISAL = "/kn/nhan-su/danh-gia";
 const appraisalUUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const appraisalDetail = new RegExp(`^/dot/${appraisalUUID}(?:/phieu/${appraisalUUID})?$`,"i");
+const appraisalDetail = new RegExp(`^/dot/${appraisalUUID}(?:/de-xuat/${appraisalUUID})?$`,"i");
 
 // Chỉ các trang hiện có được ánh xạ vào lá đánh giá của lãnh đạo/HCTH.
 // Không nhận URL cũ hoặc đường dẫn gần giống; backend kiểm phân công lần nữa.
@@ -55,11 +55,14 @@ function appraisalLink(tree: MenuTree, pathname: string): MenuLink | null | unde
  if(!pathname.startsWith(HRM_APPRAISAL))return undefined;
  if(pathname !== HRM_APPRAISAL && !pathname.startsWith(HRM_APPRAISAL + "/"))return null;
  const admin = tree.role === "admin";
- if(!admin && (tree.department_code !== "hanh_chinh_tong_hop" || tree.role !== "kn_tinh"))return null;
+ const central=tree.role==="kn_tinh"&&tree.department_code==="hanh_chinh_tong_hop";
+ const manager=tree.role==="kn_tinh"&&menuLinks(tree).some(l=>l.node.key==="tinh.chung.de_xuat_xep_loai"&&l.node.href===HRM_APPRAISAL);
+ if(!admin&&!central&&!manager)return null;
  const tail = pathname.slice(HRM_APPRAISAL.length);
  const detail = appraisalDetail.test(tail);
  const editor = tail === "/dot/them-moi" || new RegExp(`^/mau/(?:them-moi|${appraisalUUID})$`,"i").test(tail);
  if(tail !== "" && tail !== "/mau" && !detail && !editor)return null;
+ if(!admin&&!central&&(tail==="/mau"||editor))return null;
  return menuLinks(tree).find(l => l.node.href === HRM_APPRAISAL) ?? null;
 }
 

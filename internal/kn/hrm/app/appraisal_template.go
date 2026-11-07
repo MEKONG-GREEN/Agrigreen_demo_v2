@@ -70,6 +70,10 @@ func (s *Service) appraisalCaller(ctx context.Context) (appraisalActor, error) {
 	return c, nil
 }
 
+func (c appraisalActor) onPeriod(p AppraisalPeriod) bool {
+	return (c.group == domain.GroupAdmin && c.unitRef == uuid.Nil) || (c.unitRef != uuid.Nil && c.unitRef == p.NodeRef)
+}
+
 func (c appraisalActor) canRead(m domain.AppraisalMember) bool {
 	self := m.AccountRef != nil && *m.AccountRef == c.ref
 	unit := c.unit != "" && (m.Unit == c.unit || m.ManagementUnit == c.unit)
@@ -245,18 +249,7 @@ func (s *Service) SaveAppraisalTemplate(ctx context.Context, kind, code, idem st
 		in.Summary = &v
 		payload = v
 	case "form":
-		if in.Form == nil || in.Summary != nil {
-			return AppraisalTemplate{}, problem.Validation.WithField("form", "cần cấu hình phiếu đánh giá")
-		}
-		v, e := domain.ValidateAppraisalForm(*in.Form, in.Status == "published")
-		if e != nil {
-			return AppraisalTemplate{}, appraisalValidation(e)
-		}
-		if v.Code != code {
-			return AppraisalTemplate{}, problem.Validation.WithField("code", "mã ở route và thân phải trùng")
-		}
-		in.Form = &v
-		payload = v
+		return AppraisalTemplate{}, port.ErrAppraisalNotFound
 	default:
 		return AppraisalTemplate{}, port.ErrAppraisalNotFound
 	}

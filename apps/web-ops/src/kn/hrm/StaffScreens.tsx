@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
 import { Tabs } from "@/components/Tabs";
+import { AppraisalProfileResults } from "./AppraisalProfileResults";
 import { BackLink, LabelValueBlock } from "@/components/patterns/detail";
 import {
   DataTable,
@@ -1191,6 +1192,7 @@ export function HrmStaffDetailScreen() {
             ...(d.can["sensitive.view"]
               ? [{ id: "tk", label: "Thống kê BC Sở" }]
               : []),
+            { id: "danh_gia", label: "Kết quả đánh giá" },
             { id: "lich_su", label: "Lịch sử sửa" },
             ...(d.can["audit.view"]
               ? [{ id: "nhat_ky", label: "Nhật ký xem/xuất" }]
@@ -1319,6 +1321,8 @@ export function HrmStaffDetailScreen() {
                   </>
                 ) : tab === "tk" ? (
                   <SensitiveTab d={d} sa={sa} />
+                ) : tab === "danh_gia" ? (
+                  <AppraisalProfileResults staff={id} />
                 ) : tab === "lich_su" ? (
                   <ol className="log-list">
                     {d.history.map((h) => (

@@ -13612,7 +13612,7 @@ paths:
         "503": {description: hrm.docs_unavailable, $ref: "#/components/responses/Problem"}
   /v1/hrm/staff/{id}/ratings:
     get:
-      summary: Xếp loại năm của một hồ sơ (dùng kiểm điều kiện nâng bậc — FN-09 BR-02) — mọi dòng sổ, cũ trước
+      summary: Xếp loại năm lịch sử chỉ đọc — mọi dòng sổ, cũ trước; kết quả v4 tại appraisal-results
       operationId: hrmRatingList
       tags: [hrm]
       parameters:
@@ -13629,40 +13629,11 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/HrmAnnualRating"}}
         "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
-    post:
-      summary: Ghi xếp loại năm (nguồn chuyển đổi ban đầu hoặc nhập tay; FN-18 W11.26 ghi nguồn evaluation) — năm đã có → thay, cần lý do ≥ 10 ký tự; rating rỗng = hủy
-      operationId: hrmRatingSet
-      tags: [hrm]
-      parameters:
-        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [year, rating]
-              properties:
-                year: {type: integer, minimum: 1990, maximum: 2100}
-                rating: {type: string, enum: ["", HTXSNV, HTTNV, HTNV, KHTNV]}
-                source: {type: string, enum: [manual, conversion]}
-                reason: {type: string, maxLength: 500}
-      responses:
-        "201":
-          description: Đã ghi
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/HrmAnnualRating"}
-        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
-        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
-        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
   /v1/hrm/appraisals/templates/{kind}:
     parameters:
       - {name: kind, in: path, required: true, schema: {type: string, enum: [summary, form]}}
     get:
-      summary: Mẫu/phiếu đánh giá hiện hành, chỉ HCTH/Admin có assessment toàn Trung tâm
+      summary: Mẫu tổng hợp hiện hành; phiếu form cũ chỉ đọc bởi HCTH/Admin
       operationId: hrmAppraisalTemplates
       tags: [hrm]
       responses:
@@ -13674,10 +13645,10 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
   /v1/hrm/appraisals/templates/{kind}/{code}:
     parameters:
-      - {name: kind, in: path, required: true, schema: {type: string, enum: [summary, form]}}
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [summary]}}
       - {name: code, in: path, required: true, schema: {type: string, maxLength: 40}}
     post:
-      summary: Lưu phiên bản mẫu/phiếu; phát hành cần đủ tiêu chí/ngưỡng hoặc tám cột MS05/MS06
+      summary: Lưu phiên bản Mẫu số 05/06 tám cột; writer phiếu/tiêu chí cũ trả 404
       operationId: hrmAppraisalSaveTemplate
       tags: [hrm]
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
@@ -13692,7 +13663,6 @@ paths:
               properties:
                 status: {type: string, enum: [draft, published, retired]}
                 version: {type: integer, minimum: 0}
-                form: {$ref: "#/components/schemas/HrmAppraisalForm"}
                 summary: {$ref: "#/components/schemas/HrmAppraisalSummary"}
       responses:
         "201": {description: Đã ghi, content: {application/json: {schema: {$ref: "#/components/schemas/HrmAppraisalTemplate"}}}}
@@ -13730,15 +13700,13 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [year, quarter, cutoff_on, self_due_at, manager_due_at, summary_due_at, forms, summaries, acknowledge_warnings]
+              required: [year, quarter, cutoff_on, manager_due_at, groups, summaries, acknowledge_warnings]
               properties:
                 year: {type: integer, minimum: 2020, maximum: 2100}
                 quarter: {type: integer, minimum: 0, maximum: 4}
                 cutoff_on: {type: string, format: date}
-                self_due_at: {type: string, format: date-time}
                 manager_due_at: {type: string, format: date-time}
-                summary_due_at: {type: string, format: date-time}
-                forms: {type: object, additionalProperties: {type: string, format: uuid}, maxProperties: 3}
+                groups: {type: array, minItems: 1, maxItems: 3, uniqueItems: true, items: {type: string, enum: [vien_chuc, lanh_dao, can_bo_xa]}}
                 summaries: {type: object, additionalProperties: {type: string, format: uuid}, maxProperties: 2}
                 excluded: {type: array, maxItems: 5000, items: {type: object, required: [staff_id, reason], properties: {staff_id: {type: string, format: uuid}, reason: {type: string, minLength: 10, maxLength: 2000}}}}
                 acknowledge_warnings: {type: boolean}
@@ -13750,7 +13718,7 @@ paths:
   /v1/hrm/appraisals/periods/{period}:
     parameters: [{name: period, in: path, required: true, schema: {type: string, format: uuid}}]
     post:
-      summary: Gia hạn/khóa bước/gửi đơn vị/nhắc/ký/chốt; chốt năm ghi annual_rating, không suy kết quả năm từ bốn quý
+      summary: Gia hạn hạn gửi/gửi đơn vị/nhắc/ký/chốt; kết quả quý/năm chỉ ghi hồ sơ, không dùng nâng bậc
       operationId: hrmAppraisalChangePeriod
       tags: [hrm]
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
@@ -13763,14 +13731,12 @@ paths:
               additionalProperties: false
               required: [action, version]
               properties:
-                action: {type: string, enum: [extend, lock_self, unlock_self, lock_manager, unlock_manager, send, remind, attach_signed, close]}
+                action: {type: string, enum: [extend, send, remind, attach_signed, close]}
                 version: {type: integer, minimum: 1}
                 reason: {type: string, maxLength: 2000}
                 unit: {type: string, maxLength: 100}
-                step: {type: string, enum: [self, manager, summary]}
-                self_due_at: {type: string, format: date-time}
+                step: {type: string, enum: [manager]}
                 manager_due_at: {type: string, format: date-time}
-                summary_due_at: {type: string, format: date-time}
                 signed_documents: {type: object, maxProperties: 2, additionalProperties: {type: string, format: uuid}, description: Mã tài liệu DocDanhGia; UUID zero để gỡ liên kết có lý do}
                 acknowledge_unsigned: {type: boolean}
       responses:
@@ -13814,7 +13780,7 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
     post:
-      summary: Tự chấm/nhập thay có scan/quản lý/gửi/trả/kết luận/mở lại một người; khóa bền cùng body/actor
+      summary: Lãnh đạo nhập DG04–08/gửi; HCTH điều chỉnh/kết luận/mở lại một người, không có tiêu chí hay điểm
       operationId: hrmAppraisalChangeEntry
       tags: [hrm]
       parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
@@ -13892,7 +13858,7 @@ paths:
               additionalProperties: false
               required: [kind, format, version]
               properties:
-                kind: {type: string, enum: [MS05, MS06, PHIEU_DIEM]}
+                kind: {type: string, enum: [MS05, MS06]}
                 format: {type: string, enum: [xlsx, docx]}
                 version: {type: integer, minimum: 1}
                 unit: {type: string, maxLength: 100}
@@ -13918,6 +13884,54 @@ paths:
             X-Data-Drift: {schema: {type: string}}
           content:
             application/octet-stream: {schema: {type: string, format: binary}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/hrm/staff/{id}/appraisal-results:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Kết luận quý/năm hiện hành trong hồ sơ FN18, chỉ đọc theo quyền xem hồ sơ; không dùng nâng bậc
+      operationId: hrmAppraisalResults
+      tags: [hrm]
+      responses:
+        "200": {description: Kết quả đã chốt, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: "#/components/schemas/HrmAppraisalProfileResult"}}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /v1/hrm/appraisals/periods/{period}/import:
+    parameters: [{name: period, in: path, required: true, schema: {type: string, format: uuid}}]
+    post:
+      summary: Nhập đề xuất Excel FN17 theo tám cột mẫu, kiểm toàn bộ dòng và ghi nguyên tử trong phạm vi lãnh đạo/HCTH
+      operationId: hrmAppraisalImport
+      tags: [hrm]
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [version, file]
+              properties:
+                version: {type: string, pattern: '^[1-9][0-9]{0,17}$'}
+                file: {type: string, format: binary}
+      responses:
+        "201": {description: Đã nhập toàn bộ, content: {application/json: {schema: {type: object, required: [count, version], properties: {count: {type: integer}, version: {type: integer}}}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /v1/hrm/appraisals/periods/{period}/import-template/{kind}:
+    parameters:
+      - {name: period, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: kind, in: path, required: true, schema: {type: string, enum: [MS05, MS06]}}
+    get:
+      summary: Tệp nhập Excel tám cột với người trong phân công hiện tại; chỉ lãnh đạo/HCTH có quyền nhập
+      operationId: hrmAppraisalImportTemplate
+      tags: [hrm]
+      responses:
+        "200":
+          description: Tệp nhập .xlsx
+          headers: {Content-Disposition: {schema: {type: string}}}
+          content: {application/octet-stream: {schema: {type: string, format: binary}}}
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
   /v1/extension/khtc/periods/{id}/forms/{dept}/submissions:
@@ -27258,6 +27272,8 @@ components:
       type: object
       required: [id, version, year, quarter, node_ref, label, cutoff_on, known_at, self_due_at, manager_due_at, summary_due_at, forms, summaries, self_locked, manager_locked, closed, signed_documents, warnings, counts, recorded_at, actor_ref]
       properties:
+        workflow_version: {type: string, description: hrm.appraisal-proposal/v4 cho đợt mới; trống là dữ liệu cũ chỉ đọc}
+        groups: {type: array, items: {type: string, enum: [vien_chuc, lanh_dao, can_bo_xa]}}
         id: {type: string, format: uuid}
         version: {type: integer}
         year: {type: integer}
@@ -27299,21 +27315,19 @@ components:
       additionalProperties: false
       required: [action, version]
       properties:
-        action: {type: string, enum: [proxy_self, manager_draft, manager_submit, send, return, official, reopen]}
+        action: {type: string, enum: [manager_submit, send, return, official, reopen]}
         version: {type: integer, minimum: 1}
-        answers: {type: array, maxItems: 200, items: {$ref: "#/components/schemas/HrmAppraisalAnswer"}}
         self_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
         collective_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
         official_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
         reason: {type: string, maxLength: 2000}
         personnel_proposal: {type: string, maxLength: 2000}
         note: {type: string, maxLength: 2000}
-        return_to: {type: string, enum: [self, manager]}
-        proxy_document: {type: string, format: uuid}
     HrmAppraisalItem:
       type: object
-      required: [id, period_id, version, actor_ref, recorded_at, action, member, status, self, manager, self_rating, collective_rating, official_rating, closed_rating, reason, personnel_proposal, note, correction_reason, returned_to, reopened, can_manage, can_center, self_late, manager_late]
+      required: [legacy_read_only, id, period_id, version, actor_ref, recorded_at, action, member, status, self, manager, self_rating, collective_rating, official_rating, closed_rating, reason, personnel_proposal, note, correction_reason, returned_to, reopened, can_manage, can_center, self_late, manager_late]
       properties:
+        legacy_read_only: {type: boolean}
         id: {type: string, format: uuid}
         period_id: {type: string, format: uuid}
         version: {type: integer}
@@ -27340,7 +27354,7 @@ components:
             unit_name: {type: string}
             summary_kind: {type: string, enum: [MS05, MS06]}
             excluded_reason: {type: string}
-        status: {type: string, enum: [not_started, self_submitted, manager_submitted, sent, change_requested, closed]}
+        status: {type: string, enum: [not_started, entered, sent, change_requested, closed, self_submitted, manager_submitted], description: Năm trạng thái v4; self_submitted/manager_submitted chỉ có ở dữ liệu lịch sử chỉ đọc}
         self: {$ref: "#/components/schemas/HrmAppraisalScoring"}
         manager: {$ref: "#/components/schemas/HrmAppraisalScoring"}
         self_rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
@@ -27408,6 +27422,18 @@ components:
         version: {type: integer}
         status: {type: string}
         rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+
+    HrmAppraisalProfileResult:
+      type: object
+      required: [period_id, entry_version, year, quarter, label, rating, recorded_at]
+      properties:
+        period_id: {type: string, format: uuid}
+        entry_version: {type: string, format: uuid}
+        year: {type: integer}
+        quarter: {type: integer, minimum: 0, maximum: 4}
+        label: {type: string}
+        rating: {$ref: "#/components/schemas/HrmAppraisalRating"}
+        recorded_at: {type: string, format: date-time}
     KHTCFormReviewInput:
       type: object
       required: [decision, expected_submission_id, base_attempt]

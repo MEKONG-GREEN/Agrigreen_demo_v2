@@ -240,16 +240,7 @@ export function createPromotionApi(api: ApiClient) {
         ),
       };
     },
-    setRating: (
-      staff: string,
-      body: { year: number; rating: string; source?: "manual" | "conversion"; reason?: string },
-    ): Promise<AnnualRating> =>
-      unwrap(
-        api.POST("/v1/hrm/staff/{id}/ratings", {
-          params: { header: header(), path: { id: staff } },
-          body: body as { year: number; rating: "" | "HTXSNV" | "HTTNV" | "HTNV" | "KHTNV" },
-        }),
-      ),
+
   };
 }
 

@@ -8,44 +8,20 @@ type periodInput struct {
 	Year         int                  `json:"year"`
 	Quarter      int                  `json:"quarter"`
 	CutoffOn     string               `json:"cutoff_on"`
-	SelfDueAt    string               `json:"self_due_at"`
 	ManagerDueAt string               `json:"manager_due_at"`
-	SummaryDueAt string               `json:"summary_due_at"`
-	Forms        map[string]uuid.UUID `json:"forms"`
+	Groups       []string             `json:"groups"`
 	Summaries    map[string]uuid.UUID `json:"summaries"`
 }
 type templateChange struct {
 	Status  string         `json:"status"`
 	Summary map[string]any `json:"summary,omitempty"`
-	Form    *formInput     `json:"form,omitempty"`
-}
-type formInput struct {
-	Code     string           `json:"code"`
-	Name     string           `json:"name"`
-	Group    string           `json:"group"`
-	Criteria []criterionInput `json:"criteria"`
-	Bands    []bandInput      `json:"bands"`
-}
-type criterionInput struct {
-	Code    string `json:"code"`
-	Title   string `json:"title"`
-	Maximum string `json:"maximum"`
-}
-type bandInput struct {
-	Minimum string `json:"minimum"`
-	Rating  string `json:"rating"`
-}
-type answerInput struct {
-	Code   string `json:"code"`
-	Points string `json:"points"`
-	Note   string `json:"note"`
 }
 type entryInput struct {
-	Action        string        `json:"action"`
-	Version       int           `json:"version"`
-	Answers       []answerInput `json:"answers"`
-	Reason        string        `json:"reason"`
-	ProxyDocument *uuid.UUID    `json:"proxy_document,omitempty"`
+	Action           string `json:"action"`
+	SelfRating       string `json:"self_rating"`
+	CollectiveRating string `json:"collective_rating"`
+	Version          int    `json:"version"`
+	Reason           string `json:"reason"`
 }
 
 func summaryTemplate(kind string) map[string]any {

@@ -36,7 +36,7 @@ func TestHRMRemovedSelfHTTPHC0(t *testing.T) {
 	a := newAppraisalFixture(t)
 	period := a.open(t, "hc0-open-period")
 	base := "/v1/hrm/appraisals/periods/" + period
-	item := a.change(t, period, "xa", "ld_tt", "hc0-proxy-kept", a.proxyInput(t, "xa", a.answers), http.StatusCreated)
+	item := a.change(t, period, "xa", "ld_tt", "hc0-manager-proposal", domain.AppraisalEntryChange{Action: "manager_submit", Version: 1, SelfRating: "HTTNV", CollectiveRating: "HTNV"}, http.StatusCreated)
 	beforeCount, beforeHash := appraisalEntryFingerprint(t, a)
 	for _, who := range []string{"xa", "vc_tt"} {
 		// Existing FN-20 overrides must not resurrect a removed actor capability.
@@ -45,11 +45,11 @@ func TestHRMRemovedSelfHTTPHC0(t *testing.T) {
 			appraisalCall(t, a.f, who, http.MethodGet, path, "", nil, http.StatusForbidden)
 		}
 		for _, action := range []string{"self_draft", "self_submit"} {
-			a.change(t, period, who, who, "hc0-deny-"+who+action, domain.AppraisalEntryChange{Action: action, Version: 1, Answers: a.answers}, http.StatusForbidden)
+			a.change(t, period, who, who, "hc0-deny-"+who+action, domain.AppraisalEntryChange{Action: action, Version: 1}, http.StatusForbidden)
 		}
 	}
 	for _, action := range []string{"self_draft", "self_submit"} {
-		a.change(t, period, "vc_tt", "hcth", "hc0-center-deny-"+action, domain.AppraisalEntryChange{Action: action, Version: 1, Answers: a.answers}, http.StatusUnprocessableEntity)
+		a.change(t, period, "vc_tt", "hcth", "hc0-center-deny-"+action, domain.AppraisalEntryChange{Action: action, Version: 1}, http.StatusUnprocessableEntity)
 	}
 	for _, who := range []string{"admin", "hcth", "xa"} {
 		r := appraisalRequest(a.f, who, http.MethodPost, base+"/entries/"+a.staff["xa"]+"/guest-link", "hc0-removed-guest", nil)
@@ -76,7 +76,7 @@ func TestHRMRemovedSelfHTTPHC0(t *testing.T) {
 	if len(history["items"].([]any)) != 2 {
 		t.Fatal("HCTH mất lịch sử")
 	}
-	for _, field := range []string{"self", "self_rating", "proxy_document"} {
+	for _, field := range []string{"self", "self_rating"} {
 		if a.detail(t, period, "xa")[field] == nil {
 			t.Fatalf("mất trường lịch sử %s", field)
 		}
@@ -84,7 +84,7 @@ func TestHRMRemovedSelfHTTPHC0(t *testing.T) {
 	if _, present := a.detail(t, period, "xa")["can_self"]; present {
 		t.Fatal("API còn quảng bá capability tự đánh giá")
 	}
-	a.change(t, period, "xa", "ld_tt", "hc0-manager-kept", domain.AppraisalEntryChange{Action: "manager_submit", Version: 2, Answers: a.answers, CollectiveRating: "HTTNV", Reason: "Biên bản họp tập thể đánh giá"}, http.StatusCreated)
+	a.change(t, period, "xa", "ld_tt", "hc0-manager-kept", domain.AppraisalEntryChange{Action: "manager_submit", Version: 2, SelfRating: "HTTNV", CollectiveRating: "HTTNV", Reason: "Biên bản họp tập thể đánh giá"}, http.StatusCreated)
 }
 
 func uuidPointer(id uuid.UUID) *uuid.UUID { return &id }
@@ -99,6 +99,9 @@ func TestHRMRemovedSelfMigrationPreservesHistoryHC0(t *testing.T) {
 	defer func() { _ = tx.Rollback(ctx) }()
 	// Only in this rollback-only, private pgtest database: reconstruct the old
 	// insertion rule, put an authentic ledger event in it, then apply the new rule.
+	if _, err = tx.Exec(ctx, `DROP TRIGGER appraisal_proposal_v4_write ON pf_hrm.appraisal_event`); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = tx.Exec(ctx, `DROP TRIGGER appraisal_no_self_write ON pf_hrm.appraisal_event`); err != nil {
 		t.Fatal(err)
 	}

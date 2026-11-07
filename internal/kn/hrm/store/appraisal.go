@@ -159,3 +159,14 @@ func InsertAppraisal(ctx context.Context, tx pgx.Tx, tenant uuid.UUID, x Apprais
 		at.UTC(), x.Actor, x.IdemKey, domain.RuleVersion).Scan(&x.Seq, &x.RecordedAt)
 	return x, err
 }
+
+// AppraisalResults lấy phiên bản hiện hành của mỗi dòng hồ sơ, không chiếu sang annual_rating.
+func AppraisalResults(ctx context.Context, tx pgx.Tx, staff uuid.UUID) ([]AppraisalEvent, error) {
+	rows, err := tx.Query(ctx, `SELECT `+appraisalColumns+` FROM (
+        SELECT DISTINCT ON (entity_key) `+appraisalColumns+` FROM pf_hrm.appraisal_event
+        WHERE entity_kind = 'entry' AND staff_ref = $1 ORDER BY entity_key, seq DESC) v ORDER BY recorded_at`, staff)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, scanAppraisalEvent)
+}

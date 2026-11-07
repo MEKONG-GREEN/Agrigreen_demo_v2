@@ -93,20 +93,10 @@ func TestHRMAppraisalTemplatesHTTP_W1126(t *testing.T) {
 	if !oneCreatedOneConflict {
 		t.Fatalf("concurrent=%d,%d", a, b)
 	}
-	// Đầu vào số sai bị chặn trước ghi sổ/Decimal, kể cả gọi API trực tiếp.
-	form := domain.AppraisalForm{Code: "phieu_xa", Name: "Phiếu cán bộ xã", Group: domain.AppraisalCommune,
-		Criteria: []domain.AppraisalCriterion{{Code: "tc_1", Title: "Kết quả nhiệm vụ", Maximum: "90"}},
-		Bands:    []domain.AppraisalBand{{Minimum: "81", Rating: "HTXSNV"}, {Minimum: "63", Rating: "HTTNV"}, {Minimum: "45", Rating: "HTNV"}, {Minimum: "0", Rating: "KHTNV"}}}
-	for _, bad := range []string{"1e100000", "1e-100000", strings.Repeat("9", 100000), "-1", "0", "1.001", "1000001"} {
-		form.Criteria[0].Maximum = bad
-		p := appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/templates/form/phieu_xa", "appraisal-invalid-points", app.AppraisalTemplateChange{Status: "published", Form: &form}, http.StatusUnprocessableEntity)
-		if p["code"] != "validation_failed" {
-			t.Fatalf("problem=%v", p)
-		}
+	// FN17 v4 không còn route ghi tiêu chí/điểm, kể cả request có cú pháp số hợp lệ.
+	for _, bad := range []string{"1e100000", "1e-100000", strings.Repeat("9", 100000), "90"} {
+		appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/templates/form/phieu_xa", "appraisal-removed-form", map[string]any{"status": "published", "version": 0, "form": map[string]any{"criteria": []any{map[string]any{"maximum": bad}}}}, http.StatusNotFound)
 	}
-	form.Criteria[0].Maximum = "90"
-	appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/templates/form/phieu_xa", "appraisal-form-first", app.AppraisalTemplateChange{Status: "published", Form: &form}, http.StatusCreated)
-	appraisalCall(t, f, "hcth", http.MethodPost, "/v1/hrm/appraisals/templates/form/phieu_xa", "appraisal-summary-first", app.AppraisalTemplateChange{Status: "published", Form: &form}, http.StatusConflict)
 	for _, q := range []string{"UPDATE pf_hrm.appraisal_event SET action='draft'", "DELETE FROM pf_hrm.appraisal_event"} {
 		err := db.WithModuleTenantTx(context.Background(), f.svc.DB, app.DBModule, f.tid, func(tx pgx.Tx) error { _, e := tx.Exec(context.Background(), q); return e })
 		if err == nil {

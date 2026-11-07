@@ -9756,11 +9756,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Xếp loại năm của một hồ sơ (dùng kiểm điều kiện nâng bậc — FN-09 BR-02) — mọi dòng sổ, cũ trước */
+        /** Xếp loại năm lịch sử chỉ đọc — mọi dòng sổ, cũ trước; kết quả v4 tại appraisal-results */
         get: operations["hrmRatingList"];
         put?: never;
-        /** Ghi xếp loại năm (nguồn chuyển đổi ban đầu hoặc nhập tay; FN-18 W11.26 ghi nguồn evaluation) — năm đã có → thay, cần lý do ≥ 10 ký tự; rating rỗng = hủy */
-        post: operations["hrmRatingSet"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -9776,7 +9775,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Mẫu/phiếu đánh giá hiện hành, chỉ HCTH/Admin có assessment toàn Trung tâm */
+        /** Mẫu tổng hợp hiện hành; phiếu form cũ chỉ đọc bởi HCTH/Admin */
         get: operations["hrmAppraisalTemplates"];
         put?: never;
         post?: never;
@@ -9791,14 +9790,14 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                kind: "summary" | "form";
+                kind: "summary";
                 code: string;
             };
             cookie?: never;
         };
         get?: never;
         put?: never;
-        /** Lưu phiên bản mẫu/phiếu; phát hành cần đủ tiêu chí/ngưỡng hoặc tám cột MS05/MS06 */
+        /** Lưu phiên bản Mẫu số 05/06 tám cột; writer phiếu/tiêu chí cũ trả 404 */
         post: operations["hrmAppraisalSaveTemplate"];
         delete?: never;
         options?: never;
@@ -9855,7 +9854,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Gia hạn/khóa bước/gửi đơn vị/nhắc/ký/chốt; chốt năm ghi annual_rating, không suy kết quả năm từ bốn quý */
+        /** Gia hạn hạn gửi/gửi đơn vị/nhắc/ký/chốt; kết quả quý/năm chỉ ghi hồ sơ, không dùng nâng bậc */
         post: operations["hrmAppraisalChangePeriod"];
         delete?: never;
         options?: never;
@@ -9895,7 +9894,7 @@ export interface paths {
         /** Phiếu đóng băng + lịch sử 50 phiên bản mới nhất; xem bản cũ qua route versions */
         get: operations["hrmAppraisalEntry"];
         put?: never;
-        /** Tự chấm/nhập thay có scan/quản lý/gửi/trả/kết luận/mở lại một người; khóa bền cùng body/actor */
+        /** Lãnh đạo nhập DG04–08/gửi; HCTH điều chỉnh/kết luận/mở lại một người, không có tiêu chí hay điểm */
         post: operations["hrmAppraisalChangeEntry"];
         delete?: never;
         options?: never;
@@ -10000,6 +9999,64 @@ export interface paths {
         };
         /** Tải lại đúng lần xuất, kiểm quyền hiện tại và đánh dấu nguồn thay đổi */
         get: operations["hrmAppraisalExportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/staff/{id}/appraisal-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Kết luận quý/năm hiện hành trong hồ sơ FN18, chỉ đọc theo quyền xem hồ sơ; không dùng nâng bậc */
+        get: operations["hrmAppraisalResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nhập đề xuất Excel FN17 theo tám cột mẫu, kiểm toàn bộ dòng và ghi nguyên tử trong phạm vi lãnh đạo/HCTH */
+        post: operations["hrmAppraisalImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hrm/appraisals/periods/{period}/import-template/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                kind: "MS05" | "MS06";
+            };
+            cookie?: never;
+        };
+        /** Tệp nhập Excel tám cột với người trong phân công hiện tại; chỉ lãnh đạo/HCTH có quyền nhập */
+        get: operations["hrmAppraisalImportTemplate"];
         put?: never;
         post?: never;
         delete?: never;
@@ -23305,6 +23362,9 @@ export interface components {
             actor_ref: string;
         };
         HrmAppraisalPeriod: {
+            /** @description hrm.appraisal-proposal/v4 cho đợt mới; trống là dữ liệu cũ chỉ đọc */
+            workflow_version?: string;
+            groups?: ("vien_chuc" | "lanh_dao" | "can_bo_xa")[];
             /** Format: uuid */
             id: string;
             version: number;
@@ -23357,21 +23417,17 @@ export interface components {
         };
         HrmAppraisalEntryChange: {
             /** @enum {string} */
-            action: "proxy_self" | "manager_draft" | "manager_submit" | "send" | "return" | "official" | "reopen";
+            action: "manager_submit" | "send" | "return" | "official" | "reopen";
             version: number;
-            answers?: components["schemas"]["HrmAppraisalAnswer"][];
             self_rating?: components["schemas"]["HrmAppraisalRating"];
             collective_rating?: components["schemas"]["HrmAppraisalRating"];
             official_rating?: components["schemas"]["HrmAppraisalRating"];
             reason?: string;
             personnel_proposal?: string;
             note?: string;
-            /** @enum {string} */
-            return_to?: "self" | "manager";
-            /** Format: uuid */
-            proxy_document?: string;
         };
         HrmAppraisalItem: {
+            legacy_read_only: boolean;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -23405,8 +23461,11 @@ export interface components {
                 summary_kind: "MS05" | "MS06";
                 excluded_reason?: string;
             };
-            /** @enum {string} */
-            status: "not_started" | "self_submitted" | "manager_submitted" | "sent" | "change_requested" | "closed";
+            /**
+             * @description Năm trạng thái v4; self_submitted/manager_submitted chỉ có ở dữ liệu lịch sử chỉ đọc
+             * @enum {string}
+             */
+            status: "not_started" | "entered" | "sent" | "change_requested" | "closed" | "self_submitted" | "manager_submitted";
             self: components["schemas"]["HrmAppraisalScoring"];
             manager: components["schemas"]["HrmAppraisalScoring"];
             self_rating: components["schemas"]["HrmAppraisalRating"];
@@ -23483,6 +23542,18 @@ export interface components {
             version: number;
             status: string;
             rating: components["schemas"]["HrmAppraisalRating"];
+        };
+        HrmAppraisalProfileResult: {
+            /** Format: uuid */
+            period_id: string;
+            /** Format: uuid */
+            entry_version: string;
+            year: number;
+            quarter: number;
+            label: string;
+            rating: components["schemas"]["HrmAppraisalRating"];
+            /** Format: date-time */
+            recorded_at: string;
         };
         KHTCFormReviewInput: {
             /** @enum {string} */
@@ -47293,47 +47364,6 @@ export interface operations {
             404: components["responses"]["Problem"];
         };
     };
-    hrmRatingSet: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    year: number;
-                    /** @enum {string} */
-                    rating: "" | "HTXSNV" | "HTTNV" | "HTNV" | "KHTNV";
-                    /** @enum {string} */
-                    source?: "manual" | "conversion";
-                    reason?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Đã ghi */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HrmAnnualRating"];
-                };
-            };
-            /** @description forbidden */
-            403: components["responses"]["Problem"];
-            /** @description hrm.staff_not_found */
-            404: components["responses"]["Problem"];
-            /** @description validation_failed */
-            422: components["responses"]["Problem"];
-        };
-    };
     hrmAppraisalTemplates: {
         parameters: {
             query?: never;
@@ -47366,7 +47396,7 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
-                kind: "summary" | "form";
+                kind: "summary";
                 code: string;
             };
             cookie?: never;
@@ -47377,7 +47407,6 @@ export interface operations {
                     /** @enum {string} */
                     status: "draft" | "published" | "retired";
                     version: number;
-                    form?: components["schemas"]["HrmAppraisalForm"];
                     summary?: components["schemas"]["HrmAppraisalSummary"];
                 };
             };
@@ -47463,14 +47492,8 @@ export interface operations {
                     /** Format: date */
                     cutoff_on: string;
                     /** Format: date-time */
-                    self_due_at: string;
-                    /** Format: date-time */
                     manager_due_at: string;
-                    /** Format: date-time */
-                    summary_due_at: string;
-                    forms: {
-                        [key: string]: string;
-                    };
+                    groups: ("vien_chuc" | "lanh_dao" | "can_bo_xa")[];
                     summaries: {
                         [key: string]: string;
                     };
@@ -47513,18 +47536,14 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    action: "extend" | "lock_self" | "unlock_self" | "lock_manager" | "unlock_manager" | "send" | "remind" | "attach_signed" | "close";
+                    action: "extend" | "send" | "remind" | "attach_signed" | "close";
                     version: number;
                     reason?: string;
                     unit?: string;
                     /** @enum {string} */
-                    step?: "self" | "manager" | "summary";
-                    /** Format: date-time */
-                    self_due_at?: string;
+                    step?: "manager";
                     /** Format: date-time */
                     manager_due_at?: string;
-                    /** Format: date-time */
-                    summary_due_at?: string;
                     /** @description Mã tài liệu DocDanhGia; UUID zero để gỡ liên kết có lý do */
                     signed_documents?: {
                         [key: string]: string;
@@ -47764,7 +47783,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    kind: "MS05" | "MS06" | "PHIEU_DIEM";
+                    kind: "MS05" | "MS06";
                     /** @enum {string} */
                     format: "xlsx" | "docx";
                     version: number;
@@ -47805,6 +47824,97 @@ export interface operations {
                     "Content-Disposition"?: string;
                     "X-Content-SHA256"?: string;
                     "X-Data-Drift"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalResults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kết quả đã chốt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["HrmAppraisalProfileResult"][];
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalImport: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    version: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã nhập toàn bộ */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        version: number;
+                    };
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    hrmAppraisalImportTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period: string;
+                kind: "MS05" | "MS06";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tệp nhập .xlsx */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
                     [name: string]: unknown;
                 };
                 content: {

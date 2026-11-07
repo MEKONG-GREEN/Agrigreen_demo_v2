@@ -29,7 +29,7 @@ func TestAppraisalNotificationTargetsAndOwnerDirectory_W1126(t *testing.T) {
 	}
 	p.StaffRef = &self
 	drafts, err = build(t, dir, tid, port.EventAppraisalChanged, p)
-	if err != nil || drafts[0].DeepLink != "/kn/nhan-su/danh-gia/dot/"+p.PeriodRef.String()+"/phieu/"+self.String() {
+	if err != nil || drafts[0].DeepLink != "/kn/nhan-su/danh-gia/dot/"+p.PeriodRef.String()+"/de-xuat/"+self.String() {
 		t.Fatal("thông báo không mở đúng phiếu UUID", err)
 	}
 	p.NodeRef = uuid.Nil

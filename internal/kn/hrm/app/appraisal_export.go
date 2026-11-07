@@ -61,8 +61,12 @@ func (s *Service) appraisalExportCaller(ctx context.Context, write bool) (apprai
 	if err = s.appraisalRecords(); err != nil {
 		return c, domain.ScopeNone, err
 	}
-	if (write && c.readOnly) || (!c.center() && c.group != domain.GroupManager) {
-		return c, domain.ScopeNone, problem.Forbidden.WithDetail("chỉ HCTH/Admin hoặc lãnh đạo đơn vị được xuất đề xuất")
+	if write {
+		if err = c.needCenter(true); err != nil {
+			return c, domain.ScopeNone, err
+		}
+	} else if !c.center() && c.group != domain.GroupManager {
+		return c, domain.ScopeNone, problem.Forbidden
 	}
 	scope := domain.ScopeNone
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
@@ -70,8 +74,8 @@ func (s *Service) appraisalExportCaller(ctx context.Context, write bool) (apprai
 		scope = m[domain.PermExport]
 		return e
 	})
-	if err == nil && scope != domain.ScopeAll && scope != domain.ScopeUnit {
-		err = problem.Forbidden.WithDetail("chưa có quyền xuất theo đơn vị/toàn Trung tâm")
+	if err == nil && ((write && scope != domain.ScopeAll) || (!write && scope != domain.ScopeAll && scope != domain.ScopeUnit)) {
+		err = problem.Forbidden.WithDetail("chưa có quyền xuất trong phạm vi")
 	}
 	if scope == domain.ScopeUnit && c.scope == domain.ScopeAll {
 		c.scope = domain.ScopeUnit
@@ -107,17 +111,16 @@ func (s *Service) appraisalPaperTx(ctx context.Context, tx pgx.Tx, c appraisalAc
 	if err != nil {
 		return AppraisalPaper{}, nil, err
 	}
-	if kind != "MS05" && kind != "MS06" && kind != AppraisalScores {
+	if !c.onPeriod(p) {
+		return AppraisalPaper{}, nil, port.ErrAppraisalNotFound
+	}
+	if kind != "MS05" && kind != "MS06" {
 		return AppraisalPaper{}, nil, problem.Validation.WithField("kind", "MS05 hoặc MS06")
 	}
-	if !c.center() && ((kind != "MS05" && kind != AppraisalScores) || unit != "" && unit != c.unit) {
+	if !c.center() && (kind != "MS05" || unit != "" && unit != c.unit) {
 		return AppraisalPaper{}, nil, problem.Forbidden
 	}
 	t := p.Summaries[kind]
-	if kind == AppraisalScores {
-		score := appraisalScoreTemplate(defaultAppraisalScoreLayout())
-		t.Summary = &score
-	}
 	if t.Summary == nil {
 		return AppraisalPaper{}, nil, port.ErrAppraisalNotFound
 	}
@@ -131,10 +134,11 @@ func (s *Service) appraisalPaperTx(ctx context.Context, tx pgx.Tx, c appraisalAc
 		if e != nil {
 			return out, nil, e
 		}
-		if (kind != AppraisalScores && x.Member.SummaryKind != kind) || (!c.center() && x.Member.SummaryKind != "MS05") || x.Member.ExcludedReason != "" || !c.canRead(x.Member) || (unit != "" && unit != x.Member.ManagementUnit) ||
+		if x.Member.SummaryKind != kind || (!c.center() && x.Member.SummaryKind != "MS05") || x.Member.ExcludedReason != "" || !c.canRead(x.Member) || (unit != "" && unit != x.Member.ManagementUnit) ||
 			!scope.Allows(x.Member.AccountRef != nil && *x.Member.AccountRef == c.ref, c.unit != "" && c.unit == x.Member.ManagementUnit) {
 			continue
 		}
+		appraisalReadOnly(&x, p.WorkflowVersion != AppraisalProposalV4)
 		out.Items = append(out.Items, x)
 	}
 	if len(out.Items) == 0 {
@@ -151,6 +155,9 @@ func (s *Service) appraisalPaperTx(ctx context.Context, tx pgx.Tx, c appraisalAc
 func (s *Service) PreviewAppraisal(ctx context.Context, period uuid.UUID, kind, unit string) (AppraisalPaper, error) {
 	c, scope, err := s.appraisalExportCaller(ctx, false)
 	if err != nil {
+		return AppraisalPaper{}, err
+	}
+	if err = c.needCenter(false); err != nil {
 		return AppraisalPaper{}, err
 	}
 	var out AppraisalPaper
@@ -219,13 +226,30 @@ func (s *Service) reserveAppraisalExport(ctx context.Context, c appraisalActor, 
 		if e != nil {
 			return e
 		}
+		allRows, e := store.AppraisalEntrySummaries(ctx, tx, period, true)
+		if e != nil {
+			return e
+		}
+		for _, row := range allRows {
+			item, e := appraisalItem(row, c)
+			if e != nil {
+				return e
+			}
+			if item.Member.ExcludedReason != "" {
+				continue
+			}
+			if e = validateAppraisalExport([]AppraisalItem{item}); e != nil {
+				return e
+			}
+		}
 		if paper.Period.Version != in.Version {
 			return port.ErrAppraisalConflict
 		}
-		if in.Kind != AppraisalScores {
-			if e = validateAppraisalExport(paper.Items); e != nil {
-				return e
-			}
+		if paper.Period.WorkflowVersion != AppraisalProposalV4 {
+			return port.ErrAppraisalBlocked.WithDetail("chỉ tải lại lần xuất của dữ liệu cũ")
+		}
+		if e = validateAppraisalExport(paper.Items); e != nil {
+			return e
 		}
 		p, exists, e := store.AppraisalPeriodByRef(ctx, tx, period)
 		if e != nil {
@@ -236,10 +260,6 @@ func (s *Service) reserveAppraisalExport(ctx context.Context, c appraisalActor, 
 		}
 		out = AppraisalExport{ID: ids.New(), PeriodID: period, PeriodVersion: p.ID, Kind: in.Kind, Format: in.Format, Unit: in.Unit,
 			EntryVersions: versions, Status: "pending", Count: len(versions), Actor: c.ref, At: s.Clock.Now().UTC()}
-		if in.Kind == AppraisalScores {
-			layout := defaultAppraisalScoreLayout()
-			out.ScoreLayout = &layout
-		}
 		out.FileName = fmt.Sprintf("%s-%d-q%d-%s.%s", in.Kind, paper.Period.Year, paper.Period.Quarter, out.ID.String(), in.Format)
 		raw, e := appraisalJSON(out)
 		if e != nil {
@@ -267,6 +287,9 @@ func (s *Service) frozenAppraisalPaper(ctx context.Context, c appraisalActor, sc
 		out.Period, e = appraisalPeriod(pr)
 		if e != nil {
 			return e
+		}
+		if !c.onPeriod(out.Period) {
+			return port.ErrAppraisalNotFound
 		}
 		t := out.Period.Summaries[x.Kind]
 		if x.Kind == AppraisalScores && x.ScoreLayout != nil {
@@ -351,8 +374,8 @@ func (s *Service) ExportAppraisal(ctx context.Context, period uuid.UUID, idem st
 	if !slices.Contains([]string{"xlsx", "docx"}, in.Format) {
 		return AppraisalExport{}, problem.Validation.WithField("format", "xlsx hoặc docx")
 	}
-	if in.Kind == AppraisalScores && in.Format != "xlsx" {
-		return AppraisalExport{}, problem.Validation.WithField("format", "bảng tổng hợp điểm chỉ xuất Excel nội bộ")
+	if in.Kind != "MS05" && in.Kind != "MS06" {
+		return AppraisalExport{}, port.ErrAppraisalNotFound
 	}
 	if in.Format == "docx" && s.AppraisalExporter == nil {
 		return AppraisalExport{}, port.ErrAppraisalUnavailable.WithDetail("chưa nối cap/export")
@@ -427,8 +450,12 @@ func (s *Service) AppraisalExports(ctx context.Context, period uuid.UUID) ([]App
 	}
 	out := []AppraisalExport{}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
-		if _, e := loadAppraisalPeriod(ctx, tx, period); e != nil {
+		p, e := loadAppraisalPeriod(ctx, tx, period)
+		if e != nil {
 			return e
+		}
+		if !c.onPeriod(p) {
+			return port.ErrAppraisalNotFound
 		}
 		rows, e := store.AppraisalCurrent(ctx, tx, "export", &period)
 		if e != nil {

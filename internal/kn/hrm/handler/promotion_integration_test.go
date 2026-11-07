@@ -102,7 +102,7 @@ func TestHRMPromotionHTTP_W1125(t *testing.T) {
 	e := mk("Ngô Văn Em", "0913000005", "nam", grade("2", "2024-06-01"), ev("award", "2025", map[string]any{"form": "bang_khen_bo"}))
 	rate := func(id string, ys map[int]string) {
 		for y, r := range ys {
-			f.call("hcth", http.MethodPost, "/v1/hrm/staff/"+id+"/ratings", map[string]any{"year": y, "rating": r, "source": "conversion"}, http.StatusCreated)
+			seedLegacyAnnualRating281(t, f, id, y, r)
 		}
 	}
 	ok3 := map[int]string{2023: "HTNV", 2024: "HTTNV", 2025: "HTXSNV"}
@@ -110,12 +110,10 @@ func TestHRMPromotionHTTP_W1125(t *testing.T) {
 	rate(cc, ok3)
 	rate(d, ok3)
 	rate(b, map[int]string{2023: "HTNV", 2024: "KHTNV", 2025: "HTNV"})
-	// Sửa xếp loại đã có cần lý do; lịch sử giữ dòng cũ.
-	f.call("hcth", http.MethodPost, "/v1/hrm/staff/"+a+"/ratings", map[string]any{"year": 2025, "rating": "HTTNV"}, http.StatusUnprocessableEntity)
-	f.call("hcth", http.MethodPost, "/v1/hrm/staff/"+a+"/ratings", map[string]any{"year": 2025, "rating": "HTTNV",
-		"reason": "Nhập nhầm từ dữ liệu chuyển đổi"}, http.StatusCreated)
-	if xs := items(f.call("hcth", http.MethodGet, "/v1/hrm/staff/"+a+"/ratings", nil, http.StatusOK), "items"); len(xs) != 4 {
-		t.Fatalf("lịch sử xếp loại: %v", xs)
+	// HC-2: writer annual_rating đã gỡ, lịch sử chuyển đổi vẫn đọc. FN09 cũ sẽ được HC-3 thay khi tích hợp.
+	f.call("hcth", http.MethodPost, "/v1/hrm/staff/"+a+"/ratings", map[string]any{"year": 2025, "rating": "HTTNV"}, http.StatusNotFound)
+	if xs := items(f.call("hcth", http.MethodGet, "/v1/hrm/staff/"+a+"/ratings", nil, http.StatusOK), "items"); len(xs) != 3 {
+		t.Fatal("mất lịch sử xếp loại cũ")
 	}
 
 	// Quyền: lãnh đạo phòng, viên chức, Cấp Xã/TW không có màn nâng bậc; ngữ cảnh chỉ xem không ghi.
@@ -450,5 +448,27 @@ func TestHRMPromotionHTTP_W1125(t *testing.T) {
 	}
 	if xs := items(f.call("other", http.MethodGet, "/v1/hrm/promotion/decisions", nil, http.StatusOK), "items"); len(xs) != 0 {
 		t.Fatalf("tenant khác: %v", xs)
+	}
+}
+
+// Dựng dữ liệu chuyển đổi lịch sử qua owner của DB tạm, không gọi lại writer đã gỡ.
+func seedLegacyAnnualRating281(t *testing.T, f *recFixture, staff string, year int, rating string) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := f.env.AdminPool(t, migrations.PF).Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `SELECT set_config('app.tenant_id',$1,true)`, f.tid.String()); err != nil {
+		t.Fatal(err)
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO pf_hrm.annual_rating (id,tenant_id,stream_key,staff_id,year,rating,source,action,event_time,actor_ref,idem_key,rule_version)
+        VALUES ($1,$2,'rating:'||$3::uuid::text,$3,$4,$5,'conversion','add',$6,$7,$1::uuid::text,'legacy-fixture')`, uuid.New(), f.tid, uuid.MustParse(staff), year, rating, f.svc.Clock.Now(), f.who["hcth"].ActorRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		t.Fatal(err)
 	}
 }

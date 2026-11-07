@@ -192,7 +192,10 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
         fingerprintBody = binaryFingerprint(bytes);
       }
       const fingerprint = `${opts.surface}|${persona.id}|${url.pathname}${url.search}|${fingerprintBody}`;
-      const prev = replay.get(key);
+      // FN16–18 owns its replay journal and rechecks the current assignment.
+      // A generic cached response would bypass that scope check after a switch.
+      const appraisalReplay = url.pathname.startsWith("/v1/hrm/appraisals/");
+      const prev = appraisalReplay ? undefined : replay.get(key);
       if (prev) {
         if (prev.fingerprint !== fingerprint) return problem(422, "idempotency_key_reused", "Idempotency key reused");
         return new Response(prev.body, { status: prev.status, headers: { ...prev.headers, "Idempotent-Replayed": "true" } });
@@ -209,7 +212,7 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
       supportRecord(request, url, null, "attempted", key);
       const res = dispatch(routes, request, url, persona, body);
       supportRecord(request, url, res.status, "completed", key);
-      if (res.ok) {
+      if (res.ok && !appraisalReplay) {
         inflight.set(key, fingerprint);
         try {
           replay.set(key, { status: res.status, body: replayBody(res, await res.clone().text()), headers: { "Content-Type": res.headers.get("Content-Type") ?? "application/json" }, fingerprint });

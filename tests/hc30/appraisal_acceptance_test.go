@@ -11,7 +11,7 @@ import (
 )
 
 // HC-0 retains frozen cohort/idempotency coverage while removing personal submissions.
-// Managers enter assigned MS05 records and HCTH enters MS06 using verified scans.
+// Managers enter assigned MS05 proposals and HCTH enters MS06 directly (HC-2).
 // These are sequential in-process HTTP attempts, not a concurrency or deployed-load claim.
 func TestHCTHQuarterCohort_HC0(t *testing.T)            { runCohort(t, 494) }
 func TestHCTH500ManagementSubmissions_HC0(t *testing.T) { runCohort(t, 500) }
@@ -41,19 +41,11 @@ func runCohort(t *testing.T, count int) {
 		staff[i] = v["id"].(string)
 		f.call("hcth", http.MethodPost, "/v1/hrm/staff/"+staff[i]+"/profile", "", map[string]any{"account_ref": f.who[as].ActorRef}, http.StatusOK)
 	}
-	in := periodInput{Year: 2026, Quarter: 3, CutoffOn: "2026-09-30", SelfDueAt: "2026-10-12T16:59:59Z", ManagerDueAt: "2026-10-20T16:59:59Z", SummaryDueAt: "2026-10-25T16:59:59Z", Forms: map[string]uuid.UUID{}, Summaries: map[string]uuid.UUID{}}
+	in := periodInput{Year: 2026, Quarter: 3, CutoffOn: "2026-09-30", ManagerDueAt: "2026-10-20T16:59:59Z", Groups: []string{"vien_chuc", "lanh_dao", "can_bo_xa"}, Summaries: map[string]uuid.UUID{}}
 	for _, kind := range []string{"MS05", "MS06"} {
 		summary := summaryTemplate(kind)
 		v := f.call("hcth", http.MethodPost, "/v1/hrm/appraisals/templates/summary/"+strings.ToLower(kind), "summary-"+kind, templateChange{Status: "published", Summary: summary}, http.StatusCreated)
 		in.Summaries[kind] = uuid.MustParse(v["id"].(string))
-	}
-	for _, group := range []string{"vien_chuc", "lanh_dao", "can_bo_xa"} {
-		form := formInput{Code: "uat_" + group, Name: "Phiếu nghiệm thu", Group: group, Bands: []bandInput{{Minimum: "81", Rating: "HTXSNV"}, {Minimum: "63", Rating: "HTTNV"}, {Minimum: "45", Rating: "HTNV"}, {Minimum: "0", Rating: "KHTNV"}}}
-		for j := range 6 {
-			form.Criteria = append(form.Criteria, criterionInput{Code: fmt.Sprintf("tc_%d", j), Title: fmt.Sprintf("Tiêu chí %d", j+1), Maximum: "15"})
-		}
-		v := f.call("hcth", http.MethodPost, "/v1/hrm/appraisals/templates/form/"+form.Code, "form-"+group, templateChange{Status: "published", Form: &form}, http.StatusCreated)
-		in.Forms[group] = uuid.MustParse(v["id"].(string))
 	}
 	start := time.Now()
 	opened := f.call("hcth", http.MethodPost, "/v1/hrm/appraisals/periods", "w1131-q3-open", in, http.StatusCreated)
@@ -102,23 +94,11 @@ func runCohort(t *testing.T, count int) {
 	}
 	// Late staffing changes do not mutate the frozen cohort or the 470/24 split.
 	f.call("hcth", http.MethodPost, "/v1/hrm/staff", "", newStaff("vien_chuc", "Người Ngoài Đợt", "0999000001", ev("unit", "2020-01-01", map[string]any{"unit": "trong_trot"}), ev("position", "2020-01-01", map[string]any{"position": "vien_chuc"})), http.StatusCreated)
-	answers := []answerInput{}
-	for j := range 6 {
-		points := "15"
-		if j == 5 {
-			points = "7"
-		}
-		answers = append(answers, answerInput{Code: fmt.Sprintf("tc_%d", j), Points: points, Note: "Hoàn thành nhiệm vụ"})
-	}
-	change := entryInput{Action: "proxy_self", Version: 1, Answers: answers, Reason: "Lãnh đạo nhập thay từ bản giấy đã đối chiếu"}
-	ms05Proof := f.appraisalProof("trong_trot", staff[:count-24])
-	ms06Proof := f.appraisalProof("hcth", staff[count-24:])
+	change := entryInput{Action: "manager_submit", Version: 1, SelfRating: "HTXSNV", CollectiveRating: "HTTNV", Reason: "Lãnh đạo nhập theo bản tự đề xuất và cuộc họp đơn vị"}
 	for _, who := range []string{"person-000", "person-001"} {
-		f.call(who, http.MethodPost, base+"/entries/"+staff[0], "removed-personal-submit", entryInput{Action: "self_submit", Version: 1, Answers: answers}, http.StatusForbidden)
+		f.call(who, http.MethodPost, base+"/entries/"+staff[0], "removed-personal-submit", entryInput{Action: "self_submit", Version: 1}, http.StatusForbidden)
 	}
-	f.call("hcth", http.MethodPost, base+"/entries/"+staff[0], "removed-management-self", entryInput{Action: "self_submit", Version: 1, Answers: answers}, http.StatusUnprocessableEntity)
-	change.ProxyDocument = &ms06Proof
-	f.call("ld_tt", http.MethodPost, base+"/entries/"+staff[0], "wrong-proof-unit", change, http.StatusNotFound)
+	f.call("hcth", http.MethodPost, base+"/entries/"+staff[0], "removed-management-self", entryInput{Action: "self_submit", Version: 1}, http.StatusUnprocessableEntity)
 	submitted := make([]string, count)
 	start = time.Now()
 	slowest := time.Duration(0)
@@ -126,16 +106,15 @@ func runCohort(t *testing.T, count int) {
 		idx := i % count
 		before := time.Now()
 		actor := "ld_tt"
-		change.ProxyDocument = &ms05Proof
 		if idx >= count-24 {
-			actor, change.ProxyDocument = "hcth", &ms06Proof
+			actor = "hcth"
 		}
 		v := f.call(actor, http.MethodPost, base+"/entries/"+staff[idx], fmt.Sprintf("submit-%03d", idx), change, http.StatusCreated)
 		if elapsed := time.Since(before); elapsed > slowest {
 			slowest = elapsed
 		}
-		if v["self_rating"] != "HTXSNV" || v["self"].(map[string]any)["total"] != "82" {
-			t.Fatalf("submission %d rating/score=%v", i, v)
+		if v["self_rating"] != "HTXSNV" || v["collective_rating"] != "HTTNV" {
+			t.Fatalf("submission %d DG04/05=%v", i, v)
 		}
 		if i < count {
 			submitted[idx] = v["id"].(string)
@@ -150,7 +129,7 @@ func runCohort(t *testing.T, count int) {
 	}
 	for _, v := range entries {
 		e := v.(map[string]any)
-		if e["status"] != "self_submitted" || e["version"] != json.Number("2") {
+		if e["status"] != "entered" || e["version"] != json.Number("2") {
 			t.Fatalf("incomplete or duplicated submission: %v", e)
 		}
 	}
@@ -159,7 +138,7 @@ func runCohort(t *testing.T, count int) {
 		p := v.(map[string]any)
 		if p["id"] == period {
 			counts := p["counts"].(map[string]any)
-			if counts["self_submitted"] != json.Number(fmt.Sprint(count)) || counts["MS05"] != json.Number(fmt.Sprint(count-24)) || counts["MS06"] != json.Number("24") {
+			if counts["entered"] != json.Number(fmt.Sprint(count)) || counts["MS05"] != json.Number(fmt.Sprint(count-24)) || counts["MS06"] != json.Number("24") {
 				t.Fatalf("progress counts: %v", counts)
 			}
 			return

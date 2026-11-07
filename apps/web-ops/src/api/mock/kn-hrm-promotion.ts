@@ -522,23 +522,7 @@ export const hrmPromotionRoutes: Route[] = [
       return json({ items: (ST.ratings as (S["HrmAnnualRating"] & { staff: string })[]).filter((r) => r.staff === ctx.params[0]) });
     },
   },
-  {
-    method: "POST",
-    pattern: /^\/v1\/hrm\/staff\/([^/]+)\/ratings$/,
-    handler: (ctx) => {
-      const c = H.caller(ctx);
-      if (c instanceof Response) return c;
-      if ((c.m["profile.edit"] ?? "none") === "none" || c.readOnly) return problem(403, "forbidden", "hồ sơ nhân sự: không có quyền profile.edit (FN-20)");
-      const b = body<{ year: number; rating: string; source?: string; reason?: string }>(ctx);
-      if (!(b.year >= 1990 && b.year <= 2100)) return validation([{ field: "year", reason: "năm 1990–2100" }]);
-      const staff = ctx.params[0]!;
-      const cur = (ST.ratings as (S["HrmAnnualRating"] & { staff: string })[]).filter((r) => r.staff === staff && r.year === b.year).pop();
-      if (cur && (b.reason ?? "").trim().length < 10) return validation([{ field: "reason", reason: "sửa/hủy xếp loại đã có cần lý do 10–500 ký tự" }]);
-      const r = rating(staff, b.year, b.rating, cur ? b.reason!.trim() : "", cur?.id ?? null);
-      ST.ratings.push(r);
-      return json(r, 201);
-    },
-  },
+
 ];
 
 resetHrmPromotion();

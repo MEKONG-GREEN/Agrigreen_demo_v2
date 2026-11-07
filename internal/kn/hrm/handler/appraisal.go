@@ -17,6 +17,7 @@ import (
 )
 
 func (h Handler) registerAppraisals(rg *gin.RouterGroup) {
+	rg.GET("/hrm/staff/:id/appraisal-results", h.appraisalResults)
 	r := rg.Group("/hrm/appraisals")
 	r.Use(func(c *gin.Context) { c.Header("Cache-Control", "no-store"); c.Next() })
 	r.GET("/templates/:kind", h.appraisalTemplates)
@@ -25,6 +26,8 @@ func (h Handler) registerAppraisals(rg *gin.RouterGroup) {
 	r.GET("/periods", h.appraisalPeriods)
 	r.POST("/periods", h.appraisalOpenPeriod)
 	r.POST("/periods/:period", h.appraisalChangePeriod)
+	r.POST("/periods/:period/import", h.appraisalImport)
+	r.GET("/periods/:period/import-template/:kind", h.appraisalImportTemplate)
 	r.GET("/periods/:period/entries", h.appraisalEntries)
 	r.GET("/periods/:period/entries/:staff", h.appraisalEntry)
 	r.POST("/periods/:period/entries/:staff", h.appraisalChangeEntry)
@@ -80,6 +83,10 @@ func appraisalIdem(c *gin.Context) string {
 	return c.GetHeader(idempotency.Header)
 }
 func (h Handler) appraisalSaveTemplate(c *gin.Context) {
+	if c.Param("kind") != "summary" {
+		httpx.Fail(c, port.ErrAppraisalNotFound)
+		return
+	}
 	var in app.AppraisalTemplateChange
 	if !appraisalDecode(c, &in) {
 		return
@@ -179,4 +186,18 @@ func (h Handler) appraisalChangeEntry(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, v)
+}
+
+func (h Handler) appraisalResults(c *gin.Context) {
+	staff, ok := uuidParam(c, "id", port.ErrStaffNotFound)
+	if !ok {
+		return
+	}
+	items, err := h.Svc.AppraisalResults(c.Request.Context(), staff)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"items": items})
 }

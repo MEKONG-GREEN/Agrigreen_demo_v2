@@ -22,7 +22,6 @@ import {
   fromTo,
   KIND_FORM,
   KIND_LABEL,
-  RATINGS,
   STATUS_LABEL,
   vnNum,
   type NLTHPool,
@@ -1137,7 +1136,6 @@ export function HrmPromotionCaseScreen() {
   const pa = usePromotionApi();
   const [nonce, setNonce] = useState(0);
   const [reasonOpen, setReasonOpen] = useState(false);
-  const [rating, setRating] = useState({ year: new Date().getFullYear() - 1, rating: "HTNV", reason: "" });
   const act = useAction();
   const d = useLoad(() => pa.detail(key), [key, nonce]);
   const reload = () => setNonce((n) => n + 1);
@@ -1281,9 +1279,9 @@ export function HrmPromotionCaseScreen() {
               </div>
               <div className="grid2">
                 <div className="card">
-                  <h2 className="h3">Xếp loại năm</h2>
+                  <h2 className="h3">Xếp loại năm lịch sử chỉ đọc</h2>
                   {c.ratings.length === 0 ? (
-                    <p className="mute small">Chưa có xếp loại (FN-18 hoặc dữ liệu chuyển đổi ban đầu).</p>
+                    <p className="mute small">Chưa có dữ liệu xếp loại lịch sử.</p>
                   ) : (
                     <ul className="plain">
                       {c.ratings.map((r) => (
@@ -1296,51 +1294,7 @@ export function HrmPromotionCaseScreen() {
                       ))}
                     </ul>
                   )}
-                  <div className="row">
-                    <input
-                      type="number"
-                      aria-label="Năm xếp loại"
-                      style={{ width: 90 }}
-                      value={rating.year}
-                      onChange={(e) => setRating((r) => ({ ...r, year: Number(e.target.value) }))}
-                    />
-                    <select
-                      aria-label="Xếp loại"
-                      value={rating.rating}
-                      onChange={(e) => setRating((r) => ({ ...r, rating: e.target.value }))}
-                    >
-                      {RATINGS.map((x) => (
-                        <option key={x}>{x}</option>
-                      ))}
-                    </select>
-                    <input
-                      aria-label="Lý do sửa (khi năm đã có xếp loại)"
-                      placeholder="Lý do sửa (nếu đã có)"
-                      value={rating.reason}
-                      onChange={(e) => setRating((r) => ({ ...r, reason: e.target.value }))}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-o btn-sm"
-                      disabled={act.busy}
-                      onClick={() =>
-                        void act
-                          .run(
-                            () =>
-                              pa.setRating(c.staff_id, {
-                                year: rating.year,
-                                rating: rating.rating,
-                                source: "conversion",
-                                ...(rating.reason ? { reason: rating.reason } : {}),
-                              }),
-                            "Đã ghi xếp loại năm.",
-                          )
-                          .then(reload)
-                      }
-                    >
-                      Ghi xếp loại
-                    </button>
-                  </div>
+
                 </div>
                 <div className="card">
                   <h2 className="h3">Lịch sử</h2>

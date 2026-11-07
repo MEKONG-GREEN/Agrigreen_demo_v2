@@ -458,6 +458,17 @@
           "ComingSoon": false,
           "Needs": "manager",
           "Children": null
+        },
+        {
+          "Key": "tinh.chung.de_xuat_xep_loai",
+          "Label": "Đề xuất xếp loại",
+          "Route": "/kn/nhan-su/danh-gia",
+          "Icon": "approve",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "manager",
+          "Children": null
         }
       ]
     }

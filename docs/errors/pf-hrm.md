@@ -29,6 +29,6 @@ HRM-DOC-FILE-001: resolver thư mục cung cấp FileAuthorizer. Đường mở 
 
 Các lỗi trường nhập dùng `validation_failed` với đường dẫn `errors[].field`. Không phản chiếu JSON thô hay PII vào lỗi.
 `assessment` giao quyền chủ thể/HS37 đóng băng và quyền hiện tại; xuất còn giao quyền `export` và quyền kho định danh.
-MS05/MS06 chặn người chưa gửi hoặc thiếu căn cứ; PHIEU_DIEM là Excel tổng hợp tiến độ riêng và không phải biểu ký.
+HC-2 / HCTH v4.0: MS05/MS06 chặn xuất/chốt nếu trong đợt còn người chưa gửi hoặc thiếu căn cứ. PHIEU_DIEM chỉ còn tải lại lần xuất lịch sử; POST form, các trường answers/proxy/return_to và POST ratings cũ không còn writer. Đợt cũ trả `hrm.appraisal_blocked` khi yêu cầu ghi. Nhập Excel dùng `validation_failed` theo dòng/trường, đổi snapshot dùng `hrm.appraisal_conflict`; thiếu bản ký là cảnh báo cần xác nhận.
 
 HC-0 / HCTH v4.0: đường guest-link HCTH đã gỡ trả404 chuẩn; không còn lỗi guest_unavailable. Hai action tự đánh giá cũ bị từ chối, Xã/TW/nhân viên không có capability assessment kể cả override cũ. Lịch sử vẫn theo phạm vi lãnh đạo/HCTH.

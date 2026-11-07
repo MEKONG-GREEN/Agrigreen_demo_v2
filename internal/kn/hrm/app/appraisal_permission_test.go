@@ -49,13 +49,13 @@ func TestAppraisalExtensionAtomicAndLate_W1126(t *testing.T) {
 	self := time.Date(2026, 10, 5, 16, 0, 0, 0, time.UTC)
 	p := AppraisalPeriod{SelfDueAt: self, ManagerDueAt: self.Add(10 * 24 * time.Hour), SummaryDueAt: self.Add(20 * 24 * time.Hour)}
 	before := p
-	if extendAppraisalPeriod(&p, AppraisalPeriodChange{SelfDueAt: "2026-10-25T16:00:00Z"}) == nil || p.SelfDueAt != before.SelfDueAt {
+	if extendAppraisalPeriod(&p, AppraisalPeriodChange{ManagerDueAt: "2026-10-05T16:00:00Z"}) == nil || p.SelfDueAt != before.SelfDueAt {
 		t.Fatal("gia hạn sai thứ tự đã làm đổi snapshot đầu vào")
 	}
-	item := AppraisalItem{AppraisalEntry: domain.AppraisalEntry{Status: domain.AppraisalSelfSubmitted, SelfSubmittedAt: &self}}
+	item := AppraisalItem{AppraisalEntry: domain.AppraisalEntry{Status: domain.AppraisalNotStarted}}
 	appraisalLate(&item, p, self.Add(30*24*time.Hour))
 	if item.SelfLate || !item.ManagerLate {
-		t.Fatal("nộp đúng hạn tự chấm không bị gắn muộn theo ngày truy cập; bước quản lý còn thiếu phải muộn")
+		t.Fatal("chỉ cảnh báo hạn gửi; không tái tạo bước tự chấm")
 	}
 }
 
@@ -88,7 +88,7 @@ func TestAppraisalQuarterReferencesRespectHistoricAssignment_W1126(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(item.QuarterResults) != 2 || item.QuarterResults[0].Quarter != 1 || item.QuarterResults[1].Quarter != 3 {
+	if len(item.QuarterResults) != 1 || item.QuarterResults[0].Quarter != 1 {
 		t.Fatal("lộ quý khác phân công lịch sử")
 	}
 	raw, err := json.Marshal(item)
@@ -100,7 +100,7 @@ func TestAppraisalQuarterReferencesRespectHistoricAssignment_W1126(t *testing.T)
 	}
 	c.scope = domain.ScopeSelf
 	item, err = appraisalItem(store.AppraisalEvent{Payload: payload}, c)
-	if err != nil || len(item.QuarterResults) != 1 || item.QuarterResults[0].Quarter != 3 {
+	if err != nil || len(item.QuarterResults) != 0 {
 		t.Fatal("self thấy tham chiếu quý người khác")
 	}
 }

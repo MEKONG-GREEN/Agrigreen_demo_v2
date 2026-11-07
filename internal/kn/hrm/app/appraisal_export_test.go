@@ -7,7 +7,7 @@ import (
 
 func TestAppraisalPaperRejectsIncomplete_W1126(t *testing.T) {
 	item := AppraisalItem{AppraisalEntry: domain.AppraisalEntry{Status: domain.AppraisalSent, SelfRating: "HTTNV", CollectiveRating: "HTTNV"}}
-	for _, status := range []string{domain.AppraisalNotStarted, domain.AppraisalSelfSubmitted, domain.AppraisalManagerSubmitted, domain.AppraisalChangeRequested} {
+	for _, status := range []string{domain.AppraisalNotStarted, domain.AppraisalEntered, domain.AppraisalSelfSubmitted, domain.AppraisalManagerSubmitted, domain.AppraisalChangeRequested} {
 		item.Status = status
 		if validateAppraisalExport([]AppraisalItem{item}) == nil {
 			t.Fatalf("xuất được phiếu %s", status)

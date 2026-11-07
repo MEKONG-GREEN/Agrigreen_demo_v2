@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appraisalPointGuard, appraisalSuggestion, appraisalYear, validateAppraisalAnswers, type AppraisalForm } from "./appraisal-form";
+import { appraisalPointGuard, appraisalSuggestion, appraisalYear, validateAppraisalProposal, validateAppraisalAnswers, type AppraisalForm } from "./appraisal-form";
 
 const form: AppraisalForm = { code: "phieu_xa", name: "Phiếu xã", group: "can_bo_xa",
   criteria: Array.from({ length: 6 }, (_, i) => ({ code: `tc_${i}`, title: `Tiêu chí ${i}`, maximum: "15", guide: "", group: "" })),
@@ -23,4 +23,9 @@ describe("W11.26: số được kiểm trước phép tính", () => {
     for (const raw of ["1e100000", "1e-100000", "9".repeat(100000), "2019", "2101", "2026.0"]) expect(appraisalYear(raw)).toBeNull();
     expect(appraisalYear("2020")).toBe(2020); expect(appraisalYear("2100")).toBe(2100);
   });
+});
+
+it("HC2 DG04–06: căn cứ bắt buộc ở một trong hai mức đặc biệt, tối đa 2.000 ký tự",()=>{
+ for(const self of ["HTXSNV","HTTNV","HTNV","KHTNV"] as const)for(const collective of ["HTXSNV","HTTNV","HTNV","KHTNV"] as const){const need=[self,collective].some(r=>r==="HTXSNV"||r==="KHTNV");expect(!!validateAppraisalProposal(self,collective,"").reason).toBe(need);expect(validateAppraisalProposal(self,collective,"x")).toEqual({});}
+ expect(validateAppraisalProposal("","HTNV","")).toHaveProperty("self_rating");expect(validateAppraisalProposal("HTNV","HTNV","á".repeat(2000))).toEqual({});expect(validateAppraisalProposal("HTNV","HTNV","á".repeat(2001))).toHaveProperty("reason");
 });

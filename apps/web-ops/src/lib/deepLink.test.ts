@@ -13,9 +13,10 @@ describe("deepLinkHref — liên kết thông báo sang trang web", () => {
       expect(deepLinkHref(path)).toBeNull();
     }
     expect(deepLinkHref(null, "hrm_appraisal")).toBe(base);
-    expect(deepLinkHref(`${base}/dot/${ID}/phieu/${ID.toUpperCase()}`, "hrm_appraisal")).toBe(`${base}/dot/${ID}/phieu/${ID}`);
-    expect(deepLinkHref(`${base}/dot/${ID}/phieu/${ID}/extra`, "hrm_appraisal")).toBe(base);
-    expect(deepLinkHref(`${base}/dot/${ID}/phieu/invalid`, "hrm_appraisal")).toBe(base);
+    expect(deepLinkHref(`${base}/dot/${ID}/de-xuat/${ID.toUpperCase()}`, "hrm_appraisal")).toBe(`${base}/dot/${ID}/de-xuat/${ID}`);
+    expect(deepLinkHref(`${base}/dot/${ID}/phieu/${ID}`, "hrm_appraisal")).toBe(`${base}/dot/${ID}/de-xuat/${ID}`);
+    expect(deepLinkHref(`${base}/dot/${ID}/de-xuat/${ID}/extra`, "hrm_appraisal")).toBe(base);
+    expect(deepLinkHref(`${base}/dot/${ID}/de-xuat/invalid`, "hrm_appraisal")).toBe(base);
 
     expect(deepLinkHref(null, "hrm_promotion_due")).toBe("/kn/nhan-su/nang-bac");
     expect(deepLinkHref(null, "hrm_plan_reminder")).toBe("/kn/nhan-su/ke-hoach-phong");

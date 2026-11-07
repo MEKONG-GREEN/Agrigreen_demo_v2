@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -38,11 +37,10 @@ func (a appraisalFixture) finish(t *testing.T, period string) {
 		if who == "hcth2" {
 			as = "hcth"
 		}
-		a.change(t, period, who, as, "proxy-ready-"+period+who, a.proxyInput(t, who, a.answers), http.StatusCreated)
-		a.change(t, period, who, as, "manager-ready-"+period+who, domain.AppraisalEntryChange{Action: "manager_submit", Version: 2, Answers: a.answers, CollectiveRating: "HTTNV", Reason: "Căn cứ họp tập thể của đơn vị"}, http.StatusCreated)
+		a.change(t, period, who, as, "manager-ready-"+period+who, domain.AppraisalEntryChange{Action: "manager_submit", Version: 1, SelfRating: "HTTNV", CollectiveRating: "HTTNV", Reason: "Căn cứ họp tập thể của đơn vị"}, http.StatusCreated)
 	}
 	appraisalCall(t, a.f, "ld_tt", http.MethodPost, "/v1/hrm/appraisals/periods/"+period, "send-ready-"+period, app.AppraisalPeriodChange{Action: "send", Version: 1, Unit: "trong_trot"}, http.StatusCreated)
-	a.change(t, period, "hcth2", "hcth", "send-ms06-ready-"+period, domain.AppraisalEntryChange{Action: "send", Version: 3}, http.StatusCreated)
+	a.change(t, period, "hcth2", "hcth", "send-ms06-ready-"+period, domain.AppraisalEntryChange{Action: "send", Version: 2}, http.StatusCreated)
 }
 func appraisalAuditCount(t *testing.T, a appraisalFixture, as, scope string) int {
 	t.Helper()
@@ -118,7 +116,7 @@ func TestHRMAppraisalExportAndAuditHTTP_W1126(t *testing.T) {
 		t.Fatal("thiếu audit xem trước")
 	}
 	appraisalCall(t, f, "xa", http.MethodGet, base+"/paper/MS05", "", nil, http.StatusForbidden)
-	appraisalCall(t, f, "ld_cn", http.MethodGet, base+"/paper/MS05", "", nil, http.StatusNotFound)
+	appraisalCall(t, f, "ld_cn", http.MethodGet, base+"/paper/MS05", "", nil, http.StatusForbidden)
 	appraisalCall(t, f, "ld_tt", http.MethodGet, base+"/paper/MS06", "", nil, http.StatusForbidden)
 	input := app.AppraisalExportInput{Kind: "MS05", Format: "xlsx", Version: 2}
 	xl := appraisalCall(t, f, "hcth", http.MethodPost, base+"/exports", "export-xlsx-one", input, http.StatusCreated)
@@ -246,7 +244,7 @@ func TestHRMAppraisalAnnualAndRacesHTTP_W1126(t *testing.T) {
 		wg.Add(1)
 		go func(rating string) {
 			defer wg.Done()
-			w := appraisalRequest(a.f, "hcth", http.MethodPost, base+"/entries/"+a.staff["xa"], "annual-race-"+rating, domain.AppraisalEntryChange{Action: "official", Version: 4, OfficialRating: rating, Reason: "Kết luận tập thể lãnh đạo cơ quan"})
+			w := appraisalRequest(a.f, "hcth", http.MethodPost, base+"/entries/"+a.staff["xa"], "annual-race-"+rating, domain.AppraisalEntryChange{Action: "official", Version: 3, OfficialRating: rating, Reason: "Kết luận tập thể lãnh đạo cơ quan"})
 			statuses <- w.Code
 		}(rating)
 	}
@@ -268,27 +266,34 @@ func TestHRMAppraisalAnnualAndRacesHTTP_W1126(t *testing.T) {
 		t.Fatal("retry chốt thêm phiên bản")
 	}
 	var count int
-	var actual string
 	err := db.WithModuleTenantTx(context.Background(), a.f.svc.DB, app.DBModule, a.f.tid, func(tx pgx.Tx) error {
-		if e := tx.QueryRow(context.Background(), "SELECT count(*) FROM pf_hrm.annual_rating WHERE year=2026 AND source='evaluation'").Scan(&count); e != nil {
-			return e
-		}
-		return tx.QueryRow(context.Background(), "SELECT rating FROM pf_hrm.annual_rating WHERE staff_id=$1 ORDER BY seq DESC LIMIT 1", uuid.MustParse(a.staff["xa"])).Scan(&actual)
+		return tx.QueryRow(context.Background(), "SELECT count(*) FROM pf_hrm.annual_rating WHERE year=2026").Scan(&count)
 	})
-	if err != nil || count != 3 || actual != official {
-		t.Fatalf("kết luận năm không đến hồ sơ nâng bậc: %d %q %v", count, actual, err)
+	if err != nil || count != 0 {
+		t.Fatalf("kết luận năm ghi salary ledger: %d %v", count, err)
+	}
+	profile := appraisalCall(t, a.f, "hcth", http.MethodGet, "/v1/hrm/staff/"+a.staff["xa"]+"/appraisal-results", "", nil, http.StatusOK)["items"].([]any)
+	found := false
+	for _, x := range profile {
+		result := x.(map[string]any)
+		if result["quarter"] == json.Number("0") {
+			found = result["rating"] == official
+		}
+	}
+	if !found {
+		t.Fatal("kết luận năm chưa ghi vào hồ sơ")
 	}
 	// Mở riêng một người và kết luận lại: thêm dòng thay thế đúng người, giữ kết quả hai người khác.
 	n, _ := a.detail(t, period, "xa")["version"].(json.Number).Int64()
 	a.change(t, period, "xa", "hcth", "annual-reopen", domain.AppraisalEntryChange{Action: "reopen", Version: n, Reason: "Điều chỉnh kết luận năm của riêng cán bộ"}, http.StatusCreated)
-	a.change(t, period, "xa", "ld_tt", "annual-reassess", domain.AppraisalEntryChange{Action: "manager_submit", Version: n + 1, Answers: a.answers, CollectiveRating: "HTTNV", Reason: "Căn cứ biên bản điều chỉnh kết luận năm"}, http.StatusCreated)
+	a.change(t, period, "xa", "ld_tt", "annual-reassess", domain.AppraisalEntryChange{Action: "manager_submit", Version: n + 1, SelfRating: "HTTNV", CollectiveRating: "HTTNV", Reason: "Căn cứ biên bản điều chỉnh kết luận năm"}, http.StatusCreated)
 	a.change(t, period, "xa", "ld_tt", "annual-resend", domain.AppraisalEntryChange{Action: "send", Version: n + 2}, http.StatusCreated)
 	appraisalCall(t, a.f, "hcth", http.MethodPost, base, "annual-reclose", app.AppraisalPeriodChange{Action: "close", Version: 3, AcknowledgeUnsigned: true, Reason: "Điều chỉnh kết luận năm của riêng cán bộ"}, http.StatusCreated)
 	err = db.WithModuleTenantTx(context.Background(), a.f.svc.DB, app.DBModule, a.f.tid, func(tx pgx.Tx) error {
 		return tx.QueryRow(context.Background(), "SELECT count(*) FROM pf_hrm.annual_rating WHERE year=2026 AND supersedes_id IS NOT NULL").Scan(&count)
 	})
-	if err != nil || count != 1 {
-		t.Fatalf("chốt lại không ghi đúng một sự kiện bù: %d %v", count, err)
+	if err != nil || count != 0 {
+		t.Fatalf("chốt lại đã ghi vào salary ledger: %d %v", count, err)
 	}
 }
 
@@ -326,31 +331,9 @@ func TestHRMAppraisalProofAndSignedHTTP_W1126(t *testing.T) {
 	good, bad := upload("vc_tt"), upload("hcth2")
 	period := a.open(t, "open-proxy-proof")
 	base := "/v1/hrm/appraisals/periods/" + period
-	body := domain.AppraisalEntryChange{Action: "proxy_self", Version: 1, Answers: a.answers, Reason: "Bản giấy có chữ ký đã đối chiếu", ProxyDocument: &bad}
-	a.change(t, period, "vc_tt", "ld_tt", "proxy-wrong-binding", body, http.StatusNotFound)
-	body.ProxyDocument = &good
-	a.change(t, period, "vc_tt", "xa", "proxy-self-forbidden", body, http.StatusForbidden)
-	first := a.change(t, period, "vc_tt", "ld_tt", "proxy-good-document", body, http.StatusCreated)
-	replay := a.change(t, period, "vc_tt", "ld_tt", "proxy-good-document", body, http.StatusCreated)
-	if first["id"] != replay["id"] || first["proxy_document"] != good.String() {
-		t.Fatal("nhập thay mất scan/replay")
-	}
-	for _, who := range []string{"xa", "hcth2"} {
-		as := "ld_tt"
-		if who == "hcth2" {
-			as = "hcth"
-		}
-		a.change(t, period, who, as, "proxy-proof-"+who, a.proxyInput(t, who, a.answers), http.StatusCreated)
-	}
-	for _, who := range []string{"xa", "vc_tt", "hcth2"} {
-		as := "ld_tt"
-		if who == "hcth2" {
-			as = "hcth"
-		}
-		a.change(t, period, who, as, "manage-proof-"+who, domain.AppraisalEntryChange{Action: "manager_submit", Version: 2, Answers: a.answers, CollectiveRating: "HTTNV", Reason: "Biên bản họp tập thể đánh giá"}, http.StatusCreated)
-	}
-	appraisalCall(t, f, "ld_tt", http.MethodPost, base, "send-proof-tt", app.AppraisalPeriodChange{Action: "send", Version: 1, Unit: "trong_trot"}, http.StatusCreated)
-	a.change(t, period, "hcth2", "hcth", "send-proof-ms06", domain.AppraisalEntryChange{Action: "send", Version: 3}, http.StatusCreated)
+	body := map[string]any{"action": "proxy_self", "version": 1, "answers": a.answers, "proxy_document": bad}
+	appraisalCall(t, f, "ld_tt", http.MethodPost, base+"/entries/"+a.staff["vc_tt"], "proxy-removed-even-with-proof", body, http.StatusUnprocessableEntity)
+	a.finish(t, period)
 	appraisalCall(t, f, "hcth", http.MethodPost, base, "signed-attach-proof", app.AppraisalPeriodChange{Action: "attach_signed", Version: 2, SignedDocuments: map[string]uuid.UUID{"MS05": good, "MS06": bad}}, http.StatusCreated)
 	appraisalCall(t, f, "hcth", http.MethodPost, base, "signed-close-proof", app.AppraisalPeriodChange{Action: "close", Version: 3}, http.StatusCreated)
 	if a.detail(t, period, "vc_tt")["status"] != "closed" {
@@ -358,61 +341,17 @@ func TestHRMAppraisalProofAndSignedHTTP_W1126(t *testing.T) {
 	}
 }
 
+// HC-2: chỉ giữ reader lần xuất cũ; không tạo bảng điểm mới dù đợt đã đủ đề xuất.
 func TestHRMAppraisalScoreSummaryHTTP_W1126(t *testing.T) {
 	a := newAppraisalFixture(t)
 	period := a.open(t, "open-score-summary")
 	base := "/v1/hrm/appraisals/periods/" + period
-	load := func(id string) [][]string {
-		w := appraisalRequest(a.f, "hcth", http.MethodGet, base+"/exports/"+id+"/file", "", nil)
-		if w.Code != http.StatusOK {
-			t.Fatalf("score download: %d %s", w.Code, w.Body.String())
-		}
-		f, e := excelize.OpenReader(bytes.NewReader(w.Body.Bytes()))
-		if e != nil {
-			t.Fatal(e)
-		}
-		rows, e := f.GetRows(f.GetSheetName(0))
-		_ = f.Close()
-		if e != nil {
-			t.Fatal(e)
-		}
-		return rows
+	for _, format := range []string{"xlsx", "docx"} {
+		appraisalCall(t, a.f, "hcth", http.MethodPost, base+"/exports", "score-removed-"+format, app.AppraisalExportInput{Kind: app.AppraisalScores, Format: format, Version: 1}, http.StatusNotFound)
 	}
-	blank := appraisalCall(t, a.f, "hcth", http.MethodPost, base+"/exports", "scores-before-submission", app.AppraisalExportInput{Kind: app.AppraisalScores, Format: "xlsx", Version: 1}, http.StatusCreated)
-	if blank["count"] != json.Number("3") {
-		t.Fatal("tổng hợp chưa nộp thiếu người")
-	}
-	before := load(blank["id"].(string))
 	a.finish(t, period)
-	next := appraisalCall(t, a.f, "hcth", http.MethodPost, base+"/exports", "scores-after-submission", app.AppraisalExportInput{Kind: app.AppraisalScores, Format: "xlsx", Version: 2}, http.StatusCreated)
-	rows := load(next["id"].(string))
-	seen, header := 0, false
-	for _, row := range rows {
-		if len(row) > 0 && row[0] == "STT" {
-			header = true
-			if len(row) != 10 {
-				t.Fatal("tổng hợp điểm không đúng10cột riêng")
-			}
-		}
-		if len(row) >= 7 && strings.HasPrefix(row[1], "Người Đánh Giá") {
-			seen++
-			if row[4] != "82" || row[5] != "82" {
-				t.Fatalf("sai tổng điểm phiếu: %v", row)
-			}
-		}
-	}
-	if !header || seen != 3 {
-		t.Fatalf("thiếu header/đủ3người: %v %d", header, seen)
-	}
-	if again := load(blank["id"].(string)); !slices.EqualFunc(before, again, func(a, b []string) bool { return slices.Equal(a, b) }) {
-		t.Fatal("lần xuất điểm cũ bị thay theo phiếu nộp mới")
-	}
-	unit := appraisalCall(t, a.f, "ld_tt", http.MethodPost, base+"/exports", "scores-unit-only", app.AppraisalExportInput{Kind: app.AppraisalScores, Format: "xlsx", Version: 2}, http.StatusCreated)
-	if unit["count"] != json.Number("2") {
-		t.Fatal("tổng hợp điểm lãnh đạo lộ MS06/đơn vị khác")
-	}
-	appraisalCall(t, a.f, "xa", http.MethodPost, base+"/exports", "scores-self-denied", app.AppraisalExportInput{Kind: app.AppraisalScores, Format: "xlsx", Version: 2}, http.StatusForbidden)
-	appraisalCall(t, a.f, "hcth", http.MethodPost, base+"/exports", "scores-no-word", app.AppraisalExportInput{Kind: app.AppraisalScores, Format: "docx", Version: 2}, http.StatusUnprocessableEntity)
+	appraisalCall(t, a.f, "hcth", http.MethodPost, base+"/exports", "score-removed-after-send", app.AppraisalExportInput{Kind: app.AppraisalScores, Format: "xlsx", Version: 2}, http.StatusNotFound)
+	appraisalCall(t, a.f, "ld_tt", http.MethodPost, base+"/exports", "manager-no-fn18", app.AppraisalExportInput{Kind: "MS05", Format: "xlsx", Version: 2}, http.StatusForbidden)
 }
 
 func TestHRMAppraisalPositionSnapshotHTTP_W1126(t *testing.T) {

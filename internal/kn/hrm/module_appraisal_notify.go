@@ -94,7 +94,7 @@ func appraisalDrafts(ctx context.Context, acc port.Access, dir port.NotifyDirect
 	subject := p.PeriodRef
 	link := "/kn/nhan-su/danh-gia/dot/" + p.PeriodRef.String()
 	if p.StaffRef != nil && *p.StaffRef != uuid.Nil {
-		link += "/phieu/" + p.StaffRef.String()
+		link += "/de-xuat/" + p.StaffRef.String()
 	}
 	template := notifyport.NotificationDraft{Kind: port.KindAppraisal, Severity: notifyport.SeverityNormal, Title: title, Body: body,
 		DeepLink: link, SubjectRef: &subject, CreatedAt: at.UTC()}

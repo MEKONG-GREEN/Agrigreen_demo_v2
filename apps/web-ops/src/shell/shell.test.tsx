@@ -360,7 +360,7 @@ describe("AppShell: nguồn menu và kiểm hiển thị", () => {
 
 describe("HRM v4.0: gỡ tự đánh giá, giữ route lãnh đạo/HCTH",()=>{
  const period="019abcde-0000-7000-8000-000000000001",staff="019abcde-0000-7000-8000-000000000002";
- const canonical=`/kn/nhan-su/danh-gia/dot/${period}/phieu/${staff}`;
+ const canonical=`/kn/nhan-su/danh-gia/dot/${period}/de-xuat/${staff}`;
  const center=():MenuTree=>({version:"test",role:"kn_tinh",department_code:"hanh_chinh_tong_hop",groups:[{key:"dieu_hanh",label:"Điều hành",items:[{key:"tinh.hcth.danh_gia",label:"Đánh giá",icon:"approve",href:"/kn/nhan-su/danh-gia",status:"active"}]}]});
  it("chỉ ánh xạ URL UUID thực vào lá hiện có, giữ breadcrumb và các màn HCTH",()=>{
   const tree=center();
@@ -385,4 +385,11 @@ describe("HRM v4.0: gỡ tự đánh giá, giữ route lãnh đạo/HCTH",()=>{
   const absent=center();absent.groups[0]!.items=[];expect(menuAllows(absent,canonical)).toBe(false);
   for(const path of [canonical+"/extra",canonical+"?x=1",canonical.replace(period,"not-a-uuid"),canonical.replace(staff,"%2F"),"/kn/nhan-su/danh-gia/unknown"])expect(menuAllows(center(),path)).toBe(false);
  });
+});
+
+it("HC2: lá lãnh đạo chỉ mở danh sách/đề xuất, không mở mẫu hoặc đợt mới",()=>{
+ const p="019abcde-0000-7000-8000-000000000001",staff="019abcde-0000-7000-8000-000000000002",base="/kn/nhan-su/danh-gia";
+ const manager:MenuTree={version:"test",role:"kn_tinh",department_code:"trong_trot",groups:[{key:"dieu_hanh",label:"Điều hành",items:[{key:"tinh.chung.de_xuat_xep_loai",label:"Đề xuất xếp loại",icon:"approve",href:base,status:"active"}]}]};
+ expect(menuAllows(manager,base)).toBe(true);expect(menuAllows(manager,`${base}/dot/${p}/de-xuat/${staff}`)).toBe(true);
+ for(const suffix of ["/mau","/mau/them-moi","/dot/them-moi",`/dot/${p}/phieu/${staff}`])expect(menuAllows(manager,base+suffix)).toBe(false);
 });

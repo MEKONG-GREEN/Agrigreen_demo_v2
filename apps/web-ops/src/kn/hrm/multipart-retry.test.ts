@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApiClient } from "@/api/client";
 import { IdempotentOperation, withIdempotentOperation } from "@/api/idempotency";
+import { createAppraisalApi } from "./appraisal-api";
 import { createDocApi, type HrmDocInput } from "./doc-api";
 import { createPromotionApi, type DecisionInput } from "./promotion-api";
 import { saveDecision } from "./DecisionScreens";
@@ -9,6 +10,7 @@ import { HRM_MAX_DOC_BYTES } from "./upload-file";
 import { createSurveyApi } from "@/kn/price/surveys/api";
 
 const pdf = (bytes = "%PDF-1.7\nscan", modified = 1) => new File([bytes], "scan.pdf", { type: "application/pdf", lastModified: modified });
+const xlsx = (bytes = "PK\u0003\u0004workbook", modified = 1) => new File([bytes], "de-xuat.xlsx", {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",lastModified:modified});
 const csv = (bytes = "xa,gia\nA,100\n", modified = 1) => new File([bytes], "nhap.csv", { type: "text/csv", lastModified: modified });
 const meta = { folder_id: "folder", title: "Quyết định", doc_type: "nang_bac" } as HrmDocInput;
 const decision = { decision_no: "540/QĐ", decided_on: "2026-07-01", issuer: "Sở NN&MT", kind: "nltx", people: [] } as DecisionInput;
@@ -47,6 +49,7 @@ function server() {
 }
 
 const variants = [
+  { name: "Đề xuất xếp loại", file: xlsx, send: (s: ReturnType<typeof server>, f: File) => createAppraisalApi(s.api).importExcel("period-281", 1, f) },
   { name: "Kho HCTH", file: pdf, send: (s: ReturnType<typeof server>, f: File) => createDocApi(s.api).upload(meta, f) },
   { name: "Tệp quyết định", file: pdf, send: (s: ReturnType<typeof server>, f: File) => createPromotionApi(s.api).attachFile("decision-1", f) },
   { name: "Xem trước điều tra", file: csv, send: (s: ReturnType<typeof server>, f: File) => createSurveyApi(s.api).preview("round-1", { file: f, mapping: { commune: 0, price: 1 } }) },
@@ -134,4 +137,12 @@ describe("Quyết định + tệp, một lượt qua await", () => {
       expect(s.writes).toBe(2);
     } finally { vi.unstubAllGlobals(); }
   });
+});
+
+it("HC2: nhập đề xuất kiểm đuôi, cỡ tệp và phiên bản trước gửi",async()=>{
+ const s=server(),api=createAppraisalApi(s.api);
+ for(const version of [0,-1,1.1,Number.POSITIVE_INFINITY,Number.NaN])await expect(api.importExcel("period-281",version,xlsx())).rejects.toBeDefined();
+ await expect(api.importExcel("period-281",1,new File(["PK"],"de-xuat.csv"))).rejects.toBeDefined();
+ await expect(api.importExcel("period-281",1,new File([new Uint8Array(5*1024*1024+1)],"de-xuat.xlsx"))).rejects.toBeDefined();
+ expect(s.requests).toHaveLength(0);
 });

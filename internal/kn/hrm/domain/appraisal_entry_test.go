@@ -46,154 +46,108 @@ func TestAppraisalScopeUsesSubjectAndHS37_W1126(t *testing.T) {
 	}
 }
 
-func TestAppraisalReasonCountsCharacters_W1126(t *testing.T) {
-	e, _, manager, _ := appraisalEntryExample()
-	e.Status = AppraisalSelfSubmitted
-	if _, err := ChangeAppraisalEntry(e, appraisalExample(), AppraisalStepLocks{}, manager,
-		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "ááááá"}); err == nil {
-		t.Fatal("5 ký tự không được tính thành10 vì UTF8 có10byte")
-	}
-	if _, err := ChangeAppraisalEntry(e, appraisalExample(), AppraisalStepLocks{}, manager,
-		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Cần sửa lại phần căn cứ"}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestAppraisalAuthenticatedFlowAndImmutableClose_W1126(t *testing.T) {
+// HC-2 thay assertions chấm điểm cũ bằng DG04–10; bộ decode/ScoreAppraisal lịch sử vẫn giữ ở appraisal_test.go.
+func TestAppraisalV4StatesCorrectionsAndClose281(t *testing.T) {
 	e, self, manager, center := appraisalEntryExample()
-	form := appraisalExample()
-	var err error
-	e, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, appraisalTestProxy(manager), appraisalTestProxyInput(8200))
+	save := AppraisalEntryChange{Action: "manager_submit", SelfRating: "HTXSNV", CollectiveRating: "HTTNV", Reason: "Căn cứ kết quả hoàn thành nhiệm vụ", PersonnelProposal: "Tiếp tục công tác", Note: "Biên bản đơn vị"}
+	for _, actor := range []AppraisalAuthority{self, {Actor: manager.Actor, Group: GroupManager, Unit: "khac", Manager: true}, {Actor: manager.Actor, Group: GroupManager, Unit: "tt", Manager: true, ReadOnly: true}} {
+		if _, err := ChangeAppraisalEntry(e, AppraisalStepLocks{}, actor, save); err == nil {
+			t.Fatal("caller ngoài quyền vẫn nhập đề xuất")
+		}
+	}
+	entered, err := ChangeAppraisalEntry(e, AppraisalStepLocks{}, manager, save)
+	if err != nil || entered.Status != AppraisalEntered || entered.SelfRating != "HTXSNV" || entered.PersonnelProposal != save.PersonnelProposal {
+		t.Fatalf("DG04–08: %+v %v", entered, err)
+	}
+	if e.Status != AppraisalNotStarted || e.SelfRating != "" {
+		t.Fatal("lưu sửa phiên bản nguồn")
+	}
+	sent, err := ChangeAppraisalEntry(entered, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "send"})
+	if err != nil || sent.Status != AppraisalSent {
+		t.Fatalf("gửi: %+v %v", sent, err)
+	}
+	if _, err = ChangeAppraisalEntry(sent, AppraisalStepLocks{}, manager, save); err == nil {
+		t.Fatal("đã gửi còn sửa trực tiếp")
+	}
+	if _, err = ChangeAppraisalEntry(sent, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "return", Reason: "Đề nghị phòng rà soát lại"}); err == nil {
+		t.Fatal("lãnh đạo tự trả đề xuất đã gửi")
+	}
+	if _, err = ChangeAppraisalEntry(sent, AppraisalStepLocks{}, center, AppraisalEntryChange{Action: "return", Reason: "ááááá"}); err == nil {
+		t.Fatal("5 ký tự được tính nhầm thành 10byte")
+	}
+	corrected, err := ChangeAppraisalEntry(sent, AppraisalStepLocks{}, center, AppraisalEntryChange{Action: "return", Reason: "Cần bổ sung căn cứ đề xuất"})
+	if err != nil || corrected.Status != AppraisalChangeRequested || corrected.ReturnedTo != "manager" {
+		t.Fatalf("trả: %+v %v", corrected, err)
+	}
+	corrected, err = ChangeAppraisalEntry(corrected, AppraisalStepLocks{}, manager, save)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.Status != AppraisalSelfSubmitted || e.SelfRating != "HTXSNV" {
-		t.Fatalf("%+v", e)
-	}
-	if _, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, self, AppraisalEntryChange{Action: "self_draft"}); err == nil {
-		t.Fatal("đã nộp vẫn tự sửa")
-	}
-	e, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "manager_submit", Answers: appraisalAnswers(7000), CollectiveRating: "HTTNV", Reason: "Kết quả thực hiện nhiệm vụ theo phân công"})
+	corrected, err = ChangeAppraisalEntry(corrected, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "send"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.Manager.Total != "70" || e.Manager.Suggested != "HTTNV" || e.Self.Suggested != "HTXSNV" {
-		t.Fatal("mất điểm tự chấm hoặc gợi ý cấp quản lý")
-	}
-	e, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "send"})
+	official, err := ChangeAppraisalEntry(corrected, AppraisalStepLocks{}, center, AppraisalEntryChange{Action: "official", OfficialRating: "HTNV"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "manager_draft"}); err == nil {
-		t.Fatal("đã gửi HCTH vẫn sửa")
+	closed, err := CloseAppraisalEntry(official)
+	if err != nil || closed.Status != AppraisalClosed || closed.ClosedRating != "HTNV" {
+		t.Fatalf("chốt DG09: %+v %v", closed, err)
 	}
-	e, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, center, AppraisalEntryChange{Action: "official", OfficialRating: "HTNV", Reason: "Kết luận theo biên bản họp tập thể lãnh đạo"})
-	if err != nil {
-		t.Fatal(err)
+	fallback, err := CloseAppraisalEntry(corrected)
+	if err != nil || fallback.ClosedRating != "HTTNV" {
+		t.Fatalf("chốt fallbackDG05: %+v %v", fallback, err)
 	}
-	closed, err := CloseAppraisalEntry(e)
-	if err != nil || closed.ClosedRating != "HTNV" || closed.Status != AppraisalClosed {
-		t.Fatalf("%+v %v", closed, err)
+	if _, err = ChangeAppraisalEntry(closed, AppraisalStepLocks{Closed: true}, center, AppraisalEntryChange{Action: "official", OfficialRating: "HTTNV"}); err == nil {
+		t.Fatal("sửa trực tiếp người đã chốt")
 	}
-	if e.ClosedRating != "" || e.Status != AppraisalSent {
-		t.Fatal("chốt đã sửa phiên bản nguồn")
-	}
-	if _, err = ChangeAppraisalEntry(closed, form, AppraisalStepLocks{Closed: true}, center, AppraisalEntryChange{Action: "official", OfficialRating: "HTTNV"}); err == nil {
-		t.Fatal("sửa trực tiếp bản đã chốt")
-	}
-	reopened, err := ChangeAppraisalEntry(closed, form, AppraisalStepLocks{Closed: true}, center, AppraisalEntryChange{Action: "reopen", Reason: "Đính chính kết quả theo biên bản bổ sung"})
-	if err != nil || !reopened.Reopened || reopened.ReturnedTo != "manager" {
-		t.Fatalf("%+v %v", reopened, err)
+	reopened, err := ChangeAppraisalEntry(closed, AppraisalStepLocks{Closed: true}, center, AppraisalEntryChange{Action: "reopen", Reason: "Điều chỉnh theo biên bản bổ sung"})
+	if err != nil || !reopened.Reopened || reopened.Status != AppraisalChangeRequested || reopened.ClosedRating != "" {
+		t.Fatalf("mở lại: %+v %v", reopened, err)
 	}
 	if closed.Status != AppraisalClosed || closed.ClosedRating != "HTNV" {
-		t.Fatal("mở lại đã làm đổi ảnh chụp chốt")
+		t.Fatal("mở lại làm đổi snapshot chốt")
+	}
+	if _, err = ChangeAppraisalEntry(reopened, AppraisalStepLocks{Closed: true}, manager, save); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = ChangeAppraisalEntry(entered, AppraisalStepLocks{Closed: true}, manager, save); err == nil {
+		t.Fatal("mở một người đã mở toàn đợt")
 	}
 }
 
-func TestAppraisalLocksReadonlyAndProxyProof_W1126(t *testing.T) {
-	e, self, manager, _ := appraisalEntryExample()
-	form := appraisalExample()
-	input := AppraisalEntryChange{Action: "self_submit", Answers: appraisalAnswers(7000)}
-	if _, err := ChangeAppraisalEntry(e, form, AppraisalStepLocks{Self: true}, self, input); err == nil {
-		t.Fatal("khóa bước vẫn nộp")
+func TestAppraisalV4RejectsIncompleteAndScoring281(t *testing.T) {
+	e, _, manager, center := appraisalEntryExample()
+	for _, self := range []string{"", "HTXSNV", "HTTNV", "HTNV", "KHTNV"} {
+		for _, collective := range []string{"", "HTXSNV", "HTTNV", "HTNV", "KHTNV"} {
+			in := AppraisalEntryChange{Action: "manager_submit", SelfRating: self, CollectiveRating: collective}
+			_, err := ChangeAppraisalEntry(e, AppraisalStepLocks{}, manager, in)
+			need := self == "" || collective == "" || self == "HTXSNV" || self == "KHTNV" || collective == "HTXSNV" || collective == "KHTNV"
+			if (err != nil) != need {
+				t.Errorf("%s/%s: %v", self, collective, err)
+			}
+		}
 	}
-	self.ReadOnly = true
-	if _, err := ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, self, input); err == nil {
-		t.Fatal("chỉ xem vẫn ghi")
-	}
-	proof := uuid.MustParse("00000000-0000-7000-8000-000000000021")
-	input.Action = "proxy_self"
-	input.ProxyDocument = &proof
-	if _, err := ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, manager, input); err == nil {
-		t.Fatal("tin mã scan chưa kiểm quyền")
-	}
-	manager.ProofVerified = true
-	got, err := ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, manager, input)
-	if err != nil || got.ProxyDocument == nil {
-		t.Fatalf("%+v %v", got, err)
-	}
-	*got.ProxyDocument = uuid.Nil
-	if proof == uuid.Nil {
-		t.Fatal("bản phiếu giữ con trỏ đầu vào")
+	for _, action := range []string{"self_draft", "self_submit", "proxy_self", "manager_draft"} {
+		if _, err := ChangeAppraisalEntry(e, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: action}); err == nil {
+			t.Errorf("writer cũ %s còn tồn tại", action)
+		}
 	}
 	if _, err := CloseAppraisalEntry(e); err == nil {
-		t.Fatal("chốt phiếu chưa nộp")
+		t.Fatal("chốt người chưa nhập")
 	}
-}
-
-func TestAppraisalReturnRequiresReasonAndAssignment_W1126(t *testing.T) {
-	e, _, manager, center := appraisalEntryExample()
-	form := appraisalExample()
-	e, err := ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, appraisalTestProxy(manager), appraisalTestProxyInput(7000))
-	if err != nil {
+	for _, who := range []AppraisalAuthority{manager, center} {
+		if _, err := ChangeAppraisalEntry(e, AppraisalStepLocks{}, who, AppraisalEntryChange{Action: "proxy_self"}); err == nil {
+			t.Fatal("nhận writer phiếu cũ")
+		}
+	}
+	e.Member.SummaryKind = "MS06"
+	save := AppraisalEntryChange{Action: "manager_submit", SelfRating: "HTTNV", CollectiveRating: "HTNV"}
+	if _, err := ChangeAppraisalEntry(e, AppraisalStepLocks{}, manager, save); err == nil {
+		t.Fatal("lãnh đạo ghi Mẫu06")
+	}
+	if _, err := ChangeAppraisalEntry(e, AppraisalStepLocks{}, center, save); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "sửa"}); err == nil {
-		t.Fatal("trả phiếu không đủ lý do")
-	}
-	if _, err = ChangeAppraisalEntry(e, form, AppraisalStepLocks{Self: true}, manager, AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Cần bổ sung nội dung tự đánh giá"}); err == nil {
-		t.Fatal("lãnh đạo tự mở khóa bước HCTH đã khóa")
-	}
-	returned, err := ChangeAppraisalEntry(e, form, AppraisalStepLocks{}, manager, AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Cần bổ sung nội dung tự đánh giá"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	returned, err = ChangeAppraisalEntry(returned, form, AppraisalStepLocks{}, appraisalTestProxy(manager), appraisalTestProxyInput(7500))
-	if err != nil || returned.Self.Total != "75" || returned.Status != AppraisalSelfSubmitted {
-		t.Fatalf("%+v %v", returned, err)
-	}
-	if _, err = ChangeAppraisalEntry(returned, form, AppraisalStepLocks{}, center, AppraisalEntryChange{Action: "return", ReturnTo: "manager", Reason: "Cần điều chỉnh tập thể đề xuất"}); err == nil {
-		t.Fatal("trả đề xuất chưa được gửi HCTH")
-	}
-}
-
-func TestAppraisalIndividualReturnDoesNotUnlockOtherEntries_W1126(t *testing.T) {
-	e, _, manager, center := appraisalEntryExample()
-	e.Status = AppraisalSent
-	locks := AppraisalStepLocks{Self: true, Manager: true}
-	returned, err := ChangeAppraisalEntry(e, appraisalExample(), locks, center,
-		AppraisalEntryChange{Action: "return", ReturnTo: "manager", Reason: "Cần đơn vị rà soát lại đề xuất"})
-	if err != nil || !returned.Reopened {
-		t.Fatalf("HCTH trả riêng: %+v %v", returned, err)
-	}
-	returned, err = ChangeAppraisalEntry(returned, appraisalExample(), locks, manager,
-		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Cần cá nhân bổ sung căn cứ"})
-	if err != nil || returned.ReturnedTo != "self" {
-		t.Fatalf("lãnh đạo trả tiếp đúng phiếu đã mở riêng: %+v %v", returned, err)
-	}
-	if _, err = ChangeAppraisalEntry(e, appraisalExample(), locks, manager,
-		AppraisalEntryChange{Action: "return", ReturnTo: "self", Reason: "Không được tự mở phiếu khác"}); err == nil {
-		t.Fatal("mở riêng một phiếu làm mở khóa cả đơn vị")
-	}
-}
-
-// Luồng nhập thay có scan vẫn do lãnh đạo thực hiện trong gói HC-0;
-// bỏ toàn bộ phiếu/điểm và đổi trạng thái thuộc HC-2.
-func appraisalTestProxy(a AppraisalAuthority) AppraisalAuthority {
-	a.ProofVerified = true
-	return a
-}
-func appraisalTestProxyInput(points int64) AppraisalEntryChange {
-	proof := uuid.MustParse("00000000-0000-7000-8000-000000000021")
-	return AppraisalEntryChange{Action: "proxy_self", Answers: appraisalAnswers(points), ProxyDocument: &proof, Reason: "Căn cứ phiếu giấy đã được đối chiếu"}
 }

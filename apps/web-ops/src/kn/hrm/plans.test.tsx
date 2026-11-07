@@ -85,7 +85,8 @@ describe("kế hoạch nhân lực năm (W11.27, FN-11) — giả lập", () => 
     expect(closed.rows.every((r) => r.status === "missed")).toBe(true);
     const a = await pa.adjust(2027, "trong_trot", { leaving: 0, additional: 2, reason: "Bổ sung theo chỉ tiêu mới" });
     expect(a.values.demand).toBe(a.values.current - a.values.retiring + 2);
-    const tt = await clientFor("kn-binh", "asg-binh-tinh");
+    // Cá nhân thường: Bình là Trưởng phòng trong phân công seed.
+    const tt = await clientFor("kn-an", "asg-an-tinh");
     expect(await problemCode(tt.pa.list())).toBe("forbidden");
   });
 

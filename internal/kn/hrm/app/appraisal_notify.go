@@ -17,12 +17,14 @@ import (
 )
 
 func appraisalNotice(p AppraisalPeriod, c appraisalActor, action, step string, id uuid.UUID) port.AppraisalChangedV1 {
-	due := p.SelfDueAt
+	due := p.ManagerDueAt
 	switch step {
 	case "manager":
 		due = p.ManagerDueAt
 	case "summary":
-		due = p.SummaryDueAt
+		if !p.SummaryDueAt.IsZero() {
+			due = p.SummaryDueAt
+		}
 	}
 	return port.AppraisalChangedV1{NoticeID: id, PeriodRef: p.ID, NodeRef: p.NodeRef, Year: p.Year, Quarter: p.Quarter,
 		Action: action, Step: step, DueAt: due.UTC().Format(time.RFC3339), ActorRef: c.ref, Targets: []uuid.UUID{}, Units: []string{}}
@@ -68,7 +70,7 @@ func (s *Service) enqueueAppraisalNotice(ctx context.Context, tx pgx.Tx, c appra
 func (s *Service) appraisalEntryNotice(ctx context.Context, tx pgx.Tx, c appraisalActor, p AppraisalPeriod, row store.AppraisalEvent, e domain.AppraisalEntry) error {
 	step := "manager"
 	switch row.Action {
-	case "proxy_self", "reopen":
+	case "reopen":
 	case "return":
 		step = e.ReturnedTo
 	case "send":
@@ -91,8 +93,8 @@ func (s *Service) appraisalEntryNotice(ctx context.Context, tx pgx.Tx, c apprais
 }
 
 func (s *Service) remindAppraisal(ctx context.Context, tx pgx.Tx, c appraisalActor, p AppraisalPeriod, step, _ string) error {
-	if step != "self" && step != "manager" && step != "summary" {
-		return problem.Validation.WithField("step", "chọn self, manager hoặc summary")
+	if step != "manager" {
+		return problem.Validation.WithField("step", "nhắc các đơn vị chưa gửi đề xuất")
 	}
 	rows, err := store.AppraisalEntrySummaries(ctx, tx, p.ID, false)
 	if err != nil {
@@ -107,26 +109,12 @@ func (s *Service) remindAppraisal(ctx context.Context, tx pgx.Tx, c appraisalAct
 		if x.Member.ExcludedReason != "" || x.Status == domain.AppraisalClosed {
 			continue
 		}
-		switch step {
-		case "self":
-			if x.Status != domain.AppraisalNotStarted && (x.Status != domain.AppraisalChangeRequested || x.ReturnedTo != "self") {
-				continue
-			}
-			appraisalManagerAudience(&n, x.Member)
-		case "manager":
-			if x.Status != domain.AppraisalSelfSubmitted && (x.Status != domain.AppraisalChangeRequested || x.ReturnedTo != "manager") {
-				continue
-			}
-			appraisalManagerAudience(&n, x.Member)
-		case "summary":
-			if x.Status == domain.AppraisalSent {
-				continue
-			}
+		if x.Status != domain.AppraisalSent {
 			appraisalManagerAudience(&n, x.Member)
 		}
 	}
 	if len(n.Targets) == 0 && len(n.Units) == 0 && !n.Center {
-		return port.ErrAppraisalBlocked.WithDetail("không còn phiếu phù hợp để nhắc")
+		return port.ErrAppraisalBlocked.WithDetail("không còn đơn vị chưa gửi để nhắc")
 	}
 	return s.enqueueAppraisalNotice(ctx, tx, c, n)
 }

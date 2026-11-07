@@ -392,7 +392,7 @@ paths:
 # @ag-order: 1215
   /v1/hrm/staff/{id}/ratings:
     get:
-      summary: Xếp loại năm của một hồ sơ (dùng kiểm điều kiện nâng bậc — FN-09 BR-02) — mọi dòng sổ, cũ trước
+      summary: Xếp loại năm lịch sử chỉ đọc — mọi dòng sổ, cũ trước; kết quả v4 tại appraisal-results
       operationId: hrmRatingList
       tags: [hrm]
       parameters:
@@ -409,35 +409,6 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/HrmAnnualRating"}}
         "403": {description: forbidden | hrm.records_disabled, $ref: "#/components/responses/Problem"}
         "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
-    post:
-      summary: Ghi xếp loại năm (nguồn chuyển đổi ban đầu hoặc nhập tay; FN-18 W11.26 ghi nguồn evaluation) — năm đã có → thay, cần lý do ≥ 10 ký tự; rating rỗng = hủy
-      operationId: hrmRatingSet
-      tags: [hrm]
-      parameters:
-        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [year, rating]
-              properties:
-                year: {type: integer, minimum: 1990, maximum: 2100}
-                rating: {type: string, enum: ["", HTXSNV, HTTNV, HTNV, KHTNV]}
-                source: {type: string, enum: [manual, conversion]}
-                reason: {type: string, maxLength: 500}
-      responses:
-        "201":
-          description: Đã ghi
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/HrmAnnualRating"}
-        "403": {description: forbidden, $ref: "#/components/responses/Problem"}
-        "404": {description: hrm.staff_not_found, $ref: "#/components/responses/Problem"}
-        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
 components:
   schemas:
 # @ag-order: 1240

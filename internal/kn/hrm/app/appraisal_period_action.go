@@ -22,9 +22,7 @@ type AppraisalPeriodChange struct {
 	Reason              string               `json:"reason,omitempty"`
 	Unit                string               `json:"unit,omitempty"`
 	Step                string               `json:"step,omitempty"`
-	SelfDueAt           string               `json:"self_due_at,omitempty"`
 	ManagerDueAt        string               `json:"manager_due_at,omitempty"`
-	SummaryDueAt        string               `json:"summary_due_at,omitempty"`
 	SignedDocuments     map[string]uuid.UUID `json:"signed_documents,omitempty"`
 	AcknowledgeUnsigned bool                 `json:"acknowledge_unsigned"`
 }
@@ -50,29 +48,14 @@ func appraisalPeriodPermission(c appraisalActor, action string) error {
 }
 
 func extendAppraisalPeriod(p *AppraisalPeriod, in AppraisalPeriodChange) error {
-	nextPeriod := *p
-	changed := false
-	for _, v := range []struct {
-		field, raw string
-		old        *time.Time
-	}{{"self_due_at", in.SelfDueAt, &nextPeriod.SelfDueAt}, {"manager_due_at", in.ManagerDueAt, &nextPeriod.ManagerDueAt}, {"summary_due_at", in.SummaryDueAt, &nextPeriod.SummaryDueAt}} {
-		if v.raw == "" {
-			continue
-		}
-		if len(v.raw) > 40 {
-			return problem.Validation.WithField(v.field, "hạn RFC3339 có múi giờ")
-		}
-		next, err := time.Parse(time.RFC3339, v.raw)
-		if err != nil || next.Before(*v.old) {
-			return problem.Validation.WithField(v.field, "gia hạn không được rút ngắn hạn hiện có")
-		}
-		changed = changed || next.After(*v.old)
-		*v.old = next.UTC()
+	if len(in.ManagerDueAt) > 40 {
+		return problem.Validation.WithField("manager_due_at", "chỉ gia hạn gửi đề xuất của các phòng")
 	}
-	if !changed || !nextPeriod.ManagerDueAt.After(nextPeriod.SelfDueAt) || !nextPeriod.SummaryDueAt.After(nextPeriod.ManagerDueAt) {
-		return problem.Validation.WithField("summary_due_at", "cần hạn mới và giữ tự đánh giá < cấp quản lý < tổng hợp")
+	due, err := time.Parse(time.RFC3339, in.ManagerDueAt)
+	if err != nil || !due.After(p.ManagerDueAt) {
+		return problem.Validation.WithField("manager_due_at", "hạn mới phải sau hạn gửi hiện có")
 	}
-	*p = nextPeriod
+	p.ManagerDueAt = due.UTC()
 	return nil
 }
 
@@ -108,6 +91,12 @@ func (s *Service) ChangeAppraisalPeriod(ctx context.Context, period uuid.UUID, i
 		pre, e = loadAppraisalPeriod(ctx, tx, period)
 		if e != nil {
 			return e
+		}
+		if !c.onPeriod(pre) {
+			return port.ErrAppraisalNotFound
+		}
+		if pre.WorkflowVersion != AppraisalProposalV4 {
+			return port.ErrAppraisalBlocked.WithDetail("đợt và phiếu cũ chỉ được đọc")
 		}
 		if ok {
 			replay = &old
@@ -145,7 +134,7 @@ func (s *Service) ChangeAppraisalPeriod(ctx context.Context, period uuid.UUID, i
 			}
 			continue
 		}
-		p, e := s.verifiedAppraisalDocument(ctx, c, doc, uuid.Nil, true)
+		p, e := s.verifiedAppraisalSignedDocument(ctx, c, doc)
 		if e != nil {
 			return AppraisalPeriod{}, e
 		}
@@ -185,19 +174,6 @@ func (s *Service) ChangeAppraisalPeriod(ctx context.Context, period uuid.UUID, i
 		switch in.Action {
 		case "extend":
 			e = extendAppraisalPeriod(&p, in)
-		case "lock_self", "unlock_self", "lock_manager", "unlock_manager":
-			unlock := strings.HasPrefix(in.Action, "unlock")
-			if unlock && utf8.RuneCountInString(in.Reason) < 10 {
-				return problem.Validation.WithField("reason", "mở khóa bước cần lý do ít nhất 10 ký tự")
-			}
-			field := &p.SelfLocked
-			if strings.HasSuffix(in.Action, "manager") {
-				field = &p.ManagerLocked
-			}
-			if *field == !unlock {
-				return port.ErrAppraisalConflict.WithDetail("trạng thái khóa không thay đổi")
-			}
-			*field = !unlock
 		case "attach_signed":
 			if p.SignedDocuments == nil {
 				p.SignedDocuments = map[string]uuid.UUID{}
@@ -220,7 +196,7 @@ func (s *Service) ChangeAppraisalPeriod(ctx context.Context, period uuid.UUID, i
 				}
 			}
 			e = s.closeAppraisalEntries(ctx, tx, c, p, idem, hash, in.Reason)
-			p.Closed, p.SelfLocked, p.ManagerLocked = true, true, true
+			p.Closed = true
 		case "remind":
 			e = s.remindAppraisal(ctx, tx, c, p, in.Step, idem)
 		default:
@@ -234,7 +210,7 @@ func (s *Service) ChangeAppraisalPeriod(ctx context.Context, period uuid.UUID, i
 		if e != nil {
 			return e
 		}
-		saved, e = store.InsertAppraisal(ctx, tx, c.tenant, store.AppraisalEvent{ID: ids.New(), Kind: "period", Key: appraisalPeriodKey(p.Year, p.Quarter),
+		saved, e = store.InsertAppraisal(ctx, tx, c.tenant, store.AppraisalEvent{ID: ids.New(), Kind: "period", Key: appraisalPeriodKey(p.Year, p.Quarter) + ":" + p.ID.String(),
 			PeriodRef: &period, Action: in.Action, Payload: raw, Reason: in.Reason, RequestHash: hash, IdemKey: idem, Actor: c.ref}, s.Clock.Now())
 		if e == nil && in.Action == "send" {
 			n := appraisalNotice(p, c, "send", "summary", saved.ID)
@@ -268,19 +244,15 @@ func (s *Service) sendAppraisalUnit(ctx context.Context, tx pgx.Tx, c appraisalA
 			(unit != "" && unit != x.Member.ManagementUnit) || x.Status == domain.AppraisalSent || x.Status == domain.AppraisalClosed {
 			continue
 		}
-		if x.Status != domain.AppraisalManagerSubmitted {
+		if x.Status != domain.AppraisalEntered {
 			return port.ErrAppraisalBlocked.WithDetail("đơn vị còn người chưa hoàn tất đề xuất; chưa gửi dòng nào")
 		}
 		_, full, e := loadAppraisalItem(ctx, tx, c, p.ID, x.Member.StaffID)
 		if e != nil {
 			return e
 		}
-		form := p.Forms[x.Member.Group]
-		if form.Form == nil {
-			return port.ErrAppraisalBlocked
-		}
-		next, e := domain.ChangeAppraisalEntry(full.AppraisalEntry, *form.Form,
-			domain.AppraisalStepLocks{Self: p.SelfLocked, Manager: p.ManagerLocked, Closed: p.Closed}, appraisalAuthority(c), domain.AppraisalEntryChange{Action: "send"})
+		next, e := domain.ChangeAppraisalEntry(full.AppraisalEntry,
+			domain.AppraisalStepLocks{Closed: p.Closed}, appraisalAuthority(c), domain.AppraisalEntryChange{Action: "send"})
 		if e != nil {
 			return appraisalValidation(e)
 		}
@@ -307,7 +279,7 @@ func (s *Service) closeAppraisalEntries(ctx context.Context, tx pgx.Tx, c apprai
 		return err
 	}
 	n := 0
-	for _, row := range rows { // SQL sắp theo khóa staff trong cùng đợt, giữ thứ tự khóa rating ổn định
+	for _, row := range rows { // Chỉ ghi kết quả trong sổ hồ sơ đánh giá; không ghi annual_rating của nâng bậc.
 		x, e := appraisalItem(row, c)
 		if e != nil {
 			return e
@@ -324,29 +296,6 @@ func (s *Service) closeAppraisalEntries(ctx context.Context, tx pgx.Tx, c apprai
 			return appraisalValidation(e)
 		}
 		staff := x.Member.StaffID
-		if p.Quarter == 0 {
-			if e = store.LockRating(ctx, tx, c.tenant, staff); e != nil {
-				return e
-			}
-			old, e := store.Ratings(ctx, tx, staff)
-			if e != nil {
-				return e
-			}
-			rating := store.RatingRow{ID: ids.New(), StaffID: staff, Year: p.Year, Rating: next.ClosedRating, Source: "evaluation", Actor: c.ref}
-			if previous, ok := store.EffectiveRatings(old)[staff][p.Year]; ok {
-				why := reason
-				if why == "" {
-					why = full.CorrectionReason
-				}
-				if utf8.RuneCountInString(why) < 10 {
-					return problem.Validation.WithField("reason", "đã có kết quả năm; thay bằng kết luận đợt cần lý do ít nhất 10 ký tự")
-				}
-				rating.Supersedes, rating.Reason = &previous.ID, why
-			}
-			if _, e = store.InsertRating(ctx, tx, c.tenant, rating, s.Clock.Now(), idem+":rating:"+staff.String()); e != nil {
-				return e
-			}
-		}
 		raw, e := appraisalJSON(next)
 		if e != nil {
 			return e

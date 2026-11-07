@@ -43,7 +43,6 @@ func (h Handler) registerPromotion(rg *gin.RouterGroup) {
 	rg.POST("/hrm/promotion/decisions/:id/cancel", h.decisionCancel)
 	rg.POST("/hrm/promotion/decisions/:id/file", h.decisionFile)
 	rg.GET("/hrm/staff/:id/ratings", h.ratingList)
-	rg.POST("/hrm/staff/:id/ratings", h.ratingSet)
 }
 
 func ymd(t time.Time) string { return t.Format(time.DateOnly) }
@@ -570,28 +569,4 @@ func (h Handler) ratingList(c *gin.Context) {
 		out = append(out, ratingOut(x))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": out})
-}
-
-type ratingIn struct {
-	Year   int    `json:"year"`
-	Rating string `json:"rating"`
-	Source string `json:"source"`
-	Reason string `json:"reason"`
-}
-
-func (h Handler) ratingSet(c *gin.Context) {
-	id, ok := uuidParam(c, "id", port.ErrStaffNotFound)
-	if !ok {
-		return
-	}
-	var in ratingIn
-	if !decode(c, &in) {
-		return
-	}
-	r, err := h.Svc.SetRating(c.Request.Context(), id, app.RatingInput{Year: in.Year, Rating: in.Rating, Source: in.Source, Reason: in.Reason}, idem(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusCreated, ratingOut(r))
 }

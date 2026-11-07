@@ -751,6 +751,12 @@ const SHARED_BY_AUDIENCE: Partial<Record<KnRole, Item[]>> = {
       "label": "Tài liệu của phòng",
       "route": "/kn/nhan-su/tai-lieu-phong",
       "icon": "library"
+    },
+    {
+      "key": "tinh.chung.de_xuat_xep_loai",
+      "label": "Đề xuất xếp loại",
+      "route": "/kn/nhan-su/danh-gia",
+      "icon": "approve"
     }
   ]
 };
@@ -2371,7 +2377,7 @@ export function navigationRoute(audience: KnRole, profile: KnMenuProfile | null,
  * KNMenu trên dây (= Go app.DepartmentMenu / app.AdminMenu). Admin: Điều hành / Phòng ban (mọi phòng ban, chưa mở
  * enabled = false) / Quản trị hệ thống / Dùng chung (kn.menu/v3). Phòng ban chưa mở → 409 ở handler.
  */
-export function knMenu(audience: KnRole, departmentCode: string | null, opts: { adHoc?: boolean; orgRef?: string | null } = {}): KnMenu {
+export function knMenu(audience: KnRole, departmentCode: string | null, opts: { adHoc?: boolean; orgRef?: string | null; manager?: boolean } = {}): KnMenu {
   if (audience === "admin") {
     const groups: KnMenuGroup[] = [
       { key: ADMIN_OVERVIEW.key, label: ADMIN_OVERVIEW.label, items: wire(ADMIN_OVERVIEW.items, true, false) },
@@ -2383,7 +2389,8 @@ export function knMenu(audience: KnRole, departmentCode: string | null, opts: { 
   }
   const d = KN_DEPARTMENTS.find((x) => x.code === (departmentCode ?? "trong_trot")) ?? KN_DEPARTMENTS[0]!;
   const adHoc = opts.adHoc ?? ADHOC_FORMS[d.code] ?? false;
-  const shared: Group = { ...SHARED, items: [...SHARED.items, ...(SHARED_BY_AUDIENCE[audience] ?? [])] };
+  const assignedShared=(SHARED_BY_AUDIENCE[audience]??[]).filter(item=>item.key!=="tinh.chung.de_xuat_xep_loai"||opts.manager!==false);
+  const shared: Group = { ...SHARED, items: [...SHARED.items, ...assignedShared] };
   const groups = [...profileGroups(profileOf(d.code), audience), shared]
     .map((g) => ({ key: g.key, label: g.label, items: wire(g.items, true, adHoc) }))
     .filter((g) => g.items.length > 0);
@@ -2473,7 +2480,7 @@ export function contextProblem(base: MockPersona, contextId: string | null): Res
 /** Context đã lưu (cho kiểm thử và khôi phục sau tải lại trong cùng tab). */
 export function knContext(contextId: string): SessionContext | undefined {
   const stored = CONTEXTS.get(contextId);
-  return stored ? { ...stored.ctx, default_route: knMenu(stored.ctx.role, stored.ctx.department_code, { orgRef: stored.ctx.org_ref }).default_route } : undefined;
+  return stored ? { ...stored.ctx, default_route: knMenu(stored.ctx.role, stored.ctx.department_code, { orgRef: stored.ctx.org_ref, manager: stored.ctx.manager??false }).default_route } : undefined;
 }
 
 const NO_STORE = { "Cache-Control": "no-store" };
@@ -2487,7 +2494,7 @@ function menuQuery(
   request: Request,
   url: URL,
   pathDepartment?: string,
-): Response | { audience: KnRole; department: string | null; orgRef: string | null } {
+): Response | { audience: KnRole; department: string | null; orgRef: string | null; manager?: boolean } {
   const asked = (url.searchParams.get("audience") ?? url.searchParams.get("role")) as KnRole | null;
   if (asked && !(asked in DEFAULT_ROUTE)) return problem(422, "validation_failed", "audience: kn_tw | kn_tinh | kn_xa | admin");
   let department = pathDepartment ?? url.searchParams.get("department");
@@ -2499,7 +2506,7 @@ function menuQuery(
     }
     const audience = asked ?? role;
     if (!department && audience === role) department = stored.ctx.department_code;
-    return { audience, department, orgRef: stored.ctx.org_ref };
+    return { audience, department, orgRef: stored.ctx.org_ref, manager: stored.ctx.manager??false };
   }
   if (!asked) return problem(422, "validation_failed", "audience: bắt buộc khi không có ngữ cảnh phiên");
   return { audience: asked, department, orgRef: null };
@@ -2537,16 +2544,21 @@ export const knAppRoutes: Route[] = [
         if (!dept) return problem(422, "accounts.department_required", "Department required");
         if (dept.status !== "active") return problem(409, "accounts.department_not_open", "Department not open");
       }
+      const manager=asg.role==="kn_tinh"&&["Trưởng phòng","Phó Trưởng phòng","Phụ trách"].includes(asg.mgmt_level??"");
+      const internalUnit=dept?.code==="hanh_chinh_tong_hop"?"hcth":dept?.code==="chan_nuoi_thuy_san"?"chan_nuoi":dept?.code??null;
       const ctx: SessionContext = {
         context_id: uuidv7(),
         assignment_id: asg.assignment_id,
         role: asg.role,
+        manager,
+        internal_unit_code:internalUnit,
+        mgmt_level_code:asg.mgmt_level_code??null,
         department_code: dept?.code ?? null,
         department_name: dept?.name ?? null,
         org_ref: asg.org_ref,
         org_name: asg.org_name,
         communes: asg.communes,
-        default_route: knMenu(asg.role, dept?.code ?? null, { orgRef: asg.org_ref }).default_route,
+        default_route: knMenu(asg.role, dept?.code ?? null, { orgRef: asg.org_ref, manager }).default_route,
         // Server: 24 giờ hoặc tới khi lần gán hết hiệu lực (P1 domain.ContextTTL).
         expires_at: new Date(Date.now() + 24 * 3_600_000).toISOString(),
         support_session_id: null,
@@ -2562,11 +2574,11 @@ export const knAppRoutes: Route[] = [
     handler: ({ request, url }) => {
       const q = menuQuery(request, url);
       if (q instanceof Response) return q;
-      if (q.audience === "admin") return json(knMenu("admin", null, { orgRef: q.orgRef }), 200, NO_STORE);
+      if (q.audience === "admin") return json(knMenu("admin", null, { orgRef: q.orgRef, manager:q.manager }), 200, NO_STORE);
       const d = q.department ? findKnDepartment(q.department) : KN_DEPARTMENTS.find((x) => x.status === "active");
       if (!d) return problem(404, "party.department_not_found", "Department not found");
       if (d.status !== "active") return problem(409, "party.department_not_open", "Department not open");
-      return json(knMenu(q.audience, d.code, { orgRef: q.orgRef }), 200, NO_STORE);
+      return json(knMenu(q.audience, d.code, { orgRef: q.orgRef, manager:q.manager }), 200, NO_STORE);
     },
   },
   {
@@ -2589,7 +2601,7 @@ export const knAppRoutes: Route[] = [
         );
       }
       if (d.status !== "active") return problem(409, "party.department_not_open", "Department not open");
-      return json(knMenu(q.audience, d.code, { orgRef: q.orgRef }), 200, NO_STORE);
+      return json(knMenu(q.audience, d.code, { orgRef: q.orgRef, manager:q.manager }), 200, NO_STORE);
     },
   },
   {

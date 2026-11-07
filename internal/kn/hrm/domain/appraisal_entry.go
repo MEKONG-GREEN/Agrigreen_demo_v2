@@ -13,7 +13,8 @@ import (
 const (
 	AppraisalNotStarted       = "not_started"
 	AppraisalSelfSubmitted    = "self_submitted"
-	AppraisalManagerSubmitted = "manager_submitted"
+	AppraisalEntered          = "entered"
+	AppraisalManagerSubmitted = "manager_submitted" // trạng thái lịch sử chỉ đọc
 	AppraisalSent             = "sent"
 	AppraisalChangeRequested  = "change_requested"
 	AppraisalClosed           = "closed"
@@ -75,7 +76,6 @@ type AppraisalAuthority struct {
 	Actor             uuid.UUID
 	Group, Unit       string
 	Manager, ReadOnly bool
-	ProofVerified     bool
 }
 
 func (a AppraisalAuthority) center() bool { return a.Group == GroupAdmin || a.Group == GroupHCTH }
@@ -94,52 +94,32 @@ func CanReadAppraisal(a AppraisalAuthority, m AppraisalMember) bool {
 	if !slices.Contains([]string{GroupAdmin, GroupHCTH, GroupManager}, a.Group) || a.Actor == uuid.Nil {
 		return false
 	}
-	return a.center() || a.self(m) || a.management(m)
+	return a.center() || a.management(m)
 }
 
 func CanManageAppraisal(a AppraisalAuthority, m AppraisalMember) bool {
 	return !a.ReadOnly && CanReadAppraisal(a, m) && a.management(m)
 }
 
-type AppraisalStepLocks struct{ Self, Manager, Closed bool }
+type AppraisalStepLocks struct{ Closed bool }
 type AppraisalEntryChange struct {
-	Action            string            `json:"action"`
-	Version           int64             `json:"version"`
-	Answers           []AppraisalAnswer `json:"answers,omitempty"`
-	SelfRating        string            `json:"self_rating,omitempty"`
-	CollectiveRating  string            `json:"collective_rating,omitempty"`
-	OfficialRating    string            `json:"official_rating,omitempty"`
-	Reason            string            `json:"reason,omitempty"`
-	PersonnelProposal string            `json:"personnel_proposal,omitempty"`
-	Note              string            `json:"note,omitempty"`
-	ReturnTo          string            `json:"return_to,omitempty"`
-	ProxyDocument     *uuid.UUID        `json:"proxy_document,omitempty"`
+	Action            string `json:"action"`
+	Version           int64  `json:"version"`
+	SelfRating        string `json:"self_rating,omitempty"`
+	CollectiveRating  string `json:"collective_rating,omitempty"`
+	OfficialRating    string `json:"official_rating,omitempty"`
+	Reason            string `json:"reason,omitempty"`
+	PersonnelProposal string `json:"personnel_proposal,omitempty"`
+	Note              string `json:"note,omitempty"`
 }
 
-// ChangeAppraisalEntry không ghi DB, không I/O. Gọi sau khi ứng dụng đã kiểm tenant, idempotency và phiên bản.
-func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks AppraisalStepLocks, a AppraisalAuthority, in AppraisalEntryChange) (AppraisalEntry, error) {
+// ChangeAppraisalEntry chỉ ghi mức đề xuất DG04–08; các kiểu điểm cũ chỉ dùng cho reader lịch sử.
+// Cá nhân không có writer; lãnh đạo nhập cả hai mức từ bản tự đề xuất và kết quả họp đơn vị.
+func ChangeAppraisalEntry(old AppraisalEntry, locks AppraisalStepLocks, a AppraisalAuthority, in AppraisalEntryChange) (AppraisalEntry, error) {
 	e := old
 	e.QuarterResults = slices.Clone(old.QuarterResults)
-	e.Self.Answers = slices.Clone(old.Self.Answers)
-	e.Manager.Answers = slices.Clone(old.Manager.Answers)
-	if old.Member.AccountRef != nil {
-		account := *old.Member.AccountRef
-		e.Member.AccountRef = &account
-	}
-	if old.ProxyDocument != nil {
-		document := *old.ProxyDocument
-		e.ProxyDocument = &document
-	}
-	if old.SelfSubmittedAt != nil {
-		at := *old.SelfSubmittedAt
-		e.SelfSubmittedAt = &at
-	}
-	if old.ManagerSubmittedAt != nil {
-		at := *old.ManagerSubmittedAt
-		e.ManagerSubmittedAt = &at
-	}
 	if a.ReadOnly || !CanReadAppraisal(a, e.Member) {
-		return e, appraisalInvalid("action", "không có quyền ghi phiếu này")
+		return e, appraisalInvalid("action", "không có quyền ghi đề xuất này")
 	}
 	if e.Member.ExcludedReason != "" {
 		return e, appraisalInvalid("action", "người đã loại trừ khỏi đợt")
@@ -151,109 +131,50 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 		return e, appraisalInvalid("reason", "nội dung tối đa 2.000 ký tự")
 	}
 	switch in.Action {
-	case "proxy_self":
-		if !a.management(e.Member) || !a.ProofVerified || in.ProxyDocument == nil {
-			return e, appraisalInvalid("action", "nhập thay cần người quản lý và bản scan đã kiểm quyền")
-		}
-		selfOpen := e.Status == AppraisalNotStarted || (e.Status == AppraisalChangeRequested && e.ReturnedTo == "self")
-		if (locks.Self && !e.Reopened) || !selfOpen {
-			return e, appraisalInvalid("action", "bước tự đánh giá đã khóa hoặc đã nộp")
-		}
-		score, err := ScoreAppraisal(form, in.Answers, true)
-		if err != nil {
-			return e, err
-		}
-		rating := in.SelfRating
-		if rating == "" && score.Complete {
-			rating = score.Suggested
-		}
-		if rating != "" {
-			if err := ValidateAppraisalProposal(rating, "", in.Reason, false); err != nil {
-				return e, err
-			}
-		}
-		e.Self, e.SelfRating, e.Reason, e.Note = score, rating, strings.TrimSpace(in.Reason), in.Note
-		proof := *in.ProxyDocument
-		e.ProxyDocument = &proof
-		e.Status = AppraisalSelfSubmitted
-		e.ReturnedTo = ""
-		e.Manager = AppraisalScoring{}
-		e.CollectiveRating = ""
-		e.OfficialRating = ""
-	case "manager_draft", "manager_submit":
+	case "manager_submit":
 		if !a.management(e.Member) {
-			return e, appraisalInvalid("action", "chỉ cấp quản lý được phân công; MS06 do HCTH nhập kết quả tập thể")
+			return e, appraisalInvalid("action", "chỉ cấp quản lý được phân công; Mẫu số 06 do HCTH nhập")
 		}
-		managerOpen := e.Status == AppraisalSelfSubmitted || e.Status == AppraisalManagerSubmitted || (e.Status == AppraisalChangeRequested && e.ReturnedTo == "manager")
-		if (locks.Manager && !e.Reopened) || !managerOpen {
-			return e, appraisalInvalid("action", "chưa có phiếu tự nộp, đã gửi HCTH hoặc bước quản lý đã khóa")
+		if e.Status != AppraisalNotStarted && e.Status != AppraisalEntered && e.Status != AppraisalChangeRequested {
+			return e, appraisalInvalid("action", "đã gửi HCTH hoặc đã chốt; chỉ sửa khi được yêu cầu điều chỉnh")
 		}
-		complete := in.Action == "manager_submit"
-		score, err := ScoreAppraisal(form, in.Answers, complete)
-		if err != nil {
+		if err := ValidateAppraisalProposal(in.SelfRating, in.CollectiveRating, in.Reason, true); err != nil {
 			return e, err
 		}
-		collective := in.CollectiveRating
-		if collective == "" && score.Complete {
-			collective = score.Suggested
-		}
-		if err := ValidateAppraisalProposal(e.SelfRating, collective, in.Reason, complete); err != nil {
-			return e, err
-		}
-		e.Manager, e.CollectiveRating, e.Reason = score, collective, strings.TrimSpace(in.Reason)
-		e.PersonnelProposal, e.Note = in.PersonnelProposal, in.Note
-		if complete {
-			e.Status = AppraisalManagerSubmitted
-			e.ReturnedTo = ""
-		} else {
-			e.Status = AppraisalSelfSubmitted
-		}
+		e.SelfRating, e.CollectiveRating = in.SelfRating, in.CollectiveRating
+		e.Reason, e.PersonnelProposal, e.Note = strings.TrimSpace(in.Reason), in.PersonnelProposal, in.Note
+		e.Status, e.ReturnedTo = AppraisalEntered, ""
 	case "send":
-		if !a.management(e.Member) || (locks.Manager && !e.Reopened) || e.Status != AppraisalManagerSubmitted {
-			return e, appraisalInvalid("action", "cần cấp quản lý hoàn tất đánh giá trước khi gửi HCTH")
+		if !a.management(e.Member) || e.Status != AppraisalEntered {
+			return e, appraisalInvalid("action", "cần cấp quản lý nhập đủ đề xuất trước khi gửi HCTH")
 		}
 		if err := ValidateAppraisalProposal(e.SelfRating, e.CollectiveRating, e.Reason, true); err != nil {
 			return e, err
 		}
-		e.Status = AppraisalSent
-		e.ReturnedTo = ""
+		e.Status, e.ReturnedTo = AppraisalSent, ""
 	case "return":
+		if !a.center() || e.Status != AppraisalSent {
+			return e, appraisalInvalid("action", "chỉ HCTH yêu cầu điều chỉnh đề xuất đã gửi")
+		}
 		if utf8.RuneCountInString(strings.TrimSpace(in.Reason)) < 10 {
-			return e, appraisalInvalid("reason", "lý do trả phiếu cần ít nhất 10 ký tự")
+			return e, appraisalInvalid("reason", "lý do yêu cầu điều chỉnh cần ít nhất 10 ký tự")
 		}
-		switch in.ReturnTo {
-		case "self":
-			if !a.management(e.Member) || e.Status == AppraisalNotStarted || e.Status == AppraisalClosed || e.Status == AppraisalSent || (locks.Self && !e.Reopened && !a.center()) {
-				return e, appraisalInvalid("action", "không trả được phiếu về bước tự đánh giá")
-			}
-			if a.center() && locks.Self {
-				e.Reopened = true
-			}
-		case "manager":
-			if !a.center() || e.Status != AppraisalSent {
-				return e, appraisalInvalid("action", "chỉ HCTH trả đề xuất đã gửi")
-			}
-			if locks.Manager {
-				e.Reopened = true
-			}
-		default:
-			return e, appraisalInvalid("return_to", "chọn self hoặc manager")
-		}
-		e.Status, e.ReturnedTo, e.CorrectionReason = AppraisalChangeRequested, in.ReturnTo, strings.TrimSpace(in.Reason)
+		e.Status, e.ReturnedTo, e.CorrectionReason = AppraisalChangeRequested, "manager", strings.TrimSpace(in.Reason)
+		e.OfficialRating = ""
 	case "official":
 		if !a.center() || e.Status != AppraisalSent {
 			return e, appraisalInvalid("action", "chỉ HCTH nhập kết luận cho đề xuất đã gửi")
 		}
-		if !slices.Contains(Ratings, in.OfficialRating) {
-			return e, appraisalInvalid("official_rating", "chọn kết quả xếp loại chính thức")
+		if in.OfficialRating != "" && !slices.Contains(Ratings, in.OfficialRating) {
+			return e, appraisalInvalid("official_rating", "chọn kết quả xếp loại chính thức hoặc để trống để dùng mức tập thể")
 		}
-		if in.OfficialRating != e.CollectiveRating && utf8.RuneCountInString(strings.TrimSpace(in.Reason)) < 10 {
-			return e, appraisalInvalid("reason", "kết luận khác tập thể đề xuất cần lý do ít nhất 10 ký tự")
-		}
-		e.OfficialRating = in.OfficialRating
 		if strings.TrimSpace(in.Reason) != "" {
+			if err := ValidateAppraisalProposal(e.SelfRating, e.CollectiveRating, in.Reason, true); err != nil {
+				return e, err
+			}
 			e.Reason = strings.TrimSpace(in.Reason)
 		}
+		e.OfficialRating = in.OfficialRating
 	case "reopen":
 		if !a.center() || e.Status != AppraisalClosed {
 			return e, appraisalInvalid("action", "chỉ HCTH mở lại một người đã chốt")
@@ -262,9 +183,9 @@ func ChangeAppraisalEntry(old AppraisalEntry, form AppraisalForm, locks Appraisa
 			return e, appraisalInvalid("reason", "lý do mở lại cần ít nhất 10 ký tự")
 		}
 		e.Reopened, e.Status, e.ReturnedTo, e.CorrectionReason = true, AppraisalChangeRequested, "manager", strings.TrimSpace(in.Reason)
-		e.OfficialRating = ""
+		e.OfficialRating, e.ClosedRating = "", ""
 	default:
-		return e, appraisalInvalid("action", "không có thao tác đánh giá này")
+		return e, appraisalInvalid("action", "không có thao tác đề xuất này")
 	}
 	return e, nil
 }

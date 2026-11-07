@@ -23,19 +23,22 @@ type AppraisalExclusion struct {
 	StaffID uuid.UUID `json:"staff_id"`
 	Reason  string    `json:"reason"`
 }
+
+const AppraisalProposalV4 = "hrm.appraisal-proposal/v4"
+
 type AppraisalPeriodInput struct {
+	Groups              []string             `json:"groups"`
 	Year                int                  `json:"year"`
 	Quarter             int                  `json:"quarter"` // 0 = đánh giá năm; 1..4 = quý
 	CutoffOn            string               `json:"cutoff_on"`
-	SelfDueAt           string               `json:"self_due_at"`
 	ManagerDueAt        string               `json:"manager_due_at"`
-	SummaryDueAt        string               `json:"summary_due_at"`
-	Forms               map[string]uuid.UUID `json:"forms"`
 	Summaries           map[string]uuid.UUID `json:"summaries"`
 	Excluded            []AppraisalExclusion `json:"excluded"`
 	AcknowledgeWarnings bool                 `json:"acknowledge_warnings"`
 }
 type AppraisalPeriod struct {
+	WorkflowVersion string                       `json:"workflow_version,omitempty"`
+	Groups          []string                     `json:"groups,omitempty"`
 	ID              uuid.UUID                    `json:"id"`
 	Version         int64                        `json:"version"`
 	Year            int                          `json:"year"`
@@ -76,30 +79,24 @@ func (s *Service) appraisalRecords() error {
 	}
 	return nil
 }
-func appraisalDates(in AppraisalPeriodInput) (time.Time, time.Time, time.Time, time.Time, error) {
+func appraisalDates(in AppraisalPeriodInput) (time.Time, time.Time, error) {
 	if in.Year < 2020 || in.Year > 2100 || in.Quarter < 0 || in.Quarter > 4 {
-		return time.Time{}, time.Time{}, time.Time{}, time.Time{}, problem.Validation.WithField("year", "năm 2020–2100, quý 1–4 hoặc 0 cho năm")
+		return time.Time{}, time.Time{}, problem.Validation.WithField("year", "năm 2020–2100, quý 1–4 hoặc 0 cho năm")
 	}
 	cutoff, err := time.Parse(time.DateOnly, in.CutoffOn)
 	if err != nil || cutoff.Year() != in.Year {
-		return cutoff, time.Time{}, time.Time{}, time.Time{}, problem.Validation.WithField("cutoff_on", "ngày chốt YYYY-MM-DD thuộc năm đánh giá")
+		return cutoff, time.Time{}, problem.Validation.WithField("cutoff_on", "ngày chốt YYYY-MM-DD thuộc năm đánh giá")
 	}
-	dates := []time.Time{}
-	for _, f := range []struct{ key, value string }{{"self_due_at", in.SelfDueAt}, {"manager_due_at", in.ManagerDueAt}, {"summary_due_at", in.SummaryDueAt}} {
-		if len(f.value) > 40 {
-			return cutoff, time.Time{}, time.Time{}, time.Time{}, problem.Validation.WithField(f.key, "hạn RFC3339 có múi giờ")
-		}
-		d, e := time.Parse(time.RFC3339, f.value)
-		if e != nil {
-			return cutoff, time.Time{}, time.Time{}, time.Time{}, problem.Validation.WithField(f.key, "hạn RFC3339 có múi giờ")
-		}
-		dates = append(dates, d.UTC())
+	if len(in.ManagerDueAt) > 40 {
+		return cutoff, time.Time{}, problem.Validation.WithField("manager_due_at", "hạn gửi RFC3339 có múi giờ")
 	}
-	if !dates[0].After(cutoff) || !dates[1].After(dates[0]) || !dates[2].After(dates[1]) {
-		return cutoff, dates[0], dates[1], dates[2], problem.Validation.WithField("summary_due_at", "ngày chốt < hạn tự chấm < hạn cấp quản lý < hạn tổng hợp")
+	due, err := time.Parse(time.RFC3339, in.ManagerDueAt)
+	if err != nil || !due.After(cutoff) {
+		return cutoff, time.Time{}, problem.Validation.WithField("manager_due_at", "hạn gửi sau ngày chốt, RFC3339 có múi giờ")
 	}
-	return cutoff, dates[0], dates[1], dates[2], nil
+	return cutoff, due.UTC(), nil
 }
+
 func appraisalAuthority(c appraisalActor) domain.AppraisalAuthority {
 	return domain.AppraisalAuthority{Actor: c.ref, Group: c.group, Unit: c.unit, Manager: c.manager, ReadOnly: c.readOnly}
 }
@@ -126,17 +123,19 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 	if err = appraisalKey(idem); err != nil {
 		return AppraisalPeriod{}, err
 	}
-	cutoff, selfDue, managerDue, summaryDue, err := appraisalDates(in)
+	cutoff, managerDue, err := appraisalDates(in)
 	if err != nil {
 		return AppraisalPeriod{}, err
 	}
-	if len(in.Forms) == 0 || len(in.Forms) > 3 || len(in.Summaries) > 2 || len(in.Excluded) > 5000 {
-		return AppraisalPeriod{}, problem.Validation.WithField("forms", "chọn 1–3 nhóm đối tượng/phiếu và tối đa 2 mẫu tổng hợp")
+	if len(in.Groups) == 0 || len(in.Groups) > 3 || len(in.Summaries) > 2 || len(in.Excluded) > 5000 {
+		return AppraisalPeriod{}, problem.Validation.WithField("groups", "chọn 1–3 nhóm đối tượng và tối đa 2 mẫu tổng hợp")
 	}
-	for group, id := range in.Forms {
-		if !slices.Contains([]string{domain.AppraisalCivil, domain.AppraisalLeader, domain.AppraisalCommune}, group) || id == uuid.Nil {
-			return AppraisalPeriod{}, problem.Validation.WithField("forms", "nhóm/phiên bản phiếu không hợp lệ")
+	selectedGroups := map[string]bool{}
+	for _, group := range in.Groups {
+		if !slices.Contains([]string{domain.AppraisalCivil, domain.AppraisalLeader, domain.AppraisalCommune}, group) || selectedGroups[group] {
+			return AppraisalPeriod{}, problem.Validation.WithField("groups", "nhóm đối tượng không hợp lệ hoặc trùng")
 		}
+		selectedGroups[group] = true
 	}
 	excluded := map[uuid.UUID]string{}
 	for _, e := range in.Excluded {
@@ -164,7 +163,14 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 		return AppraisalPeriod{}, err
 	}
 	if replay != nil {
-		return appraisalPeriod(*replay)
+		prior, e := appraisalPeriod(*replay)
+		if e != nil {
+			return AppraisalPeriod{}, e
+		}
+		if !c.onPeriod(prior) {
+			return AppraisalPeriod{}, port.ErrAppraisalNotFound
+		}
+		return prior, nil
 	}
 	pop, err := s.loadPopulation(ctx, rc{ref: c.ref, tenant: c.tenant, unitRef: c.unitRef, group: c.group, unit: c.unit}, cutoff, nil)
 	if err != nil {
@@ -174,8 +180,8 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 	if in.Quarter > 0 {
 		label = fmt.Sprintf("Quý %s/%d", []string{"", "I", "II", "III", "IV"}[in.Quarter], in.Year)
 	}
-	p := AppraisalPeriod{ID: ids.New(), Year: in.Year, Quarter: in.Quarter, NodeRef: c.unitRef, Label: label, CutoffOn: in.CutoffOn, KnownAt: pop.known,
-		SelfDueAt: selfDue, ManagerDueAt: managerDue, SummaryDueAt: summaryDue, Forms: map[string]AppraisalTemplate{}, Summaries: map[string]AppraisalTemplate{}, SignedDocuments: map[string]uuid.UUID{}, Warnings: []string{}, Counts: map[string]int{}}
+	p := AppraisalPeriod{WorkflowVersion: AppraisalProposalV4, Groups: slices.Clone(in.Groups), ID: ids.New(), Year: in.Year, Quarter: in.Quarter, NodeRef: c.unitRef, Label: label, CutoffOn: in.CutoffOn, KnownAt: pop.known,
+		ManagerDueAt: managerDue, Forms: map[string]AppraisalTemplate{}, Summaries: map[string]AppraisalTemplate{}, SignedDocuments: map[string]uuid.UUID{}, Warnings: []string{}, Counts: map[string]int{}}
 	unitNames := map[string]string{}
 	for _, u := range pop.cat.Units {
 		unitNames[u.Code] = u.Name
@@ -197,7 +203,7 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 		} else if position.Attrs.Leader {
 			group = domain.AppraisalLeader
 		}
-		if _, selected := in.Forms[group]; !selected {
+		if !selectedGroups[group] {
 			continue
 		}
 		management := snap.Unit
@@ -211,9 +217,6 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 		} else {
 			if member.Position == "" || member.ManagementUnit == "" {
 				p.Warnings = append(p.Warnings, member.Code+": thiếu chức vụ/đơn vị quản lý; cần kiểm phân công")
-			}
-			if h.AccountRef == nil {
-				p.Warnings = append(p.Warnings, member.Code+": chưa có tài khoản; guest OTP chưa nối (#184), nhập thay cần bản scan")
 			}
 		}
 		members = append(members, domain.AppraisalEntry{Member: member, Status: domain.AppraisalNotStarted})
@@ -237,6 +240,13 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 			return e
 		}
 		if ok {
+			prior, e := appraisalPeriod(old)
+			if e != nil {
+				return e
+			}
+			if !c.onPeriod(prior) {
+				return port.ErrAppraisalNotFound
+			}
 			saved = old
 			return nil
 		}
@@ -244,11 +254,20 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 		if e = store.LockAppraisal(ctx, tx, c.tenant, "period:"+key); e != nil {
 			return e
 		}
-		if _, exists, e := store.AppraisalLatest(ctx, tx, "period", key); e != nil {
+		periods, e := store.AppraisalCurrent(ctx, tx, "period", nil)
+		if e != nil {
 			return e
-		} else if exists {
-			return port.ErrAppraisalConflict.WithDetail("đã có đợt của kỳ; dùng mở lại có lý do cho người đã chốt")
 		}
+		for _, row := range periods {
+			current, e := appraisalPeriod(row)
+			if e != nil {
+				return e
+			}
+			if current.WorkflowVersion == AppraisalProposalV4 && current.Year == in.Year && current.Quarter == in.Quarter && current.NodeRef == p.NodeRef && !current.Closed {
+				return port.ErrAppraisalConflict.WithDetail("đang có đợt mở cùng kỳ")
+			}
+		}
+		key += ":" + p.ID.String()
 		load := func(kind string, id uuid.UUID) (AppraisalTemplate, error) {
 			row, exists, e := store.AppraisalVersion(ctx, tx, id)
 			if e != nil {
@@ -265,16 +284,6 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 				return AppraisalTemplate{}, port.ErrAppraisalConflict.WithDetail("phiên bản mẫu/phiếu đã thay đổi; tải lại trước khi mở đợt")
 			}
 			return appraisalTemplate(row)
-		}
-		for group, id := range in.Forms {
-			v, e := load("form", id)
-			if e != nil {
-				return e
-			}
-			if v.Form == nil || v.Form.Group != group {
-				return problem.Validation.WithField("forms", "phiếu không đúng nhóm đối tượng")
-			}
-			p.Forms[group] = v
 		}
 		for _, entry := range members {
 			kind := entry.Member.SummaryKind
@@ -295,7 +304,7 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 			p.Summaries[kind] = v
 		}
 		if in.Quarter == 0 {
-			if e := pinAppraisalQuarters(ctx, tx, in.Year, members); e != nil {
+			if e := pinAppraisalQuarters(ctx, tx, in.Year, p.NodeRef, members); e != nil {
 				return e
 			}
 		}
@@ -318,7 +327,7 @@ func (s *Service) OpenAppraisalPeriod(ctx context.Context, idem string, in Appra
 		if e != nil {
 			return e
 		}
-		n := appraisalNotice(p, c, "open", "self", saved.ID)
+		n := appraisalNotice(p, c, "open", "manager", saved.ID)
 		for _, entry := range members {
 			if entry.Member.ExcludedReason == "" {
 				appraisalManagerAudience(&n, entry.Member)
@@ -351,12 +360,16 @@ func (s *Service) AppraisalPeriods(ctx context.Context) ([]AppraisalPeriod, erro
 			if e != nil {
 				return e
 			}
+			if !c.onPeriod(p) {
+				continue
+			}
 			entries, e := store.AppraisalEntrySummaries(ctx, tx, p.ID, false)
 			if e != nil {
 				return e
 			}
-			p.Counts = map[string]int{}
+			p.Counts = map[string]int{"units_sent": 0}
 			visible := 0
+			unitsSent := map[string]bool{}
 			for _, r := range entries {
 				entry, e := appraisalsReadObject[domain.AppraisalEntry](r)
 				if e != nil {
@@ -371,6 +384,18 @@ func (s *Service) AppraisalPeriods(ctx context.Context) ([]AppraisalPeriod, erro
 				} else {
 					p.Counts[entry.Status]++
 					p.Counts[entry.Member.SummaryKind]++
+					unit := entry.Member.ManagementUnit
+					if _, seen := unitsSent[unit]; !seen {
+						unitsSent[unit] = true
+					}
+					if entry.Status != domain.AppraisalSent && entry.Status != domain.AppraisalClosed {
+						unitsSent[unit] = false
+					}
+				}
+			}
+			for _, sent := range unitsSent {
+				if sent {
+					p.Counts["units_sent"]++
 				}
 			}
 			if (c.center() && c.scope == domain.ScopeAll) || visible > 0 {

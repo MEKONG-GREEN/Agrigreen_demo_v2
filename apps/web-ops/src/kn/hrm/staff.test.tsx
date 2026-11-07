@@ -186,7 +186,8 @@ describe("hồ sơ nhân sự — backend giả lập theo hợp đồng /v1/hrm
   });
 
   it("Cấp Tỉnh ngoài HCTH không xem hồ sơ (BR-04); Admin cấp 'bản thân' theo nhóm; Admin cố định", async () => {
-    const tt = await clientFor("kn-binh", "asg-binh-tinh");
+    // Cá nhân thường: Bình là Trưởng phòng trong phân công seed.
+    const tt = await clientFor("kn-an", "asg-an-tinh");
     expect((await tt.sa.access()).perms["profile.view"]).toBe("none");
     expect(await problemCode(tt.sa.list({}))).toBe("forbidden");
     const { sa } = await clientFor("kn-admin", "asg-admin");
