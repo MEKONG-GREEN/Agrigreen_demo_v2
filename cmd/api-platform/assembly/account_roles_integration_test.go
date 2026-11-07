@@ -35,7 +35,7 @@ func TestBuildAccountRoleOrderThroughHTTP(t *testing.T) {
 	// authority. This fails if Build forgets to inject UnitDelegations.
 	partial := authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: ids.New(), TenantID: ids.New(),
 		KN: &authz.KNContext{Role: authz.KNAdmin}})
-	if _, err := mods.Accounts.KNPeople().PeopleInScope(partial); err == nil || problem.From(err).Code != problem.Forbidden.Code {
+	if _, err := mods.Accounts.KNPeople().PeopleInScope(partial); err == nil || problem.From(err).Code != authz.ErrNoKNContext.Code {
 		t.Fatalf("API bypassed the configured session owner: %v", err)
 	}
 	issuer := authztest.New(t)

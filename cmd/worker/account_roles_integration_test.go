@@ -31,7 +31,7 @@ func TestWorkerAccountsUsesOwnerRoleOrder(t *testing.T) {
 	}
 	partial := authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: ids.New(), TenantID: ids.New(),
 		KN: &authz.KNContext{Role: authz.KNAdmin}})
-	if _, err := m.KNPeople().PeopleInScope(partial); err == nil || problem.From(err).Code != problem.Forbidden.Code {
+	if _, err := m.KNPeople().PeopleInScope(partial); err == nil || problem.From(err).Code != authz.ErrNoKNContext.Code {
 		t.Fatalf("worker bypassed the configured session owner: %v", err)
 	}
 	issuer := authztest.New(t)
