@@ -3,7 +3,7 @@ import { loginAs } from "./helpers";
 
 test.describe("Lịch sử chỉ số đã chốt (pf/metrics — KN US-DASH-01/02, CGH FN-10/11)", () => {
   test("KN US-DASH-02: bảng điều hành có biểu đồ theo ngày; xem giá trị kỳ đã chốt bị thay kèm lý do", async ({ page }) => {
-    await loginAs(page, "tw", "/");
+    await loginAs(page, "setter", "/");
     const sec = page.getByTestId("metric-history");
     await expect(sec.getByRole("heading", { name: "Diễn biến theo ngày (lịch sử đã chốt)" })).toBeVisible();
     await expect(sec.getByTestId("line-chart")).toHaveAttribute("data-points", /^[1-9]\d*$/);
@@ -20,11 +20,9 @@ test.describe("Lịch sử chỉ số đã chốt (pf/metrics — KN US-DASH-01/
     await expect(sec.getByTestId("line-chart")).toHaveAttribute("data-points", /^(8\d|90)$/);
   });
 
-  test("TTKN tỉnh: lịch sử theo tỉnh mình (không xin phạm vi toàn quốc)", async ({ page }) => {
+  test("KN không mount lịch sử chỉ số của dashboard legacy", async ({ page }) => {
     await loginAs(page, "tinh", "/");
-    const sec = page.getByTestId("metric-history");
-    await expect(sec.getByTestId("line-chart")).toHaveAttribute("data-points", /^[1-9]\d*$/);
-    await expect(sec.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByTestId("metric-history")).toHaveCount(0);
   });
 
   test("Cổng CGH: xu hướng theo vụ — chọn vụ đã ghi", async ({ page }) => {

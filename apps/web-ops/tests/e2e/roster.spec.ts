@@ -2,8 +2,9 @@ import { expect, test } from "@playwright/test";
 import { loginAs, navTo } from "./helpers";
 
 test("danh bạ trực (US-DIR-02): tra theo xã, liên hệ → liên kết gọi/nhắn một chạm; xã không ai trực → cán bộ tỉnh dự phòng", async ({ page }) => {
-  await loginAs(page, "tinh", "/");
+  await loginAs(page, "setter", "/");
   await navTo(page, "Danh bạ trực");
+  await page.getByLabel("Tỉnh").selectOption("82");
   await expect(page.getByRole("heading", { level: 1, name: "Danh bạ trực" })).toBeVisible();
 
   // Xã đầu tiên của Đồng Tháp (82101): một người tự khai, một người theo ca.
@@ -36,18 +37,16 @@ test("danh bạ trực (US-DIR-02): tra theo xã, liên hệ → liên kết g�
   await expect(prov.getByRole("link", { name: /^Gọi / })).toHaveAttribute("href", /^tel:0999\d{6}$/);
 });
 
-test("danh bạ trực (US-DIR-01/03): cán bộ xã tự khai Tạm nghỉ; TTKN tỉnh khai báo ca trực", async ({ page }) => {
-  await loginAs(page, "xa", "/danh-ba");
-  await expect(page.getByRole("heading", { level: 1, name: "Danh bạ trực" })).toBeVisible();
-  await expect(page.getByLabel("Tỉnh")).toHaveCount(0);
-  const me = page.getByRole("table", { name: "Cán bộ trong địa bàn" }).locator('tr[data-actor="mock-xa-0001"]');
-  await expect(me).toContainText("Đang trực");
-  await page.getByRole("button", { name: "Tạm nghỉ" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Đã cập nhật: Tạm nghỉ" })).toBeVisible();
-  await expect(me).toContainText("Tạm nghỉ");
-  await expect(page.getByRole("heading", { name: "Khai báo ca trực" })).toHaveCount(0);
-
-  await loginAs(page, "tinh", "/danh-ba");
+test("danh bạ trực legacy: KN bị chặn; quản trị nền tảng vẫn khai báo ca trực", async ({ page }) => {
+  // S-2 removes this legacy feature from KN; no self-service write UI mounts.
+  for (const persona of ["xa", "tinh"] as const) {
+    await loginAs(page, persona, "/danh-ba");
+    await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tạm nghỉ" })).toHaveCount(0);
+  }
+  // The platform-owned legacy shift editor remains functional.
+  await loginAs(page, "setter", "/danh-ba");
+  await page.getByLabel("Tỉnh").selectOption("82");
   await page.getByLabel("Xã").selectOption("82103");
   await expect(page.getByRole("heading", { name: "Khai báo ca trực" })).toBeVisible();
   const row = page.getByRole("table", { name: "Cán bộ trong địa bàn" }).locator('tr[data-actor="mock-knv-82103-2"]');

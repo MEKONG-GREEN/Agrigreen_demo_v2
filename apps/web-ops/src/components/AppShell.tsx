@@ -12,7 +12,7 @@ import { contextLabel, contextShortLabel, optionLabel, otherOptions } from "@/kn
 import { canSee, disabledModules, findNavItem, homeFor, visibleNav, type DisabledModules } from "@/nav/nav";
 import { AccountMenu } from "@/shell/AccountMenu";
 import { Breadcrumb, BreadcrumbTailProvider, useBreadcrumbTailValue, type Crumb } from "@/shell/Breadcrumb";
-import { crumbsFor, legacyMenu, menuAllows, withExtraGroups } from "@/shell/menu";
+import { crumbsFor, legacyMenu, menuAllows } from "@/shell/menu";
 import { Sidebar } from "@/shell/Sidebar";
 import { useStoredValue, writeStoredValue } from "@/lib/useStoredValue";
 import { Icon } from "./Icon";
@@ -22,26 +22,25 @@ import { SupportBanner } from "@/kn/SupportBanner";
 
 /** Trang không có khung (đăng nhập, chọn vai trò & phòng ban). */
 export function isBareRoute(pathname: string): boolean {
-  return pathname.startsWith("/login") || pathname.startsWith("/chon-vai-tro");
+  return pathname === "/login" || pathname.startsWith("/login/") || pathname === "/chon-vai-tro";
 }
 
 /** Menu đang dùng: menu cấu hình KN (P2) khi có ngữ cảnh, ngược lại menu cũ theo vai realm (nav.ts). */
 export function activeMenu(kn: KnSessionState, principal: Principal | null, disabled: DisabledModules = NO_MODULES): MenuTree {
-  const legacy = legacyMenu(visibleNav(principal, disabled));
-  if (kn.status === "active" && kn.menu) {
-    if (!config.knLegacyMenu) return kn.menu;
-    const extra = legacy.groups.map((g) => ({ ...g, key: `extra-${g.key}`, label: `Chức năng khác · ${g.label.replace(/^\d+\.\s*/, "")}` }));
-    return withExtraGroups(kn.menu, extra);
-  }
-  return legacy;
+  if (kn.status === "active" && kn.menu) return kn.menu;
+  return legacyMenu(visibleNav(principal, disabled));
 }
 
 /**
  * Hiện màn hình được không (chỉ ẩn/hiện — backend vẫn kiểm từng lời gọi, R-55).
- * Bề mặt KN: đường /kn/* phải nằm trong menu của ngữ cảnh; màn hiện có ngoài /kn vẫn theo vai (canSee).
+ * Phiên KN chỉ mở /kn/* thuộc menu đã chọn và các trang dùng chung.
+ * Phiên HTX/MKG giữ kiểm vai legacy; API vẫn tự kiểm quyền ở backend.
  */
 export function isAllowed(pathname: string, kn: KnSessionState, menu: MenuTree, principal: Principal | null, disabled: DisabledModules = NO_MODULES): boolean {
-  if (kn.status === "active" && pathname.startsWith("/kn")) return menuAllows(menu, pathname);
+  if (kn.status === "active") {
+    if (isBareRoute(pathname) || pathname === "/thong-bao" || pathname === "/khong-co-quyen") return true;
+    return pathname.startsWith("/kn/") && menuAllows(menu, pathname);
+  }
   const item = findNavItem(pathname);
   return !item || canSee(item, principal, disabled);
 }
@@ -129,7 +128,6 @@ export function AppShell({ children, SidebarComponent = Sidebar }: {
       router.replace(`/login?returnTo=${encodeURIComponent(pathname)}`);
     } else if (status === "authenticated") {
       if (kn.status === "choose") router.replace(`/chon-vai-tro?returnTo=${encodeURIComponent(pathname)}`);
-      else if (kn.status === "active" && kn.context && pathname === "/") router.replace(kn.context.default_route);
       // Cục KTHT vào "/" → cổng CGH (BRD CGH FN-11 B1).
       else if (kn.status === "legacy" && pathname === "/" && !allowed) router.replace(homeFor(principal, disabled));
     }

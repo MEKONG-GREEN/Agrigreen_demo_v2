@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers";
 
 test("xuất báo cáo: 202 + việc xuất → theo dõi trạng thái → tải tệp; nhãn Số liệu tạm tính", async ({ page }) => {
-  await loginAs(page, "tinh", "/bao-cao");
+  await loginAs(page, "setter", "/bao-cao");
   await expect(page.getByRole("heading", { level: 1, name: "Báo cáo & xuất dữ liệu" })).toBeVisible();
   await page.getByLabel("Mẫu báo cáo").selectOption("kn.sowing_progress");
   await page.getByLabel("Kỳ").selectOption("month");

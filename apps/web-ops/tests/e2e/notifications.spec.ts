@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers";
 
-test("chuông thông báo: số chưa đọc → mở chỉ đạo qua deep link → xác nhận đã đọc", async ({ page }) => {
-  await loginAs(page, "xa", "/nhiem-vu");
+test("chuông thông báo phiên nền tảng: mở chỉ đạo đánh dấu đã đọc, không xác nhận thay người nhận", async ({ page }) => {
+  await loginAs(page, "setter", "/nhiem-vu");
   const count = page.getByTestId("bell-count");
   // Số chưa đọc phụ thuộc dữ liệu giả lập của mọi gói (Báo giá thêm thông báo) — kiểm giảm đúng 1 khi mở chỉ đạo.
   await expect(count).toHaveText(/^[1-9]\d*$/);
@@ -15,12 +15,12 @@ test("chuông thông báo: số chưa đọc → mở chỉ đạo qua deep link
   const detail = page.getByTestId("directive-detail");
   await expect(detail.getByRole("heading", { name: /rầy nâu/ })).toBeVisible();
   await expect(count).toHaveText(String(unread - 1));
-  await detail.getByRole("button", { name: "Xác nhận đã đọc" }).click();
-  await expect(detail).toContainText("Đã xác nhận");
+  // The platform actor is not a recipient; opening a notice cannot grant acknowledgement rights.
+  await expect(detail.getByRole("button", { name: "Xác nhận đã đọc" })).toHaveCount(0);
 });
 
 test("thông báo tài liệu và nhiệm vụ mở đúng màn hình; đánh dấu tất cả đã đọc", async ({ page }) => {
-  await loginAs(page, "tinh", "/");
+  await loginAs(page, "setter", "/");
   await page.getByTestId("bell").click();
   await page.getByRole("dialog", { name: "Hộp thư thông báo" }).getByRole("button", { name: /Cảnh báo/ }).first().click();
   await expect(page).toHaveURL(/\/thu-vien\?doc=/);

@@ -132,8 +132,3 @@ export function badgeOf(node: MenuNode, badges: MenuBadges | null): number {
 export function firstHref(tree: MenuTree): string | undefined {
   return menuLinks(tree)[0]?.node.href;
 }
-
-/** Ghép thêm nhóm (vd menu cũ sau cờ NEXT_PUBLIC_KN_LEGACY_MENU=1). */
-export function withExtraGroups(tree: MenuTree, extra: readonly MenuGroup[]): MenuTree {
-  return extra.length ? { ...tree, groups: [...tree.groups, ...extra] } : tree;
-}

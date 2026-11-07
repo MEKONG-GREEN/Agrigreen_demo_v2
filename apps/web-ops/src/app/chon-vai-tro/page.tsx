@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { ApiProblem } from "@/api/problem";
 import { useAuth } from "@/auth/AuthProvider";
-import { safeReturnTo } from "@/auth/oidc";
 import { ProblemAlert } from "@/components/ProblemAlert";
 import { Loading } from "@/components/ui";
 import type { SelectContextRequest } from "@/kn/contract";
@@ -18,7 +17,6 @@ import { RoleContextPicker } from "@/shell/RoleContextPicker";
 function ChooseInner() {
   const { status, principal, kn, selectContext, logout } = useAuth();
   const router = useRouter();
-  const returnTo = safeReturnTo(useSearchParams().get("returnTo"));
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<ApiProblem | null>(null);
 
@@ -41,8 +39,8 @@ function ChooseInner() {
     setProblem(null);
     try {
       const ctx = await selectContext(sel);
-      // Vào trang mặc định của vai trò (FN-CH-00.01); trang cũ ngoài /kn được mở lại nếu có.
-      router.replace(returnTo !== "/" && !returnTo.startsWith("/kn") && !returnTo.startsWith("/chon-vai-tro") ? returnTo : ctx.default_route);
+      // FN-CH-00.01: phiên đã chọn luôn bắt đầu ở trang mặc định của vai trò.
+      router.replace(ctx.default_route);
     } catch (e) {
       setProblem(e instanceof ApiProblem ? e : null);
       setBusy(false);

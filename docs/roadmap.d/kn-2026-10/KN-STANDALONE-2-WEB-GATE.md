@@ -1,0 +1,1 @@
+- [ ] KN-STANDALONE-2-WEB-GATE (#263): S-2 theo BRD 2.0 FN-CH-00.01 BR-04/AC-02/03; active KN chỉ mở /kn/ theo menu và utility allowlist, bỏ chín cấp quyền nav legacy và cờ; giữ phiên HTX/MKG. Đang tự kiểm, chưa gộp. [Phạm vi, tệp và cách chạy](../../kn/gia-dinh/KN-STANDALONE-2-WEB-GATE.md), [nghiệm thu](../../uat/kn-standalone-web-gate-acceptance.md).

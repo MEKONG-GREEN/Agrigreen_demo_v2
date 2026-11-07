@@ -57,7 +57,7 @@ test.describe("Bản đồ GIS: xem lại theo ngày (GIS US-REPLAY-01, US-EVL-0
   });
 
   test("ngày tương lai bị chặn trước khi gọi máy chủ", async ({ page }) => {
-    await loginAs(page, "tinh", "/ban-do-gis");
+    await loginAs(page, "setter", "/ban-do-gis");
     const panel = page.getByTestId("gis-replay");
     await panel.getByLabel("Xem lại theo ngày").fill(vnDay(3));
     await panel.getByRole("button", { name: "Xem lại" }).click();
@@ -66,7 +66,7 @@ test.describe("Bản đồ GIS: xem lại theo ngày (GIS US-REPLAY-01, US-EVL-0
 
   test("KNV xã không có vai xem lịch sử lớp → không gọi phát lại", async ({ page }) => {
     await loginAs(page, "xa", "/ban-do-gis");
-    await expect(page.getByTestId("replay-locked")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
     await expect(page.getByTestId("gis-replay")).toHaveCount(0);
   });
 });

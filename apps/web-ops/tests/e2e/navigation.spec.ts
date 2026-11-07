@@ -2,16 +2,17 @@ import { expect, test } from "@playwright/test";
 import { accountMenu, loginAs, loginViaUi, sidebar } from "./helpers";
 
 test.describe("đăng nhập giả lập và điều hướng theo vai/phạm vi", () => {
-  test("đăng nhập qua /login bằng vai thử TW → bảng điều hành toàn quốc", async ({ page }) => {
+  test("vai thử TW legacy không còn chín màn đã gỡ, vẫn có công cụ theo vai hiện hữu", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByText("dữ liệu giả lập", { exact: false }).first()).toBeVisible();
     await loginViaUi(page, /Cán bộ TTKN Quốc gia/);
-    await expect(page.getByRole("heading", { level: 1, name: "Bảng điều hành toàn quốc" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Đồng bộ thiết bị" })).toBeVisible();
     const nav = sidebar(page);
-    for (const label of ["Tổng quan", "Chỉ đạo khẩn", "Báo cáo & xuất dữ liệu", "Đồng bộ thiết bị", "Thư viện số"]) {
-      await expect(nav.getByRole("link", { name: label })).toBeVisible();
+    for (const label of ["Tổng quan", "Chỉ đạo khẩn", "Báo cáo & xuất dữ liệu", "Thư viện số"]) {
+      await expect(nav.getByRole("link", { name: label, exact: true })).toHaveCount(0);
     }
+    await expect(nav.getByRole("link", { name: "Đồng bộ thiết bị", exact: true })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Bản đồ CGH" })).toHaveCount(0);
     await expect(nav.getByRole("link", { name: "Tài khoản cán bộ" })).toHaveCount(0);
     await expect(page.getByTestId("bell")).toBeVisible();

@@ -17,10 +17,10 @@ function persona(id: string): Principal {
 const hrefs = (p: Principal | null) => visibleNav(p).flatMap((g) => g.items.map((i) => i.href));
 
 describe("menu theo phạm vi và vai", () => {
-  it("TW/Tỉnh/Xã thấy màn hình khuyến nông, không thấy cổng Cục và quản trị", () => {
+  it("menu legacy không cấp chín màn ngoài BRD cho TW/Tỉnh/Xã", () => {
     for (const id of ["tw", "tinh", "xa"]) {
       const h = hrefs(persona(id));
-      expect(h).toEqual(expect.arrayContaining(["/", "/htx", "/ban-do", "/nhiem-vu", "/thu-vien"]));
+      for (const href of ["/", "/htx", "/ban-do", "/ban-do-gis", "/nhiem-vu", "/chi-dao", "/danh-ba", "/bao-cao", "/thu-vien"]) expect(h).not.toContain(href);
       expect(h).not.toContain("/cgh");
       expect(h.some((x) => x.startsWith("/quan-tri"))).toBe(false);
     }
@@ -32,8 +32,8 @@ describe("menu theo phạm vi và vai", () => {
     expect(homeFor(cuc)).toBe("/cgh");
   });
 
-  it("chỉ đạo, báo cáo cho KN; đồng bộ ngay chỉ cho quản lý tỉnh/TW; hộp thư không nằm trong menu", () => {
-    expect(hrefs(persona("xa"))).toEqual(expect.arrayContaining(["/chi-dao", "/bao-cao"]));
+  it("không còn chỉ đạo/báo cáo legacy cho KN; giữ đồng bộ theo vai và hộp thư dùng chung", () => {
+    for (const href of ["/chi-dao", "/bao-cao"]) expect(hrefs(persona("xa"))).not.toContain(href);
     expect(hrefs(persona("xa"))).not.toContain("/dong-bo");
     expect(hrefs(persona("tinh"))).toContain("/dong-bo");
     expect(hrefs(persona("tw"))).toContain("/dong-bo");
@@ -133,12 +133,12 @@ describe("<Sidebar>", () => {
   // Khung P6: phạm vi người dùng chuyển lên menu tài khoản ở thanh trên (src/shell/AccountMenu.tsx).
   it("menu cũ: hiển thị nhóm đánh số của người dùng tỉnh, mục chi tiết thuộc mục danh sách", () => {
     const p = persona("tinh");
-    render(<Sidebar menu={legacyMenu(visibleNav(p))} pathname="/htx/123" />);
+    render(<Sidebar menu={legacyMenu(visibleNav(p))} pathname="/htx/dashboard" />);
     const nav = screen.getByRole("navigation");
     expect(within(nav).getByText("1. Điều hành")).toBeInTheDocument();
     expect(within(nav).queryByText("6. Quản trị")).toBeNull();
     expect(within(nav).queryByRole("link", { name: /Bản đồ CGH/ })).toBeNull();
-    expect(within(nav).getByRole("link", { name: /Quản lý HTX/ })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Bảng điều hành sản xuất" })).toHaveAttribute("aria-current", "page");
   });
 
   it("Cục chỉ có cổng CGH và báo cáo", () => {
@@ -154,9 +154,9 @@ describe("W1.4 (R-MOD-08): áº©n mÃ n cá»§a module chÆ°a báº­t cho �
   const off = (...m: string[]) => disabledModules(m.map((module) => ({ module, enabled: false })));
 
   it("khÃ´ng táº¯t gÃ¬ â†’ menu nhÆ° cÅ©; táº¯t pf/geo â†’ áº©n báº£n Ä‘á»“, giá»¯ mÃ n lÃµi", () => {
-    const tw = persona("tw");
-    expect(visibleNav(tw, off())).toEqual(visibleNav(tw));
-    const h = visibleNav(tw, off("pf/geo")).flatMap((g) => g.items.map((i) => i.href));
+    const admin = persona("setter");
+    expect(visibleNav(admin, off())).toEqual(visibleNav(admin));
+    const h = visibleNav(admin, off("pf/geo")).flatMap((g) => g.items.map((i) => i.href));
     expect(h).not.toContain("/ban-do");
     expect(h).not.toContain("/ban-do-gis");
     expect(h).toEqual(expect.arrayContaining(["/", "/htx", "/nhiem-vu"]));

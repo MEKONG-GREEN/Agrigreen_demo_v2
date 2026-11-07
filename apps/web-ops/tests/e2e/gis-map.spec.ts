@@ -106,19 +106,18 @@ test.describe("Bản đồ GIS nhiều lớp (GIS FN-01/04/13/14/15, US-ROAD-01,
       if (r.url().includes("/v1/mechanization/")) mech.push(r.url());
     });
     await loginAs(page, "tinh", "/ban-do-gis");
-    await expect(page.getByLabel("Tình trạng máy CGH (thiếu/thừa)")).toBeDisabled();
-    await expect(page.getByTestId("cgh-locked")).toContainText("cần vai Xem hoặc Quản trị Bản đồ CGH");
-    await expect.poll(() => countOf(page, "count-coops"), { timeout: 20_000 }).toBeGreaterThan(0);
+    await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
+    await expect(page.getByTestId("count-coops")).toHaveCount(0);
     expect(mech).toEqual([]);
   });
 
-  test("tắt lớp → không tải lớp đó; cán bộ tỉnh chỉ thấy HTX trong phạm vi", async ({ page }) => {
+  test("KN bị chặn bản đồ legacy; quản trị nền tảng giữ bộ lọc lớp", async ({ page }) => {
     await loginAs(page, "tinh", "/ban-do-gis");
+    await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
+    await expect(page.getByTestId("count-coops")).toHaveCount(0);
+    await loginAs(page, "setter", "/ban-do-gis");
     await expect.poll(() => countOf(page, "count-coops"), { timeout: 20_000 }).toBeGreaterThan(0);
-    const tinh = await countOf(page, "count-coops");
     await page.getByLabel("Kho / Hub (dung lượng)").uncheck();
     await expect(page.locator(".map-widget")).toHaveCount(0);
-    await loginAs(page, "setter", "/ban-do-gis");
-    await expect.poll(() => countOf(page, "count-coops"), { timeout: 20_000 }).toBeGreaterThan(tinh);
   });
 });

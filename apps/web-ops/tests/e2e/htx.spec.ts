@@ -10,7 +10,7 @@ const confirmable = plots.find((p, i) => p.properties.status === "draft" && i % 
 const crossCoop = plots.find((p, i) => p.properties.status === "draft" && i % 3 === 0)!;
 
 test("chi tiết HTX: tên địa bàn, số hộ; nông hộ có huy hiệu đồng ý (G-03/G-04)", async ({ page }) => {
-  await loginAs(page, "tw", "/htx");
+  await loginAs(page, "setter", "/htx");
   await page.getByLabel("Tìm HTX").fill(coop.api.code);
   const link = page.getByRole("link", { name: coop.api.name });
   await expect(link).toBeVisible();
@@ -24,7 +24,7 @@ test("chi tiết HTX: tên địa bàn, số hộ; nông hộ có huy hiệu đ�
 });
 
 test("gán thửa nháp: chồng lấn cùng HTX → Xác nhận vẫn lưu; chồng lấn HTX khác → không bỏ qua được", async ({ page }) => {
-  await loginAs(page, "tw", `/htx/${coop.api.ref}`);
+  await loginAs(page, "setter", `/htx/${coop.api.ref}`);
   await page.getByRole("tab", { name: "Thửa ruộng" }).click();
   await expect(page.getByRole("heading", { name: "Thửa nháp trong xã (chưa gán HTX)" })).toBeVisible();
 

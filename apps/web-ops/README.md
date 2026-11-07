@@ -57,7 +57,6 @@ Bản build production thật: `next build` **dừng** nếu thiếu `NEXT_PUBLI
 | `NEXT_PUBLIC_OIDC_CLIENT_ID` | `agrigreen-web-ops` | Client công khai, PKCE S256 |
 | `NEXT_PUBLIC_MAP_STYLE_URL` | rỗng | Style MapLibre của nhà cung cấp tile trong lãnh thổ (ADR-0007). Rỗng = nền trơn, không gọi tile ngoài |
 | `NEXT_PUBLIC_SURFACE` | `auto` | `auto`: tài khoản có vai trò KN v7.7 (`GET /v1/me/contexts` trả lần gán) dùng menu theo cấu hình; còn lại menu cũ `src/nav/nav.ts`. `legacy`: luôn menu cũ |
-| `NEXT_PUBLIC_KN_LEGACY_MENU` | rỗng | `1` = thêm nhóm "Chức năng khác" (menu cũ theo vai realm) dưới menu KN — cho tính năng đã rút khỏi Trồng trọt |
 
 ## Đăng nhập
 

@@ -59,6 +59,4 @@ export const config = {
    * dùng menu theo cấu hình, còn lại menu cũ; "legacy" = luôn menu cũ (nav.ts).
    */
   surface: process.env.NEXT_PUBLIC_SURFACE === "legacy" ? ("legacy" as const) : ("auto" as const),
-  /** 1 = thêm nhóm "Chức năng khác" (menu cũ theo vai realm) dưới menu KN — tính năng bị rút khỏi Trồng trọt. */
-  knLegacyMenu: process.env.NEXT_PUBLIC_KN_LEGACY_MENU === "1",
 } as const;

@@ -18,8 +18,8 @@ test("vô hiệu hoá HTX: hộp thoại hiện số vụ đang mở / nhật k�
   await expect(page.getByText("Đã vô hiệu hoá").first()).toBeVisible();
 });
 
-test("cán bộ KN không có nút vô hiệu hoá HTX", async ({ page }) => {
+test("cán bộ KN không mở chi tiết HTX legacy hoặc nút vô hiệu hoá", async ({ page }) => {
   await loginAs(page, "xa", `/htx/${coop.api.ref}`);
-  await expect(page.getByRole("heading", { level: 1, name: coop.api.name })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Vô hiệu hoá HTX" })).toHaveCount(0);
 });

@@ -75,7 +75,6 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-const KN: readonly ScopeLevel[] = ["tw", "tinh", "xa"];
 /** Ghi dữ liệu mùa vụ HTX: quản lý HTX (HTX mình) và quản trị nền tảng. */
 const HTX_WRITE: readonly string[] = [ROLES.coopManager, ROLES.platformAdmin];
 /** Xem dữ liệu mùa vụ HTX: thêm cán bộ KN (chỉ đọc theo phạm vi). */
@@ -89,13 +88,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "1. Điều hành",
     items: [
-      { href: "/", label: "Tổng quan", icon: "dashboard", levels: KN },
-      { href: "/ban-do", module: "pf/geo", label: "Bản đồ khuyến nông", icon: "map", levels: KN },
-      { href: "/ban-do-gis", module: "pf/geo", label: "Bản đồ GIS nhiều lớp", icon: "layers", levels: KN },
-      { href: "/nhiem-vu", module: "pf/extension", label: "Nhiệm vụ hỗ trợ", icon: "task", levels: KN },
-      { href: "/chi-dao", label: "Chỉ đạo khẩn", icon: "megaphone", levels: KN },
-      { href: "/danh-ba", label: "Danh bạ trực", icon: "phone", levels: KN },
-      { href: "/bao-cao", module: "pf/reports", label: "Báo cáo & xuất dữ liệu", icon: "report", levels: [...KN, "cuc"] },
+      { href: "/", label: "Tổng quan", icon: "dashboard", levels: [] },
+      { href: "/ban-do", module: "pf/geo", label: "Bản đồ khuyến nông", icon: "map", levels: [] },
+      { href: "/ban-do-gis", module: "pf/geo", label: "Bản đồ GIS nhiều lớp", icon: "layers", levels: [] },
+      { href: "/nhiem-vu", module: "pf/extension", label: "Nhiệm vụ hỗ trợ", icon: "task", levels: [] },
+      { href: "/chi-dao", label: "Chỉ đạo khẩn", icon: "megaphone", levels: [] },
+      { href: "/danh-ba", label: "Danh bạ trực", icon: "phone", levels: [] },
+      { href: "/bao-cao", module: "pf/reports", label: "Báo cáo & xuất dữ liệu", icon: "report", levels: ["cuc"] },
       // pf/mrv G3: đủ hồ sơ, đối chiếu HTX ↔ KN (KN US-MRV-02), bất thường FR-08, ước tính CO2 tạm.
       { href: "/mrv", module: "pf/mrv", label: "MRV: hồ sơ & đối chiếu", icon: "approve", roles: [...MRV_ROLES, ROLES.platformAdmin] },
       {
@@ -111,7 +110,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     label: "2. HTX & nông hộ",
     // App HTX (pf/cropcycle, pf/accounts): quản lý HTX ghi trong HTX mình; cán bộ KN chỉ xem trong phạm vi.
     items: [
-      { href: "/htx", label: "Quản lý HTX & nông hộ", icon: "coop", levels: KN },
+      { href: "/htx", label: "Quản lý HTX & nông hộ", icon: "coop", levels: [] },
       { href: "/htx/dashboard", module: "pf/cropcycle", label: "Bảng điều hành sản xuất", icon: "chart", roles: HTX_READ },
       { href: "/htx/nong-ho", label: "Quản lý nông hộ", icon: "coop", roles: HTX_READ },
       { href: "/htx/lo-ruong", module: "pf/geo", label: "Lô ruộng & ranh giới", icon: "plot", roles: HTX_READ },
@@ -128,7 +127,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
   {
     label: "3. Tri thức",
-    items: [{ href: "/thu-vien", module: "pf/content", label: "Thư viện số", icon: "library", levels: KN }],
+    items: [{ href: "/thu-vien", module: "pf/content", label: "Thư viện số", icon: "library", levels: [] }],
   },
   {
     label: "4. Cơ giới hoá",

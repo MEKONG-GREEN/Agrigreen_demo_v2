@@ -343,7 +343,7 @@ describe("AppShell: nguồn menu và kiểm hiển thị", () => {
     expect(activeMenu(legacy, tinhPrincipal).version).toBe("legacy");
   });
 
-  it("/kn/* theo menu của ngữ cảnh; màn hiện có ngoài /kn vẫn theo vai (không xóa tính năng)", () => {
+  it("/kn/* theo menu của ngữ cảnh; trang dùng chung được giữ, legacy ngoài KN bị chặn", () => {
     expect(isAllowed("/kn/nhiem-vu/phat-hanh", active, tinh, tinhPrincipal)).toBe(true);
     expect(isAllowed("/kn/nhiem-vu/cong-viec", active, tinh, tinhPrincipal)).toBe(false);
     expect(isAllowed("/thong-bao", active, tinh, tinhPrincipal)).toBe(true);

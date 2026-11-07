@@ -36,7 +36,7 @@ function LoginInner() {
       return;
     }
     if (kn.status === "active" && kn.context && kn.menu) {
-      router.replace(returnTo !== "/" && menuAllows(kn.menu, returnTo) ? returnTo : kn.context.default_route);
+      router.replace(returnTo.startsWith("/kn/") && menuAllows(kn.menu, returnTo) ? returnTo : kn.context.default_route);
       return;
     }
     const item = findNavItem(returnTo);
