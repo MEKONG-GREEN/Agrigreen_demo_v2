@@ -543,6 +543,7 @@ export const priceTicketRoutes: Route[] = [
       seedOnce();
       const role = roleOf(ctx);
       if (role instanceof Response) return role;
+      if (role === "kn_tw") return problem(403, "forbidden", "Cấp Quốc gia không xem phiếu báo giá");
       const to = dayQ(ctx, "to", vnToday());
       const from = dayQ(ctx, "from", addDay(to, -30));
       const today = vnToday();
@@ -551,7 +552,7 @@ export const priceTicketRoutes: Route[] = [
       const rows: S["PriceHistoryRow"][] = [];
       for (let d = to; d >= from; d = addDay(d, -1)) {
         const p = pointOf(point, d);
-        if (!p) continue;
+        if (!p || (role === "kn_xa" && !mineXa(p))) continue;
         const ts = TICKETS.filter((t) => t.point === point && last(t.heads).day === d);
         const live = ts.find((t) => last(t.heads).status !== "deleted");
         const add = (t: Ticket | undefined) => {
