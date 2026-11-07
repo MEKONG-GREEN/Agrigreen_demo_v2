@@ -284,3 +284,15 @@ Theo [kn-v7.7-plan.md §5](../brd/kn-v7.7-plan.md#5-câu-hỏi-cho-khách-hàng)
 - Quyết định P8: (a) lý do vô hiệu hóa HTX ≥ 20 ký tự ở DB, máy chủ, OpenAPI, web giả lập và field-app (BRD v7.7 không nêu số; giữ giá trị chặt hơn của sổ `org_event`, US-HTXSTATUS-01 AC-3); (b) tham số đường dẫn máy móc HTX là `{ref}` (`/v1/kn/machine-counts/{ref}`, `…/{ref}/log`) như handler và như `/v1/kn/cooperatives/{ref}`.
 - Chưa có tệp Excel gốc của 14 mẫu (Q-01): tiêu chí "bố cục trùng sheet mẫu theo chữ cái cột" và "kết quả công thức trùng Excel" chỉ kiểm được với T01, T04 (cấu trúc đã biết) cho tới khi có tệp.
 - Máy dev không có Docker, Kubernetes, Keycloak thật: các dòng realm (N-09, N-10, X-06..X-09) kiểm bằng `realm_test.go` + emulator; sao lưu, sẵn sàng, tải (N-01..N-05) chờ hạ tầng.
+
+## CI/lifecycle field-app — BF-CI-FIELDAPP-WIDGETS (#286)
+
+Phần kỹ thuật hỗ trợ FN-XA-03.02 (UR-XA-02–15), FN-XA-03.03 của BRD 2.0 Trồng trọt v7.7; không thay tiêu chí nghiệp vụ các Function này.
+
+- Đóng màn đang nhập: bản đang nhập vẫn được lưu vào kho cục bộ của phiên nhập, không đọc Riverpod `ref` sau unmount.
+- Giữ thao tác tự lưu bằng `Completer`, bắt đầu chuyển tab rồi đóng màn: hoàn tất lưu/xếp nháp nhưng không `setState` sau dispose.
+- Giữ kết quả tải tab bằng `Completer` rồi đóng màn: khi I/O trả về không dựng lại màn đã đóng.
+- Luồng nhập/gửi vẫn kiểm ô bắt buộc, đúng nội dung bản ghi nháp/gửi và trạng thái chờ đồng bộ; luồng thêm hồ sơ vẫn kiểm đúng request `/v1/kn/producer-records`.
+- Test chờ hiệu ứng quan sát được thay số vòng chờ cố định; deadline hiện hữu, assertion và toàn bộ cổng CI được giữ. Bỏ mounted guard trong phép làm sai phải làm test thất bại, rồi khôi phục và kiểm lại.
+
+Lệnh chạy và giới hạn bằng chứng: [giả định gói](../kn/gia-dinh/BF-CI-FIELDAPP-WIDGETS.md). Các ca này kiểm độ an toàn I/O/lifecycle; không thay thế nghiệm thu năm phòng trên profile KN độc lập.

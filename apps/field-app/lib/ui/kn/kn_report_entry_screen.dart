@@ -36,12 +36,14 @@ class _EntryState extends ConsumerState<KnReportEntryScreen> {
   KnColumnGroup? _group;
   Timer? _debounce;
 
-  KnReportService get _svc => ref.read(knReportServiceProvider);
+  // Dịch vụ gắn với phiên nhập đã tải, kể cả tự lưu lúc dispose.
+  late final KnReportService _svc;
   KnReportTask? get _task => _tabs.isEmpty ? null : _tabs[_idx];
 
   @override
   void initState() {
     super.initState();
+    _svc = ref.read(knReportServiceProvider);
     _init();
   }
 
@@ -58,11 +60,13 @@ class _EntryState extends ConsumerState<KnReportEntryScreen> {
 
   Future<void> _init() async {
     final t = await _svc.task(widget.taskId);
+    if (!mounted) return;
     if (t == null) {
-      if (mounted) setState(() => _loading = false);
+      setState(() => _loading = false);
       return;
     }
     final tabs = await _svc.tabsFor(t);
+    if (!mounted) return;
     _tabs = tabs;
     _idx = tabs.indexWhere((x) => x.id == t.id).clamp(0, tabs.length - 1);
     await _loadTab();
@@ -113,6 +117,7 @@ class _EntryState extends ConsumerState<KnReportEntryScreen> {
     if (i == _idx || _busy) return;
     _debounce?.cancel();
     await _autosave();
+    if (!mounted) return;
     setState(() => _idx = i);
     await _loadTab();
   }

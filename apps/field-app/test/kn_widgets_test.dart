@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:agrigreen_field/application/app_services.dart';
 import 'package:agrigreen_field/application/kn_context_service.dart';
+import 'package:agrigreen_field/application/kn_report_service.dart';
 import 'package:agrigreen_field/domain/kn_context.dart';
 import 'package:agrigreen_field/domain/kn_report.dart';
 import 'package:agrigreen_field/ui/app.dart';
 import 'package:agrigreen_field/ui/kn/kn_cooperatives_screen.dart';
 import 'package:agrigreen_field/ui/kn/kn_home_screen.dart';
 import 'package:agrigreen_field/ui/kn/kn_report_entry_screen.dart';
+import 'package:agrigreen_field/ui/kn/kn_providers.dart';
 import 'package:agrigreen_field/ui/providers.dart';
 import 'package:agrigreen_mobile/application/auth_flow.dart';
 import 'package:agrigreen_mobile/core/clock.dart';
@@ -118,6 +121,82 @@ class _Env {
   }
 }
 
+class _GatedReportService extends KnReportService {
+  _GatedReportService(_Env env, {this.saveGate, this.tabsGate})
+    : super(
+        db: env.s.db,
+        refs: env.s.refs,
+        outbox: env.s.outbox,
+        api: env.server,
+        clock: env.pf.clock,
+        syncNow: env.s.knReports.syncNow,
+      );
+
+  final Completer<void>? saveGate;
+  final Completer<void>? tabsGate;
+  bool saveStarted = false;
+  bool tabsStarted = false;
+  bool tabsFinished = false;
+  int savesFinished = 0;
+
+  @override
+  Future<void> saveWork(String taskId, Map<String, String> values) async {
+    saveStarted = true;
+    final gate = saveGate;
+    if (gate != null) await gate.future;
+    await super.saveWork(taskId, values);
+    savesFinished++;
+  }
+
+  @override
+  Future<List<KnReportTask>> tabsFor(KnReportTask task) async {
+    final tabs = await super.tabsFor(task);
+    tabsStarted = true;
+    final gate = tabsGate;
+    if (gate != null) await gate.future;
+    tabsFinished = true;
+    return tabs;
+  }
+}
+
+Future<void> waitForCondition(
+  WidgetTester t,
+  FutureOr<bool> Function() condition, {
+  String? reason,
+}) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (true) {
+    await t.pump();
+    final ready = (await t.runAsync(() async => condition()))!;
+    if (ready) return;
+    if (!DateTime.now().isBefore(deadline)) {
+      expect(ready, isTrue, reason: reason);
+      return;
+    }
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 15)),
+    );
+    await t.pump(const Duration(milliseconds: 50));
+  }
+}
+
+void cleanupEntryTest(
+  WidgetTester t,
+  _Env env, [
+  List<Completer<void>> gates = const [],
+]) {
+  t.view.physicalSize = const Size(720, 1600);
+  t.view.devicePixelRatio = 2;
+  addTearDown(t.view.reset);
+  addTearDown(() async {
+    for (final gate in gates) {
+      if (!gate.isCompleted) gate.complete();
+    }
+    await settle(t);
+    await _finish(t, env);
+  });
+}
+
 Future<void> settle(WidgetTester t, {int rounds = 12}) async {
   for (var i = 0; i < rounds; i++) {
     await t.runAsync(
@@ -129,16 +208,8 @@ Future<void> settle(WidgetTester t, {int rounds = 12}) async {
 
 // SQLite FFI/HTTP chạy ngoài đồng hồ giả của tester. Chờ kết quả quan sát được,
 // thay vì giả định I/O xong sau số vòng cố định khi cả bộ test chạy song song.
-Future<void> waitForWidget(WidgetTester t, Finder finder) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 5));
-  while (finder.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
-    await t.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 15)),
-    );
-    await t.pump(const Duration(milliseconds: 50));
-  }
-  expect(finder, findsWidgets);
-}
+Future<void> waitForWidget(WidgetTester t, Finder finder) =>
+    waitForCondition(t, () => finder.evaluate().isNotEmpty);
 
 Future<void> _finish(WidgetTester t, _Env env) async {
   await t.pumpWidget(const SizedBox());
@@ -146,16 +217,18 @@ Future<void> _finish(WidgetTester t, _Env env) async {
   await t.runAsync(env.dispose);
 }
 
-Widget _app(_Env env, AppState st, {Widget? home}) => ProviderScope(
-  overrides: [
-    platformProvider.overrideWithValue(env.pf),
-    oidcProvider.overrideWithValue(FakeOidc()),
-    appControllerProvider.overrideWith(() => _Fixed(st)),
-  ],
-  child: home == null
-      ? const FieldApp()
-      : MaterialApp(theme: buildTheme(), home: home),
-);
+Widget _app(_Env env, AppState st, {Widget? home, KnReportService? reports}) =>
+    ProviderScope(
+      overrides: [
+        if (reports != null) knReportServiceProvider.overrideWithValue(reports),
+        platformProvider.overrideWithValue(env.pf),
+        oidcProvider.overrideWithValue(FakeOidc()),
+        appControllerProvider.overrideWith(() => _Fixed(st)),
+      ],
+      child: home == null
+          ? const FieldApp()
+          : MaterialApp(theme: buildTheme(), home: home),
+    );
 
 KnSessionContext _ctx() => const KnSessionContext(
   contextId: 'ctx-0',
@@ -171,6 +244,102 @@ KnSessionContext _ctx() => const KnSessionContext(
 void main() {
   setUp(() {
     // Màn hình điện thoại phổ thông.
+  });
+
+  testWidgets('#286 đóng màn hình đang sửa vẫn tự lưu bản đang nhập', (
+    tester,
+  ) async {
+    final env = (await tester.runAsync(_Env.create))!;
+    cleanupEntryTest(tester, env);
+    await tester.runAsync(env.seedTasks);
+    final service = _GatedReportService(env);
+    await tester.pumpWidget(
+      _app(
+        env,
+        AppState(
+          const AuthView(AuthStage.unlocked),
+          services: env.s,
+          kn: KnContextState(KnContextStage.ready, context: _ctx()),
+        ),
+        home: const KnReportEntryScreen(taskId: taskA2),
+        reports: service,
+      ),
+    );
+    await waitForWidget(tester, find.byKey(const ValueKey('cell-$xaA-H')));
+    await tester.enterText(find.byKey(const ValueKey('cell-$xaA-H')), '7');
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+    await waitForCondition(tester, () => service.savesFinished > 0);
+    final task = (await tester.runAsync(() => service.task(taskA2)))!;
+    final entry = (await tester.runAsync(() => service.entry(task)))!;
+    expect(entry.values[knCellKey(xaA, 'H')], '7');
+  });
+
+  testWidgets('#286 đóng màn hình khi chuyển tab còn chờ tự lưu', (
+    tester,
+  ) async {
+    final env = (await tester.runAsync(_Env.create))!;
+    final gate = Completer<void>();
+    cleanupEntryTest(tester, env, [gate]);
+    await tester.runAsync(env.seedTasks);
+    final service = _GatedReportService(env, saveGate: gate);
+    await tester.pumpWidget(
+      _app(
+        env,
+        AppState(
+          const AuthView(AuthStage.unlocked),
+          services: env.s,
+          kn: KnContextState(KnContextStage.ready, context: _ctx()),
+        ),
+        home: const KnReportEntryScreen(taskId: taskA2),
+        reports: service,
+      ),
+    );
+    await waitForWidget(tester, find.byKey(const ValueKey('cell-$xaA-H')));
+    await tester.enterText(find.byKey(const ValueKey('cell-$xaA-E')), '3,5');
+    await tester.enterText(find.byKey(const ValueKey('cell-$xaA-H')), '7');
+    await tester.ensureVisible(find.byKey(const ValueKey('kn-tab-$xaB')));
+    await tester.tap(find.byKey(const ValueKey('kn-tab-$xaB')));
+    expect(service.saveStarted, isTrue);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+    gate.complete();
+    await waitForCondition(
+      tester,
+      () async => (await env.s.outbox.list()).isNotEmpty,
+    );
+    final drafts = (await tester.runAsync(env.s.outbox.list))!;
+    expect(drafts.single.payload['kind'], 'draft');
+    expect(drafts.single.payload['task_id'], taskA2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('#286 đóng màn hình khi danh sách tab còn đang tải', (
+    tester,
+  ) async {
+    final env = (await tester.runAsync(_Env.create))!;
+    final gate = Completer<void>();
+    cleanupEntryTest(tester, env, [gate]);
+    await tester.runAsync(env.seedTasks);
+    final service = _GatedReportService(env, tabsGate: gate);
+    await tester.pumpWidget(
+      _app(
+        env,
+        AppState(
+          const AuthView(AuthStage.unlocked),
+          services: env.s,
+          kn: KnContextState(KnContextStage.ready, context: _ctx()),
+        ),
+        home: const KnReportEntryScreen(taskId: taskA2),
+        reports: service,
+      ),
+    );
+    await waitForCondition(tester, () => service.tabsStarted);
+    await tester.pumpWidget(const SizedBox());
+    gate.complete();
+    await waitForCondition(tester, () => service.tabsFinished);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -277,7 +446,7 @@ void main() {
           home: const KnReportEntryScreen(taskId: taskA2),
         ),
       );
-      await settle(tester);
+      await waitForWidget(tester, find.byKey(const ValueKey('cell-$xaA-H')));
       expect(find.byKey(const ValueKey('kn-tab-$xaA')), findsOneWidget);
       expect(find.byKey(const ValueKey('kn-tab-$xaB')), findsOneWidget);
       expect(find.text('TIẾN ĐỘ XUỐNG GIỐNG THU ĐÔNG 2026'), findsOneWidget);
@@ -316,7 +485,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const ValueKey('kn-tab-$xaB')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('kn-tab-$xaB')));
-      await settle(tester, rounds: 20);
+      await waitForWidget(tester, find.byKey(const ValueKey('cell-$xaB-E')));
       final drafts = (await tester.runAsync(env.s.outbox.list))!;
       expect(drafts.single.payload['kind'], 'draft');
       expect(drafts.single.payload['task_id'], taskA2);
@@ -326,7 +495,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const ValueKey('kn-tab-$xaA')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('kn-tab-$xaA')));
-      await settle(tester, rounds: 20);
+      await waitForWidget(tester, find.byKey(const ValueKey('cell-$xaA-H')));
       expect(find.text('7'), findsOneWidget);
       // Đợi thông báo (SnackBar) tự ẩn để không che nút.
       ScaffoldMessenger.of(tester.element(find.byType(KnReportEntryScreen)))
@@ -334,7 +503,18 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await settle(tester);
       await tester.tap(find.byKey(const ValueKey('kn-submit')));
-      await settle(tester, rounds: 20);
+      await waitForCondition(tester, () async {
+        final records = await env.s.outbox.list(
+          entity: PushEntity.reportSubmission,
+        );
+        return records.isNotEmpty &&
+            records.first.payload['kind'] == 'submitted';
+      });
+      await waitForCondition(tester, () {
+        final buttons = find.byKey(const ValueKey('kn-submit')).evaluate();
+        return buttons.length == 1 &&
+            (buttons.single.widget as FilledButton).onPressed != null;
+      });
       final recs = (await tester.runAsync(
         () => env.s.outbox.list(entity: PushEntity.reportSubmission),
       ))!;
@@ -497,8 +677,12 @@ void main() {
       '0912345123',
     );
     await tester.tap(find.byKey(const ValueKey('kn-coop-f-save')));
-    await settle(tester);
+    await waitForCondition(tester, () => env.server.actionCalls.isNotEmpty);
     expect(env.server.actionCalls.single.$1, '/v1/kn/producer-records');
+    await waitForCondition(
+      tester,
+      () => find.byKey(const ValueKey('kn-coop-f-save')).evaluate().isEmpty,
+    );
     await _finish(tester, env);
   });
 

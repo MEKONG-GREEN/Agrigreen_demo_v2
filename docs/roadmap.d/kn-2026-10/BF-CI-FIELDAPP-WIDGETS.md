@@ -1,0 +1,1 @@
+- [x] BF-CI-FIELDAPP-WIDGETS (#286): giữ service theo phiên nhập, chặn cập nhật widget đã đóng và chờ kết quả I/O quan sát được; hồi quy tự lưu/gửi FN-XA-03.02 và hồ sơ FN-XA-03.03. [Phạm vi/cách kiểm](../../kn/gia-dinh/BF-CI-FIELDAPP-WIDGETS.md). Không đổi nghiệp vụ hoặc cổng CI.
