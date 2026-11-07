@@ -1,7 +1,5 @@
 # ADR-0057: Tự đặt lại mật khẩu qua email, bỏ PIN Mobile
 
-> Số ADR đổi 0056 → 0057 (07/11/2026, #236) vì trùng số với ADR-0056 hộ chăn nuôi gộp trước; chú thích "ADR-0056" trong migration đã áp dụng `20261106150125_pf_accounts_password_reset` trỏ tới ADR này (không sửa migration đã áp dụng).
-
 **Trạng thái:** Chấp nhận — gói #255 AUTH-V2-RESET-NOPIN. **Ngày:** 06/11/2026.
 **Căn cứ:** BRD 2.0 — Báo giá v2.0 FN-CH-00.01 (luồng phụ “Quên mật khẩu?”, “Mobile: không có đăng nhập bằng PIN”), HCTH v4.0 FN-05 (luồng phụ “Mobile: không có đăng nhập bằng PIN”).
 **Liên quan:** [ADR-0010](0010-kenh-nong-ho.md) (không gửi mật khẩu tạm), [ADR-0041](0041-mfa-theo-nhom-d24.md) (TOTP cán bộ KN), [ADR-0048](0048-lien-ket-khach-co-otp.md) (mẫu mã một lần), liên kết tải Chi cục của pf/reports (mẫu mã trong email + consumer gửi ngoài giao dịch).
