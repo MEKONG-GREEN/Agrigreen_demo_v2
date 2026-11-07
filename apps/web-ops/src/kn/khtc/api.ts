@@ -91,7 +91,7 @@ export const DEPT_LABEL: Record<string, string> = {
   trong_trot: "Trồng trọt",
   chan_nuoi_thuy_san: "Chăn nuôi – Thủy sản",
   ke_hoach_tai_chinh: "Kế hoạch – Tài chính",
-  thong_tin_truyen_thong: "Thông tin – Truyền thông",
+  thong_tin_truyen_thong: "Thông tin Tuyên truyền",
   hanh_chinh_tong_hop: "Hành chính – Tổng hợp",
 };
 

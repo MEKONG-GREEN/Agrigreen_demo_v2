@@ -32,31 +32,6 @@
       ],
       "before": [
         {
-          "Key": "tinh.bao_cao.tong_hop",
-          "Label": "Báo cáo tổng hợp các xã",
-          "Route": "/kn/bao-cao/tong-hop",
-          "Icon": "layers",
-          "BadgeSource": "",
-          "Requires": null,
-          "ComingSoon": false,
-          "Needs": "",
-          "Children": null
-        },
-        {
-          "Key": "tinh.bao_cao.dot_xuat",
-          "Label": "Báo cáo đột xuất",
-          "Route": "/kn/bao-cao/dot-xuat",
-          "Icon": "zap",
-          "BadgeSource": "extension.report_status.ad_hoc_pending",
-          "Requires": {
-            "ReportType": "dot_xuat",
-            "Level": "province"
-          },
-          "ComingSoon": false,
-          "Needs": "",
-          "Children": null
-        },
-        {
           "Key": "tinh.khtc.bao_cao",
           "Label": "Soạn báo cáo (Mẫu 1–5)",
           "Route": "/kn/khtc/bao-cao",
@@ -113,31 +88,6 @@
         }
       ],
       "after": [
-        {
-          "Key": "tinh.bao_cao.tong_hop",
-          "Label": "Báo cáo tổng hợp các xã",
-          "Route": "/kn/bao-cao/tong-hop",
-          "Icon": "layers",
-          "BadgeSource": "",
-          "Requires": null,
-          "ComingSoon": false,
-          "Needs": "",
-          "Children": null
-        },
-        {
-          "Key": "tinh.bao_cao.dot_xuat",
-          "Label": "Báo cáo đột xuất",
-          "Route": "/kn/bao-cao/dot-xuat",
-          "Icon": "zap",
-          "BadgeSource": "extension.report_status.ad_hoc_pending",
-          "Requires": {
-            "ReportType": "dot_xuat",
-            "Level": "province"
-          },
-          "ComingSoon": false,
-          "Needs": "",
-          "Children": null
-        },
         {
           "Key": "tinh.khtc.bao_cao",
           "Label": "Soạn báo cáo (Mẫu 1–5)",

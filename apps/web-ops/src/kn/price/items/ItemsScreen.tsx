@@ -86,7 +86,7 @@ function ItemCatalog({ initialTab, initialFilters }: { initialTab?: "proposals";
   return (
     <>
       <PageHeader title={initialTab === "proposals" ? "Đề xuất mặt hàng" : "Mặt hàng theo thời kỳ"}>
-        Phòng Thông tin – Truyền thông là chủ danh mục. Mọi thay đổi áp dụng từ
+        Phòng Thông tin Tuyên truyền là chủ danh mục. Mọi thay đổi áp dụng từ
         ngày báo giá kế tiếp, không ảnh hưởng phiếu đã có.
       </PageHeader>
       <div className="row" style={{ marginBottom: 12 }}>

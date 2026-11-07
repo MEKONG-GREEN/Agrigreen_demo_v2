@@ -166,6 +166,9 @@ func (s *Service) periodInScope(ctx context.Context, tx pgx.Tx, a actor, id uuid
 	if b.Status == "withdrawn" {
 		return nil, nil, ErrBatchWithdrawn
 	}
+	if lock && b.ReportType == "adhoc" {
+		return nil, nil, problem.Forbidden
+	}
 	return p, b, nil
 }
 
@@ -591,6 +594,9 @@ func (s *Service) Remind(ctx context.Context, batchID uuid.UUID, in RemindInput,
 		b, err := s.batchInScope(ctx, tx, a, batchID, false)
 		if err != nil {
 			return err
+		}
+		if b.ReportType == "adhoc" {
+			return problem.Forbidden
 		}
 		if b.Status == "withdrawn" {
 			return ErrBatchWithdrawn

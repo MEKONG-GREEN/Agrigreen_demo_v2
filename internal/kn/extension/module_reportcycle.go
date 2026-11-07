@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/menu"
 	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/app"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
@@ -24,6 +25,8 @@ import (
 // ReportCycleDeps là port của module khác cho vòng đời báo cáo. Thiếu Forms/Regions/Assignments → 503
 // extension.dependency_unavailable ở thao tác cần; Names, Dispatches tùy chọn.
 type ReportCycleDeps struct {
+	Departments partyport.ProvinceDepartments
+	MenuCatalog *menu.Catalog
 	Forms       repport.FormEngine
 	Regions     partyport.Regions
 	Assignments accport.Assignments
@@ -33,6 +36,7 @@ type ReportCycleDeps struct {
 
 // UseReportCycle nối port cho vòng đời báo cáo.
 func (m *Module) UseReportCycle(d ReportCycleDeps) {
+	m.rc.Departments, m.rc.MenuCatalog = d.Departments, d.MenuCatalog
 	m.rc.Forms, m.rc.Regions, m.rc.Assignments, m.rc.Names, m.rc.Log = d.Forms, d.Regions, d.Assignments, d.Names, d.Log
 }
 

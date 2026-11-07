@@ -175,6 +175,17 @@ func (k *KN) UnitDepartments(ctx context.Context, unitRef uuid.UUID) ([]port.Dep
 	return out, err
 }
 
+// ProvinceDepartments is the tenant-only read-side for background callers.
+func (k *KN) ProvinceDepartments(ctx context.Context) ([]port.ProvinceDepartment, error) {
+	var out []port.ProvinceDepartment
+	err := tenant.FromCtxTx(ctx, k.DB, func(tx pgx.Tx) error {
+		var err error
+		out, err = store.ProvinceDepartments(ctx, tx)
+		return err
+	})
+	return out, err
+}
+
 // DepartmentByCode thực hiện port.Departments.
 func (k *KN) DepartmentByCode(ctx context.Context, unitRef uuid.UUID, code string) (port.Department, error) {
 	var d *port.Department

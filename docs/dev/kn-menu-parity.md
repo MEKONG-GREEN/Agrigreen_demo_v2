@@ -35,7 +35,7 @@ Phủ:
 
 Kết quả lần chạy 26/10/2026: không lệch nội dung menu ở ca nào: 2.163 cặp HTTP (1.589 ca 200 giống từng byte, trong đó 21 ca Admin mọi đơn vị qua khác biệt 1 bên dưới; 574 ca cùng từ chối, cùng mã lỗi), 1.533 ca ContextNavigation (1.113 cùng trang đích, 420 cùng lỗi). Kiểm thử hỏng nếu gỡ dòng nối ở gốc lắp ráp (đã chạy thử).
 
-Mẫu báo cáo đột xuất (FormAvailability = true) không dựng được qua HTTP trong kiểm thử này; phủ bởi ảnh chụp 657 ca bên dưới (traits × có/không mẫu × module tắt).
+S-4 (#265, BRD 2.0 Q4) gỡ báo cáo đột xuất TT. 657 ca ảnh chụp vẫn phủ có/không mẫu; cả hai đều không được mở lại mục đã gỡ. Direct API của phiên custom department/profile TT và profile HCTH cũng được kiểm trong parity integration.
 
 ## Khác biệt có chủ đích (kiểm tường minh)
 

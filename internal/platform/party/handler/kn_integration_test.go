@@ -541,7 +541,7 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 
 	// Báo cáo đột xuất: chỉ khi phòng ban có mẫu loại dot_xuat ở cấp tương ứng (P3).
 	f.mod.UseFormAvailability(fakeForms{"trong_trot|commune|dot_xuat": true})
-	if keys := menuKeys(xa.menu(port.MenuQuery{Department: "trong_trot"})); !slices.Contains(keys, "xa.bao_cao.dot_xuat") {
+	if keys := menuKeys(xa.menu(port.MenuQuery{Department: "trong_trot"})); slices.Contains(keys, "xa.bao_cao.dot_xuat") {
 		t.Fatalf("Cấp Xã có mẫu đột xuất: %v", keys)
 	}
 	if keys := menuKeys(tinh.menu(port.MenuQuery{Department: "trong_trot"})); slices.Contains(keys, "tinh.bao_cao.dot_xuat") {

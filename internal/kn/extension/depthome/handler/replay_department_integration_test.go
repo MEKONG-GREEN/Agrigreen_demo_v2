@@ -64,7 +64,9 @@ func TestReviewDepartmentReplayRechecksCurrentDepartment(t *testing.T) {
 		if e == nil {
 			t.Fatalf("replay crossed department: returnedOriginal=%v department=%s name=%q", replay.Ref == created.Ref, replay.Department, replay.Name)
 		}
-		reused(t, e)
+		if !errors.Is(e, problem.Forbidden) {
+			t.Fatalf("removed department replay: %v", e)
+		}
 		// Cùng phòng: phát lại vẫn trả bản cũ.
 		same, e := svc.CreateFolder(a, input, idem)
 		if e != nil || same.ID != created.ID {
@@ -92,7 +94,9 @@ func TestReviewDepartmentReplayRechecksCurrentDepartment(t *testing.T) {
 		if e == nil {
 			t.Fatalf("rename replay crossed department: department=%s name=%q", replay.Department, replay.Name)
 		}
-		reused(t, e)
+		if !errors.Is(e, problem.Forbidden) {
+			t.Fatalf("removed department rename replay: %v", e)
+		}
 	})
 	t.Run("profile", func(t *testing.T) {
 		idem := key()

@@ -145,19 +145,20 @@ func (m *mailer) all() []repport.Message {
 // ---- fixture ----
 
 type fixture struct {
-	t       *testing.T
-	env     *pgtest.Env
-	iss     *authztest.FakeIssuer
-	clk     *clock.Fixed
-	tenant  uuid.UUID
-	ext     *extension.Module
-	rep     *reports.Module
-	repPool tenant.Beginner
-	extPool tenant.Beginner
-	app     *httptest.Server
-	admin   *httptest.Server
-	mail    *mailer
-	asg     *assignments
+	t           *testing.T
+	env         *pgtest.Env
+	iss         *authztest.FakeIssuer
+	clk         *clock.Fixed
+	tenant      uuid.UUID
+	ext         *extension.Module
+	rep         *reports.Module
+	repPool     tenant.Beginner
+	extPool     tenant.Beginner
+	app         *httptest.Server
+	admin       *httptest.Server
+	mail        *mailer
+	asg         *assignments
+	departments *fixtureDepartments
 	// repParams: tham số của pf/reports trong kiểm thử (A4: reports.dispatch_attachment_limit_mb,
 	// reports.dispatch_link_ttl_hours); rỗng → mặc định.
 	repParams *repParams
@@ -233,8 +234,12 @@ func newFixture(t *testing.T, o fixtureOpts) *fixture {
 	f.repParams = &repParams{v: map[string]decimal.Decimal{}}
 	f.rep = reports.New(repPool, f.clk, reports.Deps{FormSeeds: []repport.FormSeedRegistration{extension.ReportFormSeeds()}, Builders: extension.ReportBuilders(extension.ReportBuilderDeps{Data: f.ext.ReportData(), Orgs: og, Units: units{names: names}, Clock: f.clk}), Catalog: []repport.CatalogRegistration{extension.ReportCatalog()}, Policies: []repport.Policy{extension.ReportPolicy()}, ResolveSession: extension.ReportSessionResolver(og), Orgs: og, Units: units{names: names}, Store: store, Mailer: f.mail, Getenv: func(string) string { return "" },
 		Params: f.repParams})
-	f.ext.UseReportCycle(extension.ReportCycleDeps{Forms: f.rep.Forms(), Regions: rg, Assignments: f.asg})
+	f.departments = newFixtureDepartments(t)
+	deps := f.departments.reportCycle
+	deps.Forms, deps.Regions, deps.Assignments = f.rep.Forms(), rg, f.asg
+	f.ext.UseReportCycle(deps)
 	f.ext.UseDispatchHistory(f.rep.DispatchHistory())
+	f.ext.UseDepartmentAdmin(f.departments)
 	// W6.2: ghi song song chốt/mở lại kỳ + ảnh chụp đóng băng sang cap/forms (cấu hình KN thật của gốc lắp ráp).
 	fm, err := forms.New(nil, f.clk, forms.Deps{Profiles: []formsport.Profile{platformasm.KNProfile}})
 	if err != nil {

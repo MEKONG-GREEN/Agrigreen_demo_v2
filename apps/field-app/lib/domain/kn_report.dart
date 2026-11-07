@@ -141,7 +141,9 @@ class KnReportTask {
   final Map<String, String> provincial;
   final DateTime? updatedAt;
 
-  bool get adHoc => reportType == knReportTypeAdHoc;
+  // This is the legacy TT report_task transport. Native cap/forms tasks use
+  // FormsTask/forms_task and keep their own period-kind permissions.
+  bool get adHoc => reportType == knReportTypeAdHoc || reportType == 'adhoc';
 
   /// Còn nhập/nộp được: kỳ chưa chốt (máy coi kỳ đã chốt khi qua giờ tự chốt
   /// — bi quan khi ngoại tuyến), hoặc đã mở lại và chưa hết hạn mở.
@@ -174,6 +176,7 @@ class KnReportTask {
 
   /// Nút trên dòng công việc: Nhập / Tiếp tục / Sửa / Xem.
   String actionAt(DateTime now, {String? localKind}) {
+    if (adHoc) return 'Xem';
     final d = displayAt(now, localKind: localKind);
     if (d == KnTaskStatus.closed) return 'Xem';
     final hasDraft =
@@ -192,6 +195,7 @@ class KnReportTask {
 
   /// Việc còn phải gửi (đếm "Cần làm").
   bool pendingAt(DateTime now, {String? localKind}) {
+    if (adHoc) return false;
     final d = displayAt(now, localKind: localKind);
     return d == KnTaskStatus.notStarted ||
         d == KnTaskStatus.draft ||
@@ -512,7 +516,7 @@ KnCellRole knCellRole(KnColumn c, KnReportTask t, DateTime now) {
 }
 
 bool knEditable(KnColumn c, KnReportTask t, DateTime now) {
-  if (!t.openAt(now)) return false;
+  if (t.adHoc || !t.openAt(now)) return false;
   final r = knCellRole(c, t, now);
   return r == KnCellRole.input || r == KnCellRole.openPeriod;
 }

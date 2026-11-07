@@ -412,7 +412,9 @@ func adminDeptItem(d port.Department) MenuItemView {
 func AdminMenu(unit uuid.UUID, depts []port.Department) MenuView {
 	deptItems := make([]MenuItemView, 0, len(depts))
 	for _, d := range depts {
-		deptItems = append(deptItems, adminDeptItem(d))
+		if item := adminDeptItem(d); len(item.Children) > 0 {
+			deptItems = append(deptItems, item)
+		}
 	}
 	view := MenuView{Version: domain.MenuVersion, Audience: port.AudienceAdmin, UnitRef: unit, DefaultRoute: domain.DefaultRoute(port.AudienceAdmin)}
 	view.Groups = []MenuGroupView{

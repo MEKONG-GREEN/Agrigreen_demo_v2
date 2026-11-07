@@ -277,10 +277,8 @@ func TestFN20_DeptLibrary(t *testing.T) {
 		t.Fatalf("Cấp Xã chỉ thấy văn bản có đối tượng xa: %v", got)
 	}
 	want(t, xa.get("/v1/extension/dept-docs/"+str(qt, "ref")), 404, "extension.dept_doc_not_found", "Cấp Xã mở văn bản nội bộ")
-	if got := titles(want(t, other.get("/v1/extension/dept-docs"), 200, "", "phòng khác")); len(got) != 0 {
-		t.Fatalf("phòng KHTC thấy văn bản CNTS: %v", got)
-	}
-	want(t, other.get("/v1/extension/dept-docs/"+ndRef), 404, "extension.dept_doc_not_found", "phòng khác mở văn bản")
+	want(t, other.get("/v1/extension/dept-docs"), 403, "forbidden", "FN20 không có ở phòng khác")
+	want(t, other.get("/v1/extension/dept-docs/"+ndRef), 403, "forbidden", "phòng khác mở trực tiếp văn bản")
 	want(t, other.get("/v1/extension/dept-docs?department="+cnts), 403, "forbidden", "phòng khác chọn phòng CNTS")
 	ex := want(t, vc.get("/v1/extension/dept-docs?validity=expired"), 200, "", "lọc hết hiệu lực")
 	if got := titles(ex); len(got) != 1 || got[0] != "Kế hoạch tiêm phòng 2025" {

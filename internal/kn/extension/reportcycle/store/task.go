@@ -267,9 +267,12 @@ func MarkReminded(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, at time.Time)
 }
 
 // ExpiredReopens trả công việc có hạn mở lại đã qua (job tự chốt lại).
-func ExpiredReopens(ctx context.Context, tx pgx.Tx, now time.Time, limit int) ([]Task, error) {
+func ExpiredReopens(ctx context.Context, tx pgx.Tx, now time.Time, limit int, scopes []string) ([]Task, error) {
 	return collectTasks(tx.Query(ctx, "SELECT "+taskCols+` FROM pf_extension.report_task
-	  WHERE reopened_until IS NOT NULL AND reopened_until <= $1 ORDER BY period_id, reopened_until LIMIT $2`, now.UTC(), limit))
+	  WHERE reopened_until IS NOT NULL AND reopened_until <= $1
+      AND (province_code||':'||department_code)=ANY($3::text[])
+      AND EXISTS (SELECT 1 FROM pf_extension.report_batch b WHERE b.id = report_task.batch_id AND b.report_type <> 'adhoc')
+    ORDER BY period_id, reopened_until LIMIT $2`, now.UTC(), limit, scopes))
 }
 
 // ---------------------------------------------------------------------------

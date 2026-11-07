@@ -164,6 +164,9 @@ func (m *Module) SyncSink() syncport.Sink { return app.ConsentSink{Svc: m.svc} }
 // Departments cho module khác đọc phòng ban (P1 ngữ cảnh phiên, P3 mẫu báo cáo — qua port).
 func (m *Module) Departments() port.Departments { return m.kn }
 
+// ProvinceDepartments exposes the current tenant/province department read-side.
+func (m *Module) ProvinceDepartments() port.ProvinceDepartments { return m.kn }
+
 // Regions cho P4 nhóm xã theo Khu vực và dòng tổng Khu vực/Toàn tỉnh (qua port).
 func (m *Module) Regions() port.Regions { return m.kn }
 

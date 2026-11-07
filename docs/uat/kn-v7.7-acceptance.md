@@ -284,3 +284,11 @@ Theo [kn-v7.7-plan.md §5](../brd/kn-v7.7-plan.md#5-câu-hỏi-cho-khách-hàng)
 - Quyết định P8: (a) lý do vô hiệu hóa HTX ≥ 20 ký tự ở DB, máy chủ, OpenAPI, web giả lập và field-app (BRD v7.7 không nêu số; giữ giá trị chặt hơn của sổ `org_event`, US-HTXSTATUS-01 AC-3); (b) tham số đường dẫn máy móc HTX là `{ref}` (`/v1/kn/machine-counts/{ref}`, `…/{ref}/log`) như handler và như `/v1/kn/cooperatives/{ref}`.
 - Chưa có tệp Excel gốc của 14 mẫu (Q-01): tiêu chí "bố cục trùng sheet mẫu theo chữ cái cột" và "kết quả công thức trùng Excel" chỉ kiểm được với T01, T04 (cấu trúc đã biết) cho tới khi có tệp.
 - Máy dev không có Docker, Kubernetes, Keycloak thật: các dòng realm (N-09, N-10, X-06..X-09) kiểm bằng `realm_test.go` + emulator; sao lưu, sẵn sàng, tải (N-01..N-05) chờ hạ tầng.
+
+## S-4: menu từng phòng (BRD 2.0, Q3/Q4)
+
+- TT FN-AD-04.05: Admin chỉ thấy Danh mục nông nghiệp ở TT; các phòng khác giữ danh mục riêng của FN.
+- TT FN-TW-01.01–02, TI-02.01–06, XA-03.01–02/07: chỉ menu TT có báo cáo T01–V06/phát hành/rà soát; gọi trực tiếp API từ phòng khác trả 403.
+- CNTS FN-20, UR-TINH-25, AC-01–03: menu/API kho văn bản chỉ CNTS; tỉnh/xã/Admin đúng phạm vi tiếp tục đọc/ghi theo vai; phòng khác 403.
+- Q4: không còn menu báo cáo đột xuất TT; URL trả 404; không phát hành mới hoặc sửa bản cũ. Dữ liệu cũ giữ đọc lịch sử.
+- Chạy `TestStandaloneDepartmentAPI`, `TestStandaloneDepartmentMenus`, parity `TestKNSPLIT2MenuParityConfiguredMatchesCompatibility`, web `DepartmentMenus.test.ts` và Playwright `kn-department-menus.spec.ts`.

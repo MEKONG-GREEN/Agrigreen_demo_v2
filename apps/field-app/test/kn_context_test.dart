@@ -158,7 +158,9 @@ void main() {
   test(
     'KN P2 menu: khóa lạ bị ẩn, dùng bản đệm khi ngoại tuyến, badge tại máy',
     () async {
+      await svc.resolve();
       final menu = KnMenuService(
+        context: svc.stored,
         db: h.db,
         api: h.server,
         clock: h.clock,
@@ -177,7 +179,7 @@ void main() {
       expect(contact.group, 'Dùng chung');
       expect(contact.comingSoon, isTrue);
       expect(contact.enabled, isFalse);
-      expect(online.version, 'kn.menu/v3');
+      expect(online.version, 'kn.menu/v17');
       expect((await menu.badges())[knBadgeTasksTodo], 3);
       kn.offline = true;
       final cached = await menu.load();

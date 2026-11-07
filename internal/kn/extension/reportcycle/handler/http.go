@@ -3,7 +3,9 @@
 package handler
 
 import (
+	"context"
 	"encoding/base64"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"io"
 	"net/http"
 	"strconv"
@@ -22,53 +24,57 @@ import (
 )
 
 // Handler gói Service cho HTTP.
-type Handler struct{ Svc *app.Service }
+type Handler struct {
+	Svc  *app.Service
+	Menu func(context.Context) (partyport.MenuView, error)
+}
 
 // RegisterApp gắn route vào nhóm /v1 (đã có xác thực, ngữ cảnh phiên, Idempotency-Key).
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g := rg.Group("/extension")
 	h.registerCNTSDesign(g)
-	g.GET("/report-forms", h.reportForms)
-	g.POST("/report-batches/preview", h.preview)
-	httpx.AllowBody(g, http.MethodPost, "/report-batches/provincial-import", app.MaxProvincialImportBytes+1024)
-	g.POST("/report-batches/provincial-import", h.provincialImport)
-	g.POST("/report-batches", h.issue)
-	g.GET("/report-batches", h.listBatches)
-	g.GET("/report-batches/:id", h.getBatch)
-	g.GET("/report-batches/:id/log", h.batchLog)
-	g.POST("/report-batches/:id/withdraw", h.withdraw)
-	g.POST("/report-batches/:id/deadline", h.deadline)
-	g.GET("/report-batches/:id/provincial-values", h.provincial)
-	g.GET("/report-batches/:id/status", h.status)
-	g.POST("/report-batches/:id/reminders", h.remind)
-	g.GET("/report-batches/:id/reminders", h.reminders)
+	tt := g.Group("", h.trongTrotOnly)
+	tt.GET("/report-forms", h.reportForms)
+	tt.POST("/report-batches/preview", h.preview)
+	httpx.AllowBody(tt, http.MethodPost, "/report-batches/provincial-import", app.MaxProvincialImportBytes+1024)
+	tt.POST("/report-batches/provincial-import", h.provincialImport)
+	tt.POST("/report-batches", h.issue)
+	tt.GET("/report-batches", h.listBatches)
+	tt.GET("/report-batches/:id", h.getBatch)
+	tt.GET("/report-batches/:id/log", h.batchLog)
+	tt.POST("/report-batches/:id/withdraw", h.withdraw)
+	tt.POST("/report-batches/:id/deadline", h.deadline)
+	tt.GET("/report-batches/:id/provincial-values", h.provincial)
+	tt.GET("/report-batches/:id/status", h.status)
+	tt.POST("/report-batches/:id/reminders", h.remind)
+	tt.GET("/report-batches/:id/reminders", h.reminders)
 
-	g.GET("/report-tasks", h.listTasks)
-	g.GET("/report-tasks/:id", h.getTask)
-	g.POST("/report-tasks/:id/submissions", h.submit)
-	httpx.AllowBody(g, http.MethodPost, "/report-tasks/:id/grid-import", app.MaxGridImportBytes+1024)
-	g.POST("/report-tasks/:id/grid-import", h.gridImport)
-	g.GET("/report-tasks/:id/history", h.history)
-	g.GET("/report-tasks/:id/log", h.taskLog)
-	g.POST("/report-tasks/:id/adjustment-request", h.adjust)
-	g.POST("/report-tasks/:id/confirm", h.confirm)
+	tt.GET("/report-tasks", h.listTasks)
+	tt.GET("/report-tasks/:id", h.getTask)
+	tt.POST("/report-tasks/:id/submissions", h.submit)
+	httpx.AllowBody(tt, http.MethodPost, "/report-tasks/:id/grid-import", app.MaxGridImportBytes+1024)
+	tt.POST("/report-tasks/:id/grid-import", h.gridImport)
+	tt.GET("/report-tasks/:id/history", h.history)
+	tt.GET("/report-tasks/:id/log", h.taskLog)
+	tt.POST("/report-tasks/:id/adjustment-request", h.adjust)
+	tt.POST("/report-tasks/:id/confirm", h.confirm)
 
-	g.GET("/kn-periods", h.listPeriods)
-	g.GET("/report-periods/:id", h.getPeriod)
-	g.GET("/report-periods/:id/log", h.periodLog)
-	g.POST("/report-periods/:id/close", h.closePeriod)
-	g.POST("/report-periods/:id/reopen", h.reopen)
+	tt.GET("/kn-periods", h.listPeriods)
+	tt.GET("/report-periods/:id", h.getPeriod)
+	tt.GET("/report-periods/:id/log", h.periodLog)
+	tt.POST("/report-periods/:id/close", h.closePeriod)
+	tt.POST("/report-periods/:id/reopen", h.reopen)
 
-	g.GET("/consolidations", h.consolidation)
-	g.POST("/consolidations", h.consolidate)
-	g.GET("/consolidations/pending-changes", h.pending)
-	g.GET("/consolidations/runs", h.runs)
-	g.GET("/consolidations/:id/changes", h.changes)
+	tt.GET("/consolidations", h.consolidation)
+	tt.POST("/consolidations", h.consolidate)
+	tt.GET("/consolidations/pending-changes", h.pending)
+	tt.GET("/consolidations/runs", h.runs)
+	tt.GET("/consolidations/:id/changes", h.changes)
 
-	g.GET("/kn-dashboard", h.dashboard)
-	g.GET("/report-badges", h.badges)
-	g.GET("/commune-reports", h.communeReports)
-	g.GET("/commune-reports/stats", h.communeStats)
+	tt.GET("/kn-dashboard", h.dashboard)
+	tt.GET("/report-badges", h.badges)
+	tt.GET("/commune-reports", h.communeReports)
+	tt.GET("/commune-reports/stats", h.communeStats)
 
 	h.registerCNTS(g)     // W11.42
 	h.registerCNTSAgg(g)  // W11.44

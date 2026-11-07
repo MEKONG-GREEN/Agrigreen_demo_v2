@@ -66,11 +66,17 @@ func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (
 	// Cổng của module khác (khu vực P2, engine mẫu P3, cán bộ phụ trách P1) đọc tenant từ ngữ cảnh: job không có request nên
 	// phải gắn tenant trước khi chốt/chốt lại/tổng hợp (lỗi P8: "tenant: thiếu tenant_id" khi chốt lại tự động trên gốc lắp ráp thật).
 	ctx = tenant.WithID(ctx, tid)
+	// Resolve the current tenant/province catalog before any extension transaction.
+	// A per-run allowlist also filters before LIMIT, so legacy rows cannot starve TT.
+	scopes, err := s.trongTrotScopes(ctx)
+	if err != nil {
+		return JobResult{}, err
+	}
 	var out JobResult
 	var due []store.Period
 	if err := s.tx(ctx, tid, func(tx pgx.Tx) error {
 		var err error
-		due, err = store.DuePeriods(ctx, tx, now, 200)
+		due, err = store.DuePeriods(ctx, tx, now, 200, scopes)
 		return err
 	}); err != nil {
 		return out, err
@@ -103,7 +109,7 @@ func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (
 	var expired []store.Task
 	if err := s.tx(ctx, tid, func(tx pgx.Tx) error {
 		var err error
-		expired, err = store.ExpiredReopens(ctx, tx, now, 5000)
+		expired, err = store.ExpiredReopens(ctx, tx, now, 5000, scopes)
 		return err
 	}); err != nil {
 		return out, err
@@ -145,12 +151,39 @@ func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (
 		s.afterConsolidate(cons)
 		out.Reclosed++
 	}
-	n, err := s.autoRemind(ctx, tid, now)
+	n, err := s.autoRemind(ctx, tid, now, scopes)
 	out.Reminders = n
 	return out, err
 }
 
-func (s *Service) autoRemind(ctx context.Context, tid uuid.UUID, now time.Time) (int, error) {
+func (s *Service) trongTrotScopes(ctx context.Context) ([]string, error) {
+	if s.Departments == nil || s.MenuCatalog == nil {
+		return nil, ErrDependency
+	}
+	departments, err := s.Departments.ProvinceDepartments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	eligible := map[string]bool{}
+	for _, d := range departments {
+		key := d.ProvinceCode + ":" + d.Code
+		allowed := s.MenuCatalog.SupportsTrongTrot(d.Department)
+		// Historical reports have no unit UUID; ambiguous units fail closed.
+		if previous, seen := eligible[key]; seen {
+			allowed = allowed && previous
+		}
+		eligible[key] = allowed
+	}
+	scopes := []string{}
+	for key, allowed := range eligible {
+		if allowed {
+			scopes = append(scopes, key)
+		}
+	}
+	return scopes, nil
+}
+
+func (s *Service) autoRemind(ctx context.Context, tid uuid.UUID, now time.Time, scopes []string) (int, error) {
 	before := s.paramInt(ctx, port.ParamReminderBeforeHours, 24)
 	every := s.paramInt(ctx, port.ParamReminderOverdueEveryHours, 24)
 	if before <= 0 && every <= 0 {
@@ -158,7 +191,7 @@ func (s *Service) autoRemind(ctx context.Context, tid uuid.UUID, now time.Time) 
 	}
 	sent := 0
 	err := s.tx(ctx, tid, func(tx pgx.Tx) error {
-		ps, err := store.OpenPeriodsOf(ctx, tx, 1000)
+		ps, err := store.OpenPeriodsOf(ctx, tx, 1000, scopes)
 		if err != nil {
 			return err
 		}

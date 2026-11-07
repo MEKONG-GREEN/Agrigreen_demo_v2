@@ -275,6 +275,7 @@ class AppServices {
       api: api,
       clock: pf.clock,
       localTodoCount: knReports.todoCount,
+      context: knContext.stored,
     );
     final photos = PhotoPipeline(
       camera: pf.camera,

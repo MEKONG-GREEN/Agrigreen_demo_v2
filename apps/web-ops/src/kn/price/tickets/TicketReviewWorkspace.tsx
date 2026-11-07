@@ -16,7 +16,7 @@ export function TicketReviewWorkspace({ path = [] }: { path?: string[] }) {
   const filters = reviewFilters(query, vnToday()), route = reviewRoute(path), ctx = auth.kn.context;
   const allowed = auth.status === "authenticated" && auth.kn.status === "active" && !!ctx && (ctx.role === "admin" || (ctx.role === "kn_tinh" && ctx.department_code === "thong_tin_truyen_thong"));
   const back = { href: reviewHref(filters), label: "Danh sách kiểm duyệt" };
-  if (!allowed) return <DetailPage back={back} title="Phiếu báo giá"><p role="alert">Chọn ngữ cảnh Cấp Tỉnh Phòng Thông tin truyền thông hoặc Admin để xem phiếu và nhật ký.</p></DetailPage>;
+  if (!allowed) return <DetailPage back={back} title="Phiếu báo giá"><p role="alert">Chọn ngữ cảnh Cấp Tỉnh Phòng Thông tin Tuyên truyền hoặc Admin để xem phiếu và nhật ký.</p></DetailPage>;
   if (route.kind === "invalid") return <DetailPage back={back} title="Không tìm thấy trang phiếu"><p role="alert">Đường dẫn phiếu không hợp lệ.</p></DetailPage>;
   const readOnly = ctx?.read_only === true || (ctx?.role === "admin" && auth.principal?.mfa !== true);
   const identity = JSON.stringify([clientIdentity(auth.api), auth.status, auth.principal, auth.kn.status, ctx, auth.kn.support]);

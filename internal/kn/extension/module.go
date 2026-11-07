@@ -223,7 +223,12 @@ func (m *Module) StaffNames() mdport.StaffNames { return m.svc }
 // RegisterApp gắn route Application API (gồm vòng đời báo cáo KN v7.7 — cần header X-AG-Context).
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.RegisterApp(rg)
-	rchandler.Handler{Svc: m.rc}.RegisterApp(rg)
+	rchandler.Handler{Svc: m.rc, Menu: func(ctx context.Context) (partyport.MenuView, error) {
+		if m.departments == nil {
+			return partyport.MenuView{}, rcapp.ErrDependency
+		}
+		return m.departments.Menu(ctx, partyport.MenuQuery{})
+	}}.RegisterApp(rg)
 	mathandler.Handler{Svc: m.mat}.RegisterApp(rg)
 	khtchandler.Handler{Svc: m.khtc}.RegisterApp(rg)
 	m.registerKHTCPeriods(rg) // W11.62

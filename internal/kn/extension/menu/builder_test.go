@@ -107,7 +107,7 @@ func TestDefaultRouteSelection(t *testing.T) {
 		{partyport.AudienceTinh, "ke_hoach_tai_chinh", partyport.MenuProfileGeneric, nil, "/kn/khtc/ky-bao-cao"},
 		{partyport.AudienceTinh, "ke_hoach_tai_chinh", "", nil, "/kn/khtc/ky-bao-cao"},
 		{partyport.AudienceTinh, "trong_trot", partyport.MenuProfileTrongTrot, nil, "/kn/bao-cao-khtc"},
-		{partyport.AudienceTinh, "phong_moi", partyport.MenuProfileGeneric, nil, "/kn/dashboard"},
+		{partyport.AudienceTinh, "phong_moi", partyport.MenuProfileGeneric, nil, "/kn/dung-chung/contact"},
 		{partyport.AudienceTW, "ke_hoach_tai_chinh", partyport.MenuProfileKeHoachTaiChinh, nil, "/kn/khtc/bao-cao-da-xuat"},
 		// BF-MENU (#98): menu CNTS Cấp Xã không có "Công việc cần làm" của Trồng trọt → mục bật đầu tiên "Việc cần làm".
 		{partyport.AudienceXa, "chan_nuoi_thuy_san", partyport.MenuProfileGeneric, nil, "/kn/cnts/bao-cao-ky"},
@@ -194,14 +194,14 @@ func (failingForms) HasForms(context.Context, string, string, string) (bool, err
 	return false, errors.New("forms down")
 }
 
-// Lỗi nguồn form availability là lỗi cuối (không ẩn mục âm thầm); nil = chưa có mẫu → ẩn mục Requires.
-func TestFormAvailabilityErrorsAreFinal(t *testing.T) {
+// The removed ad hoc feature must not reappear or require a forms lookup.
+func TestRemovedAdHocDoesNotDependOnFormAvailability(t *testing.T) {
 	c := catalog(t)
 	unit := uuid.New()
 	request := partyport.MenuBuildRequest{NavigationRequest: partyport.NavigationRequest{Audience: partyport.AudienceXa, UnitRef: unit,
 		Department: department(unit, "trong_trot", partyport.MenuProfileTrongTrot)}, Mode: partyport.MenuDepartment}
 	c.UseFormAvailability(failingForms{})
-	if _, err := c.Build(context.Background(), request); err == nil || err.Error() != "forms down" {
+	if _, err := c.Build(context.Background(), request); err != nil {
 		t.Fatalf("err %v", err)
 	}
 	c.UseFormAvailability(nil)
@@ -217,8 +217,8 @@ func TestFormAvailabilityErrorsAreFinal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if it, ok := leaves(def.Groups)["xa.bao_cao.dot_xuat"]; !ok || it.Module != "pf/extension" {
-		t.Fatalf("ad hoc report %+v", it)
+	if _, ok := leaves(def.Groups)["xa.bao_cao.dot_xuat"]; ok {
+		t.Fatal("removed ad hoc report reappeared with forms")
 	}
 }
 

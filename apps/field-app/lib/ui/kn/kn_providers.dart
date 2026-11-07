@@ -20,9 +20,12 @@ final knMenuServiceProvider = Provider<KnMenuService>(
 );
 
 /// Menu Cấp Xã (máy chủ hoặc bản đệm ngoại tuyến).
-final knMenuProvider = FutureProvider<KnMenu>(
-  (ref) => ref.watch(knMenuServiceProvider).load(),
-);
+final knMenuProvider = FutureProvider<KnMenu>((ref) {
+  ref.watch(
+    appControllerProvider.select((state) => state.kn?.context?.contextId),
+  );
+  return ref.watch(knMenuServiceProvider).load();
+});
 
 /// Số đếm badge, làm mới theo trạng thái đồng bộ.
 final knBadgesProvider = FutureProvider<Map<String, int>>((ref) {

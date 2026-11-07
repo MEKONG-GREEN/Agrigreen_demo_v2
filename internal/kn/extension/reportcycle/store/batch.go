@@ -364,11 +364,12 @@ func ClosePeriod(ctx context.Context, tx pgx.Tx, id, actor uuid.UUID, mode strin
 }
 
 // DuePeriods trả kỳ mở đã tới giờ chốt tự động (job).
-func DuePeriods(ctx context.Context, tx pgx.Tx, now time.Time, limit int) ([]Period, error) {
+func DuePeriods(ctx context.Context, tx pgx.Tx, now time.Time, limit int, scopes []string) ([]Period, error) {
 	rows, err := tx.Query(ctx, periodFrom+`
 	  WHERE p.status = 'open' AND p.auto_close_at <= $1
-	    AND EXISTS (SELECT 1 FROM pf_extension.report_batch b WHERE b.id = p.batch_id AND b.status = 'issued')
-	  ORDER BY p.auto_close_at LIMIT $2`, now.UTC(), limit)
+      AND (p.province_code||':'||p.department_code)=ANY($3::text[])
+	    AND EXISTS (SELECT 1 FROM pf_extension.report_batch b WHERE b.id = p.batch_id AND b.status = 'issued' AND b.report_type <> 'adhoc')
+	  ORDER BY p.auto_close_at LIMIT $2`, now.UTC(), limit, scopes)
 	if err != nil {
 		return nil, err
 	}
@@ -376,10 +377,11 @@ func DuePeriods(ctx context.Context, tx pgx.Tx, now time.Time, limit int) ([]Per
 }
 
 // OpenPeriodsOf trả kỳ còn mở (của đợt chưa thu hồi) — cho job tự nhắc.
-func OpenPeriodsOf(ctx context.Context, tx pgx.Tx, limit int) ([]Period, error) {
+func OpenPeriodsOf(ctx context.Context, tx pgx.Tx, limit int, scopes []string) ([]Period, error) {
 	rows, err := tx.Query(ctx, periodFrom+`
-	  WHERE p.status = 'open' AND EXISTS (SELECT 1 FROM pf_extension.report_batch b WHERE b.id = p.batch_id AND b.status = 'issued')
-	  ORDER BY p.due_at LIMIT $1`, limit)
+	  WHERE p.status = 'open' AND (p.province_code||':'||p.department_code)=ANY($2::text[])
+      AND EXISTS (SELECT 1 FROM pf_extension.report_batch b WHERE b.id = p.batch_id AND b.status = 'issued' AND b.report_type <> 'adhoc')
+	  ORDER BY p.due_at LIMIT $1`, limit, scopes)
 	if err != nil {
 		return nil, err
 	}

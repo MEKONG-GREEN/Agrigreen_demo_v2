@@ -4,6 +4,8 @@ import 'package:agrigreen_mobile/core/clock.dart';
 import 'package:agrigreen_mobile/data/db/local_db.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
+import '../domain/kn_context.dart';
+
 /// Khóa menu Cấp Xã mà app hiện trường có màn hình (hợp đồng P7 §6). Khóa
 /// khác trong `GET /v1/menu` bị ẩn — trừ mục "Sắp có" (kn.menu/v3,
 /// `status: coming_soon`) và nhóm "Dùng chung", hiện mờ để người dùng thấy.
@@ -14,7 +16,6 @@ abstract final class KnMenuKey {
   static const baoCaoThang = 'xa.bao_cao.thang';
   static const baoCaoVu = 'xa.bao_cao.hang_vu';
   static const baoCaoCuaXa = 'xa.bao_cao.cua_xa';
-  static const baoCaoDotXuat = 'xa.bao_cao.dot_xuat';
   static const htx = 'xa.thu_thap.htx';
   static const mayMoc = 'xa.thu_thap.may_moc';
   static const thua = 'xa.thu_thap.thua';
@@ -33,7 +34,6 @@ abstract final class KnMenuKey {
     baoCaoThang,
     baoCaoVu,
     baoCaoCuaXa,
-    baoCaoDotXuat,
     htx,
     mayMoc,
     thua,
@@ -89,6 +89,8 @@ class KnMenu {
       for (final it in (items is List ? items : const [])) {
         if (it is! Map) continue;
         final key = '${it['key']}';
+        // Q4 is retired even in an older cached coming-soon item.
+        if (key == 'xa.bao_cao.dot_xuat') continue;
         final kids = it['children'];
         final leaf = kids is! List || kids.isEmpty;
         final soon = it['status'] == knMenuComingSoon;
@@ -127,13 +129,16 @@ class KnMenuService {
     required SyncApi api,
     required Clock clock,
     required this.localTodoCount,
+    required Future<KnSessionContext?> Function() context,
   }) : _db = db,
        _api = api,
-       _clock = clock;
+       _clock = clock,
+       _context = context;
 
   final LocalDb _db;
   final SyncApi _api;
   final Clock _clock;
+  final Future<KnSessionContext?> Function() _context;
 
   /// Số việc cần làm tính trên máy (khi ngoại tuyến).
   final Future<int> Function() localTodoCount;
@@ -158,37 +163,53 @@ class KnMenuService {
         .cast<String, Object?>();
   }
 
-  /// Menu hiện hành; lỗi mạng → bản đệm; không có bản đệm → menu Cấp Xã mặc
-  /// định (chỉ "Công việc cần làm" và "Lịch công tác").
+  // v17 is the first catalog with standalone department menus. Earlier caches
+  // contain copied TT functions and cannot establish a department permission.
+  static bool _standaloneVersion(Map<String, Object?> menu) {
+    final match = RegExp(r'^kn\.menu/v(\d+)$')
+        .firstMatch('${menu['menu_version']}');
+    return (int.tryParse(match?.group(1) ?? '') ?? 0) >= 17;
+  }
+
+  /// Fresh authenticated menus are authoritative. Offline menus must also have
+  /// the current context binding and standalone version; no menu means no grant.
   Future<KnMenu> load({bool refresh = true}) async {
+    final selected = await _context();
+    if (selected == null || selected.contextId.isEmpty) {
+      return const KnMenu([], fromCache: true);
+    }
     if (refresh) {
       try {
         final j = await _api.getJson('/v1/menu');
-        await _put('menu', j);
+        if (!_standaloneVersion(j)) return const KnMenu([]);
+        final current = await _context();
+        if (current == null ||
+            current.contextId.isEmpty ||
+            current.scopeKey != selected.scopeKey) {
+          return const KnMenu([]);
+        }
+        await _put('menu', {'context_id': current.contextId, 'menu': j});
         return KnMenu.fromJson(j);
       } on DeviceRevokedException {
         rethrow;
       } on NetworkException {
-        // dùng bản đệm
-      } on ApiException {
-        // dùng bản đệm
+        // A matching offline cache is still usable; data is not wiped.
+      } on ApiException catch (e) {
+        if (!e.retriable) return const KnMenu([]);
       }
     }
-    final c = await _get('menu');
-    if (c != null) return KnMenu.fromJson(c, fromCache: true);
-    return const KnMenu([
-      KnMenuEntry(
-        key: KnMenuKey.congViec,
-        label: 'Công việc cần làm',
-        group: 'Điều hành',
-        badgeSource: knBadgeTasksTodo,
-      ),
-      KnMenuEntry(
-        key: KnMenuKey.lichCongTac,
-        label: 'Lịch công tác',
-        group: 'Điều hành',
-      ),
-    ], fromCache: true);
+    final context = (await _context())?.contextId;
+    final cached = await _get('menu');
+    if (context != null &&
+        context.isNotEmpty &&
+        cached?['context_id'] == context &&
+        cached?['menu'] is Map) {
+      final menu = (cached!['menu'] as Map).cast<String, Object?>();
+      if (_standaloneVersion(menu)) {
+        return KnMenu.fromJson(menu, fromCache: true);
+      }
+    }
+    return const KnMenu([], fromCache: true);
   }
 
   /// Số đếm theo `badge_source`. Trực tuyến: máy chủ; ngoại tuyến: đếm trên

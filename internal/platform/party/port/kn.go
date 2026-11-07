@@ -110,6 +110,19 @@ type Departments interface {
 	DepartmentByCode(ctx context.Context, unitRef uuid.UUID, code string) (Department, error)
 }
 
+// ProvinceDepartment is a current department with its province owner. This
+// read-side needs only the trusted tenant context, including background jobs.
+type ProvinceDepartment struct {
+	Department
+	ProvinceCode string
+}
+
+// ProvinceDepartments reads current departments of active province units in
+// the tenant. It does not create a user/session or grant a business permission.
+type ProvinceDepartments interface {
+	ProvinceDepartments(ctx context.Context) ([]ProvinceDepartment, error)
+}
+
 // ErrDepartmentNotFound: đơn vị không có phòng ban với mã này.
 var ErrDepartmentNotFound = errors.New("party: không có phòng ban")
 

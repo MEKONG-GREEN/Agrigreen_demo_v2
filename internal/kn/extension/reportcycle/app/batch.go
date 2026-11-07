@@ -134,6 +134,9 @@ func (s *Service) PreviewBatch(ctx context.Context, in BatchInput) (Preview, err
 }
 
 func (s *Service) preview(ctx context.Context, a actor, in BatchInput, strict bool) (Preview, error) {
+	if in.ReportType == "adhoc" {
+		return Preview{}, problem.Forbidden
+	}
 	if err := s.deps(); err != nil {
 		return Preview{}, err
 	}
@@ -592,6 +595,9 @@ func (s *Service) batchInScope(ctx context.Context, tx pgx.Tx, a actor, id uuid.
 	}
 	if b == nil || !a.allowsProvince(b.ProvinceCode, b.DepartmentCode) {
 		return nil, ErrBatchNotFound
+	}
+	if lock && b.ReportType == "adhoc" {
+		return nil, problem.Forbidden
 	}
 	return b, nil
 }

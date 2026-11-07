@@ -361,7 +361,7 @@ class _EntryState extends ConsumerState<KnReportEntryScreen> {
               margin: const EdgeInsets.only(top: 6),
               padding: const EdgeInsets.all(8),
               color: Colors.grey.shade300,
-              child: const Text('Kỳ đã chốt — chỉ xem.'),
+              child: const Text('Báo cáo này chỉ xem.'),
             ),
           if (t.adjustmentReason != null &&
               t.status == KnTaskStatus.adjustmentRequested)

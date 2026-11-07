@@ -156,9 +156,7 @@ func TestFN_TI_02_KN77FullCycle(t *testing.T) {
 	if str(arr(l1.body, "items")[0], "status") != "not_started" || str(arr(l1.body, "items")[0], "period_label") != "Tuần 1" {
 		t.Fatalf("sắp theo hạn gần nhất, Chưa nhập: %v", arr(l1.body, "items")[0])
 	}
-	if l := c.bvtv.must(c.bvtv.get("/v1/extension/report-tasks"), http.StatusOK, "BVTV"); len(arr(l.body, "items")) != 0 {
-		t.Fatalf("Cán bộ xã khác phòng ban không nhận: %d", len(arr(l.body, "items")))
-	}
+	c.bvtv.fail(c.bvtv.get("/v1/extension/report-tasks"), http.StatusForbidden, "forbidden", "S-4: outside-TT department cannot call the copied reporting API")
 	c.xa1.fail(c.xa1.get("/v1/extension/report-tasks?commune="+c3), http.StatusForbidden, "extension.out_of_scope", "xã ngoài phạm vi")
 	// Số đếm menu (P2 badge_source): công việc còn phải gửi của kỳ đã bắt đầu.
 	bg := c.xa1.must(c.xa1.get("/v1/extension/report-badges"), http.StatusOK, "số đếm menu")

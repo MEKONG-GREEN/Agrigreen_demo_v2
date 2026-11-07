@@ -38,6 +38,7 @@ provides:
     - Orgs
     - PartnerAccess
     - PlotStats
+    - ProvinceDepartments
     - Regions
     - ScopeResolver
     - SeasonActivity

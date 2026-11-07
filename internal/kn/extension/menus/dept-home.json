@@ -3,7 +3,8 @@
   "order": 300,
   "tables": {
     "adminDeptItems": {
-      "generic": [
+      "generic": [],
+      "trong_trot": [
         {
           "Key": "admin.pb.trang_chu",
           "Label": "Trang chủ phòng",
@@ -14,20 +15,19 @@
           "ComingSoon": false,
           "Needs": "",
           "Children": null
-        },
-        {
-          "Key": "admin.pb.van_ban",
-          "Label": "Quy trình, văn bản",
-          "Route": "/kn/phong-ban/{department}/van-ban",
-          "Icon": "library",
-          "BadgeSource": "",
-          "Requires": null,
-          "ComingSoon": false,
-          "Needs": "",
-          "Children": null
         }
-      ],
-      "trong_trot": [
+      ]
+    },
+    "menuModules": {
+      "/kn/trang-chu": "pf/extension",
+      "/kn/van-ban": "pf/extension"
+    },
+    "menuDeptModules": {
+      "/trang-chu": "pf/extension",
+      "/van-ban": "pf/extension"
+    },
+    "adminDeptBusiness": {
+      "chan_nuoi_thuy_san": [
         {
           "Key": "admin.pb.trang_chu",
           "Label": "Trang chủ phòng",
@@ -51,14 +51,6 @@
           "Children": null
         }
       ]
-    },
-    "menuModules": {
-      "/kn/trang-chu": "pf/extension",
-      "/kn/van-ban": "pf/extension"
-    },
-    "menuDeptModules": {
-      "/trang-chu": "pf/extension",
-      "/van-ban": "pf/extension"
     }
   }
 }

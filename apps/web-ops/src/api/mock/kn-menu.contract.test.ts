@@ -75,7 +75,7 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
     const admin = cases.find((c) => c.name === "admin")!.menu;
     const pb = fromKnMenu(admin).groups.find((g) => g.key === "phong_ban")!;
     expect(pb.items.map((i) => [i.label, i.status ?? "active", i.children?.length ?? 0])).toEqual([
-      ["Phòng Trồng trọt", "active", 10], // W11.11: + Báo cáo cho KHTC; W11.54: + Trang chủ phòng, Quy trình, văn bản
+      ["Phòng Trồng trọt", "active", 9], // W11.11: + Báo cáo cho KHTC; W11.54: + Trang chủ phòng, Quy trình, văn bản
       ["Chăn nuôi - TS", "not_open", 0],
       ["Kế hoạch - TC", "not_open", 0],
       ["2 phòng khác", "not_open", 0],
@@ -121,14 +121,14 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       expect(menuOf(`kn_tinh/${code}`).groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "du_lieu", "dung_chung"]);
     }
     // KHTC: Cấp Xã không có menu KHTC.
-    expect(menuOf("kn_xa/ke_hoach_tai_chinh").groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "dung_chung"]);
+    expect(menuOf("kn_xa/ke_hoach_tai_chinh").groups.map((g) => g.key)).toEqual(["dung_chung"]);
   });
 
   it("UP-01 Trồng trọt Cấp Xã đúng hình file v1", () => {
     expect(groupsOf("kn_xa/trong_trot")).toEqual({
       "Điều hành": [["Nhiệm vụ", ["Công việc cần làm", "Lịch công tác"]]],
       "Báo cáo": [["Báo cáo tuần", T(true)], "Báo cáo tháng", ["Báo cáo hàng vụ", V], "Báo cáo của xã"],
-      "Dữ liệu": [["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Vẽ thửa ruộng", "Vật tư"]], "Quy trình, văn bản"], // W11.54
+      "Dữ liệu": [["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Vẽ thửa ruộng", "Vật tư"]]], // S-4 FN20 belongs to CNTS
       "Dùng chung": ["Contact"],
     });
   });
@@ -141,7 +141,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       "Báo cáo Chi cục",
       KHTC,
     ]);
-    expect(g["Dữ liệu"]).toEqual([["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Thửa ruộng", "Vật tư"]], "Quy trình, văn bản"]); // W11.54
+    expect(g["Dữ liệu"]).toEqual([["Thu thập dữ liệu", ["Danh sách HTX", "Máy móc HTX", "Thửa ruộng", "Vật tư"]]]); // S-4 FN20 belongs to CNTS
   });
 
   it("UP-03 CNTS Cấp Xã đúng hình file v1", () => {
@@ -199,18 +199,19 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "dieu_hanh:tinh.hcth.ke_hoach" /* W11.27 */, "bao_cao:tinh.hcth.bao_cao_so",
         "du_lieu:tinh.hcth.ho_so", "du_lieu:tinh.hcth.kho_tai_lieu", "du_lieu:tinh.hcth.danh_muc"]),
     );
-    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài" /* W11.67 có màn */, "Quy trình, văn bản"]);
-    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành", "Mặt hàng", "Quy trình, văn bản"]); // BG-ITEM-PROPOSAL: danh mục đã có màn; đề xuất ở Điều hành
+    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài" /* S-7 owns its removal */]);
+    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành", "Mặt hàng"]); // BG-ITEM-PROPOSAL: danh mục đã có màn; đề xuất ở Điều hành
     // W11.53 (UR-QG-01): TW xem dự án KNQG và mẫu biểu, xác nhận/trả lại Mẫu 07.
     expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual([["Dự án KNQG", ["Dự án tại An Giang", "Mẫu biểu, nghiệm thu năm (07)"]]]);
     // W11.54: Trang chủ phòng đầu Điều hành Cấp Tỉnh mọi phòng; Quy trình, văn bản (/kn/van-ban) cuối Dữ liệu; Cấp Xã/TW không có Trang chủ phòng.
     for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
-      expect(leaves(`kn_tinh/${code}`)[0]).toBe(code === "ke_hoach_tai_chinh" ? "dieu_hanh:tinh.khtc.trang_chu" : "dieu_hanh:tinh.trang_chu");
+      const first: Record<string,string> = { trong_trot:"dieu_hanh:tinh.trang_chu", chan_nuoi_thuy_san:"dieu_hanh:tinh.trang_chu", ke_hoach_tai_chinh:"dieu_hanh:tinh.khtc.trang_chu", thong_tin_truyen_thong:"dieu_hanh:tinh.bao_gia.tien_do", hanh_chinh_tong_hop:"dieu_hanh:tinh.hcth.dashboard" };
+      expect(leaves(`kn_tinh/${code}`)[0]).toBe(first[code]);
       expect(leaves(`kn_xa/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
       expect(leaves(`kn_tw/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
     }
-    expect(leaves("kn_tinh/hanh_chinh_tong_hop").filter((l) => l.startsWith("du_lieu:")).at(-1)).toBe("du_lieu:tinh.van_ban");
-    for (const code of ["trong_trot", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) expect(leaves(`kn_xa/${code}`).filter((l) => l.startsWith("du_lieu:")).at(-1)).toBe("du_lieu:xa.van_ban");
+    expect(leaves("kn_tinh/hanh_chinh_tong_hop")).not.toContain("du_lieu:tinh.van_ban");
+    for (const code of ["trong_trot", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) expect(leaves(`kn_xa/${code}`)).not.toContain("du_lieu:xa.van_ban");
     expect(menuOf("kn_xa/chan_nuoi_thuy_san").groups.find((g) => g.key === "du_lieu")!.items.find((i) => i.key === "xa.cnts.quy_trinh")!.route).toBe("/kn/van-ban");
   });
 

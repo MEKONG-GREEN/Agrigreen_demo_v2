@@ -154,7 +154,7 @@ class KnEntry {
   final bool formulaPending;
   final DateTime now;
 
-  bool get readOnly => !task.openAt(now);
+  bool get readOnly => task.adHoc || !task.openAt(now);
 
   bool editable(KnColumn c) => knEditable(c, task, now);
 
@@ -537,7 +537,7 @@ class KnReportService {
     required bool submit,
   }) async {
     if (e.readOnly) {
-      throw KnValidationException(const {}, 'Kỳ đã chốt — chỉ xem.');
+      throw KnValidationException(const {}, 'Báo cáo này chỉ xem.');
     }
     final errs = validate(e, values, submit: submit);
     if (errs.isNotEmpty) throw KnValidationException(errs);

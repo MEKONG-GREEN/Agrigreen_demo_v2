@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/menu"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/store"
@@ -61,6 +62,8 @@ type Service struct {
 	Clock clock.Clock
 	Log   *slog.Logger
 
+	Departments partyport.ProvinceDepartments
+	MenuCatalog *menu.Catalog
 	Forms       repport.FormEngine      // P3: mẫu, phiên bản, Evaluate, Totals
 	Regions     partyport.Regions       // P2: khu vực của Nút xã
 	Orgs        partyport.Orgs          // tỉnh của Nút trong ngữ cảnh
@@ -174,6 +177,15 @@ func (s *Service) writer(ctx context.Context, roles ...string) (actor, error) {
 	}
 	if !slices.Contains(roles, a.k.Role) {
 		return a, problem.Forbidden.WithDetail("vai trò của ngữ cảnh phiên không được thao tác này")
+	}
+	// The sync sink calls these use cases directly, without HTTP menu middleware.
+	// Resolve eligibility through the same current catalog before any business tx.
+	scopes, err := s.trongTrotScopes(ctx)
+	if err != nil {
+		return a, err
+	}
+	if !slices.Contains(scopes, a.province+":"+a.k.Department) {
+		return a, problem.Forbidden
 	}
 	return a, nil
 }

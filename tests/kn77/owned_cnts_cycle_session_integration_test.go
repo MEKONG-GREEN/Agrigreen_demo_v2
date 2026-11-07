@@ -27,6 +27,7 @@ func TestCNTSAndReportCycleRequireOwnedSessionThroughHTTP(t *testing.T) {
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	counted := &countedSessionDB{Beginner: pool}
 	module := extension.New(counted, clock.System{}, extension.Deps{})
+	module.UseDepartmentAdmin(newFixtureDepartments(t))
 	valid, err := extport.NewSessionContext(extport.SessionContext{ID: ids.New(), Role: extport.SessionRoleAdmin, Scope: authz.Scope{All: true}})
 	if err != nil {
 		t.Fatal(err)

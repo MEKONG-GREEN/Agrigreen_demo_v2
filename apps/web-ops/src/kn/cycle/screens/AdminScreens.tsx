@@ -19,6 +19,7 @@ import { KN_ROLE_LABEL, type KnRole } from "@/kn/contract";
 import { listForms } from "@/kn/forms/api";
 import { Greeting } from "@/kn/ui";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
+import { menuLinks } from "@/shell/menu";
 import { RawFile, type AccountsUser, type InternalUnit, type KnAssignment, type KnAssignmentInput, type KnDelegation, type KnDepartment, type KnOrgTreeNode, type KnUserImport } from "../api";
 import { LoadState, dt, useAction, useLoad } from "../common";
 
@@ -60,7 +61,8 @@ const fullName = (u: AccountsUser) => `${u.last_name} ${u.first_name}`.trim();
 
 /** Hình 3c Tổng quan hệ thống. */
 export function AdminOverviewScreen() {
-  const { knAdminApi, adminApi, cycleApi } = useAuth();
+  const { knAdminApi, adminApi, cycleApi, kn } = useAuth();
+  const departmentHref = (code: string) => (kn.menu ? menuLinks(kn.menu).find((link) => link.ancestors.some((node) => node.key === `phong_ban.${code}` || node.key.startsWith(`phong_ban.${code}.`)))?.node.href : undefined) ?? "/kn/quan-tri/phong-ban";
   const s = useLoad(async () => {
     const [users, depts, forms, dash] = await Promise.all([
       knAdminApi.users(),
@@ -124,7 +126,7 @@ export function AdminOverviewScreen() {
                         <dd>{sub ? sub.communes_total - sub.communes_submitted : "—"}</dd>
                       </dl>
                       <p style={{ marginTop: 10 }}>
-                        <Link className="link-all" href={`/kn/phong-ban/${x.code}/theo-doi-nop`}>
+                        <Link className="link-all" href={departmentHref(x.code)}>
                           Mở menu phòng ban →
                         </Link>
                       </p>

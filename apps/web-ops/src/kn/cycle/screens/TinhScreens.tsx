@@ -293,7 +293,6 @@ function ClosedPeriods() {
             { value: "weekly", label: "Tuần" },
             { value: "monthly", label: "Tháng" },
             { value: "seasonal", label: "Vụ" },
-            { value: "adhoc", label: "Đột xuất" },
           ]}
         />
       </FilterBar>

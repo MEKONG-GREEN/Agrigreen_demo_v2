@@ -1,0 +1,1 @@
+- [ ] KN-STANDALONE-4-TT-MENU-PHONG (#265): menu/API từng phòng theo BRD 2.0, Q3/Q4; mapping FN/UR/BR và cách chạy: [giả định gói](../../kn/gia-dinh/KN-STANDALONE-4-TT-MENU-PHONG.md); chờ foundation surface map và toàn bộ cổng trên SHA tích hợp.

@@ -35,7 +35,7 @@ function HomeBody({ h, hapi, department, reload }: { h: DeptHome; hapi: DeptHome
     <>
       {h.read_only ? <div className="alert alert-info" role="status">Ngữ cảnh chỉ xem — không sửa được giới thiệu, văn bản.</div> : null}
       <section className="grid4" aria-label="Chỉ số của phòng">
-        {h.kpis.map((k) => {
+        {h.kpis.filter((k) => h.department_code === "chan_nuoi_thuy_san" || !k.key.startsWith("docs_")).map((k) => {
           const href = kpiLink(k.key, department);
           const body = (
             <div className={`kpi ${kpiColor(k.tone)}`} data-testid={`dept-kpi-${k.key}`}>
@@ -77,7 +77,7 @@ function HomeBody({ h, hapi, department, reload }: { h: DeptHome; hapi: DeptHome
               </p>
             </section>
           ) : null}
-          <section className="card sec">
+          {h.department_code === "chan_nuoi_thuy_san" ? <section className="card sec">
             <h2>Văn bản mới</h2>
             <p className="mute">
               {h.library.total} văn bản · {h.library.new_30d} mới trong 30 ngày · {h.library.expired} hết hiệu lực. <Link href={libHref}>Mở kho văn bản</Link>
@@ -97,7 +97,7 @@ function HomeBody({ h, hapi, department, reload }: { h: DeptHome; hapi: DeptHome
                 </tbody>
               </table>
             ) : <p className="mute">Chưa có văn bản.</p>}
-          </section>
+          </section> : null}
         </div>
         <div>
           <ProfileCard h={h} hapi={hapi} reload={reload} />

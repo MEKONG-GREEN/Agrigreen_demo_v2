@@ -204,7 +204,7 @@ Map<String, Object?> assignment(
 };
 
 Map<String, Object?> menuJson() => {
-  'menu_version': 'kn.menu/v3',
+  'menu_version': 'kn.menu/v17',
   'audience': 'kn_xa',
   'org_ref': null,
   'department': null,

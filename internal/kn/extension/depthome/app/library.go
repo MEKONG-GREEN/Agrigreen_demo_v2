@@ -19,6 +19,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/depthome/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/depthome/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -28,12 +29,16 @@ var libraryRoles = []string{port.SessionRoleAdmin, port.SessionRoleProvince, por
 
 // readerOf: Admin, Cấp Tỉnh, Cấp Xã của phòng (FN-20). Cấp TW không có.
 func (s *Service) readerOf(ctx context.Context, dept string) (caller, error) {
-	return s.resolve(ctx, dept, libraryRoles...)
+	c, err := s.resolve(ctx, dept, libraryRoles...)
+	if err == nil && c.dept != partyport.DeptChanNuoiThuySan {
+		return c, problem.Forbidden
+	}
+	return c, err
 }
 
 // writerOf: Admin, Cấp Tỉnh của phòng (CRU), không ở ngữ cảnh chỉ xem.
 func (s *Service) writerOf(ctx context.Context, dept string) (caller, error) {
-	c, err := s.resolve(ctx, dept, libraryRoles...)
+	c, err := s.readerOf(ctx, dept)
 	if err != nil {
 		return c, err
 	}

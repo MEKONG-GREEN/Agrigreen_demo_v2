@@ -25,7 +25,6 @@ IconData _iconFor(String key) => switch (key) {
   KnMenuKey.baoCaoThang => Icons.calendar_today_outlined,
   KnMenuKey.baoCaoVu => Icons.grass_outlined,
   KnMenuKey.baoCaoCuaXa => Icons.bar_chart_outlined,
-  KnMenuKey.baoCaoDotXuat => Icons.bolt_outlined,
   KnMenuKey.htx => Icons.groups_outlined,
   KnMenuKey.mayMoc => Icons.agriculture_outlined,
   KnMenuKey.thua => Icons.map_outlined,
@@ -51,10 +50,6 @@ Widget? knScreenFor(KnMenuEntry e) => switch (e.key) {
   KnMenuKey.baoCaoVu => KnTasksScreen(
     title: e.label,
     initial: const KnTaskFilter(periodType: KnPeriodType.season, adHoc: false),
-  ),
-  KnMenuKey.baoCaoDotXuat => KnTasksScreen(
-    title: e.label,
-    initial: const KnTaskFilter(adHoc: true),
   ),
   KnMenuKey.baoCaoCuaXa => const KnCommuneReportsScreen(),
   KnMenuKey.htx => const KnCooperativesScreen(),
@@ -115,7 +110,12 @@ class KnHomeScreen extends ConsumerWidget {
     final ctx = st.kn?.context;
     final menu = ref.watch(knMenuProvider);
     final badges = ref.watch(knBadgesProvider).value ?? const <String, int>{};
-    final entries = menu.value?.entries ?? const <KnMenuEntry>[];
+    final entries = menu.isLoading
+        ? const <KnMenuEntry>[]
+        : menu.value?.entries ?? const <KnMenuEntry>[];
+    final ttTasks = entries.any(
+      (e) => e.key == KnMenuKey.congViec && e.enabled,
+    );
     void open(KnMenuEntry e) {
       final w = knScreenFor(e);
       Navigator.of(context).pop(); // đóng ngăn kéo
@@ -130,7 +130,7 @@ class KnHomeScreen extends ConsumerWidget {
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Công việc cần làm'),
+        title: Text(ttTasks ? 'Công việc cần làm' : 'Khuyến nông'),
         actions: [
           PopupMenuButton<String>(
             key: const ValueKey('kn-account'),
@@ -240,7 +240,19 @@ class KnHomeScreen extends ConsumerWidget {
             const KnOfflineBanner(
               text: 'Ngoại tuyến — đang dùng vai trò đã lưu trên máy.',
             ),
-          const Expanded(child: KnTasksView()),
+          Expanded(
+            child: ttTasks
+                ? const KnTasksView()
+                : Center(
+                    child: Text(
+                      menu.isLoading
+                          ? 'Đang tải menu phòng ban…'
+                          : entries.isEmpty
+                          ? 'Chưa có menu đã lưu. Kết nối mạng để tải menu phòng ban.'
+                          : 'Chọn chức năng trong menu phòng ban.',
+                    ),
+                  ),
+          ),
         ],
       ),
     );

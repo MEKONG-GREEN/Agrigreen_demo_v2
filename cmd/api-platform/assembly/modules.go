@@ -337,7 +337,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	})
 	// KN v7.7 P4: vòng đời báo cáo — engine mẫu (P3), khu vực (P2), cán bộ phụ trách (P1), lịch sử gửi Chi cục; nối ngược
 	// cho P2: bảng Ảnh hưởng (kỳ chưa chốt), dữ liệu theo phòng ban, menu "Báo cáo đột xuất", cột "biểu đang dùng".
-	kn.UseReportCycle(extension.ReportCycleDeps{Forms: rep.Forms(), Regions: pty.Regions(), Assignments: acc.Assignments(), Names: acc.ActorNames(),
+	kn.UseReportCycle(extension.ReportCycleDeps{Forms: rep.Forms(), Regions: pty.Regions(), Assignments: acc.Assignments(), Names: acc.ActorNames(), Departments: pty.ProvinceDepartments(), MenuCatalog: menuCatalog,
 		Log: slog.Default()})
 	kn.UseDispatchHistory(rep.DispatchHistory())
 	// W11.71: cap/price (/v1/price/*), khung giá — ADR-0049; W11.72: danh bạ cán bộ phân công xã báo giá.

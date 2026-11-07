@@ -68,7 +68,7 @@ function CalendarList({ api, base }: { api: ApiClient; base: string }) {
   return (
     <>
       <PageHeader title="Lịch báo giá, giờ khóa, nhắc nhập giá, ngưỡng cảnh báo">
-        Báo giá nông sản — Phòng Thông tin – Truyền thông
+        Báo giá nông sản — Phòng Thông tin Tuyên truyền
       </PageHeader>
       {act.view}
       <LoadState s={cal}>

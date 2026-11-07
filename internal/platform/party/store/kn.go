@@ -169,6 +169,27 @@ func ListAllDepartments(ctx context.Context, tx pgx.Tx) ([]port.Department, erro
 	return out, rows.Err()
 }
 
+// ProvinceDepartments reads through party's own tenant-scoped transaction.
+func ProvinceDepartments(ctx context.Context, tx pgx.Tx) ([]port.ProvinceDepartment, error) {
+	rows, err := tx.Query(ctx, `SELECT d.id,d.org_ref,d.code,d.name,coalesce(d.description,''),d.sort_order,d.status,d.menu_profile,d.retired,d.updated_by,d.updated_at,o.admin_unit_code
+  FROM pf_party.department d JOIN pf_party.org o ON o.ref=d.org_ref
+  WHERE NOT d.retired AND o.active AND o.kind='ttkn_province' AND o.admin_unit_code IS NOT NULL
+  ORDER BY o.admin_unit_code,d.code,d.org_ref`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []port.ProvinceDepartment{}
+	for rows.Next() {
+		var d port.ProvinceDepartment
+		if err := rows.Scan(&d.ID, &d.OrgRef, &d.Code, &d.Name, &d.Description, &d.SortOrder, &d.Status, &d.MenuProfile, &d.Retired, &d.UpdatedBy, &d.UpdatedAt, &d.ProvinceCode); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
 // PutDepartment ghi bảng chiếu phòng ban (cùng giao dịch với sổ, R-21).
 func PutDepartment(ctx context.Context, tx pgx.Tx, tid uuid.UUID, d port.Department, e KNEvent) error {
 	var desc *string

@@ -162,6 +162,12 @@ func (c *Catalog) effectiveProfile(profile, code string) string {
 	return profile
 }
 
+// SupportsTrongTrot uses the same profile/alias resolution as the menu. Jobs
+// must not write legacy TT reports for removed, inactive or unknown departments.
+func (c *Catalog) SupportsTrongTrot(d partyport.Department) bool {
+	return d.Selectable() && c.effectiveProfile(d.MenuProfile, d.Code) == partyport.MenuProfileTrongTrot
+}
+
 func (c *Catalog) knownProfile(profile string) bool {
 	_, ok := c.profiles[profile]
 	return ok
@@ -512,7 +518,9 @@ func (c *Catalog) admin(request partyport.MenuBuildRequest) ([]partyport.MenuGro
 		if codes[d.Code] > 1 {
 			it.Key += "." + d.OrgRef.String()
 		}
-		departments = append(departments, it)
+		if len(it.Children) > 0 {
+			departments = append(departments, it)
+		}
 	}
 	return []partyport.MenuGroup{
 		{Key: c.t.AdminOverview.Key, Label: c.t.AdminOverview.Label, Items: c.plain(c.t.AdminOverview.Items, true)},

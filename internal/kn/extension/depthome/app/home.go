@@ -95,11 +95,13 @@ func (s *Service) GetHome(ctx context.Context, dept string) (Home, error) {
 		if profile, err = store.ProfileHistory(ctx, tx, c.dept, 1); err != nil {
 			return err
 		}
-		if folders, err = store.FoldersCurrent(ctx, tx, c.dept); err != nil {
-			return err
-		}
-		if docs, err = store.DocsCurrent(ctx, tx, c.dept); err != nil {
-			return err
+		if c.dept == partyport.DeptChanNuoiThuySan {
+			if folders, err = store.FoldersCurrent(ctx, tx, c.dept); err != nil {
+				return err
+			}
+			if docs, err = store.DocsCurrent(ctx, tx, c.dept); err != nil {
+				return err
+			}
 		}
 		if c.dept == partyport.DeptThongTinTruyenThong {
 			pp := s.PriceProfile
@@ -135,8 +137,9 @@ func (s *Service) GetHome(ctx context.Context, dept string) (Home, error) {
 			h.LatestDocs = append(h.LatestDocs, s.docView(c, d, folders, today, nil))
 		}
 	}
-	h.KPIs = append(h.KPIs, KPI{Key: "docs_total", Label: "Văn bản trong kho", Value: h.Library.Total, Tone: "info"},
-		KPI{Key: "docs_expired", Label: "Văn bản hết hiệu lực", Value: h.Library.Expired, Tone: "neutral"})
+	if c.dept == partyport.DeptChanNuoiThuySan {
+		h.KPIs = append(h.KPIs, KPI{Key: "docs_total", Label: "Văn bản trong kho", Value: h.Library.Total, Tone: "info"}, KPI{Key: "docs_expired", Label: "Văn bản hết hiệu lực", Value: h.Library.Expired, Tone: "neutral"})
+	}
 
 	refs := []uuid.UUID{}
 	if len(profile) > 0 {

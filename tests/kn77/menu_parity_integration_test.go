@@ -164,6 +164,30 @@ func TestKNSPLIT2MenuParityConfiguredMatchesCompatibility(t *testing.T) {
 	create(s.nat, "trong_trot", "trong_trot", partyport.DeptActive)
 	nat.codes = append(nat.codes, "trong_trot")
 	units := []parityUnit{prov, nat}
+	// Background read-side uses only the trusted tenant context, with real RLS.
+	rows, err := st.Mods.Party.ProvinceDepartments().ProvinceDepartments(tenant.WithID(context.Background(), s.tid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != len(prov.codes) {
+		t.Fatalf("province catalog: %d want %d", len(rows), len(prov.codes))
+	}
+	customFound := false
+	for _, row := range rows {
+		if row.ProvinceCode != agProv || row.OrgRef != prov.ref || row.Retired || row.Code == "pb_da_xoa" {
+			t.Fatalf("foreign/retired unit in job catalog: %+v", row)
+		}
+		if row.Code == "pb_trong_trot" {
+			customFound = row.MenuProfile == partyport.MenuProfileTrongTrot && row.Selectable()
+		}
+	}
+	if !customFound {
+		t.Fatal("custom TT profile missing from current province catalog")
+	}
+	other, err := st.Mods.Party.ProvinceDepartments().ProvinceDepartments(tenant.WithID(context.Background(), uuid.New()))
+	if err != nil || len(other) != 0 {
+		t.Fatalf("job catalog tenant isolation: %d %v", len(other), err)
+	}
 
 	// ---- Người dùng: vai realm (không phiên) và phiên KN thật với traits ----
 	realm := func(role string, org uuid.UUID) *agUser {
@@ -304,6 +328,12 @@ func TestKNSPLIT2MenuParityConfiguredMatchesCompatibility(t *testing.T) {
 			}
 		}
 	}
+
+	// S-4: a server-selected custom department keeps the TT profile's API.
+	alias := cv.as(cvA[authz.KNXa], "pb_trong_trot")
+	s.want(alias.do(st.App.URL, http.MethodGet, "/v1/extension/report-tasks", nil), http.StatusOK, "custom department TT profile direct API")
+	foreign := cv.as(cvA[authz.KNXa], "pb_hanh_chinh_tong_hop")
+	s.wantCode(foreign.do(st.App.URL, http.MethodGet, "/v1/extension/report-tasks", nil), http.StatusForbidden, "forbidden", "custom HCTH profile cannot borrow TT API")
 
 	// ---- Bộ module tắt: mỗi lượt đổi trạng thái rồi vượt TTL cache module của cả hai đường ----
 	disabledSets := [][]string{nil, {"pf/extension"}, {"pf/hrm"}, {"pf/price"}, {"pf/geo"}, {"pf/masterdata", "pf/reports", "pf/sync", "pf/metering", "pf/mechanization"},

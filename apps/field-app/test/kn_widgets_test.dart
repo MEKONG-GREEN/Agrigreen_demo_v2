@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:agrigreen_field/application/app_services.dart';
@@ -70,6 +71,8 @@ class _Env {
     );
     final e = _Env(dir, pf, server, kn);
     e.s = await AppServices.open(pf, accessToken: () async => 'tok');
+    // The fixed widget state below represents this already selected context.
+    await e.s.db.setMeta('kn.context', jsonEncode(_ctx().toJson()));
     return e;
   }
 

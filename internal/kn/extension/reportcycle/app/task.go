@@ -145,6 +145,15 @@ func (s *Service) taskInScope(ctx context.Context, tx pgx.Tx, a actor, id uuid.U
 	if t == nil || t.Withdrawn || !a.allowsTask(*t) {
 		return nil, ErrTaskNotFound
 	}
+	if lock {
+		b, err := store.BatchByID(ctx, tx, t.BatchID, false)
+		if err != nil {
+			return nil, err
+		}
+		if b != nil && b.ReportType == "adhoc" {
+			return nil, problem.Forbidden
+		}
+	}
 	return t, nil
 }
 

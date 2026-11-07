@@ -160,3 +160,11 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-FARM-LAYER.md),
 | AC-03: chọn ngày cũ thấy số ảnh hưởng theo diễn biến của ngày đó | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
 | AC-02: Cấp Xã chỉ thấy trang trại và số ảnh hưởng từ ổ dịch xã mình; tenant khác không thấy | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
 | Trang trại, số ảnh hưởng trong vùng (đối tượng trong vùng đệm 3 km/10 km, khoảng cách tới tâm) | `TestCNTSMap_FarmLayerAndImpact_FN18`; vitest `map.test.ts` | G1 |
+
+## S-4: menu từng phòng (BRD 2.0, Q3/Q4)
+
+- TT FN-AD-04.05: Admin chỉ thấy Danh mục nông nghiệp ở TT; các phòng khác giữ danh mục riêng của FN.
+- TT FN-TW-01.01–02, TI-02.01–06, XA-03.01–02/07: chỉ menu TT có báo cáo T01–V06/phát hành/rà soát; gọi trực tiếp API từ phòng khác trả 403.
+- CNTS FN-20, UR-TINH-25, AC-01–03: menu/API kho văn bản chỉ CNTS; tỉnh/xã/Admin đúng phạm vi tiếp tục đọc/ghi theo vai; phòng khác 403.
+- Q4: không còn menu báo cáo đột xuất TT; URL trả 404; không phát hành mới hoặc sửa bản cũ. Dữ liệu cũ giữ đọc lịch sử.
+- Chạy `TestStandaloneDepartmentAPI`, `TestStandaloneDepartmentMenus`, parity `TestKNSPLIT2MenuParityConfiguredMatchesCompatibility`, web `DepartmentMenus.test.ts` và Playwright `kn-department-menus.spec.ts`.
