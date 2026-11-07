@@ -1,5 +1,8 @@
 // Client Báo cáo dịch bệnh BM-10 và báo nghi dịch (W11.49 — BRD CNTS v3.7 FN-11, UR-XA-10): ổ dịch có phiên bản diễn
 // biến (/v1/extension/cnts/outbreaks*), lớp điểm cho bản đồ (/outbreak-points), tin báo nghi dịch (/suspects*).
+// CNTS-V4-OUTBREAK-MULTI (#252, BRD CNTS v4.0 FN-11 BR-03, AC-04, AC-05): DB-04 chọn một hoặc nhiều hộ trong danh sách hộ
+// chăn nuôi hoặc nhập hộ chưa có (tạo hộ "Chờ bổ sung vị trí" — FN-10 BR-08), DB-14 theo hộ, DB-15 tự đếm, DB-16 diện tích
+// thủy sản khi bệnh thuộc nhóm thủy sản.
 // openapi-fetch sinh từ contracts/openapi/application.yaml; Bearer, X-AG-Context, Idempotency-Key do createApiClient gắn.
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
@@ -15,6 +18,41 @@ export type OutbreakDetail = S["CNTSOutbreakDetail"];
 export type Suspect = S["CNTSSuspect"];
 export type SuspectInput = S["CNTSSuspectInput"];
 export type OutbreakStatus = Outbreak["status"];
+export type OutbreakHousehold = S["CNTSOutbreakHousehold"];
+export type LivestockType = OutbreakHousehold["livestock_type"];
+export type HouseholdOption = S["CNTSLivestockHousehold"];
+
+/** DB-14 — loại chăn nuôi (HCN-06). */
+export const TYPE_LABEL: Record<LivestockType, string> = {
+  nong_ho: "Nông hộ",
+  trang_trai_nho: "Trang trại nhỏ",
+  trang_trai_vua: "Trang trại vừa",
+  trang_trai_cong_nghiep: "Trang trại công nghiệp",
+};
+export const HH_STATUS_LABEL: Record<OutbreakHousehold["status"], string> = {
+  active: "Đang dùng",
+  pending_location: "Chờ bổ sung vị trí",
+  deactivated: "Vô hiệu hóa",
+};
+
+/** Hộ chưa có trong danh sách, nhập ở DB-04 (một dòng vật nuôi). */
+export interface NewHouseholdForm {
+  owner_name: string;
+  owner_phone: string;
+  hamlet: string;
+  livestock_type: LivestockType | "";
+  species_code: string;
+  head_count: string;
+}
+
+export const emptyNewHousehold = (): NewHouseholdForm => ({ owner_name: "", owner_phone: "", hamlet: "", livestock_type: "", species_code: "", head_count: "" });
+
+/** Bệnh thuộc nhóm thủy sản (FN-06, như máy chủ): một loài của bệnh có nhóm thuy_san; bệnh chưa khai loài → xét vật nuôi chọn. */
+export function isAquatic(disease: { attrs: Record<string, string> } | undefined, speciesCode: string, species: { code: string; attrs: Record<string, string> }[]): boolean {
+  const list = (disease?.attrs.species ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const codes = list.length ? list : speciesCode ? [speciesCode] : [];
+  return codes.some((c) => species.find((s) => s.code === c)?.attrs.group === "thuy_san");
+}
 
 // BF-CN-OUTBREAK (UP-07): ổ dịch vừa gửi chờ Cấp Tỉnh xác nhận → "Chờ xác nhận".
 export const STATUS_LABEL: Record<OutbreakStatus, string> = { reported: "Chờ xác nhận", monitoring: "Đang theo dõi", closed: "Đã kết thúc" };
@@ -54,6 +92,13 @@ export interface OutbreakForm {
   prevention_note: string;
   as_of: string;
   progress_note: string;
+  /** DB-04 hộ chọn trong danh sách hộ chăn nuôi (household_ref). */
+  household_refs: string[];
+  /** DB-04 hộ chưa có — tạo ở trạng thái Chờ bổ sung vị trí. */
+  new_households: NewHouseholdForm[];
+  /** DB-16 (ha). */
+  aqua_farmed_ha: string;
+  aqua_wild_ha: string;
 }
 
 export function emptyForm(commune = ""): OutbreakForm {
@@ -62,6 +107,7 @@ export function emptyForm(commune = ""): OutbreakForm {
     // UP-08: ô số mặc định 0 (không âm) — quy mô đàn vẫn phải > 0 khi gửi; ngày tuổi, sai số GPS để trống (không có nghĩa 0).
     location_source: "gps", herd_size: "0", herd_age_days: "", dead: "0", symptoms: "", sample_date: "", lab_name: "", lab_result: "",
     culled_head: "0", culled_kg: "0", chemical_liters: "0", buffer_note: "", prevention_note: "", as_of: "", progress_note: "",
+    household_refs: [], new_households: [], aqua_farmed_ha: "", aqua_wild_ha: "",
   };
 }
 
@@ -82,6 +128,8 @@ export function formOf(o: Outbreak): OutbreakForm {
     symptoms: o.symptoms, sample_date: o.sample_date ?? "", lab_name: o.lab_name ?? "", lab_result: o.lab_result ?? "", culled_head: s(o.culled_head),
     culled_kg: o.culled_kg ?? "", chemical_liters: o.chemical_liters ?? "", buffer_note: o.buffer_note ?? "", prevention_note: o.prevention_note ?? "",
     as_of: "", progress_note: "",
+    // Dữ liệu cũ (v1) không có hộ trong danh sách: cập nhật diễn biến phải chọn hộ theo quy tắc mới (ADR-0056 mục 8).
+    household_refs: o.households.map((h) => h.household_ref), new_households: [], aqua_farmed_ha: o.aqua_farmed_ha ?? "", aqua_wild_ha: o.aqua_wild_ha ?? "",
   };
 }
 
@@ -104,16 +152,38 @@ export function numValue(k: NumKey, v: string): string {
 }
 
 const COORD = /^-?\d{1,3}(\.\d{1,7})?$/;
+const HA = /^\d{1,10}(\.\d{1,2})?$/;
+const HEADS = /^\d{1,10}$/;
+
+/** Số hộ bị ảnh hưởng (DB-15) — tự đếm, không sửa tay (AC-04). */
+export const affectedCount = (f: OutbreakForm) => f.household_refs.length + f.new_households.length;
 
 /** Lỗi phía máy khách trước khi gửi (máy chủ kiểm lại) — quy tắc chặn UR-XA-10. Khóa trường API → lý do. */
-export function formErrors(f: OutbreakForm): Record<string, string> {
+export function formErrors(f: OutbreakForm, aquatic = false): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.commune_code) e.commune_code = "Chọn xã";
   if (!f.disease_code) e.disease_code = "Chọn bệnh (DB-01)";
   if (!f.species_code) e.species_code = "Chọn vật nuôi";
   if (!f.received_at) e.received_at = "Bắt buộc (DB-02)";
   if (!f.source) e.source = "Chọn nguồn tin (DB-03)";
-  if (!f.locality.trim()) e.locality = "Ghi địa bàn (ấp, khu vực) — không ghi họ tên, số điện thoại";
+  if (affectedCount(f) === 0) e.households = "Chọn ít nhất một hộ chăn nuôi hoặc nhập hộ chưa có (DB-04, DB-15 ≥ 1).";
+  else if (affectedCount(f) > 200) e.households = "Tối đa 200 hộ mỗi ổ dịch.";
+  f.new_households.forEach((h, i) => {
+    const k = (x: string) => `new_households[${i}].${x}`;
+    if (!h.owner_name.trim()) e[k("owner_name")] = "Bắt buộc (HCN-02)";
+    else if (h.owner_name.trim().length > 200) e[k("owner_name")] = "Tối đa 200 ký tự";
+    if (h.owner_phone.trim() && !/^[0-9]{1,15}$/.test(h.owner_phone.trim())) e[k("owner_phone")] = "Chỉ nhập chữ số";
+    if (!h.livestock_type) e[k("livestock_type")] = "Chọn loại chăn nuôi (DB-14)";
+    if (!h.species_code) e[k("animals[0].species_code")] = "Chọn vật nuôi";
+    if (!HEADS.test(h.head_count.trim())) e[k("animals[0].head_count")] = "Số nguyên ≥ 0";
+  });
+  if (aquatic) {
+    for (const k of ["aqua_farmed_ha", "aqua_wild_ha"] as const) {
+      const v = f[k].trim().replace(",", ".");
+      if (!v) e[k] = "Bắt buộc khi bệnh thuộc nhóm thủy sản (DB-16)";
+      else if (!HA.test(v)) e[k] = "Số ha ≥ 0, tối đa 2 chữ số thập phân";
+    }
+  }
   if (!f.lat.trim() || !f.lon.trim()) e.location = "Chưa có vị trí ổ dịch — lấy GPS hoặc nhập tọa độ (DB-05)";
   else if (!COORD.test(f.lat.trim()) || !COORD.test(f.lon.trim())) e.location = "Tọa độ độ thập phân, vd 10.25341 và 105.9721";
   else {
@@ -136,16 +206,27 @@ const opt = (s: string) => (s.trim() === "" ? undefined : s.trim());
 const optNum = (k: NumKey, s: string) => numValue(k, s) || null;
 const optInt = (k: NumKey, s: string) => (numValue(k, s) === "" ? null : Number(numValue(k, s)));
 
-/** Thân request từ biểu nhập. */
-export function payload(f: OutbreakForm, baseVersion?: number): OutbreakInput {
+/** Thân request từ biểu nhập. DB-16 chỉ gửi khi bệnh thuộc nhóm thủy sản. */
+export function payload(f: OutbreakForm, baseVersion?: number, aquatic = false): OutbreakInput {
+  const ha = (v: string) => (aquatic && v.trim() ? v.trim().replace(",", ".") : null);
   return {
+    household_refs: f.household_refs,
+    new_households: f.new_households.map((h) => ({
+      owner_name: h.owner_name.trim(),
+      ...(h.owner_phone.trim() ? { owner_phone: h.owner_phone.trim() } : {}),
+      hamlet: h.hamlet.trim(),
+      livestock_type: h.livestock_type as LivestockType,
+      animals: [{ species_code: h.species_code, head_count: Number(h.head_count.trim()) }],
+    })),
+    aqua_farmed_ha: ha(f.aqua_farmed_ha),
+    aqua_wild_ha: ha(f.aqua_wild_ha),
     ...(baseVersion !== undefined ? { base_version: baseVersion } : {}),
     commune_code: f.commune_code,
     disease_code: f.disease_code,
     species_code: f.species_code,
     received_at: new Date(f.received_at).toISOString(),
     source: f.source || undefined,
-    locality: f.locality.trim(),
+    locality: opt(f.locality),
     location: f.lat.trim() && f.lon.trim() ? { lat: f.lat.trim(), lon: f.lon.trim(), accuracy_m: optNum("accuracy_m", f.accuracy_m), source: f.location_source } : null,
     herd_size: Number(numValue("herd_size", f.herd_size)),
     herd_age_days: optInt("herd_age_days", f.herd_age_days),
@@ -185,6 +266,11 @@ export function createOutbreakApi(api: ApiClient) {
       unwrap(api.POST("/v1/extension/cnts/outbreaks/{ref}/close", { params: { path: { ref }, ...idem() }, body: { base_version, reason } })),
     reopen: (ref: string, base_version: number, reason: string): Promise<Outbreak> =>
       unwrap(api.POST("/v1/extension/cnts/outbreaks/{ref}/reopen", { params: { path: { ref }, ...idem() }, body: { base_version, reason } })),
+    /** Ô chọn DB-04: hộ của xã (Đang dùng, Chờ bổ sung vị trí — hộ vô hiệu hóa không chọn được, FN-10 BR-07). */
+    households: async (commune: string): Promise<HouseholdOption[]> =>
+      (await unwrap(api.GET("/v1/extension/cnts/livestock-households", { params: { query: { commune, limit: 200 } } }))).items.filter(
+        (h) => h.status !== "deactivated",
+      ),
     suspects: async (status?: Suspect["status"]): Promise<Suspect[]> =>
       (await unwrap(api.GET("/v1/extension/cnts/suspects", { params: { query: status ? { status } : {} } }))).items,
     reportSuspect: (body: SuspectInput): Promise<Suspect> => unwrap(api.POST("/v1/extension/cnts/suspects", { params: idem(), body })),

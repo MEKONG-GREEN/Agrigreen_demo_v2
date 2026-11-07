@@ -2,11 +2,14 @@
 // /v1/extension/cnts/outbreaks*, /outbreak-points, /suspects*: ổ dịch là chuỗi phiên bản đủ trường (gửi → cập nhật diễn biến
 // → Cấp Tỉnh kết thúc / mở lại), khóa lạc quan base_version, quy tắc chặn (thiếu vị trí, chết/tiêu hủy > quy mô đàn), tin báo
 // nghi dịch xác nhận thành ổ dịch hoặc bác bỏ. Dữ liệu tổng hợp, không phải thật.
+// CNTS-V4-OUTBREAK-MULTI (#252): DB-04 chọn hộ trong danh sách hộ chăn nuôi (giả lập kn-cnts-livestock) hoặc nhập hộ mới
+// (tạo hộ "Chờ bổ sung vị trí"), DB-14 chụp loại theo hộ, DB-15 tự đếm, DB-16 bắt buộc khi bệnh thuộc nhóm thủy sản.
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { CATALOGS } from "./data";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
+import { createPendingHousehold, livestockHouseholdRef } from "./kn-cnts-livestock";
 
 type S = components["schemas"];
 type Outbreak = S["CNTSOutbreak"];
@@ -56,13 +59,43 @@ function writer(w: Who, role: "kn_xa" | "kn_tinh"): Response | null {
   return w.readOnly ? problem(403, "extension.read_only", "Ngữ cảnh chỉ xem") : null;
 }
 
-function check(o: OutbreakInput): { field: string; reason: string }[] {
+const HA = /^\d{1,10}(\.\d{1,2})?$/;
+
+/** Bệnh nhóm thủy sản (như máy chủ): một loài của bệnh có nhóm thuy_san; bệnh chưa khai loài → xét vật nuôi ổ dịch. */
+function aquatic(o: OutbreakInput): boolean {
+  const d = CATALOGS.cnts_disease.find((x) => x.code === o.disease_code);
+  const list = (d?.attrs.species ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const codes = list.length ? list : o.species_code ? [o.species_code] : [];
+  return codes.some((c) => CATALOGS.cnts_species.find((x) => x.code === c)?.attrs.group === "thuy_san");
+}
+
+function check(o: OutbreakInput, commune: string): { field: string; reason: string }[] {
   const e: { field: string; reason: string }[] = [];
+  const refs = o.household_refs ?? [], news = o.new_households ?? [];
+  if ((o as { household_ref?: string | null }).household_ref) e.push({ field: "household_ref", reason: "dữ liệu cũ — chọn hộ trong danh sách hộ chăn nuôi (DB-04)" });
+  if (refs.length + news.length === 0) e.push({ field: "households", reason: "chọn ít nhất một hộ chăn nuôi hoặc nhập hộ chưa có (DB-04, DB-15 ≥ 1)" });
+  if (new Set(refs).size !== refs.length) e.push({ field: "households", reason: "mã hộ bị lặp" });
+  refs.forEach((r, i) => {
+    const h = livestockHouseholdRef(r);
+    if (!h) e.push({ field: `households[${i}]`, reason: "không có trong danh sách hộ chăn nuôi" });
+    else if (h.status === "deactivated") e.push({ field: `households[${i}]`, reason: `hộ ${h.code} đã vô hiệu hóa (FN-10 BR-07)` });
+    else if (h.commune_code !== commune) e.push({ field: `households[${i}]`, reason: `hộ ${h.code} thuộc xã khác xã của ổ dịch` });
+  });
+  news.forEach((h, i) => {
+    if (!h.owner_name?.trim()) e.push({ field: `new_households[${i}].owner_name`, reason: "bắt buộc, tối đa 200 ký tự (HCN-02)" });
+    if (!h.livestock_type) e.push({ field: `new_households[${i}].livestock_type`, reason: "nông hộ, trang trại nhỏ, vừa hoặc công nghiệp" });
+    if (!h.animals?.length) e.push({ field: `new_households[${i}].animals`, reason: "nhập ít nhất một vật nuôi" });
+  });
+  for (const k of ["aqua_farmed_ha", "aqua_wild_ha"] as const) {
+    const v = o[k];
+    if (v !== null && v !== undefined && !HA.test(v)) e.push({ field: k, reason: "số ha ≥ 0, tối đa 2 chữ số thập phân (DB-16)" });
+    else if (aquatic(o) && (v === null || v === undefined)) e.push({ field: k, reason: "bắt buộc khi bệnh thuộc nhóm thủy sản (DB-16)" });
+    else if (!aquatic(o) && v !== null && v !== undefined) e.push({ field: k, reason: "chỉ ghi khi bệnh thuộc nhóm thủy sản (DB-16)" });
+  }
   if (!o.disease_code || !CATALOGS.cnts_disease.some((x) => x.code === o.disease_code)) e.push({ field: "disease_code", reason: "chọn bệnh trong danh mục (DB-01)" });
   if (!o.species_code || !CATALOGS.cnts_species.some((x) => x.code === o.species_code)) e.push({ field: "species_code", reason: "chọn vật nuôi trong danh mục" });
   if (!o.received_at) e.push({ field: "received_at", reason: "bắt buộc (DB-02)" });
   if (!o.source) e.push({ field: "source", reason: "UBND xã, nông hộ báo hoặc cán bộ phát hiện (DB-03)" });
-  if (!o.household_ref && !o.locality?.trim()) e.push({ field: "locality", reason: "bắt buộc" });
   if (!o.location) e.push({ field: "location", reason: "chưa có vị trí ổ dịch — lấy GPS hoặc chọn trên bản đồ (DB-05)" });
   else {
     const lat = Number(o.location.lat), lon = Number(o.location.lon);
@@ -77,12 +110,21 @@ function check(o: OutbreakInput): { field: string; reason: string }[] {
   return e;
 }
 
-function version(o: OutbreakInput, base: Partial<Outbreak>, event: Outbreak["event"], w: Who, seq: number, ref: string): Outbreak {
+/** DB-04 của phiên bản mới: hộ chọn (chụp bản hiện hành) rồi hộ nhập mới (tạo "Chờ bổ sung vị trí"). Gọi sau khi `check` sạch. */
+function households(o: OutbreakInput, commune: string, w: Who): S["CNTSOutbreakHousehold"][] {
+  const sel = (o.household_refs ?? []).map((r) => livestockHouseholdRef(r)!);
+  const made = (o.new_households ?? []).map((h) => createPendingHousehold(w.actor, commune, h));
+  return [...sel, ...made].map(({ commune_code, ...h }) => (void commune_code, h));
+}
+
+function version(o: OutbreakInput, base: Partial<Outbreak>, event: Outbreak["event"], w: Who, seq: number, ref: string, hs: S["CNTSOutbreakHousehold"][]): Outbreak {
   return {
+    legacy: false, households: hs, affected_households: hs.length, aqua_farmed_ha: o.aqua_farmed_ha ? String(Number(o.aqua_farmed_ha)) : null,
+    aqua_wild_ha: o.aqua_wild_ha ? String(Number(o.aqua_wild_ha)) : null,
     ref, version: seq, version_id: uuidv7(), event, status: status(event), commune_code: o.commune_code ?? base.commune_code ?? "",
     disease_code: o.disease_code!, disease_name: name("cnts_disease", o.disease_code!), species_code: o.species_code!,
     species_name: name("cnts_species", o.species_code!), received_at: o.received_at!, source: o.source!, suspect_ref: base.suspect_ref ?? null,
-    household_ref: o.household_ref ?? null, locality: o.locality || null,
+    household_ref: null, locality: o.locality || null,
     location: o.location ? { lat: o.location.lat, lon: o.location.lon, accuracy_m: o.location.accuracy_m ?? null, source: o.location.source ?? "map" } : null,
     herd_size: o.herd_size!, herd_age_days: o.herd_age_days ?? null, dead: o.dead ?? 0, symptoms: o.symptoms!, sample_date: o.sample_date || null,
     lab_name: o.lab_name || null, lab_result: o.lab_result || null, culled_head: o.culled_head ?? null, culled_kg: o.culled_kg || null,
@@ -149,9 +191,9 @@ export const cntsOutbreakRoutes: Route[] = [
       if (deny) return deny;
       const b = body<OutbreakInput>(ctx);
       if (!b.commune_code || !sees(w, b.commune_code)) return problem(403, "extension.out_of_scope", "Ngoài phạm vi phụ trách");
-      const errs = check(b);
+      const errs = check(b, b.commune_code);
       if (errs.length) return invalid("extension.cnts_outbreak_invalid", errs);
-      const o = version(b, {}, "reported", w, 1, uuidv7());
+      const o = version(b, {}, "reported", w, 1, uuidv7(), households(b, b.commune_code, w));
       OUTBREAKS.set(o.ref, [o]);
       return json(o, 201);
     },
@@ -197,12 +239,12 @@ export const cntsOutbreakRoutes: Route[] = [
       const cur = latest(ctx, w, ctx.params[0]!, b.base_version);
       if (cur instanceof Response) return cur;
       if (cur.status === "closed") return problem(409, "extension.cnts_outbreak_closed", "Ổ dịch đã kết thúc");
-      const errs = check(b);
+      const errs = check(b, cur.commune_code);
       const asOf = b.as_of ?? today();
       if (asOf < cur.as_of) errs.push({ field: "as_of", reason: `ngày diễn biến trước ngày của phiên bản hiện hành (${cur.as_of})` });
       if (b.commune_code && b.commune_code !== cur.commune_code) errs.push({ field: "commune_code", reason: "không đổi xã của ổ dịch" });
       if (errs.length) return invalid("extension.cnts_outbreak_invalid", errs);
-      const o = version({ ...b, as_of: asOf, commune_code: cur.commune_code }, cur, "updated", w, cur.version + 1, cur.ref);
+      const o = version({ ...b, as_of: asOf, commune_code: cur.commune_code }, cur, "updated", w, cur.version + 1, cur.ref, households(b, cur.commune_code, w));
       OUTBREAKS.get(cur.ref)!.push(o);
       return json(o, 201);
     },
@@ -246,7 +288,7 @@ export const cntsOutbreakRoutes: Route[] = [
         WORD_NUMBERS.set(ref, no);
       }
       const runs = WORD_RUNS.get(ref) ?? [];
-      const run = { id: uuidv7(), seq: runs.length + 1, template: "cnts.bm10", template_version: 1, doc_number: no, doc_number_auto: true,
+      const run = { id: uuidv7(), seq: runs.length + 1, template: "cnts.bm10", template_version: 2, doc_number: no, doc_number_auto: true,
         file_name: `bao-cao-dich-benh-${ref}-v${cur.version}.docx`, body_hash: "0".repeat(64), size: 4, actor_ref: w.actor, at: new Date().toISOString() };
       WORD_RUNS.set(ref, [run, ...runs]);
       return json(run, 201);
@@ -343,9 +385,9 @@ export const cntsOutbreakRoutes: Route[] = [
           ...b, commune_code: cur.commune_code, source: b.source ?? cur.reporter_kind, received_at: b.received_at ?? cur.observed_at,
           location: b.location ?? (cur.location ? { ...cur.location, source: "gps" } : null),
         };
-        const errs = check(input);
+        const errs = check(input, cur.commune_code);
         if (errs.length) return invalid("extension.cnts_outbreak_invalid", errs);
-        const o = version(input, { suspect_ref: cur.ref }, "reported", w, 1, uuidv7());
+        const o = version(input, { suspect_ref: cur.ref }, "reported", w, 1, uuidv7(), households(input, cur.commune_code, w));
         OUTBREAKS.set(o.ref, [o]);
         vs!.push({ ...next, status: "confirmed", outbreak_ref: o.ref });
         return json(o, 201);
