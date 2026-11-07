@@ -51,6 +51,7 @@
 | 0055 | [Tách hệ thống Khuyến nông — hệ độc lập về logic (`internal/kn/*`, dữ liệu hệ khác chỉ qua `_pub`/data product/lớp tích hợp, client kn-web trong G1, frontend riêng sau G1); tách vật lý tùy chọn khi vận hành cần](0055-tach-he-thong-khuyen-nong.md) | Chốt ranh giới G1 theo PO; đề xuất đối chiếu D2 chờ PO |
 | 0056 | [Hộ chăn nuôi CNTS v4.0 — danh sách hộ là sổ của KN, họ tên/SĐT ở kho định danh, ổ dịch nhiều hộ qua bảng con chỉ ghi thêm](0056-ho-chan-nuoi-cnts-v4.md) | Chấp nhận — gói CNTS-V4-HOUSEHOLD-ADR (#248); hiện thực #251, #252, dùng ở #236 |
 | 0057 | [Tự đặt lại mật khẩu qua email (mã một lần chỉ lưu băm, 30 phút, 5 lần/giờ/tài khoản, gửi qua outbox, thu hồi phiên), bỏ PIN Mobile](0057-tu-dat-lai-mat-khau-qua-email.md) | Chấp nhận — gói #255 AUTH-V2-RESET-NOPIN (BRD 2.0 FN-CH-00.01, FN-05) |
+| 0058 | [Khuyến nông chạy độc lập theo BRD 2.0 — hạ tầng/hệ ngoài, D1–D3, Q2–Q10, hoãn pha kết nối](0058-kn-doc-lap-theo-brd-2.md) | Chấp nhận — gói #261 KN-STANDALONE-0-GOV; bổ sung ADR-0055 |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 

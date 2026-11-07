@@ -1,0 +1,1 @@
+- [x] KN-STANDALONE-0-GOV (#261): ghi [ADR-0058](../../adr/0058-kn-doc-lap-theo-brd-2.md) bổ sung ADR-0055, chốt D1–D3/Q2–Q10 và điều kiện KN độc lập theo BRD 2.0; pha kết nối vẫn hoãn. [Phạm vi và cách kiểm](../../kn/gia-dinh/KN-STANDALONE-0-GOV.md). Chưa chứng nhận các gói gỡ bề mặt, chuyển dữ liệu hay profile/UAT đã hoàn thành.
