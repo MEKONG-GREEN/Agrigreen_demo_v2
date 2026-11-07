@@ -288,6 +288,7 @@ class WsCheckin {
     this.pending = false,
     this.legacyNoPhoto = false,
     this.checkout,
+    this.noCheckout = false,
   });
   final DateTime capturedAt;
   final double? distanceM;
@@ -302,6 +303,9 @@ class WsCheckin {
   /// Check-out của mục (CNTS v4.0 CV-08), null = chưa check-out.
   final WsCheckout? checkout;
 
+  /// Nhãn "Chưa check-out" (CNTS v4.0 BR-07): máy chủ tính lúc 23:59 ngày công tác giờ Việt Nam.
+  final bool noCheckout;
+
   WsCheckin withCheckout(WsCheckout? o) => WsCheckin(
     capturedAt: capturedAt,
     distanceM: distanceM,
@@ -309,10 +313,15 @@ class WsCheckin {
     pending: pending,
     legacyNoPhoto: legacyNoPhoto,
     checkout: o,
+    noCheckout: o == null && noCheckout,
   );
 
   String get label {
-    final out = checkout == null ? '' : ' · ${checkout!.label}';
+    final out = checkout != null
+        ? ' · ${checkout!.label}'
+        : noCheckout
+        ? ' · Chưa check-out'
+        : '';
     if (pending) return 'Đã check-in (chờ đồng bộ)$out';
     final d = distanceM == null
         ? ''
@@ -333,6 +342,7 @@ class WsCheckin {
       distanceM: d is num ? d.toDouble() : null,
       far: j['far'] == true,
       legacyNoPhoto: j['legacy_no_photo'] == true,
+      noCheckout: j['no_checkout'] == true,
       checkout: o is Map
           ? WsCheckout.fromJson(o.cast<String, Object?>())
           : null,

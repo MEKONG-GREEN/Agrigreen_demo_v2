@@ -11,6 +11,10 @@
 // BF-CN-OUTBREAK (#111, UP-07/UP-08): 4 thẻ thống kê (Tổng, Chờ xác nhận, Đang theo dõi, Đã kết thúc), tìm kiếm + lọc Bệnh,
 // Xã, Trạng thái, bảng Mã/Bệnh/Xã/Tiếp nhận/Quy mô đàn/Số chết/Nguồn tin/Trạng thái có trạng thái rỗng và phân trang; lập
 // báo cáo trên trang riêng /kn/cnts/dich-benh/tao-moi (3 phần); Xuất Word BM-10 (pf/export), xem trên bản đồ.
+// CNTS-V4-OUTBREAK-MULTI (#252, BRD CNTS v4.0 FN-11 BR-03, AC-04, AC-05; UR-XA-10 Hình 10): DB-04 chọn một hoặc nhiều hộ trong
+// danh sách hộ chăn nuôi của xã hoặc nhập hộ chưa có (tạo hộ "Chờ bổ sung vị trí"), DB-14 loại chăn nuôi theo hộ, DB-15 số
+// hộ tự đếm (không sửa tay), DB-16 diện tích thủy sản (nuôi trồng, khai thác) khi bệnh thuộc nhóm thủy sản. Ổ dịch trước
+// CNTS v4.0 hiện nhãn "Dữ liệu cũ".
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { unwrap } from "@/api/client";
@@ -23,11 +27,16 @@ import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/c
 import { ReasonDialog } from "../ReasonDialog";
 import {
   EVENT_LABEL,
+  HH_STATUS_LABEL,
   OUTBREAK_RULES,
   SOURCE_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
   SUSPECT_LABEL,
+  TYPE_LABEL,
+  affectedCount,
+  emptyNewHousehold,
+  isAquatic,
   createOutbreakApi,
   createOutbreakWordApi,
   emptyForm,
@@ -42,11 +51,16 @@ import {
   type OutbreakApi,
   type OutbreakForm,
   type OutbreakStatus,
+  type LivestockType,
+  type NewHouseholdForm,
   type Suspect,
 } from "./api";
 
 /** Số con của tin báo: số nguyên ≥ 0, không bắt buộc. */
 const SUSPECT_COUNT: NumberRule = { integer: true, max: 999_999_999 };
+
+/** Ô văn bản/số của biểu (không gồm danh sách hộ DB-04). */
+type TextKey = { [K in keyof OutbreakForm]: OutbreakForm[K] extends string ? K : never }[keyof OutbreakForm];
 
 export type Mode = { kind: "new" } | { kind: "progress"; o: Outbreak } | { kind: "confirm"; s: Suspect };
 
@@ -374,8 +388,35 @@ function OutbreakDetailView({
                   {dt(o.received_at)} · {SOURCE_LABEL[o.source]}
                   {o.suspect_ref ? " · từ tin báo nghi dịch" : ""}
                 </dd>
-                <dt>Địa bàn (DB-04)</dt>
-                <dd>{o.locality ?? "—"}</dd>
+                <dt>Hộ chăn nuôi bị ảnh hưởng (DB-04)</dt>
+                <dd>
+                  {o.legacy ? (
+                    <>
+                      <StatusPill tone="neutral">Dữ liệu cũ</StatusPill> Báo cáo trước CNTS v4.0 — {o.locality ?? "một hộ"}; không có loại chăn nuôi, diện tích thủy sản.
+                    </>
+                  ) : (
+                    <ul aria-label="Hộ chăn nuôi bị ảnh hưởng">
+                      {o.households.map((h) => (
+                        <li key={h.household_ref}>
+                          {h.code} · {h.owner_label ?? "—"}
+                          {h.hamlet ? ` · ${h.hamlet}` : ""} · {TYPE_LABEL[h.livestock_type]}
+                          {h.status !== "active" ? ` (${HH_STATUS_LABEL[h.status]})` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {!o.legacy && o.locality ? <span className="mute small">Địa bàn: {o.locality}</span> : null}
+                </dd>
+                <dt>Số hộ bị ảnh hưởng (DB-15)</dt>
+                <dd>{o.affected_households}</dd>
+                {o.aqua_farmed_ha !== null || o.aqua_wild_ha !== null ? (
+                  <>
+                    <dt>Diện tích thủy sản bị ảnh hưởng (DB-16)</dt>
+                    <dd>
+                      Nuôi trồng {o.aqua_farmed_ha ?? "0"} ha; khai thác {o.aqua_wild_ha ?? "0"} ha
+                    </dd>
+                  </>
+                ) : null}
                 <dt>Vị trí (DB-05)</dt>
                 <dd>
                   {o.location ? `${o.location.lat}, ${o.location.lon}` : "—"}
@@ -409,6 +450,7 @@ function OutbreakDetailView({
                   { key: "ver", header: "Phiên bản", cell: (v) => `v${v.version}` },
                   { key: "ev", header: "Sự việc", cell: (v) => EVENT_LABEL[v.event] },
                   { key: "asof", header: "Ngày", cell: (v) => ymd(v.as_of) },
+                  { key: "hh", header: "Số hộ", cell: (v) => (v.legacy ? `${v.affected_households} (dữ liệu cũ)` : v.affected_households) },
                   { key: "dead", header: "Chết", cell: (v) => v.dead },
                   { key: "culled", header: "Tiêu hủy", cell: (v) => v.culled_head ?? "—" },
                   { key: "note", header: "Ghi chú", cell: (v) => v.status_reason ?? v.progress_note ?? "—" },
@@ -607,20 +649,26 @@ export function OutbreakEditor({
   const dz = diseases.find((d) => d.code === f.disease_code);
   const allowed = (dz?.attrs.species ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const speciesOpts = allowed.length ? species.filter((s) => allowed.includes(s.code)) : species;
+  const aquatic = isAquatic(dz, f.species_code, species);
+  const hhs = useLoad(f.commune_code ? () => oapi.households(f.commune_code) : null, [oapi, f.commune_code]);
+  const toggleHH = (ref: string, on: boolean) =>
+    setF((x) => ({ ...x, household_refs: on ? [...x.household_refs, ref] : x.household_refs.filter((r) => r !== ref) }));
+  const upNew = (i: number, patch: Partial<NewHouseholdForm>) =>
+    setF((x) => ({ ...x, new_households: x.new_households.map((h, j) => (j === i ? { ...h, ...patch } : h)) }));
   const title = mode.kind === "new" ? "Lập báo cáo dịch bệnh (BM-10)" : mode.kind === "progress" ? `Cập nhật diễn biến — phiên bản ${mode.o.version + 1}` : "Xác nhận tin báo → báo cáo dịch bệnh";
 
   const submit = async () => {
-    const fe = formErrors(f);
+    const fe = formErrors(f, aquatic);
     setErrs(fe);
     if (Object.keys(fe).length) return;
     try {
       // P0-WEB-IDEMKEY: trong phiên thao tác của act — gửi lại sau lỗi mạng dùng lại khóa cũ.
       const o = await act.idem(() =>
         mode.kind === "new"
-          ? oapi.report(payload(f))
+          ? oapi.report(payload(f, undefined, aquatic))
           : mode.kind === "progress"
-            ? oapi.progress(mode.o.ref, payload(f, mode.o.version))
-            : oapi.confirm(mode.s.ref, payload(f, mode.s.version)),
+            ? oapi.progress(mode.o.ref, payload(f, mode.o.version, aquatic))
+            : oapi.confirm(mode.s.ref, payload(f, mode.s.version, aquatic)),
       );
       onDone(o.ref);
     } catch (e) {
@@ -633,7 +681,7 @@ export function OutbreakEditor({
     }
   };
 
-  const field = (key: keyof OutbreakForm, label: string, opts: { req?: boolean; type?: string; area?: boolean; ph?: string; err?: string } = {}) => {
+  const field = (key: TextKey, label: string, opts: { req?: boolean; type?: string; area?: boolean; ph?: string; err?: string } = {}) => {
     const error = errs[opts.err ?? key];
     const onChange = (v: string) => up({ [key]: v } as Partial<OutbreakForm>);
     if (key in OUTBREAK_RULES) {
@@ -740,8 +788,91 @@ export function OutbreakEditor({
           </select>
           {errs.source ? <span className="err">{errs.source}</span> : null}
         </label>
-        {field("locality", "DB-04 Hộ chăn nuôi — địa bàn (ấp, khu vực)", { req: true, ph: "Không ghi họ tên, số điện thoại" })}
+        {field("locality", "Địa bàn (ấp, khu vực) — ghi chú", { ph: "Không ghi họ tên, số điện thoại" })}
       </div>
+      <fieldset className="field" aria-label="DB-04 Hộ chăn nuôi bị ảnh hưởng">
+        <legend>
+          DB-04 Hộ chăn nuôi bị ảnh hưởng<span className="req"> *</span>
+        </legend>
+        {mode.kind === "progress" && mode.o.legacy ? (
+          <p className="mute small">Báo cáo này lập trước CNTS v4.0 (dữ liệu cũ, một hộ/địa bàn). Lần cập nhật này chọn hộ theo danh sách hộ chăn nuôi.</p>
+        ) : null}
+        {!f.commune_code ? (
+          <p className="mute small">Chọn xã để hiện danh sách hộ chăn nuôi của xã.</p>
+        ) : (hhs.data ?? []).length === 0 ? (
+          <p className="mute small">Xã chưa có hộ trong danh sách hộ chăn nuôi — nhập hộ chưa có ở dưới.</p>
+        ) : (
+          <ul className="plain" aria-label="Chọn hộ trong danh sách">
+            {(hhs.data ?? []).map((h) => (
+              <li key={h.id}>
+                <label className="row small">
+                  <input type="checkbox" checked={f.household_refs.includes(h.id)} onChange={(e) => toggleHH(h.id, e.target.checked)} />
+                  {h.code} · {h.owner_label ?? "—"}
+                  {h.hamlet ? ` · ${h.hamlet}` : ""} · DB-14 {TYPE_LABEL[h.livestock_type]}
+                  {h.status === "pending_location" ? " (Chờ bổ sung vị trí)" : ""}
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+        {f.new_households.map((h, i) => {
+          const k = (x: string) => errs[`new_households[${i}].${x}`];
+          return (
+            <fieldset className="field" key={i} aria-label={`Hộ chưa có ${i + 1}`}>
+              <legend>Hộ chưa có {i + 1} — sẽ thêm vào danh sách ở trạng thái “Chờ bổ sung vị trí”</legend>
+              <div className="ws-two">
+                <TextField label="Họ tên chủ hộ / tên trang trại" required maxLength={200} value={h.owner_name} onChange={(v) => upNew(i, { owner_name: v })} error={k("owner_name")} />
+                <TextField label="Số điện thoại" value={h.owner_phone} onChange={(v) => upNew(i, { owner_phone: v })} error={k("owner_phone")} />
+                <TextField label="Ấp, khu phố" maxLength={200} value={h.hamlet} onChange={(v) => upNew(i, { hamlet: v })} error={k("hamlet")} />
+                <SelectField
+                  label="DB-14 Loại chăn nuôi"
+                  required
+                  value={h.livestock_type}
+                  onChange={(v) => upNew(i, { livestock_type: v as LivestockType | "" })}
+                  options={(Object.keys(TYPE_LABEL) as LivestockType[]).map((t) => ({ value: t, label: TYPE_LABEL[t] }))}
+                  error={k("livestock_type")}
+                />
+                <SelectField
+                  label="Vật nuôi của hộ"
+                  required
+                  value={h.species_code}
+                  onChange={(v) => upNew(i, { species_code: v })}
+                  options={species.map((s) => ({ value: s.code, label: s.name }))}
+                  error={k("animals[0].species_code")}
+                />
+                <TextField label="Số con của hộ" required value={h.head_count} onChange={(v) => upNew(i, { head_count: v })} error={k("animals[0].head_count")} />
+              </div>
+              <button className="btn btn-sm" type="button" onClick={() => setF((x) => ({ ...x, new_households: x.new_households.filter((_, j) => j !== i) }))}>
+                Bỏ hộ này
+              </button>
+            </fieldset>
+          );
+        })}
+        <div className="row">
+          <button className="btn btn-sm" type="button" onClick={() => setF((x) => ({ ...x, new_households: [...x.new_households, emptyNewHousehold()] }))}>
+            Nhập hộ chưa có
+          </button>
+          <span aria-live="polite">
+            DB-15 Số hộ bị ảnh hưởng: <b>{affectedCount(f)}</b> (tự đếm)
+          </span>
+        </div>
+        {errs.households ? (
+          <span className="err" role="alert">
+            {errs.households}
+          </span>
+        ) : null}
+      </fieldset>
+      {aquatic ? (
+        <fieldset className="field" aria-label="DB-16 Diện tích thủy sản bị ảnh hưởng">
+          <legend>
+            DB-16 Diện tích thủy sản bị ảnh hưởng (ha)<span className="req"> *</span>
+          </legend>
+          <div className="row">
+            <TextField label="Nuôi trồng (ha)" required value={f.aqua_farmed_ha} onChange={(v) => up({ aqua_farmed_ha: v })} error={errs.aqua_farmed_ha} />
+            <TextField label="Khai thác (ha)" required value={f.aqua_wild_ha} onChange={(v) => up({ aqua_wild_ha: v })} error={errs.aqua_wild_ha} />
+          </div>
+        </fieldset>
+      ) : null}
       <fieldset className="field">
         <legend>
           DB-05 Vị trí ổ dịch<span className="req"> *</span>

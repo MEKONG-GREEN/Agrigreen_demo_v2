@@ -1,5 +1,6 @@
 // Package handler: route /v1/extension/cnts/outbreaks…, /v1/extension/cnts/suspects… (W11.49 — Báo cáo dịch bệnh BM-10,
-// báo nghi dịch). Mọi route cần header X-AG-Context (ngữ cảnh phiên KN); thao tác ghi cần Idempotency-Key.
+// báo nghi dịch; #252 — CNTS v4.0 DB-04 nhiều hộ, DB-14…DB-16). Mọi route cần header X-AG-Context (ngữ cảnh phiên KN);
+// thao tác ghi cần Idempotency-Key.
 package handler
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	lhdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntslivestock/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
@@ -148,8 +150,19 @@ func locDTO(p *domain.Point, acc *decimal.Decimal, source string) any {
 // Ổ dịch
 // ---------------------------------------------------------------------------
 
+func householdsDTO(hs []app.HouseholdView) []gin.H {
+	out := make([]gin.H, 0, len(hs))
+	for _, h := range hs {
+		out = append(out, gin.H{"household_ref": h.HouseholdRef.String(), "household_version": h.HouseholdSeq, "code": h.Code,
+			"livestock_type": h.LivestockType, "hamlet": optStr(h.Hamlet), "status": h.Status, "owner_label": optStr(h.OwnerLabel)})
+	}
+	return out
+}
+
 func obDTO(v app.OutbreakView) gin.H {
 	return gin.H{
+		"legacy": v.Legacy, "households": householdsDTO(v.Households), "affected_households": v.Affected,
+		"aqua_farmed_ha": optDec(v.AquaFarmedHa), "aqua_wild_ha": optDec(v.AquaWildHa),
 		"ref": v.Ref.String(), "version": v.Seq, "version_id": v.ID.String(), "event": v.Event, "status": v.Status,
 		"commune_code": v.CommuneCode, "disease_code": v.DiseaseCode, "disease_name": v.DiseaseName, "species_code": v.SpeciesCode,
 		"species_name": v.SpeciesName, "received_at": ts(v.ReceivedAt), "source": v.Source, "suspect_ref": optRef(v.SuspectRef),
@@ -255,32 +268,49 @@ type locationReq struct {
 	Source    string           `json:"source"`
 }
 
+type animalReq struct {
+	SpeciesCode string `json:"species_code"`
+	HeadCount   int64  `json:"head_count"`
+}
+
+type newHouseholdReq struct {
+	OwnerName     string      `json:"owner_name"`
+	OwnerPhone    string      `json:"owner_phone"`
+	Hamlet        string      `json:"hamlet"`
+	LivestockType string      `json:"livestock_type"`
+	Animals       []animalReq `json:"animals"`
+}
+
 type outbreakReq struct {
-	BaseVersion    *int64           `json:"base_version"`
-	CommuneCode    string           `json:"commune_code"`
-	DiseaseCode    string           `json:"disease_code"`
-	SpeciesCode    string           `json:"species_code"`
-	ReceivedAt     string           `json:"received_at"`
-	Source         string           `json:"source"`
-	HouseholdRef   *uuid.UUID       `json:"household_ref"`
-	Locality       string           `json:"locality"`
-	Location       *locationReq     `json:"location"`
-	HerdSize       int64            `json:"herd_size"`
-	HerdAgeDays    *int64           `json:"herd_age_days"`
-	Dead           int64            `json:"dead"`
-	Symptoms       string           `json:"symptoms"`
-	SampleDate     string           `json:"sample_date"`
-	LabName        string           `json:"lab_name"`
-	LabResult      string           `json:"lab_result"`
-	CulledHead     *int64           `json:"culled_head"`
-	CulledKg       *decimal.Decimal `json:"culled_kg"`
-	ChemicalLiters *decimal.Decimal `json:"chemical_liters"`
-	BufferNote     string           `json:"buffer_note"`
-	PreventionNote string           `json:"prevention_note"`
-	AttachmentRefs []uuid.UUID      `json:"attachment_refs"`
-	AsOf           string           `json:"as_of"`
-	ProgressNote   string           `json:"progress_note"`
-	CapturedAt     string           `json:"captured_at"`
+	BaseVersion    *int64            `json:"base_version"`
+	HouseholdRefs  []uuid.UUID       `json:"household_refs"`
+	NewHouseholds  []newHouseholdReq `json:"new_households"`
+	AquaFarmedHa   *string           `json:"aqua_farmed_ha"`
+	AquaWildHa     *string           `json:"aqua_wild_ha"`
+	CommuneCode    string            `json:"commune_code"`
+	DiseaseCode    string            `json:"disease_code"`
+	SpeciesCode    string            `json:"species_code"`
+	ReceivedAt     string            `json:"received_at"`
+	Source         string            `json:"source"`
+	HouseholdRef   *uuid.UUID        `json:"household_ref"`
+	Locality       string            `json:"locality"`
+	Location       *locationReq      `json:"location"`
+	HerdSize       int64             `json:"herd_size"`
+	HerdAgeDays    *int64            `json:"herd_age_days"`
+	Dead           int64             `json:"dead"`
+	Symptoms       string            `json:"symptoms"`
+	SampleDate     string            `json:"sample_date"`
+	LabName        string            `json:"lab_name"`
+	LabResult      string            `json:"lab_result"`
+	CulledHead     *int64            `json:"culled_head"`
+	CulledKg       *decimal.Decimal  `json:"culled_kg"`
+	ChemicalLiters *decimal.Decimal  `json:"chemical_liters"`
+	BufferNote     string            `json:"buffer_note"`
+	PreventionNote string            `json:"prevention_note"`
+	AttachmentRefs []uuid.UUID       `json:"attachment_refs"`
+	AsOf           string            `json:"as_of"`
+	ProgressNote   string            `json:"progress_note"`
+	CapturedAt     string            `json:"captured_at"`
 }
 
 func (r outbreakReq) outbreak() (domain.Outbreak, error) {
@@ -310,8 +340,40 @@ func (r outbreakReq) outbreak() (domain.Outbreak, error) {
 	if asOf != nil {
 		o.AsOf = *asOf
 	}
-	o.CapturedAt, err = parseTS("captured_at", r.CapturedAt)
+	if o.CapturedAt, err = parseTS("captured_at", r.CapturedAt); err != nil {
+		return o, err
+	}
+	if o.AquaFarmedHa, err = hectares("aqua_farmed_ha", r.AquaFarmedHa); err != nil {
+		return o, err
+	}
+	o.AquaWildHa, err = hectares("aqua_wild_ha", r.AquaWildHa)
 	return o, err
+}
+
+// hectares đọc DB-16 dạng chuỗi thập phân (kiểm cú pháp trước khi parse).
+func hectares(field string, s *string) (*decimal.Decimal, error) {
+	if s == nil {
+		return nil, nil
+	}
+	d, ok := domain.ParseHectares(*s)
+	if !ok {
+		return nil, problem.Validation.WithField(field, "số ha ≥ 0, tối đa 10 chữ số phần nguyên, 2 chữ số thập phân (DB-16)")
+	}
+	return d, nil
+}
+
+// households đọc DB-04: hộ chọn và hộ nhập mới.
+func (r outbreakReq) households() ([]uuid.UUID, []app.NewHousehold) {
+	news := make([]app.NewHousehold, 0, len(r.NewHouseholds))
+	for _, n := range r.NewHouseholds {
+		h := app.NewHousehold{OwnerName: n.OwnerName, OwnerPhone: n.OwnerPhone}
+		h.Hamlet, h.LivestockType = n.Hamlet, n.LivestockType
+		for _, a := range n.Animals {
+			h.Animals = append(h.Animals, lhdomain.Animal{Species: a.SpeciesCode, Heads: a.HeadCount})
+		}
+		news = append(news, h)
+	}
+	return r.HouseholdRefs, news
 }
 
 func (h Handler) reportOutbreak(c *gin.Context) {
@@ -324,7 +386,9 @@ func (h Handler) reportOutbreak(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	v, replayed, err := h.Svc.ReportOutbreak(c.Request.Context(), app.OutbreakInput{Outbreak: o, IdemKey: idem(c)})
+	sel, news := req.households()
+	v, replayed, err := h.Svc.ReportOutbreak(c.Request.Context(), app.OutbreakInput{Outbreak: o, IdemKey: idem(c), Households: sel,
+		NewHouseholds: news})
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -346,7 +410,9 @@ func (h Handler) updateOutbreak(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	v, replayed, err := h.Svc.UpdateOutbreak(c.Request.Context(), ref, app.OutbreakInput{Outbreak: o, BaseVersion: req.BaseVersion, IdemKey: idem(c)})
+	sel, news := req.households()
+	v, replayed, err := h.Svc.UpdateOutbreak(c.Request.Context(), ref, app.OutbreakInput{Outbreak: o, BaseVersion: req.BaseVersion,
+		IdemKey: idem(c), Households: sel, NewHouseholds: news})
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -495,7 +561,9 @@ func (h Handler) confirmSuspect(c *gin.Context) {
 		httpx.Fail(c, err)
 		return
 	}
-	v, replayed, err := h.Svc.ConfirmSuspect(c.Request.Context(), ref, app.ConfirmInput{BaseVersion: req.BaseVersion, Outbreak: o, IdemKey: idem(c)})
+	sel, news := req.households()
+	v, replayed, err := h.Svc.ConfirmSuspect(c.Request.Context(), ref, app.ConfirmInput{BaseVersion: req.BaseVersion, Outbreak: o,
+		IdemKey: idem(c), Households: sel, NewHouseholds: news})
 	if err != nil {
 		httpx.Fail(c, err)
 		return

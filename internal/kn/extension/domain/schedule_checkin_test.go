@@ -122,3 +122,36 @@ func TestCheckoutRules(t *testing.T) {
 		t.Fatal("đồng bộ trong ngày công tác không trễ")
 	}
 }
+
+func TestNoCheckout(t *testing.T) {
+	zone := time.FixedZone("ICT", 7*3600)
+	day := time.Date(2027, 10, 6, 0, 0, 0, 0, time.UTC)
+	at := func(s string) time.Time {
+		v, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	if got := NoCheckoutAt(day, zone); !got.Equal(at("2027-10-06T23:59:00+07:00")) {
+		t.Fatalf("mốc 23:59 giờ Việt Nam: %v", got)
+	}
+	cases := []struct {
+		name    string
+		in, out bool
+		now     string
+		want    bool
+	}{
+		{"AC-10: 23:58 chưa tới mốc", true, false, "2027-10-06T23:58:59+07:00", false},
+		{"AC-10: đúng 23:59", true, false, "2027-10-06T23:59:00+07:00", true},
+		{"AC-10: sáng hôm sau", true, false, "2027-10-07T07:00:00+07:00", true},
+		{"BR-08/AC-13: check-out đồng bộ trễ gỡ nhãn", true, true, "2027-10-07T07:10:00+07:00", false},
+		{"chưa check-in không gắn nhãn", false, false, "2027-10-07T07:00:00+07:00", false},
+		{"16:59 UTC (= 23:59 VN) không lệch múi giờ", true, false, "2027-10-06T16:59:00Z", true},
+	}
+	for _, c := range cases {
+		if got := NoCheckout(day, c.in, c.out, at(c.now), zone); got != c.want {
+			t.Errorf("%s: %v, muốn %v", c.name, got, c.want)
+		}
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -101,6 +102,68 @@ type bm11Resp struct {
 	} `json:"items"`
 	Ready   bool     `json:"ready"`
 	Reasons []string `json:"reasons"`
+	Herds   *struct {
+		Communes []bm11HerdRow `json:"communes"`
+		Total    bm11HerdRow   `json:"total"`
+		Heads    []struct {
+			Species, Household, Farm string
+		} `json:"heads"`
+	} `json:"herds"`
+}
+
+type bm11HerdRow struct {
+	Commune, Name     string
+	Households, Farms int
+	ByType            map[string]int `json:"by_type"`
+}
+
+// household ghi một phiên bản hộ chăn nuôi thẳng vào sổ (pf 20261106164138 — như dịch vụ #251 ghi): hộ Đang dùng có check-in,
+// Chờ bổ sung vị trí không có, Vô hiệu hóa có lý do.
+func (f *aggFx) household(ref uuid.UUID, code, event, status, commune, typ string, heads int) {
+	f.t.Helper()
+	checkin, reason := "NULL", "NULL"
+	if status == "active" {
+		checkin = "'" + ids.New().String() + "'"
+	}
+	if event == "deactivated" {
+		reason = "'Hộ ngừng chăn nuôi'"
+	}
+	if err := f.admin.exec(fmt.Sprintf(`INSERT INTO pf_extension.cnts_livestock_household (id, tenant_id, stream_key, household_ref, code,
+	    event, status, commune_code, person_ref, livestock_type, species_codes, head_counts, checkin_ref, reason, event_time, actor_ref,
+	    idem_key, rule_version)
+	  VALUES ('%s', '%s', 'lhh:%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '{heo}', '{%d}', %s, %s, now(), '%s', '%s',
+	    'kn.cnts.livestock_household/v1')`, ids.New(), f.tid, ref, ref, code, event, status, commune, ids.New(), typ, heads, checkin, reason,
+		ids.New(), "t-"+ids.New().String())); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+// seedHouseholds (CNTS v4.0 FN-16 AC-05): xã X1 có 12 hộ Đang dùng — 8 nông hộ, 3 trang trại nhỏ, 1 trang trại vừa — cộng
+// 1 hộ Chờ bổ sung vị trí và 1 hộ đã vô hiệu hóa (không tính); xã X2 có 1 trang trại công nghiệp. Trả mã một nông hộ của X1.
+func (f *aggFx) seedHouseholds() uuid.UUID {
+	n := 0
+	add := func(event, status, commune, typ string, heads int) uuid.UUID {
+		n++
+		ref := ids.New()
+		f.household(ref, fmt.Sprintf("HCN%07d", n), event, status, commune, typ, heads)
+		return ref
+	}
+	var first uuid.UUID
+	for i := range 8 {
+		r := add("created", "active", "X1", "nong_ho", 10)
+		if i == 0 {
+			first = r
+		}
+	}
+	for range 3 {
+		add("created", "active", "X1", "trang_trai_nho", 100)
+	}
+	add("created", "active", "X1", "trang_trai_vua", 500)
+	add("created_pending", "pending_location", "X1", "trang_trai_vua", 999)
+	gone := add("created", "active", "X1", "trang_trai_nho", 999)
+	f.household(gone, fmt.Sprintf("HCN%07d", n), "deactivated", "deactivated", "X1", "trang_trai_nho", 999)
+	add("created", "active", "X2", "trang_trai_cong_nghiep", 2000)
+	return first
 }
 
 func (r bm11Resp) line(key string) string {
@@ -166,6 +229,8 @@ func TestCNTSBM11_W1145(t *testing.T) {
 	f.submit(w40b17, "X1", catchVals("4", "0", "1", "0"))
 	f.submit(w40b17, "X2", catchVals("1", "0", "0", "0"))
 
+	changed := f.seedHouseholds()
+
 	var week bm11Resp
 	idem := "t-" + ids.New().String()
 	t.Run("lập báo cáo tuần: số tự động từ bài đã nộp, Tổng hợp từ 2/2 xã, gửi lặp trả bản cũ", func(t *testing.T) {
@@ -185,6 +250,19 @@ func TestCNTSBM11_W1145(t *testing.T) {
 		if week.Fishery.CatchCur != "6" || week.Fishery.CatchYTD != "12.5" {
 			t.Fatalf("khai thác tuần 40 = 6, lũy kế năm = 12,5: %+v", week.Fishery)
 		}
+		// CNTS v4.0 FN-16 BR-07, AC-05: bảng theo loại chăn nuôi đếm từ danh sách hộ (hộ Đang dùng).
+		h := week.Herds
+		if h == nil || len(h.Communes) != 2 || h.Communes[0].Commune != "X1" {
+			t.Fatalf("bảng theo loại chăn nuôi: %s", b)
+		}
+		x1 := h.Communes[0]
+		if x1.Households != 12 || x1.Farms != 4 || x1.ByType["nong_ho"] != 8 || x1.ByType["trang_trai_nho"] != 3 ||
+			x1.ByType["trang_trai_vua"] != 1 || x1.ByType["trang_trai_cong_nghiep"] != 0 {
+			t.Fatalf("AC-05 xã X1 = 12 hộ, 4 trang trại; nông hộ 8, nhỏ 3, vừa 1, công nghiệp 0: %+v", x1)
+		}
+		if h.Total.Households != 13 || h.Total.Farms != 5 || len(h.Heads) != 1 || h.Heads[0].Household != "80" || h.Heads[0].Farm != "2800" {
+			t.Fatalf("toàn tỉnh 13 hộ, 5 trang trại; heo nông hộ 80, trang trại 2800: %+v", h)
+		}
 		var again bm11Resp
 		c, b = f.as(writer, http.MethodPost, base+"/reports", idem, map[string]any{"type": "week", "period_key": "2026-W40"})
 		f.ok(c, b, &again)
@@ -194,6 +272,23 @@ func TestCNTSBM11_W1145(t *testing.T) {
 		}
 		c, b = f.as(writer, http.MethodPost, base+"/reports", "", map[string]any{"type": "week", "period_key": "2026-W40"})
 		f.fail(c, b, "extension.cnts_bm11_exists")
+	})
+
+	// FN-10 BR-06: hộ đổi loại sau khi lập không làm đổi báo cáo đã lập; "Làm mới số liệu" mới đếm lại.
+	f.household(changed, "HCN0000001", "updated", "active", "X1", "trang_trai_nho", 10)
+	t.Run("BR-06: hộ đổi loại sau khi lập không đổi báo cáo; làm mới đếm lại", func(t *testing.T) {
+		var v bm11Resp
+		c, b := f.as(writer, http.MethodGet, base+"/reports/"+week.ID, "", nil)
+		f.ok(c, b, &v)
+		if v.Herds == nil || v.Herds.Communes[0].ByType["nong_ho"] != 8 || v.Herds.Total.Farms != 5 {
+			t.Fatalf("báo cáo đã lập phải giữ số cũ: %s", b)
+		}
+		c, b = f.as(writer, http.MethodPost, base+"/reports/"+week.ID+"/refresh", "", map[string]any{"expected_seq": v.Seq})
+		f.ok(c, b, &v)
+		if v.Herds.Communes[0].ByType["nong_ho"] != 7 || v.Herds.Communes[0].ByType["trang_trai_nho"] != 4 || v.Herds.Total.Farms != 6 {
+			t.Fatalf("làm mới đếm lại theo loại hiện hành: %s", b)
+		}
+		week = v
 	})
 
 	t.Run("soạn: khóa lạc quan, mục lạ, phòng khác không soạn được", func(t *testing.T) {

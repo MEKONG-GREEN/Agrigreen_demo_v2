@@ -287,6 +287,7 @@ void main() {
     final ck = v.items.firstWhere((i) => i.id == 'i-today').checkin!;
     expect(ck.far, isTrue);
     expect(ck.label, contains('612 m'));
+    expect(ck.label, isNot(contains('Chưa check-out')));
 
     status = 'draft';
     checkins = [];
@@ -295,6 +296,21 @@ void main() {
       svc.checkin(_week, v.items.firstWhere((i) => i.id == 'i-today')),
       throwsA(isA<WorkScheduleError>()),
     );
+  });
+
+  test('CNTS v4.0 BR-07 (#250): máy chủ gắn nhãn Chưa check-out lúc 23:59 → hiện ở màn cán bộ xã; check-out gỡ nhãn', () {
+    final ck = WsCheckin.fromJson({
+      'captured_at': '2026-10-14T01:00:00Z',
+      'no_checkout': true,
+      'checkout': null,
+    })!;
+    expect(ck.noCheckout, isTrue);
+    expect(ck.label, endsWith('Chưa check-out'));
+    final out = ck.withCheckout(
+      WsCheckout(capturedAt: DateTime.utc(2026, 10, 14, 9, 30), pending: true),
+    );
+    expect(out.noCheckout, isFalse);
+    expect(out.label, isNot(contains('Chưa check-out')));
   });
 
   test('sửa mục trên app giữ địa điểm bản đồ trong thân lệnh', () {
