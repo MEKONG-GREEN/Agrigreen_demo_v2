@@ -431,7 +431,7 @@ export const cntsCalRoutes: Route[] = [
         id: uuidv7(), item_id: ctx.params[1]!, day: b.captured_at.slice(0, 10), captured_at: b.captured_at, recorded_at: new Date().toISOString(),
         accuracy_m: b.accuracy_m ?? null, distance_m: null, far: false, weak_accuracy: (b.accuracy_m ?? 0) > 50, mock_location: !!b.mock_location,
         point_stored: true, location: { lat: b.lat, lon: b.lon }, photo: { content_type: "image/jpeg", size_bytes: Math.ceil((b.photo.length * 3) / 4) },
-        legacy_no_photo: false, checkout: null,
+        legacy_no_photo: false, checkout: null, no_checkout: false,
       };
       CHECKINS.set(checkin.item_id, checkin);
       return json({ checkin, warnings: [{ code: "checkin_no_place", message: "Mục chưa có địa điểm trên bản đồ — không tính được khoảng cách", item_ids: [checkin.item_id] }] }, 201);

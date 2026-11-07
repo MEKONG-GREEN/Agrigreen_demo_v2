@@ -5,7 +5,7 @@ import { resetKnAdmin } from "@/api/mock/kn-admin";
 import { resetCntsOutbreaks } from "@/api/mock/kn-cnts-outbreak";
 import { ApiProblem } from "@/api/problem";
 import { createKnAdminApi } from "@/kn/cycle/api";
-import { createOutbreakApi, emptyForm, formErrors, formOf, payload, type OutbreakForm } from "./api";
+import { affectedCount, createOutbreakApi, emptyForm, formErrors, formOf, isAquatic, payload, type OutbreakForm } from "./api";
 
 async function contextOf(personaId: string, assignmentId: string, dept: string | null) {
   const r = await mockFetchNoDelay(
@@ -26,7 +26,9 @@ const code = async (p: Promise<unknown>) => p.then(() => "ok", (e: unknown) => (
 
 const filled = (patch: Partial<OutbreakForm> = {}): OutbreakForm => ({
   ...emptyForm("91301"), disease_code: "ASF", species_code: "HEO", received_at: "2026-10-12T08:30", source: "can_bo", locality: "Ấp Hòa Thuận A",
-  lat: "10.25341", lon: "105.9721", accuracy_m: "8", herd_size: "120", dead: "5", symptoms: "Sốt cao, bỏ ăn", ...patch,
+  lat: "10.25341", lon: "105.9721", accuracy_m: "8", herd_size: "120", dead: "5", symptoms: "Sốt cao, bỏ ăn",
+  new_households: [{ owner_name: "Nguyễn Văn Hộ", owner_phone: "", hamlet: "Ấp Hòa Thuận A", livestock_type: "nong_ho", species_code: "HEO", head_count: "50" }],
+  ...patch,
 });
 
 describe("Báo cáo dịch bệnh BM-10 — hàm phía máy khách", () => {
@@ -44,7 +46,25 @@ describe("Báo cáo dịch bệnh BM-10 — hàm phía máy khách", () => {
     expect(formErrors(filled({ herd_age_days: "1,5" })).herd_age_days).toBe("Chỉ nhập số nguyên.");
     expect(formErrors(filled({ chemical_liters: "-2" })).chemical_liters).toBe("Không được nhập số âm.");
     expect(payload(filled({ culled_kg: "1.234,5" })).culled_kg).toBe("1234.5");
+    // CNTS v4.0 (#252): DB-04 ≥ 1 hộ, DB-15 tự đếm; hộ mới thiếu họ tên/loại; DB-16 khi bệnh nhóm thủy sản.
+    expect(formErrors(filled({ new_households: [] })).households).toMatch(/DB-04/);
+    expect(formErrors(filled({ new_households: [], household_refs: ["h1"] }))).toEqual({});
+    expect(affectedCount(filled({ household_refs: ["h1", "h2"] }))).toBe(3);
+    const nh = filled().new_households[0]!;
+    expect(formErrors(filled({ new_households: [{ ...nh, owner_name: "", livestock_type: "" }] }))).toMatchObject({
+      "new_households[0].owner_name": expect.stringMatching(/HCN-02/), "new_households[0].livestock_type": expect.stringMatching(/DB-14/),
+    });
+    expect(formErrors(filled(), true)).toMatchObject({ aqua_farmed_ha: expect.stringMatching(/DB-16/), aqua_wild_ha: expect.stringMatching(/DB-16/) });
+    expect(formErrors(filled({ aqua_farmed_ha: "1.234", aqua_wild_ha: "0" }), true).aqua_farmed_ha).toMatch(/2 chữ số/);
+    expect(formErrors(filled({ aqua_farmed_ha: "2,5", aqua_wild_ha: "0" }), true)).toEqual({});
+    expect(payload(filled({ aqua_farmed_ha: "2,5", aqua_wild_ha: "0" }), undefined, true)).toMatchObject({ aqua_farmed_ha: "2.5", aqua_wild_ha: "0" });
+    expect(payload(filled({ aqua_farmed_ha: "2,5" }))).toMatchObject({ aqua_farmed_ha: null, aqua_wild_ha: null });
+    const fish = [{ code: "TOM", attrs: { group: "thuy_san" } }, { code: "HEO", attrs: { group: "gia_suc" } }];
+    expect(isAquatic({ attrs: { species: "TOM" } }, "TOM", fish)).toBe(true);
+    expect(isAquatic({ attrs: { species: "HEO" } }, "HEO", fish)).toBe(false);
+    expect(isAquatic({ attrs: {} }, "TOM", fish)).toBe(true);
     const p = payload(filled({ culled_head: "", chemical_liters: "20.5" }), 3);
+    expect(p.new_households).toEqual([{ owner_name: "Nguyễn Văn Hộ", hamlet: "Ấp Hòa Thuận A", livestock_type: "nong_ho", animals: [{ species_code: "HEO", head_count: 50 }] }]);
     expect(p).toMatchObject({ base_version: 3, herd_size: 120, dead: 5, culled_head: null, chemical_liters: "20.5", location: { lat: "10.25341", source: "gps" } });
   });
 });
@@ -65,8 +85,10 @@ describe("Báo cáo dịch bệnh BM-10 — backend giả lập /v1/extension/cn
 
     expect(await code(xa.report(payload(filled({ lat: "", lon: "" }))))).toBe("extension.cnts_outbreak_invalid");
     expect(await code(tinh.report(payload(filled())))).toBe("forbidden");
+    expect(await code(xa.report(payload(filled({ new_households: [] }))))).toBe("extension.cnts_outbreak_invalid");
     const o = await xa.report(payload(filled()));
-    expect(o).toMatchObject({ status: "reported", version: 1, disease_name: "Dịch tả heo Châu Phi", as_of: "2026-10-12" });
+    expect(o).toMatchObject({ status: "reported", version: 1, disease_name: "Dịch tả heo Châu Phi", as_of: "2026-10-12", legacy: false, affected_households: 1 });
+    expect(o.households[0]).toMatchObject({ code: expect.stringMatching(/^HCN/), status: "pending_location", livestock_type: "nong_ho" });
 
     const up = payload({ ...formOf(o), dead: "30", progress_note: "Thêm 25 con chết" }, 1);
     const v2 = await xa.progress(o.ref, up);

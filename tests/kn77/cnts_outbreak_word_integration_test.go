@@ -36,6 +36,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -93,6 +94,7 @@ func newObwFix(t *testing.T) *obwFix {
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	mod := extension.New(pool, clk, extension.Deps{Units: obwUnits{}})
 	mod.UseCNTSCatalogs(obwCatalogs{})
+	mod.UseCNTSModelVault(clienttest.New()) // #252: hộ nhập mới tại DB-04 (họ tên ở kho định danh)
 	ex, err := export.New(pool, clk, export.Deps{Access: exportport.AccessFunc(func(context.Context) bool { return false }),
 		Templates: []exportport.TemplateRegistration{extension.ExportTemplates()}})
 	if err != nil {
@@ -177,6 +179,9 @@ func (u obwUser) report(t *testing.T, commune string) string {
 		"source": "ubnd_xa", "locality": "Ấp Hòa Lợi", "location": map[string]any{"lat": "10.2534100", "lon": "105.9721000", "source": "gps"},
 		"herd_size": 6, "herd_age_days": 60, "dead": 1, "symptoms": "Bỏ ăn, sốt, nổi mẩn đỏ trên da", "culled_head": 6, "culled_kg": "130",
 		"chemical_liters": "1", "buffer_note": "Ấp Hòa Bình 25 hộ 219 con", "prevention_note": "Đề nghị Chi cục hỗ trợ hóa chất",
+		// #252 (CNTS v4.0 DB-04): hộ chưa có → tạo hộ "Chờ bổ sung vị trí".
+		"new_households": []any{map[string]any{"owner_name": "Nguyễn Văn Lợi", "hamlet": "Ấp Hòa Lợi", "livestock_type": "nong_ho",
+			"animals": []any{map[string]any{"species_code": "heo", "head_count": 6}}}},
 	})
 	if code != http.StatusCreated {
 		t.Fatalf("lập ổ dịch: %d %s", code, raw)
@@ -234,7 +239,8 @@ func TestBFCNOutbreak_WordBM10Numbering(t *testing.T) {
 	text := content.Text()
 	for _, s := range []string{"Số: 1/BC-TTKN", "An Giang, ngày", "Tình hình bệnh Dịch tả lợn châu Phi", "Xã Hòa Thuận 30001", "16:43 ngày 12/10/2027",
 		"Quy mô đàn heo tại thời điểm phát hiện: 6 con (khoảng 60 ngày tuổi)", "Số con chết: 1 con", "6 con, tổng trọng lượng 130 kg",
-		"Ấp Hòa Bình 25 hộ 219 con", "Đề nghị Chi cục hỗ trợ hóa chất", "Chờ xác nhận"} {
+		"Ấp Hòa Bình 25 hộ 219 con", "Đề nghị Chi cục hỗ trợ hóa chất", "Chờ xác nhận",
+		"Số hộ bị ảnh hưởng: 1 hộ", "HCN0000001", "Nông hộ"} {
 		if !strings.Contains(text, s) {
 			t.Fatalf("Word thiếu %q:\n%s", s, text)
 		}

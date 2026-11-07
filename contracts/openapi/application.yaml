@@ -19663,7 +19663,7 @@ components:
         source: {type: string, enum: [map, gps]}
     ExtWorkScheduleCheckin:
       type: object
-      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, legacy_no_photo, checkout]
+      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, legacy_no_photo, checkout, no_checkout]
       properties:
         id: {type: string, format: uuid}
         item_id: {type: string, format: uuid}
@@ -19696,6 +19696,7 @@ components:
           oneOf:
             - type: "null"
             - {$ref: "#/components/schemas/ExtWorkScheduleCheckout"}
+        no_checkout: {type: boolean, description: "Nhãn \"Chưa check-out\" (CNTS v4.0 FN-12 BR-07): đã check-in, tới 23:59 ngày công tác (giờ Việt Nam) chưa check-out; check-out đồng bộ trễ gỡ nhãn (BR-08)"}
     ExtWorkScheduleCheckout:
       type: object
       required: [id, checkin_id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, stay_minutes, synced_at, synced_late]
@@ -20100,11 +20101,12 @@ components:
             checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
             checkin_count: {type: integer}
             missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
+            no_checkout_count: {type: integer, description: "Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07)"}
     ExtWorkScheduleWarning:
       type: object
       required: [code, message, item_ids]
       properties:
-        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed, checkout_far, checkout_weak_gps, checkout_mock_location]}
+        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed, checkout_far, checkout_weak_gps, checkout_mock_location, checkout_missing]}
         message: {type: string}
         item_ids: {type: array, items: {type: string, format: uuid}}
     ExtWorkScheduleVersion:
@@ -20131,6 +20133,7 @@ components:
         checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
         checkin_count: {type: integer}
         missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
+        no_checkout_count: {type: integer, description: "Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07)"}
         can:
           type: object
           required: [edit, submit, approve, request_changes]
@@ -23980,8 +23983,11 @@ components:
     CNTSOutbreakInput:
       type: object
       description: >-
-        Nội dung BM-10 (DB-01…DB-13). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại đủ trường
-        (mỗi lần là một phiên bản). Xác nhận tin báo: commune_code, location, source, received_at trống lấy theo tin báo.
+        Nội dung BM-10 (DB-01…DB-16, CNTS v4.0). Lập mới: mọi trường bắt buộc; cập nhật diễn biến / xác nhận tin báo: gửi lại
+        đủ trường (mỗi lần là một phiên bản, quy tắc v2). Xác nhận tin báo: commune_code, location, source, received_at trống
+        lấy theo tin báo. DB-04: ít nhất một hộ (household_refs + new_households, tối đa 200); DB-14 lấy theo hộ; DB-15 tự đếm
+        (không nhận từ API — AC-04); DB-16 bắt buộc khi bệnh thuộc nhóm thủy sản (AC-05), không ghi với bệnh khác.
+        household_ref (DB-04 một hộ của dữ liệu cũ v1) không ghi được nữa — gửi khác null → 422.
       properties:
         base_version: {type: integer, description: Phiên bản người nhập đã thấy (bắt buộc khi cập nhật, xác nhận tin báo)}
         commune_code: {type: string}
@@ -23989,8 +23995,21 @@ components:
         species_code: {type: string, description: Mã danh mục cnts_species}
         received_at: {type: string, format: date-time, description: DB-02}
         source: {type: string, enum: [ubnd_xa, nong_ho, can_bo], description: DB-03}
-        household_ref: {type: [string, "null"], format: uuid, description: DB-04 hộ (pf/cooperative)}
-        locality: {type: string, description: DB-04 địa bàn (ấp, khu vực) — không ghi họ tên, số điện thoại; bắt buộc khi không có household_ref}
+        household_refs:
+          type: array
+          maxItems: 200
+          items: {type: string, format: uuid}
+          description: >-
+            DB-04 hộ chọn trong danh sách hộ chăn nuôi (FN-10), cùng xã với ổ dịch, trạng thái Đang dùng hoặc Chờ bổ sung vị trí
+            (hộ vô hiệu hóa → 422, BR-07). DB-14 chụp loại chăn nuôi của hộ lúc ghi.
+        new_households:
+          type: array
+          maxItems: 200
+          items: {$ref: "#/components/schemas/CNTSOutbreakNewHousehold"}
+          description: DB-04 hộ chưa có — tạo trong danh sách ở trạng thái Chờ bổ sung vị trí, không cần check-in (FN-10 BR-08)
+        aqua_farmed_ha: {type: [string, "null"], description: "DB-16 diện tích nuôi trồng thủy sản bị ảnh hưởng (ha, ≥ 0, ≤ 2 số lẻ)"}
+        aqua_wild_ha: {type: [string, "null"], description: "DB-16 diện tích khai thác thủy sản bị ảnh hưởng (ha, ≥ 0, ≤ 2 số lẻ)"}
+        locality: {type: string, description: Địa bàn (ấp, khu vực) — ghi chú tùy chọn; không ghi họ tên, số điện thoại}
         location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
         herd_size: {type: integer, minimum: 1, description: DB-06}
         herd_age_days: {type: [integer, "null"]}
@@ -24008,13 +24027,49 @@ components:
         as_of: {type: string, format: date, description: Ngày diễn biến (mặc định ngày tiếp nhận ở bản 1, hôm nay ở bản sau); không lùi}
         progress_note: {type: string, description: Diễn biến của lần cập nhật}
         captured_at: {type: string, format: date-time, description: Giờ thiết bị của bản ngoại tuyến}
+    CNTSOutbreakNewHousehold:
+      type: object
+      required: [owner_name, livestock_type, animals]
+      description: Hộ chưa có trong danh sách hộ chăn nuôi, nhập tại DB-04 (HCN-02…HCN-06; xã = xã của ổ dịch)
+      properties:
+        owner_name: {type: string, maxLength: 200, description: HCN-02 họ tên chủ hộ / tên trang trại (kho định danh)}
+        owner_phone: {type: string, description: HCN-03 chỉ chữ số (tùy chọn)}
+        hamlet: {type: string, maxLength: 200, description: HCN-04 ấp, khu phố}
+        livestock_type: {type: string, enum: [nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep], description: DB-14 do cán bộ chọn}
+        animals:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items:
+            type: object
+            required: [species_code, head_count]
+            properties:
+              species_code: {type: string}
+              head_count: {type: integer, minimum: 0}
+    CNTSOutbreakHousehold:
+      type: object
+      required: [household_ref, household_version, code, livestock_type, hamlet, status, owner_label]
+      properties:
+        household_ref: {type: string, format: uuid}
+        household_version: {type: integer, description: Phiên bản hộ đã chụp lúc ghi ổ dịch}
+        code: {type: string, description: HCN-01 mã hộ}
+        livestock_type: {type: string, enum: [nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep], description: DB-14 (chụp lúc ghi)}
+        hamlet: {type: [string, "null"]}
+        status: {type: string, enum: [active, pending_location, deactivated], description: Trạng thái hiện hành của hộ}
+        owner_label: {type: [string, "null"], description: Họ tên che bớt — chỉ ở chi tiết ổ dịch}
     CNTSOutbreak:
       type: object
       required: [ref, version, version_id, event, status, commune_code, disease_code, disease_name, species_code, species_name,
         received_at, source, suspect_ref, household_ref, locality, location, herd_size, herd_age_days, dead, symptoms, sample_date,
         lab_name, lab_result, culled_head, culled_kg, chemical_liters, buffer_note, prevention_note, attachment_refs, as_of,
-        progress_note, status_reason, captured_at, recorded_at, actor]
+        progress_note, status_reason, captured_at, recorded_at, actor, legacy, households, affected_households, aqua_farmed_ha,
+        aqua_wild_ha]
       properties:
+        legacy: {type: boolean, description: "Dữ liệu cũ (quy tắc v1, một hộ/địa bàn trước CNTS v4.0): không có DB-14…DB-16, DB-15 hiện 1"}
+        households: {type: array, items: {$ref: "#/components/schemas/CNTSOutbreakHousehold"}, description: DB-04/DB-14 của phiên bản (rỗng ở dữ liệu cũ)}
+        affected_households: {type: integer, description: DB-15 số hộ bị ảnh hưởng (tự đếm)}
+        aqua_farmed_ha: {type: [string, "null"], description: DB-16 nuôi trồng (ha)}
+        aqua_wild_ha: {type: [string, "null"], description: DB-16 khai thác (ha)}
         ref: {type: string, format: uuid}
         version: {type: integer}
         version_id: {type: string, format: uuid}
@@ -24028,7 +24083,7 @@ components:
         received_at: {type: string, format: date-time}
         source: {type: string, enum: [ubnd_xa, nong_ho, can_bo]}
         suspect_ref: {type: [string, "null"], format: uuid}
-        household_ref: {type: [string, "null"], format: uuid}
+        household_ref: {type: [string, "null"], format: uuid, description: Chỉ ở dữ liệu cũ v1}
         locality: {type: [string, "null"]}
         location: {oneOf: [{$ref: "#/components/schemas/CNTSLocation"}, {type: "null"}]}
         herd_size: {type: integer}

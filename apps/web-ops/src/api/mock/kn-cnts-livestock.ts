@@ -126,6 +126,44 @@ function next(w: Who, vs: Version[], patch: Partial<Version>): Version {
   return n;
 }
 
+/** Hộ DB-04 của ổ dịch (giả lập #252): bản hiện hành của hộ — mã, phiên bản, loại (DB-14), ấp, trạng thái, xã, nhãn chủ hộ. */
+export interface OutbreakHouseholdRef {
+  household_ref: string;
+  household_version: number;
+  code: string;
+  livestock_type: Version["livestock_type"];
+  hamlet: string | null;
+  status: Version["status"];
+  owner_label: string | null;
+  commune_code: string;
+}
+
+const outbreakRef = (v: Version): OutbreakHouseholdRef => ({
+  household_ref: v.id, household_version: v.version, code: v.code, livestock_type: v.livestock_type, hamlet: v.hamlet, status: v.status,
+  owner_label: v.owner_label, commune_code: v.commune_code,
+});
+
+/** Bản hiện hành của hộ (ô chọn DB-04); không có → null. */
+export function livestockHouseholdRef(ref: string): OutbreakHouseholdRef | null {
+  const v = HH.get(ref)?.at(-1);
+  return v ? outbreakRef(v) : null;
+}
+
+/** Hộ nhập mới tại DB-04 của BM-10: tạo ở trạng thái "Chờ bổ sung vị trí", không check-in (FN-10 BR-08). */
+export function createPendingHousehold(actor: string, commune: string, b: S["CNTSOutbreakNewHousehold"]): OutbreakHouseholdRef {
+  const id = uuidv7();
+  const name = b.owner_name.trim().replace(/\s+/g, " ");
+  const v: Version = {
+    id, code: `HCN${String(++counter).padStart(7, "0")}`, version: 1, status: "pending_location", event: "created_pending", commune_code: commune,
+    commune_name: communeName(commune), hamlet: b.hamlet?.trim() || null, livestock_type: b.livestock_type,
+    animals: b.animals.map((a) => ({ species_code: a.species_code, species_name: speciesName(a.species_code), head_count: a.head_count })),
+    location: null, owner_label: label(name), owner_masked_phone: b.owner_phone ? mask(b.owner_phone) : null, updated_at: new Date().toISOString(),
+    reason: null, owner_full: name, phone_full: b.owner_phone ?? "", actor, changes: [],
+  };
+  HH.set(id, [v]);
+  return outbreakRef(v);
+}
+
 export const cntsLivestockRoutes: Route[] = [
   {
     method: "GET",
