@@ -7,6 +7,14 @@ Quy tắc kỳ tháng theo Việt Nam, API, mock, dữ liệu, quyền duyệt v
 Date được cố định trước khi reset/seed mock và được phục hồi ở afterEach, kể cả test lỗi.
 Chỉ giả lập Date; timer bất đồng bộ và các timeout/worker giữ nguyên.
 
+### Ánh xạ triển khai
+
+| Tệp / phần | Bước 1–5 | FN/UR/BR BRD 2.0 |
+|---|---|---|
+| `apps/web-ops/src/apiclient/g5.test.tsx` | 5 — kiểm thử frontend/API | N/A — hợp đồng kỹ thuật CI về đồng hồ và kỳ Việt Nam |
+| Tài liệu phạm vi và roadmap CI-G5-CLOCK | 1 — cấu trúc/tệp/cách chạy | N/A — gói kiểm thử dùng chung, không tạo Function nghiệp vụ |
+| Dependency, data, service, API/routing | 1–4 — không đổi | N/A — chỉ giữ và kiểm hợp đồng hiện hành |
+
 ### Hợp đồng kiểm thử
 
 Dùng kỳ đang mở theo Việt Nam và kiểm độc lập kỳ đang mở/kỳ vừa kết thúc ở tám mốc:
