@@ -328,7 +328,7 @@ func TestBFCNTSCampaignCAS_StaleUndoRejected(t *testing.T) {
 				return err
 			}
 			campIntentSQL(t, f, cv.ID, sqlCampExpire)
-			in := map[string]any{"name": "Sửa nháp chen vào khi phát hành", "goal": "x", "field": "thuy_san", "template_code": "CNTS-BM17",
+			in := map[string]any{"owner_ref": ids.New().String(), "name": "Sửa nháp chen vào khi phát hành", "goal": "x", "field": "thuy_san", "template_code": "CNTS-BM17",
 				"scope_mode": "communes", "communes": []string{"X1", "X2"}, "from_date": "2026-10-01", "to_date": "2026-10-05",
 				"due_at": campOrigDue}
 			if c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/draft", authz.KNTinh, false, in); c != http.StatusOK {

@@ -11,6 +11,7 @@ import (
 
 	campapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscampaign/app"
 	camphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscampaign/handler"
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
@@ -32,8 +33,9 @@ type campaignService = campapp.Service
 func (m *Module) campaignSvc() *campapp.Service {
 	if m.campaigns == nil {
 		m.campaigns = &campapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Orgs: m.rc.Orgs, Units: m.rc.Units,
-			Regions: func() partyport.Regions { return m.rc.Regions },
-			Names:   func() partyport.ActorNames { return m.rc.Names }}
+			Regions:  func() partyport.Regions { return m.rc.Regions },
+			Names:    func() partyport.ActorNames { return m.rc.Names },
+			Officers: func() accport.KNDirectory { return m.svc.KNDirectory }}
 	}
 	return m.campaigns
 }

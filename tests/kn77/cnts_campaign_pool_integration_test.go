@@ -187,7 +187,7 @@ func newCampaignPoolFxCond(t *testing.T, pool *pgxpool.Pool, lease time.Duration
 
 func (f *aggFx) newCampaign(name string) campaignView {
 	f.t.Helper()
-	in := map[string]any{"name": name, "goal": "Kiểm giao dịch cap/forms", "field": "thuy_san", "template_code": "CNTS-BM17",
+	in := map[string]any{"owner_ref": ids.New().String(), "name": name, "goal": "Kiểm giao dịch cap/forms", "field": "thuy_san", "template_code": "CNTS-BM17",
 		"scope_mode": "communes", "communes": []string{"X1", "X2"}, "from_date": "2026-10-01", "to_date": "2026-10-05",
 		"due_at": "2026-10-09T03:00:00Z"}
 	var cv campaignView
@@ -404,7 +404,7 @@ func TestBFCNTSCampaignPool_IntentBlocksOtherWriters(t *testing.T) {
 	campIntentSQL(t, f, cv.ID, sqlCampHold)
 	c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/publish", authz.KNTinh, false, nil)
 	wantProblem(t, c, string(b), "extension.cnts_campaign_busy", http.StatusConflict)
-	in := map[string]any{"name": "Sửa nháp khi đang phát hành", "goal": "x", "field": "thuy_san", "template_code": "CNTS-BM17",
+	in := map[string]any{"owner_ref": ids.New().String(), "name": "Sửa nháp khi đang phát hành", "goal": "x", "field": "thuy_san", "template_code": "CNTS-BM17",
 		"scope_mode": "communes", "communes": []string{"X1"}, "from_date": "2026-10-01", "to_date": "2026-10-05", "due_at": "2026-10-09T03:00:00Z"}
 	c, b = f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/draft", authz.KNTinh, false, in)
 	wantProblem(t, c, string(b), "extension.cnts_campaign_busy", http.StatusConflict)
@@ -538,7 +538,7 @@ func TestBFCNTSCampaignPool_PublishCompensatesOnRecordFailure(t *testing.T) {
 			return err
 		}
 		campIntentSQL(t, f, cv.ID, sqlCampExpire)
-		in := map[string]any{"name": "Sửa nháp chen vào khi phát hành", "goal": "x", "field": "thuy_san", "template_code": "CNTS-BM17",
+		in := map[string]any{"owner_ref": ids.New().String(), "name": "Sửa nháp chen vào khi phát hành", "goal": "x", "field": "thuy_san", "template_code": "CNTS-BM17",
 			"scope_mode": "communes", "communes": []string{"X1", "X2"}, "from_date": "2026-10-01", "to_date": "2026-10-05",
 			"due_at": "2026-10-09T03:00:00Z"}
 		c, b := f.campaignCall(http.MethodPost, "/v1/extension/cnts/campaigns/"+cv.ID+"/draft", authz.KNTinh, false, in)

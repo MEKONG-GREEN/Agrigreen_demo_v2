@@ -3,7 +3,7 @@ import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsCampaigns } from "@/api/mock/kn-cnts-campaign";
 import { ApiProblem } from "@/api/problem";
-import { createCampaignApi, emptyForm, formErrors, formOf, payload, percent, reasonOk, type CampaignForm } from "./api";
+import { copyErrors, copyPayload, createCampaignApi, emptyForm, formErrors, formOf, payload, percent, reasonOk, type CampaignForm } from "./api";
 
 function client(personaId: string) {
   return createCampaignApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${personaId}`, getContextId: () => null, fetch: mockFetchNoDelay }));
@@ -13,7 +13,7 @@ const code = async (p: Promise<unknown>) => p.then(() => "ok", (e: unknown) => (
 
 const filled = (patch: Partial<CampaignForm> = {}): CampaignForm => ({
   ...emptyForm(), name: "Điều tra tổng đàn 01/10/2026", template_code: "CNTS-DT-TONGDAN", communes: "91307, 91310 91313", from_date: "2026-10-01",
-  to_date: "2026-10-10", due_at: "2026-10-10T17:00", ...patch,
+  to_date: "2026-10-10", due_at: "2026-10-10T17:00", owner_ref: "0193a000-0000-7000-8000-00000000c236", ...patch,
 });
 
 describe("Chiến dịch điều tra — hàm phía máy khách", () => {
@@ -25,6 +25,15 @@ describe("Chiến dịch điều tra — hàm phía máy khách", () => {
     expect(formErrors(filled({ remind_before_hours: "200" })).remind_before_hours).toBeDefined();
     const p = payload(filled());
     expect(p).toMatchObject({ communes: ["91307", "91310", "91313"], regions: [], field: "chan_nuoi", remind_before_hours: 24 });
+    expect(formErrors(filled({ owner_ref: "" })).owner_ref).toBeDefined();
+    // #236 phạm vi theo hộ: bắt buộc ít nhất một hộ; thân request chỉ mang hộ (bỏ trùng), không mang xã.
+    expect(formErrors(filled({ scope_mode: "households" })).households).toBeDefined();
+    expect(payload(filled({ scope_mode: "households", households: ["h1", "h1", "h2"] }))).toMatchObject({ households: ["h1", "h2"], communes: [] });
+    expect(payload(filled()).households).toEqual([]);
+    expect(p.owner_ref).toBe("0193a000-0000-7000-8000-00000000c236");
+    const cf = { name: " ", from_date: "2026-11-01", to_date: "2026-10-01", due_at: "", owner_ref: "" };
+    expect(copyErrors(cf)).toEqual({ to_date: "Đến ngày ≥ từ ngày", due_at: "Bắt buộc" });
+    expect(copyPayload({ ...cf, to_date: "2026-11-05", due_at: "2026-11-05T17:00" })).not.toHaveProperty("name");
     // #192 FN-21 B1: phiên bản biểu đã chọn; bỏ trống = mới nhất lúc phát hành.
     expect(payload(filled({ template_version: "2" })).template_version).toBe(2);
     expect(payload(filled()).template_version).toBeNull();
@@ -62,5 +71,19 @@ describe("Chiến dịch điều tra — backend giả lập /v1/extension/cnts/
     expect(re.state).toBe("collecting");
     expect(re.events.map((e) => e.action)).toEqual(["published", "reminded", "extended", "closed", "reopened"]);
     expect((await tinh.list()).map((x) => x.id)).toEqual([c.id]);
+  });
+
+  it("#236: người phụ trách bắt buộc, phải trong danh sách; sao chép đợt ra Nháp mới không mang tiến độ", async () => {
+    const tinh = client("kn-binh");
+    expect(await code(tinh.create(payload(filled({ owner_ref: "" }))))).toBe("validation_failed");
+    expect(await code(tinh.create({ ...payload(filled()), owner_ref: "0193a000-0000-7000-8000-0000000000ff" }))).toBe("extension.cnts_campaign_owner");
+    const owners = await tinh.owners();
+    expect(owners.length).toBe(3);
+    const c = await tinh.create(payload(filled()));
+    expect(c).toMatchObject({ can_manage: true, owner: { display: "Trần Thị Hoa (giả lập)" } });
+    await tinh.publish(c.id);
+    const cp = await tinh.copy(c.id, { from_date: "2026-11-01", to_date: "2026-11-05", due_at: "2026-11-05T10:00:00Z" });
+    expect(cp).toMatchObject({ state: "draft", version: 1, name: c.name, communes: c.communes, owner: c.owner, progress: null, events: [] });
+    expect(cp.id).not.toBe(c.id);
   });
 });

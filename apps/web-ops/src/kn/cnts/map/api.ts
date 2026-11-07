@@ -15,6 +15,9 @@ export type ZoneKind = Zone["kind"];
 export type MapLayers = S["CNTSMapLayers"];
 export type MapOutbreak = S["CNTSMapOutbreak"];
 export type MapPlace = S["CNTSMapPlace"];
+export type MapFarm = S["CNTSMapFarm"];
+export type Impact = S["CNTSMapImpact"];
+export type ZoneImpact = S["CNTSMapZoneImpact"];
 export type ZoneContents = S["CNTSMapZoneContents"];
 export type Geometry = S["CNTSMapGeometry"];
 
@@ -37,10 +40,34 @@ export const KIND_COLOR: Record<ZoneKind, string> = {
   huong_di_chuyen: "#7c3aed",
 };
 export const EPIDEMIC: readonly ZoneKind[] = ["vung_dich", "vung_uy_hiep", "vung_dem", "huong_di_chuyen"];
+/** Loại vùng hiện số hộ, diện tích thủy sản bị ảnh hưởng (CNTS v4.0 FN-18 BR-02). */
+export const IMPACT_KINDS: readonly ZoneKind[] = ["vung_dich", "vung_uy_hiep", "vung_dem"];
 export const OUTBREAK_STATUS_LABEL: Record<MapOutbreak["status"], string> = { reported: "Đã gửi", monitoring: "Đang theo dõi", closed: "Đã kết thúc" };
 /** Bán kính mặc định khi khoanh vùng từ ổ dịch (m) — giả định W11.52, máy chủ dùng cùng giá trị. */
 export const DEFAULT_RADII = { vung_dich: 500, vung_uy_hiep: 3000, vung_dem: 10000 } as const;
 export const WARNING_LABEL: Record<string, string> = { outside_communes: "Vùng nằm ngoài địa giới các xã đã chọn — kiểm tra lại hình vẽ" };
+
+/**
+ * Số hộ, diện tích thủy sản bị ảnh hưởng của các ổ dịch trong một vùng — cộng phiên bản diễn biến mới nhất của từng ổ dịch
+ * (FN-11 BR-03, không cộng dồn các lần). Máy chủ tính cùng cách; ở đây cho giả lập và kiểm thử.
+ */
+export function sumImpact(obs: readonly Pick<MapOutbreak, "affected_households" | "aqua_farmed_ha" | "aqua_wild_ha">[]): Impact {
+  const cents = (v: string | null) => (v ? Math.round(Number(v) * 100) : 0);
+  const fixed = (c: number) => (c / 100).toFixed(2);
+  return {
+    outbreak_count: obs.length,
+    affected_households: obs.reduce((s, o) => s + o.affected_households, 0),
+    aqua_farmed_ha: fixed(obs.reduce((s, o) => s + cents(o.aqua_farmed_ha), 0)),
+    aqua_wild_ha: fixed(obs.reduce((s, o) => s + cents(o.aqua_wild_ha), 0)),
+  };
+}
+
+/** "X hộ bị ảnh hưởng (n ổ dịch) · thủy sản bị ảnh hưởng: nuôi trồng a ha, khai thác b ha" (FN-18 BR-02). */
+export function impactText(i: Impact): string {
+  const ha = (v: string) => Number(v).toLocaleString("vi-VN");
+  const aqua = Number(i.aqua_farmed_ha) > 0 || Number(i.aqua_wild_ha) > 0 ? ` · thủy sản bị ảnh hưởng: nuôi trồng ${ha(i.aqua_farmed_ha)} ha, khai thác ${ha(i.aqua_wild_ha)} ha` : "";
+  return `${i.affected_households.toLocaleString("vi-VN")} hộ bị ảnh hưởng (${i.outbreak_count} ổ dịch)${aqua}`;
+}
 
 /** Ngày YYYY-MM-DD → DD/MM/YYYY. */
 export const dmy = (d: string | null | undefined) => (d ? d.split("-").reverse().join("/") : "—");

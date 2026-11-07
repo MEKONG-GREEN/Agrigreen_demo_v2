@@ -165,7 +165,7 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       "Cảnh báo",
       ["Biểu mẫu", ["Thiết kế biểu mẫu", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
       ["Lịch", ["Lịch trực KSGM", "Lịch tiêm phòng", "Lịch công tác cán bộ xã", "Lịch công tác phòng"]],
-      ["Chiến dịch điều tra", ["Quản lý chiến dịch", "Tạo chiến dịch*"]],
+      ["Chiến dịch điều tra", ["Quản lý chiến dịch", "Tạo chiến dịch"]],
     ]);
     // W11.45: Báo cáo định kỳ BM-11 có màn.
     expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);

@@ -1,9 +1,9 @@
 package knaccounts_test
 
 // KNSPLIT-2-ACCOUNTS-UNIT-DELEGATION-KN (#195): hợp đồng chủ KN cho đơn vị nội bộ, ủy quyền có hạn và phạm vi nhân sự
-// (extension.UnitDelegationPolicy) so với hành vi accounts hiện hành trên PostgreSQL thật qua HTTP. accounts chưa dùng
-// adapter (nối là #196), nên một middleware quan sát chạy NGAY SAU mod.Middleware() của Application API: nó gọi adapter
-// với đúng context accounts sẽ nhận (phiên chủ đã giải ở server) rồi so quyết định với phản hồi HTTP của đường cũ —
+// (extension.UnitDelegationPolicy) so với hành vi accounts hiện hành trên PostgreSQL thật qua HTTP. #196 chạy cả bridge
+// và provider đã nối; middleware quan sát chạy NGAY SAU mod.Middleware() của Application API: nó gọi adapter độc lập
+// với đúng context accounts nhận (phiên chủ đã giải ở server) rồi so quyết định với phản hồi HTTP —
 // gồm phạm vi phòng/đơn vị, chỉ xem, thu hồi, hết hạn, phát lại trên ngữ cảnh tái dùng, mất lần gán và tenant khác.
 
 import (
@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"sync"
 	"testing"
@@ -454,6 +455,32 @@ func runUnitDelegationFlow(t *testing.T, deps fixtureDeps) {
 		t.Fatalf("read-only session allowed to grant in its department: %+v", rec.grant)
 	}
 
+	// Support keeps the authenticated Admin identity and the selected target
+	// session, but cannot use its manager flag to grant a delegation.
+	support := d.root.do(http.MethodPost, "/v1/accounts/support-sessions", map[string]any{
+		"target_assignment_id": mgr.aid, "department_code": "trong_trot", "reason": "Hỗ trợ kiểm tra phân quyền của phòng"})
+	if support.status != http.StatusCreated {
+		t.Fatalf("support start: %d %v", support.status, support.body)
+	}
+	supportContext := support.body["context_id"].(string)
+	probe := ids.New().String()
+	body, _ := json.Marshal(d.delegBody(staff, "", approve, time.Hour))
+	saved := f.srv
+	f.srv = f.app
+	supportGrant := d.root.rawWith(http.MethodPost, "/v1/me/delegations", "k-"+ids.New().String(), "application/json", body,
+		map[string]string{authz.ContextHeader: supportContext, authz.ReasonHeader: url.PathEscape("Hỗ trợ theo yêu cầu của lãnh đạo"), probeHeader: probe})
+	f.srv = saved
+	if supportGrant.status != http.StatusForbidden || codeOf(supportGrant) != "accounts.delegation_forbidden" {
+		t.Fatalf("support granted delegated authority: %d %v", supportGrant.status, supportGrant.body)
+	}
+	if rec, ok := pr.get(probe); !ok || !rec.grantHandled || rec.grant.Allowed {
+		t.Fatalf("support did not reach the denying owner: %+v", rec)
+	}
+	supportID := support.body["support_session_id"].(string)
+	if ended := d.root.do(http.MethodPost, "/v1/accounts/support-sessions/"+supportID+"/end", nil); ended.status != http.StatusOK {
+		t.Fatalf("support end: %d %v", ended.status, ended.body)
+	}
+
 	// --- Quyền nhận được trên ngữ cảnh tái dùng; thu hồi; phát lại thu hồi. ---
 	if rec, ctxResp := d.observe("staff/powers", staff, ctxStaff, ""); !rec.can[approve] || !slices.Contains(sortedList(t, ctxResp.body["powers"]), approve) {
 		t.Fatalf("delegated power missing: %v %v", rec.can, ctxResp.body["powers"])
@@ -583,6 +610,11 @@ func TestKNUnitDelegationOwnerParityOnPostgres(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		runUnitDelegationFlow(t, fixtureDeps{Attributes: attrs, Roles: roles, AssignmentRules: extension.AssignmentRules()})
+		policy := newRolloutPolicy(t)
+		runUnitDelegationFlow(t, fixtureDeps{Attributes: attrs, Roles: roles, AssignmentRules: extension.AssignmentRules(), UnitDelegations: policy,
+			SessionPolicies: extension.AccountSessionPolicies(nil)})
+		if policy.grants.Load() < 10 || policy.revokes.Load() < 5 || policy.people.Load() < 10 {
+			t.Fatalf("configured policy was not consumed: grant=%d revoke=%d people=%d", policy.grants.Load(), policy.revokes.Load(), policy.people.Load())
+		}
 	})
 }

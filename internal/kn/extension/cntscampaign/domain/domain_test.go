@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -36,7 +37,8 @@ func TestPeriodKeyAndState(t *testing.T) {
 }
 
 func TestDraftValidate(t *testing.T) {
-	ok := Draft{Name: "Điều tra tổng đàn 01/10/2026", Field: "chan_nuoi", TemplateCode: "CNTS-DT-TONGDAN", Units: []string{"X1"},
+	owner := uuid.MustParse("01920000-0000-7000-8000-0000000000aa")
+	ok := Draft{OwnerRef: &owner, Name: "Điều tra tổng đàn 01/10/2026", Field: "chan_nuoi", TemplateCode: "CNTS-DT-TONGDAN", Units: []string{"X1"},
 		From: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 10, 10, 0, 0, 0, 0, time.UTC),
 		DueAt: time.Date(2026, 10, 10, 10, 0, 0, 0, time.UTC)}
 	ok.Normalize()
@@ -70,6 +72,35 @@ func TestDraftValidate(t *testing.T) {
 	ok.TemplateVersion = &one
 	if err := ok.Validate(); err != nil {
 		t.Fatal(err)
+	}
+	bad = ok
+	bad.OwnerRef = nil
+	var ie ErrInput
+	if err := bad.Validate(); !errors.As(err, &ie) || ie.Field != "owner_ref" {
+		t.Fatalf("FN-21 B1: thiếu người phụ trách phải lỗi owner_ref: %v", err)
+	}
+	// #236 phạm vi theo hộ: bắt buộc ít nhất một hộ; danh sách hộ chỉ dùng với phạm vi theo hộ; bỏ trùng.
+	h := uuid.MustParse("01920000-0000-7000-8000-0000000000bb")
+	hh := ok
+	hh.ScopeMode, hh.Households = ScopeHouseholds, []uuid.UUID{h, h, uuid.Nil}
+	hh.Normalize()
+	if err := hh.Validate(); err != nil || len(hh.Households) != 1 {
+		t.Fatalf("phạm vi theo hộ: %v %v", err, hh.Households)
+	}
+	hh.Households = nil
+	if err := hh.Validate(); !errors.As(err, &ie) || ie.Field != "households" {
+		t.Fatalf("phạm vi theo hộ thiếu hộ: %v", err)
+	}
+	bad = ok
+	bad.Households = []uuid.UUID{h}
+	if err := bad.Validate(); !errors.As(err, &ie) || ie.Field != "households" {
+		t.Fatalf("hộ ngoài phạm vi theo hộ: %v", err)
+	}
+	empty := ok
+	empty.Households = []uuid.UUID{}
+	empty.Normalize()
+	if empty.Households != nil {
+		t.Fatal("phạm vi khác: households phải NULL")
 	}
 	if _, ok := Reason("ngắn"); ok {
 		t.Fatal("lý do < 10 ký tự")

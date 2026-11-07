@@ -137,7 +137,7 @@ type delegationDTO struct {
 	CreatedAt      string `json:"created_at"`
 }
 
-func toDelegationDTO(d port.Delegation, now time.Time) delegationDTO {
+func toDelegationDTO(d port.Delegation, now time.Time, powers []port.CatalogItem) delegationDTO {
 	status := "active"
 	switch {
 	case d.Revoked:
@@ -148,8 +148,17 @@ func toDelegationDTO(d port.Delegation, now time.Time) delegationDTO {
 		status = "scheduled"
 	}
 	return delegationDTO{DelegationID: d.ID.String(), GrantorRef: d.GrantorRef.String(), GranteeRef: d.GranteeRef.String(),
-		DepartmentCode: d.Department, Power: d.Power, PowerLabel: port.CatalogLabel(port.Powers, d.Power), ValidFrom: rfc(d.ValidFrom),
+		DepartmentCode: d.Department, Power: d.Power, PowerLabel: port.CatalogLabel(powers, d.Power), ValidFrom: rfc(d.ValidFrom),
 		ValidTo: rfc(d.ValidTo), Revoked: d.Revoked, Status: status, Reason: d.Reason, CreatedAt: rfc(d.CreatedAt)}
+}
+
+func (h Handler) delegationResponse(c *gin.Context, status int, d port.Delegation) {
+	definition, err := h.Svc.DelegationDefinition()
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(status, toDelegationDTO(d, h.Svc.Clock.Now(), definition.Powers))
 }
 
 func (h Handler) delegationList(c *gin.Context, ds []port.Delegation, err error) {
@@ -158,9 +167,14 @@ func (h Handler) delegationList(c *gin.Context, ds []port.Delegation, err error)
 		return
 	}
 	now := h.Svc.Clock.Now()
+	definition, err := h.Svc.DelegationDefinition()
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
 	items := make([]delegationDTO, 0, len(ds))
 	for _, d := range ds {
-		items = append(items, toDelegationDTO(d, now))
+		items = append(items, toDelegationDTO(d, now, definition.Powers))
 	}
 	c.Header("Cache-Control", "private, no-store")
 	c.JSON(http.StatusOK, gin.H{"items": items})
@@ -219,7 +233,7 @@ func (h Handler) createDelegation(c *gin.Context) {
 	if res.Replayed {
 		status = http.StatusOK
 	}
-	c.JSON(status, toDelegationDTO(res.Delegation, h.Svc.Clock.Now()))
+	h.delegationResponse(c, status, res.Delegation)
 }
 
 type revokeDelegationReq struct {
@@ -241,6 +255,6 @@ func (h Handler) revokeDelegation(admin bool) gin.HandlerFunc {
 			httpx.Fail(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, toDelegationDTO(res.Delegation, h.Svc.Clock.Now()))
+		h.delegationResponse(c, http.StatusOK, res.Delegation)
 	}
 }

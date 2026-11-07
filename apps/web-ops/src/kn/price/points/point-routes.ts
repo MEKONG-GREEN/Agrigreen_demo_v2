@@ -3,7 +3,7 @@ import { isCalendarDay } from "../calendar-routes";
 export const POINTS_BASE = "/kn/bao-gia/xa-bao-gia";
 export type PointRoute =
   | { kind: "point-new" }
-  | { kind: "point"; code: string; mode: "view" | "edit" | "officers" }
+  | { kind: "point"; code: string; mode: "view" | "edit" }
   | { kind: "region-new" }
   | { kind: "region"; code: string; edit: boolean };
 export function parsePointRoute(parts: readonly string[]): PointRoute | null {
@@ -22,18 +22,12 @@ export function parsePointRoute(parts: readonly string[]): PointRoute | null {
   if (
     first &&
     /^XBG\d{4}$/.test(first) &&
-    (parts.length === 1 ||
-      (parts.length === 2 && (second === "sua" || second === "phan-cong")))
+    (parts.length === 1 || (parts.length === 2 && second === "sua"))
   )
     return {
       kind: "point",
       code: first,
-      mode:
-        second === "sua"
-          ? "edit"
-          : second === "phan-cong"
-            ? "officers"
-            : "view",
+      mode: second === "sua" ? "edit" : "view",
     };
   return null;
 }

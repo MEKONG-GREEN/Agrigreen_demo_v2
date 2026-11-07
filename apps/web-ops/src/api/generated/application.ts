@@ -11453,6 +11453,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/cnts/campaigns/{id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sao chép đợt cũ (FN-21 luồng phụ): đợt Nháp mới mang biểu, phạm vi, người phụ trách; không mang số liệu */
+        post: operations["extensionCntsCopyCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/cnts/model-households/{ref}": {
         parameters: {
             query?: never;
@@ -11465,6 +11482,23 @@ export interface paths {
         put?: never;
         /** Sửa hộ mô hình (base_version; không đổi chủ hộ) */
         post: operations["extensionCntsHouseholdUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/cnts/campaign-owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cán bộ chọn được làm người phụ trách đợt điều tra (Cấp Tỉnh Phòng CNTS của tỉnh) */
+        get: operations["extensionCntsCampaignOwners"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11651,7 +11685,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng, ổ dịch BM-10, điểm/hộ mô hình có tọa độ, thống kê thửa HTX theo xã (FN-18, W11.52) */
+        /** Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng (kèm số hộ, diện tích thủy sản bị ảnh hưởng), ổ dịch BM-10, điểm/hộ mô hình có tọa độ, lớp trang trại, thống kê thửa HTX theo xã (FN-18, W11.52, CNTS v4.0) */
         get: operations["extensionCntsMapLayers"];
         put?: never;
         post?: never;
@@ -11860,7 +11894,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Điểm trình diễn, hộ mô hình, ổ dịch nằm trong vùng ở ngày xem (vùng đệm 3 km/10 km), kèm khoảng cách tới tâm */
+        /** Điểm trình diễn, hộ mô hình, trang trại, ổ dịch nằm trong vùng ở ngày xem (vùng đệm 3 km/10 km), kèm khoảng cách tới tâm, số hộ và diện tích thủy sản bị ảnh hưởng */
         get: operations["extensionCntsMapZoneContents"];
         put?: never;
         post?: never;
@@ -24743,7 +24777,7 @@ export interface components {
             /** @description #192 FN-21 B1: phiên bản biểu điều tra đã chọn (FN-07); bỏ trống = mới nhất lúc phát hành */
             template_version?: number | null;
             /** @enum {string} */
-            scope_mode: "province" | "regions" | "communes";
+            scope_mode: "province" | "regions" | "communes" | "households";
             regions?: string[];
             communes?: string[];
             /** Format: date */
@@ -24753,8 +24787,10 @@ export interface components {
             /** Format: date-time */
             due_at: string;
             /** Format: uuid */
-            owner_ref?: string;
+            owner_ref: string;
             remind_before_hours?: number;
+            /** @description #236 phạm vi theo hộ (scope_mode=households): household_ref của hộ chăn nuôi Đang dùng (FN-10, ADR-0056) */
+            households?: string[];
         };
         CNTSPoint: {
             lat: number;
@@ -24883,6 +24919,8 @@ export interface components {
                 late: boolean;
                 /** Format: date-time */
                 last_submitted_at: string | null;
+                unit: string;
+                household_code: string;
             }[];
         };
         CNTSKHTCProgram: {
@@ -24894,6 +24932,7 @@ export interface components {
             active: boolean;
         };
         CNTSCampaign: {
+            can_manage: boolean;
             /** Format: uuid */
             id: string;
             version: number;
@@ -24902,7 +24941,7 @@ export interface components {
             field: string;
             template_code: string;
             /** @enum {string} */
-            scope_mode: "province" | "regions" | "communes";
+            scope_mode: "province" | "regions" | "communes" | "households";
             regions: string[];
             communes: string[];
             tasks: number;
@@ -24927,6 +24966,14 @@ export interface components {
             template_version: number | null;
             progress: components["schemas"]["CNTSCampaignProgress"] | null;
             events: components["schemas"]["CNTSCampaignEvent"][];
+            /** @description #236 hộ của phạm vi theo hộ (chi tiết có mã hộ, xã, trạng thái hiện hành; danh sách chỉ có ref) */
+            households: {
+                /** Format: uuid */
+                ref: string;
+                code: string;
+                commune: string;
+                status: string;
+            }[];
         };
         CNTSKHTCProgramList: {
             items: components["schemas"]["CNTSKHTCProgram"][];
@@ -24993,6 +25040,8 @@ export interface components {
                     [key: string]: string;
                 };
                 nil_report: boolean;
+                unit: string;
+                household_code: string;
             }[];
             total: {
                 [key: string]: string;
@@ -25025,6 +25074,17 @@ export interface components {
             training_note?: string | null;
             supplies_note?: string | null;
             attachment_refs?: string[];
+        };
+        CNTSCampaignCopyInput: {
+            name?: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: uuid */
+            owner_ref?: string;
         };
         CNTSStatusChange: {
             base_version: number;
@@ -25897,6 +25957,14 @@ export interface components {
             as_of: string;
             herd_size: number;
             dead: number;
+            /** @description DB-15 số hộ bị ảnh hưởng của phiên bản; dữ liệu cũ một hộ (legacy) = 1 */
+            affected_households: number;
+            /** @description DB-16 diện tích thủy sản nuôi trồng bị ảnh hưởng (ha) */
+            aqua_farmed_ha: string | null;
+            /** @description DB-16 diện tích thủy sản khai thác bị ảnh hưởng (ha) */
+            aqua_wild_ha: string | null;
+            /** @description Phiên bản ghi trước CNTS v4.0 (ổ dịch một hộ — ADR-0056 mục 8) */
+            legacy: boolean;
             distance_m?: number;
         };
         CNTSDiaryFeedPurchase: {
@@ -25961,6 +26029,8 @@ export interface components {
             zones: components["schemas"]["CNTSMapZone"][];
             outbreaks: components["schemas"]["CNTSMapOutbreak"][];
             places: components["schemas"]["CNTSMapPlace"][];
+            farms: components["schemas"]["CNTSMapFarm"][];
+            zone_impacts: components["schemas"]["CNTSMapZoneImpact"][];
             plot_stats: components["schemas"]["CNTSMapPlotStat"][];
             plots_ready: boolean;
         };
@@ -25977,10 +26047,13 @@ export interface components {
             date: string;
             zone: components["schemas"]["CNTSMapZone"];
             places: components["schemas"]["CNTSMapPlace"][];
+            farms: components["schemas"]["CNTSMapFarm"][];
             outbreaks: components["schemas"]["CNTSMapOutbreak"][];
             site_count: number;
             household_count: number;
+            farm_count: number;
             outbreak_count: number;
+            impact: components["schemas"]["CNTSMapImpact"] | null;
         };
         CNTSDiaryOfficerNote: {
             /** Format: date */
@@ -25989,6 +26062,13 @@ export interface components {
             officer?: string;
             content: string;
             farmer_opinion?: string;
+        };
+        /** @description Số hộ, diện tích thủy sản bị ảnh hưởng của vùng dịch/vùng bị uy hiếp/vùng đệm — cộng phiên bản diễn biến mới nhất của các ổ dịch trong vùng (FN-18 BR-02, FN-11 BR-03) */
+        CNTSMapImpact: {
+            outbreak_count: number;
+            affected_households: number;
+            aqua_farmed_ha: string;
+            aqua_wild_ha: string;
         };
         CNTSDiaryTables: {
             /** @description NC-09 mục 3 — mua thức ăn chăn nuôi */
@@ -25999,6 +26079,14 @@ export interface components {
             vaccinations?: components["schemas"]["CNTSDiaryVaccination"][];
             sales?: components["schemas"]["CNTSDiarySale"][];
             officer_notes?: components["schemas"]["CNTSDiaryOfficerNote"][];
+        };
+        CNTSMapZoneImpact: {
+            /** Format: uuid */
+            zone_ref: string;
+            outbreak_count: number;
+            affected_households: number;
+            aqua_farmed_ha: string;
+            aqua_wild_ha: string;
         };
         CNTSDiaryEntryVersion: {
             /** @enum {string} */
@@ -26018,6 +26106,11 @@ export interface components {
             updated_by: string;
             updated_by_display: string | null;
         };
+        CNTSMapFarmAnimal: {
+            species_code: string;
+            species_name: string | null;
+            head_count: number;
+        };
         CNTSDiaryPhoto: {
             /** Format: uuid */
             file_ref: string;
@@ -26034,6 +26127,21 @@ export interface components {
             uploaded_by: string;
             /** Format: date-time */
             uploaded_at: string;
+        };
+        /** @description Hộ chăn nuôi Đang dùng loại trang trại, vị trí check-in hiện hành (ADR-0056 mục 9); không có họ tên, SĐT chủ hộ */
+        CNTSMapFarm: {
+            /** Format: uuid */
+            household_ref: string;
+            code: string;
+            commune_code: string;
+            hamlet: string | null;
+            /** @enum {string} */
+            livestock_type: "trang_trai_nho" | "trang_trai_vua" | "trang_trai_cong_nghiep";
+            livestock_type_label: string;
+            animals: components["schemas"]["CNTSMapFarmAnimal"][];
+            lat: number;
+            lng: number;
+            distance_m?: number;
         };
         CNTSDiaryEntry: {
             /** Format: uuid */
@@ -51037,6 +51145,50 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
+    extensionCntsCopyCampaign: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CNTSCampaignCopyInput"];
+            };
+        };
+        responses: {
+            /** @description Gọi lặp cùng Idempotency-Key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSCampaign"];
+                };
+            };
+            /** @description Đã tạo đợt Nháp mới */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CNTSCampaign"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     extensionCntsHouseholdGet: {
         parameters: {
             query?: never;
@@ -51103,6 +51255,35 @@ export interface operations {
             /** @description extension.cnts_household_version_conflict | extension.cnts_household_exists | extension.cnts_household_withdrawn | extension.cnts_site_closed */
             409: components["responses"]["Problem"];
             /** @description extension.cnts_household_invalid */
+            422: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionCntsCampaignOwners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["CNTSCampaignActor"][];
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
         };

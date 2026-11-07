@@ -73,7 +73,10 @@ type Service struct {
 	SessionPolicies port.SessionPolicies // instance configuration; no owner payload decoding here
 	// AssignmentRules is optional trusted owner policy; configured errors never fall back.
 	AssignmentRules port.AssignmentRules `json:"-"`
-	DB              tenant.Beginner      // pool vai accounts_app
+	// UnitDelegations owns selected-session decisions and unit/delegation definitions.
+	// Nil keeps compatibility; configured decisions and errors are final.
+	UnitDelegations port.UnitDelegationPolicy `json:"-"`
+	DB              tenant.Beginner           // pool vai accounts_app
 	Clock           clock.Clock
 	Dir             port.Directory          // nil → ErrDependency
 	Scope           partyport.ScopeResolver // nil → ErrDependency

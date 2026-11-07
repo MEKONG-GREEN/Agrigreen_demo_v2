@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -60,52 +59,65 @@ func TestCellNumberSyntax(t *testing.T) {
 	}
 }
 
-// allocs đo số byte cấp phát của f (một luồng, sau GC).
-func allocs(f func()) uint64 {
-	runtime.GC()
-	var a, b runtime.MemStats
-	runtime.ReadMemStats(&a)
-	f()
-	runtime.ReadMemStats(&b)
-	return b.TotalAlloc - a.TotalAlloc
-}
-
 func TestCellNumberRejectsExponentWithinBudget(t *testing.T) {
 	for _, kind := range []string{KindNumber, KindInt} {
-		for _, v := range []string{"1e-100000", "1e100000", "1E-999999999", "9e+2147483647", "+1e-2147483648"} {
-			var bad string
-			used := allocs(func() { _, bad = cell(kind, nil, v) })
-			if bad == "" || used > 4<<10 {
-				t.Fatalf("cell(%s, %q): lỗi %q, cấp phát %d byte (phải bị chặn trước khi dựng decimal)", kind, v, bad, used)
+		t.Run(kind, func(t *testing.T) {
+			for _, v := range []string{"1e-100000", "1e100000", "1E-999999999", "9e+2147483647", "+1e-2147483648", strings.Repeat("9", 100000), strings.Repeat("9", 23)} {
+				for iteration := 0; iteration < 2; iteration++ {
+					var bad string
+					used := allocatedBytes(t, func() { _, bad = cell(kind, nil, v) })
+					if bad == "" || used > 4<<10 {
+						t.Fatalf("cell(%s, length=%d): lỗi %q, cấp phát %d byte (phải bị chặn trước khi dựng decimal)", kind, len(v), bad, used)
+					}
+					t.Logf("BYTE207 cell kind=%s length=%d iteration=%d bytes=%d", kind, len(v), iteration, used)
+				}
 			}
-		}
+		})
 	}
 }
 
 func TestNormalizeAndWarningsRejectExponentWithinBudget(t *testing.T) {
 	s, _ := Lookup(Form01)
-	c := Content{Tables: map[string][]Row{"vat_tu": {{"ten": "Vật tư", "ke_hoach": "1e-100000", "da_cap": "1e100000"}}}}
-	var es Errors
-	used := allocs(func() { es = s.Normalize(&c) })
-	if len(es) != 2 || used > 64<<10 {
-		t.Fatalf("Normalize: %v, cấp phát %d byte", es, used)
-	}
-	for _, e := range es {
-		if e.Reason != "số không âm (dấu chấm thập phân)" {
-			t.Fatalf("lý do theo ô: %v", es)
+	t.Run("Normalize", func(t *testing.T) {
+		for _, v := range []string{"1e-100000", "1e100000", "1E-999999999", "9e+2147483647", "+1e-2147483648", strings.Repeat("9", 23)} {
+			for iteration := 0; iteration < 2; iteration++ {
+				c := Content{Tables: map[string][]Row{"vat_tu": {{"ten": "Vật tư", "ke_hoach": v, "da_cap": v}}}}
+				var es Errors
+				used := allocatedBytes(t, func() { es = s.Normalize(&c) })
+				if len(es) != 2 || used > 64<<10 {
+					t.Fatalf("Normalize: %v, cấp phát %d byte", es, used)
+				}
+				want := "số không âm (dấu chấm thập phân)"
+				if len(v) > MaxNumberLen {
+					want = "số quá dài"
+				}
+				for _, e := range es {
+					if e.Reason != want {
+						t.Fatalf("lý do theo ô: %v", es)
+					}
+				}
+				t.Logf("BYTE207 Normalize length=%d iteration=%d bytes=%d", len(v), iteration, used)
+			}
 		}
-	}
-	// Warnings đọc nội dung đã lưu; giá trị ngoài cú pháp (dữ liệu cũ/hỏng) bị bỏ qua, không dựng decimal.
-	raw := Content{Tables: map[string][]Row{"vat_tu": {{"ten": "X", "ke_hoach": "1e-100000", "da_cap": "1e100000"}}}}
-	var w []string
-	used = allocs(func() { w = s.Warnings(raw) })
-	if len(w) != 0 || used > 16<<10 {
-		t.Fatalf("Warnings: %v, cấp phát %d byte", w, used)
-	}
-	ok := Content{Tables: map[string][]Row{"vat_tu": {{"ten": "X", "ke_hoach": "10", "da_cap": "10.5"}}}}
-	if w := s.Warnings(ok); len(w) != 1 || !strings.Contains(w[0], "đã cấp 10.5 vượt kế hoạch 10") {
-		t.Fatalf("Warnings hợp lệ: %v", w)
-	}
+	})
+	t.Run("Warnings", func(t *testing.T) {
+		// Warnings đọc nội dung đã lưu; giá trị ngoài cú pháp bị bỏ qua.
+		for _, v := range []string{"1e-100000", "1e100000", "1E-999999999", "9e+2147483647", "+1e-2147483648", strings.Repeat("9", 100000), strings.Repeat("9", 23)} {
+			for iteration := 0; iteration < 2; iteration++ {
+				raw := Content{Tables: map[string][]Row{"vat_tu": {{"ten": "X", "ke_hoach": v, "da_cap": v}}}}
+				var w []string
+				used := allocatedBytes(t, func() { w = s.Warnings(raw) })
+				if len(w) != 0 || used > 16<<10 {
+					t.Fatalf("Warnings: %v, cấp phát %d byte", w, used)
+				}
+				t.Logf("BYTE207 Warnings length=%d iteration=%d bytes=%d", len(v), iteration, used)
+			}
+		}
+		ok := Content{Tables: map[string][]Row{"vat_tu": {{"ten": "X", "ke_hoach": "10", "da_cap": "10.5"}}}}
+		if w := s.Warnings(ok); len(w) != 1 || !strings.Contains(w[0], "đã cấp 10.5 vượt kế hoạch 10") {
+			t.Fatalf("Warnings hợp lệ: %v", w)
+		}
+	})
 }
 
 func FuzzCellNumber(f *testing.F) {

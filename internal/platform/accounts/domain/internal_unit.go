@@ -3,6 +3,7 @@ package domain
 // W11.07 (Q-068): đơn vị nội bộ của TTKN tỉnh (phòng/trạm/trại/BGĐ/văn phòng/tăng cường). Hàm thuần.
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -48,18 +49,26 @@ func InternalUnitSnapshotOf(u port.InternalUnit) InternalUnitSnapshot {
 // NormalizeInternalUnit kiểm và chuẩn hóa đơn vị nội bộ (tạo/sửa): mã như mã phòng ban, loại trong danh mục,
 // chỉ loại "phong" mới gắn phòng ban P2.
 func NormalizeInternalUnit(u port.InternalUnit) (port.InternalUnit, error) {
+	return NormalizeInternalUnitWithDefinition(u, port.InternalUnitDefinition{
+		Kinds: port.InternalUnitKinds, DepartmentKinds: []string{port.UnitKindPhong},
+	})
+}
+
+// NormalizeInternalUnitWithDefinition applies a validated owner catalog while
+// retaining the shared code, name and sort-order constraints.
+func NormalizeInternalUnitWithDefinition(u port.InternalUnit, d port.InternalUnitDefinition) (port.InternalUnit, error) {
 	u.Code, u.Kind, u.Name = strings.TrimSpace(u.Code), strings.TrimSpace(u.Kind), strings.TrimSpace(u.Name)
 	u.DepartmentCode = strings.TrimSpace(u.DepartmentCode)
 	switch {
 	case !unitCodeRe.MatchString(u.Code):
 		return u, FieldError{Field: "code", Msg: MsgUnitCode}
-	case port.CatalogLabel(port.InternalUnitKinds, u.Kind) == "":
+	case port.CatalogLabel(d.Kinds, u.Kind) == "":
 		return u, FieldError{Field: "kind", Msg: MsgUnitKind}
 	case u.Name == "" || utf8.RuneCountInString(u.Name) > 200:
 		return u, FieldError{Field: "name", Msg: MsgUnitName}
 	case u.SortOrder < 0 || u.SortOrder > 100000:
 		return u, FieldError{Field: "sort_order", Msg: MsgUnitSort}
-	case u.DepartmentCode != "" && u.Kind != port.UnitKindPhong:
+	case u.DepartmentCode != "" && !slices.Contains(d.DepartmentKinds, u.Kind):
 		return u, FieldError{Field: "department_code", Msg: MsgUnitDeptKind}
 	case u.DepartmentCode != "" && !unitCodeRe.MatchString(u.DepartmentCode):
 		return u, FieldError{Field: "department_code", Msg: MsgUnitCode}

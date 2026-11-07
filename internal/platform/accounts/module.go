@@ -46,6 +46,8 @@ type Deps struct {
 	SessionPolicies port.SessionPolicies // trusted application-owned request projections
 	// AssignmentRules validates normalized values without replacing native scope checks.
 	AssignmentRules port.AssignmentRules `json:"-"`
+	// UnitDelegations supplies trusted owner definitions and selected-session decisions.
+	UnitDelegations port.UnitDelegationPolicy `json:"-"`
 	// Sessions contains trusted application-owned projections for selected requests.
 	Sessions *authz.SessionRegistry
 	// Directory: Keycloak Admin REST. Nil → mọi route trả 503 accounts.dependency_unavailable.
@@ -90,10 +92,18 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	if !d.Roles.Valid() {
 		panic("accounts: invalid role catalog configuration")
 	}
+	if d.UnitDelegations != nil {
+		if err := port.ValidateInternalUnitDefinition(d.UnitDelegations.InternalUnitDefinition()); err != nil {
+			panic(err)
+		}
+		if err := port.ValidateDelegationDefinition(d.UnitDelegations.DelegationDefinition()); err != nil {
+			panic(err)
+		}
+	}
 	db = forModule(db)
 	return &Module{svc: &app.Service{Attributes: catalog, DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation, Roles: d.Roles, AssignmentRules: d.AssignmentRules,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, SessionPolicies: d.SessionPolicies, Departments: d.Departments, Units: d.Units, Names: d.Names,
-		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
+		Modules: d.Modules, DormantDryRun: d.DormantDryRun, UnitDelegations: d.UnitDelegations}, sessions: d.Sessions}
 }
 
 // RegisterApp gắn route Application API của App HTX: tài khoản nông dân (quản lý
