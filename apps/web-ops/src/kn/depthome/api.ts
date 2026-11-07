@@ -49,6 +49,8 @@ export function kpiLink(key: string, dept?: string): string | null {
     alerts_open: "/kn/cnts/canh-bao",
     alerts_overdue: "/kn/cnts/canh-bao",
     outbreaks_active: "/kn/cnts/dich-benh",
+    livestock_households: "/kn/cnts/so-lieu-xa/ho-chan-nuoi",
+    livestock_farms: "/kn/cnts/so-lieu-xa/ho-chan-nuoi",
     tasks_open: "/kn/nhiem-vu/cong-viec",
     tasks_overdue: "/kn/nhiem-vu/cong-viec",
     schedules_week: "/kn/nhiem-vu/lich-cong-tac",

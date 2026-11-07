@@ -11,6 +11,20 @@ type S = components["schemas"];
 type Report = S["CNTSBM11"];
 type Type = Report["type"];
 
+// Hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07) — số minh họa theo Hình 48 của BRD, không đọc danh sách hộ giả lập.
+const herdRow = (commune: string, name: string, nongHo: number, nho: number, vua: number, congNghiep: number): S["CNTSBM11HerdRow"] => ({
+  commune, name, households: nongHo + nho + vua + congNghiep, farms: nho + vua + congNghiep,
+  by_type: { nong_ho: nongHo, trang_trai_nho: nho, trang_trai_vua: vua, trang_trai_cong_nghiep: congNghiep },
+});
+const HERDS: S["CNTSBM11Herds"] = {
+  communes: [herdRow("30280", "Xã Mỹ Hòa Hưng", 8, 3, 1, 0), herdRow("30307", "Xã Bình Đức", 17, 2, 0, 1), herdRow("30316", "Xã Ba Chúc", 9, 0, 0, 0)],
+  total: herdRow("", "Toàn tỉnh", 34, 5, 1, 1), communes_total: 102,
+  heads: [{ species: "heo", name: "Heo", household: "212", farm: "1460" }, { species: "bo", name: "Bò", household: "38", farm: "0" },
+    { species: "ga", name: "Gà", household: "1150", farm: "6000" }, { species: "vit", name: "Vịt", household: "640", farm: "400" }],
+};
+const HERD_TYPES: S["CNTSBM11Key"][] = [{ key: "nong_ho", label: "Nông hộ" }, { key: "trang_trai_nho", label: "Trang trại nhỏ" },
+  { key: "trang_trai_vua", label: "Trang trại vừa" }, { key: "trang_trai_cong_nghiep", label: "Trang trại công nghiệp" }];
+
 const REPORTS = new Map<string, Report>();
 const WORDS = new Map<string, S["CNTSBM11WordRun"][]>();
 let WORD_NO = 0;
@@ -181,7 +195,8 @@ export const cntsBm11Routes: Route[] = [
         basis: "submitted", communes: "Tổng hợp từ 99/102 xã", coverage: COVERAGE, groups: GROUPS, lines: LINES, fishery: FISHERY,
         programs: [{ ref: uuidv7(), code: "CT-CN-GS", name: "Chương trình phát triển chăn nuôi gia súc", kind: "tinh", manager_ref: w.actor, sites: 15,
           households: 15, text: "", manager_name: "", can_edit: false }],
-        sections: SECTIONS[b.type === "week" ? "week" : "period"].map(([key, l]) => ({ key, label: l, text: "" })), supplement: [], return_comment: "",
+        sections: SECTIONS[b.type === "week" ? "week" : "period"].map(([key, l]) => ({ key, label: l, text: "" })), supplement: [],
+        herds: HERDS, herd_types: HERD_TYPES, return_comment: "",
         recipient_list: recipients.map((code) => ({ code, label: { bgd: "Ban Giám đốc TTKN", hcth: "Phòng Hành chính – Tổng hợp", khtc: "Phòng Kế hoạch – Tài chính" }[code], received: false, received_at: null, actor_name: "" })),
         history: [{ seq: 1, event: "created", status: "draft", comment: "", recipient: "", content_hash: "0".repeat(64), actor_name: "", at }],
         can: { edit: false, refresh: false, submit: false, approve: false, return: false, receive: false, word: true }, replayed: false,
@@ -264,7 +279,7 @@ export const cntsBm11Routes: Route[] = [
       const runs = WORDS.get(r.id) ?? [];
       const prior = runs.find((x) => x.doc_number);
       const no = r.status === "sent" ? (prior?.doc_number ?? `${++WORD_NO}/BC-CNTS`) : "";
-      const run = { id: uuidv7(), seq: runs.length + 1, template: r.type === "week" ? "cnts.bm11_tuan" : "cnts.bm11_ky", template_version: 1, doc_number: no,
+      const run = { id: uuidv7(), seq: runs.length + 1, template: r.type === "week" ? "cnts.bm11_tuan" : "cnts.bm11_ky", template_version: 2, doc_number: no,
         doc_number_auto: !!no, file_name: `bao-cao-phong-cnts-${r.type}-${r.period_key}-v${r.version}.docx`, body_hash: "0".repeat(64), size: 4,
         actor_ref: w.actor, at: new Date().toISOString() };
       WORDS.set(r.id, [run, ...runs]);

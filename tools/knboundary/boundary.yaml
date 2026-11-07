@@ -103,6 +103,7 @@ kn_shared_route_prefixes:
   - /v1/me/delegations
   - /v1/internal-units
   - /v1/departments
+  - /v1/orgs/{ref}/departments # nạp phòng ban mặc định (KNSPLIT-2 #222), chủ KN; /v1/orgs khác là primitive pf/party
   - /v1/accounts/kn-users
   - /v1/accounts/internal-units
   - /v1/accounts/delegations

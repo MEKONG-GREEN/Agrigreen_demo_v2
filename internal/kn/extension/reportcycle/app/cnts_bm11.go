@@ -64,6 +64,10 @@ const (
 // BM11ProgramSource trả CT/DA của tỉnh còn hiệu lực trong [from, to] (W11.47; gốc module nối từ cntsmodel).
 type BM11ProgramSource func(ctx context.Context, province string, from, to time.Time) ([]domain.BM11Program, error)
 
+// BM11HerdSource trả số hộ, số con của hộ Đang dùng trong các xã communes (nil = mọi xã) tại lúc gọi — danh sách hộ chăn
+// nuôi FN-10 (CNTS v4.0 FN-16 BR-07; gốc module nối từ cntslivestock).
+type BM11HerdSource func(ctx context.Context, tid uuid.UUID, communes []string) (domain.BM11HerdInput, error)
+
 const (
 	deptHCTH = "hanh_chinh_tong_hop"
 	groupBGD = "ban_giam_doc"
@@ -355,6 +359,25 @@ func (s *Service) bm11Compute(ctx context.Context, a actor, province string, p d
 		}
 		c.content.Programs = append(c.content.Programs, ps...)
 	}
+	// CNTS v4.0 FN-16 BR-07: bảng theo loại chăn nuôi đếm từ danh sách hộ chăn nuôi (hộ Đang dùng) tại thời điểm lập; đóng
+	// băng trong nội dung phiên bản (FN-10 BR-06). Biểu nhập theo xã (BM-01, BM-04, BM-17) không chia theo loại.
+	if programs && s.BM11Herds != nil {
+		var cs []string
+		for code := range comm {
+			cs = append(cs, code)
+		}
+		slices.Sort(cs)
+		in, err := s.BM11Herds(ctx, a.p.TenantID, cs)
+		if err != nil {
+			return nil, err
+		}
+		h := domain.BM11HerdsOf(in, len(comm))
+		for i := range h.Communes {
+			h.Communes[i].Name = nb.commune(ctx, s, h.Communes[i].Commune)
+		}
+		h.Total.Name = "Toàn tỉnh"
+		c.content.Herds = &h
+	}
 	return c, nil
 }
 
@@ -485,22 +508,25 @@ type BM11Can struct {
 // BM11View là chi tiết báo cáo (nội dung phiên bản hiện hành).
 type BM11View struct {
 	BM11Summary
-	Version       int64                   `json:"version"` // seq của bước mang nội dung hiện hành
-	ContentHash   string                  `json:"content_hash"`
-	Basis         string                  `json:"basis"`
-	Communes      string                  `json:"communes"` // "Tổng hợp từ n/N xã"
-	Coverage      []domain.BM11Coverage   `json:"coverage"`
-	Groups        []domain.Key            `json:"groups"`
-	Lines         []BM11LineView          `json:"lines"`
-	Fishery       domain.BM11Catch        `json:"fishery"`
-	Programs      []BM11ProgramView       `json:"programs"`
-	Sections      []BM11SectionView       `json:"sections"`
-	Supplement    []domain.BM11Supplement `json:"supplement"`
-	ReturnComment string                  `json:"return_comment"`
-	RecipientList []BM11RecipientView     `json:"recipient_list"`
-	History       []BM11EventView         `json:"history"`
-	Can           BM11Can                 `json:"can"`
-	Replayed      bool                    `json:"replayed"`
+	Version     int64                   `json:"version"` // seq của bước mang nội dung hiện hành
+	ContentHash string                  `json:"content_hash"`
+	Basis       string                  `json:"basis"`
+	Communes    string                  `json:"communes"` // "Tổng hợp từ n/N xã"
+	Coverage    []domain.BM11Coverage   `json:"coverage"`
+	Groups      []domain.Key            `json:"groups"`
+	Lines       []BM11LineView          `json:"lines"`
+	Fishery     domain.BM11Catch        `json:"fishery"`
+	Programs    []BM11ProgramView       `json:"programs"`
+	Sections    []BM11SectionView       `json:"sections"`
+	Supplement  []domain.BM11Supplement `json:"supplement"`
+	// Herds: hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07); null ở báo cáo lập trước v4.0.
+	Herds         *domain.BM11Herds   `json:"herds"`
+	HerdTypes     []domain.Key        `json:"herd_types"`
+	ReturnComment string              `json:"return_comment"`
+	RecipientList []BM11RecipientView `json:"recipient_list"`
+	History       []BM11EventView     `json:"history"`
+	Can           BM11Can             `json:"can"`
+	Replayed      bool                `json:"replayed"`
 }
 
 func bm11Lines(c domain.BM11Content) []BM11LineView {
@@ -547,7 +573,8 @@ func (s *Service) bm11View(ctx context.Context, w bm11Who, r store.BM11Report, e
 	nm := s.names(ctx, refs)
 	v := BM11View{BM11Summary: summaryOf(r, last, nm), Version: cev.Seq, ContentHash: cev.ContentHash, Basis: content.Basis,
 		Communes: BM11CommunesText(content.Coverage), Coverage: content.Coverage, Groups: domain.BM11Groups, Lines: bm11Lines(content),
-		Fishery: content.Fishery, Supplement: content.Supplement, RecipientList: []BM11RecipientView{}, History: []BM11EventView{}}
+		Fishery: content.Fishery, Supplement: content.Supplement, Herds: content.Herds, HerdTypes: domain.BM11HerdTypes,
+		RecipientList: []BM11RecipientView{}, History: []BM11EventView{}}
 	if v.Supplement == nil {
 		v.Supplement = []domain.BM11Supplement{}
 	}

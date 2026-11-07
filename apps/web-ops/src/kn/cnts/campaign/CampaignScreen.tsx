@@ -152,6 +152,7 @@ function CampaignEditor({ capi, current, templates, onDone }: {
   const [f, setF] = useState<CampaignForm>(current ? formOf(current) : emptyForm());
   const [errs, setErrs] = useState<Record<string, string>>({});
   const act = useAction();
+  const versions = useLoad(f.template_code ? () => capi.versions(f.template_code) : null, [capi, f.template_code]);
   const set = <K extends keyof CampaignForm>(k: K, v: CampaignForm[K]) => setF((x) => ({ ...x, [k]: v }));
   const save = async () => {
     const e = formErrors(f);
@@ -191,7 +192,7 @@ function CampaignEditor({ capi, current, templates, onDone }: {
         </label>
         <label>
           Biểu điều tra
-          <select className="select" aria-label="Biểu điều tra" value={f.template_code} onChange={(e) => set("template_code", e.target.value)}>
+          <select className="select" aria-label="Biểu điều tra" value={f.template_code} onChange={(e) => setF((x) => ({ ...x, template_code: e.target.value, template_version: "" }))}>
             <option value="">— Chọn biểu (thiết kế ở Quản lý biểu mẫu) —</option>
             {templates.map((t) => (
               <option key={t.code} value={t.code}>
@@ -200,6 +201,18 @@ function CampaignEditor({ capi, current, templates, onDone }: {
             ))}
           </select>
           {err("template_code")}
+        </label>
+        <label>
+          Phiên bản biểu
+          <select className="select" aria-label="Phiên bản biểu" value={f.template_version} disabled={!f.template_code} onChange={(e) => set("template_version", e.target.value)}>
+            <option value="">Mới nhất lúc phát hành</option>
+            {(versions.data ?? []).map((v) => (
+              <option key={v.version} value={String(v.version)}>
+                Phiên bản {v.version} — {v.title} ({v.fields.length} chỉ tiêu)
+              </option>
+            ))}
+          </select>
+          {err("template_version")}
         </label>
         <label>
           Phạm vi

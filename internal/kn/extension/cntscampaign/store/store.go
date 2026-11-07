@@ -25,6 +25,7 @@ type Version struct {
 	Goal              *string
 	Field             string
 	TemplateCode      string
+	TemplateVersion   *int64 // phiên bản biểu đã chọn (#192); nil = Nháp ghi trước #192 → mới nhất lúc phát hành
 	ScopeMode         string
 	Regions           []string
 	Units             []string
@@ -37,12 +38,12 @@ type Version struct {
 	RecordedAt        time.Time
 }
 
-const versionCols = `id, campaign_id, seq, org_ref, province_code, name, goal, field, template_code, scope_mode, regions, units,
-  period_from, period_to, due_at, owner_ref, remind_before_hours, actor_ref, event_time, recorded_at`
+const versionCols = `id, campaign_id, seq, org_ref, province_code, name, goal, field, template_code, template_version, scope_mode,
+  regions, units, period_from, period_to, due_at, owner_ref, remind_before_hours, actor_ref, event_time, recorded_at`
 
 func scanVersion(row pgx.Row) (Version, error) {
 	var v Version
-	err := row.Scan(&v.RowID, &v.CampaignID, &v.Seq, &v.OrgRef, &v.Province, &v.Name, &v.Goal, &v.Field, &v.TemplateCode, &v.ScopeMode,
+	err := row.Scan(&v.RowID, &v.CampaignID, &v.Seq, &v.OrgRef, &v.Province, &v.Name, &v.Goal, &v.Field, &v.TemplateCode, &v.TemplateVersion, &v.ScopeMode,
 		&v.Regions, &v.Units, &v.From, &v.To, &v.DueAt, &v.OwnerRef, &v.RemindBeforeHours, &v.ActorRef, &v.EventTime, &v.RecordedAt)
 	return v, err
 }
@@ -56,13 +57,13 @@ func InsertVersion(ctx context.Context, tx pgx.Tx, tid uuid.UUID, v *Version, id
 	}
 	return tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_campaign (id, tenant_id, stream_key, campaign_id, org_ref, province_code, name,
 	    goal, field, template_code, scope_mode, regions, units, period_from, period_to, due_at, owner_ref, remind_before_hours,
-	    event_time, actor_ref, idem_key, rule_version)
+	    event_time, actor_ref, idem_key, rule_version, template_version)
 	  VALUES ($1, $2, 'cnts_campaign:' || $3::uuid::text, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::date, $14::date, $15, $16, $17,
-	    $18, $19, $20, $21)
+	    $18, $19, $20, $21, $22)
 	  RETURNING seq, recorded_at`,
 		v.RowID, tid, v.CampaignID, v.OrgRef, v.Province, v.Name, v.Goal, v.Field, v.TemplateCode, v.ScopeMode, v.Regions, v.Units,
 		dateOnly(v.From), dateOnly(v.To), v.DueAt.UTC(), v.OwnerRef, v.RemindBeforeHours, v.EventTime.UTC(), v.ActorRef, idem,
-		domain.RuleVersion).Scan(&v.Seq, &v.RecordedAt)
+		domain.RuleVersion, v.TemplateVersion).Scan(&v.Seq, &v.RecordedAt)
 }
 
 // VersionByIdem đọc phiên bản đã ghi với khóa idempotent (nil nếu chưa có).

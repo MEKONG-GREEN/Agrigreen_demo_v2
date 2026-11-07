@@ -36,7 +36,9 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: append(append([]formsport.Profile{}, KNProfiles...), KNHRMProfiles...),
 		Facilities: facilities, Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator(),
 			KNKHTCProfile.Name: kn.KHTCFormValidator(), hrmport.PlanProfile: hrm.PlanValidator()},
-		ReviewGuards: map[string]formsport.ReviewGuard{KNCNTSProfile.Name: kn.CNTSReviewGuard()}})
+		ReviewGuards: map[string]formsport.ReviewGuard{KNCNTSProfile.Name: kn.CNTSReviewGuard()},
+		// #192: chính sách định nghĩa biểu kn_cnts (khóa KNQG, quyền thiết kế FN-07) — profile bắt buộc policy.
+		DefinitionPolicies: map[string]formsport.TemplateDefinitionPolicy{KNCNTSProfile.Name: kn.CNTSDefinitionPolicy()}})
 	if err != nil {
 		return nil, err
 	}

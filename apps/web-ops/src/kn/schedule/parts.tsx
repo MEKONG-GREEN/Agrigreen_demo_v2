@@ -156,7 +156,7 @@ export type CardItem = WsItemInput & {
   changed?: boolean;
   removed?: boolean;
   /** W11.46: check-in của mục (phòng có check-in). */
-  checkin?: { far: boolean; distance_m?: number | null } | null;
+  checkin?: { far: boolean; distance_m?: number | null; checkout?: { far: boolean } | null } | null;
 };
 
 export function ItemCard({
@@ -191,6 +191,9 @@ export function ItemCard({
           {item.checkin.far ? "check-in xa" : "đã check-in"}
           {item.checkin.distance_m !== null && item.checkin.distance_m !== undefined ? ` ${Math.round(item.checkin.distance_m)} m` : ""}
         </span>
+      ) : null}
+      {item.checkin?.checkout ? (
+        <span className={`ws-flag ${item.checkin.checkout.far ? "f-conflict" : "f-changed"}`}>{item.checkin.checkout.far ? "check-out xa" : "đã check-out"}</span>
       ) : null}
       {place || item.place ? <span className="ws-place">{[place, item.place ? "có tọa độ" : ""].filter(Boolean).join(" · ")}</span> : null}
     </>

@@ -107,6 +107,8 @@ type Client struct {
 var (
 	_ port.Directory   = (*Client)(nil)
 	_ port.ActionLinks = (*Client)(nil)
+
+	_ port.PasswordSetter = (*Client)(nil)
 )
 
 // New tạo client. Không gọi mạng — token lấy ở lần gọi đầu và được lưu tới gần hạn.
@@ -640,6 +642,18 @@ func (c *Client) ActionLink(ctx context.Context, id, grantID uuid.UUID, actions 
 		}
 		return out.Link, nil
 	}
+}
+
+// SetPassword đặt mật khẩu cố định (PUT /users/{id}/reset-password, temporary=false — #255 ADR-0057). Keycloak kiểm
+// chính sách mật khẩu của realm: 400 → port.ErrPasswordPolicy. Mật khẩu chỉ nằm trong thân request, không vào lỗi/log.
+func (c *Client) SetPassword(ctx context.Context, id uuid.UUID, password string) error {
+	cred := map[string]any{"type": "password", "value": password, "temporary": false}
+	_, err := c.do(ctx, "đặt mật khẩu", http.MethodPut, userPath(id)+"/reset-password", nil, cred, nil)
+	var se *statusError
+	if err != nil && errors.As(err, &se) && se.status == http.StatusBadRequest {
+		return fmt.Errorf("%w: %w", port.ErrPasswordPolicy, se)
+	}
+	return err
 }
 
 // Logout thu hồi mọi phiên của người dùng.

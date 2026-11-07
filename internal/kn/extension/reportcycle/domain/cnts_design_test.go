@@ -58,3 +58,49 @@ func TestParseCNTSDesign(t *testing.T) {
 		t.Fatal(bad)
 	}
 }
+
+// #192: kiểm cấu trúc lưu từ màn thiết kế, khóa KNQG, mã biểu điều tra, quy tắc chỉ thêm cột.
+func TestCNTSDesignEditRules(t *testing.T) {
+	ok := []CNTSField{{Key: "a", Label: "A", Type: "integer", NonNegative: true}, {Key: "b", Label: "B", Type: "choice", Options: []string{"x", "y"}}}
+	if is := ValidateDesignFields(ok); len(is) != 0 {
+		t.Fatalf("hợp lệ: %+v", is)
+	}
+	bad := [][]CNTSField{nil, {{Key: "A", Label: "x", Type: "text"}}, {{Key: "a", Label: "x", Type: "text"}, {Key: "a", Label: "y", Type: "text"}},
+		{{Key: "a", Label: "", Type: "text"}}, {{Key: "a", Label: "x", Type: "money"}}, {{Key: "a", Label: "x", Type: "choice"}},
+		{{Key: "a", Label: "x", Type: "text", Options: []string{"x"}}}, {{Key: "a", Label: "x", Type: "text", NonNegative: true}},
+		{{Key: "a", Label: "x", Type: "choice", Options: []string{"x", "x"}}}, make([]CNTSField, MaxDesignFields+1)}
+	for i, fs := range bad {
+		if len(ValidateDesignFields(fs)) == 0 {
+			t.Fatalf("ca %d phải lỗi", i)
+		}
+	}
+	for _, c := range []string{CNTSBM01, CNTSBM04, CNTSBM05I, CNTSBM05II} {
+		if !CNTSLocked(c) || ProvinceDesignable(c) {
+			t.Fatalf("%s là mẫu KNQG khóa", c)
+		}
+	}
+	if CNTSLocked(CNTSBM17) || !ProvinceDesignable(CNTSBM17) {
+		t.Fatal("BM-17 không khóa")
+	}
+	if code, ok := SurveyCode(" tong-dan "); !ok || code != "CNTS-DT-TONG-DAN" || !IsSurveyCode(code) || !ProvinceDesignable(code) {
+		t.Fatalf("mã điều tra: %q %v", code, ok)
+	}
+	for _, s := range []string{"", "-A", "A B", "Á", strings.Repeat("A", 41)} {
+		if _, ok := SurveyCode(s); ok {
+			t.Fatalf("hậu tố %q phải sai", s)
+		}
+	}
+	if IsSurveyCode("CNTS-BM17") || IsSurveyCode("CNTS-DT-") || ProvinceDesignable("LIVE202") {
+		t.Fatal("mã ngoài biểu điều tra")
+	}
+	cur := []CNTSField{{Key: "a", Type: "integer"}, {Key: "b", Type: "text"}}
+	if is := DesignChange(cur, []CNTSField{{Key: "b", Label: "đổi tên", Type: "text"}, {Key: "a", Type: "integer"}, {Key: "c", Type: "date"}}); len(is) != 0 {
+		t.Fatalf("thêm cột, đổi tên, đổi thứ tự được phép: %+v", is)
+	}
+	if is := DesignChange(cur, []CNTSField{{Key: "a", Type: "integer"}}); len(is) != 1 || is[0].Field != "b" {
+		t.Fatalf("xóa cột: %+v", is)
+	}
+	if is := DesignChange(cur, []CNTSField{{Key: "a", Type: "decimal"}, {Key: "b", Type: "text"}}); len(is) != 1 || is[0].Field != "a" {
+		t.Fatalf("đổi kiểu: %+v", is)
+	}
+}

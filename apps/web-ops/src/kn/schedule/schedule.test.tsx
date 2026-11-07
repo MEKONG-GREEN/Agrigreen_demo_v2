@@ -255,6 +255,17 @@ describe("<ApproveSchedules> Cấp Tỉnh (Hình 12)", { timeout: 30_000 }, () =
     expect(screen.queryByRole("button", { name: /Duyệt hàng loạt/ })).toBeNull();
   });
 
+  it("CNTS v4.0 Hình 49 (#250): tab Check-in, check-out mở màn theo dõi của cán bộ xã", async () => {
+    const user = userEvent.setup();
+    const { api, ws } = await clientFor("kn-binh", "asg-binh-tinh");
+    render(<ApproveSchedules ws={ws} api={api} />);
+    await screen.findByRole("tab", { name: "Chờ duyệt (2)" });
+    await user.click(screen.getByRole("tab", { name: /Check-in, check-out/ }));
+    expect(await screen.findByRole("region", { name: "Theo dõi check-in, check-out" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Chỉ mục Chưa check-out/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Duyệt hàng loạt/ })).toBeNull();
+  });
+
   it("BF-SCHED R-B1 (PO 25/10/2026): Lịch của tôi Cấp Tỉnh bắt buộc Xã/phường, chọn trong mọi xã của tỉnh (tuần mới)", async () => {
     const user = userEvent.setup();
     const { api, ws } = await clientFor("kn-binh", "asg-binh-tinh");

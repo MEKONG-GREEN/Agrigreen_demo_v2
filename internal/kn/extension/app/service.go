@@ -24,6 +24,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -103,6 +104,8 @@ type Service struct {
 	// PlanFeed (tùy chọn, BF-CN-WEEKLY): đọc bài nộp BM-05 Phần II của cap/forms để dựng Lịch công tác từ kế hoạch tuần.
 	// Thiếu → route "tạo lịch từ kế hoạch" trả 503.
 	PlanFeed formsport.SubmissionFeed
+	// Objects (CNTS-V4-CHECKOUT-PHOTO): kho đối tượng của module cho ảnh check-in/check-out lịch công tác. Thiếu → 503.
+	Objects objstore.Store
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

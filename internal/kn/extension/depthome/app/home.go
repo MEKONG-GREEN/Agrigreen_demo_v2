@@ -213,7 +213,9 @@ func kpis(c caller, n store.Counts, price *store.PriceInfo) []KPI {
 		out = append(out,
 			KPI{Key: "alerts_open", Label: "Cảnh báo cần xử lý", Value: n.AlertsOpen, Tone: warn(n.AlertsOpen, "warn")},
 			KPI{Key: "alerts_overdue", Label: "Cảnh báo quá hạn", Value: n.AlertsOverdue, Tone: warn(n.AlertsOverdue, "bad")},
-			KPI{Key: "outbreaks_active", Label: "Ổ dịch đang theo dõi", Value: n.OutbreaksActive, Tone: warn(n.OutbreaksActive, "bad")})
+			KPI{Key: "outbreaks_active", Label: "Ổ dịch đang theo dõi", Value: n.OutbreaksActive, Tone: warn(n.OutbreaksActive, "bad")},
+			KPI{Key: "livestock_households", Label: "Hộ chăn nuôi đang dùng", Value: n.Households, Tone: "info"},
+			KPI{Key: "livestock_farms", Label: "Trang trại chăn nuôi", Value: n.Farms, Tone: "info"})
 	case partyport.DeptTrongTrot:
 		out = append(out,
 			KPI{Key: "tasks_open", Label: "Nhiệm vụ đang mở", Value: n.TasksOpen, Tone: "info"},
