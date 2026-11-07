@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,12 +11,14 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz/authztest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
@@ -25,6 +28,11 @@ func TestWorkerAccountsUsesOwnerRoleOrder(t *testing.T) {
 	m, err := workerAccounts(pgtest.Get(t).Pool(t, migrations.PF, dbadmin.AppWorker), clock.System{}, accounts.Deps{Roles: accport.NativeRoleCatalog()})
 	if err != nil {
 		t.Fatal(err)
+	}
+	partial := authz.WithPrincipal(context.Background(), authz.Principal{ActorRef: ids.New(), TenantID: ids.New(),
+		KN: &authz.KNContext{Role: authz.KNAdmin}})
+	if _, err := m.KNPeople().PeopleInScope(partial); err == nil || problem.From(err).Code != authz.ErrNoKNContext.Code {
+		t.Fatalf("worker bypassed the configured session owner: %v", err)
 	}
 	issuer := authztest.New(t)
 	engine := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 1<<20)

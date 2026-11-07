@@ -36,6 +36,8 @@ Sau thay đổi, tìm `accounts.New(` ngoài test chỉ còn API constructor và
 
 #195 (lane KN) chốt exact owner contract/adapter cho đơn vị và ủy quyền; #196 (shared) rollout sau #193 và hợp đồng owner đã vào dev. Không làm trùng #60/#72/#79 hoặc các gói tenant move #87–94. #57 chỉ retire sau rollout và direct consumer coverage đầy đủ, không tạo vòng phụ thuộc.
 
+#196 đã nối owner đơn vị/ủy quyền vào service/domain/handler và API/worker; xem [phạm vi, kiểm thử và giới hạn rollout](accounts-unit-delegation-rollout.md). Bảng trên giữ lại kiểm kê tại thời điểm #193; các fallback và compatibility order vẫn chờ #57.
+
 ## Giới hạn bằng chứng
 
 Catalog role rollout không chứng minh tenant cutover, realm OIDC sống, năm tenant-boundary cases hoặc G1 hoàn tất. Phiên hiện hành, MFA, native HTX/MKG, hỗ trợ, ủy quyền và RLS không được nới. Không đổi golden hoặc baseline để che ordering. Kết quả lệnh/PG/mutation/CI đúng SHA ở bình luận bàn giao #193; không coi unit test là PG/HTTP live.

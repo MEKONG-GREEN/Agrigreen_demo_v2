@@ -190,6 +190,14 @@ type DelegationInput struct {
 // NormalizeDelegation kiểm ràng buộc không phụ thuộc dữ liệu: quyền trong danh mục, có hạn (≤ 30 ngày), có
 // lý do ≥ 10 ký tự, không tự ủy quyền.
 func NormalizeDelegation(grantor uuid.UUID, in DelegationInput, now time.Time) (DelegationInput, error) {
+	return NormalizeDelegationWithDefinition(grantor, in, now, port.DelegationDefinition{
+		Powers: port.Powers, MaxDuration: DelegationMaxDays * 24 * time.Hour,
+	})
+}
+
+// NormalizeDelegationWithDefinition retains shared input checks and applies the
+// validated owner's powers and maximum duration.
+func NormalizeDelegationWithDefinition(grantor uuid.UUID, in DelegationInput, now time.Time, d port.DelegationDefinition) (DelegationInput, error) {
 	in.Department, in.Power, in.Reason = strings.TrimSpace(in.Department), strings.TrimSpace(in.Power), strings.TrimSpace(in.Reason)
 	switch {
 	case in.GranteeRef == uuid.Nil:
@@ -198,7 +206,7 @@ func NormalizeDelegation(grantor uuid.UUID, in DelegationInput, now time.Time) (
 		return in, FieldError{Field: "grantee_ref", Msg: MsgDelegSelf}
 	case in.Department == "":
 		return in, FieldError{Field: "department_code", Msg: MsgDelegDepartment}
-	case port.CatalogLabel(port.Powers, in.Power) == "":
+	case port.CatalogLabel(d.Powers, in.Power) == "":
 		return in, FieldError{Field: "power", Msg: MsgDelegPower}
 	}
 	if err := CheckKNReason("reason", in.Reason); err != nil {
@@ -209,7 +217,7 @@ func NormalizeDelegation(grantor uuid.UUID, in DelegationInput, now time.Time) (
 	}
 	in.ValidFrom = in.ValidFrom.UTC().Truncate(time.Microsecond)
 	in.ValidTo = in.ValidTo.UTC().Truncate(time.Microsecond)
-	if !in.ValidTo.After(in.ValidFrom) || in.ValidTo.Sub(in.ValidFrom) > DelegationMaxDays*24*time.Hour {
+	if !in.ValidTo.After(in.ValidFrom) || in.ValidTo.Sub(in.ValidFrom) > d.MaxDuration {
 		return in, FieldError{Field: "valid_to", Msg: MsgDelegWindow}
 	}
 	return in, nil

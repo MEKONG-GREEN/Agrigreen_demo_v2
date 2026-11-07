@@ -22,7 +22,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/store"
-	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
@@ -248,18 +247,17 @@ func (s *Service) CreateDelegation(ctx context.Context, in domain.DelegationInpu
 	if err := requireKey(idem); err != nil {
 		return DelegationResult{}, err
 	}
-	p, k, err := authz.RequireKN(ctx, port.KNTinh)
+	p, decision, err := s.authorizeDelegationGrant(ctx, in.Department)
 	if err != nil {
 		return DelegationResult{}, err
 	}
-	if in.Department == "" {
-		in.Department = k.Department
-	}
-	if !k.Manager || k.ReadOnly() || k.Support != nil || in.Department != k.Department {
-		return DelegationResult{}, ErrDelegationForbidden
+	in.Department = decision.Department
+	definition, err := s.DelegationDefinition()
+	if err != nil {
+		return DelegationResult{}, err
 	}
 	now := s.now()
-	if in, err = domain.NormalizeDelegation(p.ActorRef, in, now); err != nil {
+	if in, err = domain.NormalizeDelegationWithDefinition(p.ActorRef, in, now, definition); err != nil {
 		return DelegationResult{}, fieldProblem(err)
 	}
 	key := "deleg:grant:" + idem
@@ -290,12 +288,12 @@ func (s *Service) CreateDelegation(ctx context.Context, in domain.DelegationInpu
 			return err
 		}
 		if !slices.ContainsFunc(as, func(a port.Assignment) bool {
-			return a.Role == port.KNTinh && a.UnitRef == k.UnitRef && slices.Contains(a.Departments, in.Department) &&
+			return slices.Contains(definition.GranteeRoles, a.Role) && a.UnitRef == decision.UnitRef && slices.Contains(a.Departments, in.Department) &&
 				a.EffectiveAt(now) && (a.ValidTo == nil || !a.ValidTo.Before(in.ValidTo))
 		}) {
 			return ErrDelegationGrantee
 		}
-		d := port.Delegation{ID: ids.New(), GrantorRef: p.ActorRef, GranteeRef: in.GranteeRef, UnitRef: k.UnitRef, Department: in.Department,
+		d := port.Delegation{ID: ids.New(), GrantorRef: p.ActorRef, GranteeRef: in.GranteeRef, UnitRef: decision.UnitRef, Department: in.Department,
 			Power: in.Power, ValidFrom: in.ValidFrom, ValidTo: in.ValidTo, Reason: in.Reason, CreatedBy: p.ActorRef, CreatedAt: now, UpdatedAt: now}
 		e := store.DelegEvent{ID: ids.New(), TenantID: p.TenantID, Action: "granted", D: d, Reason: in.Reason, EventTime: now,
 			ActorRef: p.ActorRef, IdemKey: key}
@@ -334,7 +332,7 @@ func (s *Service) RevokeDelegation(ctx context.Context, id uuid.UUID, reason, id
 			return DelegationResult{}, err
 		}
 		p = a.p
-	} else if p, _, err = authz.RequireKN(ctx, port.KNTinh); err != nil {
+	} else if p, err = s.authorizeDelegationRevoke(ctx); err != nil {
 		return DelegationResult{}, err
 	}
 	key := "deleg:revoke:" + idem
@@ -420,30 +418,30 @@ var _ port.KNPeople = (*Service)(nil)
 //   - Lãnh đạo đơn vị, Ban Giám đốc: toàn bộ (chỉ đọc — BR-04, Q-059);
 //   - còn lại (kể cả Cấp TW, Cấp Xã, ngữ cảnh chỉ xem không phải lãnh đạo): chỉ chính mình.
 func (s *Service) PeopleInScope(ctx context.Context) (port.KNPeopleScope, error) {
-	p, k, err := authz.RequireKN(ctx)
+	p, decision, err := s.peopleScope(ctx)
 	if err != nil {
 		return port.KNPeopleScope{}, err
 	}
-	caps, err := s.attributeCapabilities(port.Assignment{Role: k.Role, MgmtLevel: k.MgmtLevel}, port.AssignmentAttrs{ProvinceGroup: k.ProvinceGroup, Duties: k.Duties})
-	if err != nil {
-		return port.KNPeopleScope{}, err
-	}
-	self := port.KNPeopleScope{InternalUnit: k.InternalUnit, Members: []uuid.UUID{p.ActorRef}, CommuneOfficers: []uuid.UUID{}}
-	switch {
-	case k.Role == port.KNAdmin, k.Role == port.KNTinh && k.Department == partyport.DeptHanhChinhTongHop && !k.ReadOnly() && !caps.ForceReadOnly,
-		caps.ReadsAllDepartments:
-		return port.KNPeopleScope{All: true, InternalUnit: k.InternalUnit, Members: []uuid.UUID{}, CommuneOfficers: []uuid.UUID{}}, nil
-	case k.Role != port.KNTinh || !caps.Manager || k.InternalUnit == "":
-		return self, nil
+	switch decision.Mode {
+	case port.PeopleScopeAll:
+		return port.KNPeopleScope{All: true, InternalUnit: decision.InternalUnit, Members: []uuid.UUID{}, CommuneOfficers: []uuid.UUID{}}, nil
+	case port.PeopleScopeSelf:
+		return port.KNPeopleScope{InternalUnit: decision.InternalUnit, Members: []uuid.UUID{p.ActorRef}, CommuneOfficers: []uuid.UUID{}}, nil
+	case port.PeopleScopeInternalUnit:
+		if s.UnitDelegations != nil && (decision.UnitRef == uuid.Nil || decision.InternalUnit == "" || decision.MemberRole == "" || decision.OfficerRole == "") {
+			return port.KNPeopleScope{}, ErrDependency
+		}
+	default:
+		return port.KNPeopleScope{}, ErrDependency
 	}
 	now := s.now()
-	out := port.KNPeopleScope{InternalUnit: k.InternalUnit}
+	out := port.KNPeopleScope{InternalUnit: decision.InternalUnit}
 	err = tenant.WithTenantTx(ctx, s.DB, p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		if out.Members, e = store.UsersOfInternalUnit(ctx, tx, k.UnitRef, k.InternalUnit, port.KNTinh, now); e != nil {
+		if out.Members, e = store.UsersOfInternalUnit(ctx, tx, decision.UnitRef, decision.InternalUnit, decision.MemberRole, now); e != nil {
 			return e
 		}
-		out.CommuneOfficers, e = store.UsersOfInternalUnit(ctx, tx, k.UnitRef, k.InternalUnit, port.KNXa, now)
+		out.CommuneOfficers, e = store.UsersOfInternalUnit(ctx, tx, decision.UnitRef, decision.InternalUnit, decision.OfficerRole, now)
 		return e
 	})
 	if err != nil {

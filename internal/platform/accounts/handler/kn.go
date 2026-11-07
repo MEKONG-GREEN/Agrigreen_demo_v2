@@ -352,6 +352,11 @@ func (h Handler) mgmtLevels(c *gin.Context) {
 		return
 	}
 	levels := catalog.Levels()
+	delegations, err := h.Svc.DelegationDefinition()
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
 	items := make([]gin.H, 0, len(levels))
 	for _, l := range levels {
 		items = append(items, gin.H{"code": l.Code, "label": l.Label, "manager": l.Manager, "reads_all_departments": l.ReadsAllDepartments})
@@ -362,8 +367,8 @@ func (h Handler) mgmtLevels(c *gin.Context) {
 		groups = append(groups, port.CatalogItem{Code: g.Code, Label: g.Label})
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "provisional": catalog.Provisional(), "version": catalog.Version(),
-		"province_groups": catalogDTO(groups), "duties": catalogDTO(catalog.Duties()), "powers": catalogDTO(port.Powers),
-		"delegation_max_days": domain.DelegationMaxDays})
+		"province_groups": catalogDTO(groups), "duties": catalogDTO(catalog.Duties()), "powers": catalogDTO(delegations.Powers),
+		"delegation_max_days": delegations.MaxDuration / (24 * time.Hour)})
 }
 
 type assignmentReq struct {
