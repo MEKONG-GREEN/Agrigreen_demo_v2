@@ -186,7 +186,19 @@ func (s *TicketService) boardRead(ctx context.Context, tx pgx.Tx, prof port.Prof
 	switch v.State {
 	case domain.BoardOpen, domain.BoardReopened:
 		v.Can.Approve = can && len(v.Blockers) == 0
-		v.Can.CancelReopen = can && v.State == domain.BoardReopened
+		if can && v.State == domain.BoardReopened {
+			var since time.Time
+			for _, h := range v.Log {
+				if h.Action == domain.BoardReopen {
+					since = h.RecordedAt
+				}
+			}
+			changed, err := store.DayChangedSince(ctx, tx, v.Day, since)
+			if err != nil {
+				return v, nil, err
+			}
+			v.Can.CancelReopen = !changed
+		}
 	case domain.BoardApproving:
 		v.Can.Approve = can && v.LockedBy == c.ref && len(v.Blockers) == 0
 		v.Can.Unlock = can && v.LockedBy == c.ref
@@ -628,22 +640,12 @@ func (s *TicketService) CancelReopen(ctx context.Context, profile string, in Boa
 		if v.State != domain.BoardReopened {
 			return port.ErrBoardState.WithDetail("bảng giá không ở trạng thái Đang mở duyệt")
 		}
-		var since time.Time
-		for _, h := range v.Log {
-			if h.Action == domain.BoardReopen {
-				since = h.RecordedAt
-			}
-		}
-		changed, err := store.DayChangedSince(ctx, tx, v.Day, since)
-		if err != nil {
-			return err
-		}
-		if changed {
+		if !v.Can.CancelReopen {
 			return port.ErrBoardChanged
 		}
 		w := boardWrite(prof, v, domain.BoardCancelReopen, domain.BoardApproved)
 		w.Reason = strings.TrimSpace(in.Reason)
-		_, err = store.InsertBoard(ctx, tx, ids.New(), c.tenant, w, v.Now, c.ref, idemKey(idem, "board:cancel_reopen"))
+		_, err := store.InsertBoard(ctx, tx, ids.New(), c.tenant, w, v.Now, c.ref, idemKey(idem, "board:cancel_reopen"))
 		return err
 	})
 }

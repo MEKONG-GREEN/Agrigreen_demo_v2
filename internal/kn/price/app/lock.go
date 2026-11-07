@@ -172,7 +172,7 @@ func (s *Service) recordLock(ctx context.Context, tid uuid.UUID, prof port.Profi
 }
 
 // remind gửi nhắc lần 1/2: người nhận từ ReminderTargets (W11.72/W11.75); chưa nối → một thông báo chủ đề tới cán bộ
-// xã của tenant. Lần 2 không còn xã chưa gửi → chỉ ghi nhật ký (0 người nhận).
+// xã của tenant. Không còn xã chưa gửi → chỉ ghi nhật ký (0 người nhận).
 func (s *Service) remind(ctx context.Context, tid uuid.UUID, prof port.Profile, plan domain.DayPlan, kind string, now time.Time) (CalendarJobResult, error) {
 	round := 1
 	scheduled := plan.Remind1

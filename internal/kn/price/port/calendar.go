@@ -45,7 +45,7 @@ type ReminderTarget struct {
 	RecipientRefs []uuid.UUID
 }
 
-// ReminderTargets cho job nhắc biết NHẮC AI (FN-XA-03.04). round = 1 | 2; lần 2 chỉ xã chưa gửi (BR-01).
+// ReminderTargets cho job nhắc biết NHẮC AI (FN-XA-03.04). round = 1 | 2; cả hai lần chỉ xã chưa gửi (BR-01).
 // W11.72 (xã báo giá + phân công) và W11.75 (phiếu) cài đặt; nil → nhắc chủ đề tới mọi cán bộ xã (vai kn_officer) của
 // tenant, một thông báo (đủ cho vận hành thử trước khi có danh sách xã).
 type ReminderTargets interface {

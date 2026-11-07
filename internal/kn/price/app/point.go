@@ -875,7 +875,7 @@ func (s *Service) PointAt(ctx context.Context, code string, at time.Time) (port.
 
 // PointReminders cài port.ReminderTargets (W11.74 FN-XA-03.04) từ xã báo giá + phân công: mỗi xã đang hoạt động tại
 // ngày có cán bộ Xã phụ trách → một nhóm người nhận (cán bộ đó); xã "Chưa có cán bộ Xã" không nhắc (FN-TI-02.01 luồng
-// ngoại lệ). Lần 2 bỏ xã đã gửi phiếu nếu W11.75 nối PointHooks.Submitted (chưa nối → nhắc lại mọi xã).
+// ngoại lệ). Cả hai lần bỏ xã đã gửi phiếu qua PointHooks.Submitted (FN-XA-03.04 BR-01, AC-01/02).
 type PointReminders struct{ S *Service }
 
 var _ port.ReminderTargets = PointReminders{}
@@ -902,7 +902,7 @@ func (r PointReminders) Targets(ctx context.Context, tid uuid.UUID, _ string, da
 			if off == uuid.Nil {
 				continue
 			}
-			if round >= 2 && r.S.Points.Submitted != nil {
+			if r.S.Points.Submitted != nil {
 				sub, err := r.S.Points.Submitted(ctx, tx, day, code)
 				if err != nil {
 					return err

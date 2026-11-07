@@ -71,6 +71,7 @@ export function BoardPanel({ day, nonce, onChanged }: { day: string; nonce: numb
       <LoadState s={board}>
         {(b) => {
           const s = b.summary;
+          const showCancelReopen = steward && b.state === "reopened" && (b.can.cancel_reopen || status.data?.level === "TINH");
           return (
             <>
               <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
@@ -113,8 +114,8 @@ export function BoardPanel({ day, nonce, onChanged }: { day: string; nonce: numb
                       {b.summary && b.summary.open_alerts > 0 ? `Duyệt bảng giá (còn ${b.summary.open_alerts} cảnh báo)` : "Duyệt bảng giá"}
                     </button>
                   )}
-                  {steward && b.can.cancel_reopen ? (
-                    <button type="button" className="btn" disabled={act.busy} onClick={() => void run(b, "cancel-reopen", "Đã hủy mở duyệt.")}>
+                  {showCancelReopen ? (
+                    <button type="button" className="btn" disabled={!b.can.cancel_reopen || act.busy} onClick={() => void run(b, "cancel-reopen", "Đã hủy mở duyệt.")}>
                       Hủy mở duyệt
                     </button>
                   ) : null}
@@ -125,6 +126,9 @@ export function BoardPanel({ day, nonce, onChanged }: { day: string; nonce: numb
                   ) : null}
                 </div>
               </div>
+              {showCancelReopen && !b.can.cancel_reopen ? (
+                <p role="note" style={{ marginTop: 8 }}>Đã có thay đổi trong thời gian mở duyệt. Cần duyệt lại để tạo phiên bản mới.</p>
+              ) : null}
               {s ? (
                 <div className="row" style={{ gap: 6, flexWrap: "wrap", marginTop: 8 }} aria-label="Tóm tắt kỳ">
                   <StatusPill tone="neutral">Xã phải báo giá {s.points}</StatusPill>

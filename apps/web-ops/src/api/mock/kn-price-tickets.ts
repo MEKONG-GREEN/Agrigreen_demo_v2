@@ -95,6 +95,14 @@ function seedOnce(): void {
   }
 }
 
+/** Dấu phiên bản nguồn của ngày, kể cả phiếu đã chuyển ngày / bị xóa và mọi lần đổi cảnh báo. */
+export function mockDayBoardRevision(day: string): string {
+  seedOnce();
+  return JSON.stringify(TICKETS.filter((t) => t.heads.some((h) => h.day === day)).map((t) => [
+    t.id, t.heads.length, [...t.lines].map(([item, vs]) => [item, vs.length]), [...t.alerts].map(([item, vs]) => [item, vs.length]),
+  ]));
+}
+
 /** Ngày báo giá theo lịch giả lập (T2–T6) — bảng giá W11.76. */
 export const priceQuoteDay = quote;
 

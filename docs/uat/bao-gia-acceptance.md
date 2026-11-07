@@ -21,3 +21,18 @@ Playwright kiểm luồng browser trên build mock. Đây là ba loại bằng c
 Lệnh chạy: từ gốc worktree dùng `scripts/pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./internal/kn/price/... ./migrations`;
 trong `apps/web-ops` dùng `npm ci`, `npx vitest run src/kn/price/points`, `npm run build:mock` và
 `npx playwright test tests/e2e/price-points182.spec.ts`. Ghi kết quả trên issue đúng SHA sau đủ CI/cổng; chỉ ticket merge vào dev.
+
+## PRICE-V2-SMALL-CR — hủy mở duyệt và nhắc nhập giá (#283)
+
+Theo Function chi tiết BRD Báo giá v2.0; FN-XA-03.04 BR-01/AC-01 loại xã đã gửi ngay ở lần 07:30.
+
+| Mã ca | Vai/phạm vi | Thao tác | Kết quả cần kiểm | FN/BR/AC |
+|---|---|---|---|---|
+| BG283-01 | Tỉnh có quyền duyệt | Mở duyệt; chưa sửa rồi Hủy mở duyệt | Nút hoạt động; về Đã duyệt phiên bản cũ, thêm một nhật ký; retry cùng khóa không thêm dòng | FN-TI-02.06 luồng phụ, BR-02 |
+| BG283-02 | Tỉnh có quyền duyệt | Sau mở duyệt: hiệu chỉnh, sửa ngày đi/tới, xóa, nhập thay hoặc mở lại cảnh báo | Hủy mở duyệt hiện nhưng disabled, không POST; gọi trực tiếp trả price.board_changed, không ghi sổ; phải duyệt lại tạo phiên bản mới | FN-TI-02.06 luồng phụ, BR-02/04 |
+| BG283-03 | Tỉnh chỉ xem/không QTNV; Admin chính thức; Xã/TW | Xem bảng giá đang mở duyệt | Không có thao tác Hủy mở duyệt; backend không cấp quyền. Tenant khác không thấy dữ liệu gốc | FN-TI-02.06 người dùng, phạm vi hiện hữu |
+| BG283-04 | Job lúc 07:30 | Một xã Đã gửi, một Bản nháp, một Chưa nhập (đã gửi ngày khác) | Chỉ hai xã chưa gửi có sự kiện chuông/email; xã Đã gửi không có trong hàng đợi | FN-XA-03.04 BR-01, AC-01 |
+| BG283-05 | Job lúc 10:30 | Xã Bản nháp gửi trước 10:30; xã còn lại chưa nhập | Chỉ xã chưa nhập nhận lần 2; chạy lặp không gửi trùng | FN-XA-03.04 AC-02 |
+| BG283-06 | Job nhiều tenant/ngày | Chạy trước giờ, ngày không báo giá, tenant khác có cùng mã xã | Không gửi trước giờ/ngoài ngày báo giá; trạng thái/người nhận không lẫn tenant hoặc ngày | FN-XA-03.04 BR-01/02/03 |
+
+Chạy `TestPrice283*` bằng pg-ephemeral và Vitest `src/kn/price/tickets/board-cancel.test.tsx`; cổng module/consumer theo [gia-dinh PRICE-V2-SMALL-CR](../kn/gia-dinh/PRICE-V2-SMALL-CR.md). Native PG kiểm bản công bố, băm sổ và outbox; build production mock kiểm tương tác giao diện.

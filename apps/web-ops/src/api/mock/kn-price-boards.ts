@@ -4,7 +4,7 @@
 // gọn từ internal/platform/price/app/board.go):
 //   - Duyệt khi đã qua giờ khóa, hết cảnh báo chưa xử lý, có dòng giá; khóa "Đang duyệt" một người 10 phút.
 //   - Duyệt → phiên bản mới (ảnh chụp dòng CT-04: min / max toàn tỉnh, trung bình P các xã); mở duyệt có lý do, trong 30
-//     ngày; hủy mở duyệt (giả lập không kiểm "đã sửa").
+//     ngày; hủy mở duyệt chỉ khi chưa đổi nguồn kể từ lần mở duyệt (FN-TI-02.06).
 //   - Cấp Tỉnh duyệt; Admin chỉ xem (vận hành chính thức); Cấp TW / Xã chỉ thấy phiên bản đã duyệt.
 // Dữ liệu là GIẢ LẬP. Trạng thái nằm trong bộ nhớ tab. Không float (Decimal BigInt).
 // ============================================================================
@@ -13,7 +13,7 @@ import { Decimal } from "@/kn/grid/decimal";
 import { json, problem, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
 import { addDay, vnToday } from "./kn-price-items";
-import { mockDayBoardSource, priceQuoteDay } from "./kn-price-tickets";
+import { mockDayBoardRevision, mockDayBoardSource, priceQuoteDay } from "./kn-price-tickets";
 
 type S = components["schemas"];
 type Role = "kn_tw" | "kn_tinh" | "kn_xa" | "admin";
@@ -31,6 +31,7 @@ interface BoardVer {
   actor_ref: string;
   at: string;
   lines: S["PriceBoardLine"][] | null; // chỉ thao tác approve
+  source_revision?: string; // chỉ thao tác reopen
 }
 
 const ME = "0190c0de-0000-7000-8000-0000000071a1";
@@ -115,6 +116,8 @@ function dto(role: Role, day: string): S["PriceBoard"] {
   const approve = [...vs].reverse().find((v) => v.action === "approve" && v.version === cur?.version);
   const lockedBy = state === "approving" ? cur!.actor_ref : null;
   const can = role === "kn_tinh";
+  const reopen = [...vs].reverse().find((v) => v.action === "reopen");
+  const changed = reopen?.source_revision !== undefined && reopen.source_revision !== mockDayBoardRevision(day);
   return {
     day,
     quote,
@@ -146,7 +149,7 @@ function dto(role: Role, day: string): S["PriceBoard"] {
       approve: can && blockers.length === 0 && (state === "open" || state === "reopened" || (state === "approving" && lockedBy === ME)),
       unlock: can && state === "approving" && lockedBy === ME,
       reopen: can && state === "approved" && day >= addDay(vnToday(), -30),
-      cancel_reopen: can && state === "reopened",
+      cancel_reopen: can && state === "reopened" && !changed,
     },
     blockers,
     reopen_days: 30,
@@ -206,10 +209,11 @@ function write(ctx: Ctx, action: BoardVer["action"]): Response {
       if (!(b.reason ?? "").trim()) return problem(422, "price.reason_required", "lý do mở duyệt");
       if (state !== "approved") return problem(409, "price.board_state", state);
       if (day < addDay(vnToday(), -30)) return problem(422, "price.reopen_expired", "30 ngày");
-      vs.push({ ...base, action, status: "reopened", reason: b.reason!.trim() });
+      vs.push({ ...base, action, status: "reopened", reason: b.reason!.trim(), source_revision: mockDayBoardRevision(day) });
       break;
     case "cancel_reopen":
       if (state !== "reopened") return problem(409, "price.board_state", state);
+      if (!v.can.cancel_reopen) return problem(409, "price.board_changed", "Đã có thay đổi trong thời gian mở duyệt — cần duyệt lại");
       vs.push({ ...base, action, status: "approved", reason: (b.reason ?? "").trim() || null });
       break;
   }
