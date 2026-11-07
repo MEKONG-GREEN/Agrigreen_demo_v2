@@ -271,10 +271,41 @@ type Outbreak struct {
 	HerdSize  int
 	Dead      int
 	DistanceM *float64 // tới tâm vùng (khi đọc trong vùng)
+	// CNTS v4.0 FN-11 BR-03 (#252): DB-15 số hộ bị ảnh hưởng, DB-16 diện tích thủy sản bị ảnh hưởng. NULL ở phiên bản v1.
+	AffectedHouseholds *int
+	AquaFarmedHa       *decimal.Decimal
+	AquaWildHa         *decimal.Decimal
+	RuleVersion        string
 }
 
 const outbreakCols = `outbreak_ref, seq, event, commune_code, disease_code, species_code, ST_Y(location), ST_X(location), as_of,
-  herd_size, dead`
+  herd_size, dead, affected_households, aqua_farmed_ha::text, aqua_wild_ha::text, rule_version`
+
+// outbreakDest trả đích Scan theo thứ tự outbreakCols; xong thì gọi finish để đổi diện tích chuỗi sang decimal.
+func outbreakDest(o *Outbreak) (dest []any, finish func() error) {
+	var farmed, wild *string
+	dest = []any{&o.Ref, &o.Version, &o.Event, &o.Commune, &o.Disease, &o.Species, &o.Location.Lat, &o.Location.Lng, &o.AsOf,
+		&o.HerdSize, &o.Dead, &o.AffectedHouseholds, &farmed, &wild, &o.RuleVersion}
+	return dest, func() error {
+		var err error
+		if o.AquaFarmedHa, err = optDecimal(farmed); err != nil {
+			return err
+		}
+		o.AquaWildHa, err = optDecimal(wild)
+		return err
+	}
+}
+
+func optDecimal(s *string) (*decimal.Decimal, error) {
+	if s == nil {
+		return nil, nil
+	}
+	d, err := decimal.NewFromString(*s)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
 
 // OutbreaksAt trả, với mỗi ổ dịch đã có ở ngày day, phiên bản diễn biến mới nhất có as_of <= day. inZone khác nil →
 // chỉ ổ dịch nằm trong hình của phiên bản vùng đó.
@@ -289,9 +320,11 @@ func OutbreaksAt(ctx context.Context, tx pgx.Tx, day time.Time, inZone *uuid.UUI
 	  ORDER BY as_of DESC, outbreak_ref`, day.Format(time.DateOnly), inZone)
 	return collect(rows, err, func(r pgx.Row) (Outbreak, error) {
 		var o Outbreak
-		err := r.Scan(&o.Ref, &o.Version, &o.Event, &o.Commune, &o.Disease, &o.Species, &o.Location.Lat, &o.Location.Lng, &o.AsOf,
-			&o.HerdSize, &o.Dead, &o.DistanceM)
-		return o, err
+		dest, finish := outbreakDest(&o)
+		if err := r.Scan(append(dest, &o.DistanceM)...); err != nil {
+			return o, err
+		}
+		return o, finish()
 	})
 }
 
@@ -299,10 +332,12 @@ func OutbreaksAt(ctx context.Context, tx pgx.Tx, day time.Time, inZone *uuid.UUI
 func LatestOutbreak(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (*Outbreak, error) {
 	return one(func() (Outbreak, error) {
 		var o Outbreak
-		err := tx.QueryRow(ctx, `SELECT `+outbreakCols+` FROM pf_extension.cnts_outbreak WHERE outbreak_ref = $1
-		  ORDER BY seq DESC LIMIT 1`, ref).Scan(&o.Ref, &o.Version, &o.Event, &o.Commune, &o.Disease, &o.Species, &o.Location.Lat,
-			&o.Location.Lng, &o.AsOf, &o.HerdSize, &o.Dead)
-		return o, err
+		dest, finish := outbreakDest(&o)
+		if err := tx.QueryRow(ctx, `SELECT `+outbreakCols+` FROM pf_extension.cnts_outbreak WHERE outbreak_ref = $1
+		  ORDER BY seq DESC LIMIT 1`, ref).Scan(dest...); err != nil {
+			return o, err
+		}
+		return o, finish()
 	}())
 }
 
@@ -366,5 +401,71 @@ func Places(ctx context.Context, tx pgx.Tx, inZone *uuid.UUID) ([]Place, error) 
 			p.Scale = &d
 		}
 		return p, nil
+	})
+}
+
+// ZoneOutbreak là một ổ dịch nằm trong hình của một phiên bản vùng.
+type ZoneOutbreak struct {
+	ZoneID      uuid.UUID // id phiên bản vùng
+	OutbreakRef uuid.UUID
+}
+
+// ZoneOutbreaks trả, với mỗi phiên bản vùng dạng đa giác trong zoneIDs, các ổ dịch (phiên bản diễn biến mới nhất có
+// as_of <= day) có vị trí nằm trong hình (ST_Covers) — nguồn số hộ, diện tích bị ảnh hưởng của vùng (CNTS v4.0 FN-18 BR-02).
+func ZoneOutbreaks(ctx context.Context, tx pgx.Tx, day time.Time, zoneIDs []uuid.UUID) ([]ZoneOutbreak, error) {
+	if len(zoneIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx, `WITH o AS (SELECT DISTINCT ON (outbreak_ref) outbreak_ref, location FROM pf_extension.cnts_outbreak
+	    WHERE as_of <= $1::date ORDER BY outbreak_ref, as_of DESC, seq DESC)
+	  SELECT z.id, o.outbreak_ref FROM pf_extension.cnts_map_zone z JOIN o ON ST_Covers(z.geom, o.location)
+	  WHERE z.id = ANY ($2::text[]::uuid[]) AND GeometryType(z.geom) IN ('POLYGON', 'MULTIPOLYGON')
+	  ORDER BY z.id, o.outbreak_ref`, day.Format(time.DateOnly), refStrings(zoneIDs))
+	return collect(rows, err, func(r pgx.Row) (ZoneOutbreak, error) {
+		var x ZoneOutbreak
+		err := r.Scan(&x.ZoneID, &x.OutbreakRef)
+		return x, err
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Lớp trang trại (CNTS v4.0 FN-18, ADR-0056 mục 9) — chỉ đọc danh sách hộ chăn nuôi (#251)
+// ---------------------------------------------------------------------------
+
+// Farm là một hộ chăn nuôi loại trang trại đang dùng, vị trí lấy từ lần check-in hiện hành (HCN-07). Không có họ tên,
+// SĐT chủ hộ (ở kho định danh).
+type Farm struct {
+	Ref           uuid.UUID // household_ref
+	Code          string    // HCN-01
+	Commune       string
+	Hamlet        string
+	LivestockType string // HCN-06: trang_trai_nho | trang_trai_vua | trang_trai_cong_nghiep
+	Species       []string
+	HeadCounts    []int64
+	Location      domain.Point
+	DistanceM     *float64
+}
+
+// Farms trả hộ có phiên bản hiện hành trạng thái Đang dùng và loại trang trại (ADR-0056 mục 9: không lấy hộ Chờ bổ sung
+// vị trí, Vô hiệu hóa — FN-10 BR-08, BR-07). inZone khác nil → chỉ hộ nằm trong hình của phiên bản vùng đó, kèm khoảng
+// cách tới tâm vùng.
+func Farms(ctx context.Context, tx pgx.Tx, inZone *uuid.UUID) ([]Farm, error) {
+	rows, err := tx.Query(ctx, `WITH z AS (SELECT geom FROM pf_extension.cnts_map_zone WHERE $1::uuid IS NOT NULL AND id = $1::uuid),
+	  h AS (SELECT DISTINCT ON (household_ref) household_ref, code, status, commune_code, hamlet, livestock_type, species_codes,
+	      head_counts, checkin_ref
+	    FROM pf_extension.cnts_livestock_household ORDER BY household_ref, seq DESC)
+	  SELECT h.household_ref, h.code, h.commune_code, coalesce(h.hamlet, ''), h.livestock_type, h.species_codes, h.head_counts,
+	    ST_Y(c.location), ST_X(c.location),
+	    CASE WHEN $1::uuid IS NOT NULL THEN round(ST_Distance(c.location::geography,
+	      ST_Centroid((SELECT geom FROM z))::geography)::numeric, 0)::float8 END
+	  FROM h JOIN pf_extension.cnts_livestock_household_checkin c ON c.id = h.checkin_ref
+	  WHERE h.status = 'active' AND h.livestock_type IN ('trang_trai_nho', 'trang_trai_vua', 'trang_trai_cong_nghiep')
+	    AND ($1::uuid IS NULL OR ST_Covers((SELECT geom FROM z), c.location))
+	  ORDER BY h.commune_code, h.code`, inZone)
+	return collect(rows, err, func(r pgx.Row) (Farm, error) {
+		var f Farm
+		err := r.Scan(&f.Ref, &f.Code, &f.Commune, &f.Hamlet, &f.LivestockType, &f.Species, &f.HeadCounts, &f.Location.Lat,
+			&f.Location.Lng, &f.DistanceM)
+		return f, err
 	})
 }

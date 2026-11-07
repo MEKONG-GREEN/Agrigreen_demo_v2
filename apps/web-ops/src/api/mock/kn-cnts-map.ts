@@ -2,7 +2,7 @@
 // Mỗi thay đổi là một phiên bản có ngày áp dụng (khóa lạc quan base_version, lý do); bản đồ ngày D lấy phiên bản mới nhất có
 // ngày áp dụng ≤ D. Vùng theo bán kính dựng bằng đa giác 64 cạnh (máy chủ dùng PostGIS ST_Buffer). Ổ dịch, điểm, hộ là dữ
 // liệu tổng hợp riêng của giả lập này, không phải thật.
-import { addDays, centerOf, circlePolygon, containsPoint, distanceM, KIND_LABEL } from "@/kn/cnts/map/api";
+import { addDays, centerOf, circlePolygon, containsPoint, distanceM, IMPACT_KINDS, KIND_LABEL, sumImpact } from "@/kn/cnts/map/api";
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { json, problem, validation, type Ctx, type Route } from "./http";
@@ -19,7 +19,15 @@ const C1 = AG_COMMUNES[0]!.code;
 const C2 = AG_COMMUNES[1]!.code;
 const OUTBREAKS: S["CNTSMapOutbreak"][] = [
   { ref: "0190f1c4-7d3e-7000-8000-0000000c8001", version: 2, status: "monitoring", commune_code: C1, disease_code: "DTHCP", disease_name: "Dịch tả heo châu Phi",
-    species_code: "HEO", species_name: "Heo", lat: 10.385, lng: 105.425, as_of: addDays(today(), -3), herd_size: 120, dead: 15 },
+    species_code: "HEO", species_name: "Heo", lat: 10.385, lng: 105.425, as_of: addDays(today(), -3), herd_size: 120, dead: 15,
+    affected_households: 3, aqua_farmed_ha: null, aqua_wild_ha: null, legacy: false },
+];
+// Lớp trang trại (CNTS v4.0 FN-18): hộ chăn nuôi Đang dùng loại trang trại, vị trí check-in hiện hành.
+const FARMS: S["CNTSMapFarm"][] = [
+  { household_ref: "0190f1c4-7d3e-7000-8000-0000000c6001", code: "HCN0000001", commune_code: C1, hamlet: "Ấp Bình Hòa", livestock_type: "trang_trai_vua",
+    livestock_type_label: "Trang trại vừa", animals: [{ species_code: "HEO", species_name: "Heo", head_count: 450 }], lat: 10.39, lng: 105.43 },
+  { household_ref: "0190f1c4-7d3e-7000-8000-0000000c6002", code: "HCN0000002", commune_code: C2, hamlet: null, livestock_type: "trang_trai_cong_nghiep",
+    livestock_type_label: "Trang trại công nghiệp", animals: [{ species_code: "GA", species_name: "Gà", head_count: 20000 }], lat: 10.52, lng: 105.46 },
 ];
 const PLACES: S["CNTSMapPlace"][] = [
   { kind: "site", ref: "0190f1c4-7d3e-7000-8000-0000000c7201", site_ref: "0190f1c4-7d3e-7000-8000-0000000c7201", project_ref: "0190f1c4-7d3e-7000-8000-0000000c7101",
@@ -125,8 +133,10 @@ function contents(w: Who, z: ZoneCore, day: string) {
   const c = centerOf(z.geometry);
   const places = PLACES.filter((p) => sees(w, p.commune_code) && containsPoint(z.geometry, [p.lng, p.lat])).map((p) => ({ ...p, distance_m: Math.round(distanceM(c, [p.lng, p.lat])) }));
   const obs = OUTBREAKS.filter((o) => o.as_of <= day && sees(w, o.commune_code) && containsPoint(z.geometry, [o.lng, o.lat])).map((o) => ({ ...o, distance_m: Math.round(distanceM(c, [o.lng, o.lat])) }));
-  return { date: day, zone: view(w, z), places, outbreaks: obs, site_count: places.filter((p) => p.kind === "site").length,
-    household_count: places.filter((p) => p.kind === "household").length, outbreak_count: obs.length };
+  const farms = FARMS.filter((f) => sees(w, f.commune_code) && containsPoint(z.geometry, [f.lng, f.lat])).map((f) => ({ ...f, distance_m: Math.round(distanceM(c, [f.lng, f.lat])) }));
+  return { date: day, zone: view(w, z), places, farms, outbreaks: obs, site_count: places.filter((p) => p.kind === "site").length,
+    household_count: places.filter((p) => p.kind === "household").length, farm_count: farms.length, outbreak_count: obs.length,
+    impact: IMPACT_KINDS.includes(z.kind) ? sumImpact(obs) : null };
 }
 
 export const cntsMapRoutes: Route[] = [
@@ -137,8 +147,11 @@ export const cntsMapRoutes: Route[] = [
       seed();
       const w = who(ctx);
       const day = ctx.url.searchParams.get("date") || today();
-      return json({ date: day, can_draw: drawer(w), zones: zonesAt(day).filter((z) => seesZone(w, z)).map((z) => view(w, z)),
+      const zones = zonesAt(day).filter((z) => seesZone(w, z));
+      return json({ date: day, can_draw: drawer(w), zones: zones.map((z) => view(w, z)),
         outbreaks: OUTBREAKS.filter((o) => o.as_of <= day && sees(w, o.commune_code)), places: PLACES.filter((p) => sees(w, p.commune_code)),
+        farms: FARMS.filter((f) => sees(w, f.commune_code)),
+        zone_impacts: zones.filter((z) => IMPACT_KINDS.includes(z.kind)).map((z) => ({ zone_ref: z.ref, ...sumImpact(contents(w, z, day).outbreaks) })),
         plot_stats: [{ commune_code: C1, plots: 42, area_ha: "63.5000" }].filter((p) => sees(w, p.commune_code)), plots_ready: true });
     },
   },

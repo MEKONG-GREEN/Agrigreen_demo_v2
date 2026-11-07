@@ -14,9 +14,9 @@ import (
 )
 
 // KNSPLIT-2-ACCOUNTS-UNIT-DELEGATION (#195): owner contract for internal units,
-// time-limited delegations and the people scope. These are declarations only:
-// accounts keeps its compatibility path until the shared rollout (#196) injects a
-// provider. A configured provider is final; its errors never select the legacy
+// time-limited delegations and the people scope. The shared rollout (#196)
+// injects a provider in API/worker; an absent provider retains compatibility.
+// A configured provider is final; its errors never select the legacy
 // path, and its decisions never change Principal, tenant, realm roles or MFA.
 //
 // Definitions are trusted startup data. Decisions are computed only from the

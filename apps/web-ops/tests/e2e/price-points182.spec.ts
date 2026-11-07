@@ -40,7 +40,7 @@ async function openPoints(page: Page, regions = false) {
       .selectOption("an_giang");
 }
 
-test("price-points182: list → thêm → sửa → phân công có URL và Log, giữ bộ lọc", async ({
+test("price-points182: list → thêm → sửa → ngưng có URL và Log, cán bộ chỉ xem, giữ bộ lọc", async ({
   page,
 }) => {
   await page.clock.install({ time: new Date("2026-11-05T02:00:00Z") });
@@ -68,17 +68,19 @@ test("price-points182: list → thêm → sửa → phân công có URL và Log,
   await page.getByLabel(/Ghi chú/).fill("Đối chiếu danh mục xã báo giá182");
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(log).toContainText("Đối chiếu danh mục xã báo giá182");
-  await page.getByRole("link", { name: "Phân công", exact: true }).click();
-  await expect(page).toHaveURL(/XBG0004\/phan-cong\?/);
-  const who = page.getByRole("combobox", { name: /^Cán bộ/ });
-  const ref = await who
-    .locator("option")
-    .filter({ hasText: "Lê Văn Cường" })
-    .getAttribute("value");
-  await who.selectOption(ref!);
-  await page.getByRole("button", { name: "Lưu", exact: true }).click();
-  await expect(page).toHaveURL(/xa-bao-gia\/XBG0004\?/);
-  await expect(log).toContainText("Phân công cán bộ");
+  await expect(page.getByRole("link", { name: "Phân công", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: /Đã lưu|Lưu thành công/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Ngưng", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Ngưng xã XBG0004", exact: true });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Xác nhận ngưng", exact: true }).click();
+  await expect(dialog.getByRole("textbox", { name: "Lý do ngưng", exact: true })).toHaveAttribute("aria-invalid", "true");
+  await dialog.getByRole("textbox", { name: "Lý do ngưng", exact: true }).fill("Kết thúc thu thập giá xã210");
+  await dialog.getByLabel("Ngưng từ ngày", { exact: true }).fill("2026-11-07");
+  await dialog.getByRole("button", { name: "Xác nhận ngưng", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(log).toContainText("Ngưng xã báo giá");
+  await expect(log).toContainText("Kết thúc thu thập giá xã210");
   await page
     .getByRole("link", { name: "Danh mục xã báo giá", exact: true })
     .click();
@@ -86,6 +88,14 @@ test("price-points182: list → thêm → sửa → phân công có URL và Log,
   await expect(page.getByLabel("Nhóm vùng", { exact: true })).toHaveValue(
     "an_giang",
   );
+  await page.getByLabel("Tại ngày", { exact: true }).fill("2026-11-07");
+  const retired = page.getByRole("table", { name: "Danh mục xã báo giá", exact: true }).getByRole("row").filter({ hasText: "XBG0004" });
+  await expect(retired).toContainText("Ngưng");
+  await retired.getByRole("link", { name: "Chi tiết", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Ngưng", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("table", { name: "Lịch sử phân công", exact: true })).toBeVisible();
+  const removed = await page.request.get("/kn/bao-gia/xa-bao-gia/XBG0004/phan-cong");
+  expect(removed.status()).toBe(404);
 });
 
 test("price-points182: nhóm vùng trên trang riêng, required và Log không giả", async ({

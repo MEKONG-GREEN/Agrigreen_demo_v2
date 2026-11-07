@@ -8,11 +8,11 @@ import {
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { SelectField, TextField, validateForm } from "@/components/form";
 import { DetailPage, LabelValueBlock } from "@/components/patterns/detail";
-import { LoadState, useAction, useLoad } from "@/kn/cycle/common";
+import { LoadState, useLoad } from "@/kn/cycle/common";
 import {
   createPricePointApi,
   dmy,
@@ -37,7 +37,8 @@ import {
   RegionSummary,
   pointFieldErrors,
 } from "./point-view";
-import { isCalendarDay } from "../calendar-routes";
+import { usePointAction } from "./point-action";
+import { RetireConfirmation } from "./point-retire-dialog";
 
 export function PricePointDetailScreen({ route }: { route: PointRoute }) {
   const auth = useAuth();
@@ -56,11 +57,12 @@ function PointData({
   pa: PricePointApi;
   filters: PointFilters;
 }) {
+  const [nonce, setNonce] = useState(0);
   const status = useLoad(() => pa.status(), [pa]);
-  const regions = useLoad(() => pa.regions(f.at), [pa, f.at]);
+  const regions = useLoad(() => pa.regions(f.at), [pa, f.at, nonce]);
   const point = useLoad(
     route.kind === "point" ? () => pa.point(route.code, f.at) : null,
-    [pa, route.kind, "code" in route ? route.code : "", f.at],
+    [pa, route.kind, "code" in route ? route.code : "", f.at, nonce],
   );
   const canManage = status.data?.can_manage === true;
   const back = { href: pointHref("", f), label: "Danh mục xã báo giá" };
@@ -147,21 +149,10 @@ function PointData({
                         canManage={canManage}
                       />
                     );
-                  if (
-                    route.mode === "officers" &&
-                    canManage &&
-                    detail.point.state !== "retired"
-                  )
-                    return (
-                      <OfficerForm
-                        pa={pa}
-                        detail={detail}
-                        filters={f}
-                        canManage={canManage}
-                      />
-                    );
                   return (
                     <PointDetail
+                      pa={pa}
+                      onRetired={() => setNonce((value) => value + 1)}
                       detail={detail}
                       filters={f}
                       canManage={canManage}
@@ -198,28 +189,6 @@ function ReadOnly({
     </DetailPage>
   );
 }
-function useLiveAction() {
-  const action = useAction();
-  const alive = useRef(true);
-  const lock = useRef(false);
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-  const run = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
-    if (lock.current || !alive.current) return null;
-    lock.current = true;
-    try {
-      const r = await action.run(fn);
-      return alive.current ? r : null;
-    } finally {
-      lock.current = false;
-    }
-  };
-  return { ...action, run };
-}
 function Cancel({ href }: { href: string }) {
   return (
     <Link className="btn btn-o" href={href}>
@@ -228,17 +197,22 @@ function Cancel({ href }: { href: string }) {
   );
 }
 function PointDetail({
+  pa,
+  onRetired,
   detail: d,
   filters: f,
   canManage,
   showReadOnly,
 }: {
+  pa: PricePointApi;
+  onRetired: () => void;
   detail: PricePointDetail;
   filters: PointFilters;
   canManage: boolean;
   showReadOnly: boolean;
 }) {
   const p = d.point;
+  const [retire, setRetire] = useState(false);
   return (
     <DetailPage
       title={`Xã ${p.code} — ${p.name}`}
@@ -247,15 +221,16 @@ function PointDetail({
       actions={
         canManage && p.state !== "retired" ? (
           <span className="row">
-            <Link
-              className="btn btn-o"
-              href={pointHref(`${p.code}/phan-cong`, f)}
-            >
-              Phân công
-            </Link>
             <Link className="btn btn-p" href={pointHref(`${p.code}/sua`, f)}>
               Sửa
             </Link>
+            <button
+              type="button"
+              className="btn btn-d"
+              onClick={() => setRetire(true)}
+            >
+              Ngưng
+            </button>
           </span>
         ) : undefined
       }
@@ -296,6 +271,17 @@ function PointDetail({
         </p>
       )}
       <OfficerHistory detail={d} />
+      {retire && (
+        <RetireConfirmation
+          value={{ kind: "point", value: p }}
+          pa={pa}
+          canManage={canManage}
+          onClose={(changed) => {
+            setRetire(false);
+            if (changed) onRetired();
+          }}
+        />
+      )}
     </DetailPage>
   );
 }
@@ -315,7 +301,7 @@ function PointForm({
   canManage: boolean;
 }) {
   const p = detail?.point;
-  const act = useLiveAction();
+  const act = usePointAction();
   const router = useRouter();
   const [b, setB] = useState<PointFields>({
     admin_unit_code: mode === "create" ? "" : (p?.admin_unit_code ?? ""),
@@ -456,7 +442,7 @@ function RegionForm({
 }) {
   const [name, setName] = useState(region?.name ?? "");
   const [local, setLocal] = useState<FieldErrors>({});
-  const act = useLiveAction();
+  const act = usePointAction();
   const router = useRouter();
   const errors = pointFieldErrors(act.problem, local);
   const save = async () => {
@@ -509,178 +495,6 @@ function RegionForm({
         onChange={setName}
         error={errors.name}
       />
-    </DetailPage>
-  );
-}
-function OfficerForm({
-  pa,
-  detail,
-  filters: f,
-  canManage,
-}: {
-  pa: PricePointApi;
-  detail: PricePointDetail;
-  filters: PointFilters;
-  canManage: boolean;
-}) {
-  const p = detail.point;
-  const [role, setRole] = useState<"xa" | "tinh">("xa");
-  const [ref, setRef] = useState("");
-  const [from, setFrom] = useState("");
-  const [local, setLocal] = useState<FieldErrors>({});
-  const act = useLiveAction();
-  const router = useRouter();
-  const directory = useLoad(
-    () =>
-      pa
-        .officers(role === "xa" ? "XA" : "TINH")
-        .then((data) => ({ ...data, role })),
-    [pa, role],
-  );
-  const current = role === "xa" ? p.officer_ref : p.owner_ref;
-  const errors = pointFieldErrors(act.problem, local);
-  const save = async (clear: boolean) => {
-    if (
-      !canManage ||
-      act.busy ||
-      directory.loading ||
-      directory.problem ||
-      directory.data?.role !== role
-    )
-      return;
-    const checked = validateForm(
-      { officer_ref: ref, valid_from: from },
-      {
-        officer_ref: { kind: "text", required: !clear, maxLength: 36 },
-        valid_from: { kind: "text", maxLength: 10 },
-      },
-    );
-    if (from && !isCalendarDay(from))
-      checked.errors.valid_from = "Ngày không hợp lệ.";
-    if (
-      !clear &&
-      !checked.errors.officer_ref &&
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        ref,
-      )
-    )
-      checked.errors.officer_ref = "Mã tài khoản phải là UUID hợp lệ.";
-    if (
-      !clear &&
-      !checked.errors.officer_ref &&
-      directory.data?.directory &&
-      !directory.data.officers.some((o) => o.ref === ref)
-    )
-      checked.errors.officer_ref = "Chọn cán bộ trong danh bạ được cấp.";
-    if (clear && !current) return;
-    setLocal(checked.errors);
-    if (Object.keys(checked.errors).length) return;
-    const result = await act.run(() =>
-      pa.assignOfficer(p.code, {
-        role,
-        officer_ref: clear ? null : ref,
-        valid_from: from || undefined,
-      }),
-    );
-    if (result) router.push(pointHref(p.code, f));
-  };
-  const back = { href: pointHref(p.code, f), label: `Xã ${p.code}` };
-  return (
-    <DetailPage
-      title={`Phân công — ${p.code} ${p.name}`}
-      back={back}
-      log={<PointLog detail={detail} />}
-      actions={
-        <span className="row">
-          <Cancel href={back.href} />
-          {current && (
-            <button
-              type="button"
-              className="btn btn-o"
-              disabled={!canManage || act.busy}
-              onClick={() => save(true)}
-            >
-              Bỏ phân công
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-p"
-            disabled={
-              !canManage ||
-              act.busy ||
-              directory.loading ||
-              !!directory.problem ||
-              directory.data?.role !== role
-            }
-            onClick={() => save(false)}
-          >
-            Lưu
-          </button>
-        </span>
-      }
-    >
-      {act.view}
-      <SelectField
-        label="Vai phụ trách"
-        required
-        value={role}
-        onChange={(value) => {
-          if (value === "xa" || value === "tinh") {
-            setRole(value);
-            setRef("");
-            setLocal({});
-          }
-        }}
-        options={[
-          { value: "xa", label: "Cán bộ Xã phụ trách chính" },
-          { value: "tinh", label: "Cán bộ Cấp Tỉnh" },
-        ]}
-      />
-      {current && (
-        <p className="alert alert-warn">
-          Đang phân công:{" "}
-          {officerLabel(
-            current,
-            role === "xa" ? p.officer_name : p.owner_name,
-            "",
-          )}
-          . Người mới thay thế từ ngày hiệu lực; lịch sử được giữ.
-        </p>
-      )}
-      <LoadState s={directory}>
-        {(d) =>
-          d.directory ? (
-            <SelectField
-              label="Cán bộ"
-              required
-              value={ref}
-              onChange={setRef}
-              error={errors.officer_ref}
-              options={d.officers.map((o) => ({
-                value: o.ref,
-                label: `${o.name}${o.communes.length ? ` (${o.communes.join(", ")})` : ""}`,
-              }))}
-            />
-          ) : (
-            <TextField
-              label="Mã tham chiếu tài khoản (UUID)"
-              required
-              value={ref}
-              onChange={setRef}
-              error={errors.officer_ref}
-              maxLength={36}
-            />
-          )
-        }
-      </LoadState>
-      <PointDateField
-        label="Từ ngày"
-        value={from}
-        onChange={setFrom}
-        error={errors.valid_from}
-      />
-      <OfficerHistory detail={detail} />
     </DetailPage>
   );
 }

@@ -17,7 +17,11 @@ import (
 // observeRoleCatalog chạy cùng kịch bản HTTP trên một module accounts và trả kết quả đã chuẩn hóa (không id, tập
 // sắp xếp) để so trước/sau.
 func observeRoleCatalog(t *testing.T, roles *accport.RoleCatalog) map[string]any {
-	f := newFixture(t, fixtureDeps{Roles: roles})
+	return observeRoleCatalogWithDeps(t, fixtureDeps{Roles: roles})
+}
+
+func observeRoleCatalogWithDeps(t *testing.T, deps fixtureDeps) map[string]any {
+	f := newFixture(t, deps)
 	out := map[string]any{}
 	nat, prov := f.as(f.national, accport.RoleAccountAdmin), f.as(f.p91, accport.RoleAccountAdminProvince)
 	platform := f.as(f.national, "platform_admin")

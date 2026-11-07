@@ -11685,7 +11685,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng, ổ dịch BM-10, điểm/hộ mô hình có tọa độ, thống kê thửa HTX theo xã (FN-18, W11.52) */
+        /** Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng (kèm số hộ, diện tích thủy sản bị ảnh hưởng), ổ dịch BM-10, điểm/hộ mô hình có tọa độ, lớp trang trại, thống kê thửa HTX theo xã (FN-18, W11.52, CNTS v4.0) */
         get: operations["extensionCntsMapLayers"];
         put?: never;
         post?: never;
@@ -11894,7 +11894,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Điểm trình diễn, hộ mô hình, ổ dịch nằm trong vùng ở ngày xem (vùng đệm 3 km/10 km), kèm khoảng cách tới tâm */
+        /** Điểm trình diễn, hộ mô hình, trang trại, ổ dịch nằm trong vùng ở ngày xem (vùng đệm 3 km/10 km), kèm khoảng cách tới tâm, số hộ và diện tích thủy sản bị ảnh hưởng */
         get: operations["extensionCntsMapZoneContents"];
         put?: never;
         post?: never;
@@ -25957,6 +25957,14 @@ export interface components {
             as_of: string;
             herd_size: number;
             dead: number;
+            /** @description DB-15 số hộ bị ảnh hưởng của phiên bản; dữ liệu cũ một hộ (legacy) = 1 */
+            affected_households: number;
+            /** @description DB-16 diện tích thủy sản nuôi trồng bị ảnh hưởng (ha) */
+            aqua_farmed_ha: string | null;
+            /** @description DB-16 diện tích thủy sản khai thác bị ảnh hưởng (ha) */
+            aqua_wild_ha: string | null;
+            /** @description Phiên bản ghi trước CNTS v4.0 (ổ dịch một hộ — ADR-0056 mục 8) */
+            legacy: boolean;
             distance_m?: number;
         };
         CNTSDiaryFeedPurchase: {
@@ -26021,6 +26029,8 @@ export interface components {
             zones: components["schemas"]["CNTSMapZone"][];
             outbreaks: components["schemas"]["CNTSMapOutbreak"][];
             places: components["schemas"]["CNTSMapPlace"][];
+            farms: components["schemas"]["CNTSMapFarm"][];
+            zone_impacts: components["schemas"]["CNTSMapZoneImpact"][];
             plot_stats: components["schemas"]["CNTSMapPlotStat"][];
             plots_ready: boolean;
         };
@@ -26037,10 +26047,13 @@ export interface components {
             date: string;
             zone: components["schemas"]["CNTSMapZone"];
             places: components["schemas"]["CNTSMapPlace"][];
+            farms: components["schemas"]["CNTSMapFarm"][];
             outbreaks: components["schemas"]["CNTSMapOutbreak"][];
             site_count: number;
             household_count: number;
+            farm_count: number;
             outbreak_count: number;
+            impact: components["schemas"]["CNTSMapImpact"] | null;
         };
         CNTSDiaryOfficerNote: {
             /** Format: date */
@@ -26049,6 +26062,13 @@ export interface components {
             officer?: string;
             content: string;
             farmer_opinion?: string;
+        };
+        /** @description Số hộ, diện tích thủy sản bị ảnh hưởng của vùng dịch/vùng bị uy hiếp/vùng đệm — cộng phiên bản diễn biến mới nhất của các ổ dịch trong vùng (FN-18 BR-02, FN-11 BR-03) */
+        CNTSMapImpact: {
+            outbreak_count: number;
+            affected_households: number;
+            aqua_farmed_ha: string;
+            aqua_wild_ha: string;
         };
         CNTSDiaryTables: {
             /** @description NC-09 mục 3 — mua thức ăn chăn nuôi */
@@ -26059,6 +26079,14 @@ export interface components {
             vaccinations?: components["schemas"]["CNTSDiaryVaccination"][];
             sales?: components["schemas"]["CNTSDiarySale"][];
             officer_notes?: components["schemas"]["CNTSDiaryOfficerNote"][];
+        };
+        CNTSMapZoneImpact: {
+            /** Format: uuid */
+            zone_ref: string;
+            outbreak_count: number;
+            affected_households: number;
+            aqua_farmed_ha: string;
+            aqua_wild_ha: string;
         };
         CNTSDiaryEntryVersion: {
             /** @enum {string} */
@@ -26078,6 +26106,11 @@ export interface components {
             updated_by: string;
             updated_by_display: string | null;
         };
+        CNTSMapFarmAnimal: {
+            species_code: string;
+            species_name: string | null;
+            head_count: number;
+        };
         CNTSDiaryPhoto: {
             /** Format: uuid */
             file_ref: string;
@@ -26094,6 +26127,21 @@ export interface components {
             uploaded_by: string;
             /** Format: date-time */
             uploaded_at: string;
+        };
+        /** @description Hộ chăn nuôi Đang dùng loại trang trại, vị trí check-in hiện hành (ADR-0056 mục 9); không có họ tên, SĐT chủ hộ */
+        CNTSMapFarm: {
+            /** Format: uuid */
+            household_ref: string;
+            code: string;
+            commune_code: string;
+            hamlet: string | null;
+            /** @enum {string} */
+            livestock_type: "trang_trai_nho" | "trang_trai_vua" | "trang_trai_cong_nghiep";
+            livestock_type_label: string;
+            animals: components["schemas"]["CNTSMapFarmAnimal"][];
+            lat: number;
+            lng: number;
+            distance_m?: number;
         };
         CNTSDiaryEntry: {
             /** Format: uuid */

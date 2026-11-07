@@ -7,7 +7,6 @@ package app
 // migration cho gói. Admin quản lý; mọi thay đổi là dòng sổ trước → sau; không xóa cứng — "ngừng" có lý do.
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,7 +21,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/seeddata"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/store"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -84,7 +82,7 @@ type InternalUnitInput struct {
 }
 
 // checkUnitRefs kiểm Nút (cấp 1/2, đang hoạt động) và phòng ban (chưa xóa, cùng đơn vị) qua cổng pf/party.
-func (s *Service) checkUnitRefs(ctx context.Context, u port.InternalUnit, checkOrg bool) error {
+func (s *Service) checkUnitRefs(ctx context.Context, u port.InternalUnit, checkOrg bool, definition port.InternalUnitDefinition) error {
 	if s.Orgs == nil || s.Departments == nil {
 		return ErrDependency.WithDetail("chưa nối pf/party")
 	}
@@ -96,7 +94,7 @@ func (s *Service) checkUnitRefs(ctx context.Context, u port.InternalUnit, checkO
 		if err != nil {
 			return err
 		}
-		if !o.Active || (o.Kind != partyport.OrgTTKNNational && o.Kind != partyport.OrgTTKNProvince) {
+		if !o.Active || !slices.Contains(definition.OrgKinds, string(o.Kind)) {
 			return ErrInternalUnitOrg
 		}
 	}
@@ -130,19 +128,23 @@ func (s *Service) CreateInternalUnit(ctx context.Context, in InternalUnitInput, 
 	if in.OrgRef == uuid.Nil {
 		return port.InternalUnit{}, false, problem.Validation.WithField("org_ref", "bắt buộc — Nút cấp 1 hoặc cấp 2")
 	}
-	u, err := domain.NormalizeInternalUnit(port.InternalUnit{OrgRef: in.OrgRef, Code: in.Code, Kind: in.Kind, Name: in.Name,
-		DepartmentCode: in.DepartmentCode, SortOrder: in.SortOrder, Active: true})
+	definition, err := s.InternalUnitDefinition()
+	if err != nil {
+		return port.InternalUnit{}, false, err
+	}
+	u, err := domain.NormalizeInternalUnitWithDefinition(port.InternalUnit{OrgRef: in.OrgRef, Code: in.Code, Kind: in.Kind, Name: in.Name,
+		DepartmentCode: in.DepartmentCode, SortOrder: in.SortOrder, Active: true}, definition)
 	if err != nil {
 		return port.InternalUnit{}, false, fieldProblem(err)
 	}
-	return s.createInternalUnit(ctx, a.p, u, "iunit:create:"+idem)
+	return s.createInternalUnit(ctx, a.p, u, "iunit:create:"+idem, definition)
 }
 
-func (s *Service) createInternalUnit(ctx context.Context, p authz.Principal, u port.InternalUnit, key string) (port.InternalUnit, bool, error) {
+func (s *Service) createInternalUnit(ctx context.Context, p authz.Principal, u port.InternalUnit, key string, definition port.InternalUnitDefinition) (port.InternalUnit, bool, error) {
 	if prev, ok, err := s.unitReplay(ctx, p.TenantID, key, uuid.Nil); err != nil || ok {
 		return prev, ok, err
 	}
-	if err := s.checkUnitRefs(ctx, u, true); err != nil {
+	if err := s.checkUnitRefs(ctx, u, true, definition); err != nil {
 		return port.InternalUnit{}, false, err
 	}
 	now := s.now()
@@ -163,7 +165,7 @@ func (s *Service) createInternalUnit(ctx context.Context, p authz.Principal, u p
 		return store.PutInternalUnit(ctx, tx, e)
 	})
 	if errors.Is(err, ledger.ErrDuplicate) {
-		return s.createInternalUnit(ctx, p, u, key) // bên thua của hai request song song đọc lại
+		return s.createInternalUnit(ctx, p, u, key, definition) // bên thua của hai request song song đọc lại
 	}
 	return out, false, err
 }
@@ -200,6 +202,10 @@ func (s *Service) writeInternalUnit(ctx context.Context, id uuid.UUID, key, acti
 	if err != nil {
 		return port.InternalUnit{}, err
 	}
+	definition, err := s.InternalUnitDefinition()
+	if err != nil {
+		return port.InternalUnit{}, err
+	}
 	if prev, ok, err := s.unitReplay(ctx, a.p.TenantID, key, id); err != nil || ok {
 		return prev, err
 	}
@@ -218,7 +224,7 @@ func (s *Service) writeInternalUnit(ctx context.Context, id uuid.UUID, key, acti
 	if err != nil || next == nil {
 		return *cur, err
 	}
-	if err := s.checkUnitRefs(ctx, *next, false); err != nil {
+	if err := s.checkUnitRefs(ctx, *next, false, definition); err != nil {
 		return port.InternalUnit{}, err
 	}
 	now := s.now()
@@ -246,11 +252,15 @@ func (s *Service) writeInternalUnit(ctx context.Context, id uuid.UUID, key, acti
 
 // UpdateInternalUnit sửa loại, tên, phòng ban, thứ tự (PUT). Mã không đổi. Không đổi gì → không ghi sổ.
 func (s *Service) UpdateInternalUnit(ctx context.Context, id uuid.UUID, in InternalUnitInput) (port.InternalUnit, error) {
+	definition, err := s.InternalUnitDefinition()
+	if err != nil {
+		return port.InternalUnit{}, err
+	}
 	return s.writeInternalUnit(ctx, id, "iunit:put:"+ids.New().String(), domain.UnitUpdated, nil,
 		func(cur port.InternalUnit) (*port.InternalUnit, error) {
 			next := cur
 			next.Kind, next.Name, next.DepartmentCode, next.SortOrder = in.Kind, in.Name, in.DepartmentCode, in.SortOrder
-			n, err := domain.NormalizeInternalUnit(next)
+			n, err := domain.NormalizeInternalUnitWithDefinition(next, definition)
 			if err != nil {
 				return nil, fieldProblem(err)
 			}
@@ -412,28 +422,29 @@ func (s *Service) SeedInternalUnits(ctx context.Context, unit uuid.UUID, idem st
 	if unit == uuid.Nil {
 		return UnitSeedResult{}, problem.Validation.WithField("org_ref", "bắt buộc — Nút cấp 1 hoặc cấp 2")
 	}
-	var f unitSeedFile
-	dec := json.NewDecoder(bytes.NewReader(seeddata.InternalUnits))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&f); err != nil || f.Format != "agrigreen.internal-units/v1" {
-		return UnitSeedResult{}, fmt.Errorf("accounts: dữ liệu nhúng internal-units lỗi: %w", err)
+	definition, err := s.InternalUnitDefinition()
+	if err != nil {
+		return UnitSeedResult{}, err
+	}
+	if s.Departments == nil {
+		return UnitSeedResult{}, ErrDependency.WithDetail("chưa nối pf/party")
 	}
 	depts, err := s.Departments.UnitDepartments(ctx, unit)
 	if err != nil {
 		return UnitSeedResult{}, err
 	}
-	res := UnitSeedResult{Created: []port.InternalUnit{}, Status: f.Status}
-	for _, su := range f.Units {
+	res := UnitSeedResult{Created: []port.InternalUnit{}, Status: definition.SeedStatus}
+	for _, su := range definition.Seed {
 		dept := strings.TrimSpace(su.DepartmentCode)
 		if dept != "" && !slices.ContainsFunc(depts, func(d partyport.Department) bool { return d.Code == dept && !d.Retired }) {
 			dept = ""
 		}
-		u, err := domain.NormalizeInternalUnit(port.InternalUnit{OrgRef: unit, Code: su.Code, Kind: su.Kind, Name: su.Name,
-			DepartmentCode: dept, SortOrder: su.SortOrder, Active: true})
+		u, err := domain.NormalizeInternalUnitWithDefinition(port.InternalUnit{OrgRef: unit, Code: su.Code, Kind: su.Kind, Name: su.Name,
+			DepartmentCode: dept, SortOrder: su.SortOrder, Active: true}, definition)
 		if err != nil {
 			return res, fmt.Errorf("accounts: đơn vị nội bộ nhúng %s: %w", su.Code, err)
 		}
-		out, replayed, err := s.createInternalUnit(ctx, a.p, u, "seed:iunit:"+unit.String()+":"+u.Code)
+		out, replayed, err := s.createInternalUnit(ctx, a.p, u, "seed:iunit:"+unit.String()+":"+u.Code, definition)
 		switch {
 		case errors.Is(err, ErrInternalUnitCodeTaken):
 			res.Existing++
