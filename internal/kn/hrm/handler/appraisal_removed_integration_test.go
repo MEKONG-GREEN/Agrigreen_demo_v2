@@ -120,7 +120,7 @@ func TestHRMRemovedSelfMigrationPreservesHistoryHC0(t *testing.T) {
 		return n, hash
 	}
 	beforeCount, beforeHash := fingerprint()
-	sql, err := migrations.FS.ReadFile("pf/20261107004623_pf_hrm_remove_self_appraisal.up.sql")
+	sql, err := migrations.FS.ReadFile("pf/20261107044521_pf_hrm_remove_self_appraisal.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
