@@ -37,7 +37,10 @@ func (h Handler) registerSchedule(rg *gin.RouterGroup) {
 	g.GET("/:id/log", h.scheduleLog)
 	g.POST("/:id/approve", h.approveSchedule)
 	g.POST("/:id/request-changes", h.requestChanges)
-	g.POST("/:id/items/:item_id/checkin", h.checkin)                    // W11.46 (CNTS CV-07)
+	g.POST("/:id/items/:item_id/checkin", h.checkin)   // W11.46 (CNTS CV-07)
+	g.POST("/:id/items/:item_id/checkout", h.checkout) // CNTS v4.0 CV-08 (#249)
+	g.GET("/:id/items/:item_id/checkin/photo", h.visitPhoto(app.VisitCheckin))
+	g.GET("/:id/items/:item_id/checkout/photo", h.visitPhoto(app.VisitCheckout))
 	rg.POST("/extension/cnts/weekly-plan/schedule", h.scheduleFromPlan) // BF-CN-WEEKLY (UP-06)
 }
 

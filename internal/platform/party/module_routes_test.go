@@ -19,9 +19,10 @@ func routeSet(register func(*gin.RouterGroup)) map[string]bool {
 	return out
 }
 
-// KNSPLIT-2 #118: bảng đăng ký là hợp đồng — pf/party không còn đăng ký danh mục phòng ban (/v1/departments,
-// /v1/departments/:id*) ở Application lẫn Admin API; chủ KN (internal/kn/extension/departments) đăng ký qua
-// port.DepartmentAdmin. Cây module của phòng ban, menu, khu vực, cây tổ chức và nạp phòng ban mặc định vẫn ở party.
+// KNSPLIT-2 #118, #222: bảng đăng ký là hợp đồng — pf/party không còn đăng ký danh mục phòng ban (/v1/departments,
+// /v1/departments/:id*), menu (/v1/menu), cây module phòng ban (/v1/departments/:code/modules) và nạp phòng ban mặc định
+// (/v1/orgs/:ref/departments/seed); chủ KN (internal/kn/extension/departments) đăng ký qua port.DepartmentAdmin. Khu vực,
+// cây tổ chức, ảnh hưởng vẫn ở party.
 func TestDepartmentCatalogRoutesNotRegisteredByParty(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	m := New(nil, clock.System{})
@@ -29,17 +30,18 @@ func TestDepartmentCatalogRoutesNotRegisteredByParty(t *testing.T) {
 	for _, set := range []map[string]bool{app, admin} {
 		for r := range set {
 			path := strings.SplitN(r, " ", 2)[1]
-			if path == "/v1/departments" || strings.HasPrefix(path, "/v1/departments/:id") {
-				t.Errorf("pf/party vẫn đăng ký route danh mục phòng ban của chủ KN: %s", r)
+			if path == "/v1/departments" || strings.HasPrefix(path, "/v1/departments/") || path == "/v1/menu" ||
+				strings.HasSuffix(path, "/departments/seed") {
+				t.Errorf("pf/party vẫn đăng ký route phòng ban/menu của chủ KN: %s", r)
 			}
 		}
 	}
-	for _, r := range []string{"GET /v1/departments/:code/modules", "GET /v1/menu", "GET /v1/regions", "GET /v1/orgs/tree"} {
+	for _, r := range []string{"GET /v1/regions", "GET /v1/orgs/tree"} {
 		if !app[r] {
 			t.Errorf("Application API mất route còn thuộc pf/party: %s", r)
 		}
 	}
-	for _, r := range []string{"GET /v1/regions", "GET /v1/orgs/tree", "POST /v1/orgs/:ref/departments/seed", "GET /v1/orgs/:ref/impact"} {
+	for _, r := range []string{"GET /v1/regions", "GET /v1/orgs/tree", "POST /v1/orgs/:ref/communes/ensure", "GET /v1/orgs/:ref/impact"} {
 		if !admin[r] {
 			t.Errorf("Admin API mất route còn thuộc pf/party: %s", r)
 		}

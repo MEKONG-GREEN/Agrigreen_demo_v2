@@ -2,7 +2,7 @@ paths:
 # @ag-order: 31300
   /v1/extension/cnts/form-designs:
     get:
-      summary: Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS; chỉ Cấp Tỉnh CNTS và Admin
+      summary: Xem cấu trúc phiên bản hiện hành của năm biểu kỳ CNTS và các biểu điều tra; chỉ Cấp Tỉnh CNTS và Admin
       operationId: extCntsFormDesigns
       tags: [extension]
       responses:
@@ -16,6 +16,28 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/CNTSDesignView"}}
         "403": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "#192 FN-07: tạo biểu điều tra mới (phiên bản 1) hoặc sao chép biểu có sẵn; cán bộ tổng hợp Cấp Tỉnh CNTS hoặc Admin"
+      operationId: extCntsFormDesignCreate
+      tags: [extension]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSDesignCreateInput"}
+      responses:
+        "201":
+          description: Mã biểu CNTS-DT-<hậu tố> và phiên bản 1
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDesignSaved"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
 # @ag-order: 31301
   /v1/extension/cnts/form-designs/import-preview:
@@ -36,17 +58,68 @@ paths:
               schema: {$ref: "#/components/schemas/CNTSDesignImport"}
         "403": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+# @ag-order: 31302
+  /v1/extension/cnts/form-designs/{code}/versions:
+    parameters:
+      - {name: code, in: path, required: true, schema: {type: string, pattern: "^[A-Z0-9][A-Z0-9._-]{0,63}$"}}
+    get:
+      summary: "#192 FN-07: lịch sử phiên bản của biểu (mới trước); chỉ Cấp Tỉnh CNTS và Admin"
+      operationId: extCntsFormDesignVersions
+      tags: [extension]
+      parameters:
+        - {name: before_version, in: query, required: false, schema: {type: integer, minimum: 0}, description: "0 hoặc bỏ trống = mới nhất; trang sau dùng phiên bản cuối trang"}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+      responses:
+        "200":
+          description: Phiên bản giảm dần
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/CNTSDesignVersion"}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: "#192 FN-07 B1–B2: lưu cấu trúc thành phiên bản mới; mẫu KNQG từ chối (BR-02); chỉ thêm chỉ tiêu (UR-TINH-07)"
+      description: Kỳ đã phát hành giữ phiên bản cũ (BR-01, AC-03). base_version là phiên bản đã đọc; người khác lưu trước → 409.
+      operationId: extCntsFormDesignSave
+      tags: [extension]
+      parameters:
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CNTSDesignSaveInput"}
+      responses:
+        "201":
+          description: Phiên bản mới
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CNTSDesignSaved"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
 components:
   schemas:
 # @ag-order: 5500
     CNTSDesignView:
       type: object
-      required: [code, bm, title, period_type, due, template_id, version, fields]
+      required: [code, bm, title, kind, period_type, due, locked, can_edit, template_id, version, fields]
       properties:
         code: {type: string}
         bm: {type: string}
         title: {type: string}
+        kind: {type: string, enum: [report, survey], description: "report = biểu kỳ của phòng; survey = biểu điều tra (FN-21)"}
         period_type: {type: string}
+        locked: {type: boolean, description: "Mẫu cố định theo TTKN Quốc gia — không sửa cấu trúc (FN-07 BR-02)"}
+        can_edit: {type: boolean, description: "Phiên hiện tại được lưu phiên bản mới cho biểu này"}
         due: {type: string}
         template_id: {type: [string, "null"], format: uuid}
         version: {type: [integer, "null"]}
@@ -67,3 +140,39 @@ components:
               line: {type: integer}
               field: {type: string}
               message: {type: string}
+# @ag-order: 5502
+    CNTSDesignVersion:
+      type: object
+      required: [template_id, version, title, fields]
+      properties:
+        template_id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1}
+        title: {type: string}
+        fields: {type: array, items: {$ref: "#/components/schemas/FormsField"}}
+# @ag-order: 5503
+    CNTSDesignSaved:
+      type: object
+      required: [code, version]
+      properties:
+        code: {type: string}
+        version: {$ref: "#/components/schemas/CNTSDesignVersion"}
+# @ag-order: 5504
+    CNTSDesignSaveInput:
+      type: object
+      required: [base_version, title, fields]
+      properties:
+        base_version: {type: integer, minimum: 0, description: "Phiên bản đã đọc (0 khi biểu chưa có phiên bản)"}
+        title: {type: string, minLength: 1, maxLength: 200}
+        fields: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
+      additionalProperties: false
+# @ag-order: 5505
+    CNTSDesignCreateInput:
+      type: object
+      required: [code_suffix, title]
+      properties:
+        code_suffix: {type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9-]{0,39}$", description: "Mã biểu = CNTS-DT-<hậu tố in hoa>"}
+        title: {type: string, minLength: 1, maxLength: 200}
+        source_code: {type: string, description: "Sao chép từ biểu này (bỏ trống = tạo từ fields, vd kết quả kiểm Excel hợp lệ)"}
+        source_version: {type: integer, minimum: 0, description: "0 hoặc bỏ trống = phiên bản mới nhất của biểu nguồn"}
+        fields: {type: array, maxItems: 500, items: {$ref: "#/components/schemas/FormsField"}}
+      additionalProperties: false

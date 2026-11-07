@@ -6,6 +6,7 @@ package domain
 import (
 	"errors"
 	"math"
+	"net/http"
 	"time"
 )
 
@@ -135,4 +136,67 @@ func (it ScheduleItem) FieldWork() bool {
 // MissedCheckin: mục công tác ngoài cơ quan, ngày đã qua (giờ zone) mà chưa check-in.
 func MissedCheckin(it ScheduleItem, checkedIn bool, now time.Time, zone *time.Location) bool {
 	return !checkedIn && it.FieldWork() && civil(now, zone).After(it.Day)
+}
+
+// CNTS-V4-CHECKOUT-PHOTO (#249, BRD CNTS v4.0 FN-12 CV-07/CV-08, BR-06..08) — ảnh check-in/check-out, check-out.
+
+// MaxVisitPhotoBytes: ảnh check-in/check-out đã nén trên máy, ≤ 500 KB (BRD Mục VIII "Định vị, ảnh").
+const MaxVisitPhotoBytes = 500 << 10
+
+// visitPhotoTypes là kiểu ảnh nhận (đoán từ nội dung, không tin khai báo của máy).
+var visitPhotoTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
+
+// Lỗi ảnh và check-out.
+var (
+	ErrVisitPhotoRequired = errors.New("bắt buộc chụp ảnh tại chỗ")
+	ErrVisitPhotoSize     = errors.New("ảnh 1 byte – 500 KB (nén trước khi gửi)")
+	ErrVisitPhotoType     = errors.New("chỉ nhận ảnh JPEG, PNG, WebP")
+	ErrCheckoutBeforeIn   = errors.New("thời điểm check-out phải sau thời điểm check-in")
+)
+
+// VisitPhotoType kiểm ảnh check-in/check-out (FN-12 "Check-in, check-out không có ảnh → chặn", AC-09) và trả kiểu
+// nội dung đoán từ chữ ký đầu tệp.
+func VisitPhotoType(b []byte) (string, error) {
+	if len(b) == 0 {
+		return "", FieldError{Field: "photo", Err: ErrVisitPhotoRequired}
+	}
+	if len(b) > MaxVisitPhotoBytes {
+		return "", FieldError{Field: "photo", Err: ErrVisitPhotoSize}
+	}
+	ct := http.DetectContentType(b)
+	if !visitPhotoTypes[ct] {
+		return "", FieldError{Field: "photo", Err: ErrVisitPhotoType}
+	}
+	return ct, nil
+}
+
+// CheckCheckoutAfter: check-out sau (hoặc đúng) thời điểm check-in của mục (B4b: chỉ check-out sau khi đã check-in).
+func CheckCheckoutAfter(checkinAt, checkoutAt time.Time) error {
+	if checkoutAt.Before(checkinAt) {
+		return FieldError{Field: "captured_at", Err: ErrCheckoutBeforeIn}
+	}
+	return nil
+}
+
+// StayMinutes là thời gian ở địa điểm = check-out − check-in, làm tròn xuống phút (BR-07, AC-12).
+func StayMinutes(checkinAt, checkoutAt time.Time) int {
+	return int(checkoutAt.Sub(checkinAt) / time.Minute)
+}
+
+// SyncedLate: bản ghi đến máy chủ sau ngày công tác (giờ zone) — "Đồng bộ trễ" (BR-08, AC-13).
+func SyncedLate(day, recordedAt time.Time, zone *time.Location) bool {
+	return civil(recordedAt, zone).After(day)
+}
+
+// CNTS-V4-CHECKIN-MONITOR (#250, BRD CNTS v4.0 FN-12 BR-07/BR-08, AC-10, AC-13, Mục III.5 dòng 13) — "Chưa check-out".
+
+// NoCheckoutAt là mốc gắn nhãn "Chưa check-out" của mục ngày day (UTC 00:00 của ngày lịch): 23:59 cùng ngày giờ zone.
+func NoCheckoutAt(day time.Time, zone *time.Location) time.Time {
+	return time.Date(day.Year(), day.Month(), day.Day(), 23, 59, 0, 0, zone)
+}
+
+// NoCheckout: mục đã check-in, chưa có check-out và đã tới 23:59 ngày công tác (giờ zone) — nhãn "Chưa check-out" (BR-07).
+// Check-out đồng bộ sau mốc (BR-08) làm checkedOut = true nên nhãn tự gỡ.
+func NoCheckout(day time.Time, checkedIn, checkedOut bool, now time.Time, zone *time.Location) bool {
+	return checkedIn && !checkedOut && !now.Before(NoCheckoutAt(day, zone))
 }

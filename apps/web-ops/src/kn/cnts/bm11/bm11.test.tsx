@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAction } from "@/kn/cycle/common";
 import { bm11DefaultKey, cntsBm11Routes, resetCntsBm11 } from "@/api/mock/kn-cnts-bm11";
 import { Bm11Detail } from "./Bm11Detail";
-import { changedTexts, periodKeyError, returnCommentError, type Bm11, type Bm11Api } from "./api";
+import { changedTexts, herdTotalLabel, periodKeyError, returnCommentError, type Bm11, type Bm11Api, type Bm11Herds } from "./api";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/kn/cnts/bao-cao-dinh-ky",
@@ -43,7 +43,18 @@ describe("helpers", () => {
   it("chỉ gửi mục đã đổi", () => {
     expect(changedTexts({ a: "1", b: "2" }, { a: "1", b: "3", c: "" })).toEqual({ b: "3" });
   });
+  it("dòng toàn tỉnh của bảng theo loại chăn nuôi: n/N xã có dữ liệu", () => {
+    expect(herdTotalLabel(HERDS)).toBe("Toàn tỉnh (1/102 xã có dữ liệu)");
+    expect(herdTotalLabel({ ...HERDS, communes_total: 0 })).toBe("Toàn tỉnh (1 xã có dữ liệu)");
+  });
 });
+
+// CNTS v4.0 FN-16 AC-05: xã A có 12 hộ đang dùng, 3 trang trại nhỏ, 1 trang trại vừa.
+const xaA = { commune: "XA", name: "Xã A", households: 12, farms: 4, by_type: { nong_ho: 8, trang_trai_nho: 3, trang_trai_vua: 1, trang_trai_cong_nghiep: 0 } };
+const HERDS: Bm11Herds = { communes: [xaA], total: { ...xaA, commune: "", name: "Toàn tỉnh" }, communes_total: 102,
+  heads: [{ species: "heo", name: "Heo", household: "212", farm: "1460" }] };
+const HERD_TYPES = [{ key: "nong_ho", label: "Nông hộ" }, { key: "trang_trai_nho", label: "Trang trại nhỏ" },
+  { key: "trang_trai_vua", label: "Trang trại vừa" }, { key: "trang_trai_cong_nghiep", label: "Trang trại công nghiệp" }];
 
 function report(over: Partial<Bm11> = {}): Bm11 {
   return {
@@ -54,7 +65,7 @@ function report(over: Partial<Bm11> = {}): Bm11 {
     groups: [{ key: "tong_dan", label: "Tổng đàn" }],
     lines: [{ key: "tong_dan_heo", group: "tong_dan", label: "Heo", unit: "con", sub: false, value: "467495" }],
     fishery: { catch_cur: "2858.5", catch_ytd: "103318.86", aqua_cur: "1", aqua_ytd: "2", total_cur: "2859.5", total_ytd: "103320.86", groups: { ca: "1", tom: "1", muc: "0", khac: "0" } },
-    programs: [], sections: [{ key: "ke_hoach", label: "Kế hoạch tuần tới", text: "Tiếp tục điều tra." }], supplement: [], return_comment: "",
+    programs: [], sections: [{ key: "ke_hoach", label: "Kế hoạch tuần tới", text: "Tiếp tục điều tra." }], supplement: [], herds: HERDS, herd_types: HERD_TYPES, return_comment: "",
     recipient_list: [{ code: "bgd", label: "Ban Giám đốc TTKN", received: false, received_at: null, actor_name: "" }],
     history: [], can: { edit: false, refresh: false, submit: false, approve: true, return: true, receive: false, word: false }, replayed: false,
     ...over,
@@ -87,6 +98,20 @@ describe("Bm11Detail", () => {
     await userEvent.click(screen.getByRole("button", { name: "Duyệt và gửi" }));
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(bapi.approve).toHaveBeenCalledWith("r1", 3);
+  });
+
+  it("FN-16 BR-07: bảng hộ, trang trại theo loại chăn nuôi (AC-05) và số con theo vật nuôi; báo cáo cũ không có bảng", () => {
+    const { unmount } = render(<Harness v={report()} bapi={bapi} onChange={vi.fn()} />);
+    const t = screen.getByRole("table", { name: "Số hộ, trang trại theo loại chăn nuôi" });
+    const row = within(t).getByText("Xã A").closest("tr")!;
+    expect([...row.querySelectorAll("td")].map((td) => td.textContent)).toEqual(["Xã A", "12", "4", "8", "3", "1", "0"]);
+    expect(within(t).getByText("Toàn tỉnh (1/102 xã có dữ liệu)")).toBeTruthy();
+    const heads = screen.getByRole("table", { name: "Số con theo vật nuôi và loại chăn nuôi" });
+    expect(within(heads).getByText("1.460")).toBeTruthy();
+    unmount();
+    render(<Harness v={report({ herds: null })} bapi={bapi} onChange={vi.fn()} />);
+    expect(screen.queryByRole("table", { name: "Số hộ, trang trại theo loại chăn nuôi" })).toBeNull();
+    expect(screen.getByText(/lập trước CNTS v4.0/)).toBeTruthy();
   });
 
   it("trả lại: ý kiến trống không gửi (AC-04)", async () => {

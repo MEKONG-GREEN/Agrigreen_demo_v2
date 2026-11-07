@@ -90,6 +90,28 @@ func TestGated(t *testing.T) {
 	}
 }
 
+type exemptMod struct{ fakeMod }
+
+func (exemptMod) RegisterApp(rg *gin.RouterGroup) {
+	rg.GET("/x", func(c *gin.Context) { c.Status(http.StatusOK) })
+	rg.GET("/menu/:code", func(c *gin.Context) { c.Status(http.StatusOK) })
+}
+func (exemptMod) GateExemptRoutes() []string { return []string{"/v1/menu/:code"} }
+
+// #222: route module khai miễn cổng (menu) phục vụ cả khi module tắt; route khác của module vẫn qua cổng.
+func TestGatedExemptRoutes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	Gated(exemptMod{}, func(c *gin.Context) { c.AbortWithStatus(http.StatusForbidden) }).RegisterApp(r.Group("/v1"))
+	for path, want := range map[string]int{"/v1/x": http.StatusForbidden, "/v1/menu/a": http.StatusOK} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code != want {
+			t.Fatalf("%s: %d, muốn %d", path, w.Code, want)
+		}
+	}
+}
+
 // Reports checks current owner authority before the HTTP idempotency response
 // cache. Its authorizer must receive the session resolved by accounts first.
 func TestAccountsSessionPrecedesReportsReplayAuthorization(t *testing.T) {

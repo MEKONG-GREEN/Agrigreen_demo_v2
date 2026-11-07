@@ -83,15 +83,13 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	mod := party.New(f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.System{}, party.Deps{AdminUnits: f.units, Vault: f.vault, Menus: registry, NavigationPolicy: policy})
 	mod.UseSessionContext(registeredMenuSession{unit: tr.p89})
 	log := telemetry.NewLogger("menu-registry-test", io.Discard)
-	app := httpx.NewEngine(log, 1<<20)
-	mod.RegisterApp(app.Group("/v1", httpx.Authenticate(f.iss.Verifier())))
-	server := httptest.NewServer(app)
-	defer server.Close()
 	user := f.as(f.tenant, tr.p89, port.RoleKNProvinceAdmin)
-	get := func(c caller, path string) resp {
-		return c.call(server.URL, http.MethodGet, path, "", "application/json", nil)
+	// #222: binding GET /v1/menu, /v1/departments/{code}/modules ở chủ KN (tests/kndepartments); ở đây gọi cổng của instance.
+	menu := func(c caller, q port.MenuQuery) resp {
+		v, err := mod.DepartmentAdmin().Menu(c.ctx(), q)
+		return menuResp(t, v, err)
 	}
-	r := get(user, "/v1/menu")
+	r := menu(user, port.MenuQuery{})
 	wantStatus(t, r, http.StatusOK, "registered menu")
 	if str(r.body, "default_route") != "/registered/reports" || str(r.body, "menu_version") != "registered/v1" {
 		t.Fatal("legacy catalog used", r.body)
@@ -113,7 +111,7 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	defer adminServer.Close()
 	rr := root.call(adminServer.URL, http.MethodPost, "/v1/modules/pf/reports/enablement", key(), "application/json", []byte(`{"enabled":false,"reason":"Tạm ngưng module báo cáo của tenant"}`))
 	wantStatus(t, rr, http.StatusCreated, "disable registered module")
-	r = get(user, "/v1/menu")
+	r = menu(user, port.MenuQuery{})
 	wantStatus(t, r, http.StatusOK, "filtered menu")
 	if str(r.body, "default_route") != "/registered/overview" || slices.Contains(menuKeys(r), "report") || slices.Contains(menuKeys(r), "report.shortcut") {
 		t.Fatal("disabled route became landing", r.body)
@@ -131,9 +129,9 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 		t.Fatal("old selected node blocked valid new selection", landing, err)
 	}
 	before := calls
-	wantStatus(t, get(user, "/v1/menu?org_ref="+tr.p92.String()), http.StatusForbidden, "selected node cannot escape")
+	wantStatus(t, menu(user, port.MenuQuery{UnitRef: tr.p92}), http.StatusForbidden, "selected node cannot escape")
 	foreign := f.as(uuid.New(), tr.p89, port.RoleKNProvinceAdmin)
-	wantStatus(t, get(foreign, "/v1/menu"), http.StatusNotFound, "foreign tenant cannot reuse department")
+	wantStatus(t, menu(foreign, port.MenuQuery{}), http.StatusNotFound, "foreign tenant cannot reuse department")
 	foreignPrincipal := principal
 	foreignPrincipal.TenantID = uuid.New()
 	if _, err := mod.ContextNavigation()(authz.WithPrincipal(tenant.WithID(context.Background(), foreignPrincipal.TenantID), foreignPrincipal), request); err == nil {
@@ -142,21 +140,22 @@ func TestRegisteredMenusHTTPAndContextShareCurrentTenantCatalog(t *testing.T) {
 	if calls != before {
 		t.Fatal("denied node/tenant reached builder")
 	}
-	wantStatus(t, get(root, "/v1/menu?audience=admin&org_ref="+tr.p89.String()), http.StatusOK, "registered admin")
-	wantStatus(t, get(root, "/v1/departments/trong_trot/modules?audience=admin&org_ref="+tr.p89.String()), http.StatusOK, "registered department modules")
+	wantStatus(t, menu(root, port.MenuQuery{Audience: port.AudienceAdmin, UnitRef: tr.p89}), http.StatusOK, "registered admin")
+	v, err := mod.DepartmentAdmin().DepartmentModules(root.ctx(), "trong_trot", port.MenuQuery{Audience: port.AudienceAdmin, UnitRef: tr.p89})
+	wantStatus(t, menuResp(t, v, err), http.StatusOK, "registered department modules")
 	if !slices.Contains(modes, port.MenuAdmin) || !slices.Contains(modes, port.MenuDepartmentModules) {
 		t.Fatal("consumer still used legacy tree")
 	}
 	failOwner = true
-	wantStatus(t, get(user, "/v1/menu"), http.StatusForbidden, "owner denial final")
+	wantStatus(t, menu(user, port.MenuQuery{}), http.StatusForbidden, "owner denial final")
 	if _, err := mod.ContextNavigation()(ctx, request); err == nil {
 		t.Fatal("owner denial fell back in context")
 	}
 	failOwner = false
 	invalidOwner = true
-	wantStatus(t, get(user, "/v1/menu"), http.StatusServiceUnavailable, "invalid registration final")
+	wantStatus(t, menu(user, port.MenuQuery{}), http.StatusServiceUnavailable, "invalid registration final")
 	// The original unconfigured server retains its native menu in the same process.
-	native := user.appDo(http.MethodGet, "/v1/menu?audience=kn_tinh&org_ref="+tr.p89.String()+"&department=trong_trot", nil)
+	native := user.menu(port.MenuQuery{Audience: port.AudienceTinh, UnitRef: tr.p89, Department: "trong_trot"})
 	wantStatus(t, native, http.StatusOK, "nil compatibility")
 	if str(native.body, "menu_version") == "registered/v1" {
 		t.Fatal("registration leaked to another instance")

@@ -382,7 +382,16 @@ class _WorkScheduleScreenState extends ConsumerState<WorkScheduleScreen> {
               : (i) => v.canCheckin(i, DateTime.now())
                     ? () => _run(
                         () => _svc.checkin(_week, i),
-                        done: 'Đã check-in — vị trí, thời điểm không sửa được.',
+                        done: 'Đã check-in — vị trí, thời điểm, ảnh không sửa được.',
+                      )
+                    : null,
+          // CNTS v4.0 CV-08: nút Check-out chỉ hiện sau khi đã check-in (FN-12 B4b).
+          onCheckout: _busy
+              ? null
+              : (i) => v.canCheckout(i, DateTime.now())
+                    ? () => _run(
+                        () => _svc.checkout(_week, i),
+                        done: 'Đã check-out — vị trí, thời điểm, ảnh không sửa được.',
                       )
                     : null,
           checkinNote: (i) => v.checkinBlockedReason(i, DateTime.now()),
@@ -612,6 +621,7 @@ class _DayCard extends StatelessWidget {
     required this.onAdd,
     required this.onOpen,
     this.onCheckin,
+    this.onCheckout,
     this.checkinNote,
   });
   final DateTime day;
@@ -621,6 +631,7 @@ class _DayCard extends StatelessWidget {
   final void Function(WsSession) onAdd;
   final void Function(WsItem) onOpen;
   final VoidCallback? Function(WsItem)? onCheckin;
+  final VoidCallback? Function(WsItem)? onCheckout;
 
   /// Lý do chưa check-in được (R-B3), hiện dưới mục.
   final String? Function(WsItem)? checkinNote;
@@ -663,6 +674,7 @@ class _DayCard extends StatelessWidget {
                   item: i,
                   onTap: () => onOpen(i),
                   onCheckin: onCheckin?.call(i),
+                  onCheckout: onCheckout?.call(i),
                   checkinNote: checkinNote?.call(i),
                 ),
             if (!items.any((i) => i.session == s))
@@ -682,6 +694,7 @@ class _ItemTile extends StatelessWidget {
     required this.item,
     required this.onTap,
     this.onCheckin,
+    this.onCheckout,
     this.checkinNote,
   });
   final WsItem item;
@@ -692,6 +705,9 @@ class _ItemTile extends StatelessWidget {
 
   /// Khác null: hiện nút "Check-in" (W11.46).
   final VoidCallback? onCheckin;
+
+  /// Khác null: hiện nút "Check-out" (CNTS v4.0 CV-08).
+  final VoidCallback? onCheckout;
 
   @override
   Widget build(BuildContext context) {
@@ -735,6 +751,13 @@ class _ItemTile extends StatelessWidget {
                     onPressed: onCheckin,
                     icon: const Icon(Icons.my_location),
                     label: const Text('Check-in'),
+                  )
+                : onCheckout != null
+                ? FilledButton.tonalIcon(
+                    key: ValueKey('ws-checkout-${i.id}'),
+                    onPressed: onCheckout,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Check-out'),
                   )
                 : i.checkin != null
                 ? Icon(

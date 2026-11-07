@@ -111,6 +111,18 @@ func (m *Module) FarmerHouseholds() port.FarmerHouseholds { return m.svc }
 // FarmerAccounts cho gốc lắp ráp: tài khoản nông dân của các nông hộ (cảnh báo khẩn theo địa bàn).
 func (m *Module) FarmerAccounts() port.FarmerAccounts { return m.svc }
 
+// RegisterPublic gắn route công khai (không đăng nhập) của Application API: tự đặt lại mật khẩu qua email (#255).
+func (m *Module) RegisterPublic(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterPublic(rg) }
+
+// PasswordResetHandler gửi email liên kết đặt lại mật khẩu (consumer port.PasswordResetConsumer ở cmd/worker; bỏ giao
+// dịch của inbox — gửi SMTP ngoài giao dịch, ADR-0057).
+func (m *Module) PasswordResetHandler() inbox.Handler { return m.svc.HandlePasswordResetRequested }
+
+// UsePasswordReset nối kênh email, URL trang đặt lại (AG_WEB_OPS_URL) và nhật ký cho consumer đặt lại mật khẩu.
+func (m *Module) UsePasswordReset(mailer app.ResetMailer, resetURL string, log *slog.Logger) {
+	m.svc.ResetMailer, m.svc.ResetURL, m.svc.Log = mailer, resetURL, log
+}
+
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
 	h := handler.Handler{Svc: m.svc}

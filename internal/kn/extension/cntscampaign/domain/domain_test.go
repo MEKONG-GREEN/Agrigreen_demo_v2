@@ -58,6 +58,19 @@ func TestDraftValidate(t *testing.T) {
 	if err := bad.Validate(); err == nil {
 		t.Fatal("lĩnh vực ngoài danh sách phải lỗi")
 	}
+	// #192: phiên bản biểu đã chọn phải từ 1 (nil = mới nhất, Nháp cũ).
+	for _, v := range []int64{0, -1} {
+		bad = ok
+		bad.TemplateVersion = &v
+		if err := bad.Validate(); err == nil {
+			t.Fatalf("phiên bản %d phải lỗi", v)
+		}
+	}
+	one := int64(1)
+	ok.TemplateVersion = &one
+	if err := ok.Validate(); err != nil {
+		t.Fatal(err)
+	}
 	if _, ok := Reason("ngắn"); ok {
 		t.Fatal("lý do < 10 ký tự")
 	}
