@@ -160,3 +160,16 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-FARM-LAYER.md),
 | AC-03: chọn ngày cũ thấy số ảnh hưởng theo diễn biến của ngày đó | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
 | AC-02: Cấp Xã chỉ thấy trang trại và số ảnh hưởng từ ổ dịch xã mình; tenant khác không thấy | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
 | Trang trại, số ảnh hưởng trong vùng (đối tượng trong vùng đệm 3 km/10 km, khoảng cách tới tâm) | `TestCNTSMap_FarmLayerAndImpact_FN18`; vitest `map.test.ts` | G1 |
+
+## S-6 — Bản đồ/điểm trình diễn không phụ thuộc HTX (#266)
+
+Nguồn: BRD 2.0 CNTS v4.0 FN-18/FN-19 và kế hoạch KN độc lập S-6;
+[lựa chọn, tệp và cách chạy](../kn/gia-dinh/KN-STANDALONE-6-CNTS-HTX.md).
+
+| Tiêu chí | Bằng chứng tự động |
+|---|---|
+| FN-18 B1–B2: bản đồ còn lớp CNTS và bỏ lớp thửa HTX; API không trả `plot_stats`, `plots_ready`; không gọi cổng thống kê HTX | `TestCNTSMapStandaloneWithoutHTX`; vitest `map.test.ts`; Playwright `kn-cnts-standalone.spec.ts` |
+| FN-18 AC-02: Cấp Xã chỉ thấy điểm xã mình khi publication HTX rỗng hoặc schema không tồn tại; endpoint hợp lệ vẫn 200 | `TestCNTSMapStandaloneWithoutHTX`; hồi quy `TestCNTSMap_W1152`, `TestCNTSMap_FarmLayerAndImpact_FN18` |
+| FN-19 B1: tạo/sửa điểm với mã tham chiếu cũ mà không tra cứu HTX; dữ liệu cũ và lịch sử được giữ | `TestCNTSModelStandaloneWithoutHTX` (publication rỗng, schema thiếu trước khởi tạo module) |
+| FN-19 BR-01/AC-04: chủ nhiệm khác không tạo/sửa; xã khác không đọc; kiểm UUID, phiên bản và idempotency còn hiệu lực | `TestCNTSModelStandaloneWithoutHTX`; hồi quy `TestCNTSModel_W1147` |
+| Lớp còn lại FN-18 BR-01–03/AC-03, vault, RLS, append-only và menu không đổi | Toàn bộ test `cntsmap/...`, `cntsmodel/...`, `extension/menu/...`, `tests/kn77` |

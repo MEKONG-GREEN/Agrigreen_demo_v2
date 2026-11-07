@@ -66,8 +66,6 @@ type Service struct {
 	Units partyport.AdminUnits
 	// Catalogs (tùy chọn): danh mục CNTS (loài, bệnh — W11.41). nil → gửi species_code/disease_code trả 503; đọc không có tên.
 	Catalogs knport.CNTSCatalogs
-	// Plots (tùy chọn): thống kê thửa đã số hóa theo xã — đọc qua công bố pf_cooperative_pub (KN không đọc bảng HTX).
-	Plots knport.PlotStatistics
 	// Geometry (tùy chọn): phép tính trên ranh giới hành chính của pf/geo — cảnh báo vẽ ngoài địa giới.
 	Geometry geoport.AdminGeometry
 	// Names (tùy chọn): tên cán bộ.

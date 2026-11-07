@@ -1,8 +1,7 @@
 package app
 
 // Lớp bản đồ theo ngày (FN-18 B1–B2): vùng, ổ dịch BM-10 (W11.49), điểm trình diễn và hộ mô hình có tọa độ (W11.47),
-// thống kê thửa HTX theo xã (qua công bố pf_cooperative_pub — KN không đọc bảng HTX). Đối tượng trong vùng (vùng đệm 3 km,
-// 10 km…): điểm, hộ, ổ dịch nằm trong hình của vùng.
+// đối tượng trong vùng (vùng đệm 3 km, 10 km…): điểm, hộ, ổ dịch nằm trong hình của vùng.
 //
 // CNTS v4.0 (CR-CNTS-001, #254): lớp trang trại — hộ chăn nuôi Đang dùng loại trang trại, vị trí check-in hiện hành, khóa
 // household_ref (ADR-0056 mục 9); vùng dịch, vùng bị uy hiếp, vùng đệm hiện số hộ bị ảnh hưởng và diện tích thủy sản bị
@@ -84,16 +83,14 @@ func outbreakStatus(event string) string {
 
 // Layers là dữ liệu bản đồ của một ngày.
 type Layers struct {
-	Day        time.Time
-	Zones      []ZoneView
-	Outbreaks  []OutbreakView
-	Places     []store.Place
-	Farms      []store.Farm // lớp trang trại (FN-18, CR-CNTS-001)
-	Impacts    []ZoneImpact // số hộ, diện tích bị ảnh hưởng của vùng dịch, vùng bị uy hiếp, vùng đệm (FN-18 BR-02)
-	PlotStats  []knport.CommunePlots
-	PlotsReady bool // đã nối cổng thống kê thửa HTX
-	CanDraw    bool
-	Catalog    map[string]string // mã danh mục (bệnh, loài, loại mô hình) → tên
+	Day       time.Time
+	Zones     []ZoneView
+	Outbreaks []OutbreakView
+	Places    []store.Place
+	Farms     []store.Farm // lớp trang trại (FN-18, CR-CNTS-001)
+	Impacts   []ZoneImpact // số hộ, diện tích bị ảnh hưởng của vùng dịch, vùng bị uy hiếp, vùng đệm (FN-18 BR-02)
+	CanDraw   bool
+	Catalog   map[string]string // mã danh mục (bệnh, loài, loại mô hình) → tên
 }
 
 // Layers đọc mọi lớp của bản đồ tại ngày day (rỗng = hôm nay) trong phạm vi người gọi.
@@ -144,20 +141,6 @@ func (s *Service) Layers(ctx context.Context, dayText string) (Layers, error) {
 	}
 	out.Outbreaks, out.Places, out.Farms = c.outbreaks(obs), c.places(places), c.farms(farms)
 	out.Impacts = zoneImpacts(out.Zones, out.Outbreaks, inZones)
-	if s.Plots != nil {
-		var units []string
-		if !c.admin() {
-			units = append([]string{}, c.k.Scope.Units...)
-		}
-		if st, err := s.Plots.DigitizedByCommune(ctx, units); err == nil {
-			out.PlotsReady = true
-			for _, x := range st {
-				if c.sees(x.CommuneCode) {
-					out.PlotStats = append(out.PlotStats, x)
-				}
-			}
-		}
-	}
 	return out, nil
 }
 

@@ -230,12 +230,8 @@ func (h Handler) layers(c *gin.Context) {
 		m["zone_ref"] = z.ZoneRef.String()
 		impacts = append(impacts, m)
 	}
-	plots := make([]gin.H, 0, len(l.PlotStats))
-	for _, p := range l.PlotStats {
-		plots = append(plots, gin.H{"commune_code": p.CommuneCode, "plots": p.Plots, "area_ha": p.AreaHa.String()})
-	}
 	c.JSON(http.StatusOK, gin.H{"date": l.Day.Format(time.DateOnly), "can_draw": l.CanDraw, "zones": zones, "outbreaks": obs,
-		"places": places, "farms": farms, "zone_impacts": impacts, "plot_stats": plots, "plots_ready": l.PlotsReady})
+		"places": places, "farms": farms, "zone_impacts": impacts})
 }
 
 func (h Handler) listZones(c *gin.Context) {

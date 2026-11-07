@@ -11665,7 +11665,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng (kèm số hộ, diện tích thủy sản bị ảnh hưởng), ổ dịch BM-10, điểm/hộ mô hình có tọa độ, lớp trang trại, thống kê thửa HTX theo xã (FN-18, W11.52, CNTS v4.0) */
+        /** Lớp bản đồ vùng nuôi, vùng dịch theo ngày: vùng (kèm số hộ, diện tích thủy sản bị ảnh hưởng), ổ dịch BM-10, điểm/hộ mô hình có tọa độ, lớp trang trại (FN-18, W11.52, CNTS v4.0) */
         get: operations["extensionCntsMapLayers"];
         put?: never;
         post?: never;
@@ -25985,11 +25985,6 @@ export interface components {
             withdrawal_days: number;
             result?: string;
         };
-        CNTSMapPlotStat: {
-            commune_code: string;
-            plots: number;
-            area_ha: string;
-        };
         CNTSDiaryVaccination: {
             vaccine: string;
             /** @description Lần tiêm; 0 = không ghi (sổ giấy 2026 không có cột lần) */
@@ -26010,8 +26005,6 @@ export interface components {
             places: components["schemas"]["CNTSMapPlace"][];
             farms: components["schemas"]["CNTSMapFarm"][];
             zone_impacts: components["schemas"]["CNTSMapZoneImpact"][];
-            plot_stats: components["schemas"]["CNTSMapPlotStat"][];
-            plots_ready: boolean;
         };
         CNTSDiarySale: {
             /** Format: date */

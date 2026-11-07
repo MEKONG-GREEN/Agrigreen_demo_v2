@@ -77,6 +77,8 @@ describe("giả lập /v1/extension/cnts/map", () => {
   it("vùng theo ngày, phiên bản có lý do, đối tượng trong vùng, khoanh từ ổ dịch", async () => {
     const day = addDays(new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10), -1);
     const l = await mapi.layers(day);
+    expect(l).not.toHaveProperty("plot_stats");
+    expect(l).not.toHaveProperty("plots_ready");
     expect(l.zones).toHaveLength(3);
     expect((await mapi.layers(addDays(day, -10))).zones).toHaveLength(1);
     const threat = l.zones.find((z) => z.kind === "vung_uy_hiep")!;

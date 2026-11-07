@@ -123,20 +123,6 @@ func (s *Service) checkSite(ctx context.Context, c caller, p store.Project, in *
 	return nil
 }
 
-func (s *Service) checkCoop(ctx context.Context, tx pgx.Tx, in *SiteInput, cur *store.Site) error {
-	if in.CooperativeRef == nil || (cur != nil && cur.CooperativeRef != nil && *cur.CooperativeRef == *in.CooperativeRef) {
-		return nil
-	}
-	ok, err := store.CooperativeExists(ctx, tx, *in.CooperativeRef)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return ErrSiteInvalid.WithField("cooperative_ref", "không có HTX này trong dữ liệu công bố của HTX")
-	}
-	return nil
-}
-
 func (s *Service) writePoint(ctx context.Context, tx pgx.Tx, c caller, kind string, ref uuid.UUID, p *domain.Point, remove bool) error {
 	switch {
 	case p != nil:
@@ -184,9 +170,6 @@ func (s *Service) CreateSite(ctx context.Context, in SiteInput) (SiteView, error
 			return ErrProjectClosed
 		}
 		if err := s.checkSite(ctx, c, *p, &in, nil); err != nil {
-			return err
-		}
-		if err := s.checkCoop(ctx, tx, &in, nil); err != nil {
 			return err
 		}
 		if cur, err := store.LatestSite(ctx, tx, ref); err != nil {
@@ -245,9 +228,6 @@ func (s *Service) UpdateSite(ctx context.Context, in SiteInput) (SiteView, error
 			return ErrSiteConflict
 		}
 		if err := s.checkSite(ctx, c, *p, &in, cur); err != nil {
-			return err
-		}
-		if err := s.checkCoop(ctx, tx, &in, cur); err != nil {
 			return err
 		}
 		if in.CommuneCode != cur.CommuneCode {

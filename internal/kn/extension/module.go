@@ -153,7 +153,7 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
 		Vaccinations: m.cal, // BF-CN-VACC: NC-11 → ngày tiêm thực tế của lịch BM-07 (quy tắc liên biểu số 7)
 		Names:        func() partyport.ActorNames { return m.rc.Names }}
-	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.rc.BM11Programs = m.bm11Programs // W11.45: kết quả CT/DA cho Báo cáo phòng BM-11
 	m.rc.BM11Herds = m.bm11Herds       // #253: hộ, trang trại theo loại chăn nuôi cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()

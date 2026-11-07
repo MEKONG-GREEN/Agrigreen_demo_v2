@@ -1,8 +1,8 @@
 "use client";
 
-// Bản đồ vùng nuôi, vùng dịch (W11.52 — BRD CNTS v3.7 FN-18, UR-TINH-17; prototype A "map-zones"):
+// Bản đồ vùng nuôi, vùng dịch (W11.52 — BRD CNTS v4.0 FN-18, UR-TINH-17):
 // - Lớp: vùng chăn nuôi/thủy sản, vùng dịch, vùng bị uy hiếp, vùng đệm, hướng di chuyển; ổ dịch BM-10 (W11.49); điểm
-//   trình diễn, hộ mô hình có tọa độ (W11.47); thống kê thửa HTX theo xã (qua công bố của HTX). Bật/tắt lớp, bấm đối tượng.
+//   trình diễn, hộ mô hình có tọa độ (W11.47). Bật/tắt lớp, bấm đối tượng.
 // - Thanh trượt ngày: chọn ngày cũ thấy vùng đã lưu của ngày đó (BR-01, AC-03).
 // - Cán bộ phụ trách dịch Cấp Tỉnh: vẽ đa giác, theo bán kính, hướng di chuyển; khoanh vùng 500 m/3 km/10 km từ ổ dịch;
 //   sửa (phiên bản mới có lý do), ngưng/khôi phục; tải GeoJSON lên/xuống. Cấp Xã chỉ xem xã mình (AC-02).
@@ -194,29 +194,6 @@ function MapBody({ mapi, d, day, reload }: { mapi: CntsMapApi; d: MapLayers; day
           focus={focus}
           height="calc(100vh - 260px)"
         />
-        {d.plots_ready && d.plot_stats.length > 0 ? (
-          <details style={{ marginTop: 8 }}>
-            <summary>Thửa HTX đã số hóa theo xã (dữ liệu công bố của HTX)</summary>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Xã</th>
-                  <th>Số thửa</th>
-                  <th>Diện tích (ha)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.plot_stats.map((p) => (
-                  <tr key={p.commune_code}>
-                    <td>{communeName(p.commune_code)}</td>
-                    <td>{p.plots}</td>
-                    <td>{p.area_ha}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
-        ) : null}
       </div>
       <aside className="card" style={{ padding: 12, overflow: "auto", maxHeight: "calc(100vh - 220px)" }}>
         {editing ? (

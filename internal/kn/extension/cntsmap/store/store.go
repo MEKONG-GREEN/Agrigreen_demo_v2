@@ -1,7 +1,7 @@
 // Package store: SQL của bản đồ vùng nuôi, vùng dịch CNTS (pf_extension.cnts_map_zone — sổ chỉ ghi thêm qua
 // shared.apply_ledger, hình học PostGIS EPSG:4326) và các lớp đọc của bản đồ: ổ dịch BM-10 (cnts_outbreak, W11.49), điểm
 // trình diễn và hộ mô hình có tọa độ (cnts_demo_site, cnts_model_household, cnts_model_point — W11.47). Tất cả là bảng
-// của pf/extension; KHÔNG đọc bảng HTX (lớp HTX/thửa chỉ qua cổng PlotStatistics đọc pf_cooperative_pub). Chạy trên pool
+// của pf/extension. Chạy trên pool
 // vai extension_app, luôn trong giao dịch có ngữ cảnh tenant (RLS) — W11.52.
 package store
 

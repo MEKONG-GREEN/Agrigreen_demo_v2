@@ -151,8 +151,7 @@ export const cntsMapRoutes: Route[] = [
       return json({ date: day, can_draw: drawer(w), zones: zones.map((z) => view(w, z)),
         outbreaks: OUTBREAKS.filter((o) => o.as_of <= day && sees(w, o.commune_code)), places: PLACES.filter((p) => sees(w, p.commune_code)),
         farms: FARMS.filter((f) => sees(w, f.commune_code)),
-        zone_impacts: zones.filter((z) => IMPACT_KINDS.includes(z.kind)).map((z) => ({ zone_ref: z.ref, ...sumImpact(contents(w, z, day).outbreaks) })),
-        plot_stats: [{ commune_code: C1, plots: 42, area_ha: "63.5000" }].filter((p) => sees(w, p.commune_code)), plots_ready: true });
+        zone_impacts: zones.filter((z) => IMPACT_KINDS.includes(z.kind)).map((z) => ({ zone_ref: z.ref, ...sumImpact(contents(w, z, day).outbreaks) })) });
     },
   },
   {

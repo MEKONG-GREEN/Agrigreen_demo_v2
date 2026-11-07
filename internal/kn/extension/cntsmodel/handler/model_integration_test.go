@@ -325,8 +325,6 @@ func TestCNTSModel_W1147(t *testing.T) {
 		"location": map[string]any{"lat": 10.38, "lng": 105.43, "source": "map"}}
 	want(t, chu.post(base+"demo-sites", merge(site, map[string]any{"commune_code": "31001"})), 403, "extension.out_of_scope", "xã ngoài tỉnh")
 	want(t, chu.post(base+"demo-sites", merge(site, map[string]any{"model_type_code": "BO"})), 422, "extension.cnts_site_invalid", "loại mô hình")
-	want(t, chu.post(base+"demo-sites", merge(site, map[string]any{"cooperative_ref": ids.New().String()})), 422, "extension.cnts_site_invalid",
-		"HTX không có trong công bố")
 	want(t, chu.post(base+"demo-sites", merge(site, map[string]any{"officer_ref": other.ref.String()})), 422, "extension.cnts_site_invalid",
 		"cán bộ không phụ trách xã")
 	want(t, chu2.post(base+"demo-sites", site), 403, "", "chủ nhiệm khác không thêm điểm")

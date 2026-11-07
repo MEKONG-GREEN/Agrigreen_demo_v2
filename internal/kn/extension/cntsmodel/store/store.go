@@ -524,13 +524,6 @@ func Points(ctx context.Context, tx pgx.Tx, kind string, refs []uuid.UUID) (map[
 	return out, rows.Err()
 }
 
-// CooperativeExists cho biết HTX org_ref có trong công bố pf_cooperative_pub.v1_cooperatives (chỉ đọc, ADR-0055).
-func CooperativeExists(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (bool, error) {
-	var ok bool
-	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_cooperative_pub.v1_cooperatives WHERE org_ref = $1)`, ref).Scan(&ok)
-	return ok, err
-}
-
 // ImportRow là một dòng sổ (điểm hoặc hộ) đã ghi bởi một lần nạp Excel (W11.53c), tìm theo tiền tố khóa idem.
 type ImportRow struct {
 	Kind       string // "site" | "household"

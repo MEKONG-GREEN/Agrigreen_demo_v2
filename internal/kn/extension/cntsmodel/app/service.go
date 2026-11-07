@@ -11,7 +11,7 @@
 //   - Cấp quyền (FN-14): Cấp Tỉnh (tổng hợp, chủ nhiệm, lãnh đạo phòng) và Admin; chủ nhiệm chỉ cấp vai theo dõi mô
 //     hình/nông hộ trong dự án mình (BR-03); địa bàn ngoài tỉnh bị chặn.
 //
-// ADR-0055, Q-KNS-04: KN không ghi dữ liệu HTX — mọi bản ghi là của KN; HTX tham gia chỉ là mã đọc qua pf_cooperative_pub.
+// KN tự quản lý dữ liệu; cooperative_ref cũ chỉ giữ mã tham chiếu, không tra cứu dữ liệu HTX (KN-STANDALONE-6).
 // Họ tên, SĐT chủ hộ ở kho định danh (vault); sổ chỉ giữ person_ref.
 package app
 

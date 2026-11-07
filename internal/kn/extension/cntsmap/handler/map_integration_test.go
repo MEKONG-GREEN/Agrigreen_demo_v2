@@ -97,10 +97,14 @@ type fix struct {
 }
 
 func newFix(t *testing.T) *fix {
+	return newFixWithDeps(t, extension.Deps{Units: units{}})
+}
+
+func newFixWithDeps(t *testing.T, deps extension.Deps) *fix {
 	env := pgtest.Get(t)
 	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}}
 	f.pool = env.AdminPool(t, migrations.PF)
-	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}})
+	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), deps)
 	mod.UseCNTSCatalogs(catalogs{})
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 4<<20)
