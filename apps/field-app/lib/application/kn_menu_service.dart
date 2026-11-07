@@ -171,25 +171,47 @@ class KnMenuService {
     return (int.tryParse(match?.group(1) ?? '') ?? 0) >= 17;
   }
 
+  // Context recovery may renew the ID/expiry, or select another assignment.
+  // Only an unchanged authority can continue the same menu load.
+  static bool _sameMenuAuthority(KnSessionContext a, KnSessionContext b) =>
+      a.scopeKey == b.scopeKey &&
+      a.assignmentId == b.assignmentId &&
+      a.readOnly == b.readOnly &&
+      a.internalUnitCode == b.internalUnitCode &&
+      a.supportSessionId == b.supportSessionId;
+
   /// Fresh authenticated menus are authoritative. Offline menus must also have
-  /// the current context binding and standalone version; no menu means no grant.
+  /// the current context and authority binding; no menu means no grant.
   Future<KnMenu> load({bool refresh = true}) async {
-    final selected = await _context();
-    if (selected == null || selected.contextId.isEmpty) {
+    final initial = await _context();
+    if (initial == null || initial.contextId.isEmpty) {
       return const KnMenu([], fromCache: true);
     }
+    var selected = initial;
     if (refresh) {
       try {
-        final j = await _api.getJson('/v1/menu');
-        if (!_standaloneVersion(j)) return const KnMenu([]);
-        final current = await _context();
-        if (current == null ||
-            current.contextId.isEmpty ||
-            current.scopeKey != selected.scopeKey) {
-          return const KnMenu([]);
+        for (var attempt = 0; attempt < 2; attempt++) {
+          final j = await _api.getJson('/v1/menu');
+          if (!_standaloneVersion(j)) return const KnMenu([]);
+          final current = await _context();
+          if (current == null ||
+              current.contextId.isEmpty ||
+              !_sameMenuAuthority(current, selected)) {
+            return const KnMenu([]);
+          }
+          if (current.contextId != selected.contextId) {
+            // Re-read under the renewed ID: never rebind an in-flight reply.
+            selected = current;
+            continue;
+          }
+          await _put('menu', {
+            'context_id': current.contextId,
+            'context': current.toJson(),
+            'menu': j,
+          });
+          return KnMenu.fromJson(j);
         }
-        await _put('menu', {'context_id': current.contextId, 'menu': j});
-        return KnMenu.fromJson(j);
+        return const KnMenu([]);
       } on DeviceRevokedException {
         rethrow;
       } on NetworkException {
@@ -198,14 +220,20 @@ class KnMenuService {
         if (!e.retriable) return const KnMenu([]);
       }
     }
-    final context = (await _context())?.contextId;
+    final current = await _context();
     final cached = await _get('menu');
-    if (context != null &&
-        context.isNotEmpty &&
-        cached?['context_id'] == context &&
+    if (current != null &&
+        current.contextId.isNotEmpty &&
+        cached?['context_id'] == current.contextId &&
+        cached?['context'] is Map &&
         cached?['menu'] is Map) {
-      final menu = (cached!['menu'] as Map).cast<String, Object?>();
-      if (_standaloneVersion(menu)) {
+      final authority = KnSessionContext.fromJson(
+        (cached!['context'] as Map).cast<String, Object?>(),
+      );
+      final menu = (cached['menu'] as Map).cast<String, Object?>();
+      if (authority.contextId == current.contextId &&
+          _sameMenuAuthority(authority, current) &&
+          _standaloneVersion(menu)) {
         return KnMenu.fromJson(menu, fromCache: true);
       }
     }

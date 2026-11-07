@@ -32,6 +32,27 @@ void main() {
   String? context;
   Object? failure;
   String department = 'trong_trot';
+  String? assignment;
+  bool readOnly = false;
+  String? internalUnit;
+  String? support;
+  DateTime? expires;
+
+  KnSessionContext? currentContext() => context == null
+      ? null
+      : KnSessionContext(
+          contextId: context!,
+          assignmentId: assignment,
+          role: 'kn_xa',
+          departmentCode: department,
+          orgName: 'TTKN',
+          communes: const [],
+          defaultRoute: '/kn/nhiem-vu/cong-viec',
+          expiresAt: expires,
+          readOnly: readOnly,
+          internalUnitCode: internalUnit,
+          supportSessionId: support,
+        );
 
   Future<void> cache(Object value) async {
     await h.db.db.rawInsert(
@@ -50,6 +71,11 @@ void main() {
     context = 'selected-context';
     failure = null;
     department = 'trong_trot';
+    assignment = 'selected-assignment';
+    readOnly = false;
+    internalUnit = 'unit-1';
+    support = null;
+    expires = h.clock.now().add(const Duration(days: 1));
     response = menuJson();
     h.fake.onGet = (path, query) async {
       if (failure != null) throw failure!;
@@ -60,17 +86,7 @@ void main() {
       db: h.db,
       api: h.server,
       clock: h.clock,
-      context: () async => context == null
-          ? null
-          : KnSessionContext(
-              contextId: context!,
-              role: 'kn_xa',
-              departmentCode: department,
-              orgName: 'TTKN',
-              communes: const [],
-              defaultRoute: '/kn/nhiem-vu/cong-viec',
-              expiresAt: null,
-            ),
+      context: () async => currentContext(),
       localTodoCount: () async => 0,
     );
   });
@@ -110,7 +126,11 @@ void main() {
     // Old unbound caches and old catalogs with a binding both fail closed.
     for (final value in [
       old,
-      {'context_id': context, 'menu': old},
+      {
+        'context_id': context,
+        'context': currentContext()!.toJson(),
+        'menu': old,
+      },
     ]) {
       await cache(value);
       final before = await h.db.db.query('catalog_cache');
@@ -346,6 +366,61 @@ void main() {
       );
     }
   });
+
+  for (final trait in ['assignment', 'readonly', 'internal unit', 'support']) {
+    test(
+      'S4 stale menu response cannot cross $trait within the same scope',
+      () async {
+        h.fake.onGet = (path, query) async {
+          context = 'new-context';
+          switch (trait) {
+            case 'assignment':
+              assignment = 'another-assignment';
+            case 'readonly':
+              readOnly = true;
+            case 'internal unit':
+              internalUnit = 'unit-2';
+            case 'support':
+              support = 'another-support-session';
+          }
+          return response;
+        };
+        expect((await service.load()).entries, isEmpty);
+        expect(await h.db.db.query('catalog_cache'), isEmpty);
+      },
+    );
+  }
+
+  test('S4 cached menu must retain its authority binding even with the same context ID', () async {
+    await service.load();
+    readOnly = true;
+    failure = NetworkException('offline');
+    expect((await service.load()).entries, isEmpty);
+  });
+
+  test('S4 a renewed context refetches its menu instead of rebinding the old response', () async {
+    var requests = 0;
+    h.fake.onGet = (path, query) async {
+      requests++;
+      if (requests == 1) {
+        context = 'recovered-context';
+        expires = h.clock.now().add(const Duration(days: 2));
+        return response;
+      }
+      return {'menu_version': 'kn.menu/v17', 'groups': <Object?>[]};
+    };
+    expect((await service.load()).entries, isEmpty);
+    expect(requests, 2);
+  });
+
+  test(
+    'S4 a v17 cache without authority metadata cannot grant functions',
+    () async {
+      await cache({'context_id': context, 'menu': response});
+      failure = NetworkException('offline');
+      expect((await service.load()).entries, isEmpty);
+    },
+  );
 
   for (final enabled in [null, false]) {
     testWidgets(
