@@ -9,6 +9,7 @@ import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
+import { NumberField, parseNumberInput } from "@/components/form";
 import { Tabs } from "@/components/Tabs";
 import { BackLink, LabelValueBlock } from "@/components/patterns/detail";
 import {
@@ -679,12 +680,14 @@ const PAYLOAD_FIELDS: Record<HrmEventKind, [string, string][]> = {
     ["grade", "Ngạch/CDNN (mã)"],
     ["step", "Bậc"],
     ["step_since", "Ngày xếp bậc"],
+    ["promotion_months", "Thời gian xét nâng lương (tháng)"],
     ["reserved_coeff", "Hệ số bảo lưu"],
     ["decision_no", "Số quyết định"],
   ],
   step: [
     ["step", "Bậc"],
     ["step_since", "Ngày xếp bậc"],
+    ["promotion_months", "Thời gian xét nâng lương (tháng)"],
     ["reserved_coeff", "Hệ số bảo lưu"],
     ["decision_no", "Số quyết định"],
   ],
@@ -751,6 +754,7 @@ function EventDialog({
     base?.payload ?? {},
   );
   const [reason, setReason] = useState("");
+  const [monthsError, setMonthsError] = useState<string>();
   return (
     <Dialog
       title={base ? `Sửa dòng ${EVENT_LABEL[kind]}` : "Thêm dòng quá trình"}
@@ -760,7 +764,10 @@ function EventDialog({
           type="button"
           className="btn btn-p btn-sm"
           disabled={act.busy}
-          onClick={() =>
+          onClick={() => {
+            const months = parseNumberInput(payload.promotion_months ?? "", { integer:true, positive:true, max:120, maxInputLength:3 });
+            if (!months.ok) { setMonthsError(months.error); return; }
+            setMonthsError(undefined);
             void act
               .run(() =>
                 onSave({
@@ -773,8 +780,8 @@ function EventDialog({
                   reason: base ? reason : undefined,
                 }),
               )
-              .then((r) => r && onClose())
-          }
+              .then((r) => r && onClose());
+          }}
         >
           Lưu
         </button>
@@ -807,7 +814,7 @@ function EventDialog({
             />
           </Field>
         ) : null}
-        {PAYLOAD_FIELDS[kind].map(([k, l]) => (
+        {PAYLOAD_FIELDS[kind].map(([k, l]) => k === "promotion_months" ? <NumberField key={k} label={l} value={payload[k] ?? ""} onChange={v => setPayload(p => ({...p,[k]:v}))} rule={{integer:true,positive:true,max:120,maxInputLength:3}} error={monthsError} /> : (
           <Field key={k} label={l}>
             <input
               value={payload[k] ?? ""}

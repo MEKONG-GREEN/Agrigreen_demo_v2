@@ -15,7 +15,6 @@ export type PromoCond = S["HrmPromoCond"];
 export type PromoCase = S["HrmPromoCase"];
 export type PromoCaseDetail = S["HrmPromoCaseDetail"];
 export type PromotionList = S["HrmPromotionList"];
-export type NLTHPool = S["HrmNLTHPool"];
 export type PromoExportInput = S["HrmPromoExportInput"];
 export type PromoExported = S["HrmPromoExported"];
 export type PromoExportSummary = S["HrmPromoExportSummary"];
@@ -41,8 +40,7 @@ export const FORM_LABEL: Record<string, string> = {
 };
 export const STATUS_LABEL: Record<PromoStatus, string> = {
   pending: "Chưa xử lý",
-  listed: "Đã đưa vào danh sách",
-  exported: "Đã xuất danh sách",
+  exported: "Chờ quyết định",
   decided: "Đã có quyết định",
 };
 export const COND_LABEL: Record<PromoCond, string> = {
@@ -91,55 +89,12 @@ export function fromTo(c: {
 export function createPromotionApi(api: ApiClient) {
   const header = () => ({ "Idempotency-Key": newIdempotencyKey() });
   return {
-    list: (window: number, at?: string): Promise<PromotionList> =>
-      unwrap(
-        api.GET("/v1/hrm/promotion", {
-          params: {
-            query: { window: window as 1 | 3 | 6 | 12, ...(at ? { at } : {}) },
-          },
-        }),
-      ),
+    list: (query: {year?:number;month?:number;status?:PromoStatus;unit?:string;q?:string} = {}): Promise<PromotionList> =>
+      unwrap(api.GET("/v1/hrm/promotion", {params:{query}})),
     detail: (key: string): Promise<PromoCaseDetail> =>
       unwrap(
         api.GET("/v1/hrm/promotion/cases/{key}", {
           params: { path: { key } },
-        }),
-      ),
-    include: (keys: string[], reason?: string) =>
-      unwrap(
-        api.POST("/v1/hrm/promotion/cases/include", {
-          params: { header: header() },
-          body: { keys, ...(reason ? { reason } : {}) },
-        }),
-      ),
-    exclude: (keys: string[]) =>
-      unwrap(
-        api.POST("/v1/hrm/promotion/cases/exclude", {
-          params: { header: header() },
-          body: { keys },
-        }),
-      ),
-    pool: (window = 3): Promise<NLTHPool> =>
-      unwrap(
-        api.GET("/v1/hrm/promotion/nlth-pool", {
-          params: { query: { window: window as 1 | 3 | 6 | 12 } },
-        }),
-      ),
-    propose: (
-      items: { staff_id: string; award_event_id: string }[],
-      reason?: string,
-    ): Promise<{ keys: string[] }> =>
-      unwrap(
-        api.POST("/v1/hrm/promotion/proposals", {
-          params: { header: header() },
-          body: { items, ...(reason ? { reason } : {}) },
-        }),
-      ),
-    withdraw: (keys: string[]) =>
-      unwrap(
-        api.POST("/v1/hrm/promotion/proposals/withdraw", {
-          params: { header: header() },
-          body: { keys },
         }),
       ),
     exportLists: (

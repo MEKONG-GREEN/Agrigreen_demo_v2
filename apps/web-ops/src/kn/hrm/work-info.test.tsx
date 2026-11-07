@@ -149,13 +149,13 @@ describe("FN-08 Thông tin làm việc — logic màn", () => {
 
 describe("Dashboard nhân sự — Cảnh báo (prototype `dash`)", () => {
   const promo = (items: Partial<PromotionList["items"][number]>[], missing = 0) =>
-    ({ items, missing: Array.from({ length: missing }, () => ({})) }) as unknown as PromotionList;
-  it("nâng bậc chưa đủ/cần xem xét, số đến hạn trong 3 tháng, chưa tính được; biến động tháng", () => {
+    ({ as_of:"2026-10-21", items, missing: Array.from({ length: missing }, () => ({})) }) as unknown as PromotionList;
+  it("nâng thường xuyên trong 3 tháng, thiếu NB06/NB07 và biến động tháng", () => {
     const a = hrmDashboardAlerts(
       promo(
         [
           { key: "k1", kind: "nltx", status: "pending", cond: "ok", name: "A", code: "VC-1", due: "2026-11-01", why: [] },
-          { key: "k2", kind: "tnvk", status: "pending", cond: "review", name: "B", code: "VC-2", due: "2026-12-01", why: ["Thiếu xếp loại 2025"] },
+          { key: "k2", kind: "nltx", status: "pending", cond: "review", name: "B", code: "VC-2", due: "2026-12-01", why: ["Thiếu xếp loại 2025"] },
           { key: "k3", kind: "nlth", status: "pending", cond: "fail", name: "C", code: "VC-3", due: "2026-12-01", why: [] },
         ],
         2,
@@ -163,11 +163,9 @@ describe("Dashboard nhân sự — Cảnh báo (prototype `dash`)", () => {
       { joined: 1, left: 0 },
       "2026-10-21T00:00:00+07:00",
     );
-    expect(a.map((x) => x.id)).toEqual(["promo-k2", "promo-due", "promo-missing", "work-moves"]);
-    expect(a[0]).toMatchObject({ level: "attention", title: "B cần xem xét nâng bậc", href: "/kn/nhan-su/nang-bac/k2" });
-    expect(a[0]!.description).toBe("Đến kỳ 01/12/2026 · Thiếu xếp loại 2025");
-    expect(a[1]!.title).toBe("2 viên chức đến hạn nâng bậc trong 3 tháng tới");
-    expect(a[3]!.title).toBe("Biến động trong tháng: +1 vào làm / −0 nghỉ việc");
+    expect(a.map((x) => x.id)).toEqual(["promo-due", "promo-missing", "work-moves"]);
+    expect(a[0]!.title).toBe("2 viên chức đến hạn nâng bậc trong 3 tháng tới");
+    expect(a[2]!.title).toBe("Biến động trong tháng: +1 vào làm / −0 nghỉ việc");
   });
   it("lãnh đạo phòng (không có danh sách nâng bậc), không biến động → không cảnh báo", () => {
     expect(hrmDashboardAlerts(null, { joined: 0, left: 0 }, "2026-10-21T00:00:00+07:00")).toEqual([]);

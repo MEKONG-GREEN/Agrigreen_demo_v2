@@ -474,7 +474,7 @@ export function HrmDashboardScreen() {
   const { api } = useAuth();
   const pa = useMemo(() => createPromotionApi(api), [api]);
   const promo = useLoad(
-    d.data?.scope === "all" ? () => pa.list(3, at) : null,
+    d.data?.scope === "all" ? () => pa.list() : null,
     [d.data?.scope, at],
   );
   const Tile = ({ k, label, n }: { k: string; label: string; n: number }) => (

@@ -2,7 +2,7 @@
 
 Nguồn nghiệp vụ duy nhất: BRD HCTH v4.0 trong BRD 2.0 đã chốt,
 [tài liệu Drive](https://docs.google.com/document/d/1r0TqvDU8yRZSdm5BwabvWkgElm8ynC7Q/edit).
-Phần dưới chỉ ghi các tiêu chí HC-0 (#256) chạm tới; không chứng nhận toàn bộ module hoặc toàn bộ FN.
+Phần dưới ghi tiêu chí theo HC-0 (#256) và HC-3 (#278); không chứng nhận toàn bộ module hoặc toàn bộ FN.
 
 ## HC-0 — Gỡ FN-21 cũ và tự đánh giá Cấp Xã
 
@@ -37,3 +37,17 @@ npm run e2e -- tests/e2e/hrm-appraisal.spec.ts
 ```
 
 Chi tiết migration, giới hạn phạm vi và chạy API/web: [HCTH-V4-REMOVE-FN21-SELF](../kn/gia-dinh/HCTH-V4-REMOVE-FN21-SELF.md).
+
+## HC-3 — Danh sách nâng lương thường xuyên
+
+| Function / UR / BR / trường | Tiêu chí cần đạt | Bằng chứng chạy lại |
+|---|---|---|
+| FN-09 UR-HC-12/13, BR-01/02/03, AC-01/02 | Đại học NB07=36, Trung cấp NB07=24 cùng NB06=01/03/2025 ra 01/03/2028 và 01/03/2027. KHTNV/kỷ luật không loại người hay dời ngày; bậc cuối không tự TNVK, thành tích không tự NLTH | TestPromotionV4RegularOnly, TestComputeRegularPersonalMonthsV4, TestHRMPromotionHTTPV4 |
+| FN-09 B1/2, BR-06, AC-03 | Danh sách từ hồ sơ hiện hành; bất kỳ năm/tháng, trạng thái, đơn vị, họ tên; không date cutoff và không dùng dữ liệu đơn vị hiệu lực tương lai | Native HTTP v4; promotion.test.tsx; browser production |
+| FN-09 ngoại lệ, NB06/NB07 | Thiếu ngày đầy đủ hoặc NB07 thì không tính; cảnh báo liệt kê tên. NB07 số nguyên1..120, không fallback HoldMonths | TestComputeRegularPersonalMonthsV4, TestPromotionNumbersV4, native HTTP v4 |
+| FN-09 BR-04/05/07, AC-04, NL02-01..15 | Chọn trực tiếp → tháng xét/người lập/người ký/xem trước/tải Mẫu1, đủ20cột và cột19 trống; chỉ ba trạng thái. Không chỉ số/biểu đồ/quota/điều kiện/đề xuất trước hạn; routes cũ404 | Native HTTP kiểm XLSX/hash, promotion.test.tsx, hrm-promotion-v4.spec.ts |
+| FN-09 BR-05, AC-05; seam FN-10 | Xuất → Chờ quyết định; chỉ người có tên → Đã có quyết định, kể cả chưa xuất. Người vắng giữ trạng thái, không Return mới | Native HTTP v4, mock workflow |
+| Tính bất biến và quyền | Mẫu2/4 cũ tải lại đúng hash/byte, row_hash không đổi; giữ ba loại FN10 và file/sổ/hủy. HCTH/Admin đúng tenant; khác phòng/Xã/TW không được vào; view-only không xuất. Số mũ/chuỗi dài bị chặn trước parse; retry giữ khóa | Native HTTP v4; domain number guards; focused Vitest + production browser |
+
+Chạy lại theo [HC-3: phạm vi và lệnh kiểm](../kn/gia-dinh/HCTH-V4-PROMOTION-REGULAR.md).
+HC-4 còn bắt buộc/gợi ý/nhập đầu NB06/NB07 và danh mục ngạch; HC-5 còn nhập quyết định độc lập/tệp đầy đủ.

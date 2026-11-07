@@ -1,6 +1,4 @@
-// Khối "Cảnh báo" của Dashboard nhân sự theo prototype HCTH (màn `dash`, W11.29). Chỉ ghép từ API có sẵn: danh sách nâng
-// bậc khung 3 tháng (W11.25 — /v1/hrm/promotion?window=3, chỉ HCTH/Admin) và số vào làm/nghỉ việc của dashboard
-// (W11.28). Cảnh báo về phiếu đánh giá (W11.26) và kế hoạch nhân lực (W11.27) chưa có API trong gói này.
+// FN-06 warnings consume FN-09 current regular due dates; no rating/discipline condition.
 import type { DashboardAlert } from "@/components/patterns/dashboard";
 import type { PromotionList } from "./promotion-api";
 
@@ -14,17 +12,10 @@ export function hrmDashboardAlerts(
 ): DashboardAlert[] {
   const out: DashboardAlert[] = [];
   if (promo) {
-    const regular = promo.items.filter((c) => c.kind !== "nlth" && c.status !== "decided");
-    const bad = regular.find((c) => c.cond === "fail") ?? regular.find((c) => c.cond === "review");
-    if (bad)
-      out.push({
-        id: `promo-${bad.key}`,
-        level: bad.cond === "fail" ? "urgent" : "attention",
-        title: `${bad.name || bad.code} ${bad.cond === "fail" ? "chưa đủ điều kiện" : "cần xem xét"} nâng bậc`,
-        description: `Đến kỳ ${bad.due.split("-").reverse().join("/")}${bad.why.length ? ` · ${bad.why.join("; ")}` : ""}`,
-        at,
-        href: `${PROMO_ROUTE}/${encodeURIComponent(bad.key)}`,
-      });
+    const day=promo.as_of;
+    const start=new Date(`${day}T00:00:00Z`);
+    const end=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth()+3,start.getUTCDate())).toISOString().slice(0,10);
+    const regular=promo.items.filter(c=>c.kind==="nltx"&&c.status!=="decided"&&c.due<=end);
     out.push({
       id: "promo-due",
       level: regular.length ? "attention" : "info",
@@ -38,7 +29,7 @@ export function hrmDashboardAlerts(
         id: "promo-missing",
         level: "info",
         title: `${promo.missing.length} viên chức chưa tính được kỳ nâng bậc`,
-        description: "Thiếu ngạch, bậc, bảng hệ số hoặc mốc xếp bậc trong hồ sơ",
+        description: "Kiểm tra ngày hưởng bậc hiện tại (NB-06), thời gian xét (NB-07), ngạch và bậc trong hồ sơ",
         at,
         href: PROMO_ROUTE,
       });

@@ -1,12 +1,4 @@
-// ============================================================================
-// BACKEND GIẢ LẬP — Nâng bậc lương (W11.25, dom/hrm, BRD HCTH v3.0 FN-09, FN-10). Đường dẫn, tham số, hình dạng phản hồi
-// theo ĐÚNG contracts/openapi/application.yaml (/v1/hrm/promotion*, /v1/hrm/staff/{id}/ratings). Quy tắc mô phỏng RÚT GỌN
-// từ internal/kn/hrm/domain/promotion.go:
-//   - Kỳ NLTX = mốc xếp bậc + thời gian giữ bậc của ngạch; bậc cuối → TNVK (lần đầu sau 36 tháng, 5 %, +1 %/12 tháng);
-//     NLTH chỉ khi đề xuất từ thành tích (12 tháng cho bằng khen, 9 tháng cho giấy khen); chỉ tiêu = ⌊10 % × viên chức⌋.
-//   - Điều kiện: xếp loại 3 năm trước năm đến kỳ (KHTNV → Chưa đủ, thiếu → Cần xem xét).
-//   - Quyết định ghi sự kiện "step" vào hồ sơ giả lập (kn-hrm-staff); hủy = dòng hủy (bậc trở lại). Tệp là tệp giả.
-// ============================================================================
+// FN-09 v4: regular only, current profile and personal NB07. FN10 and historical files keep legacy kinds.
 import type { components } from "../generated/application";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { hrmScaleAt } from "./kn-hrm";
@@ -16,13 +8,9 @@ type S = components["schemas"];
 type Case = S["HrmPromoCase"];
 type Kind = S["HrmPromoKind"];
 type Status = S["HrmPromoStatus"];
-type Cond = S["HrmPromoCond"];
 type Staff = ReturnType<typeof H.staff>[number];
 type Ev = Staff["events"][number];
 
-const RULES = { min: "HTNV", years: 3, ach: 5, tStart: 5, tStep: 1, tCycle: 12, tFirst: 36, quotaPct: 10 };
-const CONV: Record<string, number> = { bang_khen_bo: 12, bang_khen_ubnd_tinh: 12, cstd_tinh: 12, cstd_co_so: 9, giay_khen_so: 9 };
-const RANK = ["HTXSNV", "HTTNV", "HTNV", "KHTNV"];
 
 interface PEvent { id: string; key: string; staff: string; kind: Kind; action: string; reason: string; award?: string; export_id?: string; decision_id?: string; at: string }
 interface Export extends Omit<S["HrmPromoExportSummary"], "decision_no"> { items: (S["HrmPromoExportItem"] & { award_event_id?: string })[] }
@@ -54,47 +42,23 @@ function addMonths(iso: string, m: number): string {
 }
 const fmt = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
-function ratingsOf(staff: string): Record<number, string> {
-  const out: Record<number, string> = {};
-  const dead = new Set(ST.ratings.map((r) => r.supersedes_id).filter(Boolean));
-  for (const r of ST.ratings as (S["HrmAnnualRating"] & { staff: string })[]) if (r.staff === staff && !r.void && !dead.has(r.id)) out[r.year] = r.rating;
-  return out;
-}
-
-function condRatings(staff: string, y: number): S["HrmPromoBasis"] {
-  const rs = ratingsOf(staff);
-  const years = Array.from({ length: RULES.years }, (_, i) => y - RULES.years + i);
-  const bad = years.filter((x) => rs[x] && RANK.indexOf(rs[x]!) > RANK.indexOf(RULES.min)).map((x) => `${rs[x]} ${x}`);
-  const miss = years.filter((x) => !rs[x]);
-  return {
-    label: `Xếp loại ${years.join(" · ")}`,
-    value: years.map((x) => rs[x] ?? "—").join(" · "),
-    result: bad.length ? "fail" : miss.length ? "review" : "ok",
-    note: bad.length ? bad.join(", ") : miss.length ? `thiếu xếp loại ${miss.join(", ")}` : "",
-  };
-}
-
 function caseState(key: string): PEvent | undefined {
   return [...ST.events].reverse().find((e) => e.key === key);
 }
 function statusOf(key: string, kind: Kind): { s: Status; reason: string; note: string; gone: boolean } {
+  const independent=ST.decs.some(d=>!d.cancel&&d.d.kind==="nltx"&&d.d.people.some(p=>(p.case_key||`${p.staff_id}:nltx:b${p.to_step}-${p.effective_on.replaceAll("-","")}`)===key));
+  if(independent)return {s:"decided",reason:"",note:"",gone:false};
   const e = caseState(key);
-  if (!e) return { s: kind === "nlth" ? "listed" : "pending", reason: "", note: "", gone: false };
-  const map: Record<string, Status> = { include: "listed", propose: "listed", exclude: kind === "nlth" ? "listed" : "pending", export: "exported", undecide: "exported", decide: "decided", return: kind === "nlth" ? "listed" : "pending" };
+  if (!e) return { s: "pending", reason: "", note: "", gone: false };
+  const map: Record<string, Status> = { include:"pending", propose:"pending", exclude:"pending", export:"exported", undecide:ST.events.some(x=>x.key===key&&x.action==="export")?"exported":"pending", decide:"decided", return:"exported" };
+  void kind;
   const inc = [...ST.events].reverse().find((x) => x.key === key && (x.action === "include" || x.action === "propose"));
   return { s: map[e.action] ?? "pending", reason: inc?.reason ?? "", note: e.action === "return" ? e.reason : "", gone: e.action === "withdraw" };
 }
 
-function tnvkPrev(staff: string): { pct: number; since: string } | null {
-  let best: { pct: number; since: string } | null = null;
-  for (const x of ST.decs) if (!x.cancel && x.d.kind === "tnvk") for (const p of x.d.people) if (p.staff_id === staff && (!best || p.effective_on > best.since)) best = { pct: Number(p.pct_to), since: p.effective_on };
-  return best;
-}
-const usedAwards = () => new Set(ST.decs.filter((x) => !x.cancel && x.d.kind === "nlth").flatMap((x) => x.awards));
-
 function blank(st: Staff, snap: S["HrmSnapshot"], kind: Kind): Case {
   return {
-    key: "", staff_id: st.id, code: st.code, name: st.profile.full_name, unit: snap.unit, unit_name: H.units().find((u) => u.code === snap.unit)?.name ?? snap.unit,
+    promotion_months:snap.promotion_months ?? 0, key: "", staff_id: st.id, code: st.code, name: st.profile.full_name, unit: snap.unit, unit_name: H.units().find((u) => u.code === snap.unit)?.name ?? snap.unit,
     kind, form: kind === "nltx" ? "mau1" : kind === "nlth" ? "mau2" : "mau4", due: "", grade: snap.grade, grade_name: snap.grade, steps: snap.steps,
     from_step: snap.step, to_step: snap.step, from_coeff: snap.coefficient, to_coeff: snap.coefficient, diff: "0.00", step_since: snap.step_since || null,
     reserved: snap.reserved_coeff, next_due: null, normal_due: null, early_months: 0, pct_from: null, pct_to: null, pct_since: null, cond: "ok", why: [],
@@ -102,67 +66,27 @@ function blank(st: Staff, snap: S["HrmSnapshot"], kind: Kind): Case {
   };
 }
 
-function compute(day: string, proposals = true, extraAwards?: Map<string, string[]>): { cands: Case[]; activeVC: number; missing: S["HrmPersonBrief"][] } {
-  const cands: Case[] = [];
-  const missing: S["HrmPersonBrief"][] = [];
-  let activeVC = 0;
-  const used = usedAwards();
+function compute(day:string): {cands:Case[];activeVC:number;missing:S["HrmPersonBrief"][]} {
+  const cands:Case[]=[], missing:S["HrmPersonBrief"][]=[];
+  let activeVC=0;
   for (const st of H.staff()) {
-    const snap = H.project(st.events, day);
-    if (st.type !== "vien_chuc" || snap.status !== "active") continue;
+    const snap=H.project(st.events,day);
+    if (st.type!=="vien_chuc" || snap.status!=="active") continue;
     activeVC++;
-    const sc = snap.grade ? hrmScaleAt(snap.grade, day) : null;
-    if (!sc || !snap.step || !snap.step_since) {
-      missing.push({ id: st.id, code: st.code, type: st.type, name: st.profile.full_name, unit: snap.unit, unit_name: snap.unit, position: snap.position });
-      continue;
+    const sc=snap.grade?hrmScaleAt(snap.grade,day):null;
+    if (sc && snap.step>=sc.steps) continue;
+    const months=snap.promotion_months??0;
+    if (!sc || !snap.step || !/^\d{4}-\d{2}-\d{2}$/.test(snap.step_since) || months<1 || months>120) {
+      missing.push({id:st.id,code:st.code,type:st.type,name:st.profile.full_name,unit:snap.unit,unit_name:snap.unit,position:snap.position});continue;
     }
-    const since = snap.step_since.length === 4 ? `${snap.step_since}-01-01` : snap.step_since.length === 7 ? `${snap.step_since}-01` : snap.step_since;
-    const coef = (n: number) => sc.coefficients[n - 1] ?? "";
-    const moc = { label: "Mốc xếp bậc hiện tại", value: fmt(since), result: "ok" as Cond, note: "" };
-    const finish = (c: Case, y: number) => {
-      const r = condRatings(st.id, y);
-      c.basis.push(r);
-      if (snap.disciplined) c.basis.push({ label: "Kỷ luật", value: "Đang thi hành kỷ luật", result: "fail", note: "đang thi hành kỷ luật" });
-      for (const b of c.basis) if (b.result !== "ok") { c.cond = c.cond === "fail" || b.result === "fail" ? "fail" : "review"; if (b.note) c.why.push(b.note); }
-      const s = statusOf(c.key, c.kind);
-      Object.assign(c, { status: s.s, reason: s.reason, note: s.note });
-      if (!s.gone) cands.push(c);
-    };
-    if (snap.step < sc.steps) {
-      const due = addMonths(since, sc.hold_months);
-      const c = blank(st, snap, "nltx");
-      Object.assign(c, { key: `${st.id}:nltx:b${snap.step + 1}-${due.replaceAll("-", "")}`, due, next_due: due, to_step: snap.step + 1, to_coeff: coef(snap.step + 1),
-        diff: (Number(coef(snap.step + 1)) - Number(coef(snap.step))).toFixed(2), months_enjoyed: Number(due.slice(8)) <= 15 ? "1" : "0.5" });
-      c.basis.push(moc, { label: "Thời gian giữ bậc", value: `${sc.hold_months} tháng (${fmt(since)} → ${fmt(due)})`, result: "ok", note: "" });
-      finish(c, Number(due.slice(0, 4)));
-      const awardIds = new Set([
-        ...(proposals ? ST.events.filter((e) => e.staff === st.id && e.action === "propose" && statusOf(e.key, "nlth").s !== "decided" && !statusOf(e.key, "nlth").gone).map((e) => e.award!) : []),
-        ...(extraAwards?.get(st.id) ?? []),
-      ]);
-      for (const ev of st.events.filter((e: Ev) => e.kind === "award" && !e.void && awardIds.has(e.id))) {
-        const m = CONV[ev.payload.form ?? ""] ?? 0;
-        const early = addMonths(due, -m);
-        const n = blank(st, snap, "nlth");
-        const label = `${ev.payload.title || ev.payload.form} ${ev.valid_from.slice(0, 4)}`.replace(/ (\d{4}) \1$/, " $1");
-        Object.assign(n, { key: `${st.id}:nlth:${ev.id}`, due: early, normal_due: due, next_due: early, early_months: m, to_step: snap.step + 1, to_coeff: coef(snap.step + 1),
-          diff: (Number(coef(snap.step + 1)) - Number(coef(snap.step))).toFixed(2), award: { event_id: ev.id, form: ev.payload.form ?? "", label, year: Number(ev.valid_from.slice(0, 4)), months: m, used: used.has(ev.id) } });
-        n.basis.push(moc, { label: `Thành tích ${RULES.ach} năm gần nhất`, value: `${label} (quy đổi ${m} tháng)`, result: used.has(ev.id) || !m ? "fail" : "ok", note: used.has(ev.id) ? "thành tích đã dùng" : !m ? "thành tích không thuộc bảng quy đổi" : "" });
-        if (early.slice(0, 4) !== day.slice(0, 4)) { n.planned_year = Number(early.slice(0, 4)); n.blocked.push(`ngày nâng ${fmt(early)} ngoài năm chỉ tiêu ${day.slice(0, 4)}`); }
-        if (used.has(ev.id)) n.blocked.push("thành tích đã dùng");
-        finish(n, Number(early.slice(0, 4)));
-      }
-    } else {
-      const prev = tnvkPrev(st.id);
-      const due = prev ? addMonths(prev.since, RULES.tCycle) : addMonths(since, RULES.tFirst);
-      const to = prev ? prev.pct + RULES.tStep : RULES.tStart;
-      const c = blank(st, snap, "tnvk");
-      Object.assign(c, { key: `${st.id}:tnvk:v-${due.replaceAll("-", "")}`, due, next_due: addMonths(due, RULES.tCycle), pct_from: prev ? String(prev.pct) : null, pct_to: String(to),
-        pct_since: prev?.since ?? null, diff: ((Number(snap.coefficient) * (to - (prev?.pct ?? 0))) / 100).toFixed(2) });
-      c.basis.push(moc, { label: "Ngạch, bậc", value: `${snap.grade} · bậc cuối ${snap.step}/${sc.steps}`, result: "ok", note: "" });
-      finish(c, Number(due.slice(0, 4)));
-    }
+    const due=addMonths(snap.step_since,months), c=blank(st,snap,"nltx");
+    Object.assign(c,{key:`${st.id}:nltx:b${snap.step+1}-${due.replaceAll("-","")}`,due,next_due:due,to_step:snap.step+1,to_coeff:sc.coefficients[snap.step]??"",
+      diff:(Number(sc.coefficients[snap.step])-Number(sc.coefficients[snap.step-1])).toFixed(2),months_enjoyed:Number(due.slice(8))<=15?"1":"0.5"});
+    c.basis=[{label:"Ngày hưởng bậc hiện tại",value:fmt(snap.step_since),result:"ok",note:""},{label:"Thời gian xét nâng lương",value:`${months} tháng (${fmt(snap.step_since)} → ${fmt(due)})`,result:"ok",note:""}];
+    const status=statusOf(c.key,c.kind);Object.assign(c,{status:status.s,reason:status.reason,note:status.note});
+    cands.push(c);
   }
-  return { cands, activeVC, missing };
+  return {cands,activeVC,missing};
 }
 
 function caller(ctx: Ctx, write = false) {
@@ -180,33 +104,20 @@ function pevent(c: { ref: string }, e: Omit<PEvent, "id" | "at">) {
 function decided(day: string, from: string, to: string): Case[] {
   const out: Case[] = [];
   for (const x of ST.decs) {
-    if (x.cancel) continue;
+    if (x.cancel || x.d.kind!=="nltx") continue;
     for (const p of x.d.people) {
       if (p.effective_on < from || p.effective_on > to) continue;
       const st = H.staff().find((s) => s.id === p.staff_id);
       if (!st) continue;
       const c = blank(st, H.project(st.events, day), x.d.kind);
-      Object.assign(c, { key: p.case_key || `${p.staff_id}:${x.d.kind}:${p.effective_on.replaceAll("-", "")}`, due: p.effective_on, from_step: p.from_step, to_step: p.to_step,
+      Object.assign(c, { key: p.case_key || `${p.staff_id}:${x.d.kind}:b${p.to_step}-${p.effective_on.replaceAll("-", "")}`, due: p.effective_on, from_step: p.from_step, to_step: p.to_step,
         from_coeff: p.from_coeff, to_coeff: p.to_coeff, pct_from: p.pct_from || null, pct_to: p.pct_to || null, status: "decided", decision_id: x.d.id, decision_no: x.d.decision_no });
       out.push(c);
     }
   }
   return out;
 }
-function quota(day: string, cands: Case[], activeVC: number): S["HrmPromoQuota"] {
-  const y = day.slice(0, 4);
-  return {
-    year: Number(y),
-    total: Math.floor((activeVC * RULES.quotaPct) / 100),
-    used: ST.decs.filter((x) => !x.cancel && x.d.kind === "nlth").flatMap((x) => x.d.people).filter((p) => p.effective_on.startsWith(y)).length,
-    pending: cands.filter((c) => c.kind === "nlth" && !c.planned_year && c.status !== "decided").length,
-  };
-}
-const xlsx = (name: string, extra: Record<string, string> = {}) =>
-  new Response(new Blob([`Tệp giả lập ${name}`]), {
-    status: 200,
-    headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Cache-Control": "no-store", "Content-Disposition": `attachment; filename="${name}"`, ...extra },
-  });
+const xlsx = (name: string, extra: Record<string,string> = {}) => new Response(new Blob([`Tệp giả lập ${name}`]), {status:200,headers:{"Content-Type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Cache-Control":"no-store","Content-Disposition":`attachment; filename="${name}"`,...extra}});
 
 function decisionOut(x: Dec, full: boolean): S["HrmDecision"] {
   return { ...x.d, status: x.cancel ? "cancelled" : "applied", cancel_reason: x.cancel ?? null, ...(full ? {} : { history: undefined }) } as S["HrmDecision"];
@@ -219,19 +130,14 @@ export const hrmPromotionRoutes: Route[] = [
     handler: (ctx) => {
       const c = caller(ctx);
       if (c instanceof Response) return c;
-      const day = ctx.url.searchParams.get("at") || vnToday();
-      const w = [1, 3, 6, 12].includes(Number(ctx.url.searchParams.get("window"))) ? Number(ctx.url.searchParams.get("window")) : 3;
-      const end = addMonths(day, w);
-      const { cands, activeVC, missing } = compute(day);
-      const items = [...cands.filter((x) => x.due <= end && x.status !== "decided"), ...decided(day, addMonths(day, -3), end)].sort((a, b) => a.due.localeCompare(b.due) || a.code.localeCompare(b.code));
-      const by = (f: (x: Case) => string) => items.reduce<Record<string, number>>((m, x) => ({ ...m, [f(x)]: (m[f(x)] ?? 0) + 1 }), {});
-      const out: S["HrmPromotionList"] = {
-        as_of: day, window: w, items, missing, last_scan: ST.scans ? { day, counts: { due_3: items.length }, recorded_at: now() } : null,
-        summary: { total: items.length, nltx: items.filter((x) => x.kind === "nltx").length, tnvk: items.filter((x) => x.kind === "tnvk").length, nlth: items.filter((x) => x.kind === "nlth").length,
-          by_status: { pending: 0, listed: 0, exported: 0, decided: 0, ...by((x) => x.status) }, by_month: by((x) => x.due.slice(0, 7)), quota: quota(day, cands, activeVC) },
-        rules: { min_rating: RULES.min, rating_years: RULES.years, achievement_years: RULES.ach, tnvk_start_pct: String(RULES.tStart), tnvk_step_pct: String(RULES.tStep),
-          tnvk_cycle_months: RULES.tCycle, tnvk_first_months: RULES.tFirst, nlth_quota_pct: String(RULES.quotaPct), remind_months: [1, 3, 6] },
-      };
+      const day=vnToday(), p=ctx.url.searchParams;
+      for(const [k,max] of [["year",9999],["month",12]] as const){const raw=p.get(k);if(raw!==null&&(!/^[0-9]{1,4}$/.test(raw)||Number(raw)<1||Number(raw)>max))return validation([{field:k,reason:"Số nguyên ngoài phạm vi"}]);}
+      if(p.has("status")&&!["pending","exported","decided"].includes(p.get("status")!))return validation([{field:"status",reason:"Trạng thái không hợp lệ"}]);
+      const {cands,missing}=compute(day);
+      const items=[...cands.filter(x=>x.status!=="decided"),...decided(day,"0001-01-01","9999-12-31")]
+        .filter(x=>(!p.get("year")||Number(x.due.slice(0,4))===Number(p.get("year")))&&(!p.get("month")||Number(x.due.slice(5,7))===Number(p.get("month")))&&(!p.get("status")||x.status===p.get("status"))&&(!p.get("unit")||x.unit===p.get("unit"))&&(!p.get("q")||x.name.toLowerCase().includes(p.get("q")!.toLowerCase())))
+        .sort((a,b)=>a.due.localeCompare(b.due)||a.code.localeCompare(b.code));
+      const out:S["HrmPromotionList"]={as_of:day,items,missing};
       return json(out, 200, { "Cache-Control": "no-store" });
     },
   },
@@ -245,104 +151,11 @@ export const hrmPromotionRoutes: Route[] = [
       const day = vnToday();
       const x = compute(day).cands.find((k) => k.key === key) ?? decided(day, "1900-01-01", "2200-01-01").find((k) => k.key === key);
       if (!x) return problem(404, "hrm.promotion_case_not_found", "Không có kỳ nâng bậc này (đã xử lý hoặc dữ liệu hồ sơ đã đổi)");
-      const st = H.staff().find((s) => s.id === x.staff_id)!;
       const out: S["HrmPromoCaseDetail"] = {
         ...x,
         history: ST.events.filter((e) => e.key === key).map((e) => ({ id: e.id, action: e.action as S["HrmPromoEvent"]["action"], due_on: x.due, export_id: e.export_id ?? null, decision_id: e.decision_id ?? null, reason: e.reason, actor: c.ref, recorded_at: e.at })),
-        ratings: (ST.ratings as (S["HrmAnnualRating"] & { staff: string })[]).filter((r) => r.staff === x.staff_id),
-        awards: st.events.filter((e) => e.kind === "award" && !e.void).map((e) => ({ event_id: e.id, form: e.payload.form ?? "", label: e.payload.title || e.payload.form || "", year: Number(e.valid_from.slice(0, 4)), months: CONV[e.payload.form ?? ""] ?? 0, used: usedAwards().has(e.id) })),
       };
       return json(out, 200, { "Cache-Control": "no-store" });
-    },
-  },
-  {
-    method: "POST",
-    pattern: /^\/v1\/hrm\/promotion\/cases\/(include|exclude)$/,
-    handler: (ctx) => {
-      const c = caller(ctx, true);
-      if (c instanceof Response) return c;
-      const b = body<S["HrmPromoKeysInput"]>(ctx);
-      const inc = ctx.params[0] === "include";
-      const cands = compute(vnToday()).cands;
-      let n = 0;
-      for (const k of b.keys ?? []) {
-        const x = cands.find((y) => y.key === k);
-        if (!x) return problem(404, "hrm.promotion_case_not_found", "Không có kỳ nâng bậc này");
-        if (x.kind === "nlth") return problem(409, "hrm.promotion_conflict", "Kỳ trước hạn được lập từ thành tích");
-        if (inc && x.status === "pending") {
-          if (x.cond !== "ok" && !b.reason?.trim()) return validation([{ field: "reason", reason: "thêm người chưa đủ điều kiện hoặc cần xem xét phải có lý do (FN-09)" }]);
-          pevent(c, { key: k, staff: x.staff_id, kind: x.kind, action: "include", reason: x.cond === "ok" ? "" : b.reason!.trim() });
-          n++;
-        } else if (!inc) {
-          if (x.status !== "listed") return problem(409, "hrm.promotion_conflict", "Chỉ bỏ được kỳ đang ở trạng thái Đã đưa vào danh sách");
-          pevent(c, { key: k, staff: x.staff_id, kind: x.kind, action: "exclude", reason: "" });
-          n++;
-        }
-      }
-      return json({ changed: n });
-    },
-  },
-  {
-    method: "GET",
-    pattern: /^\/v1\/hrm\/promotion\/nlth-pool$/,
-    handler: (ctx) => {
-      const c = caller(ctx);
-      if (c instanceof Response) return c;
-      const day = vnToday();
-      const end = addMonths(day, 3);
-      const base = compute(day);
-      const due = new Set(base.cands.filter((x) => x.kind === "nltx" && x.due <= end && x.status !== "decided").map((x) => x.staff_id));
-      const open = new Set(base.cands.filter((x) => x.kind === "nlth" && (x.status === "listed" || x.status === "exported")).map((x) => x.staff_id));
-      const extra = new Map<string, string[]>();
-      for (const st of H.staff()) extra.set(st.id, st.events.filter((e) => e.kind === "award" && !e.void && !usedAwards().has(e.id) && Number(e.valid_from.slice(0, 4)) >= Number(day.slice(0, 4)) - RULES.ach).map((e) => e.id));
-      const all = compute(day, false, extra).cands;
-      const rows: S["HrmNLTHPool"]["rows"] = [];
-      let excluded = 0;
-      for (const st of H.staff()) {
-        const snap = H.project(st.events, day);
-        if (st.type !== "vien_chuc" || snap.status !== "active" || open.has(st.id)) continue;
-        if (due.has(st.id)) { excluded++; continue; }
-        const opts = all.filter((x) => x.staff_id === st.id && x.kind === "nlth");
-        const nltx = all.find((x) => x.staff_id === st.id && x.kind === "nltx");
-        rows.push({ staff_id: st.id, code: st.code, name: st.profile.full_name, unit_name: snap.unit, step: snap.step, steps: snap.steps, normal_due: nltx?.due ?? null,
-          block: !snap.grade ? "Chưa có ngạch, bậc hoặc bảng hệ số" : snap.step >= snap.steps ? "Đang ở bậc cuối (xét thâm niên vượt khung)" : opts.length ? "" : "Chưa có thành tích ghi trong hồ sơ",
-          options: opts.map((x) => ({ award: x.award!, key: x.key, due: x.due, early_months: x.early_months, cond: x.cond, why: x.why, planned_year: x.planned_year })) });
-      }
-      return json({ as_of: day, excluded, rows, quota: quota(day, base.cands, base.activeVC) } satisfies S["HrmNLTHPool"], 200, { "Cache-Control": "no-store" });
-    },
-  },
-  {
-    method: "POST",
-    pattern: /^\/v1\/hrm\/promotion\/proposals$/,
-    handler: (ctx) => {
-      const c = caller(ctx, true);
-      if (c instanceof Response) return c;
-      const b = body<{ items?: { staff_id: string; award_event_id: string }[]; reason?: string }>(ctx);
-      const day = vnToday();
-      const base = compute(day);
-      const extra = new Map((b.items ?? []).map((i) => [i.staff_id, [i.award_event_id]]));
-      const xs = compute(day, false, extra).cands.filter((x) => x.kind === "nlth" && (b.items ?? []).some((i) => i.award_event_id === x.award?.event_id));
-      if (!xs.length) return validation([{ field: "items", reason: "chọn 1–500 người" }]);
-      const q = quota(day, base.cands, base.activeVC);
-      const add = xs.filter((x) => !x.planned_year).length;
-      if (add && q.used + q.pending + add > q.total) return problem(422, "hrm.nlth_quota_exceeded", "Vượt chỉ tiêu nâng bậc trước thời hạn của năm", { detail: `năm ${q.year}: ${q.used + q.pending + add}/${q.total} người` });
-      if (xs.some((x) => x.cond !== "ok") && !b.reason?.trim()) return validation([{ field: "reason", reason: "người chưa đủ điều kiện phải có lý do" }]);
-      for (const x of xs) pevent(c, { key: x.key, staff: x.staff_id, kind: "nlth", action: "propose", reason: x.cond === "ok" ? "" : b.reason!.trim(), award: x.award!.event_id });
-      return json({ keys: xs.map((x) => x.key) }, 201);
-    },
-  },
-  {
-    method: "POST",
-    pattern: /^\/v1\/hrm\/promotion\/proposals\/withdraw$/,
-    handler: (ctx) => {
-      const c = caller(ctx, true);
-      if (c instanceof Response) return c;
-      const keys = body<S["HrmPromoKeysInput"]>(ctx).keys ?? [];
-      for (const k of keys) {
-        if (statusOf(k, "nlth").s !== "listed") return problem(409, "hrm.promotion_conflict", "Chỉ gỡ được kỳ trước hạn chưa xuất danh sách");
-        pevent(c, { key: k, staff: k.slice(0, 36), kind: "nlth", action: "withdraw", reason: "" });
-      }
-      return json({ changed: keys.length });
     },
   },
   {
@@ -367,25 +180,25 @@ export const hrmPromotionRoutes: Route[] = [
       if (c instanceof Response) return c;
       const b = body<S["HrmPromoExportInput"]>(ctx);
       if (!/^\d{4}-\d{2}$/.test(b.review_month ?? "")) return validation([{ field: "review_month", reason: "YYYY-MM" }]);
+      if(!b.preparer_id) return validation([{field:"preparer_id",reason:"Chọn người lập"}]);
       const day = vnToday();
-      const { cands, activeVC } = compute(day);
+      const { cands } = compute(day);
       const sel = (b.keys ?? []).map((k) => cands.find((x) => x.key === k));
       if (sel.some((x) => !x)) return problem(404, "hrm.promotion_case_not_found", "Không có kỳ nâng bậc này");
-      const nlth = sel.filter((x) => x!.kind === "nlth");
-      const blocked = nlth.flatMap((x) => x!.blocked.map((r) => `${x!.code}: ${r}`));
-      const q = quota(day, cands, activeVC);
-      if (nlth.length && q.used + nlth.length > q.total) blocked.push(`vượt chỉ tiêu nâng bậc trước thời hạn năm ${q.year}: ${q.used + nlth.length}/${q.total}`);
-      if (blocked.length) return problem(422, "hrm.promotion_export_blocked", "Danh sách không xuất được", { detail: `Không xuất được Mẫu số 2: ${blocked.join("; ")}` });
+      if(!sel.length || sel.some(x=>x!.kind!=="nltx"))return validation([{field:"keys",reason:"Chọn người nâng thường xuyên"}]);
+      for(const [field,max,len,dp] of [["months",12,4,1],["reserved",100,6,2],["reserved_after",100,6,2]] as const){
+        for(const raw of Object.values(b[field]??{})){if(raw!==""&&(raw.length>len||!/^\d+(?:[.,]\d{1,2})?$/.test(raw)||Number(raw.replace(",","."))>max||(raw.split(/[.,]/)[1]?.length??0)>dp))return validation([{field,reason:"Số thập phân thường ngoài phạm vi"}]);}
+      }
       const out: S["HrmPromoExported"][] = [];
-      for (const form of ["mau1", "mau2", "mau4"] as const) {
+      for (const form of ["mau1"] as const) {
         const rows = sel.filter((x) => x!.form === form) as Case[];
         if (!rows.length) continue;
         const id = uuid();
         const file_name = `MauSo${form.slice(3)}_T${b.review_month.slice(5)}_${b.review_month.slice(0, 4)}.xlsx`;
         ST.exports.unshift({ id, form, review_month: b.review_month, as_of: day, count: rows.length, file_name, sha256: "0".repeat(64), byte_size: 4096, actor: c.ref, recorded_at: now(),
-          signer_title: b.signer_title ?? "Giám đốc", preparer_id: "",
+          signer_title: b.signer_title ?? "Giám đốc", preparer_id: b.preparer_id,
           items: rows.map((x) => ({ case_key: x.key, staff_id: x.staff_id, code: x.code, name: x.name, kind: x.kind, due: x.due, unit_name: x.unit_name, grade: x.grade, grade_name: x.grade_name,
-            from_step: x.from_step, to_step: x.to_step, from_coeff: x.from_coeff, to_coeff: x.to_coeff, diff: x.diff, pct_from: b.tnvk_pct?.[x.key] ?? x.pct_from ?? "", pct_to: x.pct_to ?? "",
+            from_step: x.from_step, to_step: x.to_step, from_coeff: x.from_coeff, to_coeff: x.to_coeff, diff: x.diff, pct_from: x.pct_from ?? "", pct_to: x.pct_to ?? "",
             next_due: x.next_due ?? "", months_enjoyed: x.months_enjoyed, early_months: x.early_months, award_label: x.award?.label ?? "", note: b.notes?.[x.key] ?? "", reason: x.reason,
             status: "exported", ...(x.award ? { award_event_id: x.award.event_id } : {}) })) });
         for (const x of rows) pevent(c, { key: x.key, staff: x.staff_id, kind: x.kind, action: "export", reason: "", export_id: id, ...(x.award ? { award: x.award.event_id } : {}) });
@@ -470,8 +283,7 @@ export const hrmPromotionRoutes: Route[] = [
         if (it?.award_event_id) dec.awards.push(it.award_event_id);
         if (it) pevent(c, { key: it.case_key, staff: st.id, kind, action: "decide", reason: "", decision_id: id });
       }
-      let returned = 0;
-      for (const i of exp?.items ?? []) if (!b.people.some((p) => p.case_key === i.case_key)) { pevent(c, { key: i.case_key, staff: i.staff_id, kind: i.kind, action: "return", reason: `Không có tên trong quyết định ${dec.d.decision_no}`, decision_id: id }); returned++; }
+      const returned = 0;
       ST.decs.push(dec);
       return json({ id, updated: kind === "tnvk" ? 0 : dec.d.people.length, returned, warnings: [] }, 201);
     },

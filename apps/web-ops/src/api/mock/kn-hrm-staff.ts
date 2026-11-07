@@ -191,6 +191,7 @@ function seed(): Store {
         grade: "01.003",
         step: "5",
         step_since: "2018-01-01",
+        promotion_months: "36",
       }),
       ev("step", "2024-01-01", { step: "6", step_since: "2024-01-01" }),
       ev("degree", "2010", {
@@ -225,6 +226,7 @@ function seed(): Store {
         grade: "01.002",
         step: "4",
         step_since: "2016-01-01",
+        promotion_months: "24",
       }),
     ],
   );
@@ -266,6 +268,7 @@ function project(evs: Ev[], at: string): S["HrmSnapshot"] {
     steps: 0,
     coefficient: "",
     step_since: "",
+    promotion_months: 0,
     reserved_coeff: "",
     disciplined: false,
     top_degree: "",
@@ -275,6 +278,7 @@ function project(evs: Ev[], at: string): S["HrmSnapshot"] {
   for (const e of effective(evs)) {
     if (e.valid_from > at) continue;
     const p = e.payload;
+    if ((e.kind === "grade" || e.kind === "step") && p.promotion_months) s.promotion_months = Number(p.promotion_months);
     switch (e.kind) {
       case "work_start":
         Object.assign(s, {
@@ -539,8 +543,8 @@ const FIELDS: Record<Kind, string[]> = {
   unit: ["unit", "commune", "mgmt_unit"],
   position: ["position", "title", "allowance", "appointed_on", "decision_no"],
   secondment: ["to_org", "decision_no"],
-  grade: ["grade", "step", "step_since", "reserved_coeff", "decision_no"],
-  step: ["step", "step_since", "reserved_coeff", "decision_no"],
+  grade: ["grade", "step", "step_since", "reserved_coeff", "decision_no", "promotion_months"],
+  step: ["step", "step_since", "reserved_coeff", "decision_no", "promotion_months"],
   degree: ["level", "major", "form", "institution"],
   training: ["type", "code", "level", "cert"],
   award: ["form", "title", "level", "decision_no"],
@@ -621,6 +625,8 @@ function normEvent(
       ]);
   }
   if (b.kind === "grade" || b.kind === "step") {
+    if (payload.promotion_months && (!/^[0-9]{1,3}$/.test(payload.promotion_months) || Number(payload.promotion_months) < 1 || Number(payload.promotion_months) > 120))
+      return validation([{field:"promotion_months",reason:"Số nguyên 1–120, tối đa 3 chữ số; không dùng số mũ"}]);
     if (!payload.step_since) payload.step_since = fmt(pd.d, pd.p);
     const grade =
       b.kind === "grade" ? payload.grade! : project(st.events, pd.d).grade;
