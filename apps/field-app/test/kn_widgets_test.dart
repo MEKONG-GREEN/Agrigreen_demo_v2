@@ -180,7 +180,7 @@ Future<void> waitForCondition(
   }
 }
 
-void cleanupEntryTest(
+void _cleanupEntryTest(
   WidgetTester t,
   _Env env, [
   List<Completer<void>> gates = const [],
@@ -250,7 +250,7 @@ void main() {
     tester,
   ) async {
     final env = (await tester.runAsync(_Env.create))!;
-    cleanupEntryTest(tester, env);
+    _cleanupEntryTest(tester, env);
     await tester.runAsync(env.seedTasks);
     final service = _GatedReportService(env);
     await tester.pumpWidget(
@@ -280,7 +280,7 @@ void main() {
   ) async {
     final env = (await tester.runAsync(_Env.create))!;
     final gate = Completer<void>();
-    cleanupEntryTest(tester, env, [gate]);
+    _cleanupEntryTest(tester, env, [gate]);
     await tester.runAsync(env.seedTasks);
     final service = _GatedReportService(env, saveGate: gate);
     await tester.pumpWidget(
@@ -319,7 +319,7 @@ void main() {
   ) async {
     final env = (await tester.runAsync(_Env.create))!;
     final gate = Completer<void>();
-    cleanupEntryTest(tester, env, [gate]);
+    _cleanupEntryTest(tester, env, [gate]);
     await tester.runAsync(env.seedTasks);
     final service = _GatedReportService(env, tabsGate: gate);
     await tester.pumpWidget(
