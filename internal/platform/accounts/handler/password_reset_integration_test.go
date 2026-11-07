@@ -1,6 +1,6 @@
 package handler_test
 
-// #255 AUTH-V2-RESET-NOPIN (ADR-0056; BRD 2.0 Báo giá v2.0 FN-CH-00.01 "Quên mật khẩu?"): yêu cầu không lộ email, tối đa
+// #255 AUTH-V2-RESET-NOPIN (ADR-0057; BRD 2.0 Báo giá v2.0 FN-CH-00.01 "Quên mật khẩu?"): yêu cầu không lộ email, tối đa
 // 5 yêu cầu/giờ/tài khoản, mã chỉ lưu băm, dùng một lần, hết hạn 30 phút, sai mã bị từ chối, đổi xong thu hồi phiên.
 
 import (

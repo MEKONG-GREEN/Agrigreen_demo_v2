@@ -1,4 +1,4 @@
-// BACKEND GIẢ LẬP — tự đặt lại mật khẩu qua email (#255, ADR-0056; BRD 2.0 FN-CH-00.01 "Quên mật khẩu?"). Route CÔNG
+// BACKEND GIẢ LẬP — tự đặt lại mật khẩu qua email (#255, ADR-0057; BRD 2.0 FN-CH-00.01 "Quên mật khẩu?"). Route CÔNG
 // KHAI /v1/public/password-reset(/confirm): không cần token, chạy trước bước kiểm persona của mockFetch. Giả lập không gửi
 // email: yêu cầu luôn 202; xác nhận nhận mọi mã đúng dạng (86 ký tự base64url) đúng một lần, mật khẩu dưới 12 ký tự → 422.
 import { json, problem } from "./http";

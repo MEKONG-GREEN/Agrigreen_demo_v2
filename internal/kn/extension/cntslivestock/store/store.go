@@ -254,3 +254,48 @@ func Checkins(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID]Ch
 	}
 	return out, rows.Err()
 }
+
+// TypeCount là số hộ Đang dùng (bản hiện hành) của một xã theo loại chăn nuôi HCN-06.
+type TypeCount struct {
+	Commune, Type string
+	Households    int
+}
+
+// HeadCount là tổng số con của hộ Đang dùng (bản hiện hành) theo vật nuôi × loại chăn nuôi (chuỗi thập phân).
+type HeadCount struct {
+	Species, Type, Heads string
+}
+
+// activeCurrent là bản hiện hành của mọi hộ, giữ hộ Đang dùng thuộc các xã $1 (NULL = mọi xã). Lọc xã SAU khi lấy bản
+// hiện hành: hộ đã chuyển xã chỉ tính ở xã hiện tại.
+const activeCurrent = `SELECT * FROM (SELECT DISTINCT ON (household_ref) status, commune_code, livestock_type, species_codes, head_counts
+    FROM pf_extension.cnts_livestock_household ORDER BY household_ref, seq DESC) h
+  WHERE h.status = 'active' AND ($1::text[] IS NULL OR h.commune_code = ANY ($1::text[]))`
+
+// ActiveTally đếm hộ Đang dùng theo xã × loại chăn nuôi và cộng số con theo vật nuôi × loại (FN-16 BR-07, ADR-0056 mục 9):
+// hộ Chờ bổ sung vị trí, Vô hiệu hóa không tính (FN-10 BR-08). communes nil = mọi xã.
+func ActiveTally(ctx context.Context, tx pgx.Tx, communes []string) ([]TypeCount, []HeadCount, error) {
+	rows, err := tx.Query(ctx, `SELECT commune_code, livestock_type, count(*)::int FROM (`+activeCurrent+`) a
+	  GROUP BY 1, 2 ORDER BY 1, 2`, communes)
+	if err != nil {
+		return nil, nil, err
+	}
+	types, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (TypeCount, error) {
+		var t TypeCount
+		return t, r.Scan(&t.Commune, &t.Type, &t.Households)
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	rows, err = tx.Query(ctx, `SELECT s.code, a.livestock_type, sum(s.heads)::text FROM (`+activeCurrent+`) a,
+	    unnest(a.species_codes, a.head_counts) AS s(code, heads)
+	  GROUP BY 1, 2 ORDER BY 1, 2`, communes)
+	if err != nil {
+		return nil, nil, err
+	}
+	heads, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (HeadCount, error) {
+		var h HeadCount
+		return h, r.Scan(&h.Species, &h.Type, &h.Heads)
+	})
+	return types, heads, err
+}

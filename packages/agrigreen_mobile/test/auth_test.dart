@@ -163,7 +163,7 @@ void main() {
     });
   });
 
-  group('không có PIN (App KN — BRD 2.0 FN-CH-00.01, FN-05; ADR-0056)', () {
+  group('không có PIN (App KN — BRD 2.0 FN-CH-00.01, FN-05; ADR-0057)', () {
     test('đăng nhập trực tuyến mở thẳng, không có bước PIN; phiên 72 giờ giữ nguyên', () async {
       final flow = AuthFlow(session: session);
       expect((await flow.start()).stage, AuthStage.needsOnlineLogin);

@@ -35,7 +35,7 @@ class _AuthGate extends ConsumerWidget {
       AuthStage.loading => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      // App KN không có PIN (ADR-0056): AuthFlow không bao giờ trả needsPinSetup/locked.
+      // App KN không có PIN (ADR-0057): AuthFlow không bao giờ trả needsPinSetup/locked.
       AuthStage.needsOnlineLogin ||
       AuthStage.needsPinSetup ||
       AuthStage.locked => const LoginScreen(),

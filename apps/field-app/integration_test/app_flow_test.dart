@@ -95,7 +95,7 @@ void main() {
       ),
     );
 
-    // Đăng nhập chế độ kiểm thử → vào thẳng (không có PIN — BRD 2.0 FN-CH-00.01, ADR-0056).
+    // Đăng nhập chế độ kiểm thử → vào thẳng (không có PIN — BRD 2.0 FN-CH-00.01, ADR-0057).
     await pumpUntil(tester, find.text('Đăng nhập'));
     await tester.tap(find.text('Đăng nhập'));
     await pumpUntil(tester, find.byType(HomeScreen));

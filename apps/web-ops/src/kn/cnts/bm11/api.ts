@@ -13,6 +13,13 @@ export type Bm11Preview = S["CNTSBM11Preview"];
 export type Bm11Type = Bm11Summary["type"];
 export type Bm11Status = Bm11Summary["status"];
 export type Bm11WordRun = S["CNTSBM11WordRun"];
+export type Bm11Herds = S["CNTSBM11Herds"];
+
+/** Dòng toàn tỉnh của bảng theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07, Hình 48): "Toàn tỉnh (n/N xã có dữ liệu)". */
+export function herdTotalLabel(h: Bm11Herds): string {
+  const n = h.communes.length;
+  return h.communes_total > 0 ? `Toàn tỉnh (${n}/${h.communes_total} xã có dữ liệu)` : `Toàn tỉnh (${n} xã có dữ liệu)`;
+}
 
 const idem = () => ({ header: { "Idempotency-Key": newIdempotencyKey() } });
 

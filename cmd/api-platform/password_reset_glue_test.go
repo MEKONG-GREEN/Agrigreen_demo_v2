@@ -11,7 +11,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 )
 
-// #255 AUTH-V2-RESET-NOPIN (ADR-0056): route tự đặt lại mật khẩu nằm ở /v1/public (không cần token), còn đăng nhập bằng
+// #255 AUTH-V2-RESET-NOPIN (ADR-0057): route tự đặt lại mật khẩu nằm ở /v1/public (không cần token), còn đăng nhập bằng
 // PIN Mobile đã bỏ theo BRD 2.0 (FN-CH-00.01, FN-05) — không bề mặt API nào có route PIN.
 func TestPasswordResetPublicAndNoPinRoutes(t *testing.T) {
 	app, admin, iss := glueFixture(t)

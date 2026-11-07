@@ -29,6 +29,30 @@ go test ./internal/kn/extension/domain/ -run 'VisitPhoto|CheckoutRules'
 cd apps/web-ops; npx vitest run src/kn/schedule/
 cd apps/field-app; flutter test test/work_schedule_checkin_test.dart
 ```
+
+## FN-12/FN-13 — Theo dõi check-in, check-out; cảnh báo "Chưa check-out" (CNTS-V4-CHECKIN-MONITOR #250)
+
+Giả định: [CNTS-V4-CHECKIN-MONITOR](../kn/gia-dinh/CNTS-V4-CHECKIN-MONITOR.md). Giờ giả lập (đồng hồ cố định của kiểm thử), mốc 23:59
+tính theo giờ Việt Nam.
+
+| Tiêu chí BRD v4.0 | Bằng chứng tự động | Trạng thái |
+|---|---|---|
+| FN-12 BR-07: mục đã check-in, tới 23:59 cùng ngày chưa check-out → nhãn "Chưa check-out" ở màn cán bộ xã và màn theo dõi | `TestNoCheckout` (23:58:59 chưa, 23:59 có, mốc 16:59 UTC); `TestWorkScheduleNoCheckout` (`no_checkout` ở chi tiết lịch, `mine` của cán bộ xã, danh sách theo dõi `no_checkout_count`, cảnh báo `checkout_missing`); web `visits.test.tsx`; field-app `CNTS v4.0 BR-07 (#250)` | Đạt |
+| FN-12 AC-10: check-in 08:00, chưa check-out đến 23:59 → sáng hôm sau người theo dõi thấy nhãn | `TestWorkScheduleNoCheckout` (người duyệt đọc lịch lúc 23:59 và sau đó) | Đạt |
+| Mục III.5 dòng 13 / FN-13 BR-04: cảnh báo "Chưa check-out", mức Cần chú ý, gửi người theo dõi lịch cán bộ xã; không tạo trùng | `TestWorkScheduleNoCheckout` (job `extension_cnts_alert` sinh 2 cảnh báo, người nhận = người duyệt được lịch; chạy lại không sinh thêm), `TestTransition` (bảng loại dòng 13) | Đạt |
+| FN-12 BR-08 / AC-13: check-out offline 16:30, đồng bộ 07:10 hôm sau → gỡ nhãn, cảnh báo tự đóng, lịch ghi 16:30 kèm "Đồng bộ trễ" | `TestWorkScheduleNoCheckout` (nhãn gỡ ngay khi đọc; job tự đóng cảnh báo, `auto_closed`, kết quả ghi giờ check-out và giờ đồng bộ) | Đạt (tự đóng trong ≤ 5 phút — chu kỳ job) |
+| UR-TINH-18, Hình 49: màn theo dõi check-in, check-out, thời gian ở địa điểm, ảnh của cán bộ xã; mục chưa check-out hiện nhãn | web `visits.test.tsx` (`<VisitMonitor>`: cột, Đồng bộ trễ, lọc "Chỉ mục Chưa check-out", xem ảnh), `schedule.test.tsx` (tab "Check-in, check-out") | Đạt |
+| Job tìm tenant có check-in bằng vai `ag_ops_jobs` (chỉ cột `tenant_id`, `day`) | `TestWorkScheduleNoCheckout` (`CNTSAlertTenants`) | Đạt |
+| Dữ liệu cũ: check-in trước v4.0 (không ảnh) không gắn nhãn, không sinh cảnh báo — không bắt nhập bù | `TestWorkScheduleNoCheckout` | Đạt |
+
+Cách chạy:
+
+```powershell
+.\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v -run 'WorkScheduleNoCheckout' ./internal/kn/extension/cntscal/handler/
+go test ./internal/kn/extension/domain/ ./internal/kn/extension/cntsalert/domain/
+cd apps/web-ops; npx vitest run src/kn/schedule/
+cd apps/field-app; flutter test test/work_schedule_checkin_test.dart
+```
 # Nghiệm thu CNTS v4.0 (BRD 2.0)
 
 Đối chiếu theo BRD CNTS v4.0 (CR-CNTS-001). Mỗi gói thêm mục của FN mình chạm; kiểm thử tích hợp chạy trên PostgreSQL thật
@@ -58,6 +82,24 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-HOUSEHOLD-LIST.
 | Menu Tỉnh "Số liệu cấp xã › Danh sách hộ chăn nuôi", Xã "Dữ liệu › Danh sách hộ chăn nuôi" | `TestWebMenuFixture`, `TestBuilderMatchesWebGoldenFixture` | G1 |
 
 Chưa nghiệm thu ở gói này: đếm hộ ở báo cáo định kỳ (FN-16 BR-07, CN-5), lớp trang trại bản đồ (FN-18, CN-6), ô chọn DB-04 và tạo
+hộ từ BM-10 (FN-11, #252).
+
+## FN-16, FN-17 — BM-11 theo loại chăn nuôi, số hộ/trang trại trang chủ (CNTS-V4-BM11-TYPES #253)
+
+Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-BM11-TYPES.md), [ADR-0056](../adr/0056-ho-chan-nuoi-cnts-v4.md) mục 9.
+
+| Tiêu chí BRD | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| FN-16 BR-07, UR-TINH-16 (Hình 48): báo cáo định kỳ có bảng theo loại chăn nuôi — số hộ, số trang trại, số con theo vật nuôi — đếm, cộng từ danh sách hộ chăn nuôi (hộ Đang dùng) lúc lập báo cáo | `TestCNTSBM11_W1145`, `TestBM11HerdsOf_AC05`; vitest `bm11.test.tsx` | G1 |
+| FN-16 AC-05: xã A 12 hộ đang dùng (3 trang trại nhỏ, 1 vừa) → 12 hộ, 4 trang trại; nông hộ 8, nhỏ 3, vừa 1, công nghiệp 0 | `TestCNTSBM11_W1145`, `TestBM11HerdsOf_AC05`; vitest `bm11.test.tsx` | G1 |
+| FN-10 BR-08 (phần báo cáo): hộ Chờ bổ sung vị trí, hộ Vô hiệu hóa không tính vào báo cáo định kỳ | `TestCNTSBM11_W1145` | G1 |
+| FN-10 BR-06: hộ đổi loại sau khi lập không làm đổi báo cáo đã lập; "Làm mới số liệu" khi còn soạn đếm lại | `TestCNTSBM11_W1145` | G1 |
+| FN-16 BR-07: KSGM (BM-01), nhập liệu tuần (BM-04), khai thác (BM-17) vẫn tổng hợp theo xã, không chia theo loại | `TestCNTSBM11_W1145` (số chăn nuôi, thủy sản không đổi) | G1 |
+| UR-TINH-16 xuất Word: bảng theo loại chăn nuôi trong Word BM-11 (mẫu v2), mẫu v1 vẫn dựng được | `TestBM11WordTemplates`, `TestCNTSBM11_W1145` (Word) | G1 |
+| FN-17 (phạm vi gói): trang chủ Phòng CNTS có thẻ số hộ chăn nuôi, số trang trại (hộ Đang dùng, loại hiện hành); bấm mở danh sách hộ; phòng khác không có | `TestFN17_LivestockCounts_253`; vitest `depthome.test.ts` | G1 |
+
+Chưa nghiệm thu ở gói này: lớp trang trại bản đồ (FN-18, CN-6); FN-17 AC-01 (500 người dùng, < 5 giây trên 3G) cần đo tải trên
+môi trường triển khai.
 hộ từ BM-10 (FN-11, #252 — xem mục FN-11 dưới).
 
 ## FN-11 — Báo cáo dịch bệnh BM-10 nhiều hộ (CNTS-V4-OUTBREAK-MULTI #252)

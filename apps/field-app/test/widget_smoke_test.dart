@@ -52,7 +52,7 @@ void main() {
       expect(find.text('AgriGreen Hiện trường'), findsOneWidget);
       expect(find.text('Đăng nhập'), findsOneWidget);
 
-      // BRD 2.0 FN-CH-00.01, FN-05 (ADR-0056): Mobile không có đăng nhập bằng PIN — luồng của app vào thẳng sau đăng
+      // BRD 2.0 FN-CH-00.01, FN-05 (ADR-0057): Mobile không có đăng nhập bằng PIN — luồng của app vào thẳng sau đăng
       // nhập trực tuyến (không mở CSDL ở kiểm thử widget), đăng xuất buộc đăng nhập lại.
       final container = ProviderScope.containerOf(
         tester.element(find.byType(FieldApp)),

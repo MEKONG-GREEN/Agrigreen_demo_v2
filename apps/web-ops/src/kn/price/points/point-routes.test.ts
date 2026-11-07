@@ -5,11 +5,7 @@ import { parsePointRoute, pointFilters, pointHref } from "./point-routes";
 describe("route và kiểm nhập xã báo giá182", () => {
   it("chỉ nhận route định danh và thao tác đã đăng ký", () => {
     expect(parsePointRoute(["them-moi"])).toEqual({ kind: "point-new" });
-    expect(parsePointRoute(["XBG0001", "phan-cong"])).toEqual({
-      kind: "point",
-      code: "XBG0001",
-      mode: "officers",
-    });
+    expect(parsePointRoute(["XBG0001", "phan-cong"])).toBeNull();
     expect(parsePointRoute(["nhom-vung", "an_giang", "sua"])).toEqual({
       kind: "region",
       code: "an_giang",

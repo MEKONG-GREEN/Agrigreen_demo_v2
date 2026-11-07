@@ -28,10 +28,12 @@ import (
 
 // Mẫu Word BM-11.
 const (
-	BM11WordOwner      = "pf/extension"
-	BM11WordWeekKey    = "cnts.bm11_tuan"
-	BM11WordPeriodKey  = "cnts.bm11_ky"
-	BM11WordVersion    = 1
+	BM11WordOwner     = "pf/extension"
+	BM11WordWeekKey   = "cnts.bm11_tuan"
+	BM11WordPeriodKey = "cnts.bm11_ky"
+	// BM11WordVersion là phiên bản mẫu dùng khi xuất. v2 (CNTS v4.0, #253) thêm bảng hộ, trang trại theo loại chăn nuôi;
+	// v1 giữ nguyên để không lệch băm mẫu đã ghi sổ ở pf/export.
+	BM11WordVersion    = 2
 	BM11WordSeries     = "BC-CNTS"
 	bm11VarNumber      = "so_van_ban"
 	bm11VarPlaceDate   = "dia_danh_ngay"
@@ -40,12 +42,14 @@ const (
 	bm11ListRecipients = "noi_nhan"
 	bm11ListMissing    = "xa_thieu"
 	bm11ListSupplement = "bo_sung"
+	bm11ListHerds      = "ho_loai"
+	bm11ListHeads      = "con_loai"
 )
 
 // BM11WordSubject là đối tượng của lịch sử Word và số văn bản trong pf/export: một báo cáo nhận một số.
 func BM11WordSubject(id uuid.UUID) string { return "cnts_bm11:" + id.String() }
 
-func bm11Template(week bool) doctpl.Template {
+func bm11Template(week bool, version int) doctpl.Template {
 	v := func(key, label string, req bool) doctpl.Var { return doctpl.Var{Key: key, Label: label, Required: req} }
 	p := func(text string) doctpl.Block {
 		return doctpl.Block{Kind: doctpl.KindParagraph, Text: text, Indent: true, Align: doctpl.AlignJustify}
@@ -70,6 +74,12 @@ func bm11Template(week bool) doctpl.Template {
 		{Key: bm11ListMissing, Label: "Xã chưa nộp", Fields: []string{"bieu", "xa"}},
 		{Key: bm11ListSupplement, Label: "Số liệu kỳ trước nộp bổ sung", Fields: []string{"ky", "chi_tieu", "da_gui", "hien_tai", "dvt"}},
 	}
+	if version >= 2 {
+		lists = append(lists,
+			doctpl.List{Key: bm11ListHerds, Label: "Hộ, trang trại theo loại chăn nuôi",
+				Fields: []string{"xa", "tong_ho", "trang_trai", "nong_ho", "nho", "vua", "cong_nghiep", "tong"}},
+			doctpl.List{Key: bm11ListHeads, Label: "Số con theo vật nuôi và loại chăn nuôi", Fields: []string{"vat_nuoi", "nong_ho", "trang_trai"}})
+	}
 	head := []doctpl.Block{
 		{Kind: doctpl.KindColumns, Split: 4300,
 			Left: []doctpl.Line{{Text: "TRUNG TÂM KHUYẾN NÔNG {tinh}"}, {Text: "PHÒNG CHĂN NUÔI - THỦY SẢN", Bold: true}, {Text: "Số: {so_van_ban}"}},
@@ -93,6 +103,23 @@ func bm11Template(week bool) doctpl.Template {
 			{Header: "Số lượng", Value: "{chan_nuoi.so_luong}", Width: 2400, Align: doctpl.AlignRight},
 			{Header: "Ghi chú", Value: "", Width: 1200},
 		}}}
+	if version >= 2 {
+		// CNTS v4.0 FN-16 BR-07 (Hình 48): đếm, cộng từ danh sách hộ chăn nuôi (hộ Đang dùng) tại thời điểm lập báo cáo.
+		livestock = append(livestock, doctpl.Block{Kind: doctpl.KindSection, Key: "ho_loai",
+			Text: "Hộ, trang trại theo loại chăn nuôi (danh sách hộ chăn nuôi, hộ Đang dùng)", If: bm11ListHerds, Blocks: []doctpl.Block{
+				{Kind: doctpl.KindTable, Each: bm11ListHerds, Columns: []doctpl.Column{
+					{Header: "Xã", Value: "{ho_loai.xa}", Width: 2400, BoldIf: "tong"},
+					{Header: "Tổng số hộ", Value: "{ho_loai.tong_ho}", Width: 1100, Align: doctpl.AlignRight, BoldIf: "tong"},
+					{Header: "Số trang trại", Value: "{ho_loai.trang_trai}", Width: 1100, Align: doctpl.AlignRight, BoldIf: "tong"},
+					{Header: "Nông hộ", Value: "{ho_loai.nong_ho}", Width: 1100, Align: doctpl.AlignRight, BoldIf: "tong"},
+					{Header: "Trang trại nhỏ", Value: "{ho_loai.nho}", Width: 1100, Align: doctpl.AlignRight, BoldIf: "tong"},
+					{Header: "Trang trại vừa", Value: "{ho_loai.vua}", Width: 1100, Align: doctpl.AlignRight, BoldIf: "tong"},
+					{Header: "Trang trại công nghiệp", Value: "{ho_loai.cong_nghiep}", Width: 1100, Align: doctpl.AlignRight, BoldIf: "tong"}}},
+				{Kind: doctpl.KindTable, Each: bm11ListHeads, EmptyText: "Chưa có vật nuôi.", Columns: []doctpl.Column{
+					{Header: "Vật nuôi", Value: "{con_loai.vat_nuoi}", Width: 4000},
+					{Header: "Nông hộ (con)", Value: "{con_loai.nong_ho}", Width: 2500, Align: doctpl.AlignRight},
+					{Header: "Trang trại (con)", Value: "{con_loai.trang_trai}", Width: 2500, Align: doctpl.AlignRight}}}}})
+	}
 	programs := doctpl.Block{Kind: doctpl.KindLoop, Each: bm11ListPrograms, Blocks: []doctpl.Block{
 		{Kind: doctpl.KindParagraph, Text: "• {chuong_trinh.ten}", Bold: true},
 		pIf("chuong_trinh.tu_dong", "{chuong_trinh.tu_dong}"),
@@ -144,7 +171,7 @@ func bm11Template(week bool) doctpl.Template {
 	if week {
 		key, title = BM11WordWeekKey, "Báo cáo phòng CNTS tuần (BM-11)"
 	}
-	return doctpl.Template{Key: key, Version: BM11WordVersion, Owner: BM11WordOwner, Title: title, Vars: vars, Lists: lists, Body: body}
+	return doctpl.Template{Key: key, Version: version, Owner: BM11WordOwner, Title: title, Vars: vars, Lists: lists, Body: body}
 }
 
 func appendVar(vs []doctpl.Var, v doctpl.Var) []doctpl.Var {
@@ -156,9 +183,9 @@ func appendVar(vs []doctpl.Var, v doctpl.Var) []doctpl.Var {
 	return append(vs, v)
 }
 
-// BM11WordTemplates là mẫu Word BM-11 (đăng ký vào pf/export ở gốc lắp ráp qua extension.ExportTemplates).
+// BM11WordTemplates là mẫu Word BM-11 (đăng ký vào pf/export ở gốc lắp ráp qua extension.ExportTemplates): v1 và v2.
 func BM11WordTemplates() []doctpl.Template {
-	return []doctpl.Template{bm11Template(true), bm11Template(false)}
+	return []doctpl.Template{bm11Template(true, 1), bm11Template(false, 1), bm11Template(true, 2), bm11Template(false, 2)}
 }
 
 var bm11StatusVI = map[string]string{domain.BM11Draft: "Đang soạn (bản nháp)", domain.BM11Pending: "Chờ duyệt (bản nháp)",
@@ -197,7 +224,8 @@ func BM11WordData(r store.BM11Report, c domain.BM11Content, status, provinceName
 		"tong_hop_xa": BM11CommunesText(c.Coverage), "trang_thai": bm11StatusVI[status],
 		"khai_thac": viNum(c.Fishery.CatchCur), "khai_thac_luy_ke": viNum(c.Fishery.CatchYTD), "nuoi_trong": viNum(c.Fishery.AquaCur),
 		"nuoi_trong_luy_ke": viNum(c.Fishery.AquaYTD), "tong_san_luong": viNum(c.Fishery.TotalCur), "dau_du_lieu": hash,
-	}, Lists: map[string][]doctpl.Item{bm11ListLivestock: {}, bm11ListPrograms: {}, bm11ListRecipients: {}, bm11ListMissing: {}, bm11ListSupplement: {}}}
+	}, Lists: map[string][]doctpl.Item{bm11ListLivestock: {}, bm11ListPrograms: {}, bm11ListRecipients: {}, bm11ListMissing: {}, bm11ListSupplement: {},
+		bm11ListHerds: {}, bm11ListHeads: {}}}
 	switch r.Type {
 	case domain.BM11Month:
 		d.Vars["ky_toi"] = "THÁNG TỚI"
@@ -246,7 +274,31 @@ func BM11WordData(r store.BM11Report, c domain.BM11Content, status, provinceName
 		d.Lists[bm11ListSupplement] = append(d.Lists[bm11ListSupplement], doctpl.Item{"ky": x.Period, "chi_tieu": x.Label,
 			"da_gui": viNum(x.Sent), "hien_tai": viNum(x.Now), "dvt": x.Unit})
 	}
+	if h := c.Herds; h != nil {
+		row := func(name string, r domain.BM11HerdRow, total string) doctpl.Item {
+			n := func(v int) string { return viNum(strconv.Itoa(v)) }
+			return doctpl.Item{"xa": name, "tong_ho": n(r.Households), "trang_trai": n(r.Farms), "nong_ho": n(r.ByType[domain.BM11HerdHousehold]),
+				"nho": n(r.ByType[domain.BM11HerdFarmSmall]), "vua": n(r.ByType[domain.BM11HerdFarmMedium]),
+				"cong_nghiep": n(r.ByType[domain.BM11HerdFarmLarge]), "tong": total}
+		}
+		for _, r := range h.Communes {
+			d.Lists[bm11ListHerds] = append(d.Lists[bm11ListHerds], row(or(r.Name, r.Commune), r, ""))
+		}
+		d.Lists[bm11ListHerds] = append(d.Lists[bm11ListHerds], row(BM11HerdTotalLabel(*h), h.Total, "1"))
+		for _, x := range h.Heads {
+			d.Lists[bm11ListHeads] = append(d.Lists[bm11ListHeads], doctpl.Item{"vat_nuoi": x.Name, "nong_ho": viNum(x.Household),
+				"trang_trai": viNum(x.Farm)})
+		}
+	}
 	return d
+}
+
+// BM11HerdTotalLabel trả nhãn dòng toàn tỉnh: "Toàn tỉnh (n/N xã có dữ liệu)" (N chưa biết → "n xã có dữ liệu").
+func BM11HerdTotalLabel(h domain.BM11Herds) string {
+	if h.CommunesTotal > 0 {
+		return fmt.Sprintf("Toàn tỉnh (%d/%d xã có dữ liệu)", len(h.Communes), h.CommunesTotal)
+	}
+	return fmt.Sprintf("Toàn tỉnh (%d xã có dữ liệu)", len(h.Communes))
 }
 
 func (s *Service) bm11WordReady(ctx context.Context, id uuid.UUID) (bm11Who, store.BM11Report, []store.BM11Event, error) {

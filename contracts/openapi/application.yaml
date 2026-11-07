@@ -4792,7 +4792,7 @@ paths:
         "429": {description: "metering.egress_quota_exceeded (AG_EGRESS_MODE=enforce)", $ref: "#/components/responses/Problem"}
   /v1/public/password-reset:
     post:
-      summary: "BRD 2.0 FN-CH-00.01 \"Quên mật khẩu?\": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0056) — KHÔNG đăng nhập"
+      summary: "BRD 2.0 FN-CH-00.01 \"Quên mật khẩu?\": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0057) — KHÔNG đăng nhập"
       description: >-
         Luôn 202 cùng một thân cho mọi email đúng cú pháp — không lộ email có tồn tại, tài khoản bị khóa hay đã quá giới hạn.
         Chỉ tài khoản đang hoạt động, email đã xác minh mới được gửi; tối đa 5 yêu cầu được gửi mỗi giờ cho một tài khoản
@@ -19663,7 +19663,7 @@ components:
         source: {type: string, enum: [map, gps]}
     ExtWorkScheduleCheckin:
       type: object
-      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, legacy_no_photo, checkout]
+      required: [id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, legacy_no_photo, checkout, no_checkout]
       properties:
         id: {type: string, format: uuid}
         item_id: {type: string, format: uuid}
@@ -19696,6 +19696,7 @@ components:
           oneOf:
             - type: "null"
             - {$ref: "#/components/schemas/ExtWorkScheduleCheckout"}
+        no_checkout: {type: boolean, description: "Nhãn \"Chưa check-out\" (CNTS v4.0 FN-12 BR-07): đã check-in, tới 23:59 ngày công tác (giờ Việt Nam) chưa check-out; check-out đồng bộ trễ gỡ nhãn (BR-08)"}
     ExtWorkScheduleCheckout:
       type: object
       required: [id, checkin_id, item_id, day, captured_at, recorded_at, accuracy_m, distance_m, far, weak_accuracy, mock_location, point_stored, location, photo, stay_minutes, synced_at, synced_late]
@@ -20100,11 +20101,12 @@ components:
             checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
             checkin_count: {type: integer}
             missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
+            no_checkout_count: {type: integer, description: "Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07)"}
     ExtWorkScheduleWarning:
       type: object
       required: [code, message, item_ids]
       properties:
-        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed, checkout_far, checkout_weak_gps, checkout_mock_location]}
+        code: {type: string, enum: [time_overlap, late_registration, outside_week, checkin_far, checkin_no_place, checkin_weak_gps, checkin_mock_location, checkin_missed, checkout_far, checkout_weak_gps, checkout_mock_location, checkout_missing]}
         message: {type: string}
         item_ids: {type: array, items: {type: string, format: uuid}}
     ExtWorkScheduleVersion:
@@ -20131,6 +20133,7 @@ components:
         checkins: {type: array, items: {$ref: "#/components/schemas/ExtWorkScheduleCheckin"}}
         checkin_count: {type: integer}
         missed_checkin_count: {type: integer, description: "Mục công tác ngoài cơ quan đã qua ngày chưa check-in"}
+        no_checkout_count: {type: integer, description: "Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07)"}
         can:
           type: object
           required: [edit, submit, approve, request_changes]
@@ -28325,7 +28328,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/CNTSBM11Summary"
         - type: object
-          required: [version, content_hash, basis, communes, coverage, groups, lines, fishery, programs, sections, supplement, return_comment, recipient_list, history, can, replayed]
+          required: [version, content_hash, basis, communes, coverage, groups, lines, fishery, programs, sections, supplement, herds, herd_types, return_comment, recipient_list, history, can, replayed]
           properties:
             version: {type: integer, format: int64}
             content_hash: {type: string}
@@ -28372,6 +28375,12 @@ components:
                   unit: {type: string}
                   sent: {type: string}
                   now: {type: string}
+            herds:
+              description: "Hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07) — đếm từ danh sách hộ chăn nuôi (hộ Đang dùng) lúc lập/làm mới báo cáo; null ở báo cáo lập trước v4.0."
+              oneOf:
+                - $ref: "#/components/schemas/CNTSBM11Herds"
+                - type: "null"
+            herd_types: {type: array, items: {$ref: "#/components/schemas/CNTSBM11Key"}, description: "Loại chăn nuôi HCN-06 theo thứ tự cột"}
             return_comment: {type: string}
             recipient_list:
               type: array
@@ -28410,6 +28419,31 @@ components:
                 receive: {type: boolean}
                 word: {type: boolean}
             replayed: {type: boolean}
+    CNTSBM11HeadRow:
+      type: object
+      required: [species, name, household, farm]
+      properties:
+        species: {type: string}
+        name: {type: string}
+        household: {type: string, description: "Số con ở nông hộ (thập phân dạng chuỗi)"}
+        farm: {type: string, description: "Số con ở trang trại (thập phân dạng chuỗi)"}
+    CNTSBM11HerdRow:
+      type: object
+      required: [commune, name, households, farms, by_type]
+      properties:
+        commune: {type: string, description: "Mã xã; rỗng ở dòng toàn tỉnh"}
+        name: {type: string}
+        households: {type: integer}
+        farms: {type: integer, description: "Trang trại nhỏ + vừa + công nghiệp"}
+        by_type: {type: object, additionalProperties: {type: integer}, description: "Loại chăn nuôi → số hộ (nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep)"}
+    CNTSBM11Herds:
+      type: object
+      required: [communes, total, communes_total, heads]
+      properties:
+        communes: {type: array, items: {$ref: "#/components/schemas/CNTSBM11HerdRow"}}
+        total: {$ref: "#/components/schemas/CNTSBM11HerdRow"}
+        communes_total: {type: integer, description: "Số xã của tỉnh (0 = chưa biết)"}
+        heads: {type: array, items: {$ref: "#/components/schemas/CNTSBM11HeadRow"}}
     CNTSBM11WordRun:
       type: object
       required: [id, seq, template, template_version, doc_number, doc_number_auto, file_name, body_hash, size, actor_ref, at]

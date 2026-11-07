@@ -98,7 +98,7 @@ type Service struct {
 	// DormantDryRun (D24): job accounts_dormant chỉ đếm tài khoản sẽ báo trước / khóa, không ghi gì (chạy thử lần đầu
 	// ở môi trường thật — docs/runbooks/keycloak-mfa-d24.md).
 	DormantDryRun bool
-	// ResetMailer, ResetURL (#255, ADR-0056): kênh email và URL trang đặt lại mật khẩu (AG_WEB_OPS_URL) của consumer
+	// ResetMailer, ResetURL (#255, ADR-0057): kênh email và URL trang đặt lại mật khẩu (AG_WEB_OPS_URL) của consumer
 	// port.PasswordResetConsumer (cmd/worker). Thiếu → consumer lỗi, sự kiện giao lại rồi vào DLQ.
 	ResetMailer ResetMailer
 	ResetURL    string

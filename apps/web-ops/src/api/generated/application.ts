@@ -3435,7 +3435,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * BRD 2.0 FN-CH-00.01 "Quên mật khẩu?": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0056) — KHÔNG đăng nhập
+         * BRD 2.0 FN-CH-00.01 "Quên mật khẩu?": gửi liên kết tự đặt lại mật khẩu qua email (#255, ADR-0057) — KHÔNG đăng nhập
          * @description Luôn 202 cùng một thân cho mọi email đúng cú pháp — không lộ email có tồn tại, tài khoản bị khóa hay đã quá giới hạn. Chỉ tài khoản đang hoạt động, email đã xác minh mới được gửi; tối đa 5 yêu cầu được gửi mỗi giờ cho một tài khoản (yêu cầu vượt vẫn 202, không gửi). Liên kết hiệu lực 30 phút, dùng một lần; email gửi qua outbox ở worker. Giới hạn theo IP (dồn 5, sau đó 1/phút) → 429. Cache-Control no-store.
          */
         post: operations["requestPasswordReset"];
@@ -15004,6 +15004,8 @@ export interface components {
             legacy_no_photo: boolean;
             /** @description Check-out của mục (CV-08); null = chưa check-out */
             checkout: null | components["schemas"]["ExtWorkScheduleCheckout"];
+            /** @description Nhãn "Chưa check-out" (CNTS v4.0 FN-12 BR-07): đã check-in, tới 23:59 ngày công tác (giờ Việt Nam) chưa check-out; check-out đồng bộ trễ gỡ nhãn (BR-08) */
+            no_checkout: boolean;
         };
         ExtWorkScheduleCheckout: {
             /** Format: uuid */
@@ -15473,10 +15475,12 @@ export interface components {
             checkin_count?: number;
             /** @description Mục công tác ngoài cơ quan đã qua ngày chưa check-in */
             missed_checkin_count?: number;
+            /** @description Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07) */
+            no_checkout_count?: number;
         };
         ExtWorkScheduleWarning: {
             /** @enum {string} */
-            code: "time_overlap" | "late_registration" | "outside_week" | "checkin_far" | "checkin_no_place" | "checkin_weak_gps" | "checkin_mock_location" | "checkin_missed" | "checkout_far" | "checkout_weak_gps" | "checkout_mock_location";
+            code: "time_overlap" | "late_registration" | "outside_week" | "checkin_far" | "checkin_no_place" | "checkin_weak_gps" | "checkin_mock_location" | "checkin_missed" | "checkout_far" | "checkout_weak_gps" | "checkout_mock_location" | "checkout_missing";
             message: string;
             item_ids: string[];
         };
@@ -15505,6 +15509,8 @@ export interface components {
             checkin_count?: number;
             /** @description Mục công tác ngoài cơ quan đã qua ngày chưa check-in */
             missed_checkin_count?: number;
+            /** @description Mục đã check-in, tới 23:59 ngày công tác chưa check-out (CNTS v4.0 BR-07) */
+            no_checkout_count?: number;
             can: {
                 edit: boolean;
                 submit: boolean;
@@ -26609,6 +26615,10 @@ export interface components {
                 sent: string;
                 now: string;
             }[];
+            /** @description Hộ, trang trại theo loại chăn nuôi (CNTS v4.0 FN-16 BR-07) — đếm từ danh sách hộ chăn nuôi (hộ Đang dùng) lúc lập/làm mới báo cáo; null ở báo cáo lập trước v4.0. */
+            herds: components["schemas"]["CNTSBM11Herds"] | null;
+            /** @description Loại chăn nuôi HCN-06 theo thứ tự cột */
+            herd_types: components["schemas"]["CNTSBM11Key"][];
             return_comment: string;
             recipient_list: {
                 /** @enum {string} */
@@ -26641,6 +26651,33 @@ export interface components {
                 word: boolean;
             };
             replayed: boolean;
+        };
+        CNTSBM11HeadRow: {
+            species: string;
+            name: string;
+            /** @description Số con ở nông hộ (thập phân dạng chuỗi) */
+            household: string;
+            /** @description Số con ở trang trại (thập phân dạng chuỗi) */
+            farm: string;
+        };
+        CNTSBM11HerdRow: {
+            /** @description Mã xã; rỗng ở dòng toàn tỉnh */
+            commune: string;
+            name: string;
+            households: number;
+            /** @description Trang trại nhỏ + vừa + công nghiệp */
+            farms: number;
+            /** @description Loại chăn nuôi → số hộ (nong_ho, trang_trai_nho, trang_trai_vua, trang_trai_cong_nghiep) */
+            by_type: {
+                [key: string]: number;
+            };
+        };
+        CNTSBM11Herds: {
+            communes: components["schemas"]["CNTSBM11HerdRow"][];
+            total: components["schemas"]["CNTSBM11HerdRow"];
+            /** @description Số xã của tỉnh (0 = chưa biết) */
+            communes_total: number;
+            heads: components["schemas"]["CNTSBM11HeadRow"][];
         };
         CNTSBM11WordRun: {
             /** Format: uuid */

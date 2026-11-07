@@ -21,6 +21,8 @@ describe("W11.54 kho văn bản phòng — biểu nhập", () => {
     expect(kpiLink("alerts_open")).toBe("/kn/cnts/canh-bao");
     expect(kpiLink("docs_total", "chan_nuoi_thuy_san")).toBe("/kn/phong-ban/chan_nuoi_thuy_san/van-ban");
     expect(kpiLink("khong_co")).toBeNull();
+    expect(kpiLink("livestock_households")).toBe("/kn/cnts/so-lieu-xa/ho-chan-nuoi"); // #253: số hộ, trang trại → danh sách hộ
+    expect(kpiLink("livestock_farms")).toBe("/kn/cnts/so-lieu-xa/ho-chan-nuoi");
   });
 });
 

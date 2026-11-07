@@ -62,6 +62,8 @@ type Checkin struct {
 	Photo *VisitPhoto
 	// Checkout: check-out của mục (CV-08), nil = chưa check-out. Chỉ CheckinsOf gắn.
 	Checkout *Checkout
+	// NoCheckout: nhãn "Chưa check-out" (CNTS v4.0 BR-07) — dịch vụ suy ra theo đồng hồ khi đọc, không lưu.
+	NoCheckout bool
 }
 
 // VisitPhoto là ảnh check-in/check-out ở kho đối tượng (sổ chỉ giữ khóa, kiểu, cỡ, SHA-256).
@@ -303,4 +305,55 @@ func PurgeCheckinPoints(ctx context.Context, tx pgx.Tx, today time.Time, limit i
 	var n int64
 	err := tx.QueryRow(ctx, "SELECT pf_extension.purge_checkin_points($1::date, $2::int)", today.Format(time.DateOnly), limit).Scan(&n)
 	return int(n), err
+}
+
+// UnclosedCheckin là check-in có ảnh (từ CNTS v4.0) của cán bộ xã chưa có check-out, kèm lịch và mục (BR-07 "Chưa
+// check-out" — cảnh báo cho người theo dõi lịch cán bộ xã, Mục III.5 dòng 13).
+type UnclosedCheckin struct {
+	CheckinID    uuid.UUID
+	ScheduleID   uuid.UUID
+	ItemID       uuid.UUID
+	OwnerRef     uuid.UUID
+	Department   string
+	ProvinceCode string
+	CommuneCode  string // xã của mục; mục cũ không ghi xã → xã đầu của lịch, rồi tỉnh
+	Content      string
+	Day          time.Time
+	CapturedAt   time.Time
+}
+
+// UnclosedCheckins trả một trang tối đa limit check-in của phòng ban dept, ngày công tác trong [from, to], lịch Cấp Xã, chưa
+// có check-out, theo (ngày, mã check-in) tăng dần sau after (nil = từ đầu). Check-in cũ trước CNTS v4.0 (không ảnh) không
+// xét: khi đó chưa có check-out, không bắt nhập bù (PLAN mục 5).
+func UnclosedCheckins(ctx context.Context, tx pgx.Tx, dept string, from, to time.Time, after *UnclosedCheckin, limit int) ([]UnclosedCheckin, error) {
+	afterDay, afterID := from.AddDate(0, 0, -1), uuid.Nil
+	if after != nil {
+		afterDay, afterID = after.Day, after.CheckinID
+	}
+	rows, err := tx.Query(ctx, `SELECT c.id, c.schedule_id, c.item_id, c.owner_ref, c.department_code, s.province_code,
+	    coalesce(nullif(i.commune_code, ''), s.commune_codes[1], s.province_code), i.content, c.day, c.captured_at
+	  FROM pf_extension.work_schedule_checkin c
+	  JOIN pf_extension.work_schedule_current s ON s.tenant_id = c.tenant_id AND s.schedule_id = c.schedule_id
+	  JOIN pf_extension.work_schedule_item i ON i.tenant_id = c.tenant_id AND i.schedule_id = c.schedule_id
+	    AND i.version = c.item_version AND i.item_id = c.item_id
+	  WHERE c.department_code = $1 AND c.day BETWEEN $2::date AND $3::date AND c.photo_key IS NOT NULL
+	    AND s.owner_level = 'commune' AND (c.day, c.id) > ($4::date, $5::uuid)
+	    AND NOT EXISTS (SELECT 1 FROM pf_extension.work_schedule_checkout o WHERE o.tenant_id = c.tenant_id AND o.item_id = c.item_id)
+	  ORDER BY c.day, c.id LIMIT $6`, dept, from.Format(time.DateOnly), to.Format(time.DateOnly), afterDay.Format(time.DateOnly),
+		afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []UnclosedCheckin
+	for rows.Next() {
+		var u UnclosedCheckin
+		if err := rows.Scan(&u.CheckinID, &u.ScheduleID, &u.ItemID, &u.OwnerRef, &u.Department, &u.ProvinceCode, &u.CommuneCode,
+			&u.Content, &u.Day, &u.CapturedAt); err != nil {
+			return nil, err
+		}
+		u.Day = dateUTC(u.Day)
+		out = append(out, u)
+	}
+	return out, rows.Err()
 }

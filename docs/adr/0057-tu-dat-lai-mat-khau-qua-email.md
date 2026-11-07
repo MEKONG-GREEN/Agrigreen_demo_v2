@@ -1,4 +1,4 @@
-# ADR-0056: Tự đặt lại mật khẩu qua email, bỏ PIN Mobile
+# ADR-0057: Tự đặt lại mật khẩu qua email, bỏ PIN Mobile
 
 **Trạng thái:** Chấp nhận — gói #255 AUTH-V2-RESET-NOPIN. **Ngày:** 06/11/2026.
 **Căn cứ:** BRD 2.0 — Báo giá v2.0 FN-CH-00.01 (luồng phụ “Quên mật khẩu?”, “Mobile: không có đăng nhập bằng PIN”), HCTH v4.0 FN-05 (luồng phụ “Mobile: không có đăng nhập bằng PIN”).

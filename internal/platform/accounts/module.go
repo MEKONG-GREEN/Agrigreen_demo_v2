@@ -115,7 +115,7 @@ func (m *Module) FarmerAccounts() port.FarmerAccounts { return m.svc }
 func (m *Module) RegisterPublic(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterPublic(rg) }
 
 // PasswordResetHandler gửi email liên kết đặt lại mật khẩu (consumer port.PasswordResetConsumer ở cmd/worker; bỏ giao
-// dịch của inbox — gửi SMTP ngoài giao dịch, ADR-0056).
+// dịch của inbox — gửi SMTP ngoài giao dịch, ADR-0057).
 func (m *Module) PasswordResetHandler() inbox.Handler { return m.svc.HandlePasswordResetRequested }
 
 // UsePasswordReset nối kênh email, URL trang đặt lại (AG_WEB_OPS_URL) và nhật ký cho consumer đặt lại mật khẩu.

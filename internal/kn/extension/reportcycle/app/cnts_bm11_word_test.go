@@ -14,8 +14,8 @@ import (
 // Mẫu Word BM-11 hợp lệ (đăng ký được vào pf/export) và dựng được .docx cho cả tuần lẫn tháng.
 func TestBM11WordTemplates(t *testing.T) {
 	ts := BM11WordTemplates()
-	if len(ts) != 2 {
-		t.Fatalf("hai mẫu: %d", len(ts))
+	if len(ts) != 4 {
+		t.Fatalf("bốn mẫu (tuần, kỳ × v1, v2): %d", len(ts))
 	}
 	for _, tpl := range ts {
 		if err := doctpl.Validate(tpl); err != nil {
@@ -29,14 +29,29 @@ func TestBM11WordTemplates(t *testing.T) {
 		Programs:   []domain.BM11Program{{Ref: uuid.NewString(), Name: "Chương trình phát triển chăn nuôi gia súc", Kind: "tinh", ManagerRef: mgr.String(), Sites: 15, Households: 15, Text: "Đã chọn xong 15/15 điểm."}},
 		Sections:   map[string]string{"ke_hoach": "Tiếp tục điều tra tổng đàn.", "phuong_huong": "Đẩy mạnh chọn điểm."},
 		Supplement: []domain.BM11Supplement{{Period: "Tuần 38", Label: "Tiêm phòng — Heo", Unit: "liều", Sent: "10", Now: "12"}}}
+	herds := domain.BM11HerdsOf(domain.BM11HerdInput{Counts: []domain.BM11HerdCount{{Commune: "XA", Type: domain.BM11HerdHousehold, Households: 8},
+		{Commune: "XA", Type: domain.BM11HerdFarmSmall, Households: 3}, {Commune: "XA", Type: domain.BM11HerdFarmMedium, Households: 1}},
+		Heads: []domain.BM11HeadCount{{Species: "heo", Type: domain.BM11HerdFarmSmall, Heads: "1460"}}}, 102)
+	herds.Communes[0].Name = "Xã Mỹ Hòa Hưng"
+	c.Herds = &herds
 	for _, typ := range []string{domain.BM11Week, domain.BM11Month} {
 		r := store.BM11Report{ID: uuid.New(), Type: typ, PeriodKey: "2026-W39", Label: "Tuần 39", Recipients: domain.BM11DefaultRecipients(typ),
 			From: time.Now(), To: time.Now()}
 		d := BM11WordData(r, c, domain.BM11Sent, "An Giang", "abc", map[string]string{mgr.String(): "Huỳnh Văn Nhân"})
 		d.Vars[bm11VarNumber], d.Vars[bm11VarPlaceDate] = "39/BC-CNTS", "An Giang, ngày 29 tháng 09 năm 2026"
-		tpl := ts[0]
+		tpl := ts[2]
 		if typ != domain.BM11Week {
-			tpl = ts[1]
+			tpl = ts[3]
+		}
+		hs := d.Lists[bm11ListHerds]
+		if len(hs) != 2 || hs[0]["tong_ho"] != "12" || hs[0]["trang_trai"] != "4" || hs[1]["xa"] != "Toàn tỉnh (1/102 xã có dữ liệu)" ||
+			hs[1]["tong"] != "1" || d.Lists[bm11ListHeads][0]["trang_trai"] != "1.460" {
+			t.Fatalf("FN-16 BR-07 bảng theo loại chăn nuôi: %v %v", hs, d.Lists[bm11ListHeads])
+		}
+		for _, old := range ts[:2] {
+			if _, err := doctpl.RenderDOCX(old, d); err != nil {
+				t.Fatalf("mẫu v1 vẫn dựng được: %v", err)
+			}
 		}
 		if d.Vars["tong_hop_xa"] != "Tổng hợp từ 99/102 xã" {
 			t.Fatalf("AC-03: %q", d.Vars["tong_hop_xa"])
