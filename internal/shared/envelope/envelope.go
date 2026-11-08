@@ -52,6 +52,15 @@ func Seal(plaintext []byte, recipientPub *[KeySize]byte) (Sealed, error) {
 // SealFrom như Seal nhưng lấy ngẫu nhiên từ r (DEK, nonce, khóa tạm của sealed
 // box, theo thứ tự đó). Chỉ dùng r khác crypto/rand để sinh bộ vector kiểm thử.
 func SealFrom(r io.Reader, plaintext []byte, recipientPub *[KeySize]byte) (Sealed, error) {
+	return sealFrom(r, plaintext, nil, recipientPub)
+}
+
+// SealWithAAD binds ciphertext to caller-owned metadata; the same AAD is required to decrypt.
+func SealWithAAD(plaintext, aad []byte, recipientPub *[KeySize]byte) (Sealed, error) {
+	return sealFrom(rand.Reader, plaintext, aad, recipientPub)
+}
+
+func sealFrom(r io.Reader, plaintext, aad []byte, recipientPub *[KeySize]byte) (Sealed, error) {
 	dek := make([]byte, DEKSize)
 	nonce := make([]byte, NonceSize)
 	if _, err := io.ReadFull(r, dek); err != nil {
@@ -60,7 +69,7 @@ func SealFrom(r io.Reader, plaintext []byte, recipientPub *[KeySize]byte) (Seale
 	if _, err := io.ReadFull(r, nonce); err != nil {
 		return Sealed{}, fmt.Errorf("envelope: sinh nonce: %w", err)
 	}
-	ct, err := EncryptWithDEK(dek, nonce, plaintext)
+	ct, err := encryptWithAAD(dek, nonce, plaintext, aad)
 	if err != nil {
 		return Sealed{}, err
 	}
@@ -84,15 +93,24 @@ func Open(s Sealed, pub, priv *[KeySize]byte) ([]byte, error) {
 
 // EncryptWithDEK = AES-256-GCM(dek, nonce, plaintext), không AAD.
 func EncryptWithDEK(dek, nonce, plaintext []byte) ([]byte, error) {
+	return encryptWithAAD(dek, nonce, plaintext, nil)
+}
+
+func encryptWithAAD(dek, nonce, plaintext, aad []byte) ([]byte, error) {
 	aead, err := gcm(dek, nonce)
 	if err != nil {
 		return nil, err
 	}
-	return aead.Seal(nil, nonce, plaintext, nil), nil
+	return aead.Seal(nil, nonce, plaintext, aad), nil
 }
 
 // DecryptWithDEK mở bản mã AES-256-GCM.
 func DecryptWithDEK(dek, nonce, ciphertext []byte) ([]byte, error) {
+	return DecryptWithDEKAndAAD(dek, nonce, ciphertext, nil)
+}
+
+// DecryptWithDEKAndAAD rejects ciphertext copied to a different metadata binding.
+func DecryptWithDEKAndAAD(dek, nonce, ciphertext, aad []byte) ([]byte, error) {
 	aead, err := gcm(dek, nonce)
 	if err != nil {
 		return nil, err
@@ -100,7 +118,7 @@ func DecryptWithDEK(dek, nonce, ciphertext []byte) ([]byte, error) {
 	if len(ciphertext) < TagSize {
 		return nil, ErrMalformed
 	}
-	pt, err := aead.Open(nil, nonce, ciphertext, nil)
+	pt, err := aead.Open(nil, nonce, ciphertext, aad)
 	if err != nil {
 		return nil, ErrOpen
 	}

@@ -6,6 +6,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
+// PurposeAccountSupport là ngoại lệ hẹp của Unwrap: chỉ platform_admin + MFA và chủ thể AreaAccountSupport.
+// Không cấp thêm vai vault chung cho Admin xử lý hỗ trợ.
+//
 // Vai của kho định danh (realm role trong token của NGƯỜI DÙNG CUỐI). Kho tự
 // kiểm vai trên token được chuyển tiếp — module gọi không thể nâng quyền.
 //

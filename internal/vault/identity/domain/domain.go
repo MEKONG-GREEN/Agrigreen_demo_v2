@@ -214,7 +214,7 @@ var opPurposes = map[string]map[string]bool{
 	OpRevisionRead: set("extension.contact"),
 	// Unwrap (mở DEK ảnh): đúng tập mục đích tệp của pf/evidence (domain.Purposes). W11.24: tài liệu nhân sự (hr_records).
 	// W11.48: ảnh nhật ký nuôi khuyến nông (extension.diary, pf/extension).
-	OpUnwrap: set("mrv.evidence", "extension.field_support", "hr_records", "extension.diary"),
+	OpUnwrap: set("mrv.evidence", "extension.field_support", "hr_records", "extension.diary", "kn.account_support"),
 	OpErase:  set("registry.erasure"),
 }
 

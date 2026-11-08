@@ -427,7 +427,18 @@ func (s *Service) Lookup(ctx context.Context, purpose client.Purpose, phoneOrNat
 
 // Unwrap mở DEK đã seal bằng khóa công khai của chủ thể (xem ảnh minh chứng).
 func (s *Service) Unwrap(ctx context.Context, purpose client.Purpose, ref uuid.UUID, wrappedDEK []byte) ([]byte, error) {
-	p, err := s.begin(ctx, domain.OpUnwrap, purpose, client.RoleEvidenceViewer)
+	role := client.RoleEvidenceViewer
+	if purpose == client.PurposeAccountSupport {
+		role = authz.RolePlatformAdmin
+		p, err := authz.Require(ctx, authz.RolePlatformAdmin)
+		if err != nil {
+			return nil, err
+		}
+		if !p.MFA {
+			return nil, problem.MFARequired
+		}
+	}
+	p, err := s.begin(ctx, domain.OpUnwrap, purpose, role)
 	if err != nil {
 		return nil, err
 	}
@@ -444,6 +455,12 @@ func (s *Service) Unwrap(ctx context.Context, purpose client.Purpose, ref uuid.U
 		if err != nil || st.fail != nil {
 			result = st.fail
 			return err
+		}
+		// The purpose and key holder are exclusive in both directions: support authority cannot open another
+		// module's subject, and a generic evidence purpose cannot open the support key holder.
+		if (purpose == client.PurposeAccountSupport) != (st.subj.AreaCode == client.AreaAccountSupport) {
+			result = problem.Forbidden
+			return s.logAccess(ctx, tx, p, &ref, true, domain.OpUnwrap, purpose, domain.OutcomeRejected)
 		}
 		if k, err = store.GetKey(ctx, tx, ref); err == nil && k == nil {
 			err = errors.New("vault: chủ thể chưa xóa nhưng thiếu khóa")

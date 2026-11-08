@@ -214,7 +214,8 @@ paths:
         "422": { $ref: "#/components/responses/Problem" }
   /v1/subjects/{ref}/unwrap:
     post:
-      summary: Mở DEK đã seal bằng khóa công khai của chủ thể — vai vault_evidence_viewer
+      summary: Mở DEK đã seal — vault_evidence_viewer; riêng kn.account_support chỉ platform_admin + MFA và chủ thể kn_support
+      description: Mục đích kn.account_support và chủ thể area_code kn_support chỉ dùng cùng nhau; không cấp quyền mở chủ thể khác.
       operationId: unwrapDEK
       parameters:
         - $ref: "#/components/parameters/Ref"

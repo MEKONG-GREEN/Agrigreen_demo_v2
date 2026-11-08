@@ -132,3 +132,14 @@ func TestSections(t *testing.T) {
 		t.Error("trường quá dài phải bị từ chối")
 	}
 }
+
+func TestKNAccountSupportPurposeOnlyUnwrap274(t *testing.T) {
+	if !AllowedPurpose(OpUnwrap, "kn.account_support") {
+		t.Fatal("support unwrap purpose missing")
+	}
+	for _, op := range []string{OpCreate, OpLookup, OpResolve, OpDisplay, OpAmend, OpSectionWrite, OpSectionRead, OpCard, OpRevisionRead, OpErase} {
+		if AllowedPurpose(op, "kn.account_support") {
+			t.Fatalf("support purpose granted %s", op)
+		}
+	}
+}
