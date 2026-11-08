@@ -258,6 +258,7 @@ func (s *Service) CancelPending(ctx context.Context, id uuid.UUID) (bool, error)
 }
 
 type Detail struct {
+	SaveReceipt   *domain.SaveReceipt
 	PeriodID      uuid.UUID
 	DraftID       *uuid.UUID
 	Version       int64

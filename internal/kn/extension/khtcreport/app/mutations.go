@@ -20,6 +20,7 @@ import (
 )
 
 type SaveInput struct {
+	OperationID uuid.UUID              `json:"operation_id,omitempty"`
 	Adhoc       *domain.AdhocSelection `json:"adhoc,omitempty"`
 	BaseVersion int64                  `json:"base_version"`
 	Admin       map[string]*string     `json:"admin"`
@@ -69,91 +70,7 @@ func (s *Service) writablePeriod(ctx context.Context, id uuid.UUID) (caller, ps.
 }
 
 func (s *Service) Save(ctx context.Context, id uuid.UUID, in SaveInput, idem string) (Detail, error) {
-	if idem == "" {
-		return Detail{}, problem.IdempotencyRequired
-	}
-	c, p, term, err := s.writablePeriod(ctx, id)
-	if err != nil {
-		return Detail{}, err
-	}
-	edits := domain.Edits{Admin: in.Admin, Texts: in.Texts, Adhoc: in.Adhoc}
-	if domain.Template(p.Type) == "adhoc" {
-		if err = edits.Validate("adhoc"); err != nil {
-			return Detail{}, ErrInvalid.WithCause(err)
-		}
-	}
-	key := "khtc:report:save:" + id.String() + ":" + idem
-	var draft *store.Draft
-	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error { var e error; draft, e = store.LatestDraft(ctx, tx, id); return e })
-	if err != nil {
-		return Detail{}, err
-	}
-	var content domain.Draft
-	if draft == nil {
-		data, defaults, e := s.capture(ctx, c, p)
-		if e != nil {
-			return Detail{}, e
-		}
-		content, e = s.initialDraft(ctx, c, data, defaults)
-		if e != nil {
-			return Detail{}, e
-		}
-		if e = s.pinNewTemplate(ctx, &content, term); e != nil {
-			return Detail{}, e
-		}
-	} else {
-		content = draft.Content
-	}
-	content, err = editFixedTemplate(content.TemplateSnapshot, content, edits, c.principal.ActorRef, s.now())
-	if err != nil {
-		return Detail{}, ErrInvalid.WithCause(err)
-	}
-	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
-		if e := store.Lock(ctx, tx, c.principal.TenantID, id); e != nil {
-			return e
-		}
-		if done, e := store.DraftByIdem(ctx, tx, key); e != nil || done != nil {
-			return e
-		}
-		_, term, e := loadPeriod(ctx, tx, id)
-		if e != nil {
-			return e
-		}
-		if term == pd.PeriodCancelled {
-			return ErrCancelled
-		}
-		final, e := store.GetFinal(ctx, tx, id)
-		if e != nil {
-			return e
-		}
-		if final != nil {
-			return ErrFinal
-		}
-		latest, e := store.LatestDraft(ctx, tx, id)
-		if e != nil {
-			return e
-		}
-		if !sameVersion(latest, in.BaseVersion) {
-			return ErrVersion
-		}
-		if latest == nil {
-			if e = checkNewFixedSelection(ctx, tx, c.principal.TenantID, content.TemplateSnapshot, content); e != nil {
-				return e
-			}
-		}
-		if e = captureTemplateTerminal(&content, term); e != nil {
-			return e
-		}
-		row := store.Draft{ID: ids.New(), PeriodID: id, Action: "save", Content: content, InputHash: content.Data.InputHash, ActorRef: c.principal.ActorRef, At: s.now()}
-		if e := store.InsertDraft(ctx, tx, c.principal.TenantID, &row, key); e != nil {
-			return fmt.Errorf("insert report draft: %w", e)
-		}
-		return nil
-	})
-	if err != nil {
-		return Detail{}, classify(err)
-	}
-	return s.Get(ctx, id)
+	return s.saveWithReceipt244(ctx, id, in, idem)
 }
 
 func (s *Service) Refresh(ctx context.Context, id uuid.UUID, base int64, idem string) (Detail, error) {
