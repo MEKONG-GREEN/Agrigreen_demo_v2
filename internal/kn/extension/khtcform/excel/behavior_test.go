@@ -527,3 +527,43 @@ func TestErrorExportAndConcurrentCallsDoNotShareMutableState(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestFormulaOnlyExtraCellsCannotBypassShapeValidation(t *testing.T) {
+	c := mustCodec(t, snapshot())
+	raw := mustWorkbook(t, c, content())
+	for _, cell := range []string{"G1", "G2", "G3", "G4", "G7", "E8"} {
+		t.Run(cell, func(t *testing.T) {
+			bad := changeWorkbook(t, raw, func(f *excelize.File) {
+				if err := f.SetCellFormula("CT III", cell, "1+1"); err != nil {
+					t.Fatal(err)
+				}
+			})
+			if _, err := c.Preview(bad); !errors.Is(err, excel.ErrWorkbook) {
+				t.Fatalf("formula-only extra cell %s accepted: %v", cell, err)
+			}
+		})
+	}
+}
+
+func TestLiteralMarkerTextAndIntegerNegativeZeroFollowFieldRules(t *testing.T) {
+	s := snapshot()
+	s.Sheets[0].Columns[0].Kind = "input"
+	delete(s.Sheets[0].Rows[0].SystemValues, "A")
+	delete(s.Sheets[0].Rows[1].SystemValues, "A")
+	values := content()
+	values.Rows["program_iii"]["III.01"]["A"] = "AG-KHTC-ADJUSTMENTS/1"
+	c := mustCodec(t, s)
+	p := mustPreview(t, c, mustWorkbook(t, c, values))
+	if p.Result().ValidRows != 2 {
+		t.Fatal("literal marker text changed valid row identity")
+	}
+	s = snapshot()
+	s.Sheets[0].Columns[2].DataType = "integer"
+	c = mustCodec(t, s)
+	values = content()
+	values.Rows["program_iii"]["III.01"]["C"] = "-0"
+	p = mustPreview(t, c, mustWorkbook(t, c, values))
+	if p.Result().ValidRows != 1 || !hasIssue(p, "negative", "error") {
+		t.Fatal("integer non-negative validation drifted from manual form")
+	}
+}

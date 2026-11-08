@@ -60,7 +60,7 @@ func validateField(value string, col port.KHTCFormExcelColumn) (string, string) 
 			return "integer", "Phải là số nguyên, tối đa 9 chữ số"
 		}
 	}
-	if col.NonNegative && strings.HasPrefix(value, "-") && strings.ContainsAny(value, "123456789") {
+	if col.NonNegative && strings.HasPrefix(value, "-") && (col.DataType == "integer" || strings.ContainsAny(value, "123456789")) {
 		return "negative", "Không nhận số âm; số điều chỉnh nhập ở khối Điều chỉnh kỳ trước"
 	}
 	if len(col.Choices) > 0 && !slices.Contains(col.Choices, value) {
@@ -126,6 +126,9 @@ func (c *Codec) Preview(data []byte) (port.KHTCFormExcelPreview, error) {
 				return nil, ErrWorkbook
 			}
 		}
+		if err := onlyColumns(f, sh.Name, 1, len(metadata)); err != nil {
+			return nil, err
+		}
 		for i := len(metadata); i < len(rows[0]); i++ {
 			if rows[0][i] != "" {
 				return nil, ErrWorkbook
@@ -163,10 +166,23 @@ func (c *Codec) Preview(data []byte) (port.KHTCFormExcelPreview, error) {
 		}
 		for i := firstDataRow - 1; i < len(rows); i++ {
 			if len(rows[i]) > 0 && rows[i][0] == marker {
+				otherValues := false
+				for _, value := range rows[i][1:] {
+					if value != "" {
+						otherValues = true
+						break
+					}
+				}
+				if otherValues {
+					continue
+				} // a literal in a coded data row is not a marker.
 				if markerLine != 0 {
 					return nil, ErrWorkbook
 				}
 				markerLine = i + 1
+				if err := onlyColumns(f, sh.Name, markerLine, 1); err != nil {
+					return nil, err
+				}
 				for _, value := range rows[i][1:] {
 					if value != "" {
 						return nil, ErrWorkbook
@@ -384,4 +400,20 @@ func (c *Codec) readAdjustment(f *excelize.File, spec sheetSpec, line int) (port
 		issues = append(issues, issue(spec.def.Name, line, code, "D", "error", "reason", "Bắt buộc lý do điều chỉnh, tối đa 500 ký tự"))
 	}
 	return port.KHTCFormExcelAdjustment{Sheet: spec.def.Key, ItemCode: code, PeriodID: period, Amount: values[2], Reason: values[3]}, issues, nil
+}
+
+// GetRows may trim a formula-only cell with no cached value. Structural rows
+// therefore inspect formulas too, rather than treating cached emptiness as shape.
+func onlyColumns(f *excelize.File, sheet string, line, last int) error {
+	for n := last + 1; n <= MaxColumns+1; n++ {
+		letter, _ := excelize.ColumnNumberToName(n)
+		value, formula, err := rawCell(f, sheet, letter, line)
+		if err != nil {
+			return err
+		}
+		if value != "" || formula {
+			return ErrWorkbook
+		}
+	}
+	return nil
 }

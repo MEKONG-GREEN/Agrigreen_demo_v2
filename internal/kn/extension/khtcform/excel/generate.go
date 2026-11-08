@@ -3,6 +3,7 @@ package excel
 import (
 	"bytes"
 	"strconv"
+	"strings"
 
 	"github.com/xuri/excelize/v2"
 
@@ -144,6 +145,9 @@ func (c *Codec) Generate(content port.KHTCFormExcelContent) ([]byte, error) {
 	if out.Len() > MaxWorkbookBytes {
 		return nil, ErrLimit
 	}
+	if err := preflight(out.Bytes()); err != nil {
+		return nil, err
+	}
 	return out.Bytes(), nil
 }
 
@@ -154,9 +158,38 @@ func (c *Codec) ErrorWorkbook(preview port.KHTCFormExcelPreview) ([]byte, error)
 	if !ok || p == nil || p.owner != c {
 		return nil, ErrPreview
 	}
-	rows := make([][]string, 0, len(p.report.Issues))
+	// Group diagnostics by original row, bounding export cells by the input row
+	// limit rather than multiplying each cell issue into a seven-cell XLSX row.
+	type rowKey struct {
+		sheet string
+		line  int
+		code  string
+	}
+	type details struct{ columns, severities, rules, messages []string }
+	order := []rowKey{}
+	grouped := map[rowKey]*details{}
 	for _, issue := range p.report.Issues {
-		rows = append(rows, []string{issue.Sheet, strconv.Itoa(issue.Row), issue.ItemCode, issue.Column, issue.Severity, issue.Code, issue.Message})
+		key := rowKey{issue.Sheet, issue.Row, issue.ItemCode}
+		if grouped[key] == nil {
+			grouped[key] = &details{}
+			order = append(order, key)
+		}
+		d := grouped[key]
+		d.columns = append(d.columns, issue.Column)
+		d.severities = append(d.severities, issue.Severity)
+		d.rules = append(d.rules, issue.Code)
+		d.messages = append(d.messages, issue.Column+": "+issue.Message)
+	}
+	rows := make([][]string, 0, len(order))
+	for _, key := range order {
+		d := grouped[key]
+		row := []string{key.sheet, strconv.Itoa(key.line), key.code, strings.Join(d.columns, "; "), strings.Join(d.severities, "; "), strings.Join(d.rules, "; "), strings.Join(d.messages, "\n")}
+		for _, value := range row {
+			if len(value) > MaxCellBytes {
+				return nil, ErrLimit
+			}
+		}
+		rows = append(rows, row)
 	}
 	var out bytes.Buffer
 	if err := tabular.WriteXLSX(&out, "Dòng cần chú ý", []string{"Sheet", "Dòng", "Mã hạng mục / mục", "Cột", "Mức", "Mã lỗi", "Nội dung"}, rows); err != nil {

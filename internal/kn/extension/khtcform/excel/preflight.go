@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"io"
 	"path"
 	"strconv"
@@ -107,15 +108,19 @@ func rangeBound(ref string) error {
 func scanXML(raw []byte, name string, cells, shared, sheets *int) error {
 	decoder := xml.NewDecoder(bytes.NewReader(raw))
 	worksheet := strings.HasPrefix(name, "xl/worksheets/") && strings.HasSuffix(name, ".xml")
-	depth, cellDepth, textBytes := 0, -1, 0
+	depth, cellDepth, textBytes, tokens, rowCount := 0, -1, 0, 0, 0
 	cellRefs, rowRefs := map[string]bool{}, map[int]bool{}
 	for {
 		token, err := decoder.Token()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
 			return ErrWorkbook
+		}
+		tokens++
+		if tokens > maxXMLCells*10 {
+			return ErrLimit
 		}
 		switch t := token.(type) {
 		case xml.Directive:
@@ -205,8 +210,14 @@ func scanXML(raw []byte, name string, cells, shared, sheets *int) error {
 					}
 					cellRefs[canonical] = true
 				case "row":
+					rowCount++
+					if rowCount > maxXMLRows {
+						return ErrLimit
+					}
+					hasIndex := false
 					for _, a := range t.Attr {
 						if a.Name.Local == "r" {
+							hasIndex = true
 							if len(a.Value) > 4 {
 								return ErrLimit
 							}
@@ -222,6 +233,9 @@ func scanXML(raw []byte, name string, cells, shared, sheets *int) error {
 							}
 							rowRefs[n] = true
 						}
+					}
+					if !hasIndex {
+						return ErrWorkbook
 					}
 				case "col":
 					for _, a := range t.Attr {

@@ -1,0 +1,1 @@
+- [ ] KHTC-PN-FORM-EXCEL (#216): lát codec kỹ thuật thuần RAM, explicit immutable owner snapshot; còn publisher/schema/formula fidelity #300 và encrypted original-file/atomic Save-Submit/live UI/API #301; không full FN-PN-03.02/UAT. Kiểm chứng và tích hợp theo CONTEXT, whole CI/public/merge chờ ROOT release.
