@@ -64,15 +64,16 @@ var testAccess = port.Access{
 }
 
 type fixture struct {
-	t     *testing.T
-	r     *gin.Engine
-	svc   *app.Service
-	vault *clienttest.Fake
-	staff *staffStub
-	env   *pgtest.Env
-	tid   uuid.UUID
-	who   map[string]authz.Principal
-	logs  *bytes.Buffer
+	t                *testing.T
+	r                *gin.Engine
+	svc              *app.Service
+	vault            *clienttest.Fake
+	staff            *staffStub
+	env              *pgtest.Env
+	tid              uuid.UUID
+	who              map[string]authz.Principal
+	logs             *bytes.Buffer
+	logActorMetadata bool
 }
 
 func (f *fixture) call(as, method, path string, body any, want int) map[string]any {
@@ -137,7 +138,11 @@ func newFixture(t *testing.T) *fixture {
 			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
 		}
 		c.Next()
-		lg.Info("request", "method", c.Request.Method, "path", c.FullPath(), "status", c.Writer.Status(), "errors", c.Errors.String())
+		attrs := []any{"method", c.Request.Method, "path", c.FullPath(), "status", c.Writer.Status(), "errors", c.Errors.String()}
+		if p, ok := authz.FromContext(c.Request.Context()); ok && f.logActorMetadata {
+			attrs = append(attrs, "actor_ref", p.ActorRef.String(), "tenant_id", p.TenantID.String())
+		}
+		lg.Info("request", attrs...)
 	})
 	Handler{Svc: svc}.RegisterApp(f.r.Group("/v1"))
 	return f
@@ -369,9 +374,21 @@ func TestContact_StaffGate(t *testing.T) {
 // RLS theo tenant; sổ không có PII; log không có PII (R-14); tên theo tài khoản (thay pf_extension.staff).
 func TestContact_RLSNoPII(t *testing.T) {
 	f := newFixture(t)
+	// UUIDv7 có 1970 để oracle luôn gặp metadata trùng sentinel, không phụ thuộc ngẫu nhiên.
+	metadataActor, err := ids.Parse(contactMetadata1970)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := f.who["hcth"]
+	p.ActorRef = metadataActor
+	f.who["hcth"] = p
+	f.logActorMetadata = true
 	f.seed()
 	d := f.call("hcth", http.MethodPost, "/v1/contacts/persons", map[string]any{"full_name": "Hoàng Văn Riêng", "phone": "0987654321",
 		"level": "tw", "email": "rieng@example.vn", "birth_year": "1970", "organization": "Bộ NN&MT"}, http.StatusCreated)
+	if d["full_name"] != "Hoàng Văn Riêng" || d["birth_year"] != "1970" {
+		t.Fatal("fixture fake vault không giữ đúng tên/năm sinh")
+	}
 	f.call("hcth", http.MethodPost, "/v1/contacts/persons/"+d["id"].(string)+"/revise", map[string]any{"full_name": "Hoàng Văn Riêng Tư"}, http.StatusOK)
 	f.call("hcth", http.MethodPost, "/v1/contacts/persons", map[string]any{"full_name": "Lỗi", "phone": "0987654321", "level": "tw"}, http.StatusConflict)
 	f.call("hcth", http.MethodPost, "/v1/contacts/persons", map[string]any{"full_name": "Email Hỏng", "phone": "0987654000", "level": "tw",
@@ -393,6 +410,10 @@ func TestContact_RLSNoPII(t *testing.T) {
 	if err := admin.QueryRow(ctx, `SELECT count(*) FROM pf_contact.person WHERE tenant_id = $1`, f.tid).Scan(&n); err != nil || n != 2 {
 		t.Fatalf("số phiên bản: %d %v", n, err)
 	}
+	var metadataRows int
+	if err := admin.QueryRow(ctx, `SELECT count(*) FROM pf_contact.person WHERE tenant_id=$1 AND actor_ref=$2`, f.tid, metadataActor).Scan(&metadataRows); err != nil || metadataRows != 2 {
+		t.Fatalf("fixture actor metadata không có trong hai dòng sổ: %v", err)
+	}
 	app := f.env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	tx, err := app.Begin(ctx)
 	if err != nil {
@@ -412,29 +433,23 @@ func TestContact_RLSNoPII(t *testing.T) {
 		t.Fatal("sổ phải chặn UPDATE")
 	}
 
-	// Không PII trong bảng: mọi cột chữ của pf_contact không chứa họ tên, SĐT, email, năm sinh.
-	rows, err := admin.Query(ctx, `SELECT row_to_json(p)::text FROM pf_contact.person p UNION ALL SELECT row_to_json(u)::text FROM pf_contact.unit u`)
+	// Quét mọi nội dung còn lại sau khi kiểm metadata đúng kiểu/cấu trúc ở root.
+	rows, err := admin.Query(ctx, `SELECT 'person', row_to_json(p)::text FROM pf_contact.person p
+	    UNION ALL SELECT 'unit', row_to_json(u)::text FROM pf_contact.unit u`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var dump strings.Builder
-	for rows.Next() {
-		var s string
-		_ = rows.Scan(&s)
-		dump.WriteString(s)
+	defer rows.Close()
+	pii := contactPIISentinels()
+	if err := contactRowsWithoutPII(rows, pii); err != nil {
+		t.Fatalf("pf_contact: %v", err)
 	}
-	rows.Close()
-	pii := []string{"Hoàng Văn", "0987654321", "84987654321", "rieng@example.vn", "1970", "Trần Thị Mai", "0912000111", "mai@ttkn.vn"}
-	for _, x := range pii {
-		if strings.Contains(dump.String(), x) {
-			t.Fatalf("pf_contact chứa PII %q", x)
-		}
+	// Giữ nội dung text/log (kể cả lỗi 409/422/403), nested/array/number trong phạm vi quét.
+	if !bytes.Contains(f.logs.Bytes(), []byte(metadataActor.String())) {
+		t.Fatal("fixture log thiếu actor metadata1970")
 	}
-	// Log của mọi request (kể cả lỗi 409/422/403) không chứa PII.
-	for _, x := range pii {
-		if strings.Contains(f.logs.String(), x) {
-			t.Fatalf("log chứa PII %q: %s", x, f.logs.String())
-		}
+	if err := contactLogsWithoutPII(f.logs.Bytes(), pii); err != nil {
+		t.Fatalf("log contact: %v", err)
 	}
 	// Thông báo lỗi kiểm dữ liệu không lặp lại giá trị nhập.
 	raw := f.raw("hcth", http.MethodPost, "/v1/contacts/persons", map[string]any{"full_name": "Giá Trị Bí Mật", "phone": "0987654000",
