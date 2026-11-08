@@ -1,7 +1,7 @@
 // GIẢ LẬP danh sách hộ chăn nuôi CNTS (CNTS-V4-HOUSEHOLD-LIST #251, BRD CNTS v4.0 FN-10) theo hợp đồng
 // /v1/extension/cnts/livestock-households*. Bám quy tắc máy chủ (extension/cntslivestock): Cấp Xã chỉ xã mình, Cấp Tỉnh chỉ
 // cán bộ tổng hợp ghi, thêm hộ bắt buộc check-in, trùng họ tên + ấp + xã → 409, vô hiệu hóa có lý do, lịch sử cũ → mới
-// (họ tên/SĐT che bớt). Dữ liệu tổng hợp, không phải thật.
+// (Q9 #276: họ tên đầy đủ cũ → mới, chỉ SĐT che bớt). Dữ liệu tổng hợp, không phải thật.
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { CATALOGS } from "./data";
@@ -33,7 +33,11 @@ function who(ctx: Ctx) {
   const p = personaForContext(ctx.persona, id);
   const role = kc?.role ?? (p.me.scope.level === "commune" ? "kn_xa" : "kn_tinh");
   const communes = role === "kn_xa" ? (kc?.communes.map((c) => c.code) ?? p.me.scope.units) : null;
-  return { role, communes, actor: p.me.actor_ref, readOnly: !!kc?.read_only, group: kc?.province_group ?? "" };
+  // Sensitive history has no legacy persona fallback. Missing cohort/node/expiry stays unavailable.
+  const selected = !!kc && Date.parse(kc.expires_at) > Date.now();
+  const cohort = !!kc && (kc.role === "admin" || (!!kc.org_ref && kc.department_code === "chan_nuoi_thuy_san" &&
+    (kc.role === "kn_xa" || (kc.role === "kn_tinh" && ["vien_chuc", "tong_hop", "chu_nhiem", "lanh_dao_phong", "ban_giam_doc"].includes(kc.province_group ?? "")))));
+  return { role, communes, actor: p.me.actor_ref, readOnly: !!kc?.read_only, group: kc?.province_group ?? "", historyReader: selected && cohort, historyScope: p.me.scope };
 }
 type Who = ReturnType<typeof who>;
 
@@ -55,6 +59,7 @@ function detail(w: Who, vs: Version[], warnings: Detail["warnings"] = []): Detai
   void phone_full;
   void changes;
   const edit = v.status !== "deactivated" && canWrite(w, v.commune_code);
+  const historyNames = w.historyReader && (w.role === "admin" || w.historyScope.all || w.historyScope.units.includes(v.commune_code));
   return {
     ...rest,
     owner_name: edit ? owner_full : null,
@@ -69,7 +74,9 @@ function detail(w: Who, vs: Version[], warnings: Detail["warnings"] = []): Detai
       actor_name: "Cán bộ (giả lập)",
       at: x.updated_at,
       reason: x.reason,
-      changes: x.changes,
+      changes: x.changes.map((c) => c.field === "owner_name" && !historyNames
+        ? { ...c, old: "(không đọc được lịch sử định danh)", new: "(không đọc được lịch sử định danh)" }
+        : c),
     })),
   };
 }
@@ -239,7 +246,7 @@ export const cntsLivestockRoutes: Route[] = [
       const phone = b.owner_phone ?? v.phone_full;
       const na = animals(b);
       const changes: S["CNTSLivestockChange"][] = [];
-      if (name !== v.owner_full) changes.push({ field: "owner_name", old: v.owner_label ?? "", new: label(name) });
+      if (name !== v.owner_full) changes.push({ field: "owner_name", old: v.owner_full, new: name });
       if (phone !== v.phone_full) changes.push({ field: "owner_phone", old: mask(v.phone_full), new: mask(phone) });
       if (b.commune_code !== v.commune_code) changes.push({ field: "commune_code", old: communeName(v.commune_code), new: communeName(b.commune_code) });
       if ((b.hamlet?.trim() || null) !== v.hamlet) changes.push({ field: "hamlet", old: v.hamlet ?? "", new: b.hamlet?.trim() ?? "" });

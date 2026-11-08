@@ -1,8 +1,8 @@
 package app
 
 // Lịch sử thay đổi HCN-09 (BR-05, AC-08): người sửa, thời điểm, giá trị cũ → mới. Trường không phải dữ liệu cá nhân lấy
-// từ chuỗi phiên bản của sổ (cũ = phiên bản trước); họ tên/SĐT lấy nhãn che bớt của bản sửa ở kho định danh (ADR-0056
-// mục 4 — lệch BRD một dòng: hiện dạng che bớt, không nguyên văn).
+// từ chuỗi phiên bản của sổ (cũ = phiên bản trước). Q9 (#276): họ tên đầy đủ từ đúng bản sửa trong kho qua Resolve có
+// audit; SĐT vẫn dùng nhãn che bớt. Không suy tên cũ từ bản hiện hành hoặc lưu bản sao ở KN.
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 
 func (s *Service) history(ctx context.Context, vs []store.Household, cks map[uuid.UUID]store.Checkin, species map[string]string) []Change {
 	revs := s.revisions(ctx, vs)
+	names := s.revisionNames(ctx, vs)
 	communes := map[string]string{}
 	commune := func(code string) string {
 		if n, ok := communes[code]; ok {
@@ -52,14 +53,18 @@ func (s *Service) history(ctx context.Context, vs []store.Household, cks map[uui
 					item.Old, item.New = domain.StatusLabels[p.Status], domain.StatusLabels[v.Status]
 				case domain.FieldLocation:
 					item.Old, item.New = location(p.CheckinRef, cks), location(v.CheckinRef, cks)
-				case domain.FieldOwnerName, domain.FieldPhone:
+				case domain.FieldOwnerName:
+					item.Old, item.New = HistoryNameUnavailable, HistoryNameUnavailable
+					if v.PIIRevisionRef != nil {
+						if r, ok := names[*v.PIIRevisionRef]; ok && r.SubjectRef == v.PersonRef {
+							item.Old, item.New = r.PrevName, r.NextName
+						}
+					}
+				case domain.FieldPhone:
 					item.Old, item.New = client.ErasedLabel, client.ErasedLabel
 					if v.PIIRevisionRef != nil {
-						if r, ok := revs[*v.PIIRevisionRef]; ok {
-							item.Old, item.New = r.PrevLabel, r.NextLabel
-							if f == domain.FieldPhone {
-								item.Old, item.New = r.PrevPhone, r.NextPhone
-							}
+						if r, ok := revs[*v.PIIRevisionRef]; ok && r.SubjectRef == v.PersonRef {
+							item.Old, item.New = r.PrevPhone, r.NextPhone
 						}
 					}
 				}
@@ -93,6 +98,41 @@ func (s *Service) revisions(ctx context.Context, vs []store.Household) map[uuid.
 	}
 	for _, r := range got {
 		out[r.Ref] = r
+	}
+	return out
+}
+
+// HistoryNameUnavailable: thiếu bản sửa, quyền Resolve hoặc audit; không dùng tên hiện hành thay thế.
+const HistoryNameUnavailable = "(không đọc được lịch sử định danh)"
+
+// Chỉ gọi sau reader + kiểm phạm vi của Get; không cache để mỗi request dùng phiên/quyền hiện hành.
+func (s *Service) revisionNames(ctx context.Context, vs []store.Household) map[uuid.UUID]client.RevisionNames {
+	out := map[uuid.UUID]client.RevisionNames{}
+	refs := []uuid.UUID{}
+	for _, v := range vs {
+		if v.PIIRevisionRef == nil {
+			continue
+		}
+		for _, field := range v.ChangedFields {
+			if field == domain.FieldOwnerName {
+				refs = append(refs, *v.PIIRevisionRef)
+				break
+			}
+		}
+	}
+	r, ok := client.AsRevisionResolver(s.Vault)
+	if !ok || len(refs) == 0 {
+		return out
+	}
+	if len(refs) > client.MaxRevisionRefs {
+		refs = refs[len(refs)-client.MaxRevisionRefs:]
+	}
+	names, err := r.ResolveRevisions(ctx, client.PurposeFieldSupport, refs)
+	if err != nil {
+		return out
+	}
+	for _, n := range names {
+		out[n.Ref] = n
 	}
 	return out
 }

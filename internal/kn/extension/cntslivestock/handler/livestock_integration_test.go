@@ -380,14 +380,14 @@ func TestLivestockHouseholds_251(t *testing.T) {
 	upd["base_version"] = 2
 	want(t, x1.post(base+"/"+id1, upd), 422, "validation_failed", "không có thay đổi")
 
-	// Sửa họ tên, SĐT (cán bộ tổng hợp) → lịch sử chỉ nhãn che bớt (ADR-0056 mục 4).
+	// Q9 (#276): họ tên cũ → mới đầy đủ; SĐT vẫn che một phần.
 	upd["owner_name"], upd["owner_phone"] = "Nguyễn Văn Bình", "0913000456"
 	v = want(t, th.post(base+"/"+id1, upd), 200, "", "sửa họ tên")
-	if got := changes(v, "3"); got != "owner_name:Nguyễn V. A.→Nguyễn V. B.|owner_phone:0912•••123→0913•••456" {
+	if got := changes(v, "3"); got != "owner_name:Nguyễn Văn An→Nguyễn Văn Bình|owner_phone:0912•••123→0913•••456" {
 		t.Fatalf("lịch sử họ tên: %q", got)
 	}
-	if strings.Contains(string(mustJSON(list(v, "history"))), "Nguyễn Văn") {
-		t.Fatal("lịch sử chứa họ tên đầy đủ")
+	if strings.Contains(string(mustJSON(list(v, "history"))), "0913000456") {
+		t.Fatal("lịch sử lộ SĐT đầy đủ")
 	}
 	// SĐT đã thuộc chủ thể khác (hộ 2) → 409.
 	upd["base_version"], upd["owner_phone"] = 3, "0912000999"

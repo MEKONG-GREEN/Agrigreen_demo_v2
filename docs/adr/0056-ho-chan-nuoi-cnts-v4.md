@@ -111,3 +111,16 @@ Lý do tách: hộ mô hình (`cnts_model_household`) gắn điểm trình diễ
 - **Mảng `household_refs uuid[]` trong `cnts_outbreak`:** không chụp được DB-14 theo từng hộ, khó truy vấn ngược "ổ dịch nào có hộ X".
 - **Chuyển `household_ref` cũ sang hộ chăn nuôi:** nguồn cũ không kiểm, không có họ tên/loại chăn nuôi để tạo hộ đúng HCN-02…06; tạo hộ giả làm sai báo cáo định kỳ.
 - **Dùng lại `cnts_model_household`:** khác vòng đời, khác quyền (mục 1).
+
+## Bổ sung ngày 08/11/2026 — Q9, CNTS-V4-HCN09 (#276)
+
+Người dùng chốt “Đồng ý Q9” ngày 08/11/2026 trong kế hoạch KN độc lập đã duyệt. FN-10 BR-05/HCN-09 hiện **họ tên đầy đủ cũ → mới; chỉ SĐT tiếp tục che một phần**. Bổ sung này thay quyết định che họ tên trong mục 4 khi đọc HCN-09; nội dung quyết định trước được giữ ở trên để truy vết.
+
+- KN giữ `pii_revision_ref` đã có; không migration, không sửa dòng lịch sử, không chép tên vào sổ KN. `RevisionResolver.ResolveRevisions(PurposeFieldSupport)` đọc đúng bản mã trước/sau của bản sửa đó trong vault; không suy tên cũ từ chủ thể hiện hành.
+- Trước khi tra tên, route HCN-09 dùng phiên được chọn và phạm vi hộ hiện hành: Admin; Cấp Tỉnh/Cấp Xã phòng CNTS theo ma trận FN-10/Mục VI. Người chỉ xem vẫn được đọc HCN-09, không được ghi. Hợp đồng kho vẫn yêu cầu `vault_registrar`, mục đích, MFA khi bật và quota như Resolve; không thêm vai hay mở phạm vi KN.
+- Kho chỉ trả hai họ tên, không trả SĐT qua endpoint mới; SĐT lịch sử vẫn từ `Revisions`, đúng định dạng cũ. `Revisions` và các bên đọc nhãn che bớt khác giữ nguyên. Quyền đọc tên hiện hành tại chi tiết không đổi.
+- KMS/giải mã ngoài giao dịch; sổ truy cập `resolve/extension.field_support` phải commit rồi mới trả tên. Không cache/idempotency phản hồi đọc tên. Thiếu bản sửa, không có quyền hoặc lỗi kho/audit: tên lịch sử hiện “(không đọc được lịch sử định danh)”, không đoán hoặc dùng tên hiện hành. UI hiển thị dạng văn bản đã escape.
+
+Kiểm chứng và giới hạn của gói: [CNTS-V4-HCN09](../kn/gia-dinh/CNTS-V4-HCN09.md). Quyết định này ghi nhận yêu cầu hiển thị; không đưa ra kết luận tuân thủ pháp luật.
+
+Phản hồi POST trực tiếp vẫn có tên đã được vault audit. Bản lưu Idempotency dùng `SetStoredBody` hiện có, chỉ lưu metadata: bỏ họ tên hiện hành/người sửa, thay tên lịch sử bằng trạng thái chưa đọc được. Gửi lại cùng khóa không phát lại tên từ cache; GET chi tiết đọc lại tên qua vault với quyền hiện hành. Không sửa payload cũ đã lưu. `TestHCN09NativeCurrentSession_276` kiểm DB cache, replay và GET mới.

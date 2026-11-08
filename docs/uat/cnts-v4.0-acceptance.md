@@ -74,12 +74,14 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-HOUSEHOLD-LIST.
 | Ngoại lệ: sai số GPS > 50 m → cảnh báo, vẫn lưu; không bắt được GPS → không check-in, báo thử lại | `TestLivestockHouseholds_251`; vitest `livestock.test.ts` | G1 |
 | BR-03: vị trí chỉ từ check-in GPS, không nhập tay; sửa thông tin không đổi vị trí | `TestLivestockHouseholds_251` | G1 |
 | H4: đổi vị trí phải check-in lại và nhập lý do | `TestLivestockHouseholds_251` | G1 |
-| BR-05, AC-08: sửa loại chăn nuôi → lịch sử người sửa, thời điểm, cũ → mới; họ tên/SĐT cũ → mới dạng che bớt | `TestLivestockHouseholds_251`, `TestIdentityRevisions_251`, `TestHTTPClientEndToEnd` | G1 |
+| BR-05, AC-08, HCN-09 (Q9 chốt 08/11/2026): lịch sử người sửa, thời điểm, cũ → mới; họ tên đầy đủ qua đúng bản sửa vault có audit, chỉ SĐT che | `TestLivestockHouseholds_251`, `TestIdentityRevisions_251`, `TestResolveRevisionNames_276`, `TestLivestockHistoryVersionsAndUnavailable_276`, `TestHCN09NativeCurrentSession_276`; web `history.test.tsx` | Bằng chứng cục bộ #276; native PG/vault và UI/mock tách biệt |
 | BR-04: không xóa, chỉ vô hiệu hóa (cán bộ tổng hợp Cấp Tỉnh, có lý do); không sửa/kích hoạt lại sau vô hiệu hóa | `TestLivestockHouseholds_251` | G1 |
 | BR-08, AC-09 (phần danh sách): hộ Chờ bổ sung vị trí → cán bộ xã check-in → Đang dùng, lịch sử ghi chuyển trạng thái | `TestLivestockHouseholds_251` (hộ chờ ghi như BM-10 sẽ ghi) | G1; tạo hộ từ BM-10: #252 |
 | BR-07, AC-07 (phần danh sách): hộ vô hiệu hóa không còn trong danh sách Đang dùng | `TestLivestockHouseholds_251` (lọc `status=active`) | G1; ô chọn DB-04: #252 |
 | Xóa định danh xóa luôn bản sửa họ tên/SĐT (RB-3) | `TestIdentityRevisions_251` | G1 |
 | Menu Tỉnh "Số liệu cấp xã › Danh sách hộ chăn nuôi", Xã "Dữ liệu › Danh sách hộ chăn nuôi" | `TestWebMenuFixture`, `TestBuilderMatchesWebGoldenFixture` | G1 |
+
+Bổ sung #276: [phạm vi, ánh xạ tệp → bước → FN và cách chạy](../kn/gia-dinh/CNTS-V4-HCN09.md). Kiểm quyền đọc HCN-09 của các cohort FN-10 (kể cả chỉ xem), thu hồi/đổi Nút/phòng/phạm vi trên request kế tiếp, MFA/quota, missing-ref, KMS/audit lỗi và pool 1. Fixture định danh tổng hợp + native owner không thay bằng chứng OIDC/KMS triển khai; browser/mock không phải chứng nhận native hoặc toàn FN/UAT.
 
 Chưa nghiệm thu ở gói này: đếm hộ ở báo cáo định kỳ (FN-16 BR-07, CN-5), lớp trang trại bản đồ (FN-18, CN-6), ô chọn DB-04 và tạo
 hộ từ BM-10 (FN-11, #252).

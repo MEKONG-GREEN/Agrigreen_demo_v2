@@ -205,6 +205,26 @@ func write(c *gin.Context, v app.View, err error, status int) {
 	if v.Replayed {
 		status = http.StatusOK
 	}
+	if c.Request.Method == http.MethodPost {
+		// Chỉ cache metadata cho phát lại: tên đầy đủ phải được đọc lại qua vault có audit.
+		// Không sửa phản hồi/cached payload đã có trước gói này.
+		cached := out(v, true)
+		cached["owner_name"], cached["updated_by_name"] = nil, nil
+		for _, row := range cached["history"].([]gin.H) {
+			row["actor_name"] = nil
+			for _, item := range row["changes"].([]gin.H) {
+				if item["field"] == domain.FieldOwnerName {
+					item["old"], item["new"] = app.HistoryNameUnavailable, app.HistoryNameUnavailable
+				}
+			}
+		}
+		body, err := json.Marshal(cached)
+		if err != nil {
+			httpx.Fail(c, err)
+			return
+		}
+		idempotency.SetStoredBody(c, body)
+	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(status, out(v, true))
 }

@@ -168,6 +168,50 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "403": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/revisions/resolve:
+    post:
+      summary: >-
+        #276 Q9 HCN-09 — họ tên đầy đủ trước/sau của đúng bản sửa mã hóa, tối đa 200 ref.
+        Chỉ extension.field_support, vault_registrar; MFA khi RequireMFASensitive bật và quota Resolve cho từng ref.
+        Không trả SĐT. Ref lạ/khác tenant/đã xóa bị bỏ qua. Audit resolve từng chủ thể phải commit trước dữ liệu;
+        lỗi KMS/audit không trả tên. Phản hồi no-store, không qua Idempotency-Key.
+      operationId: subjectResolveRevisions
+      parameters:
+        - $ref: "#/components/parameters/Purpose"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refs]
+              properties:
+                purpose: { type: string, enum: [extension.field_support] }
+                refs: { type: array, maxItems: 200, items: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Tên trước/sau của bản sửa có trong tenant, sau khi audit thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [ref, subject_ref, prev_name, next_name]
+                      properties:
+                        ref: { type: string, format: uuid }
+                        subject_ref: { type: string, format: uuid }
+                        prev_name: { type: string }
+                        next_name: { type: string }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
   /v1/subjects/revisions:
     post:
       summary: >-

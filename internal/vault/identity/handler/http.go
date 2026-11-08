@@ -38,6 +38,8 @@ func (h Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/subjects/cards", h.cards)
 	// #251: nhãn che bớt của bản sửa họ tên/SĐT theo lô — phản hồi no-store, không qua Idem.
 	rg.POST("/subjects/revisions", h.revisions)
+	// #276: đọc tên lịch sử có audit Resolve, không cache/idempotency.
+	rg.POST("/subjects/revisions/resolve", h.resolveRevisions)
 	rg.GET("/subjects/:ref/display", h.display)
 	rg.POST("/subjects/:ref/resolve", h.resolve)
 	rg.POST("/subjects/:ref/unwrap", h.unwrap)

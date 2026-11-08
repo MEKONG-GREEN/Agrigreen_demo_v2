@@ -45,7 +45,7 @@ type Change struct {
 	Items     []ChangeItem
 }
 
-// ChangeItem là một trường đổi. Họ tên/SĐT chỉ ở dạng che bớt (ADR-0056 mục 4).
+// ChangeItem là một trường đổi. HCN-09 trả họ tên qua ResolveRevisions; SĐT vẫn che (Q9, #276).
 type ChangeItem struct{ Field, Old, New string }
 
 // Page là một trang danh sách.
