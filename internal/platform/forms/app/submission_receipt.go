@@ -9,13 +9,31 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 // SubmitInput's stable v1 wire shape is the request binding, including nil base
 // versus explicit zero and the offline identity. It is never inferred from latest.
-func submissionRequestOf(in SubmitInput) (json.RawMessage, error) {
+func submissionRequestOf(in SubmitInput, fields []domain.Field) (json.RawMessage, error) {
+	// Validate the immutable native template contract before encoding. JSON and
+	// UTF-8 expansion must not introduce a smaller limit than the native values.
+	values := in.Values
+	var err error
+	if in.NilReport {
+		values, err = domain.NilValues(fields, values)
+	}
+	if err == nil {
+		err = domain.ValidateValues(fields, values)
+	}
+	if err != nil {
+		var te domain.ErrTemplate
+		if errorsAs(err, &te) {
+			return nil, port.ErrInvalidValues.WithField(te.Field, te.Msg)
+		}
+		return nil, port.ErrInvalidValues.WithDetail(err.Error())
+	}
 	// Keep the persisted v1 request stable when SubmitInput gains unrelated fields.
 	request := struct {
 		ID                *uuid.UUID
@@ -27,18 +45,11 @@ func submissionRequestOf(in SubmitInput) (json.RawMessage, error) {
 		CapturedAt        *time.Time
 		DeviceID          string
 	}{in.ID, in.Unit, in.Values, in.BaseVersion, in.NilReport, in.Note, in.Explanation, in.CapturedAt, in.DeviceID}
-	raw, err := json.Marshal(request)
-	if err != nil {
-		return nil, err
-	}
-	if len(raw) > 1048576 {
-		return nil, problem.Validation.WithDetail("bài nộp quá lớn")
-	}
-	return raw, nil
+	return json.Marshal(request)
 }
 
 func recordSubmissionReceipt(ctx context.Context, tx pgx.Tx, a actor, profile string, request json.RawMessage, key string, out SubmissionView) error {
-	if key == "" {
+	if key == "" || request == nil {
 		return nil
 	}
 	return store.InsertSubmissionReceipt(ctx, tx, a.tenant, profile, request, key, out.Submission, out.Status)

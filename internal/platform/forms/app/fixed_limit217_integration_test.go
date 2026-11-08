@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -272,5 +273,78 @@ func TestFormsSubmitReceiptAtomicRollback217(t *testing.T) {
 	f.must(err, "same operation after rollback")
 	if v.Submission.Version != 1 {
 		t.Fatalf("failed operation consumed attempt: %+v", v)
+	}
+}
+
+// Existing native contracts admit 500 text fields of 2000 runes. Receipt storage
+// must preserve those values, including expansion caused by JSON escaping.
+func TestFormsLargePayload217(t *testing.T) {
+	f := newUnitFx(t)
+	admin := f.as(f.tid, uuid.Nil, "admin", uuid.Nil)
+	fields := make([]domain.Field, domain.MaxFields)
+	for i := range fields {
+		fields[i] = domain.Field{Key: fmt.Sprintf("text_%d", i), Label: "Text", Type: domain.TypeText, Required: true}
+	}
+	for _, profile := range []string{"fx", "khtc"} {
+		t.Run(profile, func(t *testing.T) {
+			unit := "U1"
+			owner := f.as(f.tid, ids.New(), "tinh", ids.New(), unit)
+			member := f.as(f.tid, ids.New(), "xa", ids.New(), unit)
+			if profile == "khtc" {
+				unit = "trong_trot"
+				owner = f.asDept(ids.New(), "tinh", "ke_hoach", ids.New())
+				member = f.asDept(ids.New(), "tinh", unit, ids.New())
+			}
+			tpl, err := f.svc.DefineTemplate(admin, TemplateInput{Profile: profile, Code: "LARGE217", Title: "Large text", Fields: fields}, "")
+			f.must(err, "large template")
+			for _, sample := range []struct{ name, text string }{
+				{"unicode", strings.Repeat("🌾", 2000)},
+				{"html_escape", strings.Repeat("<", 2000)},
+				{"control_escape", strings.Repeat("\x01", 2000)},
+			} {
+				t.Run(sample.name, func(t *testing.T) {
+					values := make(map[string]string, len(fields))
+					for _, field := range fields {
+						values[field.Key] = sample.text
+					}
+					if err := domain.ValidateValues(fields, values); err != nil {
+						t.Fatal("fixture violates existing native contract:", err)
+					}
+					p, err := f.svc.Publish(owner, PublishInput{Profile: profile, TemplateID: tpl.ID, Label: sample.name,
+						DueAt: f.clk.Now().Add(time.Hour), Units: []string{unit}}, "")
+					f.must(err, "large publication")
+					base, id := int64(0), ids.New()
+					in := SubmitInput{ID: &id, Unit: unit, Values: values, BaseVersion: &base}
+					raw, err := json.Marshal(in)
+					f.must(err, "large request JSON")
+					if len(raw) <= 1<<20 {
+						t.Fatalf("fixture does not cover expansion: bytes=%d", len(raw))
+					}
+					key := "large-" + profile + "-" + sample.name
+					sb, err := f.svc.SubmitWith(member, profile, p.Period.ID, in, key)
+					if err != nil {
+						t.Fatalf("valid %s/%s request (%d JSON bytes) rejected: %v", profile, sample.name, len(raw), err)
+					}
+					if sb.Submission.Version != 1 || sb.Submission.Values[fields[499].Key] != sample.text {
+						t.Fatal("large native values changed")
+					}
+					replay, err := f.svc.SubmitWith(member, profile, p.Period.ID, in, key)
+					f.must(err, "large original replay")
+					if !replay.Replayed || replay.Submission.ID != sb.Submission.ID || replay.Submission.Version != 1 || replay.Submission.Values[fields[499].Key] != sample.text {
+						t.Fatal("large replay did not return original native values")
+					}
+					wantReceipts := 0
+					if profile == "khtc" {
+						wantReceipts = 1
+						values[fields[499].Key] = "changed"
+						_, err = f.svc.SubmitWith(member, profile, p.Period.ID, in, key)
+						f.want(err, "conflict", "large fixed request remains bound")
+					}
+					if n := f.scalar(`SELECT count(*) FROM pf_forms.submission_receipt WHERE tenant_id=$1 AND period_id=$2`, f.tid, p.Period.ID); n != wantReceipts {
+						t.Fatalf("receipt opt-in: got %d, want %d", n, wantReceipts)
+					}
+				})
+			}
+		})
 	}
 }

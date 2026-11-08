@@ -60,7 +60,7 @@ CREATE TABLE pf_forms.submission_receipt (
   unit_code text NOT NULL,
   submission_id uuid NOT NULL,
   status text NOT NULL CHECK (status IN ('submitted','locked','awaiting_reopen')),
-  request_content jsonb NOT NULL CHECK (jsonb_typeof(request_content)='object' AND octet_length(request_content::text)<=2097152),
+  request_content jsonb NOT NULL CHECK (jsonb_typeof(request_content)='object'),
   id uuid NOT NULL,
   tenant_id uuid NOT NULL,
   stream_key text NOT NULL,

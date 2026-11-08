@@ -496,15 +496,15 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 		values = map[string]string{}
 	}
 	in.Values = values
-	if in.CapturedAt != nil {
+	if prof.FixedMaxSubmissions > 0 && in.CapturedAt != nil {
 		captured := in.CapturedAt.UTC().Truncate(time.Microsecond)
 		in.CapturedAt = &captured
 	}
-	request, err := submissionRequestOf(in)
-	if err != nil {
-		return SubmissionView{}, err
+	var request json.RawMessage
+	now := s.Clock.Now().UTC()
+	if prof.FixedMaxSubmissions > 0 {
+		now = now.Truncate(time.Microsecond)
 	}
-	now := s.Clock.Now().UTC().Truncate(time.Microsecond)
 	var out SubmissionView
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
 		if err := store.Lock(ctx, tx, periodID); err != nil {
@@ -523,14 +523,25 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 		if !slices.Contains(v.Period.Units, unit) {
 			return port.ErrUnitNotInPeriod
 		}
-		if idem != "" {
+		if prof.FixedMaxSubmissions > 0 && idem != "" {
+			template, err := store.TemplateByID(ctx, tx, v.Period.TemplateID)
+			if err != nil {
+				return err
+			}
+			if template == nil {
+				return port.ErrTemplateNotFound
+			}
+			request, err = submissionRequestOf(in, template.Fields)
+			if err != nil {
+				return err
+			}
 			if done, err := replaySubmissionReceipt(ctx, tx, a, v, unit, idem, request, &out); err != nil || done {
 				return err
 			}
 		}
 		if in.ID != nil {
 			if done, err := s.replayed(ctx, tx, *in.ID, a.ref, periodID, unit, &out); err != nil || done {
-				if done && err == nil && v.Spec.AutoLockAtLimit && idem != "" {
+				if done && err == nil && prof.FixedMaxSubmissions > 0 && idem != "" {
 					return problem.Conflict.WithDetail("thiếu receipt của đúng thao tác gửi")
 				}
 				return err
