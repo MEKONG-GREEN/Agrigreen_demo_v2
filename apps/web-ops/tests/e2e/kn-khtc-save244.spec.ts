@@ -30,9 +30,8 @@ test("244 report save exact receipt survives UI remount and renders actual befor
  await page.getByRole("combobox",{name:"Số kỳ",exact:true}).selectOption("12");
  await page.getByRole("button",{name:"Xem trước",exact:true}).click();
  await page.getByRole("button",{name:"Mở kỳ và giao phiếu",exact:true}).click();
- const folder=sidebar(page).getByRole("button",{name:"Phòng Kế hoạch - Tài chính",exact:true});
- if(await folder.getAttribute("aria-expanded")!=="true")await folder.click();
- const reportLink=sidebar(page).getByRole("link",{name:"Báo cáo KHTC",exact:true});
+ const reportLink=sidebar(page).getByRole("link",{name:"Soạn báo cáo (Mẫu 1–5)",exact:true});
+ await expect(reportLink).toBeVisible();
  await reportLink.click();
  const period=page.getByRole("button",{name:/^Tháng 12 năm 2030/});await period.click();
  await page.getByLabel("Người ký",{exact:true}).fill("Người ký lần đầu244");
@@ -44,7 +43,7 @@ test("244 report save exact receipt survives UI remount and renders actual befor
  await expect(page.getByRole("button",{name:"Lưu bản soạn",exact:true})).toBeDisabled();
  expect(await page.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith("kn:khtc:report-save:v1:")).length)).toBe(1);
  await page.screenshot({path:testInfo.outputPath("244-unresolved-local-cleanup.png"),fullPage:true});
- await sidebar(page).getByRole("link",{name:"Kỳ báo cáo",exact:true}).click();
+ await sidebar(page).getByRole("link",{name:/^Kỳ báo cáo & phiếu các phòng/}).click();
  await reportLink.click();await period.click();
  await expect(page.getByRole("status").filter({hasText:"Đã đối chiếu lần lưu phiên bản 1"})).toBeVisible();
  await expect(page.getByLabel("Người ký",{exact:true})).toHaveValue("Người ký lần đầu244");
