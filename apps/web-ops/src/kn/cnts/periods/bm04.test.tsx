@@ -1,3 +1,4 @@
+import { cntsSelection } from "@/test/cnts-template-selection";
 // BF-CN-XA-DATA #175 (BRD CNTS v3.7 FN-09): Số liệu cấp xã › Nhập liệu tuần BM-04 — Cấp Tỉnh.
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -168,7 +169,7 @@ describe("màn Nhập liệu tuần — Cấp Tỉnh", () => {
     await adm.departmentStatus(cn.id, "active").catch(() => undefined);
     await createCntsPeriodApi(apiOf("kn-admin", adminCtx)).install();
     const tinh = createCntsPeriodApi(apiOf("kn-binh", null));
-    await tinh.publish({ code: BM04_CODE, from_date: `${y}-01-07`, to_date: `${y}-01-07`, units: ["91301", "91302"], ...(owner ? { owner_ref: owner } : {}) });
+    await tinh.publish({ ...(await cntsSelection(tinh, BM04_CODE)), code: BM04_CODE, from_date: `${y}-01-07`, to_date: `${y}-01-07`, units: ["91301", "91302"], ...(owner ? { owner_ref: owner } : {}) });
     const xa = createCntsPeriodApi(apiOf("kn-an", await contextOf("kn-an", "asg-an-xa", "chan_nuoi_thuy_san")));
     const t = (await xa.tasks(BM04_CODE)).find((x) => x.unit === "91301")!;
     const values = Object.fromEntries(t.fields.filter((f) => f.type !== "text").map((f) => [f.key, "1"]));

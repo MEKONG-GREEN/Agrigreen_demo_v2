@@ -130,6 +130,8 @@ const idem = () => ({ header: { "Idempotency-Key": newIdempotencyKey() } });
 export function createCntsPeriodApi(api: ApiClient) {
   const query = { profile: PROFILE };
   return {
+    versions: async (code: string): Promise<S["CNTSDesignVersion"][]> =>
+      (await unwrap(api.GET("/v1/extension/cnts/form-designs/{code}/versions", { params: { path: { code } } }))).items,
     forms: async (): Promise<CntsForm[]> => (await unwrap(api.GET("/v1/extension/cnts/period-forms"))).items,
     install: async (): Promise<CntsForm[]> => (await unwrap(api.POST("/v1/extension/cnts/period-forms/install", { params: idem() }))).items,
     preview: (body: CntsSeriesInput): Promise<CntsSeries> => unwrap(api.POST("/v1/extension/cnts/period-series/preview", { body })),

@@ -160,3 +160,19 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-FARM-LAYER.md),
 | AC-03: chọn ngày cũ thấy số ảnh hưởng theo diễn biến của ngày đó | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
 | AC-02: Cấp Xã chỉ thấy trang trại và số ảnh hưởng từ ổ dịch xã mình; tenant khác không thấy | `TestCNTSMap_FarmLayerAndImpact_FN18` | G1 |
 | Trang trại, số ảnh hưởng trong vùng (đối tượng trong vùng đệm 3 km/10 km, khoảng cách tới tâm) | `TestCNTSMap_FarmLayerAndImpact_FN18`; vitest `map.test.ts` | G1 |
+
+
+## FN-07 — Chọn phiên bản bất biến cho kỳ native (phần đầu #275)
+
+Nguồn/phạm vi: [BF-CN-FORM-DESIGN-EDIT-DIARY](../kn/gia-dinh/BF-CN-FORM-DESIGN-EDIT-DIARY.md). Đây là bằng chứng kiểm tự động cục bộ; full FN-07/G1/UAT, Linux CI/race và OIDC triển khai chưa được nhận.
+
+| Tiêu chí/phạm vi | Bằng chứng native thật | Giới hạn |
+|---|---|---|
+| Chọn explicit template ID/version trước publish; thiếu hoặc tuple sai không ghi intent/kỳ | `TestCNTS275SelectedTupleGuard` | Biểu kỳ CNTS hiện có |
+| UR-TINH-07/BR-01/AC-03: chọn v1 sau head v2 vẫn dùng schema v1; kỳ v2 bắt cột mới, bài cũ giữ giá trị/schema; số mũ/chuỗi số dài bị từ chối | `TestCNTS275SelectedVersionRuntime` (pool1) | Runtime native Forms, không phải runtime nhật ký động |
+| Save/create durable receipt sau head tăng, CAS một thắng, native policy kiểm cấu trúc trực tiếp | `TestCNTS275DefinitionDurableReplay`, `TestCNTS275DefinitionCASAndPolicyValidation`, parent `TestCNTSDesignEdit_FN07_192` | Canonical definition; copy source provenance atomic còn supplier |
+| Mất ACK sau commit native: cùng session/actor/payload/tuple phục hồi receipt gốc; đổi target/actor/version hoặc current role/group/read-only/phạm vi/hết hạn không replay; không trùng event/audit | `TestCNTS275PublicationLostACKCurrentAuthorityAndExactReceipt` | Fixture binds actual KN owner registry, thay account middleware |
+| UI yêu cầu chọn phiên bản; preview và POST giữ nguyên tuple | `publish.test.tsx`, production built browser desktop/mobile | Mock/web tách riêng native PG |
+| Nhật ký động, GPS/ảnh/tần suất và programme owner của mẫu, loại lịch/mã báo cáo mới, usage đúng mọi runtime và assignment theo identity | Chưa nghiệm thu | Supplier/consumer proposals đã chuyển ROOT; công bố chính thức đang chờ owner, chưa có số issue |
+
+Cách chạy và map tệp → bước → FN nằm trong tài liệu giả định. Không dùng chức năng #192 đã có hoặc mock để nhận toàn bộ phần còn lại #275.

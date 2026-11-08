@@ -46,7 +46,7 @@ function vnToday(): string {
   return new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
 }
 
-type PublishErrors = Partial<Record<"from" | "to" | "units" | "dueTime" | "regions" | "owner" | "closeAfter", string>>;
+type PublishErrors = Partial<Record<"template" | "from" | "to" | "units" | "dueTime" | "regions" | "owner" | "closeAfter", string>>;
 
 export interface PublishDraft {
   from: string;
@@ -78,10 +78,11 @@ export function publishErrors(v: PublishDraft): PublishErrors {
 }
 
 /** Thân yêu cầu xem trước / phát hành từ cấu hình trên màn. */
-export function seriesBody(code: string, v: PublishDraft, form: Pick<CntsForm, "deadline_offset_days"> | undefined): CntsSeriesInput {
+export function seriesBody(code: string, v: PublishDraft, form: Pick<CntsForm, "deadline_offset_days"> | undefined, selected?: { template_id: string; version: number }): CntsSeriesInput {
   const close = v.closeAfter.trim() ? parseNumberInput(v.closeAfter, CLOSE_RULE) : null;
   return {
     code,
+    ...(selected ? { template_id: selected.template_id, template_version: selected.version } : {}),
     from_date: v.from,
     to_date: v.to,
     target: v.target,
@@ -311,6 +312,9 @@ function PublishPanel({ capi, aapi, forms, onPublished }: { capi: Capi; aapi: Aa
   const act = useAction();
   const [code, setCode] = useState("CNTS-BM04");
   const form = forms.find((f) => f.code === code);
+  const versions = useLoad(() => capi.versions(code), [capi, code, form?.template_id]);
+  const [selectedId, setSelectedId] = useState("");
+  const selected = versions.data?.find(v => v.template_id === selectedId);
   const facilityMode = form?.unit_kind === "facility";
   const [v, setV] = useState<PublishDraft>({ from: vnToday(), to: vnToday(), target: "province", units: [], regions: [], dueTime: "", owner: "", closeAfter: "" });
   const [errs, setErrs] = useState<PublishErrors>({});
@@ -336,10 +340,11 @@ function PublishPanel({ capi, aapi, forms, onPublished }: { capi: Capi; aapi: Aa
   const activeFacilities = (facilities.data ?? []).filter((f) => f.active);
   const check = () => {
     const e = publishErrors(draft);
+    if (!selected || versions.loading) e.template = "Chọn phiên bản biểu trước khi xem trước hoặc phát hành.";
     setErrs(e);
     return Object.keys(e).length === 0;
   };
-  const body = () => seriesBody(code, draft, form);
+  const body = () => seriesBody(code, draft, form, selected);
   const toggle = (list: "units" | "regions", x: string, on: boolean) => set({ [list]: on ? [...v[list], x] : v[list].filter((y) => y !== x) } as Partial<PublishDraft>);
 
   return (
@@ -350,7 +355,7 @@ function PublishPanel({ capi, aapi, forms, onPublished }: { capi: Capi; aapi: Aa
         <legend>Bước 1 — Biểu</legend>
         <label className="field">
           <span>Biểu</span>
-          <select className="select" aria-label="Biểu phát hành" value={code} onChange={(e) => (setCode(e.target.value), set({ units: [], regions: [] }))}>
+          <select className="select" aria-label="Biểu phát hành" value={code} onChange={(e) => (setCode(e.target.value), setSelectedId(""), set({ units: [], regions: [] }))}>
             {forms.map((f) => (
               <option key={f.code} value={f.code}>
                 {f.bm} — {f.title}
@@ -358,6 +363,10 @@ function PublishPanel({ capi, aapi, forms, onPublished }: { capi: Capi; aapi: Aa
             ))}
           </select>
         </label>
+        <LoadState s={versions}>{items => <SelectField label="Phiên bản biểu" value={selectedId}
+          onChange={id => { setSelectedId(id); setPreview(null); }} required error={errs.template}
+          placeholder="— Chọn phiên bản —" options={items.map(v => ({ value: v.template_id, label: `Phiên bản ${v.version} · ${v.title}` }))} />}</LoadState>
+        <p className="small mute">Kỳ mới dùng đúng phiên bản đã chọn. Lưu cấu trúc mới không đổi kỳ hoặc bài đã nộp.</p>
       </fieldset>
 
       <fieldset className="field">
@@ -486,7 +495,7 @@ function PublishPanel({ capi, aapi, forms, onPublished }: { capi: Capi; aapi: Aa
             {preview.calendar_id ? ` — lịch tuần ${preview.calendar_id} v${preview.calendar_version}` : " — tuần làm việc Thứ Hai – Thứ Sáu"}
           </p>
           <p className="small mute">
-            Đối tượng: {TARGET_LABEL[preview.target]}
+            Phiên bản biểu: {preview.template_version} · Đối tượng: {TARGET_LABEL[preview.target]}
             {preview.unit_kind === "commune" ? ` — ${preview.units.map(name).join(", ")}` : ""}
           </p>
           <DataTable

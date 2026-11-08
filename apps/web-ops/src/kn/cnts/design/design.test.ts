@@ -55,7 +55,7 @@ describe("FN07 phần xem/kiểm cấu trúc", () => {
     const saved = await api.save("CNTS-BM17", base, "BM-17 có cua", fields); expect(saved.version.version).toBe(base + 1);
     await expect(api.save("CNTS-BM17", base, "cũ", fields)).rejects.toMatchObject({ problem: { status: 409 } });
     await expect(api.save("CNTS-BM04", bm04.version ?? 0, "x", bm04.fields)).rejects.toMatchObject({ problem: { status: 403 } });
-    const copy = await api.create({ code_suffix: "tongdan", title: "Điều tra tổng đàn", source_code: "CNTS-BM17" });
+    const copy = await api.create({ code_suffix: "tongdan", title: "Điều tra tổng đàn", source_code: "CNTS-BM17", source_version: saved.version.version });
     expect(copy).toMatchObject({ code: "CNTS-DT-TONGDAN", version: { version: 1 } });
     expect((await api.list()).find(x => x.code === "CNTS-DT-TONGDAN")).toMatchObject({ kind: "survey", can_edit: true });
     expect((await api.history("CNTS-BM17"))[0]?.version).toBe(base + 1);

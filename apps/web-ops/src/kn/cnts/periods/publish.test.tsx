@@ -1,3 +1,4 @@
+import { cntsSelection } from "@/test/cnts-template-selection";
 // BF-CN-PUBLISH (#108, CN-07): cấu hình phát hành biểu kỳ CNTS (đối tượng nhóm xã, người phụ trách, giờ chốt, xem trước
 // số nhiệm vụ) và màn theo dõi (Đã nộp / Nháp / Chưa nhập / Trễ / Trả lại / Không nộp, nút Nhắc) — hàm thuần, backend giả
 // lập và màn thật.
@@ -77,6 +78,13 @@ describe("CN-07 — hàm phía máy khách", () => {
     expect(seriesBody("CNTS-BM01", { ...base, target: "facilities", units: ["f1"] }, undefined).units).toEqual(["f1"]);
   });
 
+  it("#275: gửi đúng ID/version đã chọn, không thay bằng phiên bản hiện hành", () => {
+    const old = { template_id: "0192a000-0000-7000-8000-000000000001", version: 1 };
+    const next = { template_id: "0192a000-0000-7000-8000-000000000002", version: 2 };
+    expect(seriesBody("CNTS-BM17", base, undefined, old)).toMatchObject({ template_id: old.template_id, template_version: 1 });
+    expect(seriesBody("CNTS-BM17", base, undefined, next)).toMatchObject({ template_id: next.template_id, template_version: 2 });
+  });
+
   it("trạng thái theo dõi: Trả lại > Không nộp > Đã nộp > Trễ > Nháp > Chưa nhập; nháp cũ hơn lần gửi bị bỏ qua", () => {
     const t = (x: Partial<FormsTask>) => ({ status: "not_submitted", version: 0, submitted_at: null, period_id: "p", unit: "u", ...x }) as FormsTask;
     const drafts = draftIndex({ drafts: [{ period_id: "p", unit: "u", saved_at: "2026-10-01T00:00:00Z" }] });
@@ -110,7 +118,7 @@ describe("CN-07 — backend giả lập", () => {
     expect(await code(tinh.preview({ code: "CNTS-BM04", from_date: "2099-01-06", to_date: "2099-01-12", target: "regions", units: [] }))).toBe("validation_failed");
     expect(await code(tinh.preview({ code: "CNTS-BM01", from_date: "2099-01-06", to_date: "2099-01-06", target: "province", units: [] }))).toBe("validation_failed");
 
-    const pub = await tinh.publish({ code: "CNTS-BM04", from_date: "2099-01-06", to_date: "2099-01-12", target: "regions", regions: ["KV1"], units: [],
+    const pub = await tinh.publish({ ...(await cntsSelection(tinh, "CNTS-BM04")), code: "CNTS-BM04", from_date: "2099-01-06", to_date: "2099-01-12", target: "regions", regions: ["KV1"], units: [],
       owner_ref: OWNER, close_after_hours: 48 });
     expect(pub.publication_id).toBeTruthy();
     const pid = pub.periods[0]!.id!;
@@ -152,6 +160,7 @@ describe("CN-07 — màn phát hành và theo dõi", () => {
   it("chọn khu vực + người phụ trách + giờ chốt → xem trước số nhiệm vụ → phát hành → theo dõi có người phụ trách, giờ chốt, nút Nhắc", async () => {
     await installForms();
     const u = userEvent.setup();
+    auth.api = rawClient("kn-cnts", await contextOf("kn-cnts", "asg-cnts-tinh", "chan_nuoi_thuy_san"));
     render(<CntsPublishScreen />);
     await u.click(await screen.findByRole("radio", { name: /Theo khu vực/ }));
     await u.click(await screen.findByRole("checkbox", { name: /Khu vực 2/ }));
@@ -164,6 +173,9 @@ describe("CN-07 — màn phát hành và theo dõi", () => {
     await u.type(screen.getByLabelText(/Giờ chốt sau hạn nộp/), "24");
     await waitFor(() => expect(screen.getByRole("option", { name: "Trần Bình (Cấp Tỉnh)" })).toBeInTheDocument());
     await u.selectOptions(screen.getByLabelText(/Cán bộ tỉnh phụ trách biểu/), OWNER);
+    await u.click(screen.getByRole("button", { name: /Xem trước/ }));
+    expect(await screen.findByText("Chọn phiên bản biểu trước khi xem trước hoặc phát hành.")).toBeInTheDocument();
+    await u.selectOptions(await screen.findByLabelText(/Phiên bản biểu/), (await client("kn-admin", await contextOf("kn-admin", "asg-admin", null)).forms()).find(f => f.code === "CNTS-BM04")!.template_id!);
     await u.click(screen.getByRole("button", { name: /Xem trước/ }));
     expect(await screen.findByText(/1 kỳ × 2 đơn vị = 2 nhiệm vụ/)).toBeInTheDocument();
     expect(within(screen.getByRole("table", { name: "Kỳ xem trước" })).getByRole("columnheader", { name: "Giờ chốt" })).toBeInTheDocument();

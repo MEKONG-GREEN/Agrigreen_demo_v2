@@ -1,3 +1,4 @@
+import { cntsSelection } from "@/test/cnts-template-selection";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
@@ -55,7 +56,7 @@ describe("tổng hợp CNTS — backend giả lập /v1/extension/cnts/bm18|aggr
     const xaP = createCntsPeriodApi(apiOf("kn-an", await contextOf("kn-an", "asg-an-xa", "chan_nuoi_thuy_san")));
     const agg = createCntsAggApi(apiOf("kn-binh", null));
 
-    const s = await tinhP.publish({ code: "CNTS-BM17", from_date: "2026-09-22", to_date: "2026-10-05", units: ["91301"] });
+    const s = await tinhP.publish({ ...(await cntsSelection(tinhP, "CNTS-BM17")), code: "CNTS-BM17", from_date: "2026-09-22", to_date: "2026-10-05", units: ["91301"] });
     expect(s.periods.map((p) => p.key)).toEqual(["2026-W39", "2026-W40"]);
     const [w39, w40] = s.periods.map((p) => p.id!);
     const vals = (ca: string) => ({ ca, tom: "0", muc: "0", khac: "0" });

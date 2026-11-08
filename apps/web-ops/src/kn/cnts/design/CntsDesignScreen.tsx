@@ -34,7 +34,7 @@ function Editor({ capi, design, initial, onSaved, onCancel }: { capi: DesignApi;
     if (await act.run(() => capi.save(design.code, design.version ?? 0, title.trim(), fields), r => `Đã lưu phiên bản ${r.version.version}. Kỳ đã phát hành giữ phiên bản cũ.`)) onSaved();
   };
   return <section className="card sec" aria-label="Sửa cấu trúc biểu"><h3>Sửa cấu trúc — lưu thành phiên bản {(design.version ?? 0) + 1}</h3>
-    <p className="mute">Kỳ đã phát hành và bài đã nộp giữ phiên bản cũ; kỳ phát hành sau khi lưu dùng phiên bản mới. Chỉ tiêu đã phát hành không xóa, không đổi kiểu.</p>
+    <p className="mute">Kỳ đã phát hành và bài đã nộp giữ phiên bản cũ; kỳ mới dùng đúng phiên bản được chọn khi phát hành. Chỉ tiêu đã phát hành không xóa, không đổi kiểu.</p>
     <TextField label="Tên biểu" value={title} onChange={setTitle} required />
     <div className="table-wrap"><table className="table"><caption>Chỉ tiêu</caption><thead><tr><th>Mã</th><th>Chỉ tiêu</th><th>Kiểu</th><th>Đơn vị</th><th>Nhóm</th><th>Bắt buộc</th><th>Không âm</th><th>Lựa chọn (cách nhau |)</th><th /></tr></thead><tbody>
       {fields.map((f, i) => { const old = published.has(f.key) && i < initial.length; return <tr key={i}>

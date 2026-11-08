@@ -1,3 +1,4 @@
+import { cntsSelection } from "@/test/cnts-template-selection";
 // BF-CN-WEEKLY (PRD UP-06): màn Báo cáo công việc tuần — hai phần, bảng T2–CN, thiếu trường báo lỗi theo ô và KHÔNG gửi;
 // Phần II có "Sao chép tuần trước", Phần I có "Gợi ý điền"; cột phải có Người báo cáo và Log.
 import { render, screen, within } from "@testing-library/react";
@@ -50,8 +51,8 @@ beforeEach(async () => {
   if (cn.status !== "active") await adm.departmentStatus(cn.id, "active");
   await createCntsPeriodApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-admin", getContextId: () => adminCtx, fetch: mockFetchNoDelay })).install();
   const tinh = createCntsPeriodApi(createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-binh", getContextId: () => null, fetch: mockFetchNoDelay }));
-  await tinh.publish({ code: PART_I, from_date: "2099-01-05", to_date: "2099-01-05", units: ["91301"] });
-  await tinh.publish({ code: PART_II, from_date: "2099-01-12", to_date: "2099-01-12", units: ["91301"] });
+  await tinh.publish({ ...(await cntsSelection(tinh, PART_I)), code: PART_I, from_date: "2099-01-05", to_date: "2099-01-05", units: ["91301"] });
+  await tinh.publish({ ...(await cntsSelection(tinh, PART_II)), code: PART_II, from_date: "2099-01-12", to_date: "2099-01-12", units: ["91301"] });
   const xaCtx = await contextOf("kn-an", "asg-an-xa", "chan_nuoi_thuy_san");
   auth.api = createApiClient({
     baseUrl: "http://mock",

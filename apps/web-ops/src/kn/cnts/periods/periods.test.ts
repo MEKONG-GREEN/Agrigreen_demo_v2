@@ -1,3 +1,4 @@
+import { cntsSelection } from "@/test/cnts-template-selection";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
@@ -60,7 +61,7 @@ describe("biểu kỳ CNTS — backend giả lập /v1/extension/cnts/*, /v1/for
     const xa = client("kn-an", await contextOf("kn-an", "asg-an-xa", "chan_nuoi_thuy_san"));
 
     expect((await admin.forms()).every((f) => f.template_id === null)).toBe(true);
-    expect(await code(tinh.publish({ code: "CNTS-BM04", from_date: "2026-10-07", to_date: "2026-10-13", units: ["91301"] }))).toBe("forms.template_not_found");
+    expect(await code(tinh.publish({ code: "CNTS-BM04", from_date: "2026-10-07", to_date: "2026-10-13", units: ["91301"] }))).toBe("validation_failed");
     expect(await code(xa.install())).toBe("forbidden");
     expect((await admin.install()).every((f) => f.template_up_to_date)).toBe(true);
 
@@ -75,7 +76,7 @@ describe("biểu kỳ CNTS — backend giả lập /v1/extension/cnts/*, /v1/for
     expect(pv.tasks).toBe(4);
     const bm01 = await tinh.preview({ code: "CNTS-BM01", from_date: "2026-10-01", to_date: "2026-10-03", units: ["x"] });
     expect(bm01.periods).toHaveLength(3);
-    await tinh.publish({ code: "CNTS-BM04", from_date: "2099-01-06", to_date: "2099-01-19", units: ["91301", "91302"] });
+    await tinh.publish({ ...(await cntsSelection(tinh, "CNTS-BM04")), code: "CNTS-BM04", from_date: "2099-01-06", to_date: "2099-01-19", units: ["91301", "91302"] });
 
     const tasks = await xa.tasks("CNTS-BM04");
     expect(tasks).toHaveLength(4);

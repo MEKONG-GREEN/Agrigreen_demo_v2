@@ -1,3 +1,4 @@
+import { cntsSelection } from "@/test/cnts-template-selection";
 // BF-CN-WEEKLY (PRD UP-06): quy tắc thuần của màn Báo cáo công việc tuần — bảng T2–CN, kiểm trước khi gửi, chọn kỳ mặc
 // định, gợi ý Phần I từ KSGM / Nhập liệu tuần / Lịch trực; mock: kế hoạch đã đăng ký → Lịch công tác chờ duyệt.
 import { beforeEach, describe, expect, it } from "vitest";
@@ -165,7 +166,7 @@ describe("giả lập: kế hoạch Phần II đã đăng ký → Lịch công t
     const from = mon.toISOString().slice(0, 10);
     const pv = await tinh.preview({ code: PART_II, from_date: from, to_date: from, units: ["91301"] });
     expect(pv.periods[0]!.to_date).toBe(new Date(mon.getTime() + 6 * 86_400_000).toISOString().slice(0, 10)); // T2–CN
-    await tinh.publish({ code: PART_II, from_date: from, to_date: from, units: ["91301"] });
+    await tinh.publish({ ...(await cntsSelection(tinh, PART_II)), code: PART_II, from_date: from, to_date: from, units: ["91301"] });
     const t = (await xa.tasks(PART_II)).find((x) => x.period_from === from)!;
     const plan = (body: object) => raw.POST("/v1/extension/cnts/weekly-plan/schedule", { params: { header: { "Idempotency-Key": `k-${Math.random()}` } }, body: body as never });
 

@@ -42,7 +42,8 @@ const LOCKED = ["CNTS-BM01", "CNTS-BM04", "CNTS-BM05-I", "CNTS-BM05-II"];
 interface Ver { template_id: string; version: number; title: string; fields: DesignField[] }
 const SAVED = new Map<string, Ver[]>(); // mã → phiên bản (cũ trước)
 /** Xóa trạng thái (kiểm thử). */
-export function resetCntsDesign() { SAVED.clear(); }
+const OPERATIONS = new Map<string, { fingerprint: string; code: string; version: Ver }>();
+export function resetCntsDesign() { SAVED.clear(); OPERATIONS.clear(); }
 function writer(c: Ctx, code: string): boolean {
   const k = knContext(c.request.headers.get("X-AG-Context") ?? "");
   if (!k || k.read_only) return false;
@@ -62,10 +63,20 @@ function view(c: Ctx, code: string) {
     due: base?.due ?? "Theo đợt điều tra", locked, can_edit: !locked && writer(c, code), template_id: last?.template_id ?? null, version: last?.version ?? null,
     fields: last?.fields ?? base?.fields ?? [] };
 }
-function append(code: string, base: number, title: string, fields: DesignField[]) {
+export function cntsDesignVersion(code: string, version?: number): Ver | undefined {
+  const vs = versions(code);
+  const v = version === undefined ? vs.at(-1) : vs.find(v => v.version === version);
+  return v ? structuredClone(v) : undefined;
+}
+function append(c: Ctx, code: string, base: number, title: string, fields: DesignField[]) {
+  const key = c.request.headers.get("Idempotency-Key") ?? "";
+  const fingerprint = JSON.stringify([c.persona.me.actor_ref, c.request.url, c.body]);
+  const prior = OPERATIONS.get(key);
+  if (prior) return prior.fingerprint === fingerprint ? json({ code: prior.code, version: prior.version }, 201) : problem(422, "idempotency_key_reused", "Khóa đã dùng cho thao tác khác");
   const vs = versions(code); const cur = vs.at(-1)?.version ?? 0;
   if (base !== cur) return problem(409, "conflict", `phiên bản hiện hành là ${cur}; đọc lại trước khi lưu`);
-  const v: Ver = { template_id: uuidv7(), version: cur + 1, title, fields };
+  const v: Ver = { template_id: uuidv7(), version: cur + 1, title, fields: structuredClone(fields) };
+  OPERATIONS.set(key, { fingerprint, code, version: structuredClone(v) });
   SAVED.set(code, [...(SAVED.get(code) ?? []), v]);
   return json({ code, version: v }, 201);
 }
@@ -88,12 +99,12 @@ method: "POST", pattern: /^\/v1\/extension\/cnts\/form-designs$/, handler: c => 
       if (!b.title?.trim()) return validation([{ field: "title", reason: "Tên biểu cần 1–200 ký tự" }]);
       let fields = b.fields ?? [];
       if (b.source_code) {
-        const vs = versions(b.source_code); const src = b.source_version ? vs.find(v => v.version === b.source_version) : vs.at(-1);
+        if (!b.source_version || b.source_version < 1) return validation([{ field: "source_version", reason: "Chọn phiên bản nguồn bất biến" }]);
+        const vs = versions(b.source_code); const src = vs.find(v => v.version === b.source_version);
         if (!src) return problem(404, "forms.template_not_found", "Không tìm thấy biểu nguồn"); fields = src.fields;
       }
       const errs = designFieldErrors(fields); if (errs.length) return validation([{ field: "fields", reason: errs[0]! }]);
-      if (versions(code).length) return problem(409, "conflict", `Mã biểu ${code} đã có — chọn mã khác`);
-      return append(code, 0, b.title.trim(), fields);
+      return append(c, code, 0, b.title.trim(), fields);
     }  
 },
   {    
@@ -110,9 +121,9 @@ method: "POST", pattern: /^\/v1\/extension\/cnts\/form-designs\/([^/]+)\/version
       if (!writer(c, code)) return problem(403, "forbidden", "Chỉ cán bộ tổng hợp Cấp Tỉnh CNTS hoặc Admin được lưu phiên bản");
       const b = (c.body ?? {}) as { base_version?: number; title?: string; fields?: DesignField[] };
       if (!b.title?.trim()) return validation([{ field: "title", reason: "Tên biểu cần 1–200 ký tự" }]);
-      const errs = designFieldErrors(b.fields ?? [], versions(code).at(-1)?.fields ?? []);
+      const errs = designFieldErrors(b.fields ?? [], versions(code).find(v => v.version === b.base_version)?.fields ?? []);
       if (errs.length) return validation([{ field: "fields", reason: errs[0]! }]);
-      return append(code, b.base_version ?? -1, b.title.trim(), b.fields ?? []);
+      return append(c, code, b.base_version ?? -1, b.title.trim(), b.fields ?? []);
     }  
 },
   {    

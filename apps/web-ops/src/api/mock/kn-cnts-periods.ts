@@ -7,6 +7,7 @@ import { uuidv7 } from "../idempotency";
 import { CATALOGS } from "./data";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
+import { cntsDesignVersion, resetCntsDesign } from "./kn-cnts-design";
 import { calendarAt, DEPT_CNTS, ruleTag } from "./kn-reports/domain";
 import { callerOf, stableUuid, workScheduleStore } from "./kn-schedules";
 
@@ -77,7 +78,7 @@ interface Sub { id: string; version: number; values: Record<string, string>; nil
   review?: { id: string; decision: "accepted" | "returned"; note: string | null; at: string; by: string } }
 interface Period {
   id: string; code: string; title: string; label: string; kind: string; key: string; from: string; to: string; due_at: string; rule: string;
-  template_id: string; template_version: number; unit_kind: "commune" | "facility"; units: string[]; parents: string[];
+  template_id: string; template_version: number; fields: Field[]; unit_kind: "commune" | "facility"; units: string[]; parents: string[];
   status: "open" | "closed" | "reopened" | "cancelled"; reopen_units: string[]; subs: Map<string, Sub[]>;
 }
 
@@ -110,15 +111,20 @@ export function cntsPeriodFigures(code: string) {
 /** Xóa trạng thái (kiểm thử). */
 export function resetCntsPeriods() {
   TEMPLATES.clear();
+  resetCntsDesign();
   PERIODS.length = 0;
   PUBLICATIONS.clear();
   DRAFTS.clear();
   MANUAL.clear();
 }
 
-function viewForm(f: (typeof FORMS)[number]): Form {
+function baseViewForm(f: (typeof FORMS)[number]): Form {
   const t = TEMPLATES.get(f.code);
   return { ...f, template_id: t?.id ?? null, template_version: t?.version ?? null, template_up_to_date: !!t };
+}
+function viewForm(f: (typeof FORMS)[number]): Form {
+  const base = baseViewForm(f), v = cntsDesignVersion(f.code);
+  return v ? { ...base, fields: v.fields, template_id: v.template_id, template_version: v.version } : base;
 }
 
 interface Who { role: string; communes: string[] | null; actor: string }
@@ -186,12 +192,11 @@ function unitStatus(p: Period, unit: string, now = Date.now()): S["FormsTask"]["
 }
 
 function task(p: Period, unit: string): S["FormsTask"] {
-  const f = FORMS.find((x) => x.code === p.code)!;
   const last = p.subs.get(unit)?.at(-1);
   const i = p.units.indexOf(unit);
   return {
     id: `${p.id}:${unit}`, profile: PROFILE, period_id: p.id, unit, unit_kind: p.unit_kind, parent: p.parents[i] ?? unit, template_id: p.template_id,
-    template_code: p.code, template_title: `${f.bm} — ${f.title}`, template_version: p.template_version, fields: f.fields, label: p.label, period_kind: p.kind,
+    template_code: p.code, template_title: p.title, template_version: p.template_version, fields: p.fields, label: p.label, period_kind: p.kind,
     period_key: p.key, period_from: p.from, period_to: p.to, due_at: p.due_at, period_status: p.status,
     open: p.status === "open" || (p.status === "reopened" && (p.reopen_units.length === 0 || p.reopen_units.includes(unit))), status: unitStatus(p, unit),
     version: last?.version ?? 0, submission_id: last?.id ?? null, values: last?.values ?? {}, nil_report: last?.nil_report ?? false, note: last?.note ?? "",
@@ -237,6 +242,10 @@ export const cntsPeriodRoutes: Route[] = [
         const b0 = body<S["CNTSSeriesInput"]>(ctx);
         const f = FORMS.map(viewForm).find((x) => x.code === b0.code);
         if (!f) return validation([{ field: "code", reason: "biểu kỳ CNTS không có" }]);
+        const selected = b0.template_version ? cntsDesignVersion(b0.code, b0.template_version) : undefined;
+        if ((b0.template_id || b0.template_version || !kind) && (!selected || selected.template_id !== b0.template_id)) {
+          return validation([{ field: "template_id", reason: "Chọn đúng ID và phiên bản biểu bất biến" }]);
+        }
         const target = b0.target ?? (f.unit_kind === "facility" ? "facilities" : "communes");
         if ((f.unit_kind === "facility") !== (target === "facilities")) return validation([{ field: "target", reason: "đối tượng không hợp với đơn vị nhập của biểu" }]);
         const regions = b0.regions ?? [];
@@ -253,14 +262,14 @@ export const cntsPeriodRoutes: Route[] = [
         const periods = split(f, b.from_date, b.to_date, b.deadline ?? undefined);
         const workWeek = f.code.startsWith("CNTS-BM05");
         const cal = calendarAt(DEPT_CNTS, b.from_date);
-        const series = { code: f.code, calendar_id: workWeek ? null : cal.calendar_id, calendar_version: workWeek ? null : cal.calendar_version,
+        const series = { code: f.code, template_id: selected?.template_id ?? null, template_version: selected?.version ?? null, calendar_id: workWeek ? null : cal.calendar_id, calendar_version: workWeek ? null : cal.calendar_version,
           unit_kind: f.unit_kind, units: b.units, tasks: periods.length * b.units.length, periods, target: target as S["CNTSSeries"]["target"], regions,
           owner_ref: b0.owner_ref ?? null, close_after_hours: b0.close_after_hours ?? null, communes: f.unit_kind === "commune" ? MOCK_COMMUNES : [],
           publication_id: null as string | null };
         if (kind) return json(series);
         const deny = tinhOnly(who(ctx));
         if (deny) return deny;
-        const t = TEMPLATES.get(f.code);
+        const t = selected;
         if (!t) return problem(404, "forms.template_not_found", `Không tìm thấy phiên bản biểu — biểu ${f.bm} chưa cài`);
         const parents = b.units.map((u) => (f.unit_kind === "facility" ? facilityCommune(u) : u));
         const bad = b.units.find((_, i) => !parents[i]);
@@ -268,8 +277,8 @@ export const cntsPeriodRoutes: Route[] = [
         for (const p of periods) {
           const id = uuidv7();
           p.id = id as never;
-          PERIODS.unshift({ id, code: f.code, title: f.title, label: p.label, kind: p.kind, key: p.key, from: p.from_date, to: p.to_date, due_at: p.due_at, rule: p.rule,
-            template_id: t.id, template_version: t.version, unit_kind: f.unit_kind, units: b.units, parents: parents as string[], status: "open", reopen_units: [],
+          PERIODS.unshift({ id, code: f.code, title: t.title, label: p.label, kind: p.kind, key: p.key, from: p.from_date, to: p.to_date, due_at: p.due_at, rule: p.rule,
+            template_id: t.template_id, template_version: t.version, fields: structuredClone(t.fields), unit_kind: f.unit_kind, units: b.units, parents: parents as string[], status: "open", reopen_units: [],
             subs: new Map() });
         }
         const pub: Publication = { id: uuidv7(), template_code: f.code, target, regions, owner_ref: b0.owner_ref ?? null, close_after_hours: b0.close_after_hours ?? null };
@@ -388,9 +397,8 @@ export const cntsPeriodRoutes: Route[] = [
       if (late && !(b.explanation ?? "").trim()) {
         return problem(422, "forms.late_reason_required", "Gửi sau hạn nộp phải ghi lý do trễ (giải trình)", { errors: [{ field: "explanation", reason: "bắt buộc" }] });
       }
-      const f = FORMS.find((x) => x.code === p.code)!;
       const values = { ...b.values };
-      for (const fd of f.fields) {
+      for (const fd of p.fields) {
         if (b.nil_report && (fd.type === "integer" || fd.type === "decimal")) values[fd.key] = "0";
         if (fd.required && !(values[fd.key] ?? "").trim()) return problem(422, "forms.values_invalid", "Số liệu không khớp định nghĩa biểu", { errors: [{ field: fd.key, reason: "bắt buộc" }] });
       }
@@ -539,4 +547,4 @@ export const cntsPeriodRoutes: Route[] = [
 ];
 
 // BF-CN-FORM-DESIGN: cùng dữ liệu/phiên bản với màn Phát hành, không cài hay ghi biểu.
-export function cntsDesignMockForms(): Form[] { return FORMS.map(viewForm); }
+export function cntsDesignMockForms(): Form[] { return FORMS.map(baseViewForm); }

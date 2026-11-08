@@ -1,3 +1,4 @@
+import { cntsSelection } from "@/test/cnts-template-selection";
 // BF-CN-CATCH #112 (UP-09): Khai thác thủy sản tuần theo 4 sheet của biểu "ĐÁNH BẮT (nhập liệu theo xã)".
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -109,7 +110,8 @@ describe("màn Khai thác thủy sản tuần", () => {
     const cn = (await adm.departments()).items.find((d) => d.code === "chan_nuoi_thuy_san")!;
     await adm.departmentStatus(cn.id, "active").catch(() => undefined); // đã bật ở ca trước
     await createCntsPeriodApi(apiOf("kn-admin", adminCtx)).install();
-    await createCntsPeriodApi(apiOf("kn-binh", null)).publish({ code: "CNTS-BM17", from_date: "2099-01-06", to_date: "2099-01-19", units: ["91301", "91302"] });
+    const publishing = createCntsPeriodApi(apiOf("kn-binh", null));
+    await publishing.publish({ ...(await cntsSelection(publishing, "CNTS-BM17")), code: "CNTS-BM17", from_date: "2099-01-06", to_date: "2099-01-19", units: ["91301", "91302"] });
     xaCtx = await contextOf("kn-an", "asg-an-xa", "chan_nuoi_thuy_san");
     labels = [...new Set((await createCntsPeriodApi(apiOf("kn-binh", null)).tasks("CNTS-BM17")).sort((a, b) => a.period_from!.localeCompare(b.period_from!)).map((t) => t.label))];
   });
