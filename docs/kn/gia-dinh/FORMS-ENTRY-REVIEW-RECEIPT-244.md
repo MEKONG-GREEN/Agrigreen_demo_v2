@@ -1,8 +1,8 @@
-# FORMS-ENTRY-REVIEW-RECEIPT-244 — immutable native Review proof
+## FORMS-ENTRY-REVIEW-RECEIPT-244 — immutable native Review proof
 
 Issue #288, additive shared Forms supplier for KHTC v2.3 FN-TI-02.04, especially B4 and the actor/time/change trace requirement. Final BRD DOCX SHA-256 `15859351f90574bf667190b1a12160465ba03f8ca9e408b94c90d285a3502e25`, Function paragraphs P886–920. This supplier adds no screen, REST route, submission rule or period operation. `Entry` remains source compatible, and its current `SubmissionRef` is not immutable proof.
 
-## Contract and current authority
+### Contract and current authority
 
 `Module.EntryOperations()` exposes `ExecuteReviewOperation` and `ReadReviewOperation` on the existing Entry adapter. An owner must explicitly register `UseReviewOperationPolicy(profile, policy)` before serving; absent policy/pool or a joined caller transaction fails closed. Production KN consumer wiring remains #289 after actual dev integration. No implicit fallback to legacy Review.
 
@@ -12,7 +12,7 @@ Actual production chain: `httpx.Authenticate` verifies token -> `accounts.Handle
 
 Limitation #259: the selected context UUID is an application context/assignment identity. Current `Principal` has no unique verified OIDC `sid`/`jti` metadata. Separate OIDC logins that select the same context with identical authority cannot be distinguished. `AuthTime`, MFA/HasOTP and assignment/context IDs are not used or described as a unique login session. Owners cannot claim a stronger login-session guarantee until #259 supplies trusted metadata.
 
-## Atomic result and recovery
+### Atomic result and recovery
 
 The server normalizes operation UUIDv7, profile, period, unit, exact submission/version, decision and note identically for execute/read/digest. A domain-separated SHA-256 binds the full original request. The new journal stores the digest and decision, not another copy of note/form content. Callers must persist that full intent before dispatch and retain it for reconciliation.
 
@@ -22,7 +22,7 @@ A proven pre-effect native version/superseded/terminal/self-review/limit rejecti
 
 The permanent `(tenant, operation UUID)` anchor is INSERT-only, immutable and has no expiry. Receipt is append-only through `shared.apply_ledger`, with tenant RLS, and follows shared ledger partition retention; this package introduces no purge schedule. If receipt history is absent/purged/unavailable/inconsistent, the anchor blocks reexecution while lookup stays opaque unknown. A mismatched body/actor/current authority cannot replay prior applied proof. A different tenant cannot read another tenant's anchor or journal.
 
-## Validation and remaining scope
+### Validation and remaining scope
 
 Real-PG tests cover absent reads, execute/read/canonical retry, committed ACK loss, rollback ACK uncertainty, successor/ABA and exact native identity/time, request/actor/tenant/selected-context/policy changes, revocation/MFA/read-only/role before DB, native rejections, INSERT and real deferred-FK COMMIT failure rollback/recovery, missing/corrupt history, concurrent retry, pool1 external-policy I/O, RLS and reused connections. Native RED and controlled source-fault FAIL/restore/control proof are kept separately from passing logs. Run through `scripts/pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v` with Forms, assembly and actual direct consumers. Static gates include migration check against actual `origin/dev` and no new lint/baseline increases.
 

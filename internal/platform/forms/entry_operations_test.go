@@ -12,7 +12,7 @@ func TestEntryOperations288_AdditiveModuleFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var legacy port.Entry = m.Entry()
+	legacy := m.Entry()
 	if legacy == nil || m.EntryOperations() == nil {
 		t.Fatal("missing additive/legacy capability")
 	}
