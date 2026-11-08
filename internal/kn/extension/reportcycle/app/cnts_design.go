@@ -66,8 +66,8 @@ func designReader(ctx context.Context) (port.SessionContext, error) {
 }
 
 // designWriter: ma trận FN-07 (CNTS v4.0 mục VI) — Admin CRUD; Cấp Tỉnh Phòng CNTS nhóm "Cán bộ tổng hợp" CRU (thiết kế,
-// phát hành); viên chức, lãnh đạo phòng, Ban Giám đốc, chỉ xem, Cấp Quốc gia chỉ đọc. Nhóm rỗng (lần gán chưa khai nhóm)
-// giữ quyền Cấp Tỉnh như các màn lập kế hoạch khác của phòng. Cấp Tỉnh chỉ lưu BM-17 và biểu điều tra.
+// phát hành); viên chức, lãnh đạo phòng, Ban Giám đốc, chỉ xem, Cấp Quốc gia chỉ đọc.
+// Nhóm của lần gán phải tường minh; Cấp Tỉnh chỉ lưu BM-17 và biểu điều tra.
 func designWriter(k port.SessionContext, code string) bool {
 	if k.ReadOnly() {
 		return false
@@ -76,7 +76,7 @@ func designWriter(k port.SessionContext, code string) bool {
 		return true
 	}
 	return k.Role == port.SessionRoleProvince && k.Department == partyport.DeptChanNuoiThuySan &&
-		(k.ProvinceGroup == "" || k.ProvinceGroup == accport.GroupTongHop) && domain.ProvinceDesignable(code)
+		k.ProvinceGroup == accport.GroupTongHop && domain.ProvinceDesignable(code)
 }
 
 func (s *Service) designCatalog() (formsport.TemplateCatalog, error) {
@@ -225,6 +225,9 @@ func (s *Service) SaveCNTSDesign(ctx context.Context, code string, in CNTSDesign
 	if err != nil {
 		return CNTSDesignVersion{}, err
 	}
+	if err := s.currentCNTSWrite(k); err != nil {
+		return CNTSDesignVersion{}, err
+	}
 	if idem == "" {
 		return CNTSDesignVersion{}, problem.IdempotencyRequired
 	}
@@ -250,12 +253,15 @@ func (s *Service) SaveCNTSDesign(ctx context.Context, code string, in CNTSDesign
 	if err := fieldsError(domain.ValidateDesignFields(in.Fields)); err != nil {
 		return CNTSDesignVersion{}, err
 	}
-	ref, err := s.FormsNative.LatestTemplate(ctx, domain.ProfileCNTS, code)
-	switch {
-	case errors.Is(err, formsport.ErrTemplateNotFound):
-	case err != nil:
-		return CNTSDesignVersion{}, err
-	default:
+	if in.BaseVersion > 0 {
+		cat, err := s.designCatalog()
+		if err != nil {
+			return CNTSDesignVersion{}, err
+		}
+		ref, err := cat.TemplateVersion(ctx, domain.ProfileCNTS, code, in.BaseVersion)
+		if err != nil {
+			return CNTSDesignVersion{}, err
+		}
 		cur, err := decodeFields(ref.Fields)
 		if err != nil {
 			return CNTSDesignVersion{}, err
@@ -272,7 +278,7 @@ type CNTSDesignCreate struct {
 	CodeSuffix    string
 	Title         string
 	SourceCode    string // rỗng = tạo từ Fields
-	SourceVersion int64  // 0 = phiên bản mới nhất của biểu nguồn
+	SourceVersion int64  // sao chép: phiên bản nguồn bất biến, từ 1 trở lên
 	Fields        []domain.CNTSField
 }
 
@@ -281,6 +287,9 @@ type CNTSDesignCreate struct {
 func (s *Service) CreateCNTSDesign(ctx context.Context, in CNTSDesignCreate, idem string) (string, CNTSDesignVersion, error) {
 	k, err := designReader(ctx)
 	if err != nil {
+		return "", CNTSDesignVersion{}, err
+	}
+	if err := s.currentCNTSWrite(k); err != nil {
 		return "", CNTSDesignVersion{}, err
 	}
 	if idem == "" {
@@ -312,12 +321,8 @@ func (s *Service) CreateCNTSDesign(ctx context.Context, in CNTSDesignCreate, ide
 	if err := fieldsError(domain.ValidateDesignFields(fields)); err != nil {
 		return "", CNTSDesignVersion{}, err
 	}
-	// Mã đã có: báo trùng rõ ràng (cap/forms vẫn chặn bằng base_version=0 nếu hai người tạo cùng lúc).
-	if _, err := s.FormsNative.LatestTemplate(ctx, domain.ProfileCNTS, code); err == nil {
-		return "", CNTSDesignVersion{}, problem.Conflict.WithField("code_suffix", "Mã biểu "+code+" đã có — chọn mã khác")
-	} else if !errors.Is(err, formsport.ErrTemplateNotFound) {
-		return "", CNTSDesignVersion{}, err
-	}
+	// Native base_version=0 and the durable definition receipt distinguish a new
+	// conflicting command from a retry, even after the template head advances.
 	v, err := s.define(ctx, code, title, fields, 0, idem)
 	return code, v, err
 }
@@ -326,38 +331,29 @@ func (s *Service) sourceFields(ctx context.Context, code string, version int64) 
 	if !knownDesign(code) {
 		return nil, formsport.ErrTemplateNotFound.WithField("source_code", code)
 	}
-	if version < 0 {
-		return nil, problem.Validation.WithField("source_version", "phiên bản không được âm")
+	if version < 1 {
+		return nil, problem.Validation.WithField("source_version", "chọn phiên bản nguồn bất biến từ 1 trở lên")
 	}
-	var raw json.RawMessage
-	if version == 0 {
-		ref, err := s.FormsNative.LatestTemplate(ctx, domain.ProfileCNTS, code)
-		if err != nil {
-			return nil, err
-		}
-		raw = ref.Fields
-	} else {
-		cat, err := s.designCatalog()
-		if err != nil {
-			return nil, err
-		}
-		tv, err := cat.TemplateVersion(ctx, domain.ProfileCNTS, code, version)
-		if err != nil {
-			return nil, err
-		}
-		raw = tv.Fields
+	cat, err := s.designCatalog()
+	if err != nil {
+		return nil, err
 	}
-	return decodeFields(raw)
+	tv, err := cat.TemplateVersion(ctx, domain.ProfileCNTS, code, version)
+	if err != nil {
+		return nil, err
+	}
+	return decodeFields(tv.Fields)
 }
 
 // CNTSDefinitionPolicy là chính sách định nghĩa biểu của profile kn_cnts (cổng #191), áp cho MỌI đường ghi phiên bản —
 // REST /v1/forms/templates, Publisher.DefineTemplate, màn FN-07, cài biểu chuẩn:
 //   - chỉ Admin hoặc cán bộ tổng hợp Cấp Tỉnh Phòng CNTS (designWriter); Cấp Tỉnh chỉ BM-17 và biểu điều tra;
 //   - mẫu KNQG (BR-02): chỉ chấp nhận đúng cấu trúc chuẩn của mẫu (cài/cập nhật biểu chuẩn), mọi thay đổi khác bị từ chối;
-//   - đã có phiên bản: chỉ thêm chỉ tiêu, không xóa/đổi kiểu (UR-TINH-07).
+//   - kiểm thay đổi trên base_version đã chọn; native CAS và receipt xử lý head tiến.
+//     Hạn chế add-only của #192 còn chờ public usage supplier, chưa là full UR-TINH-07.
 //
 // Chạy ngoài giao dịch ghi của cap/forms, không ghi dữ liệu; mặc định từ chối.
-func CNTSDefinitionPolicy(ctx context.Context, r formsport.TemplateDefinitionRequest) (formsport.TemplateDefinitionDecision, error) {
+func (s *Service) CNTSDefinitionPolicy(ctx context.Context, r formsport.TemplateDefinitionRequest) (formsport.TemplateDefinitionDecision, error) {
 	deny := formsport.TemplateDefinitionDecision{}
 	if r.Proposed.Profile != domain.ProfileCNTS {
 		return deny, nil
@@ -367,17 +363,32 @@ func CNTSDefinitionPolicy(ctx context.Context, r formsport.TemplateDefinitionReq
 		return deny, err
 	}
 	code := r.Proposed.Code
-	if !designWriter(k, code) {
+	if err := s.currentCNTSWrite(k); err != nil {
+		return deny, err
+	}
+	if !knownDesign(code) || !designWriter(k, code) {
+		return deny, nil
+	}
+	var next []domain.CNTSField
+	if json.Unmarshal(r.Proposed.Fields, &next) != nil || len(domain.ValidateDesignFields(next)) > 0 {
 		return deny, nil
 	}
 	if domain.CNTSLocked(code) {
 		f, _ := domain.CNTSFormByCode(code)
 		return formsport.TemplateDefinitionDecision{Allowed: sameFields(r.Proposed.Fields, f.Fields)}, nil
 	}
-	if r.Current != nil {
-		var cur, next []domain.CNTSField
-		if json.Unmarshal(r.Current.Fields, &cur) != nil || json.Unmarshal(r.Proposed.Fields, &next) != nil {
-			return deny, nil
+	if r.BaseVersion != nil && *r.BaseVersion > 0 {
+		cat, err := s.designCatalog()
+		if err != nil {
+			return deny, err
+		}
+		base, err := cat.TemplateVersion(ctx, domain.ProfileCNTS, code, *r.BaseVersion)
+		if err != nil {
+			return deny, err
+		}
+		cur, err := decodeFields(base.Fields)
+		if err != nil {
+			return deny, err
 		}
 		if len(domain.DesignChange(cur, next)) > 0 {
 			return deny, nil

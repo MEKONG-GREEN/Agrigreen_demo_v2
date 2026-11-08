@@ -60,7 +60,7 @@ func newGrantFx(t *testing.T, facs facilityDir) *grantFx {
 	if err := fm.UseDefinitionPolicy(platformasm.KNCNTSProfile.Name, kn.CNTSDefinitionPolicy()); err != nil { // #192 như assembly
 		t.Fatal(err)
 	}
-	kn.UseFormsPublisher(fm.Publisher())
+	kn.UseFormsPublisher(fm.Publisher(), facs)
 	fm.UseReviewGuard(platformasm.KNCNTSProfile.Name, kn.CNTSReviewGuard()) // như assembly (#175: chỉ người phụ trách biểu rà soát)
 	registry, err := authz.NewSessionRegistry(kn.SessionProjection())
 	if err != nil {
@@ -88,7 +88,7 @@ func newGrantFx(t *testing.T, facs facilityDir) *grantFx {
 		}
 		p.SelectedSession = &s
 		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
-	}, idempotency.Middleware(ops))
+	}, kn.Middleware(), idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
 	return f
@@ -99,7 +99,7 @@ func (f *grantFx) call(method, path string, actor uuid.UUID, role string, body a
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
-	k := authz.KNContext{Role: role, Department: aggDept, OrgRef: f.node, Communes: []string{"X1", "X2"}, Scope: authz.Scope{Units: []string{"X1", "X2"}}}
+	k := authz.KNContext{Role: role, ProvinceGroup: "tong_hop", Department: aggDept, OrgRef: f.node, Communes: []string{"X1", "X2"}, Scope: authz.Scope{Units: []string{"X1", "X2"}}}
 	if role == authz.KNAdmin {
 		k = authz.KNContext{Role: role, Scope: authz.Scope{All: true}}
 	}
@@ -112,6 +112,24 @@ func (f *grantFx) call(method, path string, actor uuid.UUID, role string, body a
 	w := httptest.NewRecorder()
 	f.eng.ServeHTTP(w, req)
 	return w.Code, w.Body.Bytes()
+}
+
+func (f *grantFx) selectTemplate(actor uuid.UUID, code string) (string, int64) {
+	f.t.Helper()
+	c, b := f.call(http.MethodGet, "/v1/extension/cnts/form-designs", actor, authz.KNTinh, nil)
+	var list struct {
+		Items []designEditView `json:"items"`
+	}
+	if c != 200 || json.Unmarshal(b, &list) != nil {
+		f.t.Fatalf("catalog: %d %s", c, b)
+	}
+	for _, v := range list.Items {
+		if v.Code == code && v.TemplateID != nil && v.Version != nil {
+			return *v.TemplateID, *v.Version
+		}
+	}
+	f.t.Fatal("missing selected template")
+	return "", 0
 }
 
 // grantRow là một phiên bản sổ cnts_grant (KN) — test gốc lắp ráp không import nội bộ cntsmodel.
@@ -177,7 +195,8 @@ func TestCNTSGrantScopeForms_49_71(t *testing.T) {
 	if c >= 300 {
 		t.Fatalf("cài biểu: %d %s", c, b)
 	}
-	c, b = f.call(http.MethodPost, "/v1/extension/cnts/period-series", tinh, authz.KNTinh, map[string]any{"code": "CNTS-BM01",
+	templateID, templateVersion := f.selectTemplate(tinh, "CNTS-BM01")
+	c, b = f.call(http.MethodPost, "/v1/extension/cnts/period-series", tinh, authz.KNTinh, map[string]any{"code": "CNTS-BM01", "template_id": templateID, "template_version": templateVersion,
 		"from_date": "2026-10-01", "to_date": "2026-10-01", "units": []string{facA.String(), facB.String()}})
 	var s series
 	if c >= 300 || json.Unmarshal(b, &s) != nil || len(s.Periods) != 1 {

@@ -125,8 +125,22 @@ func TestCNTSPublish_TargetOwnerDraft_BF_CN_PUBLISH(t *testing.T) {
 	f.kn.UseReportCycle(extension.ReportCycleDeps{Regions: pubRegions{}, Assignments: pubAssignments{owner: owner, node: f.node}})
 	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", authz.KNAdmin, nil)
 	f.ok(c, b, nil)
+	c, b = f.call(http.MethodGet, "/v1/extension/cnts/form-designs", authz.KNTinh, nil)
+	var designs struct {
+		Items []designEditView `json:"items"`
+	}
+	f.ok(c, b, &designs)
+	var selected designEditView
+	for _, v := range designs.Items {
+		if v.Code == "CNTS-BM04" {
+			selected = v
+		}
+	}
+	if selected.TemplateID == nil || selected.Version == nil {
+		t.Fatal("missing installed selection")
+	}
 	in := func(extra map[string]any) map[string]any {
-		m := map[string]any{"code": "CNTS-BM04", "from_date": "2026-10-13", "to_date": "2026-10-19", "units": []string{}}
+		m := map[string]any{"code": "CNTS-BM04", "template_id": *selected.TemplateID, "template_version": *selected.Version, "from_date": "2026-10-13", "to_date": "2026-10-19", "units": []string{}}
 		for k, v := range extra {
 			m[k] = v
 		}

@@ -2748,7 +2748,10 @@ components:
     CNTSSeriesInput:
       type: object
       required: [code, from_date, to_date, units]
+      description: "Phát hành bắt buộc template_id và template_version đã chọn từ catalog; xem trước lịch không ghi có thể bỏ cả hai. Không tự chọn latest."
       properties:
+        template_id: {type: string, format: uuid}
+        template_version: {type: integer, format: int64, minimum: 1}
         code: {type: string}
         from_date: {type: string, format: date}
         to_date: {type: string, format: date}
@@ -2783,8 +2786,10 @@ components:
 # @ag-order: 948
     CNTSSeries:
       type: object
-      required: [code, calendar_id, calendar_version, unit_kind, units, tasks, periods, target, regions, owner_ref, close_after_hours, communes, publication_id]
+      required: [code, template_id, template_version, calendar_id, calendar_version, unit_kind, units, tasks, periods, target, regions, owner_ref, close_after_hours, communes, publication_id]
       properties:
+        template_id: {type: [string, "null"], format: uuid}
+        template_version: {type: [integer, "null"], format: int64}
         code: {type: string}
         calendar_id: {type: [string, "null"], description: "Lịch tuần của phòng (D8) — mã phòng, vd chan_nuoi_thuy_san; null với tuần làm việc BM-05"}
         calendar_version: {type: [integer, "null"], description: "Phiên bản lịch (D8): 1 = v1-tam, 2 = v2 Thứ Tư–Thứ Ba, 3 = CNTS Thứ Ba–Thứ Hai; null với BM-05"}

@@ -44,7 +44,12 @@ func (m *Module) UseDispatchHistory(h repport.DispatchHistory) { m.rc.Dispatches
 func (m *Module) UseFormsFreezer(f formsport.Freezer) { m.rc.Freezer = f }
 
 // UseFormsPublisher (W11.42) nối cổng phát hành kỳ native cap/forms cho biểu kỳ Cấp Xã CNTS (BM-01/04/05/17).
-func (m *Module) UseFormsPublisher(p formsport.Publisher) { m.rc.FormsNative = p }
+func (m *Module) UseFormsPublisher(p formsport.Publisher, facilities ...formsport.FacilityDirectory) {
+	m.rc.FormsNative = p
+	if len(facilities) > 0 {
+		m.rc.CNTSDirectory = facilities[0]
+	}
+}
 
 // UseFormsFigures (W11.44) nối cổng đọc số liệu kỳ native theo lô cho tổng hợp CNTS (BM-02, BM-18). Nil → 503.
 func (m *Module) UseFormsFigures(f formsport.FiguresReader) { m.rc.FormsFigures = f }
@@ -62,7 +67,7 @@ func (m *Module) CNTSReviewGuard() formsport.ReviewGuard { return rcapp.CNTSRevi
 // CNTSDefinitionPolicy (BF-CN-FORM-DESIGN-EDIT #192, FN-07 BR-02, UR-TINH-07) cho profile kn_cnts của cap/forms (cổng #191,
 // Profile.RequireDefinitionPolicy): gốc lắp ráp đăng ký qua forms.Deps.DefinitionPolicies trước khi phục vụ.
 func (m *Module) CNTSDefinitionPolicy() formsport.TemplateDefinitionPolicy {
-	return rcapp.CNTSDefinitionPolicy
+	return m.rc.CNTSDefinitionPolicy
 }
 
 // ReportSyncSource cho pf/sync (KN v7.7 P7): chiều xuống report_task, form_layout, report_submission của các xã phụ

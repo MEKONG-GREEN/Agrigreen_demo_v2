@@ -94,7 +94,7 @@ func newAggFxPool(t *testing.T, pool *pgxpool.Pool, facs facilityDir, wire ...fu
 	if err := fm.UseDefinitionPolicy(platformasm.KNCNTSProfile.Name, kn.CNTSDefinitionPolicy()); err != nil {
 		t.Fatal(err)
 	}
-	kn.UseFormsPublisher(fm.Publisher())
+	kn.UseFormsPublisher(fm.Publisher(), facs)
 	kn.UseFormsFigures(fm.Figures())
 	for _, w := range wire {
 		w(fm, kn)
@@ -106,7 +106,7 @@ func newAggFxPool(t *testing.T, pool *pgxpool.Pool, facs facilityDir, wire ...fu
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
 		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: f.tid, KN: &k})))
-	}, idempotency.Middleware(ops))
+	}, kn.Middleware(), idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
 	// View công bố có chủ NOBYPASSRLS → đọc trong giao dịch có app.tenant_id của tenant kiểm thử.
@@ -148,7 +148,7 @@ func (f *aggFx) call(method, path, role string, body any) (int, []byte) {
 	raw, _ := json.Marshal(body)
 	req := httptest.NewRequest(method, path, bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
-	k := authz.KNContext{Role: role, Department: aggDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1", "X2"}}}
+	k := authz.KNContext{Role: role, ProvinceGroup: "tong_hop", Department: aggDept, OrgRef: f.node, Scope: authz.Scope{Units: []string{"X1", "X2"}}}
 	if role == authz.KNAdmin {
 		k = authz.KNContext{Role: role, Scope: authz.Scope{All: true}}
 	}
@@ -175,8 +175,22 @@ type series struct {
 
 func (f *aggFx) publish(code, from, to string, units ...string) series {
 	var s series
-	c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-series", authz.KNTinh, map[string]any{"code": code, "from_date": from,
-		"to_date": to, "units": units})
+	c, b := f.call(http.MethodGet, "/v1/extension/cnts/form-designs", authz.KNTinh, nil)
+	var designs struct {
+		Items []designEditView `json:"items"`
+	}
+	f.ok(c, b, &designs)
+	var selected designEditView
+	for _, v := range designs.Items {
+		if v.Code == code {
+			selected = v
+		}
+	}
+	if selected.TemplateID == nil || selected.Version == nil {
+		f.t.Fatal("select installed template before publication")
+	}
+	c, b = f.call(http.MethodPost, "/v1/extension/cnts/period-series", authz.KNTinh, map[string]any{"code": code, "from_date": from,
+		"to_date": to, "units": units, "template_id": *selected.TemplateID, "template_version": *selected.Version})
 	f.ok(c, b, &s)
 	return s
 }

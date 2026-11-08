@@ -26,9 +26,10 @@ func TestCNTSReviewOwnerOnly_175(t *testing.T) {
 	if c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-forms/install", admin, authz.KNAdmin, nil); c >= 300 {
 		t.Fatalf("cài biểu: %d %s", c, b)
 	}
+	templateID, templateVersion := f.selectTemplate(publisher, "CNTS-BM01")
 	publish := func(day string) string {
 		t.Helper()
-		c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-series", publisher, authz.KNTinh, map[string]any{"code": "CNTS-BM01",
+		c, b := f.call(http.MethodPost, "/v1/extension/cnts/period-series", publisher, authz.KNTinh, map[string]any{"code": "CNTS-BM01", "template_id": templateID, "template_version": templateVersion,
 			"from_date": day, "to_date": day, "units": []string{facA.String(), facB.String()}})
 		var s series
 		if c >= 300 || json.Unmarshal(b, &s) != nil || len(s.Periods) != 1 {

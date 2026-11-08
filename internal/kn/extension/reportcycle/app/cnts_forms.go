@@ -103,8 +103,11 @@ func (s *Service) InstallCNTSForms(ctx context.Context, idem string) ([]CNTSForm
 
 // CNTSSeriesInput là yêu cầu chia/phát hành một lô kỳ của một biểu.
 type CNTSSeriesInput struct {
-	Code     string
-	From, To string // YYYY-MM-DD
+	// Publication pins the exact immutable catalog identity selected by the caller.
+	TemplateID      uuid.UUID
+	TemplateVersion int64
+	Code            string
+	From, To        string // YYYY-MM-DD
 	// Units: mã xã (Target communes) hoặc facility_ref cơ sở giết mổ (BM-01). Với nhóm xã (Target province/regions/
 	// aquaculture/model) máy chủ tự giải danh sách xã — Units bỏ qua.
 	Units []string
@@ -120,6 +123,7 @@ type CNTSSeriesInput struct {
 
 // CNTSSeries là kết quả chia kỳ (xem trước hoặc đã phát hành).
 type CNTSSeries struct {
+	Template  *formsport.TemplateRef
 	Form      domain.CNTSForm
 	Periods   []domain.CNTSPeriod
 	Units     []string
@@ -150,6 +154,17 @@ func (s *Service) PreviewCNTSSeries(ctx context.Context, in CNTSSeriesInput) (CN
 	if err := s.cntsReady(ctx); err != nil {
 		return CNTSSeries{}, err
 	}
+	if len(in.Units) > 2000 || len(in.Regions) > 100 || len(in.Code) > 64 {
+		return CNTSSeries{}, problem.Validation.WithDetail("lô vượt giới hạn đơn vị, khu vực hoặc mã biểu")
+	}
+	for _, xs := range [][]string{in.Units, in.Regions} {
+		for _, v := range xs {
+			if len(v) > 64 {
+				return CNTSSeries{}, problem.Validation.WithField("units", "mã tối đa 64 byte")
+			}
+		}
+	}
+
 	f, ok := domain.CNTSFormByCode(in.Code)
 	if !ok {
 		return CNTSSeries{}, problem.Validation.WithField("code", "biểu kỳ CNTS không có")
@@ -175,6 +190,18 @@ func (s *Service) PreviewCNTSSeries(ctx context.Context, in CNTSSeriesInput) (CN
 		return CNTSSeries{}, err
 	}
 	sr := CNTSSeries{Form: f, Periods: ps, OwnerRef: in.OwnerRef, CloseAfterHours: in.CloseAfterHours}
+	if in.TemplateID != uuid.Nil || in.TemplateVersion != 0 {
+		selected, err := s.selectedCNTSTemplate(ctx, in)
+		if err != nil {
+			return sr, err
+		}
+		sr.Template = &selected
+		fields, err := decodeFields(selected.Fields)
+		if err != nil {
+			return sr, err
+		}
+		sr.Form.Fields, sr.Form.Title = fields, selected.Title
+	}
 	if err := s.cntsTarget(ctx, in, &sr); err != nil {
 		return sr, err
 	}
@@ -191,28 +218,7 @@ func (s *Service) PreviewCNTSSeries(ctx context.Context, in CNTSSeriesInput) (CN
 // PublishCNTSSeries chia kỳ và phát hành lô kỳ native (một giao dịch cap/forms). Quyền, phạm vi đơn vị, cơ sở thuộc
 // xã do cap/forms kiểm (cấp publish_by của kn_cnts, danh mục cơ sở giết mổ).
 func (s *Service) PublishCNTSSeries(ctx context.Context, in CNTSSeriesInput, idem string) (CNTSSeries, error) {
-	sr, err := s.PreviewCNTSSeries(ctx, in)
-	if err != nil {
-		return sr, err
-	}
-	ref, err := s.FormsNative.LatestTemplate(ctx, domain.ProfileCNTS, sr.Form.Code)
-	if errors.Is(err, formsport.ErrTemplateNotFound) {
-		return sr, formsport.ErrTemplateNotFound.WithDetail("biểu " + sr.Form.BM + " chưa cài — Admin cài biểu kỳ CNTS trước")
-	}
-	if err != nil {
-		return sr, err
-	}
-	bi := formsport.BatchInput{Profile: domain.ProfileCNTS, TemplateID: ref.ID, UnitKind: sr.Form.UnitKind, Units: sr.Units}
-	for _, p := range sr.Periods {
-		bi.Periods = append(bi.Periods, formsport.PeriodDef{Label: p.Label, DueAt: p.DueAt, Kind: p.Kind, Key: p.Key, From: p.From, To: p.To, Rule: p.Rule})
-	}
-	if sr.Published, err = s.FormsNative.PublishBatch(ctx, bi, idem); err != nil {
-		return sr, err
-	}
-	if err := s.recordCNTSPublication(ctx, in, &sr, idem); err != nil {
-		return sr, err
-	}
-	return sr, nil
+	return s.publishCNTS275(ctx, in, idem)
 }
 
 // CNTSValidator cài formsport.Validator cho profile kn_cnts (quy tắc chặn của biểu kỳ CNTS).

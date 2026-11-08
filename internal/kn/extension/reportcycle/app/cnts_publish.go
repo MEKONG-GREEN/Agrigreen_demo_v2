@@ -11,7 +11,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"sort"
 	"strings"
@@ -27,7 +26,6 @@ import (
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
@@ -179,15 +177,16 @@ func (s *Service) checkCNTSOwner(ctx context.Context, a actor, owner *uuid.UUID)
 	return problem.Validation.WithField("owner_ref", "không phải cán bộ Cấp Tỉnh Phòng Chăn nuôi – Thủy sản của đơn vị")
 }
 
-// recordCNTSPublication ghi lần phát hành sau khi cap/forms đã phát hành lô (idem trùng → đọc lại lần đã ghi).
-func (s *Service) recordCNTSPublication(ctx context.Context, in CNTSSeriesInput, sr *CNTSSeries, idem string) error {
+// cntsPublication dựng audit phát hành từ phiên hiện tại ngoài giao dịch; caller
+// ghi audit và durable result trong cùng một giao dịch KN.
+func (s *Service) cntsPublication(ctx context.Context, in CNTSSeriesInput, sr *CNTSSeries, idem string) (store.CNTSPublication, error) {
 	a, err := s.knActor(ctx)
 	if err != nil {
-		return err
+		return store.CNTSPublication{}, err
 	}
 	onBehalf, support, err := a.supportInfo()
 	if err != nil {
-		return err
+		return store.CNTSPublication{}, err
 	}
 	dl := sr.Form.Deadline
 	if in.Deadline != nil {
@@ -202,31 +201,15 @@ func (s *Service) recordCNTSPublication(ctx context.Context, in CNTSSeriesInput,
 		p.OrgRef = &org
 	}
 	if p.From, err = domain.ParseDate(in.From); err != nil {
-		return problem.Validation.WithField("from_date", err.Error())
+		return store.CNTSPublication{}, problem.Validation.WithField("from_date", err.Error())
 	}
 	if p.To, err = domain.ParseDate(in.To); err != nil {
-		return problem.Validation.WithField("to_date", err.Error())
+		return store.CNTSPublication{}, problem.Validation.WithField("to_date", err.Error())
 	}
 	for _, pp := range sr.Published {
 		p.PeriodRefs = append(p.PeriodRefs, pp.ID)
 	}
-	err = s.tx(ctx, a.p.TenantID, func(tx pgx.Tx) error {
-		if got, err := store.CNTSPublicationByIdem(ctx, tx, p.IdemKey); err != nil || got != nil {
-			if got != nil {
-				p.ID = got.ID
-			}
-			return err
-		}
-		return store.InsertCNTSPublication(ctx, tx, a.p.TenantID, p)
-	})
-	if errors.Is(ledger.Classify(err), ledger.ErrDuplicate) {
-		err = nil
-	}
-	if err == nil {
-		id := p.ID
-		sr.PublicationID = &id
-	}
-	return err
+	return p, nil
 }
 
 // CNTSTrackedPeriod là phần KN của một kỳ native trên màn theo dõi: lần phát hành, người phụ trách, giờ chốt.

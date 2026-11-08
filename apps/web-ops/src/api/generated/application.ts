@@ -19739,7 +19739,12 @@ export interface components {
             template_version: number | null;
             template_up_to_date: boolean;
         };
+        /** @description Phát hành bắt buộc template_id và template_version đã chọn từ catalog; xem trước lịch không ghi có thể bỏ cả hai. Không tự chọn latest. */
         CNTSSeriesInput: {
+            /** Format: uuid */
+            template_id?: string;
+            /** Format: int64 */
+            template_version?: number;
             code: string;
             /** Format: date */
             from_date: string;
@@ -19797,6 +19802,10 @@ export interface components {
             saved_at: string;
         };
         CNTSSeries: {
+            /** Format: uuid */
+            template_id: string | null;
+            /** Format: int64 */
+            template_version: number | null;
             code: string;
             /** @description Lịch tuần của phòng (D8) — mã phòng, vd chan_nuoi_thuy_san; null với tuần làm việc BM-05 */
             calendar_id: string | null;
@@ -23626,7 +23635,7 @@ export interface components {
             title: string;
             /** @description Sao chép từ biểu này (bỏ trống = tạo từ fields, vd kết quả kiểm Excel hợp lệ) */
             source_code?: string;
-            /** @description 0 hoặc bỏ trống = phiên bản mới nhất của biểu nguồn */
+            /** @description Bắt buộc khi sao chép: phiên bản nguồn bất biến đã chọn; không dùng latest */
             source_version?: number;
             fields?: components["schemas"]["FormsField"][];
         };

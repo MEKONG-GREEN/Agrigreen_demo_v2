@@ -61,16 +61,17 @@ type Service struct {
 	Clock clock.Clock
 	Log   *slog.Logger
 
-	Forms       repport.FormEngine      // P3: mẫu, phiên bản, Evaluate, Totals
-	Regions     partyport.Regions       // P2: khu vực của Nút xã
-	Orgs        partyport.Orgs          // tỉnh của Nút trong ngữ cảnh
-	Units       partyport.AdminUnits    // tên xã/tỉnh
-	Params      params.Params           // tham số nhắc, đánh số tuần (tạm, Q-15, Q-17)
-	Assignments accport.Assignments     // P1: cán bộ xã phụ trách cùng phòng ban
-	Names       partyport.ActorNames    // tên người thao tác trong Log (tùy chọn)
-	Dispatches  repport.DispatchHistory // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
-	Freezer     formsport.Freezer       // W6.2 cap/forms: ghi song song chốt/mở lại + ảnh chụp (tùy chọn)
-	FormsNative formsport.Publisher     // W11.42 cap/forms: cài biểu, phát hành lô kỳ native (biểu kỳ CNTS)
+	Forms         repport.FormEngine          // P3: mẫu, phiên bản, Evaluate, Totals
+	Regions       partyport.Regions           // P2: khu vực của Nút xã
+	Orgs          partyport.Orgs              // tỉnh của Nút trong ngữ cảnh
+	Units         partyport.AdminUnits        // tên xã/tỉnh
+	Params        params.Params               // tham số nhắc, đánh số tuần (tạm, Q-15, Q-17)
+	Assignments   accport.Assignments         // P1: cán bộ xã phụ trách cùng phòng ban
+	Names         partyport.ActorNames        // tên người thao tác trong Log (tùy chọn)
+	Dispatches    repport.DispatchHistory     // pf/reports: kỳ đã gửi Chi cục (tùy chọn)
+	Freezer       formsport.Freezer           // W6.2 cap/forms: ghi song song chốt/mở lại + ảnh chụp (tùy chọn)
+	CNTSDirectory formsport.FacilityDirectory // current public facility parents, read before any dispatch intent
+	FormsNative   formsport.Publisher         // W11.42 cap/forms: cài biểu, phát hành lô kỳ native (biểu kỳ CNTS)
 	// W11.44: số liệu kỳ native theo lô (tổng hợp BM-02, BM-18) và danh mục cơ sở giết mổ (tên, mộc dấu — tùy chọn).
 	FormsFigures   formsport.FiguresReader
 	CNTSFacilities CNTSFacilityCatalog

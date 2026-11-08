@@ -77,11 +77,13 @@ func (h Handler) cntsInstall(c *gin.Context) {
 }
 
 type cntsSeriesReq struct {
-	Code     string   `json:"code"`
-	From     string   `json:"from_date"`
-	To       string   `json:"to_date"`
-	Units    []string `json:"units"`
-	Deadline *struct {
+	TemplateID      uuid.UUID `json:"template_id"`
+	TemplateVersion int64     `json:"template_version"`
+	Code            string    `json:"code"`
+	From            string    `json:"from_date"`
+	To              string    `json:"to_date"`
+	Units           []string  `json:"units"`
+	Deadline        *struct {
 		OffsetDays int    `json:"offset_days"`
 		Time       string `json:"time"`
 	} `json:"deadline"`
@@ -92,7 +94,7 @@ type cntsSeriesReq struct {
 }
 
 func (r cntsSeriesReq) input() app.CNTSSeriesInput {
-	in := app.CNTSSeriesInput{Code: r.Code, From: r.From, To: r.To, Units: r.Units, Target: r.Target, Regions: r.Regions, OwnerRef: r.OwnerRef,
+	in := app.CNTSSeriesInput{TemplateID: r.TemplateID, TemplateVersion: r.TemplateVersion, Code: r.Code, From: r.From, To: r.To, Units: r.Units, Target: r.Target, Regions: r.Regions, OwnerRef: r.OwnerRef,
 		CloseAfterHours: r.CloseAfterHours}
 	if r.Deadline != nil {
 		in.Deadline = &domain.Deadline{OffsetDays: r.Deadline.OffsetDays, Time: r.Deadline.Time}
@@ -112,7 +114,9 @@ type cntsPeriodDTO struct {
 }
 
 type cntsSeriesDTO struct {
-	Code string `json:"code"`
+	TemplateID      *uuid.UUID `json:"template_id"`
+	TemplateVersion *int64     `json:"template_version"`
+	Code            string     `json:"code"`
 	// Lịch tuần của phòng (D8); null với tuần làm việc BM-05.
 	CalendarID      *string         `json:"calendar_id"`
 	CalendarVersion *int            `json:"calendar_version"`
@@ -138,6 +142,9 @@ type cntsCommuneDTO struct {
 func cntsSeriesOf(s app.CNTSSeries) cntsSeriesDTO {
 	d := cntsSeriesDTO{Code: s.Form.Code, UnitKind: s.Form.UnitKind, Units: s.Units, Tasks: s.Tasks, Periods: []cntsPeriodDTO{},
 		Target: s.Target, Regions: s.Regions, CloseAfterHours: s.CloseAfterHours, Communes: []cntsCommuneDTO{}}
+	if s.Template != nil {
+		d.TemplateID, d.TemplateVersion = &s.Template.ID, &s.Template.Version
+	}
 	if d.Units == nil {
 		d.Units = []string{}
 	}

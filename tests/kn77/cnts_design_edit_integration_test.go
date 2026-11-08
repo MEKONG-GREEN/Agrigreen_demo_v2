@@ -232,7 +232,7 @@ func TestCNTSDesignEdit_FN07_192(t *testing.T) {
 
 	t.Run("sao chép biểu thành biểu điều tra phiên bản 1; mã trùng 409; cấu trúc sai không ghi", func(t *testing.T) {
 		c, b := designAs(f, http.MethodPost, base, authz.KNTinh, "tong_hop", map[string]any{"code_suffix": "tongdan", "title": "Điều tra tổng đàn",
-			"source_code": "CNTS-BM04"})
+			"source_code": "CNTS-BM04", "source_version": 1})
 		var saved designSaved
 		f.ok(c, b, &saved)
 		bm04 := list("tong_hop")["CNTS-BM04"]
@@ -246,7 +246,7 @@ func TestCNTSDesignEdit_FN07_192(t *testing.T) {
 			t.Fatalf("mẫu gốc không đổi: %+v", v)
 		}
 		c, b = designAs(f, http.MethodPost, base, authz.KNTinh, "tong_hop", map[string]any{"code_suffix": "TONGDAN", "title": "Trùng",
-			"source_code": "CNTS-BM17"})
+			"source_code": "CNTS-BM17", "source_version": 2})
 		if c != http.StatusConflict {
 			t.Fatalf("mã trùng: %d %s", c, b)
 		}
@@ -263,7 +263,7 @@ func TestCNTSDesignEdit_FN07_192(t *testing.T) {
 			t.Fatal("cấu trúc sai vẫn ghi")
 		}
 		// Kết quả kiểm Excel hợp lệ lưu bằng thao tác tường minh (fields trả từ import-preview).
-		c, b = designAs(f, http.MethodPost, base, authz.KNTinh, "", map[string]any{"code_suffix": "THIETHAI", "title": "Khảo sát thiệt hại dịch",
+		c, b = designAs(f, http.MethodPost, base, authz.KNTinh, "tong_hop", map[string]any{"code_suffix": "THIETHAI", "title": "Khảo sát thiệt hại dịch",
 			"fields": []designEditField{{Key: "so_con_chet", Label: "Số con chết", Type: "integer", Required: true, NonNegative: true}}})
 		f.ok(c, b, &saved)
 		if saved.Code != "CNTS-DT-THIETHAI" || saved.Version.Version != 1 {
