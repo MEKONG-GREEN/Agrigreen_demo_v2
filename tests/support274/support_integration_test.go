@@ -174,6 +174,10 @@ func TestSupport274ActualPublicAdminVaultIsolation(t *testing.T) {
 	f.want(f.api(http.MethodPut, "/v1/contacts/support-requests/"+id+"/resolution", resolveKey, payload), 200)
 	f.want(f.api(http.MethodPut, "/v1/contacts/support-requests/"+id+"/resolution", resolveKey, payload), 200)
 	f.want(f.api(http.MethodPut, "/v1/contacts/support-requests/"+id+"/resolution", ids.New().String(), payload), 409)
+	// Changing/removing the selected owner context cannot replay a previously authorized success.
+	f.want(call274(f.st.App.URL, http.MethodPut, "/v1/contacts/support-requests/"+id+"/resolution", f.admin, "", resolveKey, payload), 428)
+	f.want(call274(f.st.App.URL, http.MethodPut, "/v1/contacts/support-requests/"+id+"/resolution", f.admin, ids.New().String(), resolveKey, payload), 403)
+
 	// Replaying a previously successful operation must recheck MFA/current account authority first.
 	f.want(call274(f.st.App.URL, http.MethodPut, "/v1/contacts/support-requests/"+id+"/resolution", noMFA, f.context, resolveKey, payload), 403)
 	roleLost := f.token(f.actor, f.tid, true, client.RoleEvidenceViewer)
