@@ -142,8 +142,30 @@ func TestW1106_MenuV3DepartmentTemplates(t *testing.T) {
 			t.Fatalf("EffectiveMenuProfile(generic, %s) = %s", code, p)
 		}
 		gs := domain.DepartmentMenu(port.MenuProfileGeneric, port.AudienceTinh, code)
-		if k := keys(gs); strings.Join(k, ",") != "dieu_hanh,bao_cao,du_lieu,dung_chung" {
+		wantGroups := "dieu_hanh,bao_cao,du_lieu,dung_chung"
+		if code == port.DeptThongTinTruyenThong {
+			wantGroups = "dieu_hanh,bao_cao,du_lieu,chuong_trinh_khuyen_nong,dung_chung"
+		}
+		if k := keys(gs); strings.Join(k, ",") != wantGroups {
 			t.Fatalf("%s Cấp Tỉnh: %v", code, k)
+		}
+		if code == port.DeptThongTinTruyenThong { // FN-TI-02.13: nhóm riêng chỉ Cấp Tỉnh TTTT, trước Dùng chung.
+			group := gs[3]
+			if group.Label != "Chương trình khuyến nông" || len(group.Items) != 2 {
+				t.Fatalf("nhóm chương trình: %+v", group)
+			}
+			for i, key := range []string{"thong_tin", "dao_tao"} {
+				item := group.Items[i]
+				route := []string{"thong-tin", "dao-tao-hop-tac"}[i]
+				if item.Key != "tinh.chuong_trinh."+key || item.Route != "/kn/chuong-trinh-khuyen-nong/"+route || item.ComingSoon || len(item.Children) != 0 {
+					t.Fatalf("mục chương trình: %+v", item)
+				}
+			}
+			for _, audience := range []string{port.AudienceXa, port.AudienceTW} {
+				if slices.ContainsFunc(domain.DepartmentMenu(port.MenuProfileGeneric, audience, code), func(g domain.MenuGroup) bool { return g.Key == group.Key }) {
+					t.Fatalf("%s không được có nhóm chương trình", audience)
+				}
+			}
 		}
 		var leaves func([]domain.MenuItem)
 		leaves = func(items []domain.MenuItem) {
