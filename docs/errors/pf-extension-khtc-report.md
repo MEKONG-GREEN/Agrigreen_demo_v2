@@ -10,3 +10,5 @@
 | extension.khtc_report_invalid | 422 | Chỉ nhập ô hành chính và mục lời văn trong khung Mẫu 1–5. |
 
 Dùng lại `forbidden`, `bad_request`, `idempotency_key_required`, `extension.khtc_refresh_not_owner`, `extension.khtc_period_terminal`, `extension.dependency_unavailable`. Lỗi gốc cơ sở dữ liệu không trả cho client. JSON có trường hệ thống không biết bị từ chối 400.
+
+#246: history Word trực tiếp và direct Word GET dùng lại `extension.dependency_unavailable` (503) khi run đã lưu chưa có chứng cứ liên kết với đúng snapshot hoặc metadata/băm không khớp. Chi tiết lỗi nêu rõ liên kết chưa được chứng minh; không suy theo tên/seq/kind, không backfill khi đọc. Lỗi INSERT/COMMIT audit trả lỗi hệ thống, không trả metadata/byte và không gọi FilePort. Quyền reader và các mã 401/403/404 hiện hữu giữ nguyên.

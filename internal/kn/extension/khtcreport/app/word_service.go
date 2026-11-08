@@ -7,10 +7,7 @@ import (
 	pd "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -77,44 +74,5 @@ func (s *Service) ExportWord(ctx context.Context, id, exportID uuid.UUID, idem s
 	if err = s.bindWord(ctx, c, id, x, req, run); err != nil {
 		return exportport.Run{}, err
 	}
-	return run, nil
-}
-
-// WordHistory trả các lần xuất Word của báo cáo (mới nhất trước).
-func (s *Service) WordHistory(ctx context.Context, id uuid.UUID) ([]exportport.Run, error) {
-	c, err := s.reader(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if s.Exporter == nil {
-		return nil, ErrDependency
-	}
-	if err := s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error { _, _, e := loadPeriod(ctx, tx, id); return e }); err != nil {
-		return nil, err
-	}
-	return s.Exporter.Runs(ctx, WordSubject(id))
-}
-
-// WordDownload trả byte Word đã lưu (pf/export kiểm băm), ghi điểm kiểm soát xuất như Excel.
-func (s *Service) WordDownload(ctx context.Context, id, runID uuid.UUID) (exportport.Run, error) {
-	c, err := s.reader(ctx)
-	if err != nil {
-		return exportport.Run{}, err
-	}
-	if s.Exporter == nil {
-		return exportport.Run{}, ErrDependency
-	}
-	if err := s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error { _, _, e := loadPeriod(ctx, tx, id); return e }); err != nil {
-		return exportport.Run{}, err
-	}
-	run, err := s.Exporter.Run(ctx, WordSubject(id), runID)
-	if err != nil {
-		return exportport.Run{}, err
-	}
-	_ = meter.Guard(ctx, s.Egress, s.EgressMode, meter.Egress{
-		Internal: true, SourceID: ids.New(), Channel: meter.ChannelReportExport, DataTenantID: c.principal.TenantID,
-		CounterpartyKind: meter.CounterpartyActor, CounterpartyRef: c.principal.ActorRef, Product: "kn_khtc_report",
-		Records: 1, Bytes: run.Size, OccurredAt: s.now(), ActorRef: c.principal.ActorRef, TraceID: telemetry.TraceID(ctx),
-	}, nil)
 	return run, nil
 }

@@ -253,8 +253,11 @@ func TestArchive199StoredWordBindingAndMixedZIP(t *testing.T) {
 		t.Fatalf("unattested run accepted: %d %s", c, b)
 	}
 	unbound := counter.last
+	readsBeforeUnlinked := counter.reads.Load()
 	c, b = f.call(http.MethodGet, p.ID, "/words/"+unbound.ID.String()+"/download", nil)
-	f.ok(c, b, nil)
+	if c != 503 || counter.reads.Load() != readsBeforeUnlinked || bytes.HasPrefix(b, []byte("PK")) {
+		t.Fatalf("unbound direct Word must stay unavailable before FilePort: %d %s", c, b)
+	}
 	if got := list(x2.ID, ""); len(got.Items) != 0 {
 		t.Fatal("unbound Word guessed by period/version", got)
 	}
@@ -364,13 +367,10 @@ func TestArchive199AutoNumberReplayRealExporter(t *testing.T) {
 	if counter.last.DocNumber != "1/OTHER" || !counter.last.DocNumberAuto {
 		t.Fatalf("counterexample not a real OTHER number: %+v", counter.last)
 	}
-	var history struct {
-		Items []wordRun `json:"items"`
-	}
+	exportsBeforeHistory := counter.exports.Load()
 	c, b = f.call(http.MethodGet, p.ID, "/words", nil)
-	f.ok(c, b, &history)
-	if len(history.Items) != 1 || history.Items[0].DocNumber != "1/OTHER" {
-		t.Fatal("unexpected render/allocation during attestation", history)
+	if c != 503 || counter.exports.Load() != exportsBeforeHistory || !bytes.Contains(b, []byte("chưa có chứng cứ liên kết")) {
+		t.Fatalf("wrong-series history must remain unavailable without rendering/allocation: %d %s", c, b)
 	}
 	var bound int
 	admin := pgtest.Get(t).AdminPool(t, migrations.PF)
