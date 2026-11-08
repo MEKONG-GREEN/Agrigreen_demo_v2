@@ -18,11 +18,11 @@ Không thêm dependency, migration, quyền, route, schema DTO, menu hoặc web.
 
 Phủ INSERT/deferred COMMIT rollback/recovery; Word GET thực và mixed ZIP POST dùng fresh key; tenant/current selected department/missing/unknown/foreign actor context, Admin thiếu MFA, revoke và read-only; metadata drift, unlinked Word; một kết nối cùng kiểm không I/O trong DBTX. Ma trận giữ quy tắc accounts hiện hữu: context chỉ xem được GET, POST ZIP bị chặn tập trung. Bộ kiểm này không chứng minh UAT người dùng hoặc quyền chưa có public supplier.
 
-Phần còn lại cần child chính thức trước khi đóng #246:
+Phần còn lại đã tách thành child chính thức, không nằm trong lát này:
 
-- Public original-department provenance và quyền lãnh đạo/BGĐ; quyền trên actual frozen rows sau `export_filter` thống nhất mọi đường kho. Selected department/field metadata không thay provenance; giữ Q027/Q055 và không mở TW chéo tenant Trung tâm. Phần này khác warning provenance #245.
-- Public hook của session/idempotency để mandatory deny/retry/cache-hit audit trước khi trả data; shared middleware hiện có thể replay trước handler. Không nhận header chưa xác thực làm tenant/actor/context, không biến Observe metering thành quyền.
-- Attestation được phép hoặc full unique fingerprint của Word legacy với đúng snapshot. Public exporter hiện có Export/Run/Runs, chưa có năng lực xác nhận liên kết lịch sử; chưa chứng minh thì unavailable. Không đọc private Forms/export SQL, không backfill trong đường đọc.
+- [#297 W11.69-ARCHIVE-SNAPSHOT-AUTHORITY](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/297): public original-department provenance và quyền lãnh đạo/BGĐ; quyền trên actual frozen rows sau `export_filter` thống nhất mọi đường kho. Selected department/field metadata không thay provenance; giữ Q027/Q055 và không mở TW chéo tenant Trung tâm. Phần này khác warning provenance #245; sau actual dev #246, phối hợp metadata owner #259.
+- [#298 W11.69-ARCHIVE-DENY-REPLAY-AUDIT](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/298): public hook của session/idempotency để mandatory deny/retry/cache-hit audit trước khi trả data; shared middleware hiện có thể replay trước handler. Không nhận header chưa xác thực làm tenant/actor/context, không biến Observe metering thành quyền. Sau actual dev #246 và #297.
+- [#299 W11.69-ARCHIVE-LEGACY-ATTESTATION](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/299): attestation được phép hoặc full unique fingerprint của Word legacy với đúng snapshot. Public exporter hiện có Export/Run/Runs, chưa có năng lực xác nhận liên kết lịch sử; chưa chứng minh thì unavailable. Không đọc private Forms/export SQL, không backfill trong đường đọc. Sau actual dev #246 và public supplier phải vào actual dev trước consumer.
 
 Windows CGO=0/no gcc không chạy được race; Linux race và whole CI đúng SHA vẫn phải hoàn tất khi hết HOLD tích hợp. Không tuyên bố ready/merge từ kiểm chứng cục bộ.
 
