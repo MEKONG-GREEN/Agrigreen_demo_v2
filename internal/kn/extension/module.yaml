@@ -33,6 +33,8 @@ provides:
     - HTXConfirmations
     - HTXData
     - KHTCFixedTemplates
+    - KHTCFormExcelCodec
+    - KHTCFormExcelPreview
     - KHTCMetricNames
     - KHTCOperationSource
     - KHTCPlanDepartments
