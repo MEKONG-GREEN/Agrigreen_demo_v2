@@ -11,6 +11,7 @@ import { ExternalCells } from "../external/ExternalCells";
 import { CompiledTemplateDocument } from "../templates/CompiledTemplateDocument";
 import {AdhocRequestsPanel} from "../adhoc/AdhocRequestsPanel";
 import { AdhocSelector, type AdhocSelection } from "../adhoc/AdhocSelector";
+import { ReportDraftAudit244, ReportSaveStatus244, useReportSave244 } from "./ReportSave244";
 const ADMIN: Record<string, string> = { document_no: "Số văn bản", place: "Địa danh", report_date: "Ngày báo cáo", recipient: "Kính gửi", basis: "Căn cứ", recipients: "Nơi nhận", authority: "Thẩm quyền ký", signer_title: "Chức vụ", signer: "Người ký" };
 function saveFile(file: {
     blob: Blob;
@@ -48,9 +49,12 @@ function reportAuthorityKey(auth: ReturnType<typeof useAuth>) {
 export function KhtcReportsScreen(props: ReportScreenProps) {
     const auth = useAuth();
     const scopeKey = JSON.stringify([reportAuthorityKey(auth), props.mode ?? "editor", !!props.adhoc, props.initialPeriod ?? ""]);
-    return <ReportsWorkspace key={scopeKey} {...props} api={auth.api} />;
+    const allowed = auth.status === "authenticated" && auth.kn?.status === "active" && !!auth.principal && !auth.kn.context?.read_only
+        && (auth.kn.context?.role === "kn_tinh" && auth.kn.context.department_code === "ke_hoach_tai_chinh" || !!props.adhoc && auth.kn.context?.role === "admin" && auth.principal.mfa);
+    const saveScope = allowed ? JSON.stringify([auth.principal?.tenantId,auth.principal?.subject,auth.principal?.orgRef,auth.principal?.mfa,[...(auth.principal?.roles??[])].sort(),auth.principal?.scopeAll,[...(auth.principal?.scopeUnits??[])].sort(),auth.kn?.context?.context_id,auth.kn?.context?.assignment_id,auth.kn?.context?.role,auth.kn?.context?.department_code,auth.kn?.context?.support_session_id,auth.kn?.context?.on_behalf_of]) : "";
+    return <ReportsWorkspace key={scopeKey} {...props} api={auth.api} actor={auth.principal?.subject??""} saveScope={saveScope} />;
 }
-function ReportsWorkspace({ mode = "editor", adhoc = false, initialPeriod = "", api }: ReportScreenProps & {api: ApiClient}) {
+function ReportsWorkspace({ mode = "editor", adhoc = false, initialPeriod = "", api, actor, saveScope }: ReportScreenProps & {api: ApiClient; actor: string; saveScope: string}) {
     const reports = useMemo(() => api ? createReportApi(api) : null, [api]);
     const periods = useMemo(() => api ? createKhtcPeriodApi(api) : null, [api]);
     const [year, setYear] = useState(new Date().getFullYear());
@@ -64,22 +68,25 @@ function ReportsWorkspace({ mode = "editor", adhoc = false, initialPeriod = "", 
    <label>Loại báo cáo <select value={kind} onChange={e => setKind(e.target.value)}><option value="">Tất cả</option>{REPORT_TYPES.filter(t => adhoc ? t.value === "adhoc" : t.value !== "adhoc").map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
    <LoadState s={list}>{items => <ul>{items.filter(p => (adhoc ? p.report_type === "adhoc" : p.report_type !== "adhoc") && p.state !== "cancelled" && (!kind || p.report_type === kind)).map(p => <li key={p.id}><button className="btn" aria-pressed={selected === p.id} onClick={() => setSelected(p.id)}>{p.name}</button></li>)}{!items.length && <li>Chưa có kỳ báo cáo trong năm.</li>}</ul>}</LoadState>
   </section>
-  {selected && reports && <ReportResource key={selected} id={selected} api={reports} mode={mode} />}
+  {selected && reports && <ReportResource key={selected} id={selected} api={reports} mode={mode} actor={actor} saveScope={saveScope} />}
  </>;
 }
 // Acknowledgements belong to this selected report, not its versioned editor.
 // It also outlives a failed reload without claiming that the reload succeeded.
-function ReportResource({ id, api, mode }: {id: string; api: ReportApi; mode: "editor" | "progress" | "history"}) {
+function ReportResource({ id, api, mode, actor, saveScope }: {id: string; api: ReportApi; mode: "editor" | "progress" | "history"; actor: string; saveScope: string}) {
     const detail = useLoad(() => api.get(id), [api, id]);
     const act = useAction();
-    return <>{act.view}<LoadState s={detail}>{d => <ReportEditor key={`${d.period_id}:${d.version}:${d.final?.export_id ?? ""}`} d={d} api={api} mode={mode} reload={detail.reload} act={act}/>}</LoadState></>;
+    const save = useReportSave244(api,id,actor,saveScope);
+    return <>{act.view}{saveScope && <ReportSaveStatus244 save={save} busy={act.busy} check={() => { void act.run(async () => { const result = await save.operation.reconcile(); if(result?.outcome === "applied") detail.reload(); }); }}/>}<LoadState s={detail}>{d => <ReportEditor key={`${d.period_id}:${d.version}:${d.final?.export_id ?? ""}`} d={d} api={api} mode={mode} reload={detail.reload} act={act} save={save} canAudit={!!saveScope}/>}</LoadState></>;
 }
-function ReportEditor({ d, api, mode, reload, act }: {
+function ReportEditor({ d, api, mode, reload, act, save, canAudit }: {
     d: ReportDetail;
     api: ReportApi;
     mode: "editor" | "progress" | "history";
     reload: () => void;
     act: ReturnType<typeof useAction>;
+    save: ReturnType<typeof useReportSave244>;
+    canAudit: boolean;
 }) {
     const id = d.period_id;
     const { data } = d.content;
@@ -93,6 +100,7 @@ function ReportEditor({ d, api, mode, reload, act }: {
     const history = useLoad(() => api.history(id), [api, id]);
     const words = useLoad(() => api.words(id), [api, id]);
     const dirty = Object.keys(admin).length > 0 || Object.keys(texts).length > 0 || adhocSelection !== undefined;
+    const unresolvedSave = !!save.state.pending || save.state.blocked || !save.state.ready;
     const writable = d.editable && !act.busy;
     const selected=adhocSelection??d.content.adhoc;
     const rows = filterRows(data.template==="adhoc"?(data.rows??[]).filter(r=>selected?.rows.includes(r.ref)):data.rows??[], filter);
@@ -113,14 +121,14 @@ function ReportEditor({ d, api, mode, reload, act }: {
                     const value = key in admin ? admin[key] ?? field?.system ?? "" : field?.override ?? field?.system ?? "";
                     return <div key={key}><label>{label} <input type={key === "report_date" ? "date" : "text"} maxLength={2000} disabled={!writable || d.locked_admin?.includes(key)} value={value} onChange={e => setAdmin({ ...admin, [key]: e.target.value })}/></label>{" "}<button className="btn" disabled={!writable || d.locked_admin?.includes(key)} onClick={() => setAdmin({ ...admin, [key]: null })}>Về mặc định</button>{field?.override !== null && field?.override !== undefined && <small> Đã sửa thủ công {dt(field.at)}</small>}{field?.system_changed && <small> · Giá trị mặc định đã đổi: {field.system}</small>}</div>;
                 })}
-    {data.template === "adhoc" && <AdhocRequestsPanel id={id} departments={data.period.departments} disabled={!writable||!!d.terminal} onChanged={reload}/>}
+    {data.template === "adhoc" && <AdhocRequestsPanel id={id} departments={data.period.departments} disabled={!writable||!!d.terminal||unresolvedSave} onChanged={reload}/>}
     {data.template === "adhoc" && <AdhocSelector data={data} value={adhocSelection ?? d.content.adhoc} onChange={setAdhocSelection} disabled={!writable}/>}
     <h3>Nội dung lời văn</h3>
     {!!d.locked_admin?.length && <p>Các ô hành chính đã được khóa trong mẫu chỉ đọc.</p>}
     {data.template === "mau_5" && <p>Mục II được khởi tạo từ báo cáo tiến độ kỳ trước, nếu có. Nội dung đã lưu của kỳ này được giữ khi cập nhật số liệu.</p>}
     {d.sections.filter(s => s.editable).map(s => <div key={s.key}><label>{data.template === "adhoc" ? s.title : `${d.template_document?.nodes.find(n => n.id === s.key)?.number ?? s.key} ${s.title}`}<textarea rows={4} maxLength={12000} disabled={!writable} value={texts[s.key] ?? d.content.texts[s.key] ?? ""} onChange={e => setTexts({ ...texts, [s.key]: e.target.value })}/></label></div>)}
-    <button className="btn btn-primary" disabled={!writable} onClick={() => act.run(async () => { await api.save(id, { base_version: d.version, admin, texts, ...(adhocSelection ? { adhoc: adhocSelection } : {}) }); reload(); }, "Đã lưu bản soạn")}>Lưu bản soạn</button>{" "}
-    <button className="btn" disabled={!d.can_refresh || act.busy || dirty} onClick={() => act.run(async () => { await api.refresh(id, d.version); reload(); }, "Đã cập nhật số liệu")}>Cập nhật số liệu</button>
+    <button className="btn btn-primary" disabled={!writable || unresolvedSave} onClick={() => act.run(async () => { await save.operation.save( { base_version: d.version, admin, texts, ...(adhocSelection ? { adhoc: adhocSelection } : {}) }); reload(); }, "Đã lưu bản soạn")}>Lưu bản soạn</button>{" "}
+    <button className="btn" disabled={!d.can_refresh || act.busy || dirty || unresolvedSave} onClick={() => act.run(async () => { await api.refresh(id, d.version); reload(); }, "Đã cập nhật số liệu")}>Cập nhật số liệu</button>
     {dirty && <p role="status">Có thay đổi chưa lưu. Lưu bản soạn trước khi cập nhật hoặc xuất Excel.</p>}
    </>}
    {d.template_document && <section aria-label="Bản báo cáo theo mẫu đã lưu"><h3>Nội dung báo cáo</h3>{dirty && <p>Lưu bản soạn để cập nhật nội dung xem trước.</p>}<CompiledTemplateDocument document={d.template_document} /></section>}
@@ -138,14 +146,15 @@ function ReportEditor({ d, api, mode, reload, act }: {
    {!d.final && d.editable && <div>
     {(data.template === "mau_5" || mode === "progress") && <label><input type="checkbox" checked={exportFiltered} onChange={e => setExportFiltered(e.target.checked)}/> Xuất theo bộ lọc đang chọn</label>}
     {!!data.provisional?.length && <label><input type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)}/> Tôi xác nhận xuất bản Tạm tính</label>}
-    <button className="btn" disabled={act.busy || dirty || !d.version || (!!data.provisional?.length && !ack)} onClick={() => act.run(async () => { const x = await api.export(id, d.version, ack, exportFiltered ? filter : {}); saveFile(await api.download(id, x.id)); history.reload(); }, "Đã xuất và lưu phiên bản Excel")}>Xuất Excel</button>
+    <button className="btn" disabled={act.busy || dirty || unresolvedSave || !d.version || (!!data.provisional?.length && !ack)} onClick={() => act.run(async () => { const x = await api.export(id, d.version, ack, exportFiltered ? filter : {}); saveFile(await api.download(id, x.id)); history.reload(); }, "Đã xuất và lưu phiên bản Excel")}>Xuất Excel</button>
    </div>}
   </>}
+  {canAudit && <ReportDraftAudit244 key={`audit:${d.version}`} api={api} id={id} labels={{...Object.fromEntries(Object.entries(ADMIN).map(([key,label])=>["admin."+key,label])),...Object.fromEntries(d.sections.map(section=>["texts."+section.key,section.title])),adhoc:"Lựa chọn chỉ tiêu"}}/>}
   <h3>Lịch sử xuất</h3>
   <LoadState s={history}>{items => <ul>{items.map(x => <li key={x.id}>Phiên bản {x.version} · {dt(x.at)} · {x.provisional ? "Tạm tính" : d.final?.export_id === x.id ? "Bản cuối" : "Đã xuất"}{" "}
    <button className="btn" disabled={act.busy} onClick={() => act.run(async () => saveFile(await api.download(id, x.id)), "Đã tải tệp đã lưu")}>Tải Excel v{x.version}</button>{" "}
-   {d.terminal !== "cancelled" && (d.editable || !!d.final) && mode !== "history" && <button className="btn" disabled={act.busy} title="Word dựng từ đúng nội dung của bản Excel này; ô Số văn bản trống thì hệ thống tự cấp số" onClick={() => act.run(async () => { const w = await api.word(id, x.id); saveFile(await api.downloadWord(id, w.id)); words.reload(); }, "Đã xuất và lưu Word")}>Xuất Word v{x.version}</button>}{" "}
-   {!d.final && d.editable && <button className="btn" disabled={act.busy || dirty || x.provisional || d.source_changed || !!d.source_error || x.draft_id !== d.draft_id} onClick={() => {
+   {d.terminal !== "cancelled" && (d.editable || !!d.final) && mode !== "history" && <button className="btn" disabled={act.busy || unresolvedSave} title="Word dựng từ đúng nội dung của bản Excel này; ô Số văn bản trống thì hệ thống tự cấp số" onClick={() => act.run(async () => { const w = await api.word(id, x.id); saveFile(await api.downloadWord(id, w.id)); words.reload(); }, "Đã xuất và lưu Word")}>Xuất Word v{x.version}</button>}{" "}
+   {!d.final && d.editable && <button className="btn" disabled={act.busy || dirty || unresolvedSave || x.provisional || d.source_changed || !!d.source_error || x.draft_id !== d.draft_id} onClick={() => {
                         if (window.confirm("Đánh dấu Bản cuối sẽ khóa báo cáo và cập nhật nguồn của kỳ. Tiếp tục?"))
                             void act.run(async () => { await api.final(id, x.id); reload(); history.reload(); }, "Đã đánh dấu Bản cuối");
                     }}>Đánh dấu Bản cuối</button>}

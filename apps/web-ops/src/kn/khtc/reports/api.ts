@@ -4,6 +4,7 @@ import {createRetryingMutation} from "../adhoc/retry";
 import { parseProblemResponse } from "@/api/problem";
 import { filenameFromDisposition } from "@/lib/files";
 type S = components["schemas"];
+export type ReportSaveReceipt = S["KHTCReportSaveReceipt"];
 export type ReportDetail = S["KHTCReportDetail"];
 export type ReportExport = S["KHTCReportExport"];
 export type ReportSave = S["KHTCReportSave"];
@@ -15,7 +16,12 @@ export function createReportApi(api: ApiClient) {
     const mutate=createRetryingMutation();
     return {
         get: (id: string) => unwrap(api.GET("/v1/extension/khtc/periods/{id}/report", { params: { path: { id } } })),
-        save: (id: string, body: ReportSave) => mutate("save:"+id+":"+body.base_version,body,key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/draft",{params:{path:{id},header:{"Idempotency-Key":key}},body}))),
+        save: (id: string, body: ReportSave, operationKey?: string) => {
+            const call=(key:string)=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/draft",{params:{path:{id},header:{"Idempotency-Key":key}},body}));
+            return operationKey ? call(operationKey) : mutate("save:"+id+":"+body.base_version,body,call);
+        },
+        saveOperation: (id:string,operationID:string)=>unwrap(api.GET("/v1/extension/khtc/periods/{id}/report/draft-operations/{operationID}",{params:{path:{id,operationID}}})),
+        saveAudit: async(id:string)=>(await unwrap(api.GET("/v1/extension/khtc/periods/{id}/report/draft-audit",{params:{path:{id}}}))).items,
         refresh: (id:string,version:number)=>{const body={base_version:version};return mutate("refresh:"+id+":"+version,body,key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/refresh",{params:{path:{id},header:{"Idempotency-Key":key}},body})));},
         history: async (id: string) => (await unwrap(api.GET("/v1/extension/khtc/periods/{id}/report/exports", { params: { path: { id } } }))).items,
         export:(id:string,version:number,acknowledge:boolean,filter:ReportFilter)=>{const body={base_version:version,acknowledge_provisional:acknowledge,filter};return mutate("export:"+id,body,key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/report/exports",{params:{path:{id},header:{"Idempotency-Key":key}},body})));},

@@ -10,3 +10,7 @@
 | extension.khtc_report_invalid | 422 | Chỉ nhập ô hành chính và mục lời văn trong khung Mẫu 1–5. |
 
 Dùng lại `forbidden`, `bad_request`, `idempotency_key_required`, `extension.khtc_refresh_not_owner`, `extension.khtc_period_terminal`, `extension.dependency_unavailable`. Lỗi gốc cơ sở dữ liệu không trả cho client. JSON có trường hệ thống không biết bị từ chối 400.
+
+## #244 — receipt lưu nháp
+
+`GET .../report/draft-operations/{operationID}` trả `unknown` khi chưa có receipt, không phải xác nhận rollback. Receipt đúng operation bị đổi request/key trả lỗi `conflict` (409); authority/actor/session thay đổi trả `forbidden` (403). Cổng đọc audit/receipt chỉ dành current writer theo owner kỳ; readonly/quyền sai/Admin thiếu MFA bị chặn trước DB. Không có lỗi được dùng để suy head mới là applied. Audit lỗi INSERT hoặc COMMIT rollback cùng draft và không có phản hồi thành công giả.

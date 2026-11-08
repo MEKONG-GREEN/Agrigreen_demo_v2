@@ -258,3 +258,9 @@ Không đổi kết luận của bộ khung v2.2 phía trên thành nghiệm thu
 Native `TestKHTCHistory242_*`, web `submission-history.test.ts`/`KhtcFormHistory242.test.tsx`, browser `kn-khtc-history242.spec.ts`; kết quả thực ghi tại SHA ready, không suy từ tên test. [Phạm vi và giới hạn](../kn/gia-dinh/BF-SWEEP-KHTC-AFTER-REVIEWER.md). #244 giữ phần audit/receipt, Excel gốc/cảnh báo báo cáo, kết quả tự tính lịch sử, report editor và kỳ nhúng. Chưa có UAT khách hoặc hoàn tất toàn FN/KHTC/G1.
 
 Bổ sung #243 — FN-TI-02.01/FN-TI-02.04: hộp phiếu thường niên chờ rà soát có menu riêng, đọc lần gửi cuối native theo trang kỳ, không suy từ nháp/bảng niêm phong; mở reviewer hiện hữu và giữ quyền hiện tại. [Phạm vi/giới hạn](../kn/gia-dinh/KHTC-DASHBOARD-PENDING-INBOX.md). Badge toàn cục, public batch và phần dashboard còn lại ở #245. Chưa đổi trạng thái toàn FN, chưa UAT khách hoặc G1; kết quả cổng đúng SHA trong issue READY sau khi thực sự đạt.
+
+### Lát lưu nháp report — #244, đối chiếu BRD v2.3
+
+FN-TI-02.05 P943/P952/P955 và khung lưu nháp của FN-TI-02.06–02.09: mỗi lần lưu mới ghi actor/thời điểm và các ô cũ → mới cùng transaction với draft; receipt có exact operation/request/base/draft/version. Đọc sau reload/lost ACK không suy từ head hiện tại/successor/ABA; unknown giữ khóa mutation, không tự gửi lại. Log không giả lịch sử cho draft trước capability. Các số liệu nguồn vẫn chỉ đọc.
+
+Native `TestReportSave244_*` (pool1, real COMMIT lost ACK, audit INSERT/deferred COMMIT rollback, replay/ABA/quyền trước DB) và `TestKHTCReport244_*` (HTTP thật); web `save-operation244.test.ts`, `editor.test.tsx`, production browser `kn-khtc-save244.spec.ts`. Kết quả cụ thể ghi ở packet exact SHA. [Phạm vi/giới hạn](../kn/gia-dinh/BF-SWEEP-KHTC-AFTER-HISTORY.md); supplier Review [#288](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/288) chưa là consumer đã hoàn tất. Không thay kết luận UAT khách hoặc toàn FN/KHTC/G1; phần còn lại #244 tách child trước đóng parent.

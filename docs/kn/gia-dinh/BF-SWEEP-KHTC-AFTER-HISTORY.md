@@ -1,0 +1,17 @@
+# BF-SWEEP-KHTC-AFTER-HISTORY (#244) — lát lưu nháp báo cáo
+
+Nguồn: Function BRD KHTC v2.3 final, DOCX SHA-256 `15859351f90574bf667190b1a12160465ba03f8ca9e408b94c90d285a3502e25`. FN-TI-02.05 P943/P952/P955: lưu nháp, truy vết người/thời điểm/giá trị cũ → mới; FN-TI-02.06–02.09 kế thừa khung báo cáo. Function chi tiết thắng tài liệu cũ. Không mở rộng soạn toàn văn #240.
+
+Lát trọn vẹn hiện tại chỉ gồm thao tác **Lưu bản soạn report**: ledger receipt/audit được ghi cùng transaction với draft, chụp đúng base/draft/version thực trả từ DB, actor/time thật và thay đổi các ô hành chính, lời văn, lựa chọn phát sinh. Không suy version bằng head+1, không dùng nội dung hiện tại hoặc bản xuất làm bằng chứng thao tác. Các trường số/nguồn vẫn chỉ đọc. Không thêm dependency runtime.
+
+`operation_id` do caller mới giữ qua thao tác; caller cũ không truyền được ánh xạ ổn định từ khóa idempotency của kỳ. Operation/key/request/authority phải khớp khi replay; cùng operation khác request/actor/session không được phát lại. Quyền hiện hành và selected session chủ KN được kiểm trước receipt/cache và trước DB; owner theo kỳ kiểm lại trong transaction. Readonly, role/profile/phòng sai, Admin thiếu MFA bị chặn trước DB. Cổng đọc receipt tiếp tục đối chiếu binding hiện hành, không nâng quyền vì từng lưu thành công.
+
+GET `report/draft-operations/{operationID}` chỉ đọc đúng thao tác. `applied` chỉ có khi audit và draft đã commit cùng nhau. Không tìm thấy vẫn là `unknown`, kể cả rollback hoặc request còn chạy; không chứng minh chưa ghi, không tự gửi mutation khác. Giao diện giữ metadata operation/key/base trong sessionStorage theo actor/tenant/session/scope; không lưu lời văn, tệp hoặc quyền. Sau reload đọc receipt; khi chưa rõ kết quả khóa các mutation của report và cho đọc đối chiếu lại. Người dùng vẫn xem/tải dữ liệu đã lưu. Đây là hành vi fail closed, không có nút bỏ qua unknown.
+
+Log tối đa 50 lần lưu mới với before→after. Không backfill/giả audit cho các draft đã tồn tại trước capability. Log lưu nháp không tự bao gồm refresh/export/finalize hoặc review Forms.
+
+Giới hạn/các gói tiếp: #288 `FORMS-ENTRY-REVIEW-RECEIPT-244` là supplier shared chưa có trên baseline; consumer review audit/recovery chưa làm. Frozen computed/validation từng lần gửi, Excel gốc/provenance, cảnh báo P905, phần report list/detail/nguồn/Bản cuối và embedded confirmations vẫn cần child riêng. #211 blocked nên không sửa/fallback close/cancel/undo. Không coi toàn #244, FN-TI-02.04, KHTC/UAT/G1 hoàn tất. Surface-map chỉ bổ sung sau actual-dev #262; không tạo bản đồ riêng khi supplier chưa gộp.
+
+Chạy: `go run ./tools/migratecheck -base origin/dev migrations`; PG thật qua `scripts/pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./internal/kn/extension/khtcreport/... ./internal/kn/extension ./tests/kn77 ./cmd/api-platform/assembly ./migrations`; web `npm ci`, `npm run check:api`, `npm run lint`, `npx tsc --noEmit`, `npx vitest run`, `npm run build:mock`; production `next start` trên port thử riêng. Test trọng tâm `TestReportSave244_*`, `TestKHTCReport244_*`, `save-operation244.test.ts`; không dùng kết quả mock thay PG native.
+
+Hold whole CI/public self-review/ready/PR/merge tới ROOT release và actual-dev #287/#286/#261/#262; #211/#288 và child còn lại giữ dependency riêng.

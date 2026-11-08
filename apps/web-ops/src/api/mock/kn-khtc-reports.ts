@@ -35,6 +35,42 @@ export interface KhtcTemplateNarrativeUsage {
  draftID: string | null; version: number; hasSavedNarrative: boolean;
  revisions: {draftID: string; version: number; sections: string[]}[];
 }
+type SaveOperation244 = { tenant: string; actor: string; authority: string; key: string; signature: string; receipt: S["KHTCReportSaveReceipt"] };
+const SAVE_OPERATIONS244 = new Map<string, SaveOperation244>();
+function saveAuthority244(ctx: Ctx): string {
+ const k=knContext(ctx.request.headers.get("X-AG-Context")??"");
+ return JSON.stringify([ctx.persona.me.tenant_id,ctx.persona.me.actor_ref,ctx.persona.me.mfa,[...ctx.persona.me.roles].sort(),ctx.persona.me.scope,
+  k?.context_id,k?.assignment_id,k?.role,k?.department_code,k?.org_ref,k?.read_only,k?.support_session_id,k?.on_behalf_of,k?.duties,k?.powers]);
+}
+function canSaveContext244(ctx: Ctx): boolean {
+ const k=knContext(ctx.request.headers.get("X-AG-Context")??"");
+ // Existing legacy mock fixtures have no selected context. Production rights
+ // and current-owner checks are exercised by the native PG suite.
+ return !k || !k.read_only && (k.role==="kn_tinh"&&k.department_code===KHTC || k.role==="admin"&&ctx.persona.me.mfa);
+}
+function saveReceiptRead244(ctx: Ctx): Response {
+ const [id,operationID]=ctx.params;
+ if(!id)return code("not_found","Không có báo cáo",404);
+ if(!canSaveContext244(ctx))return problem(403,"forbidden","Không có quyền");
+ const period=templatePeriod(ctx,id);
+ if(!period)return code("not_found","Không có báo cáo",404);
+ const k=knContext(ctx.request.headers.get("X-AG-Context")??"");
+ if(k?.role==="admin"&&period.p.report_type!=="adhoc")return problem(403,"forbidden","Không có quyền");
+ const rows=[...SAVE_OPERATIONS244.values()].filter(v=>v.tenant===ctx.persona.me.tenant_id&&v.receipt.period_id===id);
+ if(!operationID)return json({items:rows.sort((a,b)=>b.receipt.applied!.version-a.receipt.applied!.version).slice(0,50).map(v=>v.receipt)},200,{"Cache-Control":"no-store"});
+ const value=SAVE_OPERATIONS244.get(ctx.persona.me.tenant_id+":"+operationID);
+ if(!value)return json({operation_id:operationID,period_id:id,outcome:"unknown"},200,{"Cache-Control":"no-store"});
+ if(value.receipt.period_id!==id)return code("not_found","Không có thao tác",404);
+ if(value.actor!==ctx.persona.me.actor_ref||value.authority!==saveAuthority244(ctx))return problem(403,"forbidden","Quyền của thao tác đã thay đổi");
+ return json(value.receipt,200,{"Cache-Control":"no-store"});
+}
+function saveChanges244(before:Content,after:Content):S["KHTCReportDraftChange"][]{
+ const changes:S["KHTCReportDraftChange"][]=[];
+ for(const key of ADMIN){const a=before.admin[key],b=after.admin[key];const av=a?.override??a?.system??"",bv=b?.override??b?.system??"";const ad=a?.override==null,bd=b?.override==null;if(av!==bv||ad!==bd)changes.push({field:"admin."+key,before:av,after:bv,before_default:ad,after_default:bd});}
+ for(const key of [...new Set([...Object.keys(before.texts),...Object.keys(after.texts)])].sort())if((before.texts[key]??"")!==(after.texts[key]??""))changes.push({field:"texts."+key,before:before.texts[key]??"",after:after.texts[key]??"",before_default:false,after_default:false});
+ const a=JSON.stringify(before.adhoc??null),b=JSON.stringify(after.adhoc??null);if(a!==b)changes.push({field:"adhoc",before:a,after:b,before_default:false,after_default:false});
+ return changes;
+}
 const NARRATIVE_REVISIONS = new Map<string,KhtcTemplateNarrativeUsage["revisions"]>();
 // Fixed mock periods are fixtures of TENANT; adhoc periods carry their real mock tenant.
 function templatePeriod(ctx: Ctx, periodID: string): Stored | undefined {
@@ -155,7 +191,7 @@ export function khtcTemplatePreviewContent(ctx: Ctx, periodId: string): Content 
  const period=templatePeriod(ctx,periodId);
  return period ? structuredClone(load(ctx,period,true).detail.content) : null;
 }
-export const khtcReportRoutes: Route[] = [{method:"GET",pattern:/^\/v1\/extension\/khtc\/exported-reports\/fields$/,handler:archiveFields},{method:"GET",pattern:/^\/v1\/extension\/khtc\/exported-reports\/periods$/,handler:archivePeriods},{method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/exports\/([^/]+)\/preview$/,handler:archivePreview},{method:"POST",pattern:/^\/v1\/extension\/khtc\/exported-reports\/zip$/,handler:archiveZIP},{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
+export const khtcReportRoutes: Route[] = [{method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/draft-operations\/([^/]+)$/,handler:saveReceiptRead244},{method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/draft-audit$/,handler:saveReceiptRead244},{method:"GET",pattern:/^\/v1\/extension\/khtc\/exported-reports\/fields$/,handler:archiveFields},{method:"GET",pattern:/^\/v1\/extension\/khtc\/exported-reports\/periods$/,handler:archivePeriods},{method:"GET",pattern:/^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/exports\/([^/]+)\/preview$/,handler:archivePreview},{method:"POST",pattern:/^\/v1\/extension\/khtc\/exported-reports\/zip$/,handler:archiveZIP},{ method: "GET", pattern: /^\/v1\/extension\/khtc\/exported-reports$/, handler: archive },{ method: "GET", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report(?:\/(exports)(?:\/([^/]+)\/(download))?)?$/, handler: handle }, { method: "POST", pattern: /^\/v1\/extension\/khtc\/periods\/([^/]+)\/report\/(draft|refresh|exports)(?:\/([^/]+)\/(final))?$/, handler: handle }];
 function handle(ctx: Ctx): Response {
     const [id, op, exportID, action] = ctx.params;
     const kc = knContext(ctx.request.headers.get("X-AG-Context") ?? "");
@@ -179,7 +215,8 @@ function handle(ctx: Ctx): Response {
     if(s.p.report_type==="adhoc" && s.adhocTenant!==ctx.persona.me.tenant_id)return code("not_found","Không có báo cáo",404);
     let value: ReturnType<typeof load>;
     try { value=load(ctx,s); } catch(e) { return code("invalid",e instanceof Error?e.message:"Không đọc được mẫu đã ghim",422); }
-    const d=value.detail;
+    const original=value.detail;
+    const d=ctx.request.method==="POST"&&op==="draft"?structuredClone(original):original;
     if (ctx.request.method === "GET") {
         if (action === "download") {
             const x = value.exports.find(x => x.meta.id === exportID);
@@ -188,6 +225,22 @@ function handle(ctx: Ctx): Response {
             return new Response(x.body, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${x.meta.file_name}"` } });
         }
         return json(op === "exports" ? { items: [...value.exports].reverse().map(x => x.meta) } : d);
+    }
+    const saveBody=ctx.body as S["KHTCReportSave"];
+    const saveKey=ctx.request.headers.get("Idempotency-Key")??"";
+    const saveSignature=JSON.stringify(saveBody);
+    let saveID=saveBody.operation_id;
+    if(op==="draft"){
+        if(!canSaveContext244(ctx))return problem(403,"forbidden","Không có quyền");
+        const existing=saveID?SAVE_OPERATIONS244.get(ctx.persona.me.tenant_id+":"+saveID):[...SAVE_OPERATIONS244.values()].find(v=>v.tenant===ctx.persona.me.tenant_id&&v.key===saveKey&&v.receipt.period_id===id);
+        if(existing){
+            if(existing.receipt.period_id!==id||existing.key!==saveKey||existing.signature!==saveSignature)return code("version_conflict","Thao tác đã gắn với yêu cầu khác");
+            if(existing.actor!==ctx.persona.me.actor_ref||existing.authority!==saveAuthority244(ctx))return problem(403,"forbidden","Quyền của thao tác đã thay đổi");
+            return json({...original,save_receipt:existing.receipt},201);
+        }
+        if(saveID&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(saveID))return code("invalid","Mã thao tác không hợp lệ",422);
+        if([...SAVE_OPERATIONS244.values()].some(v=>v.tenant===ctx.persona.me.tenant_id&&v.key===saveKey&&v.receipt.period_id===id))return code("version_conflict","Khóa đã gắn với thao tác khác");
+        saveID??=uuidv7();
     }
     if (d.final)
         return code("final", "Báo cáo đã có Bản cuối");
@@ -239,7 +292,7 @@ function handle(ctx: Ctx): Response {
         d.content = fresh;
     }
     else {
-        if (Object.keys(body).some(k => !["base_version", "admin", "texts", "adhoc"].includes(k)) || Object.keys(body.admin ?? {}).some(k => !ADMIN.includes(k) || d.locked_admin?.includes(k)) || Object.keys(body.texts ?? {}).some(k => !d.sections.some(s => s.key === k && s.editable)))
+        if (Object.keys(body).some(k => !["operation_id", "base_version", "admin", "texts", "adhoc"].includes(k)) || Object.keys(body.admin ?? {}).some(k => !ADMIN.includes(k) || d.locked_admin?.includes(k)) || Object.keys(body.texts ?? {}).some(k => !d.sections.some(s => s.key === k && s.editable)))
             return code("invalid", "Ô số và mục hệ thống chỉ đọc", 422);
         if(body.adhoc!==undefined){
             if(s.p.report_type!=="adhoc"||!validAdhocSelection(body.adhoc,d.content.data))return code("invalid","Chọn 1–200 chỉ tiêu có nguồn",422);
@@ -256,7 +309,7 @@ function handle(ctx: Ctx): Response {
         for (const [key, text] of Object.entries(body.texts ?? {})) {
             if (text.length > 12000)
                 return code("invalid", "Lời văn quá dài", 422);
-            d.content.texts[key] = text;
+            d.content.texts[key] = text.trim();
         }
     }
     if(d.content.template_snapshot) d.content.template_terminal=s.terminal;
@@ -265,6 +318,12 @@ function handle(ctx: Ctx): Response {
     d.version++;
     d.draft_id = uuidv7();
     recordNarrativeRevision(ctx,d);
+    value.detail=d;
+    if(op==="draft"){
+        const receipt:S["KHTCReportSaveReceipt"]={operation_id:saveID!,period_id:s.p.id,outcome:"applied",applied:{draft_id:d.draft_id!,base_draft_id:original.draft_id,base_version:saveBody.base_version,version:d.version,request_hash:mockDigest(saveBody),actor_ref:ctx.persona.me.actor_ref,at:new Date().toISOString(),changes:saveChanges244(original.content,d.content)}};
+        SAVE_OPERATIONS244.set(ctx.persona.me.tenant_id+":"+saveID,{tenant:ctx.persona.me.tenant_id,actor:ctx.persona.me.actor_ref,authority:saveAuthority244(ctx),key:saveKey,signature:saveSignature,receipt});
+        return json({...load(ctx,s).detail,save_receipt:receipt},201);
+    }
     return json((load(ctx, s)).detail, 201);
 }
 /** W10.17: bản xuất Excel đã lưu cùng bản soạn hiện tại — nguồn của Word giả lập (kn-khtc-words). */

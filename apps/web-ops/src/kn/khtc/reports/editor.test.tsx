@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
+import { findPersona, TENANT } from "@/api/mock/personas";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { createKhtcPeriodApi } from "../periods/api";
 import { createReportApi } from "./api";
@@ -13,8 +14,9 @@ function api232(fetch: typeof mockFetchNoDelay = mockFetchNoDelay) {
     return createApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.tinh", getContextId: () => null, fetch });
 }
 beforeEach(() => {
+    window.sessionStorage.clear();
     Object.assign(auth, {api: api232(), status: "authenticated", principal: {
-        subject: "actor232", displayName: "Nhãn người dùng", tenantId: "tenant232", orgRef: "org232", roles: ["kn_officer"], mfa: true,
+        subject: findPersona("tinh")!.me.actor_ref, displayName: "Nhãn người dùng", tenantId: TENANT, orgRef: "org232", roles: ["kn_officer"], mfa: true,
         level: "tinh", unitName: null, orgName: null, scopeUnits: ["X1"], scopeAll: false,
     }, kn: {status: "active", assignments: [], menu: null, badges: null, context: {
         context_id: "context232", assignment_id: "assignment232", role: "kn_tinh", department_code: "ke_hoach_tai_chinh",
