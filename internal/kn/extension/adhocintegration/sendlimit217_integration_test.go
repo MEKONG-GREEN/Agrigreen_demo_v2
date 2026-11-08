@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -39,6 +40,34 @@ func TestKHTCFixedThreeAndFinalLostACK217(t *testing.T) {
 	p := f.open(41, dTT)
 	if p.MaxSubmissions != 3 {
 		t.Fatalf("legacy wiring selected max%d", p.MaxSubmissions)
+	}
+
+	// Exercise the actual native HTTP owner as well as the KHTC facade. This
+	// fails if the real startup profile ever stops registering its fixed rule.
+	var native struct {
+		Period struct {
+			TemplateID string `json:"template_id"`
+		} `json:"period"`
+	}
+	code, body := f.do(http.MethodGet, "/v1/forms/periods/"+p.FormsPeriodID+"?profile=kn_khtc", authz.KNTinh, khtcDept, f.khtcUser, "", nil)
+	f.ok(code, body, &native)
+	if native.Period.TemplateID == "" {
+		t.Fatalf("missing public native template identity: %s", body)
+	}
+	for _, maximum := range []any{0, 1, 9, "1e100000", "1e-100000", strings.Repeat("9", 100000)} {
+		code, body = f.do(http.MethodPost, "/v1/forms/periods", authz.KNTinh, khtcDept, f.khtcUser, "", map[string]any{
+			"profile": "kn_khtc", "template_id": native.Period.TemplateID, "label": "Forbidden cap override", "due_at": p.DueAt, "units": []string{dTT}, "unit_kind": "department", "max_submissions": maximum})
+		if code != http.StatusUnprocessableEntity && code != http.StatusBadRequest {
+			t.Fatalf("native cap override must reject: HTTP %d %s", code, body)
+		}
+	}
+	var nativeList struct {
+		Items []json.RawMessage `json:"items"`
+	}
+	code, body = f.do(http.MethodGet, "/v1/forms/periods?profile=kn_khtc", authz.KNTinh, khtcDept, f.khtcUser, "", nil)
+	f.ok(code, body, &nativeList)
+	if len(nativeList.Items) != 1 {
+		t.Fatalf("rejected native publications created periods: %d", len(nativeList.Items))
 	}
 	actor := ids.New()
 	var current struct {
