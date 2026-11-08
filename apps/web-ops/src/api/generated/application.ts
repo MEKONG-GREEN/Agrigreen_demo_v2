@@ -10906,8 +10906,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Phiếu thường niên đã gửi chờ rà soát, phân trang theo nhóm kỳ chưa kết thúc
-         * @description Đọc native Progress bằng caller hiện tại. Không gồm kỳ phát sinh; không trả tổng toàn cục. Trang rỗng vẫn có thể có next_cursor. Không suy quyền mutation từ kết quả đọc.
+         * Phiếu đã gửi chờ rà soát theo chế độ thường niên hoặc phát sinh, phân trang theo nhóm kỳ
+         * @description Đọc native Progress bằng caller hiện tại. Mặc định thường niên; chế độ phát sinh theo policy riêng (không TW/chỉ xem, Admin cần MFA), đối chiếu yêu cầu bổ sung với lần gửi native. Bộ lọc kỳ/phòng áp trước LIMIT. Không trả tổng toàn cục hoặc bộ lọc cảnh báo. Trang rỗng vẫn có thể có next_cursor; không suy quyền mutation từ kết quả đọc.
          */
         get: operations["extensionKhtcPendingReview243"];
         put?: never;
@@ -49725,6 +49725,9 @@ export interface operations {
         parameters: {
             query?: {
                 before?: string;
+                report_type?: "regular" | "adhoc";
+                period_id?: string;
+                department?: string;
             };
             header?: never;
             path?: never;
@@ -49732,7 +49735,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Tối đa 25 kỳ thường niên mỗi trang, gồm lần gửi cuối chưa có quyết định; không suy từ nháp hoặc bảng số liệu niêm phong */
+            /** @description Tối đa 25 kỳ thuộc chế độ và bộ lọc mỗi trang, gồm lần gửi cuối chưa có quyết định; không suy từ nháp hoặc bảng số liệu niêm phong */
             200: {
                 headers: {
                     "Cache-Control"?: "no-store";

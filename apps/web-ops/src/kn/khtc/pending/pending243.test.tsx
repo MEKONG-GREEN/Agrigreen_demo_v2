@@ -31,7 +31,7 @@ afterEach(() => vi.useRealTimers());
 describe("Hộp phiếu chờ native243", () => {
   it("shows recorded latest attempt, STT, and existing reviewer link with only a private GET", async () => {
     const requests:Request[]=[]; auth.api=makeApi(async request=>{requests.push(request);return Response.json(page());});
-    render(<KhtcPendingInboxScreen/>); await screen.findByText("Tuần đã gửi");
+    render(<KhtcPendingInboxScreen/>); await screen.findByRole("cell", { name: "Tuần đã gửi" });
     expect(screen.getByRole("columnheader",{name:"STT"})).toBeInTheDocument();
     expect(screen.getByRole("link",{name:"Xem phiếu"})).toHaveAttribute("href",`/kn/khtc/ra-soat/${ids.period}?department=trong_trot`);
     expect(requests).toHaveLength(1); expect(requests[0]!.method).toBe("GET"); expect(requests[0]!.cache).toBe("no-store");
@@ -44,14 +44,14 @@ describe("Hộp phiếu chờ native243", () => {
     fireEvent.click(screen.getByRole("button",{name:"Trang tiếp"}));
     expect(screen.getByText("Đang đọc hộp phiếu…")).toBeInTheDocument();
     await act(async()=>second.resolve(Response.json({rows:[{...row("Kỳ cũ hơn"),period_id:ids.second}],next_cursor:null})));
-    await screen.findByText("Kỳ cũ hơn"); expect(requests[1]!.url).toContain(`before=${ids.period}`);
+    await screen.findByRole("cell", { name: "Kỳ cũ hơn" }); expect(requests[1]!.url).toContain(`before=${ids.period}`);
     expect(screen.getByRole("button",{name:"Trang tiếp"})).toBeDisabled();
     fireEvent.click(screen.getByRole("button",{name:"Trang trước"}));
     expect(screen.queryByText("Kỳ cũ hơn")).not.toBeInTheDocument();
   });
   it("clears results on reload failure and never converts a denial to an empty count", async () => {
     let fail=false;auth.api=makeApi(async()=>fail?Response.json({status:403,code:"forbidden",title:"Denied"},{status:403}):Response.json(page()));
-    render(<KhtcPendingInboxScreen/>);await screen.findByText("Tuần đã gửi");fail=true;
+    render(<KhtcPendingInboxScreen/>);await screen.findByRole("cell", { name: "Tuần đã gửi" });fail=true;
     fireEvent.click(screen.getByRole("button",{name:"Làm mới"}));
     expect(screen.queryByText("Tuần đã gửi")).not.toBeInTheDocument();
     await screen.findByRole("alert");expect(screen.queryByText(/Chưa có phiếu/)).not.toBeInTheDocument();
@@ -68,22 +68,22 @@ describe("Hộp phiếu chờ native243", () => {
     if(part==="role")auth.kn.context={...auth.kn.context,role:"admin"};
     if(part==="readonly")auth.kn.context={...auth.kn.context,read_only:true};
     if(part==="route")route.pathname+="/replacement";
-    view.rerender(<KhtcPendingInboxScreen/>);await screen.findByText("Phiếu hiện tại");
+    view.rerender(<KhtcPendingInboxScreen/>);await screen.findByRole("cell", { name: "Phiếu hiện tại" });
     await act(async()=>old.resolve(Response.json(page("Phiếu cũ"))));
     expect(screen.queryByText("Phiếu cũ")).not.toBeInTheDocument();
   });
   it("separates a committed client A to B to A lifetime",async()=>{
     const old=delayed();let calls=0;const a=makeApi(async()=>++calls===1?old.promise:Response.json(page("A mới")));
     auth.api=a;const view=render(<KhtcPendingInboxScreen/>);await waitFor(()=>expect(calls).toBe(1));
-    auth.api=makeApi(async()=>Response.json(page("B")));view.rerender(<KhtcPendingInboxScreen/>);await screen.findByText("B");
-    auth.api=a;view.rerender(<KhtcPendingInboxScreen/>);await screen.findByText("A mới");
+    auth.api=makeApi(async()=>Response.json(page("B")));view.rerender(<KhtcPendingInboxScreen/>);await screen.findByRole("cell", { name: "B" });
+    auth.api=a;view.rerender(<KhtcPendingInboxScreen/>);await screen.findByRole("cell", { name: "A mới" });
     await act(async()=>old.resolve(Response.json(page("A cũ"))));expect(screen.queryByText("A cũ")).not.toBeInTheDocument();
   });
   it("hides cached facts when the session expires without a rerender",async()=>{
     auth.kn.context.expires_at="2026-10-13T03:00:00.100Z";
     vi.useFakeTimers();vi.setSystemTime(new Date("2026-10-13T03:00:00Z"));
     render(<KhtcPendingInboxScreen/>);await act(async()=>{await vi.advanceTimersByTimeAsync(0);});
-    expect(screen.getByText("Tuần đã gửi")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Tuần đã gửi" })).toBeInTheDocument();
     await act(async()=>{await vi.advanceTimersByTimeAsync(101);});
     expect(screen.queryByText("Tuần đã gửi")).not.toBeInTheDocument();expect(screen.getByRole("alert")).toHaveTextContent("Ngữ cảnh đã hết hạn");
   });
