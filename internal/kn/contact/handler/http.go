@@ -27,6 +27,7 @@ type Handler struct{ Svc *app.Service }
 
 // RegisterApp gắn route Application API.
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
+	h.registerSupport(rg)
 	rg.GET("/contacts/access", h.access)
 	rg.GET("/contacts/persons", h.persons)
 	rg.POST("/contacts/persons", h.personCreate)

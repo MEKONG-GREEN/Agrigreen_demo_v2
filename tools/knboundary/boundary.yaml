@@ -94,6 +94,7 @@ kn_route_prefixes:
   - /v1/price/
   - /v1/hrm/
   - /v1/contacts
+  - /v1/public/contacts/support-requests # Contact-owned anonymous intake; no shared/HTX owner
   - /v1/support-requests
 # Bề mặt KN đang do module dùng chung phục vụ (menu, ngữ cảnh phiên, phòng ban, đơn vị nội bộ, ủy quyền, hỗ trợ).
 # Khác kn_route_prefixes: thao tác không có tag ở đây tính là ghép nối (không suy được chủ từ tiền tố).

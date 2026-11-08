@@ -12680,6 +12680,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/contacts/support-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** FN-CH-00.01/Q10 — gửi yêu cầu hỗ trợ tài khoản cho Admin KN, không cần đăng nhập hay assignment */
+        post: operations["knSupportSubmit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/support-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin KN có MFA xem hàng đợi metadata không PII; ghi audit trước khi trả */
+        get: operations["knSupportList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/support-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin KN có MFA đọc nội dung qua vault với mục đích kn.account_support; no-store và audit trước plaintext */
+        get: operations["knSupportDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contacts/support-requests/{id}/resolution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Admin KN đánh dấu đã xử lý bằng CAS; replay khóa gắn actor sau kiểm quyền hiện tại, không dùng cache POST */
+        put: operations["knSupportResolve"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -27049,6 +27117,26 @@ export interface components {
             checkin: components["schemas"]["CNTSLivestockCheckin"];
             reason?: string;
         };
+        /** @description Tổng JSON chuẩn hóa cộng GCM tag không vượt 12 KiB; quá giới hạn trả validation_failed tại message để rút gọn. */
+        KNSupportInput: {
+            /** @description Họ tên liên hệ; dữ liệu cá nhân */
+            name: string;
+            /** @description Email hoặc số điện thoại; không dùng để tra/liệt kê tài khoản */
+            contact: string;
+            /** @description Nội dung hỗ trợ; không nhập mật khẩu hoặc OTP */
+            message: string;
+        };
+        KNSupportSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @enum {string} */
+            state: "new" | "resolved";
+            /** Format: int64 */
+            version: number;
+        };
+        KNSupportDetail: components["schemas"]["KNSupportSummary"] & components["schemas"]["KNSupportInput"];
     };
     responses: {
         /** @description Đã ghi dòng quá trình */
@@ -54228,6 +54316,138 @@ export interface operations {
             /** @description extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required */
             422: components["responses"]["Problem"];
             503: components["responses"]["Problem"];
+        };
+    };
+    knSupportSubmit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KNSupportInput"];
+            };
+        };
+        responses: {
+            /** @description Yêu cầu đã commit; không trả tài khoản, tenant, mã yêu cầu hoặc nội dung cá nhân */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "accepted";
+                    };
+                };
+            };
+            /** @description contact.support_too_large */
+            413: components["responses"]["Problem"];
+            /** @description contact.support_json_required */
+            415: components["responses"]["Problem"];
+            /** @description validation_failed | idempotency_key_reused */
+            422: components["responses"]["Problem"];
+            /** @description rate_limited */
+            429: components["responses"]["Problem"];
+            /** @description contact.support_unavailable */
+            503: components["responses"]["Problem"];
+        };
+    };
+    knSupportList: {
+        parameters: {
+            query?: {
+                state?: "new" | "resolved";
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tối đa 50 yêu cầu trong tenant hiện tại */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["KNSupportSummary"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+        };
+    };
+    knSupportDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Nội dung giải mã sau kiểm quyền và commit audit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNSupportDetail"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    knSupportResolve: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    expected_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Đã commit sự kiện xử lý (hoặc replay cùng thao tác đã được cấp quyền) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KNSupportSummary"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            /** @description contact.support_stale | idempotency_key_reused */
+            409: components["responses"]["Problem"];
+            413: components["responses"]["Problem"];
+            415: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
         };
     };
 }

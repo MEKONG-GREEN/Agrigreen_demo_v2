@@ -30,9 +30,10 @@ var DBModule = db.Module("pf/contact")
 
 // Service là danh bạ dùng chung. KHÔNG ghi log dữ liệu cá nhân (R-14): service không log; lỗi trả về chỉ mang tên trường.
 type Service struct {
-	DB     tenant.Beginner
-	Clock  clock.Clock
-	Access port.Access
+	Support SupportConfig
+	DB      tenant.Beginner
+	Clock   clock.Clock
+	Access  port.Access
 	// Vault: kho định danh (bắt buộc phần mở rộng client.Directory để đọc thẻ; client.Profiles để ghi liên hệ ngoài tỉnh).
 	Vault client.Client
 	// Staff (tùy chọn): nguồn cán bộ thuộc tỉnh (pf/hrm). nil → danh bạ chỉ có liên hệ ngoài tỉnh.

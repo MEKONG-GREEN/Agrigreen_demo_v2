@@ -17644,6 +17644,90 @@ paths:
         "409": {description: "extension.cnts_livestock_household_version_conflict | extension.cnts_livestock_household_duplicate | extension.cnts_livestock_household_deactivated | extension.cnts_livestock_household_phone_taken", $ref: "#/components/responses/Problem"}
         "422": {description: "extension.cnts_livestock_household_invalid | extension.cnts_livestock_household_checkin_required", $ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/public/contacts/support-requests:
+    post:
+      summary: FN-CH-00.01/Q10 — gửi yêu cầu hỗ trợ tài khoản cho Admin KN, không cần đăng nhập hay assignment
+      operationId: knSupportSubmit
+      tags: [contact]
+      security: []
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/KNSupportInput'}
+      responses:
+        '202':
+          description: Yêu cầu đã commit; không trả tài khoản, tenant, mã yêu cầu hoặc nội dung cá nhân
+          content:
+            application/json:
+              schema: {type: object, additionalProperties: false, required: [status], properties: {status: {type: string, enum: [accepted]}}}
+        '413': {description: contact.support_too_large, $ref: '#/components/responses/Problem'}
+        '415': {description: contact.support_json_required, $ref: '#/components/responses/Problem'}
+        '422': {description: validation_failed | idempotency_key_reused, $ref: '#/components/responses/Problem'}
+        '429': {description: rate_limited, $ref: '#/components/responses/Problem'}
+        '503': {description: contact.support_unavailable, $ref: '#/components/responses/Problem'}
+  /v1/contacts/support-requests:
+    get:
+      summary: Admin KN có MFA xem hàng đợi metadata không PII; ghi audit trước khi trả
+      operationId: knSupportList
+      tags: [contact]
+      parameters:
+        - {name: state, in: query, schema: {type: string, enum: [new, resolved]}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 10000}}
+      responses:
+        '200':
+          description: Tối đa 50 yêu cầu trong tenant hiện tại
+          content:
+            application/json:
+              schema: {type: object, required: [items], properties: {items: {type: array, items: {$ref: '#/components/schemas/KNSupportSummary'}}}}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
+  /v1/contacts/support-requests/{id}:
+    get:
+      summary: Admin KN có MFA đọc nội dung qua vault với mục đích kn.account_support; no-store và audit trước plaintext
+      operationId: knSupportDetail
+      tags: [contact]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Nội dung giải mã sau kiểm quyền và commit audit
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KNSupportDetail'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+  /v1/contacts/support-requests/{id}/resolution:
+    put:
+      summary: Admin KN đánh dấu đã xử lý bằng CAS; replay khóa gắn actor sau kiểm quyền hiện tại, không dùng cache POST
+      operationId: knSupportResolve
+      tags: [contact]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [expected_version], properties: {expected_version: {type: integer, format: int64, minimum: 1}}}
+      responses:
+        '200':
+          description: Đã commit sự kiện xử lý (hoặc replay cùng thao tác đã được cấp quyền)
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KNSupportSummary'}
+        '401': {$ref: '#/components/responses/Problem'}
+        '403': {$ref: '#/components/responses/Problem'}
+        '404': {$ref: '#/components/responses/Problem'}
+        '409': {description: contact.support_stale | idempotency_key_reused, $ref: '#/components/responses/Problem'}
+        '413': {$ref: '#/components/responses/Problem'}
+        '415': {$ref: '#/components/responses/Problem'}
+        '422': {$ref: '#/components/responses/Problem'}
 components:
   securitySchemes:
     oidc:
@@ -28545,3 +28629,24 @@ components:
     CNTSLivestockCheckin: {"type":"object","properties":{"lat":{"type":"number"},"lon":{"type":"number"},"accuracy_m":{"type":"string","pattern":"^[0-9]{1,8}(\\.[0-9]{1,2})?$"},"mocked":{"type":"boolean"},"captured_at":{"type":"string","format":"date-time"}},"required":["lat","lon","accuracy_m","mocked","captured_at"],"additionalProperties":false}
     CNTSLivestockHouseholdSave: {"type":"object","properties":{"base_version":{"type":"integer"},"owner_name":{"type":"string","maxLength":200},"owner_phone":{"type":["string","null"],"pattern":"^[0-9]{0,15}$"},"commune_code":{"type":"string"},"hamlet":{"type":"string","maxLength":200},"livestock_type":{"type":"string","enum":["nong_ho","trang_trai_nho","trang_trai_vua","trang_trai_cong_nghiep"]},"animals":{"type":"array","minItems":1,"maxItems":30,"items":{"type":"object","properties":{"species_code":{"type":"string"},"head_count":{"type":"integer","minimum":0}},"required":["species_code","head_count"],"additionalProperties":false}},"checkin":{"$ref":"#/components/schemas/CNTSLivestockCheckin"},"confirm_distinct":{"type":"boolean"}},"required":["commune_code","livestock_type","animals"],"additionalProperties":false}
     CNTSLivestockHouseholdCheckinRequest: {"type":"object","properties":{"base_version":{"type":"integer"},"checkin":{"$ref":"#/components/schemas/CNTSLivestockCheckin"},"reason":{"type":"string","maxLength":1000}},"required":["base_version","checkin"],"additionalProperties":false}
+    KNSupportInput:
+      description: Tổng JSON chuẩn hóa cộng GCM tag không vượt 12 KiB; quá giới hạn trả validation_failed tại message để rút gọn.
+      type: object
+      additionalProperties: false
+      required: [name, contact, message]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 100, description: Họ tên liên hệ; dữ liệu cá nhân}
+        contact: {type: string, minLength: 1, maxLength: 254, description: Email hoặc số điện thoại; không dùng để tra/liệt kê tài khoản}
+        message: {type: string, minLength: 10, maxLength: 2000, description: Nội dung hỗ trợ; không nhập mật khẩu hoặc OTP}
+    KNSupportSummary:
+      type: object
+      required: [id, created_at, state, version]
+      properties:
+        id: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+        state: {type: string, enum: [new, resolved]}
+        version: {type: integer, format: int64, minimum: 1}
+    KNSupportDetail:
+      allOf:
+        - {$ref: '#/components/schemas/KNSupportSummary'}
+        - {$ref: '#/components/schemas/KNSupportInput'}

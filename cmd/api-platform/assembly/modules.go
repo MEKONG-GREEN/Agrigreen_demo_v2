@@ -365,6 +365,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if err != nil {
 		return Modules{}, pools, err
 	}
+	supportConfig, err := contact.SupportConfigFromEnv(os.Getenv)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	ct.UseSupport(supportConfig)
 	ct.UseStaff(KNContactStaff{Dir: hr.Directory()}, KNContactLabels{Units: acc.InternalUnits(), AdminUnits: knUnits})
 	kn.UseContactNames(ct.Names())
 	// W10.17: cap/export — Word KHTC Mẫu 1–5 (mẫu có phiên bản, lần xuất có băm, số văn bản {n}/BC-TTKN).
