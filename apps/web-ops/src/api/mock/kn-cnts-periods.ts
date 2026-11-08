@@ -71,13 +71,13 @@ const FORMS: Omit<Form, "template_id" | "template_version" | "template_up_to_dat
     deadline_offset_days: -3, deadline_time: "17:00", due: "17:00 Thứ Sáu trước tuần kế hoạch", nil_label: null, fields: bm05(true) },
 ];
 
-interface Tpl { id: string; version: number }
+interface Tpl { id: string; version: number; created_by: string; created_at: string }
 interface Sub { id: string; version: number; values: Record<string, string>; nil_report: boolean; note: string; explanation: string; late: boolean; at: string; by: string;
   /** BF-CN-XA-DATA: rà soát của Cấp Tỉnh (xác thực / yêu cầu điều chỉnh). */
   review?: { id: string; decision: "accepted" | "returned"; note: string | null; at: string; by: string } }
 interface Period {
   id: string; code: string; title: string; label: string; kind: string; key: string; from: string; to: string; due_at: string; rule: string;
-  template_id: string; template_version: number; unit_kind: "commune" | "facility"; units: string[]; parents: string[];
+  template_id: string; template_version: number; unit_kind: "commune" | "facility" | "household"; fields?: Field[]; units: string[]; parents: string[];
   status: "open" | "closed" | "reopened" | "cancelled"; reopen_units: string[]; subs: Map<string, Sub[]>;
 }
 
@@ -101,7 +101,7 @@ const DRAFTS = new Map<string, { period_id: string; unit: string; values: Record
 const MANUAL = new Set<string>(); // kỳ|đơn vị|giờ
 /** W11.44: kỳ đã phát hành (chưa hủy) kèm bài cuối từng đơn vị — giả lập tổng hợp BM-02, BM-18 đọc. */
 export function cntsPeriodFigures(code: string) {
-  return PERIODS.filter((p) => p.code === code && p.status !== "cancelled").map((p) => ({
+  return PERIODS.filter((p) => p.code === code && p.kind !== "adhoc" && p.status !== "cancelled").map((p) => ({
     id: p.id, key: p.key, from: p.from, to: p.to, status: p.status, units: p.units, parents: p.parents,
     last: new Map([...p.subs].map(([u, l]) => [u, l.at(-1)!] as const)),
   }));
@@ -191,7 +191,7 @@ function task(p: Period, unit: string): S["FormsTask"] {
   const i = p.units.indexOf(unit);
   return {
     id: `${p.id}:${unit}`, profile: PROFILE, period_id: p.id, unit, unit_kind: p.unit_kind, parent: p.parents[i] ?? unit, template_id: p.template_id,
-    template_code: p.code, template_title: `${f.bm} — ${f.title}`, template_version: p.template_version, fields: f.fields, label: p.label, period_kind: p.kind,
+    template_code: p.code, template_title: p.fields ? p.title : `${f.bm} — ${f.title}`, template_version: p.template_version, fields: p.fields ?? f.fields, label: p.label, period_kind: p.kind,
     period_key: p.key, period_from: p.from, period_to: p.to, due_at: p.due_at, period_status: p.status,
     open: p.status === "open" || (p.status === "reopened" && (p.reopen_units.length === 0 || p.reopen_units.includes(unit))), status: unitStatus(p, unit),
     version: last?.version ?? 0, submission_id: last?.id ?? null, values: last?.values ?? {}, nil_report: last?.nil_report ?? false, note: last?.note ?? "",
@@ -207,7 +207,7 @@ function periodView(p: Period, w: Who): S["FormsPeriodView"] {
   return {
     period: { id: p.id, profile: PROFILE, template_id: p.template_id, template_code: p.code, template_version: p.template_version, label: p.label, due_at: p.due_at,
       units: p.units, owner_ref: null, publisher_level: "TINH", published_by: "mock", published_at: p.from + "T00:00:00Z" },
-    spec: { unit_kind: p.unit_kind, unit_parents: p.unit_kind === "facility" ? p.parents : [], max_submissions: 0, review_flow: "single", period_kind: p.kind,
+    spec: { unit_kind: p.unit_kind, unit_parents: p.unit_kind !== "commune" ? p.parents : [], max_submissions: 0, review_flow: "single", period_kind: p.kind,
       period_key: p.key, period_from: p.from, period_to: p.to, period_rule: p.rule },
     status: p.status, reopen_units: p.reopen_units, events: [], snapshots: [],
     units: p.units.filter((u) => sees(w, p, u)).map((u) => ({ unit: u, parent: p.parents[p.units.indexOf(u)] ?? u, status: unitStatus(p, u), submission: null, held: null })),
@@ -225,7 +225,7 @@ export const cntsPeriodRoutes: Route[] = [
     pattern: /^\/v1\/extension\/cnts\/period-forms\/install$/,
     handler: (ctx) => {
       if (who(ctx).role !== "admin") return problem(403, "forbidden", "định nghĩa biểu cần vai define_by của cấu hình");
-      for (const f of FORMS) if (!TEMPLATES.has(f.code)) TEMPLATES.set(f.code, { id: uuidv7(), version: 1 });
+      for (const f of FORMS) if (!TEMPLATES.has(f.code)) TEMPLATES.set(f.code, { id: uuidv7(), version: 1, created_by: who(ctx).actor, created_at: new Date().toISOString() });
       return json({ items: FORMS.map(viewForm) });
     },
   },
@@ -390,7 +390,7 @@ export const cntsPeriodRoutes: Route[] = [
       }
       const f = FORMS.find((x) => x.code === p.code)!;
       const values = { ...b.values };
-      for (const fd of f.fields) {
+      for (const fd of p.fields ?? f.fields) {
         if (b.nil_report && (fd.type === "integer" || fd.type === "decimal")) values[fd.key] = "0";
         if (fd.required && !(values[fd.key] ?? "").trim()) return problem(422, "forms.values_invalid", "Số liệu không khớp định nghĩa biểu", { errors: [{ field: fd.key, reason: "bắt buộc" }] });
       }
@@ -540,3 +540,23 @@ export const cntsPeriodRoutes: Route[] = [
 
 // BF-CN-FORM-DESIGN: cùng dữ liệu/phiên bản với màn Phát hành, không cài hay ghi biểu.
 export function cntsDesignMockForms(): Form[] { return FORMS.map(viewForm); }
+
+
+/** #277: chiếu phát hành mock sang Forms bằng refs/parents và snapshot biểu, không chép tên hộ. */
+export function projectHouseholdCampaignPeriod(p: Omit<Period, "status" | "reopen_units" | "subs">) {
+  if (!findPeriod(p.id)) PERIODS.unshift({ ...structuredClone(p), status: "open", reopen_units: [], subs: new Map() });
+}
+
+export function resetHouseholdCampaignPeriods() {
+  for (let i = PERIODS.length - 1; i >= 0; i--) if (PERIODS[i]!.unit_kind === "household" && PERIODS[i]!.kind === "adhoc") {
+    const [p] = PERIODS.splice(i, 1);
+    for (const [key, draft] of DRAFTS) if (draft.period_id === p!.id) DRAFTS.delete(key);
+  }
+}
+
+export function cntsDesignMockTemplates(): S["FormsTemplate"][] {
+  return FORMS.flatMap((f) => {
+    const t = TEMPLATES.get(f.code);
+    return t ? [{ ...t, profile: PROFILE, code: f.code, title: f.title, fields: structuredClone(f.fields), fixture: true }] : [];
+  });
+}

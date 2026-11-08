@@ -4,14 +4,15 @@
 // nhập BM-01 (theo cơ sở, theo ngày), BM-04, BM-17 (theo xã, theo tuần), BM-05 (kết quả / kế hoạch tuần làm việc).
 // Hỗ trợ: sao chép kỳ trước, báo không phát sinh, ghi chú (H08), lý do trễ (H09), lưu nháp trên máy, khóa lạc quan —
 // người lưu sau được báo "Đã có người cập nhật lúc …" và phải tải bản mới (không ghi đè).
-import { useEffect, useMemo, useRef, useState } from "react";
-import { unwrap } from "@/api/client";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { unwrap, type ApiClient } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import type { CatalogItem } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { NumberField, SelectField, TextField } from "@/components/form";
 import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
+import { createLivestockApi } from "@/kn/cnts/livestock/api";
 import { STATUS_LABEL, STATUS_TONE, createCntsPeriodApi, fieldErrors, groupFields, isLate, numberRule, payloadValues, type CntsDraft, type FormsTask } from "./api";
 
 interface Draft {
@@ -48,8 +49,31 @@ function clearDraft(t: FormsTask) {
   }
 }
 
+// FN-21 B3: tên hộ chỉ đọc qua hợp đồng FN-10 của ngữ cảnh hiện tại, không lưu vào Forms/nháp.
+function HouseholdTaskLabel({ api, task }: { api: ApiClient; task: FormsTask }) {
+  const hapi = useMemo(() => createLivestockApi(api), [api]);
+  const household = useLoad(() => hapi.get(task.unit), [hapi, task]);
+  let text = "Đang tải thông tin hộ…";
+  if (!household.loading) {
+    const h = household.data;
+    if (household.problem?.status === 401 || household.problem?.status === 403) text = "Không có quyền xem hộ";
+    else if (household.problem?.status === 404) text = "Không có hộ trong phạm vi hiện tại";
+    else if (!h) text = "Chưa tải được thông tin hộ";
+    else if (h.id !== task.unit || h.commune_code !== task.parent) text = "Thông tin hộ không khớp công việc";
+    else if (!h.code) text = "Mã hộ chưa khả dụng";
+    else text = h.code + " · " + (h.owner_name || h.owner_label || "Tên hộ chưa khả dụng");
+  }
+  return <span style={{ overflowWrap: "anywhere" }}>{text}</span>;
+}
+
 export function CntsEntryScreen() {
-  const { api } = useAuth();
+  const { api, principal, kn } = useAuth();
+  // ApiClient ổn định khi đổi ngữ cảnh: bỏ cả nhãn và biểu đang mở của tenant/lần gán/phạm vi cũ.
+  const sessionKey = JSON.stringify([principal?.subject, principal?.tenantId, principal?.scopeUnits, principal?.scopeAll, kn.context]);
+  return <CntsTasks key={sessionKey} api={api} />;
+}
+
+function CntsTasks({ api }: { api: ApiClient }) {
   const capi = useMemo(() => (api ? createCntsPeriodApi(api) : null), [api]);
   const [code, setCode] = useState("");
   const forms = useLoad(capi ? () => capi.forms() : null, [capi]);
@@ -61,13 +85,15 @@ export function CntsEntryScreen() {
   const [open, setOpen] = useState<FormsTask | null>(null);
   const communeName = useCommuneNames((tasks.data ?? []).map((t) => t.parent));
   const unitName = (t: FormsTask) =>
-    t.unit_kind === "facility" ? (facilities.data?.find((f) => f.attrs.facility_ref === t.unit)?.name ?? t.unit) : communeName(t.unit);
+    t.unit_kind === "household" ? (
+      <HouseholdTaskLabel key={t.id + ":" + t.unit + ":" + t.parent + ":" + t.version} api={api} task={t} />
+    ) : t.unit_kind === "facility" ? (facilities.data?.find((f) => f.attrs.facility_ref === t.unit)?.name ?? t.unit) : communeName(t.unit);
 
   if (!capi) return null;
   return (
     <div className="page">
       <PageHeader title="Báo cáo kỳ — Chăn nuôi, Thủy sản">
-        <p className="mute">Công việc cần làm của xã, cơ sở giết mổ được phân công (FN-08, FN-09).</p>
+        <p className="mute">Công việc cần làm của xã, cơ sở giết mổ và hộ được phân công (FN-08, FN-09, FN-21).</p>
       </PageHeader>
       <section className="card sec">
         <select className="select" aria-label="Lọc biểu" value={code} onChange={(e) => setCode(e.target.value)}>
@@ -94,7 +120,7 @@ export function CntsEntryScreen() {
                   cell: (t) => (
                     <>
                       {unitName(t)}
-                      {t.unit_kind === "facility" ? <span className="mute"> · xã {communeName(t.parent)}</span> : null}
+                      {t.unit_kind === "facility" || t.unit_kind === "household" ? <span className="mute"> · xã {communeName(t.parent)}</span> : null}
                     </>
                   ),
                 },
@@ -151,7 +177,7 @@ function Entry({
   onDone,
 }: {
   task: FormsTask;
-  unitLabel: string;
+  unitLabel: ReactNode;
   nilLabel: string | null;
   capi: ReturnType<typeof createCntsPeriodApi>;
   onDone: (reload: boolean) => void;

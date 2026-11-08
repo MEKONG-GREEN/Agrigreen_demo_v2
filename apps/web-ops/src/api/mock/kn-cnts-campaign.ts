@@ -1,13 +1,16 @@
 // GIẢ LẬP Chiến dịch điều tra mở rộng CNTS (W11.50, BRD CNTS v3.7 FN-21, UR-TINH-26) theo hợp đồng
 // /v1/extension/cnts/campaigns*: Nháp (sửa = phiên bản mới) → Phát hành (Đang thu thập, kỳ adhoc "DT-…") → nhắc, gia hạn có lý
 // do → Đóng đợt (xã chưa gửi = Không nộp) → Mở lại (lý do + thời hạn). Tiến độ/ kết quả là số giả, KHÔNG nối giả lập công
-// việc /v1/forms/tasks (máy chủ thật sinh việc cho xã). Dữ liệu tổng hợp, không phải thật.
+// việc theo xã; #277 nối công việc theo hộ vào /v1/forms/tasks. Dữ liệu tổng hợp, không phải thật.
 // #236 (BRD CNTS v4.0 FN-21): người phụ trách bắt buộc (chọn từ /v1/extension/cnts/campaign-owners), sao chép đợt cũ
 // (/copy → đợt Nháp mới, không mang số liệu). Giả lập không phân nhóm Cấp Tỉnh: người ghi được coi là cán bộ tổng hợp.
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 import { knContext } from "./kn";
+import { livestockHouseholdRef } from "./kn-cnts-livestock";
+import { cntsDesignTemplate } from "./kn-cnts-design";
+import { projectHouseholdCampaignPeriod, resetHouseholdCampaignPeriods } from "./kn-cnts-periods";
 
 type S = components["schemas"];
 type Campaign = S["CNTSCampaign"];
@@ -27,6 +30,7 @@ const CAMPAIGNS = new Map<string, Campaign>();
 /** Xóa trạng thái (kiểm thử). */
 export function resetCntsCampaigns() {
   CAMPAIGNS.clear();
+  resetHouseholdCampaignPeriods();
 }
 
 interface Who { role: string; readOnly: boolean; dept: string | null; actor: string }
@@ -174,10 +178,25 @@ export const cntsCampaignRoutes: Route[] = [
     handler: (ctx) =>
       withCampaign(ctx, (c, w) => {
         if (c.state !== "draft") return stateErr();
+        const template = c.scope_mode === "households" ? cntsDesignTemplate(c.template_code, c.template_version ?? undefined) : null;
+        if (c.scope_mode === "households") {
+          const current = c.households.map((h) => livestockHouseholdRef(h.ref));
+          if (current.some((h) => !h || h.status !== "active")) return problem(422, "extension.cnts_campaign_household", "Hộ không còn Đang dùng");
+          if (!template) return problem(422, "forms.template_not_found", "Không tìm thấy phiên bản biểu đã chọn");
+          c.households = current.map((h) => ({ ref: h!.household_ref, code: h!.code, commune: h!.commune_code, status: h!.status }));
+          c.communes = [...new Set(c.households.map((h) => h.commune))];
+        }
         c.state = "collecting";
         c.forms_period_id = uuidv7();
         c.period_key = `DT-${c.from_date.replaceAll("-", "")}-${c.id.replaceAll("-", "").slice(-6)}`;
         c.template_version = c.template_version ?? 1; // #192: giữ phiên bản đã chọn ở Nháp
+        if (template) {
+          c.template_version = template.version;
+          projectHouseholdCampaignPeriod({ id: c.forms_period_id, code: c.template_code, title: template.title, label: c.name,
+            kind: "adhoc", key: c.period_key, from: c.from_date, to: c.to_date, due_at: c.due_at, rule: "cnts.campaign/v1",
+            template_id: template.template_id, template_version: template.version, fields: template.fields, unit_kind: "household",
+            units: c.households.map((h) => h.ref), parents: c.households.map((h) => h.commune) });
+        }
         c.progress = progressOf(c, false);
         event(c, w, "published", { due_at: c.due_at });
         return json(c);
