@@ -54,6 +54,31 @@ CREATE TRIGGER trg_aa_fixed_limit_review BEFORE INSERT ON pf_forms.review
   FOR EACH ROW EXECUTE FUNCTION pf_forms.guard_fixed_limit_review();
 REVOKE ALL ON FUNCTION pf_forms.guard_fixed_limit_review() FROM PUBLIC;
 
+-- Offline held writes must obey the same final lock as native SubmitWith.
+-- Historical profiles without an auto-lock registration keep their old rules.
+CREATE FUNCTION pf_forms.guard_fixed_limit_held() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
+DECLARE v_profile text;
+BEGIN
+  SELECT p.profile INTO v_profile FROM pf_forms.period p
+  WHERE p.tenant_id=NEW.tenant_id AND p.id=NEW.period_id;
+  IF FOUND THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended('pf_forms.period:'||NEW.period_id::text,0));
+    IF EXISTS (
+      SELECT 1 FROM pf_forms.profile_submission_policy r
+      WHERE r.profile=v_profile AND r.auto_lock
+        AND (SELECT coalesce(max(s.seq),0) FROM pf_forms.submission s
+             WHERE s.tenant_id=NEW.tenant_id AND s.period_id=NEW.period_id AND s.unit_code=NEW.unit_code)>=r.max_submissions
+    ) THEN
+      RAISE EXCEPTION 'final allowed submission is locked' USING ERRCODE='AGF03';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_aa_fixed_limit_held BEFORE INSERT ON pf_forms.held_submission
+  FOR EACH ROW EXECUTE FUNCTION pf_forms.guard_fixed_limit_held();
+REVOKE ALL ON FUNCTION pf_forms.guard_fixed_limit_held() FROM PUBLIC;
+
 CREATE TABLE pf_forms.submission_receipt (
   profile text NOT NULL,
   period_id uuid NOT NULL,
@@ -87,31 +112,45 @@ SELECT shared.apply_ledger('pf_forms.submission_receipt','pf_forms.submission_re
 -- not the latest submission or a caller-supplied success marker.
 CREATE FUNCTION pf_forms.guard_submission_receipt() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog, pg_temp AS $$
-DECLARE v_ok boolean; v_max integer; v_auto boolean; v_seq bigint; v_expected text;
+DECLARE v_ok boolean; v_max integer; v_auto boolean; v_seq bigint; v_expected text; v_values jsonb;
 BEGIN
   IF NEW.request_content->>'Unit' IS DISTINCT FROM NEW.unit_code THEN
     RAISE EXCEPTION 'receipt target mismatch' USING ERRCODE='check_violation',CONSTRAINT='submission_receipt_proof';
+  END IF;
+  v_values:=NEW.request_content->'Values';
+  IF coalesce((NEW.request_content->>'NilReport')::boolean,false) THEN
+    -- Match native NilValues: preserve text, fill every numeric field with "0".
+    -- The original unnormalized request remains the replay binding.
+    SELECT v_values || coalesce(jsonb_object_agg(f->>'key','0'::text),'{}'::jsonb) INTO v_values
+    FROM pf_forms.period p JOIN pf_forms.template t ON t.tenant_id=p.tenant_id AND t.id=p.template_id
+    CROSS JOIN LATERAL jsonb_array_elements(t.fields) f
+    WHERE p.tenant_id=NEW.tenant_id AND p.id=NEW.period_id AND f->>'type' IN ('integer','decimal');
   END IF;
   IF NEW.status='awaiting_reopen' THEN
     SELECT true INTO v_ok FROM pf_forms.held_submission h
     JOIN pf_forms.period p ON p.tenant_id=h.tenant_id AND p.id=h.period_id
     WHERE h.tenant_id=NEW.tenant_id AND h.id=NEW.submission_id AND h.period_id=NEW.period_id
       AND h.unit_code=NEW.unit_code AND h.submitter_ref=NEW.actor_ref AND p.profile=NEW.profile
-      AND h.recorded_at=now() AND h.idem_key=NEW.idem_key||':held';
+      AND h.recorded_at=now() AND h.idem_key=NEW.idem_key||':held'
+      AND h.event_time=NEW.event_time AND h.values=v_values
+      AND (NEW.request_content->'ID'='null'::jsonb OR (NEW.request_content->>'ID')::uuid=h.id)
+      AND (NEW.request_content->>'CapturedAt')::timestamptz=h.captured_at;
   ELSE
     SELECT s.seq INTO v_seq FROM pf_forms.submission s
     JOIN pf_forms.period p ON p.tenant_id=s.tenant_id AND p.id=s.period_id
     JOIN pf_forms.submission_meta m ON m.tenant_id=s.tenant_id AND m.submission_id=s.id
     WHERE s.tenant_id=NEW.tenant_id AND s.id=NEW.submission_id AND s.period_id=NEW.period_id
       AND s.unit_code=NEW.unit_code AND s.submitter_ref=NEW.actor_ref AND p.profile=NEW.profile
-      AND s.recorded_at=now() AND s.idem_key=NEW.idem_key||':submission'
+      AND s.recorded_at=now() AND s.idem_key=NEW.idem_key||':submission' AND s.event_time=NEW.event_time
+      AND m.recorded_at=now() AND m.idem_key=NEW.idem_key||':meta' AND m.actor_ref=NEW.actor_ref
+      AND coalesce(NEW.request_content->>'DeviceID','')=coalesce(m.device_id,'')
       AND (NEW.request_content->'BaseVersion'='null'::jsonb OR (NEW.request_content->>'BaseVersion')::bigint=m.base_version)
       AND (NEW.request_content->'ID'='null'::jsonb OR (NEW.request_content->>'ID')::uuid=s.id)
       AND coalesce((NEW.request_content->>'NilReport')::boolean,false)=m.nil_report
       AND coalesce(NEW.request_content->>'Note','')=coalesce(m.note,'')
       AND coalesce(NEW.request_content->>'Explanation','')=coalesce(m.explanation,'')
       AND ((NEW.request_content->>'CapturedAt')::timestamptz IS NOT DISTINCT FROM m.captured_at)
-      AND (m.nil_report OR NEW.request_content->'Values'=s.values);
+      AND v_values=s.values;
     v_ok:=FOUND;
     SELECT r.max_submissions,r.auto_lock INTO v_max,v_auto FROM pf_forms.profile_submission_policy r WHERE r.profile=NEW.profile;
     v_expected:=CASE WHEN coalesce(v_auto,false) AND v_seq>=v_max THEN 'locked' ELSE 'submitted' END;

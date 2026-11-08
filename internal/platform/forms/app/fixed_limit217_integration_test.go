@@ -348,3 +348,156 @@ func TestFormsLargePayload217(t *testing.T) {
 		})
 	}
 }
+
+func TestFormsSubmitReceiptTupleProof217(t *testing.T) {
+	f, profile, pid, owner, member, _ := fixedLegacy217(t, 0)
+	principal, _ := authz.FromContext(member)
+	base := int64(0)
+	t.Run("regular_device", func(t *testing.T) {
+		err := tenant.WithTenantTx(f.ctx, f.own, f.tid, func(tx pgx.Tx) error {
+			sb := store.Submission{ID: ids.New(), PeriodID: pid, Unit: "trong_trot", Values: fx02, Submitter: principal.ActorRef, EventTime: f.clk.Now()}
+			if err := store.InsertSubmission(f.ctx, tx, f.tid, &sb, "proof-device:submission"); err != nil {
+				return err
+			}
+			meta := store.Meta{SubmissionID: sb.ID, BaseVersion: base}
+			if err := store.InsertMeta(f.ctx, tx, f.tid, &meta, principal.ActorRef, f.clk.Now(), "original-device", "proof-device:meta"); err != nil {
+				return err
+			}
+			request, err := json.Marshal(SubmitInput{Unit: "trong_trot", Values: fx02, BaseVersion: &base, DeviceID: "forged-device"})
+			if err != nil {
+				return err
+			}
+			return store.InsertSubmissionReceipt(f.ctx, tx, f.tid, profile, request, "proof-device", sb, domain.SubSubmitted)
+		})
+		if code, constraint := pgCode(err); code != "23514" || constraint != "submission_receipt_proof" {
+			t.Errorf("receipt accepted device other than original metadata: %v", err)
+		}
+	})
+	p, err := f.svc.Period(owner, profile, pid)
+	f.must(err, "regular proof period")
+	held, err := f.svc.Publish(owner, PublishInput{Profile: profile, TemplateID: p.Period.TemplateID,
+		Label: "held proof", DueAt: f.clk.Now().Add(time.Hour), Units: []string{"trong_trot"}}, "")
+	f.must(err, "held proof publication")
+	_, err = f.svc.Close(owner, profile, held.Period.ID, "")
+	f.must(err, "close for native held lifecycle")
+	captured := f.clk.Now().Add(-time.Hour).UTC().Truncate(time.Microsecond)
+	for _, mismatch := range []string{"values", "captured_at", "id", "event_time"} {
+		t.Run("held_"+mismatch, func(t *testing.T) {
+			key := "proof-held-" + mismatch
+			err := tenant.WithTenantTx(f.ctx, f.own, f.tid, func(tx pgx.Tx) error {
+				h := store.Held{ID: ids.New(), PeriodID: held.Period.ID, Unit: "trong_trot", Values: fx02,
+					Submitter: principal.ActorRef, CapturedAt: captured, EventTime: f.clk.Now()}
+				if err := store.InsertHeld(f.ctx, tx, f.tid, &h, key+":held"); err != nil {
+					return err
+				}
+				in := SubmitInput{ID: &h.ID, Unit: h.Unit, Values: h.Values, CapturedAt: &captured}
+				sb := store.Submission{ID: h.ID, PeriodID: h.PeriodID, Unit: h.Unit, Values: h.Values, Submitter: h.Submitter, EventTime: h.EventTime}
+				switch mismatch {
+				case "values":
+					in.Values = map[string]string{"pest": "other", "area_infected": "9"}
+				case "captured_at":
+					other := captured.Add(time.Minute)
+					in.CapturedAt = &other
+				case "id":
+					other := ids.New()
+					in.ID = &other
+				case "event_time":
+					sb.EventTime = sb.EventTime.Add(time.Minute)
+				}
+				request, err := json.Marshal(in)
+				if err != nil {
+					return err
+				}
+				return store.InsertSubmissionReceipt(f.ctx, tx, f.tid, profile, request, key, sb, domain.SubAwaitingReopen)
+			})
+			if code, constraint := pgCode(err); code != "23514" || constraint != "submission_receipt_proof" {
+				t.Errorf("held receipt accepted %s mismatch: %v", mismatch, err)
+			}
+		})
+	}
+	in := SubmitInput{Unit: "trong_trot", Values: fx02, CapturedAt: &captured, DeviceID: "offline-original"}
+	sb, err := f.svc.SubmitWith(member, profile, held.Period.ID, in, "held-positive")
+	f.must(err, "genuine fixed native held submission")
+	if sb.Status != domain.SubAwaitingReopen {
+		t.Fatalf("held native status=%s", sb.Status)
+	}
+	replay, err := f.svc.SubmitWith(member, profile, held.Period.ID, in, "held-positive")
+	f.must(err, "original held replay")
+	if !replay.Replayed || replay.Status != domain.SubAwaitingReopen || replay.Submission.ID != sb.Submission.ID {
+		t.Fatal("held replay did not return original ACK")
+	}
+	in.Values = map[string]string{"pest": "other", "area_infected": "9"}
+	_, err = f.svc.SubmitWith(member, profile, held.Period.ID, in, "held-positive")
+	f.want(err, "conflict", "held request payload binding")
+}
+
+func TestFormsFixedLimitHeldAfterCap217(t *testing.T) {
+	f, profile, pid, owner, member, _ := fixedLegacy217(t, 9)
+	for n := int64(0); n < 3; n++ {
+		sb, err := f.svc.SubmitWith(member, profile, pid, SubmitInput{Unit: "trong_trot", Values: fx02, BaseVersion: &n}, fmt.Sprintf("held-cap-send%d", n))
+		f.must(err, "held-cap native send")
+		if n < 2 {
+			_, err = f.svc.Review(owner, profile, sb.Submission.ID, "returned", "Bổ sung", fmt.Sprintf("held-cap-review%d", n))
+			f.must(err, "held-cap review")
+		}
+	}
+	_, err := f.svc.Close(owner, profile, pid, "")
+	f.must(err, "close after final lock")
+	_, err = f.svc.SubmitOffline(member, profile, pid, "trong_trot", fx02, f.clk.Now().Add(-time.Hour), "after-cap-native")
+	f.want(err, "forms.submission_limit", "native held after final lock")
+	principal, _ := authz.FromContext(member)
+	err = tenant.WithTenantTx(f.ctx, f.own, f.tid, func(tx pgx.Tx) error {
+		h := store.Held{ID: ids.New(), PeriodID: pid, Unit: "trong_trot", Values: fx02,
+			Submitter: principal.ActorRef, CapturedAt: f.clk.Now().Add(-time.Hour), EventTime: f.clk.Now()}
+		return store.InsertHeld(f.ctx, tx, f.tid, &h, "after-cap-sql:held")
+	})
+	if code, _ := pgCode(err); code != "AGF03" {
+		t.Fatalf("direct held bypassed final lock: %v", err)
+	}
+	if n := f.scalar(`SELECT count(*) FROM pf_forms.held_submission WHERE tenant_id=$1 AND period_id=$2`, f.tid, pid); n != 0 {
+		t.Fatalf("rejected held write persisted %d rows", n)
+	}
+}
+
+func TestFormsSubmitReceiptNilReportProof217(t *testing.T) {
+	f, profile, pid, _, member, _ := fixedLegacy217(t, 0)
+	principal, _ := authz.FromContext(member)
+	t.Run("forged_text", func(t *testing.T) {
+		err := tenant.WithTenantTx(f.ctx, f.own, f.tid, func(tx pgx.Tx) error {
+			sb := store.Submission{ID: ids.New(), PeriodID: pid, Unit: "trong_trot", Values: map[string]string{"pest": "native", "area_infected": "0"}, Submitter: principal.ActorRef, EventTime: f.clk.Now()}
+			if err := store.InsertSubmission(f.ctx, tx, f.tid, &sb, "nil-proof:submission"); err != nil {
+				return err
+			}
+			meta := store.Meta{SubmissionID: sb.ID, NilReport: true}
+			if err := store.InsertMeta(f.ctx, tx, f.tid, &meta, principal.ActorRef, f.clk.Now(), "", "nil-proof:meta"); err != nil {
+				return err
+			}
+			request, err := json.Marshal(SubmitInput{Unit: "trong_trot", Values: map[string]string{"pest": "forged"}, NilReport: true})
+			if err != nil {
+				return err
+			}
+			return store.InsertSubmissionReceipt(f.ctx, tx, f.tid, profile, request, "nil-proof", sb, domain.SubSubmitted)
+		})
+		if code, constraint := pgCode(err); code != "23514" || constraint != "submission_receipt_proof" {
+			t.Errorf("nil-report receipt ignored text values: %v", err)
+		}
+	})
+	// Use another assigned unit so the positive control is independent of the
+	// deliberately forged transaction in the initial red run.
+	member = f.asDept(ids.New(), "tinh", "chan_nuoi", ids.New())
+	base := int64(0)
+	in := SubmitInput{Unit: "chan_nuoi", Values: map[string]string{"pest": "none"}, BaseVersion: &base, NilReport: true}
+	sb, err := f.svc.SubmitWith(member, profile, pid, in, "nil-positive")
+	f.must(err, "valid native nil report")
+	if sb.Submission.Values["area_infected"] != "0" || sb.Submission.Values["pest"] != "none" {
+		t.Fatal("native nil normalization changed")
+	}
+	replay, err := f.svc.SubmitWith(member, profile, pid, in, "nil-positive")
+	f.must(err, "original nil report replay")
+	if !replay.Replayed || replay.Submission.ID != sb.Submission.ID {
+		t.Fatal("nil report replay lost original submission")
+	}
+	in.Values = map[string]string{"pest": "none", "area_infected": "0"}
+	_, err = f.svc.SubmitWith(member, profile, pid, in, "nil-positive")
+	f.want(err, "conflict", "raw nil report request remains exact despite same normalized values")
+}
