@@ -15,10 +15,20 @@ export function createReportSaveSession244(api: Pick<ReportApi, "save" | "saveOp
     const listeners = new Set<() => void>();
     const key = reportSaveStorageKey244(scope, id);
     const publish = (next: Snapshot) => { state = next; for (const listener of listeners) listener(); };
-    const persist = (pending: Pending | null) => {
+    const persist = (pending: Pending) => {
         const store = storage();
         if (!store) throw new Error("Không lưu được mã đối chiếu của lần lưu. Chưa gửi thay đổi.");
-        if (pending) store.setItem(key, JSON.stringify(pending)); else store.removeItem(key);
+        store.setItem(key, JSON.stringify(pending));
+    };
+    const forget = (pending: Pending) => {
+        const store = storage();
+        if (!store) throw new Error("Không đọc được mã đối chiếu của lần lưu.");
+        const raw = store.getItem(key);
+        if (!raw) return;
+        const stored = JSON.parse(raw) as Pending;
+        // A remounted owner may have reconciled this save and started another.
+        // An old response can clear only its own persisted operation.
+        if (stored.operationID === pending.operationID && stored.key === pending.key) store.removeItem(key);
     };
     const verify = (receipt: ReportSaveReceipt, pending: Pending) => {
         if (receipt.operation_id !== pending.operationID || receipt.period_id !== id) throw new Error("Kết quả chưa khớp lần lưu cần đối chiếu.");
@@ -32,8 +42,8 @@ export function createReportSaveSession244(api: Pick<ReportApi, "save" | "saveOp
     };
     const confirm = (receipt: ReportSaveReceipt, pending: Pending) => {
         if (!verify(receipt, pending)) return false;
-        persist(null);
-        publish({ ready: true, pending: null, receipt, error: "", blocked: false });
+        forget(pending);
+        if (state.pending?.operationID === pending.operationID) publish({ ready: true, pending: null, receipt, error: "", blocked: false });
         return true;
     };
     return {
@@ -68,8 +78,8 @@ export function createReportSaveSession244(api: Pick<ReportApi, "save" | "saveOp
                 return response.save_receipt;
             } catch (error) {
                 if (error instanceof ApiProblem && !outcomeUnknown({ status: error.status, code: error.code })) {
-                    persist(null);
-                    publish({ ...state, pending: null });
+                    forget(pending);
+                    if (state.pending?.operationID === pending.operationID) publish({ ...state, pending: null });
                 }
                 throw error;
             }

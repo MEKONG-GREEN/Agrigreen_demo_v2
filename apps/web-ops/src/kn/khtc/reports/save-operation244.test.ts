@@ -40,3 +40,22 @@ describe("report draft244 exact operation recovery",()=>{
   const reads=vi.fn(()=>store);const readonly=createReportSaveSession244(api,period,actor,"",reads);readonly.load();expect(reads).not.toHaveBeenCalled();expect(readonly.getSnapshot().blocked).toBe(true);
  });
 });
+
+it("a late old ACK after remount/reconcile cannot clear a successor's pending metadata",async()=>{
+ const store=memory();let firstReceipt:ReportSaveReceipt|null=null;
+ let releaseOld!:(v:Awaited<ReturnType<ReportApi["save"]>>)=>void;
+ let rejectNew!:(e:Error)=>void;
+ const oldResponse=new Promise<Awaited<ReturnType<ReportApi["save"]>>>(resolve=>{releaseOld=resolve;});
+ const newResponse=new Promise<Awaited<ReturnType<ReportApi["save"]>>>((_resolve,reject)=>{rejectNew=reject;});
+ const api={save:vi.fn((_id,body)=>{if(!firstReceipt){firstReceipt=applied(body.operation_id!);return oldResponse;}return newResponse;}),saveOperation:vi.fn(async()=>firstReceipt!)} satisfies SaveApi;
+ const old=createReportSaveSession244(api,period,actor,"same-current-authority",()=>store);old.load();
+ const oldSave=old.save({base_version:4});
+ const current=createReportSaveSession244(api,period,actor,"same-current-authority",()=>store);current.load();await current.reconcile();
+ const currentSave=current.save({base_version:5});
+ const pending=current.getSnapshot().pending!;
+ releaseOld({save_receipt:firstReceipt!} as Awaited<ReturnType<ReportApi["save"]>>);await oldSave;
+ const afterReload=createReportSaveSession244(api,period,actor,"same-current-authority",()=>store);afterReload.load();
+ expect(afterReload.getSnapshot().pending?.operationID).toBe(pending.operationID);
+ rejectNew(new TypeError("successor ACK unknown"));await expect(currentSave).rejects.toThrow("unknown");
+ expect(api.save).toHaveBeenCalledTimes(2);
+});
