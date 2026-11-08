@@ -604,7 +604,7 @@ components:
         values: {type: object, additionalProperties: {type: string}}
         submitter_ref: {type: string, format: uuid}
         event_time: {type: string, format: date-time}
-        status: {type: string, enum: [submitted, accepted, returned, awaiting_reopen]}
+        status: {type: string, enum: [submitted, accepted, returned, locked, awaiting_reopen]}
         review:
           oneOf:
             - {type: "null"}
@@ -653,8 +653,8 @@ components:
         parent: {type: string, description: "Đơn vị lọc phạm vi: mã xã cha (cơ sở/hộ), chính unit với loại khác"}
         status:
           type: string
-          enum: [not_submitted, overdue, submitted, accepted, returned, missed, closed_unadjusted, awaiting_reopen]
-          description: "Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05). overdue = Trễ hạn: chưa gửi, kỳ còn nhận bài, quá hạn (W11.42)"
+          enum: [not_submitted, overdue, submitted, accepted, returned, locked, missed, closed_unadjusted, awaiting_reopen]
+          description: "Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05). overdue = Trễ hạn: chưa gửi, kỳ còn nhận bài, quá hạn (W11.42). locked = đã gửi đủ fixed cap và tự khóa, không còn xác nhận/trả lại"
         submission:
           oneOf:
             - {type: "null"}
@@ -703,7 +703,7 @@ components:
         due_at: {type: string, format: date-time}
         period_status: {type: string, enum: [open, closed, reopened, cancelled]}
         open: {type: boolean, description: Kỳ đang nhận bài của đơn vị}
-        status: {type: string, enum: [not_submitted, overdue, submitted, accepted, returned, missed, closed_unadjusted, awaiting_reopen]}
+        status: {type: string, enum: [not_submitted, overdue, submitted, accepted, returned, locked, missed, closed_unadjusted, awaiting_reopen]}
         version: {type: integer, minimum: 0, description: "Phiên bản bài nộp cuối (0 = chưa có) — gửi lại làm base_version"}
         submission_id: {type: [string, "null"], format: uuid}
         values: {type: object, additionalProperties: {type: string}}

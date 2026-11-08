@@ -194,8 +194,8 @@ func TestFormStateOf(t *testing.T) {
 		{FormFacts{Max: 3, Overdue: true}, FormLate, false},
 		{FormFacts{Max: 3, Versions: 1}, FormSubmitted, true},
 		{FormFacts{Max: 3, Versions: 2, Decision: "returned"}, FormSupplement, false},
-		{FormFacts{Max: 3, Versions: 3}, FormSubmitted, false}, // lần 3 tự khóa: chỉ xác nhận
-		{FormFacts{Max: 0, Versions: 9}, FormSubmitted, true},  // không giới hạn
+		{FormFacts{Max: 3, Versions: 3}, FormLocked, false},   // v2.3: lần 3 tự khóa, không rà soát
+		{FormFacts{Max: 0, Versions: 9}, FormSubmitted, true}, // không giới hạn
 		{FormFacts{Max: 3, Versions: 1, Decision: "accepted"}, FormConfirmed, false},
 		{FormFacts{Max: 3, Terminal: PeriodClosed}, FormNotSent, false},
 		{FormFacts{Max: 3, Versions: 2, Decision: "returned", Terminal: PeriodClosed}, FormLocked, false},
@@ -208,7 +208,7 @@ func TestFormStateOf(t *testing.T) {
 			t.Fatalf("#%d: %+v", i, v)
 		}
 	}
-	if v := FormStateOf(FormFacts{Max: 3, Versions: 3}); !v.LimitReached || !v.CanConfirm || !v.CountsAsSent {
+	if v := FormStateOf(FormFacts{Max: 3, Versions: 3}); !v.LimitReached || v.CanConfirm || !v.CountsAsSent {
 		t.Fatalf("%+v", v)
 	}
 }

@@ -1,6 +1,6 @@
 // Package app: use case Kỳ KHTC (W11.62 — BRD KHTC v2.2 FN-TI-02.03, D4 KH2). Phòng KHTC (Cấp Tỉnh, phòng ban
 // ke_hoach_tai_chinh) mở kỳ bằng ô chọn, hệ thống sinh MỘT phiếu cho mỗi phòng tham gia = một kỳ native cap/forms profile
-// kn_khtc (đơn vị lá phòng ban, số lần gửi tối đa theo tham số — Q-081), gắn kỳ nguồn của module các phòng (bộ quy đổi
+// kn_khtc (đơn vị lá phòng ban, cố định 3 lần gửi theo BRD v2.3), gắn kỳ nguồn của module các phòng (bộ quy đổi
 // của gói PFPUB), theo dõi tiến độ phiếu + nguồn, sửa hạn, đóng kỳ, hủy kỳ (3 máy trạng thái — khtcperiod/domain).
 //
 // Vì sao kỳ native cap/forms (không làm máy kỳ riêng): W11.05 đã có sẵn profile kn_khtc với đơn vị lá = phòng ban,
@@ -55,7 +55,7 @@ var (
 
 // Tham số (pf/masterdata, giá trị số có hiệu lực tại ngày mở/đóng kỳ). Vắng → mặc định.
 const (
-	// ParamMaxSubmissions: số lần gửi tối đa của một phiếu (Q-081, D12 — mặc định = profile kn_khtc, 3; 0 = không giới hạn).
+	// ParamMaxSubmissions is a historical key only; it no longer controls KHTC submission limits.
 	ParamMaxSubmissions = "extension.khtc_max_submissions"
 	// ParamCloseLateDays: N ngày sau hạn nộp KHTC được đóng kỳ Trễ hạn khi còn thiếu dữ liệu (BR-DL-15, mặc định 3).
 	ParamCloseLateDays = "extension.khtc_close_late_days"
@@ -93,7 +93,7 @@ type Service struct {
 	Reports   extport.KHTCReportStates
 	// CancelGuard (khtcreport, tùy chọn): ý định hủy bền chặn Bản cuối/đóng kỳ trong lúc hủy kỳ (P0-POOL-SHARED-2).
 	CancelGuard CancelGuard
-	// MaxSubmissions: số lần gửi tối đa mặc định (gốc lắp ráp đặt = KNKHTCProfile.MaxSubmissions).
+	// MaxSubmissions is retained for wiring compatibility and ignored; BRD v2.3 fixes the cap at three.
 	MaxSubmissions int
 	// Drafts (tùy chọn, W11.63 nối): phòng đã "Lưu nháp" phiếu ở máy chủ, kèm số lần gửi đã thấy khi lưu — nháp sau lần gửi
 	// cuối, chưa gửi lần nào → trạng thái "Lưu nháp".
@@ -151,10 +151,6 @@ func (s *Service) paramInt(ctx context.Context, key string, at time.Time, def, l
 		return def
 	}
 	return n
-}
-
-func (s *Service) maxSubmissions(ctx context.Context, at time.Time) int {
-	return s.paramInt(ctx, ParamMaxSubmissions, at, s.MaxSubmissions, 0, 20)
 }
 
 func (s *Service) closeLateDays(ctx context.Context, at time.Time) int {
@@ -229,10 +225,7 @@ func (s *Service) draft(ctx context.Context, c caller, in OpenInput, strict bool
 	if plan, err = plan.Apply(o, clock.Zone()); err != nil {
 		return Draft{}, inputErr(err)
 	}
-	d := Draft{Plan: plan, DueRequired: plan.DueRequired, MaxSubmissions: s.maxSubmissions(ctx, plan.Cutoff)}
-	if plan.Type == domain.TypeAdhoc {
-		d.MaxSubmissions = 3
-	}
+	d := Draft{Plan: plan, DueRequired: plan.DueRequired, MaxSubmissions: domain.MaxSubmissions}
 	names, avail, loaded := s.unitDepartments(ctx, c.k)
 	d.DepartmentsLoaded = loaded
 	codes, err := s.pickDepartments(ctx, in.Departments, avail, loaded, plan, &d)
@@ -368,9 +361,6 @@ func (s *Service) Open(ctx context.Context, in OpenInput, idem string) (Detail, 
 		units = append(units, dp.Code)
 	}
 	maxSub := d.MaxSubmissions
-	if p.Type == domain.TypeAdhoc {
-		maxSub = 3
-	}
 	pub, err := s.Forms.PublishBatch(ctx, formsport.BatchInput{Profile: domain.ProfileKHTC, TemplateID: ref.ID, UnitKind: formsport.UnitDepartment,
 		Units: units, MaxSubmissions: &maxSub, Periods: []formsport.PeriodDef{{Label: p.Name, DueAt: p.DueAt, Kind: p.FormsKind, Key: p.FormsKey,
 			From: p.From, To: p.To, Rule: p.Rule}}}, "khtc:"+idem)

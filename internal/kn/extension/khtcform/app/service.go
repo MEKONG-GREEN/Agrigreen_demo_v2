@@ -189,6 +189,7 @@ func (s *Service) periodCtx(ctx context.Context, c caller, id uuid.UUID, dept st
 	if p == nil || !slices.Contains(p.Departments, dept) {
 		return pstore.Period{}, nil, ErrFormNotFound
 	}
+	p.MaxSubmissions = pdomain.MaxSubmissions
 	return *p, evs[id], nil
 }
 
@@ -641,7 +642,7 @@ func (s *Service) Submit(ctx context.Context, id uuid.UUID, dept string, in Save
 	if err := boundsAdhocInput(in.Sheet); err != nil {
 		return Form{}, err
 	}
-	if f, ok, err := s.replayAdhocSubmit(ctx, id, dept, in, idem); err != nil || ok {
+	if f, ok, err := s.replaySubmit(ctx, id, dept, in, idem); err != nil || ok {
 		return f, err
 	}
 	c, f, err := s.editable(ctx, id, dept)
@@ -846,6 +847,7 @@ func (s *Service) Tasks(ctx context.Context, dept string, limit int) ([]Task, er
 		if term == pdomain.PeriodCancelled {
 			continue
 		}
+		p.MaxSubmissions = pdomain.MaxSubmissions
 		t := Task{Period: p, DueAt: dueOf(p, evs[p.ID])}
 		t.Overdue = now.After(t.DueAt)
 		prog, err := s.progress(ctx, p.FormsPeriodRef, dept)

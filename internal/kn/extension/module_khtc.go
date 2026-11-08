@@ -30,8 +30,7 @@ type KHTCDeps struct {
 	Crosswalk          port.KHTCSourceCrosswalk // gói PFPUB (bộ quy đổi kỳ nguồn)
 	Plan               port.KHTCPlanDepartments // W11.61 (phòng phụ trách theo Kế hoạch năm)
 	Reports            port.KHTCReportStates    // KH6 (Bản cuối chặn hủy kỳ)
-	// MaxSubmissions: số lần gửi tối đa mặc định của phiếu (= KNKHTCProfile.MaxSubmissions; tham số
-	// extension.khtc_max_submissions ghi đè theo tenant).
+	// MaxSubmissions is retained for wiring compatibility; KHTC v2.3 always uses the fixed native cap3.
 	MaxSubmissions int
 }
 

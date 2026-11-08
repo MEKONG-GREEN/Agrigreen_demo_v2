@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcform/store"
 	periods "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/app"
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	forms "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"strings"
@@ -91,7 +92,7 @@ func (s *Service) validateRequestToken(ctx context.Context, c caller, f Form, sh
 
 // A lost native Submit response must reconcile against the actual native history.
 // An orphan sealed row never proves that a submission succeeded.
-func (s *Service) replayAdhocSubmit(ctx context.Context, id uuid.UUID, dept string, in SaveInput, key string) (Form, bool, error) {
+func (s *Service) replaySubmit(ctx context.Context, id uuid.UUID, dept string, in SaveInput, key string) (Form, bool, error) {
 	c, err := s.caller(ctx, dept)
 	if err != nil {
 		return Form{}, false, err
@@ -107,27 +108,34 @@ func (s *Service) replayAdhocSubmit(ctx context.Context, id uuid.UUID, dept stri
 	if err != nil {
 		return Form{}, false, err
 	}
-	if p.Type != pd.TypeAdhoc {
-		return Form{}, false, nil
+	if !c.writer || c.k.Role == extport.SessionRoleAdmin && p.Type != pd.TypeAdhoc {
+		return Form{}, false, errNotWriter
 	}
-	_, hash, e := in.Sheet.Normalize().Hash()
-	if e != nil {
-		return Form{}, false, e
-	}
-	if sealed.ActorRef != c.p.ActorRef || sealed.PeriodID != id || sealed.Department != dept || sealed.BaseAttempt != int(in.BaseAttempt) || !bytes.Equal(hash, sealed.ContentHash) {
-		return Form{}, false, ErrAdhocRequestConflict
-	}
-	// Canonical role/scope is still checked by load and the native port.
 	f, err := s.load(ctx, c, id, dept)
 	if err != nil {
 		return Form{}, false, err
 	}
+	_, hash, e := withPeriodNames(in.Sheet.Normalize(), f.AdjPeriods).Hash()
+	if e != nil {
+		return Form{}, false, e
+	}
+	if sealed.ActorRef != c.p.ActorRef || sealed.PeriodID != id || sealed.Department != dept || sealed.BaseAttempt != int(in.BaseAttempt) || !bytes.Equal(hash, sealed.ContentHash) {
+		return Form{}, false, problem.Conflict.WithDetail("khóa gửi đã dùng cho phiếu hoặc nội dung khác")
+	}
+	// Both owner and native target authority are rechecked before receipt replay.
 	subs, err := s.Entry.Submissions(ctx, pd.ProfileKHTC, p.FormsPeriodRef, dept)
 	if err != nil {
 		return Form{}, false, err
 	}
 	for _, sb := range subs {
 		if ref := sheetRef(sb.Values); ref != nil && *ref == sealed.ID {
+			ack, err := s.Entry.Submit(ctx, pd.ProfileKHTC, p.FormsPeriodRef, dept, map[string]string{domain.FieldSheet: sealed.ID.String()}, int64(sealed.BaseAttempt), "khtc:form:submit:"+key)
+			if err != nil {
+				return Form{}, true, err
+			}
+			if ack.ID != sb.ID || ack.Version != sb.Version {
+				return Form{}, true, ErrDependency
+			}
 			if err = s.completeAdhocRequest(ctx, c, f, sealed.ID, sealed.Content); err != nil {
 				return Form{}, true, err
 			}

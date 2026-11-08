@@ -26,7 +26,7 @@ var (
 		PublishBy: "TINH", CloseBy: "TINH", DefineBy: []string{"admin"}, AllowFixtures: true,
 		UnitKinds: []string{port.UnitCommune, port.UnitFacility, port.UnitHousehold}, Departments: []string{"chan_nuoi"}}
 	khtcProfile = port.Profile{Name: "khtc", ResolveActor: fixtureActorResolver, Hierarchy: []string{"TINH", "PHONG"}, Roles: map[string]string{"tinh@ke_hoach": "TINH", "tinh": "PHONG"},
-		PublishBy: "TINH", CloseBy: "TINH", DefineBy: []string{"admin"}, AllowFixtures: true, UnitKinds: []string{port.UnitDepartment}, MaxSubmissions: 3}
+		PublishBy: "TINH", CloseBy: "TINH", DefineBy: []string{"admin"}, AllowFixtures: true, UnitKinds: []string{port.UnitDepartment}, MaxSubmissions: 3, FixedMaxSubmissions: 3, AutoLockAtLimit: true}
 )
 
 func newUnitFx(t *testing.T) *fx {

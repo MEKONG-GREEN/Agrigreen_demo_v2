@@ -22,7 +22,9 @@ import (
 // ResolvedActor is an application-owned session projected into the forms capability.
 // Identity and tenant always come from the authenticated principal, never this projection.
 type ResolvedActor struct {
-	Role         string
+	Role string
+	// ReadOnly is projected by the registered owner; requests cannot grant write authority.
+	ReadOnly     bool
 	Department   string
 	Scope        authz.Scope
 	Node         uuid.UUID
@@ -69,6 +71,11 @@ type Profile struct {
 	// MaxSubmissions: số lần gửi tối đa mặc định của một đơn vị trong kỳ (0 = không giới hạn); kỳ đặt riêng được khi
 	// phát hành. Lần gửi thứ MaxSubmissions khóa đơn vị (KHTC FN-TI-02.03, Q-081).
 	MaxSubmissions int
+	// FixedMaxSubmissions is an immutable startup-owned rule, never a period/request override.
+	// Zero preserves configurable limits. A registered rule cannot be removed or changed at restart.
+	FixedMaxSubmissions int `json:"-"`
+	// AutoLockAtLimit also prohibits confirmation at the fixed cap.
+	AutoLockAtLimit bool `json:"-"`
 	// RequireLateReason: gửi sau hạn nộp của kỳ phải có giải trình/lý do trễ (CNTS H05, H09 — W11.42).
 	RequireLateReason bool
 	// NoReopen: kỳ đã chốt KHÔNG mở lại được (W11.27 HCTH BR-02 — sau chốt chỉ điều chỉnh qua sổ riêng của bên dùng, ảnh

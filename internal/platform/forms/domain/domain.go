@@ -75,6 +75,9 @@ func ValidateProfile(p port.Profile) error {
 	if p.MaxSubmissions < 0 || p.MaxSubmissions > MaxSubmissionsCap {
 		return fmt.Errorf("profile %s: max_submissions 0–%d", p.Name, MaxSubmissionsCap)
 	}
+	if p.FixedMaxSubmissions < 0 || p.FixedMaxSubmissions > MaxSubmissionsCap || p.AutoLockAtLimit && p.FixedMaxSubmissions == 0 {
+		return fmt.Errorf("profile %s: fixed submission policy requires limit 1–%d", p.Name, MaxSubmissionsCap)
+	}
 	for i, d := range p.Departments {
 		if !reKey.MatchString(d) || slices.Contains(p.Departments[:i], d) {
 			return fmt.Errorf("profile %s: phòng ban %q không hợp lệ hoặc trùng", p.Name, d)
@@ -93,10 +96,11 @@ const MaxSubmissionsCap = 20
 // Spec là đặc tả kỳ native (sổ phụ pf_forms.period_spec). Kỳ không có dòng đặc tả (phát hành trước W11.05) dùng
 // DefaultSpec.
 type Spec struct {
-	UnitKind       string
-	UnitParents    []string // song song với danh sách đơn vị (cơ sở/hộ → mã xã); rỗng với xã/phòng ban
-	MaxSubmissions int      // 0 = không giới hạn
-	ReviewFlow     string   // port.ReviewFlowSingle
+	UnitKind        string
+	UnitParents     []string // song song với danh sách đơn vị (cơ sở/hộ → mã xã); rỗng với xã/phòng ban
+	MaxSubmissions  int      // 0 = không giới hạn
+	AutoLockAtLimit bool     // effective startup-owned rule; not a period override
+	ReviewFlow      string   // port.ReviewFlowSingle
 	// Khóa kỳ theo lịch kỳ hệ thống (W11.03 Span/Period): loại kỳ, khóa ("2026-W41", "2026-10-K2", "2026-Q4"…),
 	// khoảng ngày, thẻ quy tắc chia kỳ. Rỗng = kỳ không gắn lịch.
 	PeriodKind, PeriodKey string
@@ -403,6 +407,7 @@ const (
 	SubSubmitted = "submitted"
 	SubAccepted  = "accepted"
 	SubReturned  = "returned"
+	SubLocked    = "locked" // fixed policy: final allowed submission is terminal
 )
 
 // Trạng thái hiển thị khi kỳ đã chốt với đơn vị (W11.05, CNTS III.3.0 dòng 10, 11, 13; KHTC "Không gửi") — phép

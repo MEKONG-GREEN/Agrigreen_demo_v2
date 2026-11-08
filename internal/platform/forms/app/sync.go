@@ -106,7 +106,7 @@ func TaskDataOf(t Task, tpl *store.Template) TaskData {
 	d := TaskData{ID: TaskID(t.Period.ID, t.Unit.Unit).String(), Profile: t.Period.Profile, PeriodID: t.Period.ID.String(), Unit: t.Unit.Unit,
 		UnitKind: t.Spec.UnitKind, Parent: t.Unit.Parent, TemplateID: t.Period.TemplateID.String(), TemplateCode: t.Period.TemplateCode,
 		TemplateVersion: t.Period.TemplateVersion, Fields: []domain.Field{}, Label: t.Period.Label, PeriodKind: t.Spec.PeriodKind,
-		PeriodKey: t.Spec.PeriodKey, DueAt: tsUTC(t.Period.DueAt), PeriodStatus: t.State.Status, Open: t.State.AcceptsUnit(t.Unit.Unit),
+		PeriodKey: t.Spec.PeriodKey, DueAt: tsUTC(t.Period.DueAt), PeriodStatus: t.State.Status, Open: t.State.AcceptsUnit(t.Unit.Unit) && t.Unit.Status != domain.SubLocked,
 		Status: t.Unit.Status, Values: map[string]string{}}
 	if tpl != nil {
 		d.TemplateTitle, d.Fields = tpl.Title, tpl.Fields

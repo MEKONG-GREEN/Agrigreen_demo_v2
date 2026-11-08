@@ -205,6 +205,8 @@ func FormStateOf(f FormFacts) FormView {
 		v.State = FormNotStarted
 	case f.Decision == "accepted":
 		v.State = FormConfirmed
+	case v.LimitReached:
+		v.State = FormLocked
 	case f.Decision == "returned":
 		v.State = FormSupplement
 	default:
@@ -212,7 +214,7 @@ func FormStateOf(f FormFacts) FormView {
 	}
 	v.CanConfirm = v.State == FormSubmitted
 	v.CanRequestSupplement = v.State == FormSubmitted && !v.LimitReached
-	v.CountsAsSent = v.State == FormSubmitted || v.State == FormConfirmed
+	v.CountsAsSent = v.State == FormSubmitted || v.State == FormConfirmed || v.State == FormLocked
 	return v
 }
 

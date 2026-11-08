@@ -77,6 +77,9 @@ func NewService(b tenant.Beginner, clk clock.Clock, approvals wfport.Approvals, 
 		}
 		s.order = append(s.order, p.Name)
 	}
+	if err := s.registerSubmissionPolicies(); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -94,7 +97,8 @@ type actor struct {
 	ref, tenant    uuid.UUID
 	role, level    string
 	dept           string // phòng ban do ứng dụng cung cấp (rỗng: vai realm)
-	leaf           bool   // cấp của người gọi là cấp lá (cấp nộp bài)
+	readOnly       bool
+	leaf           bool // cấp của người gọi là cấp lá (cấp nộp bài)
 	scope          authz.Scope
 	node           uuid.UUID
 	define         bool
@@ -123,6 +127,7 @@ func (s *Service) resolve(ctx context.Context, name string) (port.Profile, actor
 		handled = applies
 		if applies {
 			a.role, a.scope, a.node, a.dept = subject.Role, subject.Scope, subject.Node, subject.Department
+			a.readOnly = subject.ReadOnly
 			a.targetFilter = subject.AllowsTarget
 			a.templateFilter = subject.AllowsTemplate
 			a.level = prof.LevelOf(a.role, a.dept)
@@ -171,6 +176,9 @@ func (a actor) allowsTemplate(code string) bool {
 }
 
 func (a actor) need(level, what string) error {
+	if a.readOnly {
+		return problem.Forbidden.WithDetail("phiên chỉ xem không được " + what)
+	}
 	if a.level != level {
 		return problem.Forbidden.WithDetail(what + " cần cấp " + level)
 	}

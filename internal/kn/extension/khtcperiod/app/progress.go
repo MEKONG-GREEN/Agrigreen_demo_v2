@@ -91,6 +91,7 @@ func deadlinesOf(p store.Period, evs []store.Event) (time.Time, time.Time) {
 // project dựng Detail từ sổ + tiến độ kỳ native + trạng thái nguồn.
 func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []store.Event, srcs []store.Source, names map[string]string, requests map[string]*store.AdhocRequest) Detail {
 	now := s.now()
+	p.MaxSubmissions = domain.MaxSubmissions
 	d := Detail{Period: p, Events: evs}
 	d.DueAt, d.ExportDueAt = deadlinesOf(p, evs)
 	d.Overdue = now.After(d.DueAt)

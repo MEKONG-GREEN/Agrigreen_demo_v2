@@ -246,6 +246,7 @@ func (s *Service) inboxRow(ctx context.Context, p store.Period, evs []store.Even
 	if term == domain.PeriodCancelled {
 		return InboxRow{}, false
 	}
+	p.MaxSubmissions = domain.MaxSubmissions
 	row := InboxRow{Period: p}
 	row.DueAt, _ = deadlinesOf(p, evs)
 	if request != nil {

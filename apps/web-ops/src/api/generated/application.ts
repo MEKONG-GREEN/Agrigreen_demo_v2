@@ -18613,7 +18613,7 @@ export interface components {
             /** Format: date-time */
             event_time: string;
             /** @enum {string} */
-            status: "submitted" | "accepted" | "returned" | "awaiting_reopen";
+            status: "submitted" | "accepted" | "returned" | "locked" | "awaiting_reopen";
             review: null | components["schemas"]["FormsReview"];
             /** @description W11.42 Báo không phát sinh */
             nil_report?: boolean;
@@ -18663,10 +18663,10 @@ export interface components {
             /** @description Đơn vị lọc phạm vi: mã xã cha (cơ sở/hộ), chính unit với loại khác */
             parent: string;
             /**
-             * @description Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05). overdue = Trễ hạn: chưa gửi, kỳ còn nhận bài, quá hạn (W11.42)
+             * @description Khi kỳ đã chốt với đơn vị: missed = Không nộp, closed_unadjusted = Đã chốt – chưa điều chỉnh, awaiting_reopen = Chờ mở kỳ (W11.05). overdue = Trễ hạn: chưa gửi, kỳ còn nhận bài, quá hạn (W11.42). locked = đã gửi đủ fixed cap và tự khóa, không còn xác nhận/trả lại
              * @enum {string}
              */
-            status: "not_submitted" | "overdue" | "submitted" | "accepted" | "returned" | "missed" | "closed_unadjusted" | "awaiting_reopen";
+            status: "not_submitted" | "overdue" | "submitted" | "accepted" | "returned" | "locked" | "missed" | "closed_unadjusted" | "awaiting_reopen";
             submission: null | components["schemas"]["FormsSubmission"];
             held: null | components["schemas"]["FormsHeld"];
         };
@@ -19523,7 +19523,7 @@ export interface components {
             /** @description Kỳ đang nhận bài của đơn vị */
             open: boolean;
             /** @enum {string} */
-            status: "not_submitted" | "overdue" | "submitted" | "accepted" | "returned" | "missed" | "closed_unadjusted" | "awaiting_reopen";
+            status: "not_submitted" | "overdue" | "submitted" | "accepted" | "returned" | "locked" | "missed" | "closed_unadjusted" | "awaiting_reopen";
             /** @description Phiên bản bài nộp cuối (0 = chưa có) — gửi lại làm base_version */
             version: number;
             /** Format: uuid */

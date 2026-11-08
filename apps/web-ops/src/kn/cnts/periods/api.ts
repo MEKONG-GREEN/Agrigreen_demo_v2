@@ -39,12 +39,14 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
   submitted: "Đã nộp",
   accepted: "Đã xác thực",
   returned: "Yêu cầu điều chỉnh",
+  locked: "Đã khóa",
   missed: "Không nộp",
   closed_unadjusted: "Đã chốt – chưa điều chỉnh",
   awaiting_reopen: "Chờ mở kỳ",
 };
 
 export const STATUS_TONE: Record<TaskStatus, "neutral" | "ok" | "warn" | "bad" | "info"> = {
+  locked: "neutral",
   not_submitted: "neutral",
   overdue: "bad",
   submitted: "info",

@@ -22,6 +22,9 @@ const RuleVersion = "khtc-period-2026.10"
 // ProfileKHTC là profile cap/forms của phiếu "Báo cáo cho KHTC" (W11.05, gốc lắp ráp KNKHTCProfile).
 const ProfileKHTC = "kn_khtc"
 
+// MaxSubmissions is fixed by KHTC v2.3 FN-TI-02.03, P849/P876.
+const MaxSubmissions = 3
+
 // TemplateCode là mã biểu cap/forms của phiếu cơ sở (W11.62). Mẫu phiếu có cột "Từ Kế hoạch năm", "Lũy kế kỳ trước"…
 // thuộc W11.63 (KH3) — sẽ cài phiên bản mới của cùng mã hoặc mã khác chọn khi mở kỳ.
 const TemplateCode = "KHTC-PHIEU"

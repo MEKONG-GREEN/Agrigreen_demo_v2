@@ -45,8 +45,7 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 	kn.UseFormsFreezer(fm.Freezer())
 	kn.UseFormsPublisher(fm.Publisher())
 	kn.UseFormsFigures(fm.Figures()) // W11.44: tổng hợp CNTS BM-02, BM-18 đọc số liệu kỳ native theo lô
-	// W11.62: Kỳ KHTC — kỳ native kn_khtc (một phiếu mỗi phòng), tối đa KNKHTCProfile.MaxSubmissions lần gửi (tham số
-	// extension.khtc_max_submissions ghi đè). Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
+	// Kỳ KHTC: một phiếu mỗi phòng, giới hạn 3 và tự khóa lần 3 do genuine owner profile đăng ký bất biến ở Forms. Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
 	// ngay dưới. W11.63: phiếu Báo cáo cho KHTC — nhập/rà soát qua cổng Entry; bài nộp kn_khtc phải mang bảng số liệu đã
 	// niêm phong (KHTCFormValidator ở trên).
 	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Entry: fm.Entry(),

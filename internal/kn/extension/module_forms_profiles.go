@@ -52,8 +52,8 @@ func FormProfiles() []formsport.Profile {
 
 	// KNKHTCProfile là cấu hình cap/forms của phiếu "Báo cáo cho KHTC" (W11.05, BRD KHTC v2.2): đơn vị lá là PHÒNG BAN.
 	// Cấp Tỉnh của Phòng KHTC (khóa vai "kn_tinh@ke_hoach_tai_chinh") mở kỳ, rà soát (yêu cầu bổ sung/xác nhận), đóng và
-	// hủy kỳ; Cấp Tỉnh các phòng khác nộp phiếu của phòng mình. Tối đa 3 lần gửi, lần 3 tự khóa (FN-TI-02.03 — Q-081 đề
-	// xuất "tối đa 3, tham số"). KHTC không mở lại kỳ đã đóng: route mở lại vẫn có nhưng màn KHTC (W11.62) không dùng.
+	// hủy kỳ; Cấp Tỉnh các phòng khác nộp phiếu của phòng mình. BRD v2.3 FN-TI-02.03 cố định 3 lần gửi, lần 3 tự khóa;
+	// không xác nhận/yêu cầu bổ sung sau lần 3. KHTC không mở lại kỳ đã đóng.
 	planning := formsport.Profile{
 		AuthorizeOperation: extport.AuthorizeKHTCOperation,
 		Name:               "kn_khtc",
@@ -62,12 +62,14 @@ func FormProfiles() []formsport.Profile {
 			extport.SessionRoleProvince + "@" + partyport.DeptKeHoachTaiChinh: "TINH",
 			extport.SessionRoleProvince:                                       "PHONG",
 		},
-		PublishBy:      "TINH",
-		CloseBy:        "TINH",
-		ReviewBy:       "TINH",
-		DefineBy:       []string{extport.SessionRoleAdmin, "reports_admin"},
-		UnitKinds:      []string{formsport.UnitDepartment},
-		MaxSubmissions: 3,
+		PublishBy:           "TINH",
+		CloseBy:             "TINH",
+		ReviewBy:            "TINH",
+		DefineBy:            []string{extport.SessionRoleAdmin, "reports_admin"},
+		UnitKinds:           []string{formsport.UnitDepartment},
+		MaxSubmissions:      3,
+		FixedMaxSubmissions: 3,
+		AutoLockAtLimit:     true,
 	}
 
 	profiles := []formsport.Profile{base, livestock, planning}
@@ -111,7 +113,7 @@ func resolveFormActor(ctx context.Context, p authz.Principal, profile formsport.
 		return a, true, nil
 	}
 	return formsport.ResolvedActor{
-		Role: k.Role, Department: k.Department, Scope: k.Scope, Node: k.OrgRef,
+		Role: k.Role, ReadOnly: k.ReadOnly(), Department: k.Department, Scope: k.Scope, Node: k.OrgRef,
 		AllowsTarget: func(kind string, ref uuid.UUID) bool {
 			switch kind {
 			case formsport.UnitFacility:

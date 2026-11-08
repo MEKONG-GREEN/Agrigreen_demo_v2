@@ -217,6 +217,12 @@ func specOf(prof port.Profile, in PublishInput) (domain.Spec, error) {
 	if in.MaxSubmissions != nil {
 		spec.MaxSubmissions = *in.MaxSubmissions
 	}
+	if prof.FixedMaxSubmissions > 0 {
+		if in.MaxSubmissions != nil && *in.MaxSubmissions != prof.FixedMaxSubmissions {
+			return spec, problem.Validation.WithField("max_submissions", fmt.Sprintf("cố định %d lần gửi", prof.FixedMaxSubmissions))
+		}
+		spec.MaxSubmissions = prof.FixedMaxSubmissions
+	}
 	if k := in.Period; k != nil {
 		spec.PeriodKind, spec.PeriodKey, spec.From, spec.To, spec.PeriodRule = k.Kind, strings.TrimSpace(k.Key), k.From, k.To, strings.TrimSpace(k.Rule)
 	}
@@ -280,7 +286,7 @@ func load(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) (*PeriodV
 		return nil, err
 	}
 	v := &PeriodView{Period: *p}
-	if v.Spec, err = store.SpecOf(ctx, tx, id); err != nil {
+	if v.Spec, err = store.EffectiveSpecOf(ctx, tx, id); err != nil {
 		return nil, err
 	}
 	if v.Events, err = store.Events(ctx, tx, id); err != nil {
@@ -327,6 +333,9 @@ func load(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) (*PeriodV
 			uv.Held, heldAt = &h, &h.EventTime
 		}
 		uv.Status = domain.DisplayStatus(domain.SubmissionStatus(uv.Submission != nil, uv.Review), v.State, u, heldAt, p.DueAt, now)
+		if v.Spec.AutoLockAtLimit && uv.Submission != nil && v.Spec.LimitReached(uv.Submission.Version) && uv.Status != domain.SubAccepted {
+			uv.Status = domain.SubLocked
+		}
 		v.Units = append(v.Units, uv)
 	}
 	v.Snapshots, err = store.Snapshots(ctx, tx, id)
@@ -486,7 +495,16 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 	if values == nil {
 		values = map[string]string{}
 	}
-	now := s.Clock.Now().UTC()
+	in.Values = values
+	if in.CapturedAt != nil {
+		captured := in.CapturedAt.UTC().Truncate(time.Microsecond)
+		in.CapturedAt = &captured
+	}
+	request, err := submissionRequestOf(in)
+	if err != nil {
+		return SubmissionView{}, err
+	}
+	now := s.Clock.Now().UTC().Truncate(time.Microsecond)
 	var out SubmissionView
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
 		if err := store.Lock(ctx, tx, periodID); err != nil {
@@ -505,8 +523,16 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 		if !slices.Contains(v.Period.Units, unit) {
 			return port.ErrUnitNotInPeriod
 		}
+		if idem != "" {
+			if done, err := replaySubmissionReceipt(ctx, tx, a, v, unit, idem, request, &out); err != nil || done {
+				return err
+			}
+		}
 		if in.ID != nil {
 			if done, err := s.replayed(ctx, tx, *in.ID, a.ref, periodID, unit, &out); err != nil || done {
+				if done && err == nil && v.Spec.AutoLockAtLimit && idem != "" {
+					return problem.Conflict.WithDetail("thiếu receipt của đúng thao tác gửi")
+				}
 				return err
 			}
 		}
@@ -543,6 +569,13 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 			}
 			return nil
 		}
+		if v.Spec.AutoLockAtLimit {
+			for _, current := range v.Units {
+				if current.Unit == unit && current.Submission != nil && v.Spec.LimitReached(current.Submission.Version) {
+					return port.ErrSubmissionLimit
+				}
+			}
+		}
 		if in.CapturedAt != nil && v.State.ClosedFor(unit) {
 			if err := check(); err != nil {
 				return err
@@ -556,7 +589,7 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 			}
 			out = SubmissionView{Submission: store.Submission{ID: h.ID, PeriodID: periodID, Unit: unit, Values: values, Submitter: a.ref, EventTime: now},
 				Status: domain.SubAwaitingReopen}
-			return nil
+			return recordSubmissionReceipt(ctx, tx, a, profile, request, idem, out)
 		}
 		if !v.State.AcceptsUnit(unit) {
 			if v.State.Status == domain.PeriodReopened {
@@ -605,13 +638,19 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 		if err := store.InsertMeta(ctx, tx, a.tenant, &m, a.ref, now, in.DeviceID, idemOr(idem, "meta")); err != nil {
 			return err
 		}
-		if s.Approvals != nil {
+		if s.Approvals != nil && !(v.Spec.AutoLockAtLimit && v.Spec.LimitReached(sb.Version)) {
 			if _, err := s.Approvals.Submit(db.JoinTx(ctx, tx), wfport.SubmitInput{Kind: WorkflowKind, Subject: sb.ID, Requester: a.ref,
 				Summary: "forms " + profile + " " + t.Code + " " + unit, At: now}); err != nil {
 				return err
 			}
 		}
 		out = SubmissionView{Submission: sb, Status: domain.SubSubmitted, Meta: &m}
+		if v.Spec.AutoLockAtLimit && v.Spec.LimitReached(sb.Version) {
+			out.Status = domain.SubLocked
+		}
+		if err := recordSubmissionReceipt(ctx, tx, a, profile, request, idem, out); err != nil {
+			return err
+		}
 		// W11.43: quy tắc liên biểu + cảnh báo của bên dùng chạy sau commit (consumer inbox đọc qua port.SubmissionFeed).
 		return enqueueRecorded(ctx, tx, a.tenant, profile, t.Code, sb, m)
 	})
@@ -689,7 +728,7 @@ func (s *Service) Submissions(ctx context.Context, profile string, periodID uuid
 		if p == nil || p.Profile != profile || !a.allowsTemplate(p.TemplateCode) {
 			return port.ErrPeriodNotFound
 		}
-		spec, err := store.SpecOf(ctx, tx, periodID)
+		spec, err := store.EffectiveSpecOf(ctx, tx, periodID)
 		if err != nil {
 			return err
 		}
@@ -723,6 +762,9 @@ func (s *Service) Submissions(ctx context.Context, profile string, periodID uuid
 				sv.Review = &r
 			}
 			sv.Status = domain.SubmissionStatus(true, sv.Review)
+			if spec.AutoLockAtLimit && spec.LimitReached(sb.Version) && sv.Status != domain.SubAccepted {
+				sv.Status = domain.SubLocked
+			}
 			out = append(out, sv)
 		}
 		return nil
@@ -821,9 +863,9 @@ func (s *Service) Review(ctx context.Context, profile string, submissionID uuid.
 		if cur.Review != nil {
 			return port.ErrAlreadyReviewed
 		}
-		if decision == domain.SubReturned && v.Spec.LimitReached(sb.Version) {
+		if (decision == domain.SubReturned || v.Spec.AutoLockAtLimit) && v.Spec.LimitReached(sb.Version) {
 			// KHTC FN-TI-02.04: lần gửi cuối cho phép thì phiếu tự khóa — không yêu cầu bổ sung được nữa.
-			return port.ErrSubmissionLimit.WithDetail("đã gửi đủ số lần tối đa — chỉ xác nhận được")
+			return port.ErrSubmissionLimit.WithDetail("phiếu đã gửi đủ số lần tối đa")
 		}
 		if sb.Submitter == a.ref {
 			return problem.SelfApproval.WithDetail("người rà soát trùng người nộp")

@@ -31,6 +31,9 @@ func operationAllowed(ctx context.Context, prof port.Profile, op port.Operation)
 	return grant, nil
 }
 func needOperation(ctx context.Context, prof port.Profile, a actor, level, what string, op port.Operation) (port.OperationGrant, error) {
+	if a.readOnly {
+		return port.OperationGrant{}, problem.Forbidden
+	}
 	original := a.need(level, what)
 	if original == nil {
 		return port.OperationGrant{}, nil
