@@ -124,15 +124,17 @@ func (s *Service) revisionNames(ctx context.Context, vs []store.Household) map[u
 	if !ok || len(refs) == 0 {
 		return out
 	}
-	if len(refs) > client.MaxRevisionRefs {
-		refs = refs[len(refs)-client.MaxRevisionRefs:]
-	}
-	names, err := r.ResolveRevisions(ctx, client.PurposeFieldSupport, refs)
-	if err != nil {
-		return out
-	}
-	for _, n := range names {
-		out[n.Ref] = n
+	// Giới hạn của vault áp dụng cho mỗi request, không cắt lịch sử của hộ.
+	for start := 0; start < len(refs); start += client.MaxRevisionRefs {
+		end := min(start+client.MaxRevisionRefs, len(refs))
+		names, err := r.ResolveRevisions(ctx, client.PurposeFieldSupport, refs[start:end])
+		if err != nil {
+			// Không trả tên từ batch trước khi một batch sau không đọc/audit được.
+			return nil
+		}
+		for _, n := range names {
+			out[n.Ref] = n
+		}
 	}
 	return out
 }
