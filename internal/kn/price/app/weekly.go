@@ -209,17 +209,18 @@ type WeeklyNewItem struct {
 
 // WeeklyCommand is the CAS input for every modifying operation, including import confirmation.
 type WeeklyCommand struct {
-	Version  int64                `json:"version"`
-	WeekID   string               `json:"week_id"`
-	Action   string               `json:"action"`
-	Rows     []domain.WeeklyPatch `json:"rows"`
-	Item     *WeeklyNewItem       `json:"item"`
-	ItemID   string               `json:"item_id"`
-	Plan     string               `json:"plan"`
-	Reason   string               `json:"reason"`
-	Confirm  bool                 `json:"confirm"`
-	Issues   []domain.WeeklyIssue `json:"-"`
-	FileHash string               `json:"-"`
+	Version       int64                `json:"version"`
+	WeekID        string               `json:"week_id"`
+	Action        string               `json:"action"`
+	Rows          []domain.WeeklyPatch `json:"rows"`
+	Item          *WeeklyNewItem       `json:"item"`
+	ItemID        string               `json:"item_id"`
+	Plan          string               `json:"plan"`
+	Reason        string               `json:"reason"`
+	Confirm       bool                 `json:"confirm"`
+	Issues        []domain.WeeklyIssue `json:"-"`
+	FileHash      string               `json:"-"`
+	overwriteRows int                  // Derived server-side; excluded from request and permanent replay identity.
 }
 
 var weeklyIdem = regexp.MustCompile(`^[A-Za-z0-9._:-]{8,200}$`)
@@ -340,6 +341,9 @@ func (s *WeeklyService) Write(ctx context.Context, profile, program, idem string
 func applyWeeklyCommand(book *domain.WeeklyBook, w *domain.WeeklyReport, program string, in WeeklyCommand) error {
 	switch in.Action {
 	case "save", "close", "import":
+		if in.Action == "import" && in.overwriteRows > 0 && !in.Confirm {
+			return port.ErrWeeklyConfirm.WithDetail("các ô khác số liệu hiện tại sẽ bị ghi đè; cần xác nhận")
+		}
 		if in.Action == "close" && !in.Confirm {
 			return port.ErrWeeklyConfirm.WithDetail("xác nhận chốt báo cáo tuần")
 		}

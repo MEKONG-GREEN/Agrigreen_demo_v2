@@ -324,10 +324,7 @@ func (s *WeeklyService) CommitImport(ctx context.Context, profile, program, week
 	if err != nil {
 		return WeeklyView{}, err
 	}
-	if p.OverwriteRows > 0 && !confirm {
-		return WeeklyView{}, port.ErrWeeklyConfirm.WithDetail("các ô khác số liệu hiện tại sẽ bị ghi đè; cần xác nhận")
-	}
-	in := WeeklyCommand{Version: version, WeekID: weekID, Action: "import", Rows: p.patches, Confirm: confirm, Issues: p.Rows, FileHash: sha}
+	in := WeeklyCommand{Version: version, WeekID: weekID, Action: "import", Rows: p.patches, Confirm: confirm, Issues: p.Rows, FileHash: sha, overwriteRows: p.OverwriteRows}
 	return s.Write(ctx, profile, program, idem, in)
 }
 
