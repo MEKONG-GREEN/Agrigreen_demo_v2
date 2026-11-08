@@ -113,7 +113,7 @@ func resolveFormActor(ctx context.Context, p authz.Principal, profile formsport.
 		return a, true, nil
 	}
 	return formsport.ResolvedActor{
-		Role: k.Role, ReadOnly: k.ReadOnly(), Department: k.Department, Scope: k.Scope, Node: k.OrgRef,
+		Role: k.Role, ReadOnly: profile.Name == "kn_khtc" && k.ReadOnly(), Department: k.Department, Scope: k.Scope, Node: k.OrgRef,
 		AllowsTarget: func(kind string, ref uuid.UUID) bool {
 			switch kind {
 			case formsport.UnitFacility:
