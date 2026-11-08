@@ -40,10 +40,11 @@ export function createReportSaveSession244(api: Pick<ReportApi, "save" | "saveOp
         }
         return true;
     };
+    const isCurrent = (pending: Pending) => state.pending?.operationID === pending.operationID;
     const confirm = (receipt: ReportSaveReceipt, pending: Pending) => {
         if (!verify(receipt, pending)) return false;
         forget(pending);
-        if (state.pending?.operationID === pending.operationID) publish({ ready: true, pending: null, receipt, error: "", blocked: false });
+        if (isCurrent(pending)) publish({ ready: true, pending: null, receipt, error: "", blocked: false });
         return true;
     };
     return {
@@ -79,7 +80,7 @@ export function createReportSaveSession244(api: Pick<ReportApi, "save" | "saveOp
             } catch (error) {
                 if (error instanceof ApiProblem && !outcomeUnknown({ status: error.status, code: error.code })) {
                     forget(pending);
-                    if (state.pending?.operationID === pending.operationID) publish({ ...state, pending: null });
+                    if (isCurrent(pending)) publish({ ...state, pending: null });
                 }
                 throw error;
             }
