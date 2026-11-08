@@ -47,6 +47,8 @@ type Service struct {
 	PeriodOperationPolicies map[string]port.PeriodOperationPolicy
 	// PublishOperationPolicies authorize the additive batch receipt capability before native TX.
 	PublishOperationPolicies map[string]port.PublishOperationPolicy
+	// PendingPolicies revalidate complete owner read scope before every native query.
+	PendingPolicies map[string]port.PendingPolicy
 	// RequiredDefinitionPolicies denies missing policies instead of falling back to DefineBy.
 	RequiredDefinitionPolicies map[string]bool
 	profiles                   map[string]port.Profile
