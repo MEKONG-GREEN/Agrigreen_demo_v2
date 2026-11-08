@@ -94,6 +94,9 @@ func rawCell(f *excelize.File, sheet, letter string, line int) (string, bool, er
 // Rows with errors are excluded independently; ignored locked values do not
 // invalidate editable values in that row. No uploaded formula is evaluated.
 func (c *Codec) Preview(data []byte) (port.KHTCFormExcelPreview, error) {
+	if !c.initialized() {
+		return nil, ErrSnapshot
+	}
 	if err := preflight(data); err != nil {
 		return nil, err
 	}

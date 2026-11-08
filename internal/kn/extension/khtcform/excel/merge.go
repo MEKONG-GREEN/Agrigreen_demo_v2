@@ -14,6 +14,9 @@ import (
 // Current application authority/status and original-file storage remain the
 // future owner's responsibility, never a claim of this memory-only capability.
 func (c *Codec) Merge(existing port.KHTCFormExcelContent, preview port.KHTCFormExcelPreview, mode string) (port.KHTCFormExcelContent, error) {
+	if !c.initialized() {
+		return port.KHTCFormExcelContent{}, ErrSnapshot
+	}
 	p, ok := preview.(*previewData)
 	if !ok || p == nil || p.owner != c || (mode != "keep" && mode != "replace") {
 		return port.KHTCFormExcelContent{}, ErrPreview

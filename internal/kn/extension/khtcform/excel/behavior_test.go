@@ -658,3 +658,33 @@ func TestTrustedComputedFormulaProjectionKeepsExactLargeValues(t *testing.T) {
 		t.Fatalf("computed value precision lost: %q %v", value, err)
 	}
 }
+
+func TestUninitializedCodecNeverGeneratesFallbackWorkbook(t *testing.T) {
+	valid := mustCodec(t, snapshot())
+	raw := mustWorkbook(t, valid, content())
+	for _, tc := range []struct {
+		name  string
+		codec *excel.Codec
+	}{{"zero", &excel.Codec{}}, {"nil", nil}} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.codec.SnapshotHash() != "" {
+				t.Fatal("uninitialized codec advertised a snapshot")
+			}
+			for _, operation := range []struct {
+				name string
+				run  func() error
+			}{
+				{"generate", func() error { _, err := tc.codec.Generate(port.KHTCFormExcelContent{}); return err }},
+				{"preview", func() error { _, err := tc.codec.Preview(raw); return err }},
+				{"merge", func() error { _, err := tc.codec.Merge(port.KHTCFormExcelContent{}, nil, "keep"); return err }},
+				{"error_export", func() error { _, err := tc.codec.ErrorWorkbook(nil); return err }},
+			} {
+				t.Run(operation.name, func(t *testing.T) {
+					if err := operation.run(); !errors.Is(err, excel.ErrSnapshot) {
+						t.Fatalf("codec without explicit pinned snapshot was accepted: %v", err)
+					}
+				})
+			}
+		})
+	}
+}

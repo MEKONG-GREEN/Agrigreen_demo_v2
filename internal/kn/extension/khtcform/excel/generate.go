@@ -25,6 +25,9 @@ var adjustmentHeaders = []string{"Mã hạng mục", "Kỳ được điều ch�
 // Every value is explicitly written as text, including formula-looking prose.
 // Declared formula columns use only the explicit trusted server_value subset.
 func (c *Codec) Generate(content port.KHTCFormExcelContent) ([]byte, error) {
+	if !c.initialized() {
+		return nil, ErrSnapshot
+	}
 	if err := c.validateContentShape(content); err != nil {
 		return nil, err
 	}
@@ -151,6 +154,9 @@ func (c *Codec) Generate(content port.KHTCFormExcelContent) ([]byte, error) {
 // ErrorWorkbook exports fixed diagnostics as text, without copying uploaded
 // values or formulas into a new workbook. An empty report is still a valid XLSX.
 func (c *Codec) ErrorWorkbook(preview port.KHTCFormExcelPreview) ([]byte, error) {
+	if !c.initialized() {
+		return nil, ErrSnapshot
+	}
 	p, ok := preview.(*previewData)
 	if !ok || p == nil || p.owner != c {
 		return nil, ErrPreview

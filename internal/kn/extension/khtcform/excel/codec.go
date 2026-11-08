@@ -97,7 +97,16 @@ func New(snapshot port.KHTCFormExcelSnapshot) (*Codec, error) {
 	return c, nil
 }
 
-func (c *Codec) SnapshotHash() string { return c.hash }
+func (c *Codec) SnapshotHash() string {
+	if c == nil {
+		return ""
+	}
+	return c.hash
+}
+
+func (c *Codec) initialized() bool {
+	return c != nil && c.hash != "" && len(c.sheets) > 0
+}
 
 func validText(value string, maxRunes int) bool {
 	if len(value) > MaxCellBytes || !utf8.ValidString(value) || utf8.RuneCountInString(value) > maxRunes {
