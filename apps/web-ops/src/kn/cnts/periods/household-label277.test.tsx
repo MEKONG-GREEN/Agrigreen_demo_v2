@@ -1,7 +1,7 @@
 // #277 — FN-21 B3, FN-10 HCN-01…03: consumer thật, hợp đồng HTTP công việc và sổ hộ.
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
 import type { FormsTask } from "./api";
 import { CntsEntryScreen } from "./CntsEntryScreen";
@@ -24,6 +24,8 @@ let requests: Request[];
 let submissions: unknown[];
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-08T05:00:00Z"));
   localStorage.clear();
   tasks = [task()]; requests = []; submissions = [];
   auth.principal = { subject: "officer", tenantId: "tenant-a", scopeUnits: ["30001"] };
@@ -43,6 +45,8 @@ beforeEach(() => {
     },
   });
 });
+
+afterEach(() => { vi.useRealTimers(); });
 
 describe("#277 — nhãn hộ của công việc FN-21", () => {
   it("hiện HCN và tên được phép ở danh sách và biểu; gửi đúng unit, không lưu nhãn vào nháp", async () => {

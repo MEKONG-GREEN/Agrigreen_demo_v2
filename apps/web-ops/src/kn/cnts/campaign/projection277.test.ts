@@ -1,5 +1,5 @@
 // #277: fixture projection publish → FormsTask từ các hợp đồng mock hiện hữu; native auth kiểm riêng qua PG.
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, unwrap } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
@@ -22,6 +22,8 @@ async function selected(persona: string, assignment_id: string, department_code:
 }
 
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-08T05:00:00Z"));
   resetKnAdmin(); resetCntsCampaigns(); resetCntsDesign(); resetCntsLivestock(); resetCntsPeriods();
   const context = await unwrap(raw("kn-admin", null).POST("/v1/me/context", { params: { header: { "Idempotency-Key": crypto.randomUUID() } }, body: { assignment_id: "asg-admin", department_code: null } }));
   const admin = createKnAdminApi({ baseUrl: "http://mock", getAccessToken: () => "mock.kn-admin", getContextId: () => context.context_id, fetch: mockAdminFetchNoDelay });
@@ -44,7 +46,7 @@ async function setup() {
   const xa = await selected("kn-an", "asg-an-xa");
   const outside = await selected("kn-binh", "asg-binh-xa");
   const create = async (api: typeof xa, name: string, commune: string) => createLivestockApi(api).create({ owner_name: name, commune_code: commune,
-    livestock_type: "nong_ho", animals: [{ species_code: "GA", head_count: 12 }], checkin: { lat: 10.3, lon: 105.4, accuracy_m: "9", mocked: false, captured_at: "2099-10-01T00:00:00Z" } });
+    livestock_type: "nong_ho", animals: [{ species_code: "GA", head_count: 12 }], checkin: { lat: 10.3, lon: 105.4, accuracy_m: "9", mocked: false, captured_at: "2026-11-08T05:00:00Z" } });
   const first = await create(xa, "Hộ tổng hợp 277", "91301");
   const second = await create(outside, "Trang trại tổng hợp 277", "91303");
   const design = await createDesignApi(tinh).create({ code_suffix: "LABEL277", title: "Điều tra hộ 277", fields: [{ key: "dan", label: "Tổng đàn", type: "integer", required: true }] });
@@ -54,6 +56,8 @@ async function setup() {
     households: [first.id, second.id], communes: [], from_date: "2099-10-01", to_date: "2099-10-05", due_at: "2099-10-20T00:00:00Z", owner_ref: owner!.ref };
   return { tinh, xa, outside, first, second, design, capi, input };
 }
+
+afterEach(() => { vi.useRealTimers(); });
 
 describe("#277 — projection mock hộ chiến dịch", () => {
   it("giữ template/version/fields đã chọn, parent xã thật, scope và identity gửi; replay/reset không sinh/rò việc", async () => {

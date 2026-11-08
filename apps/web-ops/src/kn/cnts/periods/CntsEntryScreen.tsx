@@ -63,7 +63,7 @@ function HouseholdTaskLabel({ api, task }: { api: ApiClient; task: FormsTask }) 
     else if (!h.code) text = "Mã hộ chưa khả dụng";
     else text = h.code + " · " + (h.owner_name || h.owner_label || "Tên hộ chưa khả dụng");
   }
-  return <span style={{ overflowWrap: "anywhere" }}>{text}</span>;
+  return <span style={{ display: "inline-block", minWidth: "12rem", maxWidth: "20rem", overflowWrap: "anywhere" }}>{text}</span>;
 }
 
 export function CntsEntryScreen() {
@@ -96,7 +96,7 @@ function CntsTasks({ api }: { api: ApiClient }) {
         <p className="mute">Công việc cần làm của xã, cơ sở giết mổ và hộ được phân công (FN-08, FN-09, FN-21).</p>
       </PageHeader>
       <section className="card sec">
-        <select className="select" aria-label="Lọc biểu" value={code} onChange={(e) => setCode(e.target.value)}>
+        <select className="select" style={{ maxWidth: "100%" }} aria-label="Lọc biểu" value={code} onChange={(e) => setCode(e.target.value)}>
           <option value="">Mọi biểu</option>
           {(forms.data ?? []).map((f) => (
             <option key={f.code} value={f.code}>

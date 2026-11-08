@@ -20,3 +20,5 @@ Native: đặt GOTOOLCHAIN theo go.mod, GOTMPDIR/TEMP/TMP theo môi trường KN
 ### Seam kiểm consumer trên production mock
 
 Các tệp mock campaign/periods/design được nối tối thiểu để publish phạm vi hộ tạo FormsTask có ref, xã và snapshot template ID/version/fields hiện hữu. Sổ hộ vẫn được đọc riêng qua API owner, không chép nhãn vào kỳ. Endpoint mock GET forms/templates chỉ trả registry phiên bản của profile kn_cnts và quyền đọc hiện hành. Reset campaign bỏ kỳ theo hộ và nháp của kỳ; replay publish giữ nguyên period ID. Fixture tài khoản được chuẩn bị qua API/UI Admin hiện hữu. Projection này là bằng chứng consumer/browser, không thay kiểm phân quyền native/DB.
+
+Browser production tái hiện viewport 390 px bị tràn tới 464 px bởi bộ lọc theo chiều rộng tự nhiên và nhãn dài bị co thành cột quá hẹp. Màn đích giới hạn bộ lọc theo container, giữ cột nhãn đủ rộng để đọc mã HCN, cho tên dài xuống dòng đầy đủ trong vùng cuộn bảng của UI kit; không đổi CSS chung. Kiểm consumer dùng giờ giả lập cố định và giữ nguyên assertion text/escaping/không lưu nhãn vào nháp.
