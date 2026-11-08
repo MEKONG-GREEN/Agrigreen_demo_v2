@@ -638,7 +638,7 @@ func (s *Service) SubmitWith(ctx context.Context, profile string, periodID uuid.
 		if err := store.InsertMeta(ctx, tx, a.tenant, &m, a.ref, now, in.DeviceID, idemOr(idem, "meta")); err != nil {
 			return err
 		}
-		if s.Approvals != nil && !(v.Spec.AutoLockAtLimit && v.Spec.LimitReached(sb.Version)) {
+		if s.Approvals != nil && (!v.Spec.AutoLockAtLimit || !v.Spec.LimitReached(sb.Version)) {
 			if _, err := s.Approvals.Submit(db.JoinTx(ctx, tx), wfport.SubmitInput{Kind: WorkflowKind, Subject: sb.ID, Requester: a.ref,
 				Summary: "forms " + profile + " " + t.Code + " " + unit, At: now}); err != nil {
 				return err

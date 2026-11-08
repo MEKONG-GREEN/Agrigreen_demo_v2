@@ -111,21 +111,24 @@ func TestKHTCFixedThreeAndFinalLostACK217(t *testing.T) {
 	if p.Forms[0].State != "locked" || p.Forms[0].CanConfirm || p.Forms[0].CanRequestSupplement {
 		t.Fatalf("period projection: %s", raw)
 	}
-	var dbCounts struct {
-		Submissions int
-		Receipts    int
-		Seals       int
+
+	// Observe native submissions through the public owner API, not another
+	// module's private SQL. Receipt-row integrity is verified in Forms' own tests.
+	var submitted struct {
+		Items []json.RawMessage `json:"items"`
 	}
+	code, raw = f.do(http.MethodGet, "/v1/forms/periods/"+p.FormsPeriodID+"/submissions?profile=kn_khtc&unit="+dTT, authz.KNTinh, dTT, actor, "", nil)
+	f.ok(code, raw, &submitted)
+	if len(submitted.Items) != 3 {
+		t.Fatalf("lost ACK/reject changed native attempts: %d", len(submitted.Items))
+	}
+	var seals int
 	admin := pgtest.Get(t).AdminPool(t, migrations.PF)
-	err := admin.QueryRow(context.Background(), `SELECT
-	 (SELECT count(*) FROM pf_forms.submission WHERE tenant_id=$1 AND period_id=$2),
-	 (SELECT count(*) FROM pf_forms.submission_receipt WHERE tenant_id=$1 AND period_id=$2),
-	 (SELECT count(*) FROM pf_extension.khtc_form_sheet WHERE tenant_id=$1 AND period_id=$3 AND kind='sealed')`, f.tid, p.FormsPeriodID, p.ID).Scan(&dbCounts.Submissions, &dbCounts.Receipts, &dbCounts.Seals)
+	err := admin.QueryRow(context.Background(), `SELECT count(*) FROM pf_extension.khtc_form_sheet WHERE tenant_id=$1 AND period_id=$2 AND kind='sealed'`, f.tid, p.ID).Scan(&seals)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dbCounts.Submissions != 3 || dbCounts.Receipts != 3 || dbCounts.Seals != 3 {
-		raw, _ := json.Marshal(dbCounts)
-		t.Fatalf("lost ACK/reject created side effects: %s", raw)
+	if seals != 3 {
+		t.Fatalf("lost ACK/reject created orphan seals: %d", seals)
 	}
 }
