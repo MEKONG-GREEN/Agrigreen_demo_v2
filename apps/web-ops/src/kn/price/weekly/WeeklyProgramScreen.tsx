@@ -32,7 +32,7 @@ function WeeklyWorkspace({ program, api }: { program: Program; api: WeeklyApi })
   const [notice, setNotice] = useState("");
   const [committed, setCommitted] = useState<WeeklyView | null>(null);
   const editor = (view: WeeklyView) => view.report ? <WeeklyEditor key={`${view.report.id}:${view.version}`} view={view} program={program} api={api}
-    onSelect={id => { setCommitted(null); setSelected(id); loaded.reload(); }} onReload={() => { setCommitted(null); loaded.reload(); }}
+    onSelect={id => { setCommitted(null); setSelected(id); loaded.reload(); }} onReload={() => { setSelected(view.report!.id); setCommitted(null); loaded.reload(); }}
     onChanged={(next, message) => { setCommitted(next); setNotice(message); }} /> : <p role="status">Chưa có báo cáo tuần trong phạm vi của bạn.</p>;
   return <div className="weekly-program">
     <PageHeader title={PROGRAM_TITLE[program]}>Theo dõi tiến độ và kinh phí thực hiện kế hoạch khuyến nông năm. Quyết định 2855/QĐ-UBND ngày 19/6/2026.</PageHeader>

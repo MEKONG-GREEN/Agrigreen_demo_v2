@@ -56,6 +56,25 @@ describe("284 ordinary decimals and mock digest", () => {
 });
 
 describe("284 two program screens with actual generated client + mock contract", () => {
+  it("reloads the displayed new draft after an explicitly selected closed period and a concurrent writer", async () => {
+    const api = await fixture(); let previous = await api.read("training");
+    previous = await api.write("training", { ...command(previous, "close"), confirm: true });
+    render(<WeeklyProgramScreen program="training" />);
+    await screen.findByRole("button", { name: "Tạo báo cáo tuần mới" });
+    fireEvent.change(screen.getByRole("combobox", { name: "Kỳ báo cáo" }), { target: { value: previous.report!.id } });
+    await screen.findByRole("button", { name: "Tạo báo cáo tuần mới" });
+    fireEvent.click(screen.getByRole("button", { name: "Tạo báo cáo tuần mới" }));
+    await screen.findByRole("button", { name: "Lưu nháp" });
+    const latest = await api.read("training"), row = latest.report!.rows.find(r => r.name === rowName)!;
+    await api.write("training", { ...command(latest, "save"), rows: [{ id: row.id, progress: "4" }] });
+    fireEvent.change(input("Tiến độ tuần"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Lưu nháp" }));
+    await screen.findByRole("button", { name: "Tải lại số liệu mới" });
+    fireEvent.click(screen.getByRole("button", { name: "Tải lại số liệu mới" }));
+    await waitFor(() => expect(input("Tiến độ tuần")).toHaveValue("4"));
+    expect(screen.getByRole("combobox", { name: "Kỳ báo cáo" })).toHaveValue(latest.report!.id);
+  });
+
   it("previews one matching period or explicitly reports fallback before committing; cumulative columns are ignored", async () => {
     const api = await fixture();
     for (const program of ["training", "information"] as const) {
