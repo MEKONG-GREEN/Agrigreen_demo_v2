@@ -45,6 +45,8 @@ type Service struct {
 	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
 	// PeriodOperationPolicies are registered by owners before serving; nil disables receipts.
 	PeriodOperationPolicies map[string]port.PeriodOperationPolicy
+	// ReviewOperationPolicies authorize immutable Entry receipts before any receipt DB I/O.
+	ReviewOperationPolicies map[string]port.ReviewOperationPolicy
 	// PublishOperationPolicies authorize the additive batch receipt capability before native TX.
 	PublishOperationPolicies map[string]port.PublishOperationPolicy
 	// RequiredDefinitionPolicies denies missing policies instead of falling back to DefineBy.

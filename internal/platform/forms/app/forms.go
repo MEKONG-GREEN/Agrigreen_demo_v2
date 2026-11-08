@@ -738,115 +738,15 @@ func (s *Service) Review(ctx context.Context, profile string, submissionID uuid.
 	if err != nil {
 		return SubmissionView{}, err
 	}
-	op, err := s.reviewOperation(ctx, prof, a, submissionID, decision, strings.TrimSpace(note), idem)
-	if err != nil {
-		return SubmissionView{}, err
-	}
-	if _, err = needOperation(ctx, prof, a, prof.Reviewer(), "rà soát bài nộp", op); err != nil {
-		return SubmissionView{}, err
-	}
 	note = strings.TrimSpace(note)
-	switch decision {
-	case domain.SubAccepted:
-	case domain.SubReturned:
-		if note == "" {
-			return SubmissionView{}, problem.Validation.WithField("note", "bắt buộc khi trả lại")
-		}
-	default:
-		return SubmissionView{}, problem.Validation.WithField("decision", "accepted | returned")
-	}
-	if len([]rune(note)) > 1000 {
-		return SubmissionView{}, problem.Validation.WithField("note", "tối đa 1000 ký tự")
-	}
-	now := s.Clock.Now().UTC()
-	if g := s.ReviewGuards[profile]; g != nil {
-		// BF-CN-XA-DATA (#175): quy tắc rà soát của bên dùng (CNTS: chỉ người phụ trách biểu). Đọc kỳ của bài nộp và kiểm
-		// phạm vi như dưới (ngoài phạm vi → 404 như cũ, không lộ qua lỗi của guard), rồi gọi guard NGOÀI giao dịch.
-		var period uuid.UUID
-		var code string
-		if err := s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
-			sb, err := store.SubmissionByID(ctx, tx, submissionID)
-			if err != nil {
-				return err
-			}
-			if sb == nil {
-				return port.ErrSubmissionMissing
-			}
-			v, err := load(ctx, tx, sb.PeriodID, now)
-			if err != nil {
-				return err
-			}
-			if v == nil || v.Period.Profile != profile || !a.allowsTemplate(v.Period.TemplateCode) || !a.allowsUnit(v.Spec, v.Period.Units, sb.Unit) {
-				return port.ErrSubmissionMissing
-			}
-			period, code = sb.PeriodID, v.Period.TemplateCode
-			return nil
-		}); err != nil {
-			return SubmissionView{}, classify(err)
-		}
-		if err := g.AllowReview(ctx, period, code); err != nil {
-			return SubmissionView{}, err
-		}
+	if err = s.authorizeReview(ctx, prof, a, submissionID, decision, note, idem); err != nil {
+		return SubmissionView{}, err
 	}
 	var out SubmissionView
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
-		sb, err := store.SubmissionByID(ctx, tx, submissionID)
-		if err != nil {
-			return err
-		}
-		if sb == nil {
-			return port.ErrSubmissionMissing
-		}
-		if err := store.Lock(ctx, tx, sb.PeriodID); err != nil {
-			return err
-		}
-		v, err := load(ctx, tx, sb.PeriodID, now)
-		if err != nil {
-			return err
-		}
-		if v == nil || v.Period.Profile != profile || !a.allowsTemplate(v.Period.TemplateCode) || !a.allowsUnit(v.Spec, v.Period.Units, sb.Unit) {
-			return port.ErrSubmissionMissing
-		}
-		if v.State.Status == domain.PeriodCancelled {
-			return port.ErrPeriodCancelled
-		}
-		if v.State.Status == domain.PeriodClosed {
-			return port.ErrPeriodClosed
-		}
-		i := slices.IndexFunc(v.Units, func(u UnitView) bool { return u.Unit == sb.Unit })
-		cur := v.Units[i]
-		if cur.Submission == nil || cur.Submission.ID != sb.ID {
-			return port.ErrSuperseded
-		}
-		if cur.Review != nil {
-			return port.ErrAlreadyReviewed
-		}
-		if decision == domain.SubReturned && v.Spec.LimitReached(sb.Version) {
-			// KHTC FN-TI-02.04: lần gửi cuối cho phép thì phiếu tự khóa — không yêu cầu bổ sung được nữa.
-			return port.ErrSubmissionLimit.WithDetail("đã gửi đủ số lần tối đa — chỉ xác nhận được")
-		}
-		if sb.Submitter == a.ref {
-			return problem.SelfApproval.WithDetail("người rà soát trùng người nộp")
-		}
-		var reqID *uuid.UUID
-		if s.Approvals != nil {
-			outcome, wnote := wfport.OutcomeApproved, ""
-			if decision == domain.SubReturned {
-				outcome, wnote = wfport.OutcomeRejected, note
-			}
-			d, err := s.Approvals.Decide(db.JoinTx(ctx, tx), wfport.DecideInput{Kind: WorkflowKind, Subject: sb.ID, Requester: sb.Submitter,
-				Decider: a.ref, Outcome: outcome, Note: wnote, At: now})
-			if err != nil {
-				return err
-			}
-			reqID = &d.RequestID
-		}
-		r := domain.Review{ID: ids.New(), Decision: decision, Reviewer: a.ref, Note: note, At: now}
-		if err := store.InsertReview(ctx, tx, a.tenant, sb.ID, &r, reqID, idemOr(idem, "review")); err != nil {
-			return err
-		}
-		out = SubmissionView{Submission: *sb, Status: decision, Review: &r}
-		return nil
+		var err error
+		out, err = s.reviewNative(ctx, tx, prof, a, submissionID, decision, note, idem, s.Clock.Now().UTC(), nil, nil)
+		return err
 	})
 	return out, classify(err)
 }
