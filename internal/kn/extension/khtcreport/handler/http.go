@@ -28,6 +28,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g := rg.Group("/extension/khtc/periods/:id/report")
 	g.GET("", h.get)
 	g.POST("/draft", h.save)
+	g.GET("/draft-operations/:operationID", h.saveOperation)
+	g.GET("/draft-audit", h.saveAudit)
 	g.POST("/refresh", h.refresh)
 	g.GET("/exports", h.history)
 	g.POST("/exports", h.export)
@@ -71,6 +73,7 @@ type finalDTO struct {
 	At       time.Time `json:"at"`
 }
 type detailDTO struct {
+	SaveReceipt   *domain.SaveReceipt      `json:"save_receipt,omitempty"`
 	PeriodID      uuid.UUID                `json:"period_id"`
 	DraftID       *uuid.UUID               `json:"draft_id"`
 	Version       int64                    `json:"version"`
@@ -87,7 +90,7 @@ type detailDTO struct {
 }
 
 func detailOf(d app.Detail) detailDTO {
-	out := detailDTO{PeriodID: d.PeriodID, DraftID: d.DraftID, Version: d.Version, Content: d.Content, Sections: d.Sections, Document: d.Document, LockedAdmin: d.LockedAdmin, Editable: d.Editable, CanRefresh: d.CanRefresh, SourceChanged: d.SourceChanged, SourceError: d.SourceError, Terminal: d.Terminal}
+	out := detailDTO{SaveReceipt: d.SaveReceipt, PeriodID: d.PeriodID, DraftID: d.DraftID, Version: d.Version, Content: d.Content, Sections: d.Sections, Document: d.Document, LockedAdmin: d.LockedAdmin, Editable: d.Editable, CanRefresh: d.CanRefresh, SourceChanged: d.SourceChanged, SourceError: d.SourceError, Terminal: d.Terminal}
 	if d.Final != nil {
 		out.Final = &finalDTO{ExportID: d.Final.ExportID, Actor: d.Final.ActorRef, At: d.Final.At}
 	}

@@ -10196,6 +10196,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/extension/khtc/periods/{id}/report/draft-operations/{operationID}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đối chiếu đúng thao tác lưu; unknown không chứng minh rollback */
+        get: operations["extensionKhtcReportSaveOperation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extension/khtc/periods/{id}/report/draft-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tối đa 50 sự kiện lưu nháp mới có audit atomic */
+        get: operations["extensionKhtcReportSaveAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/extension/khtc/periods/{id}/adhoc-requests": {
         parameters: {
             query?: never;
@@ -24101,6 +24135,7 @@ export interface components {
             terminal: string;
             template_document?: components["schemas"]["KHTCTemplateRendered"];
             readonly locked_admin?: string[];
+            readonly save_receipt?: components["schemas"]["KHTCReportSaveReceipt"];
         };
         KHTCReportSave: {
             base_version: number;
@@ -24111,6 +24146,11 @@ export interface components {
                 [key: string]: string;
             };
             adhoc?: components["schemas"]["KHTCReportAdhocSelection"];
+            /**
+             * Format: uuid
+             * @description Định danh thao tác giữ nguyên để đối chiếu sau reload; bỏ trống chỉ cho caller cũ.
+             */
+            operation_id?: string;
         };
         KHTCReportRefresh: {
             base_version: number;
@@ -24172,6 +24212,39 @@ export interface components {
         };
         KHTCReportWordList: {
             items: components["schemas"]["KHTCReportWord"][];
+        };
+        KHTCReportDraftChange: {
+            field: string;
+            before: string;
+            after: string;
+            before_default: boolean;
+            after_default: boolean;
+        };
+        KHTCReportSavedDraft: {
+            /** Format: uuid */
+            draft_id: string;
+            /** Format: uuid */
+            base_draft_id: string | null;
+            base_version: number;
+            version: number;
+            request_hash: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            at: string;
+            changes: components["schemas"]["KHTCReportDraftChange"][];
+        };
+        KHTCReportSaveReceipt: {
+            /** Format: uuid */
+            operation_id: string;
+            /** Format: uuid */
+            period_id: string;
+            /** @enum {string} */
+            outcome: "applied" | "unknown";
+            applied?: components["schemas"]["KHTCReportSavedDraft"];
+        };
+        KHTCReportSaveAudit: {
+            items: components["schemas"]["KHTCReportSaveReceipt"][];
         };
         ExportTemplateVersion: {
             version: number;
@@ -48192,6 +48265,65 @@ export interface operations {
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
                 };
             };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportSaveOperation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                operationID: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    /** @description no-store */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportSaveReceipt"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
+    extensionKhtcReportSaveAudit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thành công */
+            200: {
+                headers: {
+                    /** @description no-store */
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KHTCReportSaveAudit"];
+                };
+            };
+            400: components["responses"]["Problem"];
             401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];

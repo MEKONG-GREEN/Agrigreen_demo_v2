@@ -14187,6 +14187,48 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
         "404": {$ref: "#/components/responses/Problem"}
         "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/report/draft-operations/{operationID}:
+    get:
+      summary: "Đối chiếu đúng thao tác lưu; unknown không chứng minh rollback"
+      operationId: extensionKhtcReportSaveOperation
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: operationID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          headers:
+            Cache-Control: {schema: {type: string}, description: no-store}
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCReportSaveReceipt"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+  /v1/extension/khtc/periods/{id}/report/draft-audit:
+    get:
+      summary: "Tối đa 50 sự kiện lưu nháp mới có audit atomic"
+      operationId: extensionKhtcReportSaveAudit
+      tags: [extension]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Thành công
+          headers:
+            Cache-Control: {schema: {type: string}, description: no-store}
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/KHTCReportSaveAudit"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
+
   /v1/extension/khtc/periods/{id}/adhoc-requests:
     get: {"operationId":"extensionKhtcAdhocRequestList","summary":"Yêu cầu bổ sung của kỳ phát sinh","tags":["extension"],"parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}}],"responses":{"200":{"description":"Thành công","content":{"application/json":{"schema":{"type":"object","required":["items"],"properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCAdhocRequest"}}}}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"$ref":"#/components/responses/Problem"},"409":{"$ref":"#/components/responses/Problem"},"422":{"$ref":"#/components/responses/Problem"},"428":{"$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}}}
     post: {"operationId":"extensionKhtcAdhocRequestCreate","summary":"Phát hành yêu cầu trên phiếu native đã giao; giữ bốn mắt và trần3","tags":["extension"],"parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"string","format":"uuid"}},{"$ref":"#/components/parameters/IdempotencyKey"}],"responses":{"201":{"description":"Thành công","content":{"application/json":{"schema":{"$ref":"#/components/schemas/KHTCAdhocRequest"}}}},"400":{"$ref":"#/components/responses/Problem"},"401":{"$ref":"#/components/responses/Problem"},"403":{"$ref":"#/components/responses/Problem"},"404":{"$ref":"#/components/responses/Problem"},"409":{"$ref":"#/components/responses/Problem"},"422":{"$ref":"#/components/responses/Problem"},"428":{"$ref":"#/components/responses/Problem"},"503":{"$ref":"#/components/responses/Problem"}},"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/KHTCAdhocRequestInput"}}}}}
@@ -27562,6 +27604,7 @@ components:
         due_at: {type: string, format: date-time}
         native_submission_ref: {type: [string, "null"], format: uuid}
         return_applied: {type: [boolean, "null"]}
+
     KHTCAdhocIndicator: {"type":"object","required":["code","name","unit"],"additionalProperties":false,"properties":{"code":{"type":"string","pattern":"^[A-Z][A-Z0-9_]{0,39}$"},"name":{"type":"string","minLength":1,"maxLength":200},"unit":{"type":"string","maxLength":50}}}
     KHTCAdhocRequestInput: {"type":"object","required":["department","instruction","due_at","indicators"],"additionalProperties":false,"properties":{"department":{"type":"string","minLength":1,"maxLength":64},"instruction":{"type":"string","minLength":1,"maxLength":4000},"due_at":{"type":"string","format":"date-time"},"indicators":{"type":"array","maxItems":20,"items":{"$ref":"#/components/schemas/KHTCAdhocIndicator"}}}}
     KHTCAdhocRequest: {"type":"object","required":["id","period_id","department","instruction","due_at","indicators","state","overdue","return_applied","actor_ref","at"],"additionalProperties":false,"properties":{"department":{"type":"string","minLength":1,"maxLength":64},"instruction":{"type":"string","minLength":1,"maxLength":4000},"due_at":{"type":"string","format":"date-time"},"indicators":{"type":"array","maxItems":20,"items":{"$ref":"#/components/schemas/KHTCAdhocIndicator"}},"id":{"type":"string","format":"uuid"},"period_id":{"type":"string","format":"uuid"},"state":{"type":"string","enum":["intent","issued","fulfilled","cancelled","failed"]},"overdue":{"type":"boolean"},"return_applied":{"type":["boolean","null"]},"actor_ref":{"type":"string","format":"uuid"},"at":{"type":"string","format":"date-time"}}}
@@ -27785,8 +27828,8 @@ components:
     KHTCReportContent: {"type":"object","properties":{"data":{"$ref":"#/components/schemas/KHTCReportData"},"admin":{"type":"object","additionalProperties":{"$ref":"#/components/schemas/KHTCReportAdminField"}},"texts":{"type":"object","additionalProperties":{"type":"string"}},"adhoc":{"$ref":"#/components/schemas/KHTCReportAdhocSelection"},"template_snapshot":{"$ref":"#/components/schemas/KHTCFixedTemplateSnapshot"},"template_terminal":{"type":"string","readOnly":true}},"required":["data","admin","texts"],"additionalProperties":false}
     KHTCReportSection: {"type":"object","properties":{"key":{"type":"string"},"title":{"type":"string"},"editable":{"type":"boolean"}},"required":["key","title","editable"],"additionalProperties":false}
     KHTCReportFinal: {"type":"object","properties":{"export_id":{"type":"string","format":"uuid"},"actor_ref":{"type":"string","format":"uuid"},"at":{"type":"string","format":"date-time"}},"required":["export_id","actor_ref","at"],"additionalProperties":false}
-    KHTCReportDetail: {"type":"object","properties":{"period_id":{"type":"string","format":"uuid"},"draft_id":{"type":["string","null"],"format":"uuid"},"version":{"type":"integer"},"content":{"$ref":"#/components/schemas/KHTCReportContent"},"sections":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportSection"}},"final":{"anyOf":[{"$ref":"#/components/schemas/KHTCReportFinal"},{"type":"null"}]},"editable":{"type":"boolean"},"can_refresh":{"type":"boolean"},"source_changed":{"type":"boolean"},"source_error":{"type":"string"},"terminal":{"type":"string"},"template_document":{"$ref":"#/components/schemas/KHTCTemplateRendered"},"locked_admin":{"type":"array","items":{"type":"string"},"readOnly":true}},"required":["period_id","draft_id","version","content","sections","final","editable","can_refresh","source_changed","source_error","terminal"],"additionalProperties":false}
-    KHTCReportSave: {"type":"object","properties":{"base_version":{"type":"integer","minimum":0},"admin":{"type":"object","additionalProperties":{"type":["string","null"]}},"texts":{"type":"object","additionalProperties":{"type":"string","maxLength":12000}},"adhoc":{"$ref":"#/components/schemas/KHTCReportAdhocSelection"}},"required":["base_version"],"additionalProperties":false}
+    KHTCReportDetail: {"type":"object","properties":{"period_id":{"type":"string","format":"uuid"},"draft_id":{"type":["string","null"],"format":"uuid"},"version":{"type":"integer"},"content":{"$ref":"#/components/schemas/KHTCReportContent"},"sections":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportSection"}},"final":{"anyOf":[{"$ref":"#/components/schemas/KHTCReportFinal"},{"type":"null"}]},"editable":{"type":"boolean"},"can_refresh":{"type":"boolean"},"source_changed":{"type":"boolean"},"source_error":{"type":"string"},"terminal":{"type":"string"},"template_document":{"$ref":"#/components/schemas/KHTCTemplateRendered"},"locked_admin":{"type":"array","items":{"type":"string"},"readOnly":true},"save_receipt":{"$ref":"#/components/schemas/KHTCReportSaveReceipt","readOnly":true}},"required":["period_id","draft_id","version","content","sections","final","editable","can_refresh","source_changed","source_error","terminal"],"additionalProperties":false}
+    KHTCReportSave: {"type":"object","properties":{"base_version":{"type":"integer","minimum":0},"admin":{"type":"object","additionalProperties":{"type":["string","null"]}},"texts":{"type":"object","additionalProperties":{"type":"string","maxLength":12000}},"adhoc":{"$ref":"#/components/schemas/KHTCReportAdhocSelection"},"operation_id":{"type":"string","format":"uuid","description":"Định danh thao tác giữ nguyên để đối chiếu sau reload; bỏ trống chỉ cho caller cũ."}},"required":["base_version"],"additionalProperties":false}
     KHTCReportRefresh: {"type":"object","properties":{"base_version":{"type":"integer","minimum":0}},"required":["base_version"],"additionalProperties":false}
     KHTCReportFilter: {"type":"object","properties":{"department":{"type":"string"},"program":{"type":"string"},"commune":{"type":"string"},"level":{"type":"string","enum":["","achieved","progressing","slow","qualitative"]}},"required":[],"additionalProperties":false}
     KHTCReportExportInput: {"type":"object","properties":{"base_version":{"type":"integer","minimum":1},"acknowledge_provisional":{"type":"boolean"},"filter":{"$ref":"#/components/schemas/KHTCReportFilter"}},"required":["base_version"],"additionalProperties":false}
@@ -27795,6 +27838,13 @@ components:
     KHTCReportAdhocSelection: {"type":"object","properties":{"rows":{"type":"array","maxItems":200,"items":{"type":"string","format":"uuid"}},"metrics":{"type":"array","maxItems":200,"items":{"type":"string","maxLength":512}}},"required":["rows","metrics"],"additionalProperties":false}
     KHTCReportWord: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"seq":{"type":"integer"},"template":{"type":"string"},"template_version":{"type":"integer"},"template_hash":{"type":"string"},"input_hash":{"type":"string"},"doc_number":{"type":"string"},"doc_number_auto":{"type":"boolean"},"file_name":{"type":"string"},"body_hash":{"type":"string"},"size":{"type":"integer"},"actor_ref":{"type":"string","format":"uuid"},"at":{"type":"string","format":"date-time"}},"required":["id","seq","template","template_version","template_hash","input_hash","doc_number","doc_number_auto","file_name","body_hash","size","actor_ref","at"],"additionalProperties":false}
     KHTCReportWordList: {"type":"object","properties":{"items":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportWord"}}},"required":["items"],"additionalProperties":false}
+    KHTCReportDraftChange: {"type":"object","properties":{"field":{"type":"string"},"before":{"type":"string"},"after":{"type":"string"},"before_default":{"type":"boolean"},"after_default":{"type":"boolean"}},"required":["field","before","after","before_default","after_default"],"additionalProperties":false}
+
+    KHTCReportSavedDraft: {"type":"object","properties":{"draft_id":{"type":"string","format":"uuid"},"base_draft_id":{"type":["string","null"],"format":"uuid"},"base_version":{"type":"integer","minimum":0},"version":{"type":"integer","minimum":1},"request_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},"actor_ref":{"type":"string","format":"uuid"},"at":{"type":"string","format":"date-time"},"changes":{"type":"array","items":{"$ref":"#/components/schemas/KHTCReportDraftChange"}}},"required":["draft_id","base_draft_id","base_version","version","request_hash","actor_ref","at","changes"],"additionalProperties":false}
+
+    KHTCReportSaveReceipt: {"type":"object","properties":{"operation_id":{"type":"string","format":"uuid"},"period_id":{"type":"string","format":"uuid"},"outcome":{"type":"string","enum":["applied","unknown"]},"applied":{"$ref":"#/components/schemas/KHTCReportSavedDraft"}},"required":["operation_id","period_id","outcome"],"additionalProperties":false}
+
+    KHTCReportSaveAudit: {"type":"object","properties":{"items":{"type":"array","maxItems":50,"items":{"$ref":"#/components/schemas/KHTCReportSaveReceipt"}}},"required":["items"],"additionalProperties":false}
     ExportTemplateVersion: {"type":"object","properties":{"version":{"type":"integer"},"hash":{"type":"string"},"registered":{"type":"boolean"},"recorded_at":{"type":["string","null"],"format":"date-time"},"drift":{"type":"boolean"}},"required":["version","hash","registered","recorded_at","drift"],"additionalProperties":false}
     DeptActor: {"type": "object", "properties": {"ref": {"type": "string", "format": "uuid"}, "display": {"type": ["string", "null"]}}, "required": ["ref", "display"], "additionalProperties": false}
     KHTCExternalIndicator: {"type":"object","properties":{"id":{"type":"string","format":"uuid"},"code":{"type":"string"},"name":{"type":"string"},"unit":{"type":"string"},"group":{"type":"string"},"created_at":{"type":"string","format":"date-time"}},"required":["id","code","name","unit","group","created_at"],"additionalProperties":false}
