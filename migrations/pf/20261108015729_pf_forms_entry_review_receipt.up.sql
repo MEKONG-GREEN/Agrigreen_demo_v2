@@ -70,6 +70,7 @@ BEGIN
   JOIN pf_forms.period p ON p.tenant_id=s.tenant_id AND p.id=s.period_id
   WHERE r.tenant_id=NEW.tenant_id AND r.id=(NEW.content->'result'->>'review_id')::uuid
    AND r.submission_id=NEW.submission_id AND r.period_id=NEW.period_id AND r.unit_code=NEW.unit_code AND p.profile=NEW.profile
+   AND r.recorded_at=NEW.recorded_at AND r.idem_key='forms.review_operation:'||NEW.operation_id::text||':review'
    AND s.seq=NEW.expected_version AND r.reviewer_ref=NEW.actor_ref AND r.decision=NEW.decision
    AND r.seq=(NEW.content->'result'->>'review_seq')::bigint
    AND r.reviewer_ref=(NEW.content->'result'->>'reviewer')::uuid

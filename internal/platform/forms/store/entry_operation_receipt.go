@@ -71,6 +71,8 @@ func InsertReviewOperation(ctx context.Context, tx pgx.Tx, receipt *port.ReviewO
 	if err != nil {
 		return err
 	}
-	return tx.QueryRow(ctx, `INSERT INTO pf_forms.review_operation_receipt(id,tenant_id,stream_key,operation_id,profile,period_id,unit_code,submission_id,expected_version,decision,request_digest,authority_hash,outcome,content,event_time,actor_ref,idem_key,rule_version)
+	err = tx.QueryRow(ctx, `INSERT INTO pf_forms.review_operation_receipt(id,tenant_id,stream_key,operation_id,profile,period_id,unit_code,submission_id,expected_version,decision,request_digest,authority_hash,outcome,content,event_time,actor_ref,idem_key,rule_version)
 VALUES($1,$2,'review_operation:'||$3::uuid::text,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,'review_operation:'||$3::uuid::text,'forms.review_operation/v1') RETURNING recorded_at`, id, receipt.TenantID, receipt.OperationID, receipt.Profile, receipt.PeriodID, receipt.Unit, receipt.SubmissionID, receipt.ExpectedVersion, receipt.Decision, receipt.RequestDigest, receipt.AuthorityHash, receipt.Outcome, string(raw), at.UTC(), receipt.ActorRef).Scan(&receipt.RecordedAt)
+	receipt.RecordedAt = receipt.RecordedAt.UTC()
+	return err
 }
