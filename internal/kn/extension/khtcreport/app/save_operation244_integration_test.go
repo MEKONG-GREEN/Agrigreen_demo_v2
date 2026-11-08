@@ -420,3 +420,62 @@ func TestReportSave244_FrozenReportKeepsReceiptAndRejectsNewSave(t *testing.T) {
 		t.Fatal("frozen boundary wrote draft/receipt", d, r)
 	}
 }
+
+func TestReportSave244_LegacyUsesUUID7AndReplaysOriginalKey(t *testing.T) {
+	f := newSaveFixture244(t)
+	key := ids.New().String()
+	in := SaveInput{BaseVersion: f.base, Texts: map[string]string{"B": "Caller cũ giữ khóa"}}
+	first, err := f.svc.Save(f.ctx, f.id, in, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.SaveReceipt.OperationID.Version() != 7 {
+		t.Fatal("new operation entity must use UUIDv7", first.SaveReceipt.OperationID)
+	}
+	next, err := f.svc.Save(f.ctx, f.id, SaveInput{BaseVersion: first.Version, Texts: map[string]string{"B": "Successor"}}, ids.New().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	replay, err := f.svc.Save(f.ctx, f.id, in, key)
+	if err != nil || replay.SaveReceipt == nil || replay.SaveReceipt.OperationID != first.SaveReceipt.OperationID || replay.SaveReceipt.Applied.Version != first.SaveReceipt.Applied.Version || replay.Version != next.Version {
+		t.Fatal("legacy exact key replay", replay.SaveReceipt, err)
+	}
+	d, r, o := f.counts(t)
+	if d != 3 || r != 2 || o != 0 {
+		t.Fatal("legacy retry duplicated mutation", d, r, o)
+	}
+}
+
+func TestReportSave244_ConcurrentLegacyReplayOneDraftOneReceipt(t *testing.T) {
+	f := newSaveFixture244(t)
+	f.svc.Forms = nil // Saved content remains readable; current source is explicitly unavailable.
+	key := ids.New().String()
+	in := SaveInput{BaseVersion: f.base, Texts: map[string]string{"B": "Hai request cùng thao tác"}}
+	type answer struct {
+		result Detail
+		err    error
+	}
+	replies := make(chan answer, 2)
+	for range 2 {
+		go func() { result, err := f.svc.Save(f.ctx, f.id, in, key); replies <- answer{result, err} }()
+	}
+	var operation uuid.UUID
+	for range 2 {
+		v := <-replies
+		if v.err != nil || v.result.SaveReceipt == nil {
+			t.Fatal("concurrent replay", v.err)
+		}
+		if operation == uuid.Nil {
+			operation = v.result.SaveReceipt.OperationID
+		} else if operation != v.result.SaveReceipt.OperationID {
+			t.Fatal("same key produced different operations")
+		}
+	}
+	if operation.Version() != 7 {
+		t.Fatal("UUIDv7", operation)
+	}
+	d, r, o := f.counts(t)
+	if d != 2 || r != 1 || o != 0 {
+		t.Fatal("concurrent legacy mutation duplicated", d, r, o)
+	}
+}

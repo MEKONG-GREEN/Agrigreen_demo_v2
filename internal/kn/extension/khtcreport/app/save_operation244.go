@@ -69,7 +69,13 @@ func savePeriod244(ctx context.Context, tx pgx.Tx, c caller, id uuid.UUID) (ps.P
 	return p, term, nil
 }
 func existingSave244(ctx context.Context, tx pgx.Tx, c caller, id, operation uuid.UUID, key, digest, authority string) (*store.SaveOperation, error) {
-	v, err := store.SaveOperationByID(ctx, tx, operation)
+	var v *store.SaveOperation
+	var err error
+	if operation == uuid.Nil {
+		v, err = store.SaveOperationByKey(ctx, tx, key)
+	} else {
+		v, err = store.SaveOperationByID(ctx, tx, operation)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +87,9 @@ func existingSave244(ctx context.Context, tx pgx.Tx, c caller, id, operation uui
 			return nil, problem.Forbidden.WithDetail("Quyền của thao tác lưu đã thay đổi")
 		}
 		return v, nil
+	}
+	if operation == uuid.Nil {
+		return nil, nil
 	}
 	other, err := store.SaveOperationByKey(ctx, tx, key)
 	if err != nil {
@@ -107,8 +116,9 @@ func (s *Service) saveWithReceipt244(ctx context.Context, id uuid.UUID, in SaveI
 		return Detail{}, ErrInvalid.WithDetail("Quá nhiều ô nhập")
 	}
 	key := "khtc:report:save:" + id.String() + ":" + idem
-	if in.OperationID == uuid.Nil {
-		in.OperationID = uuid.NewSHA1(id, []byte(key))
+	operationID := in.OperationID
+	if operationID == uuid.Nil {
+		operationID = ids.New()
 	}
 	keyHash, err := forms.OperationHash(key)
 	if err != nil {
@@ -182,7 +192,7 @@ func (s *Service) saveWithReceipt244(ctx context.Context, id uuid.UUID, in SaveI
 		return Detail{}, ErrInvalid.WithCause(err)
 	}
 	err = s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
-		if e := store.LockSaveOperation(ctx, tx, c.principal.TenantID, in.OperationID, keyHash); e != nil {
+		if e := store.LockSaveOperation(ctx, tx, c.principal.TenantID, operationID, keyHash); e != nil {
 			return e
 		}
 		if e := store.Lock(ctx, tx, c.principal.TenantID, id); e != nil {
@@ -225,7 +235,7 @@ func (s *Service) saveWithReceipt244(ctx context.Context, id uuid.UUID, in SaveI
 		if e = store.InsertDraft(ctx, tx, c.principal.TenantID, &row, key); e != nil {
 			return fmt.Errorf("insert report draft: %w", e)
 		}
-		v := store.SaveOperation{OperationID: in.OperationID, PeriodID: id, RequestKey: keyHash, AuthorityHash: authority, Applied: domain.SavedDraft{DraftID: row.ID, BaseVersion: in.BaseVersion, Version: row.Version, RequestHash: digest, ActorRef: row.ActorRef, At: row.At, Changes: domain.SaveChanges(before, content)}}
+		v := store.SaveOperation{OperationID: operationID, PeriodID: id, RequestKey: keyHash, AuthorityHash: authority, Applied: domain.SavedDraft{DraftID: row.ID, BaseVersion: in.BaseVersion, Version: row.Version, RequestHash: digest, ActorRef: row.ActorRef, At: row.At, Changes: domain.SaveChanges(before, content)}}
 		if latest != nil {
 			base := latest.ID
 			v.Applied.BaseDraftID = &base
