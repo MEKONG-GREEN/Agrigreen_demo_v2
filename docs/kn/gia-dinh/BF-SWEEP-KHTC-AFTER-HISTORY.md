@@ -1,4 +1,4 @@
-# BF-SWEEP-KHTC-AFTER-HISTORY (#244) — lát lưu nháp báo cáo
+## BF-SWEEP-KHTC-AFTER-HISTORY — Lát lưu nháp báo cáo (#244)
 
 Nguồn: Function BRD KHTC v2.3 final, DOCX SHA-256 `15859351f90574bf667190b1a12160465ba03f8ca9e408b94c90d285a3502e25`. FN-TI-02.05 P943/P952/P955: lưu nháp, truy vết người/thời điểm/giá trị cũ → mới; FN-TI-02.06–02.09 kế thừa khung báo cáo. Function chi tiết thắng tài liệu cũ. Không mở rộng soạn toàn văn #240.
 
