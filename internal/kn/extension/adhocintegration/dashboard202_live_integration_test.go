@@ -80,7 +80,7 @@ func TestDashboard202ActualPublicClosedSourcesAndCutoff(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	ref, err := fm.Publisher().DefineTemplate(admin, formsport.TemplateDef{Profile: "kn_cnts", Code: "LIVE202", Title: "Nguồn số đã chốt dashboard202", Fields: json.RawMessage(`[{"key":"amount","label":"Số thực hiện","type":"decimal","required":true}]`), BaseVersion: new(int64)}, "live202.define")
+	ref, err := fm.Publisher().DefineTemplate(admin, formsport.TemplateDef{Profile: "kn_cnts", Code: "CNTS-DT-LIVE202", Title: "Nguồn số đã chốt dashboard202", Fields: json.RawMessage(`[{"key":"amount","label":"Số thực hiện","type":"decimal","required":true}]`), BaseVersion: new(int64)}, "live202.define")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestDashboard202ActualPublicClosedSourcesAndCutoff(t *testing.T) {
 	for _, e := range f.planBody["entries"].([]map[string]any) {
 		if e["ref"] == f.itemMod {
 			e["department_code"] = dCNTS
-			e["source_key"] = "sum:chan_nuoi_thuy_san:live202:amount"
+			e["source_key"] = "sum:chan_nuoi_thuy_san:cnts-dt-live202:amount"
 		}
 	}
 	code, body := f.do(http.MethodPost, "/v1/kn/khtc/plans/2026/versions", authz.KNTinh, khtcDept, f.khtcUser, "", f.planBody)

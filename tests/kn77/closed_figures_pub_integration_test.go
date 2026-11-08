@@ -38,8 +38,8 @@ type cntsFx struct {
 	pub         formsport.Publisher
 	tinh, xa    caller
 	tinhCtx     context.Context
-	periodA     string // BM-T1, tuần 2026-W37, xã c1 + c2
-	periodB     string // BM-T2, tuần 2026-W37, xã c1
+	periodA     string // CNTS-DT-T1, tuần 2026-W37, xã c1 + c2
+	periodB     string // CNTS-DT-T2, tuần 2026-W37, xã c1
 	xaActorText string
 }
 
@@ -91,7 +91,7 @@ func setupCNTS(t *testing.T, f *fixture) *cntsFx {
 		code  string
 		units []string
 		dst   *string
-	}{{"BM-T1", []string{c1, c2}, &x.periodA}, {"BM-T2", []string{c1}, &x.periodB}} {
+	}{{"CNTS-DT-T1", []string{c1, c2}, &x.periodA}, {"CNTS-DT-T2", []string{c1}, &x.periodB}} {
 		ref, err := x.pub.DefineTemplate(adminCtx, formsport.TemplateDef{Profile: platformasm.KNCNTSProfile.Name, Code: p.code,
 			Title: "Biểu kiểm thử " + p.code, Fields: fields, BaseVersion: new(int64)}, "")
 		if err != nil {
@@ -175,23 +175,23 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 
 	// Chưa chốt: dòng có, cờ false, chưa có số đã chốt.
 	m := cnts()
-	if a := m["BM-T1"]; a.FormClosed || a.KeyClosed || a.KeyClosedAll || a.SnapshotID != nil || a.Rows != nil || a.ClosedAt != nil {
+	if a := m["CNTS-DT-T1"]; a.FormClosed || a.KeyClosed || a.KeyClosedAll || a.SnapshotID != nil || a.Rows != nil || a.ClosedAt != nil {
 		t.Fatalf("trước chốt: %+v", a)
 	}
 
-	// Xã nộp (kèm trường văn bản có tên người — không được công bố), Tỉnh chốt BM-T1.
+	// Xã nộp (kèm trường văn bản có tên người — không được công bố), Tỉnh chốt CNTS-DT-T1.
 	zero := int64(0)
 	x.xa.must(x.post(x.xa, "/v1/forms/periods/"+x.periodA+"/submissions?profile=kn_cnts", map[string]any{"unit": c1,
 		"values": map[string]string{"heo": "10", "heo_luy_ke": "120", "ty_le": "1.50", "ghi_chu": "Ông Nguyễn Văn A báo"}, "base_version": zero}),
-		http.StatusCreated, "xã nộp BM-T1")
+		http.StatusCreated, "xã nộp CNTS-DT-T1")
 	closePath := func(p string) string { return "/v1/forms/periods/" + p + "/close?profile=kn_cnts" }
 	reopenPath := func(p string) string { return "/v1/forms/periods/" + p + "/reopen?profile=kn_cnts" }
-	x.tinh.must(x.post(x.tinh, closePath(x.periodA), map[string]any{}), http.StatusOK, "chốt BM-T1")
+	x.tinh.must(x.post(x.tinh, closePath(x.periodA), map[string]any{}), http.StatusOK, "chốt CNTS-DT-T1")
 	m = cnts()
-	a := m["BM-T1"]
+	a := m["CNTS-DT-T1"]
 	if !a.FormClosed || !a.PeriodClosed || a.KeyClosed || a.KeyClosedAll || a.SnapshotID == nil || a.SnapshotNo == nil || *a.SnapshotNo != 1 ||
 		a.Provisional == nil || !*a.Provisional || *a.UnitsTotal != 2 || *a.UnitsWithData != 1 || len(a.MissingUnits) != 1 || a.ClosedAt == nil {
-		t.Fatalf("chốt BM-T1 (BM-T2 còn mở → key_closed false): %+v", a)
+		t.Fatalf("chốt CNTS-DT-T1 (CNTS-DT-T2 còn mở → key_closed false): %+v", a)
 	}
 	if got := unitCells(a, c1); len(got) != 3 || got["heo"] != "10" || got["heo_luy_ke"] != "120" || got["ty_le"] != "1.50" {
 		t.Fatalf("ô số đã chốt (chỉ trường số, gồm lũy kế của nguồn): %v", got)
@@ -210,41 +210,41 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 		t.Fatalf("dạng dòng hợp đồng: %s %v", a.Rows, err)
 	}
 
-	// Chốt BM-T2 (không bài) → mọi biểu của khóa W37 đã chốt.
-	x.tinh.must(x.post(x.tinh, closePath(x.periodB), map[string]any{}), http.StatusOK, "chốt BM-T2")
+	// Chốt CNTS-DT-T2 (không bài) → mọi biểu của khóa W37 đã chốt.
+	x.tinh.must(x.post(x.tinh, closePath(x.periodB), map[string]any{}), http.StatusOK, "chốt CNTS-DT-T2")
 	m = cnts()
 	for code, r := range m {
 		if !r.FormClosed || !r.KeyClosed || !r.KeyClosedAll {
 			t.Fatalf("%s sau chốt mọi biểu: %+v", code, r)
 		}
 	}
-	closed := m["BM-T1"]
+	closed := m["CNTS-DT-T1"]
 
-	// Mở lại BM-T1 cho xã c1 → cờ về false (cả key_closed của BM-T2); số đã chốt giữ nguyên dù xã nộp lại.
+	// Mở lại CNTS-DT-T1 cho xã c1 → cờ về false (cả key_closed của CNTS-DT-T2); số đã chốt giữ nguyên dù xã nộp lại.
 	x.tinh.must(x.post(x.tinh, reopenPath(x.periodA), map[string]any{"units": []string{c1}, "reason": "Xã nhập nhầm số heo tuần 37"}),
-		http.StatusOK, "mở lại BM-T1")
+		http.StatusOK, "mở lại CNTS-DT-T1")
 	one := int64(1)
 	x.xa.must(x.post(x.xa, "/v1/forms/periods/"+x.periodA+"/submissions?profile=kn_cnts", map[string]any{"unit": c1,
 		"values": map[string]string{"heo": "15", "heo_luy_ke": "125"}, "base_version": one}), http.StatusCreated, "xã nộp lại khi mở")
 	m = cnts()
-	if r := m["BM-T1"]; r.FormClosed || r.PeriodClosed || r.KeyClosed || *r.SnapshotID != *closed.SnapshotID || unitCells(r, c1)["heo"] != "10" ||
+	if r := m["CNTS-DT-T1"]; r.FormClosed || r.PeriodClosed || r.KeyClosed || *r.SnapshotID != *closed.SnapshotID || unitCells(r, c1)["heo"] != "10" ||
 		!r.ClosedAt.Equal(*closed.ClosedAt) {
 		t.Fatalf("đang mở lại: %+v", r)
 	}
-	if r := m["BM-T2"]; !r.FormClosed || r.KeyClosed || r.KeyClosedAll {
-		t.Fatalf("BM-T2 khi BM-T1 mở lại: %+v", r)
+	if r := m["CNTS-DT-T2"]; !r.FormClosed || r.KeyClosed || r.KeyClosedAll {
+		t.Fatalf("CNTS-DT-T2 khi CNTS-DT-T1 mở lại: %+v", r)
 	}
 	// Nguồn gốc (W11.64): băm số chỉ đổi khi số đã chốt đổi — đang mở lại vẫn là băm lúc chốt.
-	if r := m["BM-T1"]; closed.FiguresHash == nil || r.FiguresHash == nil || *r.FiguresHash != *closed.FiguresHash ||
+	if r := m["CNTS-DT-T1"]; closed.FiguresHash == nil || r.FiguresHash == nil || *r.FiguresHash != *closed.FiguresHash ||
 		r.ConfirmationStatus != extport.ConfirmationConfirmed || r.SourceModule != "pf/forms" || closed.StatusHash == nil {
 		t.Fatalf("băm khi mở lại: %+v", r)
 	}
 
 	// Chốt lại → ảnh chụp mới, số mới, cờ trở lại.
 	f.clk.Advance(time.Hour)
-	x.tinh.must(x.post(x.tinh, closePath(x.periodA), map[string]any{}), http.StatusOK, "chốt lại BM-T1")
+	x.tinh.must(x.post(x.tinh, closePath(x.periodA), map[string]any{}), http.StatusOK, "chốt lại CNTS-DT-T1")
 	m = cnts()
-	if r := m["BM-T1"]; !r.FormClosed || !r.KeyClosed || !r.KeyClosedAll || *r.SnapshotID == *closed.SnapshotID || *r.SnapshotNo != 2 ||
+	if r := m["CNTS-DT-T1"]; !r.FormClosed || !r.KeyClosed || !r.KeyClosedAll || *r.SnapshotID == *closed.SnapshotID || *r.SnapshotNo != 2 ||
 		unitCells(r, c1)["heo"] != "15" || !r.ClosedAt.After(*closed.ClosedAt) || *r.FiguresHash == *closed.FiguresHash ||
 		!strings.Contains(string(r.Rows), `"confirmation": "confirmed"`) {
 		t.Fatalf("sau chốt lại: %+v", r)
@@ -253,7 +253,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 	// Danh tính lịch nguồn (D8) và quy đổi sang tuần KHTC (crosswalk v1, ADR-0053 §6): kỳ CNTS 08/09–14/09 quy vào tuần KHTC
 	// 2026-W37 (09/09 – 15/09, chứa ngày cuối 14/09) → Converted; đã chốt; Sum = số đã chốt.
 	// Kỳ CNTS theo lịch D8 Thứ Ba – Thứ Hai (08/09 – 14/09, thẻ mang cal=chan_nuoi_thuy_san:v3) → phiên bản 3.
-	if r := m["BM-T1"]; r.CalendarID != cntsDept || r.CalendarVersion == nil || *r.CalendarVersion != 3 || r.PeriodKey != "2026-W37" {
+	if r := m["CNTS-DT-T1"]; r.CalendarID != cntsDept || r.CalendarVersion == nil || *r.CalendarVersion != 3 || r.PeriodKey != "2026-W37" {
 		t.Fatalf("danh tính lịch nguồn: %+v", r)
 	}
 	conv, err := reader.Converted(ctx, f.tenant, extport.ClosedFiguresQuery{Department: cntsDept}, extport.CrosswalkTarget{})
@@ -264,7 +264,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 		if o.TargetKey != "2026-W37" || !o.Converted || !o.Closed || !o.KeyClosed || o.RuleVersion != extport.CrosswalkV1 || len(o.Sources) != 1 {
 			t.Fatalf("kỳ KHTC: %+v", o)
 		}
-		if o.FormCode == "BM-T1" && (o.Sum["heo"] != "15" || o.Last["heo_luy_ke"] != "125") {
+		if o.FormCode == "CNTS-DT-T1" && (o.Sum["heo"] != "15" || o.Last["heo_luy_ke"] != "125") {
 			t.Fatalf("số quy đổi: %+v", o)
 		}
 	}
@@ -346,7 +346,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 			t.Fatalf("tham chiếu thiếu danh tính lịch: %+v", r)
 		}
 	}
-	if !bySrc[cntsDept+"|pf_forms.bm-t1"] || !bySrc[dept+"|pf_extension.t01"] {
+	if !bySrc[cntsDept+"|pf_forms.cnts-dt-t1"] || !bySrc[dept+"|pf_extension.t01"] {
 		t.Fatalf("nguồn: %v", bySrc)
 	}
 	states, err := cw.States(x.tinhCtx, refs)
@@ -372,7 +372,7 @@ func TestPFPUB_ClosedFigures(t *testing.T) {
 	if srcs[extport.ClosedSourceForms] != 2 || srcs[extport.ClosedSourceReportCycle] != 2 {
 		t.Fatalf("hai nguồn: %v", srcs)
 	}
-	if only := read(extport.ClosedFiguresQuery{Department: cntsDept, FormCodes: []string{"BM-T2"}}); len(only) != 1 || !only[0].KeyClosedAll {
+	if only := read(extport.ClosedFiguresQuery{Department: cntsDept, FormCodes: []string{"CNTS-DT-T2"}}); len(only) != 1 || !only[0].KeyClosedAll {
 		t.Fatalf("lọc biểu: %+v", only)
 	}
 
