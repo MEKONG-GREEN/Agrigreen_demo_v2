@@ -24,7 +24,8 @@ import {
   type FormsTask,
   type SubmitBody,
 } from "../periods/api";
-import { CATCH_CODE, catchMatrix, draftOf, editableWeeks, sheetTotal, sheetValue, SHEETS, unitTotal, type CatchMatrix, type CatchSheet } from "./catch";
+import { CntsTaskEntry } from "../periods/CntsEntryScreen";
+import { hasStandardCatchSchema, CATCH_CODE, catchMatrix, draftOf, editableWeeks, sheetTotal, sheetValue, SHEETS, unitTotal, type CatchMatrix, type CatchSheet } from "./catch";
 
 const LIMITS = [
   [4, "4 tuần gần nhất"],
@@ -100,7 +101,8 @@ function CatchBody({
   // (cùng base_version → cùng dấu vân tay → cùng Idempotency-Key → máy chủ phát lại kết quả cũ, không 409 dù đã lưu).
   const [attempted, setAttempted] = useState<Record<string, SubmitBody>>({});
   const full = useMemo(() => catchMatrix(view), [view]);
-  const weeks = writer ? editableWeeks(full) : [];
+  const versioned = view.some(t => !hasStandardCatchSchema(t));
+  const weeks = versioned ? [...full.weeks].reverse() : writer ? editableWeeks(full) : [];
   const [week, setWeek] = useState(weeks[0]?.periodId ?? "");
   const m = useMemo(() => {
     const shown = catchMatrix(view, limit);
@@ -110,7 +112,9 @@ function CatchBody({
   }, [view, limit, full, week]);
   const name = useCommuneNames(m.units);
   const [sheet, setSheet] = useState<Key>("ca");
-  const open = writer ? m.units.map((u) => full.cell(week, u)).filter((t): t is FormsTask => !!t?.open) : [];
+  const selectedTasks = m.units.map(u => full.cell(week, u)).filter((t): t is FormsTask => !!t);
+  const open = writer ? selectedTasks.filter(t => t.open) : [];
+  const [selectedTask, setSelectedTask] = useState<FormsTask | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Record<Key, string>>>(() => Object.fromEntries(open.map((t) => [t.unit, draftOf(t)])));
   const [nil, setNil] = useState<Record<string, boolean>>(() => Object.fromEntries(open.map((t) => [t.unit, t.nil_report])));
   const [explanation, setExplanation] = useState("");
@@ -120,6 +124,7 @@ function CatchBody({
   const pickWeek = (id: string) => {
     const ts = m.units.map((u) => full.cell(id, u)).filter((t): t is FormsTask => !!t?.open);
     setWeek(id);
+    setSelectedTask(null);
     setDrafts(Object.fromEntries(ts.map((t) => [t.unit, draftOf(t)])));
     setNil(Object.fromEntries(ts.map((t) => [t.unit, t.nil_report])));
     setErrs({});
@@ -184,7 +189,23 @@ function CatchBody({
   }
   return (
     <>
-      {writer ? (
+      {versioned ? (
+        <section className="card sec" aria-label="Biểu BM-17 theo phiên bản">
+          <h2>Nhập và xem theo phiên bản biểu</h2>
+          <p className="mute">Các trường lấy từ phiên bản đã gắn với từng kỳ. Các bảng bốn nhóm bên dưới giữ số liệu chuẩn của kỳ.</p>
+          <label>Kỳ theo phiên bản <select className="select" aria-label="Kỳ theo phiên bản" value={week} onChange={e => pickWeek(e.target.value)}>
+            {weeks.map(w => <option key={w.periodId} value={w.periodId}>{w.label}</option>)}
+          </select></label>
+          <ul className="list-plain">{selectedTasks.map(t => <li key={t.id}>
+            {name(t.unit)} · mẫu v{t.template_version} <StatusPill tone={STATUS_TONE[t.status]}>{STATUS_LABEL[t.status]}</StatusPill>{" "}
+            <button className="btn" onClick={() => setSelectedTask(t)}>Xem hoặc nhập — {name(t.unit)}</button>
+          </li>)}</ul>
+          {selectedTask ? <CntsTaskEntry key={`${selectedTask.id}:${selectedTask.version}:${writer}`} task={selectedTask}
+            unitLabel={name(selectedTask.unit)} nilLabel="Không phát sinh khai thác trong tuần" viewOnly={!writer || !selectedTask.open}
+            capi={capi} onDone={refresh => { setSelectedTask(null); if (refresh) reload(); }} /> : null}
+        </section>
+      ) : null}
+      {writer && !versioned ? (
         <section className="card sec" aria-label="Nhập tuần">
           <h2>Nhập số liệu tuần</h2>
           {weeks.length ? (
@@ -275,7 +296,7 @@ function CatchBody({
           s={s}
           m={m}
           name={name}
-          editWeek={writer ? week : ""}
+          editWeek={writer && !versioned ? week : ""}
           drafts={drafts}
           nil={nil}
           errs={errs}

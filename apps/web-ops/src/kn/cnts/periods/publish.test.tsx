@@ -1,4 +1,4 @@
-import { cntsSelection } from "@/test/cnts-template-selection";
+import { cntsSelection } from "@/kn/cnts/periods/selection.fixture";
 // BF-CN-PUBLISH (#108, CN-07): cấu hình phát hành biểu kỳ CNTS (đối tượng nhóm xã, người phụ trách, giờ chốt, xem trước
 // số nhiệm vụ) và màn theo dõi (Đã nộp / Nháp / Chưa nhập / Trễ / Trả lại / Không nộp, nút Nhắc) — hàm thuần, backend giả
 // lập và màn thật.

@@ -1,4 +1,4 @@
-import { cntsSelection } from "@/test/cnts-template-selection";
+import { cntsSelection } from "@/kn/cnts/periods/selection.fixture";
 // BF-CN-WEEKLY (PRD UP-06): quy tắc thuần của màn Báo cáo công việc tuần — bảng T2–CN, kiểm trước khi gửi, chọn kỳ mặc
 // định, gợi ý Phần I từ KSGM / Nhập liệu tuần / Lịch trực; mock: kế hoạch đã đăng ký → Lịch công tác chờ duyệt.
 import { beforeEach, describe, expect, it } from "vitest";

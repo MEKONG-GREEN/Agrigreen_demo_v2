@@ -173,6 +173,6 @@ Nguồn/phạm vi: [BF-CN-FORM-DESIGN-EDIT-DIARY](../kn/gia-dinh/BF-CN-FORM-DESI
 | Save/create durable receipt sau head tăng, CAS một thắng, native policy kiểm cấu trúc trực tiếp | `TestCNTS275DefinitionDurableReplay`, `TestCNTS275DefinitionCASAndPolicyValidation`, parent `TestCNTSDesignEdit_FN07_192` | Canonical definition; copy source provenance atomic còn supplier |
 | Mất ACK sau commit native: cùng session/actor/payload/tuple phục hồi receipt gốc; đổi target/actor/version hoặc current role/group/read-only/phạm vi/hết hạn không replay; không trùng event/audit | `TestCNTS275PublicationLostACKCurrentAuthorityAndExactReceipt` | Fixture binds actual KN owner registry, thay account middleware |
 | UI yêu cầu chọn phiên bản; preview và POST giữ nguyên tuple | `publish.test.tsx`, production built browser desktop/mobile | Mock/web tách riêng native PG |
-| Nhật ký động, GPS/ảnh/tần suất và programme owner của mẫu, loại lịch/mã báo cáo mới, usage đúng mọi runtime và assignment theo identity | Chưa nghiệm thu | Supplier/consumer proposals đã chuyển ROOT; công bố chính thức đang chờ owner, chưa có số issue |
+| Nhật ký động, GPS/ảnh/tần suất và programme owner của mẫu, loại lịch/mã báo cáo mới, usage đúng mọi runtime và assignment theo identity | Chưa nghiệm thu | Supplier [#303](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/303) mới được tạo, chưa triển khai; assignment/consumer còn bản nháp |
 
 Cách chạy và map tệp → bước → FN nằm trong tài liệu giả định. Không dùng chức năng #192 đã có hoặc mock để nhận toàn bộ phần còn lại #275.

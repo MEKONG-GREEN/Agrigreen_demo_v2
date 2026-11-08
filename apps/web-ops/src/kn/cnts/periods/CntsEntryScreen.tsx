@@ -144,6 +144,7 @@ export function CntsEntryScreen() {
 }
 
 function Entry({
+  viewOnly = false,
   task,
   unitLabel,
   nilLabel,
@@ -155,8 +156,9 @@ function Entry({
   nilLabel: string | null;
   capi: ReturnType<typeof createCntsPeriodApi>;
   onDone: (reload: boolean) => void;
+  viewOnly?: boolean;
 }) {
-  const local = loadDraft(task);
+  const local = viewOnly ? null : loadDraft(task);
   const init: Draft = local ?? { values: task.values, nil: task.nil_report, note: task.note, explanation: task.explanation };
   const [d, setD] = useState<Draft>(init);
   // Người dùng đã sửa biểu (số liệu, không phát sinh, ghi chú, giải trình, sao chép kỳ trước) kể từ khi mở.
@@ -167,7 +169,7 @@ function Entry({
   // Nháp trên máy này luôn mới hơn (lưu sau mỗi thao tác) nên không hỏi máy chủ. Nháp máy chủ không mới hơn lần gửi
   // gần nhất thì bỏ qua. Phản hồi đến sau khi người dùng đã nhập thì không ghi đè (#108 [P2] Codex).
   useEffect(() => {
-    if (local || !task.open) return;
+    if (viewOnly || local || !task.open) return;
     let alive = true;
     capi.draft(task.period_id, task.unit).then(
       (s) => {
@@ -182,7 +184,7 @@ function Entry({
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ nạp một lần khi mở công việc
-  }, [task.id]);
+  }, [task.id, viewOnly]);
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [conflict, setConflict] = useState<string | null>(null);
   const act = useAction();
@@ -195,9 +197,10 @@ function Entry({
       return n;
     });
   };
-  const readOnly = !task.open;
+  const readOnly = viewOnly || !task.open;
 
   const submit = async () => {
+    if (readOnly) return;
     const fe = fieldErrors(task.fields, d.values, d.nil);
     if (late && !d.explanation.trim()) fe.explanation = "Gửi sau hạn: bắt buộc ghi lý do trễ.";
     setErrs(fe);
@@ -239,7 +242,7 @@ function Entry({
       <p className="mute">
         {unitLabel} · hạn {dt(task.due_at)}
         {task.version > 0 ? ` · phiên bản ${task.version}, gửi lúc ${dt(task.submitted_at)}` : ""}
-        {late && task.open ? " · Trễ hạn — vẫn gửi được, ghi lý do trễ" : ""}
+        {late && !readOnly ? " · Trễ hạn — vẫn gửi được, ghi lý do trễ" : ""}
       </p>
       {act.view}
       {conflict ? (
@@ -376,5 +379,5 @@ function Entry({
   );
 }
 
-// Cho kiểm thử hồi quy nạp nháp máy chủ (publish.test.tsx).
+// Bộ nhập theo schema dùng chung cho công việc CNTS và mẫu BM-17 có phiên bản.
 export { Entry as CntsTaskEntry };

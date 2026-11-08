@@ -1,4 +1,4 @@
-import { cntsSelection } from "@/test/cnts-template-selection";
+import { cntsSelection } from "@/kn/cnts/periods/selection.fixture";
 // BF-CN-XA-DATA #175 (BRD CNTS v3.7 FN-09): Số liệu cấp xã › Nhập liệu tuần BM-04 — Cấp Tỉnh.
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

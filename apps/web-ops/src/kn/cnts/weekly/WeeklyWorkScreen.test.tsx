@@ -1,4 +1,4 @@
-import { cntsSelection } from "@/test/cnts-template-selection";
+import { cntsSelection } from "@/kn/cnts/periods/selection.fixture";
 // BF-CN-WEEKLY (PRD UP-06): màn Báo cáo công việc tuần — hai phần, bảng T2–CN, thiếu trường báo lỗi theo ô và KHÔNG gửi;
 // Phần II có "Sao chép tuần trước", Phần I có "Gợi ý điền"; cột phải có Người báo cáo và Log.
 import { render, screen, within } from "@testing-library/react";

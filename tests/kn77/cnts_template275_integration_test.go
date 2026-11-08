@@ -109,7 +109,7 @@ func TestCNTS275SelectedVersionRuntime(t *testing.T) {
 		hostile["cua"] = bad
 		c, b = f.call(http.MethodPost, "/v1/forms/periods/"+next.Periods[0].ID+"/submissions?profile=kn_cnts", authz.KNXa, map[string]any{"unit": "X1", "values": hostile, "explanation": "Giải trình gửi bổ sung"})
 		if c < 400 {
-			t.Fatalf("hostile decimal accepted: %d", c)
+			t.Fatalf("hostile decimal accepted: %d %s", c, b)
 		}
 	}
 	f.submit(next.Periods[0].ID, "X1", values)
@@ -271,7 +271,7 @@ func TestCNTS275PublicationLostACKCurrentAuthorityAndExactReceipt(t *testing.T) 
 	}
 	c, b = cn275Call(f, path, key, ids.New(), k, in)
 	if c < 400 {
-		t.Fatal("different actor replayed")
+		t.Fatalf("different actor replayed: %s", b)
 	}
 	changed := map[string]any{}
 	for x, v := range in {
@@ -280,13 +280,13 @@ func TestCNTS275PublicationLostACKCurrentAuthorityAndExactReceipt(t *testing.T) 
 	changed["units"] = []string{"X2"}
 	c, b = cn275Call(f, path, key, actor, k, changed)
 	if c < 400 {
-		t.Fatal("different target replayed")
+		t.Fatalf("different target replayed: %s", b)
 	}
 	changed["units"] = in["units"]
 	changed["template_version"] = 2
 	c, b = cn275Call(f, path, key, actor, k, changed)
 	if c < 400 {
-		t.Fatal("different version replayed")
+		t.Fatalf("different version replayed: %s", b)
 	}
 	for table, want := range map[string]int{"pf_forms.period": 1, "pf_forms.period_event": 2, "pf_extension.cnts_publish_intent": 1, "pf_extension.cnts_publish_receipt": 1, "pf_extension.cnts_publication": 1} {
 		if got := len(f.admin.query("SELECT id FROM "+table+" WHERE tenant_id=$1", f.tid)); got != want {

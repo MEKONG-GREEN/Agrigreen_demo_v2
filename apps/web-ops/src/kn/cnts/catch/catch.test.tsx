@@ -1,4 +1,5 @@
-import { cntsSelection } from "@/test/cnts-template-selection";
+import { createDesignApi } from "../design/api";
+import { cntsSelection } from "@/kn/cnts/periods/selection.fixture";
 // BF-CN-CATCH #112 (UP-09): Khai thác thủy sản tuần theo 4 sheet của biểu "ĐÁNH BẮT (nhập liệu theo xã)".
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -323,4 +324,50 @@ describe("màn Khai thác thủy sản tuần", () => {
     await u.click(within(tabs).getByRole("tab", { name: "Mực" }));
     expect(screen.getByRole("heading", { name: "Khai thác theo xã (Mực, tấn)" })).toBeInTheDocument();
   });
+
+  it("#275: nhập đủ trường của phiên bản mở rộng và đọc lại kỳ chuẩn cũ", async () => {
+    const admin = apiOf("kn-admin", await contextOf("kn-admin", "asg-admin", null));
+    const designer = createDesignApi(admin);
+    const bm17 = (await designer.list()).find(f => f.code === "CNTS-BM17")!;
+    const saved = await designer.save(bm17.code, bm17.version!, "BM17 có cột mở rộng", [...bm17.fields,
+      { key: "cua", label: "Cua theo mẫu", type: "decimal", required: true, non_negative: true, unit: "tấn" }]);
+    const publishing = createCntsPeriodApi(apiOf("kn-binh", null));
+    const published = await publishing.publish({ code: bm17.code, template_id: saved.version.template_id, template_version: saved.version.version,
+      from_date: "2099-01-20", to_date: "2099-01-26", units: ["91301"] });
+    auth.role = "kn_xa"; auth.api = apiOf("kn-an", xaCtx);
+    const u = userEvent.setup();
+    const rendered = render(<CatchScreen />);
+    const panel = await screen.findByRole("region", { name: "Biểu BM-17 theo phiên bản" });
+    await u.click(within(panel).getByRole("button", { name: /Xem hoặc nhập.*Mỹ Hòa Hưng/ }));
+    const extra = await screen.findByRole("textbox", { name: /Cua theo mẫu/ });
+    for (const [label, value] of [[/TS-01/, "4"], [/TS-02/, "0"], [/TS-03/, "1"], [/TS-04/, "0"]] as const) {
+      await u.type(screen.getByRole("textbox", { name: label }), value);
+    }
+    await u.click(screen.getByRole("button", { name: "Gửi báo cáo" }));
+    expect(await screen.findByText("Bắt buộc nhập.")).toBeInTheDocument();
+    await u.type(extra, "2,5");
+    await u.click(screen.getByRole("button", { name: "Gửi báo cáo" }));
+    const pid = published.periods[0]!.id!;
+    await waitFor(async () => {
+      const task = (await publishing.tasks("CNTS-BM17")).find(t => t.period_id === pid)!;
+      expect(task.values).toMatchObject({ ca: "4", cua: "2.5" });
+      expect(task.template_version).toBe(2);
+    });
+    const old = (await publishing.tasks("CNTS-BM17")).find(t => t.period_id !== pid)!;
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Gửi báo cáo" })).not.toBeInTheDocument());
+    await u.selectOptions(within(screen.getByRole("region", { name: "Biểu BM-17 theo phiên bản" })).getByLabelText("Kỳ theo phiên bản"), old.period_id);
+    await u.click(within(screen.getByRole("region", { name: "Biểu BM-17 theo phiên bản" })).getByRole("button", { name: /Xem hoặc nhập.*Mỹ Hòa Hưng/ }));
+    expect(screen.getByRole("textbox", { name: /TS-01/ })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /Cua theo mẫu/ })).not.toBeInTheDocument();
+    const oldTask = (await publishing.tasks("CNTS-BM17")).find(t => t.id === old.id)!;
+    expect(oldTask.fields.some(f => f.key === "cua")).toBe(false);
+    expect(oldTask.template_version).toBe(1);
+    auth.role = "kn_tinh"; auth.api = apiOf("kn-binh", null); rendered.rerender(<CatchScreen />);
+    await u.selectOptions(within(screen.getByRole("region", { name: "Biểu BM-17 theo phiên bản" })).getByLabelText("Kỳ theo phiên bản"), pid);
+    await u.click(within(screen.getByRole("region", { name: "Biểu BM-17 theo phiên bản" })).getByRole("button", { name: /Xem hoặc nhập.*Mỹ Hòa Hưng/ }));
+    expect(await screen.findByRole("textbox", { name: /Cua theo mẫu/ })).toHaveValue("2.5");
+    expect(screen.getByRole("textbox", { name: /Cua theo mẫu/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Gửi báo cáo" })).not.toBeInTheDocument();
+  });
+
 });

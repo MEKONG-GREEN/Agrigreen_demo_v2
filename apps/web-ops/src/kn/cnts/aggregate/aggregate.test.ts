@@ -1,4 +1,4 @@
-import { cntsSelection } from "@/test/cnts-template-selection";
+import { cntsSelection } from "@/kn/cnts/periods/selection.fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApiClient } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";

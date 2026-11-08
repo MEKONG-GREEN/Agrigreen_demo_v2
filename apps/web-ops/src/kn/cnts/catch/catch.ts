@@ -23,6 +23,14 @@ export const SHEETS: CatchSheet[] = [
   { key: "khac", tab: "Đánh bắt thủy sản khác", heading: "SẢN LƯỢNG ĐÁNH BẮT THỦY SẢN KHÁC" },
 ];
 
+/** Lưới bốn sheet chỉ nhập khi schema thật tương thích với biểu chuẩn.
+ * Mọi cấu trúc khác dùng bộ nhập task.fields, giữ nguyên schema của từng kỳ. */
+export function hasStandardCatchSchema(t: FormsTask): boolean {
+  const labels: Record<string, string> = { ca: "TS-01 Cá các loại", tom: "TS-02 Tôm các loại", muc: "TS-03 Mực", khac: "TS-04 Thủy sản khác" };
+  return t.fields.length === SHEETS.length && t.fields.every(f => f.type === "decimal" && f.label === labels[f.key] &&
+    f.required && f.non_negative && f.unit === "tấn" && f.group === "Sản lượng khai thác trong tuần");
+}
+
 export interface CatchWeek {
   periodId: string;
   label: string;
