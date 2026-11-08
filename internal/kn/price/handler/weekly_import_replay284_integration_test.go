@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/price/domain"
@@ -66,8 +67,8 @@ func TestWeeklyImportReplayAfterSuccessor284(t *testing.T) {
 
 			// A new import still requires confirmation before overwriting the successor.
 			_, err = e.svc.CommitImport(ctx, "kn", "information", base.Report.ID, ids.New().String(), latest.Version, preview.SHA256, false, data)
-			confirmation, ok := err.(*problem.Problem)
-			if !ok || confirmation.Status != 409 || confirmation.Code != "price.weekly_confirmation" {
+			var confirmation *problem.Problem
+			if !errors.As(err, &confirmation) || confirmation.Status != 409 || confirmation.Code != "price.weekly_confirmation" {
 				t.Fatalf("fresh import must require exact overwrite confirmation, got %v", err)
 			}
 			current, err := e.svc.Read(ctx, "kn", "information", base.Report.ID)
