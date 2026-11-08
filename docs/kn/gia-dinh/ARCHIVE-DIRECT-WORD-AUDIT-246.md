@@ -1,8 +1,8 @@
-# ARCHIVE-DIRECT-WORD-AUDIT-246 — Word/history trực tiếp
+## ARCHIVE-DIRECT-WORD-AUDIT-246 — Word/history trực tiếp
 
 Căn cứ: Function chi tiết FN-TW-01.01 (P713–738), FN-PN-03.03 (P1592–1615), BRD KHTC v2.3 Product DOCX SHA256 `15859351F90574BF667190B1A12160465BA03F8CA9E408B94C90D285A3502E25`. Lát này thuộc #246 sau #227; chưa hoàn tất toàn FN, quyền phòng/lãnh đạo/BGĐ, UAT hoặc G1.
 
-## Phạm vi và hành vi
+### Phạm vi và hành vi
 
 Giữ reader KHTC/Admin/TW-KHTC và tenant hiện hành. Hai URL cũ `/report/words` và `/report/words/{runID}/download` dùng cùng chứng cứ liên kết bất biến #199 với đúng snapshot Excel. Không dùng tên tệp, số thứ tự hay loại mẫu để suy liên kết. Đường đọc không ghi binding, không dựng lại Word, không cấp lại số.
 
@@ -12,7 +12,7 @@ Direct Word GET tra binding trong owner metadata, rồi gọi lại `DownloadArc
 
 Không thêm dependency, migration, quyền, route, schema DTO, menu hoặc web. Sổ access và ràng buộc append-only đã có đủ action cần dùng; không sửa migration cũ hay dữ liệu đã đóng băng. Các test #199 trước đây đọc được run chưa attested qua URL cũ nay yêu cầu 503/no FilePort, vẫn giữ kiểm số, snapshot archive và bằng chứng không dựng/cấp số lại.
 
-## Kiểm chứng và giới hạn
+### Kiểm chứng và giới hạn
 
 `TestArchive246DirectWordCommittedAudit` tái hiện native RED: cả history và direct Word GET trả 200 nhưng thiếu event, trong khi snapshot Word #199 là đối chứng. Các test #246 chạy router lắp ráp, signed fixture OIDC, accounts chọn/giải lại context và PostgreSQL thật; dữ liệu report tổng hợp được tạo bởi fixture HTTP owner/exporter hiện hữu. Không sao chép người xuất thành quyền người đọc, không inject context vào request kiểm quyền.
 
@@ -25,3 +25,20 @@ Phần còn lại cần child chính thức trước khi đóng #246:
 - Attestation được phép hoặc full unique fingerprint của Word legacy với đúng snapshot. Public exporter hiện có Export/Run/Runs, chưa có năng lực xác nhận liên kết lịch sử; chưa chứng minh thì unavailable. Không đọc private Forms/export SQL, không backfill trong đường đọc.
 
 Windows CGO=0/no gcc không chạy được race; Linux race và whole CI đúng SHA vẫn phải hoàn tất khi hết HOLD tích hợp. Không tuyên bố ready/merge từ kiểm chứng cục bộ.
+
+### Tệp và cách chạy
+
+| Tệp | Bước | FN/BRD |
+|---|---|---|
+| `internal/kn/extension/khtcreport/app/archive_word_direct.go` | 3 — service | FN-TW-01.01: binding đúng snapshot, COMMIT audit trước port, unlinked unavailable |
+| `internal/kn/extension/khtcreport/app/word_service.go` | 3 — service | Giữ tạo Word, chuyển reader trực tiếp sang service audit |
+| `tests/kn77/khtc_archive_direct246_integration_test.go` | 3–4 — native HTTP | Audit rollback/recovery, authority hiện hữu, Word/mixed ZIP, pool1 |
+| `tests/kn77/khtc_archive_word199_integration_test.go` | 3–4 — hồi quy | Chặn direct legacy chưa attested, giữ byte/number/binding assertions |
+
+Bước 1 không thêm dependency; bước 2 không đổi data schema/migration; bước 4 không đổi route/DTO/OpenAPI; bước 5 không đổi web/menu.
+
+```powershell
+.\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./tests/kn77 -run '^TestArchive246'
+```
+
+Affected/direct consumers: `./internal/kn/extension/khtcreport/...`, `./internal/kn/extension`, `./internal/kn/extension/adhocintegration`, `./internal/kn/extension/khtcform/app`, `./tests/kn77`, `./cmd/api-platform/assembly`, `./migrations`; native PG phải 0 SKIP. Chạy đủ static CONTEXT §3.3, lint-new0, merge-tree; controlled business FAIL → exact restore → control PASS. Whole CI/public self-review/ready/PR/merge còn HOLD tới actual dev #287 → #286 → #261/#262 và explicit ROOT release.
