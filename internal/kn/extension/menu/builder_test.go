@@ -248,6 +248,7 @@ func TestRouteOwnership(t *testing.T) {
 		"/kn/phong-ban/{department}/bao-gia-lich":  "pf/price",
 		"/kn/phong-ban/{department}/ke-hoach-nam":  "pf/party",
 		"/kn/dung-chung/contact":                   "pf/contact",
+		"/kn/quan-tri/yeu-cau-ho-tro":              "pf/contact",
 		"/kn/du-lieu/htx":                          "pf/party",
 		"/kn/tong-quan":                            "pf/party",
 		"/dong-bo":                                 "pf/sync",

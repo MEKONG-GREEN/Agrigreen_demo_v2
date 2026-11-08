@@ -18,6 +18,9 @@
           "Children": null
         }
       ]
+    },
+    "menuModules": {
+      "/kn/quan-tri/yeu-cau-ho-tro": "pf/contact"
     }
   }
 }
