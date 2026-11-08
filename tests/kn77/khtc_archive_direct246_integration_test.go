@@ -337,6 +337,18 @@ func TestArchive246CurrentNativeAuthorityBeforeWordAndZIP(t *testing.T) {
 
 func TestArchive246UnlinkedAndChangedWordMetadataUnavailable(t *testing.T) {
 	a := newArchive246Fixture(t)
+	// The SAME missing-binding negative crosses real OIDC/accounts middleware.
+	// No exporter lookup-by-bytes is used to invent an unknown-ID classification.
+	readsBeforeUnknown, historiesBeforeUnknown := a.probe.reads.Load(), a.probe.histories.Load()
+	unknown := archive246Request(t, a.u, http.MethodGet, reportPath(a.period)+"/words/"+ids.New().String()+"/download", nil)
+	archive246NoData(t, unknown, http.StatusServiceUnavailable)
+	var missing struct {
+		Code   string `json:"code"`
+		Detail string `json:"detail"`
+	}
+	if err := json.Unmarshal(unknown.body, &missing); err != nil || missing.Code != "extension.dependency_unavailable" || missing.Detail != "Word đã lưu chưa có chứng cứ liên kết với bản xuất; chưa thể xem hoặc tải" || a.probe.reads.Load() != readsBeforeUnknown || a.probe.histories.Load() != historiesBeforeUnknown {
+		t.Fatalf("native unknown/unattested ID must be exact 503 with no metadata/byte port: code=%s detail=%s err=%v", missing.Code, missing.Detail, err)
+	}
 	a.probe.tamper.Store(true)
 	r := archive246Request(t, a.u, http.MethodGet, reportPath(a.period)+"/words", nil)
 	archive246NoData(t, r, 503)

@@ -10,6 +10,8 @@ History ghi `read_history`/`metadata` với kỳ, actor, selected context, clock
 
 Direct Word GET tra binding trong owner metadata, rồi gọi lại `DownloadArchiveWord`: xác minh snapshot, COMMIT `word_attempt` với đúng run/export/byte budget trước FilePort; đối chiếu toàn metadata và SHA-256 của byte đã lưu. Không thay đổi byte, hash, số, người xuất hay thời điểm xuất. Lỗi audit INSERT hoặc deferred COMMIT không trả metadata/file và không gọi cổng exporter. Audit là truy cập/attempt, không xác nhận giao mạng hoàn tất. A5/ADR0024 Internal Observe metering giữ nguyên.
 
+Hợp đồng alias legacy phân loại thiếu owner attestation là đúng `503 extension.dependency_unavailable` với chi tiết thiếu chứng cứ liên kết, kể cả UUID ngẫu nhiên. Public exporter chỉ có `Runs` metadata bị chặn ở 100 bản và `Run` kèm byte; consumer không thể chứng minh ID không tồn tại thay vì run thực chưa liên kết. Không gọi cổng byte hoặc đọc SQL riêng chỉ để suy 404. Kỳ không có trong tenant, hoặc binding thực đã chứng minh thuộc kỳ khác, vẫn 404 theo owner. Hai mã 404/503 đã có trong OpenAPI; negative này là thay đổi phân loại có chủ đích, không phải chấp nhận lỗi bất kỳ.
+
 Không thêm dependency, migration, quyền, route, schema DTO, menu hoặc web. Sổ access và ràng buộc append-only đã có đủ action cần dùng; không sửa migration cũ hay dữ liệu đã đóng băng. Các test #199 trước đây đọc được run chưa attested qua URL cũ nay yêu cầu 503/no FilePort, vẫn giữ kiểm số, snapshot archive và bằng chứng không dựng/cấp số lại.
 
 ### Kiểm chứng và giới hạn
@@ -34,6 +36,7 @@ Windows CGO=0/no gcc không chạy được race; Linux race và whole CI đúng
 | `internal/kn/extension/khtcreport/app/word_service.go` | 3 — service | Giữ tạo Word, chuyển reader trực tiếp sang service audit |
 | `tests/kn77/khtc_archive_direct246_integration_test.go` | 3–4 — native HTTP | Audit rollback/recovery, authority hiện hữu, Word/mixed ZIP, pool1 |
 | `tests/kn77/khtc_archive_word199_integration_test.go` | 3–4 — hồi quy | Chặn direct legacy chưa attested, giữ byte/number/binding assertions |
+| `tests/kn77/khtc_word_integration_test.go` | 3–4 — negative contract | Giữ kiểm byte/hash/số; thiếu attestation trả đúng 503/code/detail và chính request có 0 FilePort |
 
 Bước 1 không thêm dependency; bước 2 không đổi data schema/migration; bước 4 không đổi route/DTO/OpenAPI; bước 5 không đổi web/menu.
 

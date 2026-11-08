@@ -53,7 +53,7 @@ func (f *reportFx) word(pid, exportID, idem string) wordRun {
 // liệu, xuất lại cùng byte, tải lại qua điểm kiểm soát xuất, chỉ cán bộ phụ trách tạo, vẫn xuất được sau Bản cuối.
 func TestKH_W10_17_WordFromFrozenExcel(t *testing.T) {
 	f := newReportFx(t)
-	withExporter(t, f)
+	counter := installArchive199Exporter(t, f)
 	// Kỳ Tạm tính trước: không được cấp số.
 	pv := f.open(40, dTT, dTTTT)
 	dv := f.refresh(pv.ID, 0)
@@ -144,6 +144,13 @@ func TestKH_W10_17_WordFromFrozenExcel(t *testing.T) {
 	if w := f.word(p2.ID, x3.ID, ""); w.DocNumber != "77/BC-TTKN" || w.DocNumberAuto {
 		t.Fatalf("số tay: %+v", w)
 	}
+	// Without owner attestation the direct legacy alias cannot prove whether
+	// an ID is unknown or an actual unlinked run. Both stay unavailable; no
+	// byte-port lookup is permitted merely to classify the missing association.
+	readsBeforeUnknown := counter.reads.Load()
 	c, b = f.call(http.MethodGet, p.ID, "/words/"+ids.New().String()+"/download", nil)
-	f.fail(c, b, "export.run_not_found")
+	if c != http.StatusServiceUnavailable || counter.reads.Load() != readsBeforeUnknown || bytes.HasPrefix(b, []byte("PK")) || !bytes.Contains(b, []byte("Word đã lưu chưa có chứng cứ liên kết với bản xuất; chưa thể xem hoặc tải")) {
+		t.Fatalf("unattested direct Word must return exact unavailable without FilePort: %d %s", c, b)
+	}
+	f.fail(c, b, "extension.dependency_unavailable")
 }
