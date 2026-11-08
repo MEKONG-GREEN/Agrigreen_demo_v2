@@ -388,14 +388,24 @@ func TestKH_FN_PN_03_02_ResubmitOnlyOnRequest(t *testing.T) {
 	c, b = f.send(p.ID, dTT, "submit", 2, ttSheet(f.item, "13"))
 	f.ok(c, b, nil)
 	r := f.form(p.ID, dTT, authz.KNTinh, khtcDept)
-	if r.Attempt != 3 || !r.LimitReached || r.CanRequestSupplement || !r.CanConfirm || len(r.Submissions) != 3 {
+	if r.State != "locked" || r.Attempt != 3 || !r.LimitReached || r.Editable || r.CanRequestSupplement || r.CanConfirm || len(r.Submissions) != 3 {
 		t.Fatalf("lần 3: %+v", r)
 	}
 	if v := r.row(t, f.item).Cells["H"]; v != "13" {
 		t.Fatalf("rà soát dùng lần gửi cuối: H=%s", v)
 	}
-	c, b = f.reviewForm(p.ID, dTT, "returned", "Thêm nữa")
-	f.fail(c, b, "extension.khtc_form_not_reviewable")
+	// KHTC v2.3 FN-TI-02.04 P900/P901/P904: the third submit is
+	// already terminal, with neither review decision nor a fourth submit.
+	for _, decision := range []string{"returned", "accepted"} {
+		c, b = f.reviewForm(p.ID, dTT, decision, "Thêm nữa")
+		f.fail(c, b, "extension.khtc_form_not_reviewable")
+	}
+	c, b = f.send(p.ID, dTT, "submit", 3, ttSheet(f.item, "14"))
+	f.fail(c, b, "extension.khtc_form_locked")
+	unchanged := f.form(p.ID, dTT, authz.KNTinh, khtcDept)
+	if unchanged.State != "locked" || unchanged.Attempt != 3 || len(unchanged.Submissions) != 3 || unchanged.row(t, f.item).Cells["H"] != "13" {
+		t.Fatal("rejected final-lock actions changed the submitted data")
+	}
 	c, b = f.khtc(http.MethodPost, "/periods/"+p.ID+"/close", f.khtcUser, "", map[string]any{})
 	f.ok(c, b, nil)
 	k = f.deptForm(p.ID, dTT)

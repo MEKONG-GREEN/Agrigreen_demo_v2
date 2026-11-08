@@ -276,8 +276,8 @@ func TestKHTCPeriod_W1162(t *testing.T) {
 		f.review(s2, "returned", me)
 		f.submit(p.FormsPeriodID, tt)
 		p = f.get(p.ID)
-		if _, n, lim, sup, conf := p.form(t, tt); n != 3 || !lim || sup || !conf {
-			t.Fatalf("lần 3: n=%d lim=%v sup=%v conf=%v", n, lim, sup, conf)
+		if state, n, lim, sup, conf := p.form(t, tt); state != "locked" || n != 3 || !lim || sup || conf {
+			t.Fatalf("lần 3: state=%s n=%d lim=%v sup=%v conf=%v", state, n, lim, sup, conf)
 		}
 		c, b := f.do(http.MethodPost, "/v1/forms/periods/"+p.FormsPeriodID+"/submissions?profile=kn_khtc", authz.KNTinh, tt, uuid.Nil, "",
 			map[string]any{"unit": tt, "values": map[string]string{"ket_qua": "lần 4"}})

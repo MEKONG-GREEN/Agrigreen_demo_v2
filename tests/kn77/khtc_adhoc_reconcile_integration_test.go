@@ -18,6 +18,7 @@ type adhocUncertainEntry struct {
 	formsport.Entry
 	reviewBefore, reviewAfter, submitAfter atomic.Bool
 	reviewCalls, submitCalls               atomic.Int64
+	submitFirst, submitLast                atomic.Pointer[formsport.SubmissionRef]
 	reviewEntered                          chan struct{}
 	reviewRelease                          chan struct{}
 }
@@ -44,6 +45,10 @@ func (e *adhocUncertainEntry) Review(ctx context.Context, profile string, id uui
 func (e *adhocUncertainEntry) Submit(ctx context.Context, profile string, id uuid.UUID, unit string, values map[string]string, base int64, key string) (formsport.SubmissionRef, error) {
 	e.submitCalls.Add(1)
 	out, err := e.Entry.Submit(ctx, profile, id, unit, values, base, key)
+	if err == nil {
+		e.submitFirst.CompareAndSwap(nil, &out)
+		e.submitLast.Store(&out)
+	}
 	if err == nil && e.submitAfter.Swap(false) {
 		return formsport.SubmissionRef{}, context.DeadlineExceeded
 	}
@@ -70,8 +75,13 @@ func TestW1168ReconcileLostNativeResponses(t *testing.T) {
 				}
 				c, b = f.do(http.MethodPost, formPath(p.ID, dTT)+"/submit", authz.KNTinh, dTT, actor, "lost-submit", body)
 				f.ok(c, b, nil)
-				if e.submitCalls.Load() != 1 {
-					t.Fatal("native Submit repeated", e.submitCalls.Load())
+				// Replay revalidates current native authority and its durable receipt.
+				// A second public call must return the original committed identity,
+				// supplied by the same native receipt.
+				first, last := e.submitFirst.Load(), e.submitLast.Load()
+				if e.submitCalls.Load() != 2 || first == nil || last == nil || first.ID == uuid.Nil ||
+					first.ID != last.ID || first.Version != 1 || last.Version != 1 || first.Unit != last.Unit {
+					t.Fatalf("native receipt replay: calls=%d first=%+v last=%+v", e.submitCalls.Load(), first, last)
 				}
 				form := f.deptForm(p.ID, dTT)
 				if form.Attempt != 1 {
