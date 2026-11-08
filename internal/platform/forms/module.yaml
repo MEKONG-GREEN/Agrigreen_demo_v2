@@ -17,6 +17,7 @@ provides:
     - FacilityDirectory
     - FiguresReader
     - Freezer
+    - PendingReader
     - PeriodControl
     - PeriodOperations
     - PublishOperations
