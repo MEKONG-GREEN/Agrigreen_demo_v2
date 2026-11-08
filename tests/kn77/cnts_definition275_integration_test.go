@@ -96,7 +96,7 @@ func TestCNTS275DefinitionReplayCurrentAuthority(t *testing.T) {
 		denied := current
 		switch reason {
 		case "read-only":
-			denied.ReadOnly = true
+			denied.ViewOnly = true
 		case "expired":
 			denied.ExpiresAt = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 		case "wrong-group":
