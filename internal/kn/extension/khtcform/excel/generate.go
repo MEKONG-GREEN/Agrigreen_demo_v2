@@ -134,9 +134,6 @@ func (c *Codec) Generate(content port.KHTCFormExcelContent) ([]byte, error) {
 		if err := f.SetPanes(sh.Name, &excelize.Panes{Freeze: true, YSplit: 3, TopLeftCell: "A4", ActivePane: "bottomLeft"}); err != nil {
 			return nil, ErrWorkbook
 		}
-		if err := f.SetColWidth(sh.Name, "A", codeLetter, 24); err != nil {
-			return nil, ErrWorkbook
-		}
 	}
 	out, err := f.WriteToBuffer()
 	if err != nil {

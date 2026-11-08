@@ -36,6 +36,11 @@ func (p *previewData) Result() port.KHTCFormExcelValidation {
 var number = regexp.MustCompile(`^-?[0-9]{1,15}(\.[0-9]{1,6})?$`)
 var integer = regexp.MustCompile(`^-?[0-9]{1,9}$`)
 
+// Trusted computed values can exceed input digit counts after accumulation.
+// They remain bounded ordinary numeric text, never an expression to execute.
+var projectedNumber = regexp.MustCompile(`^-?[0-9]+(\.[0-9]+)?$`)
+var projectedInteger = regexp.MustCompile(`^-?[0-9]+$`)
+
 func validateField(value string, col port.KHTCFormExcelColumn) (string, string) {
 	if value == "" {
 		if col.Required {

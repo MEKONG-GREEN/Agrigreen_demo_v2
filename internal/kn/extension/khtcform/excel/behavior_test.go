@@ -567,3 +567,94 @@ func TestLiteralMarkerTextAndIntegerNegativeZeroFollowFieldRules(t *testing.T) {
 		t.Fatal("integer non-negative validation drifted from manual form")
 	}
 }
+
+func replaceCellXML(t *testing.T, raw []byte, ref, replacement string) []byte {
+	t.Helper()
+	return rewriteZIP(t, raw, func(name string, body []byte) []byte {
+		if name != "xl/worksheets/sheet1.xml" {
+			return body
+		}
+		text := string(body)
+		start := strings.Index(text, `<c r="`+ref+`"`)
+		if start < 0 {
+			t.Fatal("fixture cell not found")
+		}
+		end := strings.Index(text[start:], "</c>")
+		if end < 0 {
+			t.Fatal("fixture cell not closed")
+		}
+		end += start + 4
+		return []byte(text[:start] + replacement + text[end:])
+	}, nil)
+}
+
+func TestRealNumericXMLRemainsExactAndCannotNormalizeExponents(t *testing.T) {
+	c := mustCodec(t, snapshot())
+	raw := mustWorkbook(t, c, content())
+	for _, value := range []string{"1e100000", "1e-100000", "1e-6", strings.Repeat("9", 10000)} {
+		t.Run(value[:min(len(value), 24)], func(t *testing.T) {
+			numeric := replaceCellXML(t, raw, "C4", `<c r="C4" t="n"><v>`+value+`</v></c>`)
+			p := mustPreview(t, c, numeric)
+			if p.Result().ValidRows != 1 {
+				t.Fatal("numeric XML normalized or accepted hostile syntax")
+			}
+		})
+	}
+	value := "999999999999999.123456"
+	numeric := replaceCellXML(t, raw, "C4", `<c r="C4" t="n"><v>`+value+`</v></c>`)
+	p := mustPreview(t, c, numeric)
+	merged, err := c.Merge(port.KHTCFormExcelContent{}, p, "replace")
+	if err != nil || merged.Rows["program_iii"]["III.01"]["C"] != value {
+		t.Fatalf("numeric XML precision lost: %#v %v", merged, err)
+	}
+}
+
+func TestActiveXMLPartsAndSharedFormulaRangeAreRejectedBeforeParsing(t *testing.T) {
+	c := mustCodec(t, snapshot())
+	raw := mustWorkbook(t, c, content())
+	for _, name := range []string{"xl/macrosheets/sheet2.xml", "xl/dialogsheets/sheet2.xml", "xl/webextensions/webextension1.xml"} {
+		t.Run(name, func(t *testing.T) {
+			bad := rewriteZIP(t, raw, nil, map[string][]byte{name: []byte(`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>`)})
+			if _, err := c.Preview(bad); !errors.Is(err, excel.ErrWorkbook) {
+				t.Fatalf("orphan active XML part accepted: %v", err)
+			}
+		})
+	}
+	autoOpen := rewriteZIP(t, raw, func(name string, body []byte) []byte {
+		if name == "xl/workbook.xml" {
+			return bytes.Replace(body, []byte(`</workbook>`), []byte(`<definedNames><definedName name="_xlnm.Auto_Open">'CT III'!C4</definedName></definedNames></workbook>`), 1)
+		}
+		return body
+	}, nil)
+	t.Run("auto_open", func(t *testing.T) {
+		if _, err := c.Preview(autoOpen); !errors.Is(err, excel.ErrWorkbook) {
+			t.Fatalf("auto-open definition accepted: %v", err)
+		}
+	})
+	shared := replaceCellXML(t, raw, "C4", `<c r="C4"><f t="shared" si="0" ref="A1:XFD1048576">1+1</f><v>2</v></c>`)
+	t.Run("shared_formula_range", func(t *testing.T) {
+		if _, err := c.Preview(shared); !errors.Is(err, excel.ErrLimit) {
+			t.Fatalf("huge shared-formula reference accepted: %v", err)
+		}
+	})
+}
+
+func TestTrustedComputedFormulaProjectionKeepsExactLargeValues(t *testing.T) {
+	s := snapshot()
+	s.Sheets[0].Rows[0].SystemValues["D"] = "52000000000000000.123456"
+	c := mustCodec(t, s)
+	raw := mustWorkbook(t, c, content())
+	p := mustPreview(t, c, raw)
+	if p.Result().ValidRows != 2 || hasIssue(p, "locked", "ignored") {
+		t.Fatalf("trusted projection changed: %#v", p.Result())
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	value, err := f.GetCellValue("CT III", "D4", excelize.Options{RawCellValue: true})
+	if err != nil || value != s.Sheets[0].Rows[0].SystemValues["D"] {
+		t.Fatalf("computed value precision lost: %q %v", value, err)
+	}
+}

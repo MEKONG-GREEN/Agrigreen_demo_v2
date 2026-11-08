@@ -193,7 +193,7 @@ func validateSnapshot(s port.KHTCFormExcelSnapshot) error {
 				if !ok || (col.Kind == "input" && !locked[letter]) || !add(value) {
 					return ErrSnapshot
 				}
-				if col.Kind == "formula" && value != "" && ((col.DataType == "number" && !number.MatchString(value)) || (col.DataType == "integer" && !integer.MatchString(value))) {
+				if col.Kind == "formula" && value != "" && ((col.DataType == "number" && !projectedNumber.MatchString(value)) || (col.DataType == "integer" && !projectedInteger.MatchString(value))) {
 					return ErrFormulaProjection
 				}
 			}

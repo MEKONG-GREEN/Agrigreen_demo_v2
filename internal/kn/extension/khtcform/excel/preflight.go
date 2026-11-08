@@ -43,7 +43,7 @@ func preflight(data []byte) error {
 		if file.FileInfo().IsDir() {
 			continue
 		}
-		if strings.HasSuffix(lower, ".bin") || strings.Contains(lower, "vbaproject") || strings.Contains(lower, "externallinks/") || strings.Contains(lower, "embeddings/") || strings.Contains(lower, "activex/") || strings.Contains(lower, "customui/") || strings.Contains(lower, "connections") {
+		if strings.HasSuffix(lower, ".bin") || strings.Contains(lower, "vbaproject") || strings.Contains(lower, "externallinks/") || strings.Contains(lower, "embeddings/") || strings.Contains(lower, "activex/") || strings.Contains(lower, "customui/") || strings.Contains(lower, "connections") || strings.Contains(lower, "macrosheets/") || strings.Contains(lower, "dialogsheets/") || strings.Contains(lower, "webextensions/") {
 			return ErrWorkbook
 		}
 		if file.UncompressedSize64 > MaxPartBytes || file.UncompressedSize64 > MaxUnzipBytes-total {
@@ -141,6 +141,9 @@ func scanXML(raw []byte, name string, cells, shared, sheets *int) error {
 			}
 			if t.Name.Local == "Relationship" {
 				for _, a := range t.Attr {
+					if a.Name.Local == "Type" && activeXMLType(a.Value) {
+						return ErrWorkbook
+					}
 					if a.Name.Local == "TargetMode" && strings.EqualFold(a.Value, "External") {
 						return ErrWorkbook
 					}
@@ -152,8 +155,18 @@ func scanXML(raw []byte, name string, cells, shared, sheets *int) error {
 			if name == "[content_types].xml" {
 				for _, a := range t.Attr {
 					v := strings.ToLower(a.Value)
-					if strings.Contains(v, "macroenabled") || strings.Contains(v, "vbaproject") || strings.Contains(v, "oleobject") {
+					if activeXMLType(v) {
 						return ErrWorkbook
+					}
+				}
+			}
+			if name == "xl/workbook.xml" && t.Name.Local == "definedName" {
+				for _, a := range t.Attr {
+					if a.Name.Local == "name" {
+						v := strings.ToLower(a.Value)
+						if v == "auto_open" || v == "auto_close" || v == "_xlnm.auto_open" || v == "_xlnm.auto_close" {
+							return ErrWorkbook
+						}
 					}
 				}
 			}
@@ -252,7 +265,7 @@ func scanXML(raw []byte, name string, cells, shared, sheets *int) error {
 							}
 						}
 					}
-				case "dimension", "mergeCell":
+				case "dimension", "mergeCell", "f":
 					for _, a := range t.Attr {
 						if a.Name.Local == "ref" {
 							if err := rangeBound(a.Value); err != nil {
@@ -279,4 +292,14 @@ func scanXML(raw []byte, name string, cells, shared, sheets *int) error {
 		}
 	}
 	return nil
+}
+
+func activeXMLType(value string) bool {
+	lower := strings.ToLower(value)
+	for _, fragment := range []string{"macroenabled", "vbaproject", "macrosheet", "dialogsheet", "oleobject", "activex", "webextension"} {
+		if strings.Contains(lower, fragment) {
+			return true
+		}
+	}
+	return false
 }
