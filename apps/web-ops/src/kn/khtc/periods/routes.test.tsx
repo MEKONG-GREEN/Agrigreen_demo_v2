@@ -157,3 +157,12 @@ describe("Kỳ báo cáo — route UI-KIT", () => {
     expect(validatePeriodForm("program", { name: "", asOf: "2030-06-02", from: "", to: "", cutoff: "", due: raw, exportDue: "" })).toHaveProperty("due");
   });
 });
+
+it("217: fixed three is read-only before any preview and sends no cap override", async () => {
+  nav.path = `${PERIOD_BASE}/them-moi`;
+  render(<KhtcPeriodWorkspace />);
+  const maximum = screen.getByRole("textbox", { name: "Số lần gửi tối đa" });
+  expect(maximum).toHaveValue("3");
+  expect(maximum).toHaveAttribute("readonly");
+  expect(writes).toHaveLength(0);
+});

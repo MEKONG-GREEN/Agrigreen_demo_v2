@@ -235,7 +235,7 @@ function ReviewSheet({ periodId, department, departments, onDepartment }: {
     : noteRequired && !normalizedNote ? "Bắt buộc nhập nội dung yêu cầu bổ sung." : undefined;
   const dirty = note !== "";
   const backHref = `/kn/khtc/ky-bao-cao/ky/${periodId}`;
-  const canReview = !!f?.can_review && f.state === "submitted" && !f.period.terminal && !kn.context?.read_only
+  const canReview = !!f?.can_review && f.state === "submitted" && !f.limit_reached && f.attempt < 3 && !f.period.terminal && !kn.context?.read_only
     && (kn.context?.role === "kn_tinh" && kn.context.department_code === KHTC_DEPT || kn.context?.role === "admin" && f.period.report_type === "adhoc")
     && !!latest && REVIEW_UUID.test(latest.id) && Number.isSafeInteger(latest.attempt) && latest.attempt > 0 && latest.attempt === f.attempt && !latest.decision;
   const index = departments.findIndex(d => d.code === department);

@@ -344,6 +344,8 @@ function stateOf(
     state =
       last.decision === "accepted"
         ? "confirmed"
+        : last.attempt >= 3
+          ? "locked"
         : last.decision === "returned"
           ? "supplement"
           : "submitted";
@@ -560,7 +562,7 @@ function sheet(
     });
     tabMap.set(r._tab, list);
   }
-  const limit = !!s.p.max_submissions && st.attempt >= s.p.max_submissions;
+  const limit = st.attempt >= 3;
   const request=s.p.report_type==="adhoc"?activeAdhoc(s.p.id,dept):undefined;
   const editable = member && request?.state!=="intent" && ["not_started", "draft", "late", "supplement"].includes(st.state);
   return {
@@ -574,7 +576,7 @@ function sheet(
       to_date: s.p.to_date,
       cutoff_date: s.p.cutoff_date,
       due_at: request?.due_at??s.p.due_at,
-      max_submissions: s.p.max_submissions,
+      max_submissions: 3,
       terminal: s.terminal,
     },
     department: dept,
@@ -838,9 +840,9 @@ export const khtcFormRoutes: Route[] = [
             state: st.state,
             state_label: LABEL[st.state],
             attempt: st.attempt,
-            max_submissions: s.p.max_submissions,
+            max_submissions: 3,
             limit_reached:
-              !!s.p.max_submissions && st.attempt >= s.p.max_submissions,
+              st.attempt >= 3,
             request_note: st.decision === "returned" ? (last?.note ?? "") : "",
             last_submitted_at: last?.at ?? null,
             late: !!last && last.at > s.p.due_at,

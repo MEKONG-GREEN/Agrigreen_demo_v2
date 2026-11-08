@@ -226,11 +226,13 @@ function project(s: Stored): Period {
       state =
         sub.decision === "accepted"
           ? "confirmed"
+          : sub.attempt >= MAX
+            ? "locked"
           : sub.decision === "returned"
             ? "supplement"
             : "submitted";
     if (sub) any = true;
-    if (state === "submitted" || state === "confirmed") sent++;
+    if (state === "submitted" || state === "confirmed" || state === "locked") sent++;
     const limit = !!sub && sub.attempt >= MAX;
     return {
       department: d.code,

@@ -428,7 +428,7 @@ ps.filter(p=>!adhocOnly||p.report_type==="adhoc").length === 0 ? (
               <input
                 aria-label="Số lần gửi tối đa"
                 readOnly
-                value={draft?.max_submissions ?? ""}
+                value={3}
                 style={{ background: "var(--muted-bg, #eee)" }}
               />
             </label>

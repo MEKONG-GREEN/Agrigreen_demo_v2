@@ -230,3 +230,13 @@ describe("history242 — điều hướng khỏi ghi chú rà soát", () => {
     await act(async () => operation.resolve(ack(calls.review.mock.calls[0]![2])));
   });
 });
+
+it("217: a third submission hides both review buttons even when stale legacy flags claim reviewable", async () => {
+  calls.get.mockImplementation((id, dept) => Promise.resolve({ ...sheet("Kỳ A", id, dept), attempt: 3,
+    submissions: [{ ...sheet().submissions[0]!, attempt: 3 }], can_confirm: true, can_review: true, can_request_supplement: true }));
+  render(<KhtcFormReviewScreen />);
+  await screen.findByRole("heading", { name: /Kỳ A/ });
+  expect(screen.queryByRole("button", { name: /^Xác nhận$/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Yêu cầu bổ sung$/ })).not.toBeInTheDocument();
+  expect(calls.review).not.toHaveBeenCalled();
+});
