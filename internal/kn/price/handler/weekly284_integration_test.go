@@ -627,3 +627,51 @@ func TestWeeklyConcurrentOpenImportClose284(t *testing.T) {
 		t.Fatal("closed import must fail on state, not file hash", denied.Body.String())
 	}
 }
+
+func TestWeeklyDetachedEvaluationHTTP284(t *testing.T) {
+	e := weeklyFixture284(t)
+	v := e.call(t, "tinh", "training", nil, "", 200, "")
+	leaf := v.Report.Rows[0]
+	n := v.Report.Number
+	data := weeklyCSV284(t, [][]string{{"Tên hạng mục", fmt.Sprintf("Tiến độ thực hiện tuần %d", n), fmt.Sprintf("Kinh phí tuần %d", n), fmt.Sprintf("Tiến độ thực hiện tuần %d", n+1), fmt.Sprintf("Kinh phí tuần %d", n+1), fmt.Sprintf("Đánh giá tuần %d", n), fmt.Sprintf("Đánh giá tuần %d", n+1), "Lũy kế"}, {leaf.Name, "2", "100", "3", "200", "Fixture đánh giá đúng kỳ", "Fixture thuộc kỳ sau", "1e100000"}})
+	w := e.upload(t, "tinh", "training", "preview", "", v, data, "", false, 200)
+	var preview app.WeeklyPreview
+	if err := json.Unmarshal(w.Body.Bytes(), &preview); err != nil {
+		t.Fatal(err)
+	}
+	if preview.ValidRows != 1 || preview.ErrorRows != 0 || !strings.Contains(preview.SourceColumns, fmt.Sprintf("Đánh giá tuần %d", n)) {
+		t.Fatalf("detached evaluation preview: %+v", preview)
+	}
+	untouched := e.call(t, "tinh", "training", nil, "", 200, "")
+	if untouched.Version != v.Version || untouched.Report.Rows[0].Evaluation != "" {
+		t.Fatal("preview wrote data")
+	}
+	w = e.upload(t, "tinh", "training", "confirm", "", v, data, preview.SHA256, true, 200)
+	if err := json.Unmarshal(w.Body.Bytes(), &v); err != nil {
+		t.Fatal(err)
+	}
+	row := v.Report.Rows[0]
+	assertDecimal284(t, row.Progress, "2")
+	assertDecimal284(t, row.Money, "100")
+	if row.Evaluation != "Fixture đánh giá đúng kỳ" {
+		t.Fatal("must import evaluation from the same source period", row.Evaluation)
+	}
+	missing := weeklyCSV284(t, [][]string{{"Tên hạng mục", fmt.Sprintf("Tiến độ thực hiện tuần %d", n), fmt.Sprintf("Kinh phí tuần %d", n), fmt.Sprintf("Đánh giá tuần %d", n+1), "Lũy kế"}, {leaf.Name, "4", "300", "Không được lấy từ kỳ sau", "1e100000"}})
+	w = e.upload(t, "tinh", "training", "preview", "", v, missing, "", false, 200)
+	if err := json.Unmarshal(w.Body.Bytes(), &preview); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(preview.SourceColumns, "đánh giá: không có") {
+		t.Fatal("must disclose missing evaluation column", preview.SourceColumns)
+	}
+	w = e.upload(t, "tinh", "training", "confirm", "", v, missing, preview.SHA256, true, 200)
+	if err := json.Unmarshal(w.Body.Bytes(), &v); err != nil {
+		t.Fatal(err)
+	}
+	row = v.Report.Rows[0]
+	assertDecimal284(t, row.Progress, "4")
+	assertDecimal284(t, row.Money, "300")
+	if row.Evaluation != "Fixture đánh giá đúng kỳ" {
+		t.Fatal("another week's evaluation overwrote existing text", row.Evaluation)
+	}
+}

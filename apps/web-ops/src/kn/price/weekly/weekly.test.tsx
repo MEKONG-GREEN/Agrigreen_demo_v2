@@ -75,12 +75,12 @@ describe("284 two program screens with actual generated client + mock contract",
     expect(screen.getByRole("combobox", { name: "Kỳ báo cáo" })).toHaveValue(latest.report!.id);
   });
 
-  it("previews one matching period or explicitly reports fallback before committing; cumulative columns are ignored", async () => {
+  it("previews matching detached evaluation columns or explicit fallback before committing; cumulative columns are ignored", async () => {
     const api = await fixture();
     for (const program of ["training", "information"] as const) {
       const v = await api.read(program), row = v.report!.rows.find(r => !r.group)!, week = v.report!.number;
       const first = program === "training" ? week : week + 3, last = first + 1;
-      const csv = `Tên hạng mục,Tiến độ thực hiện tuần ${first},Kinh phí tuần ${first},Đánh giá tuần ${first},Tiến độ thực hiện tuần ${last},Kinh phí tuần ${last},Đánh giá tuần ${last},Lũy kế kinh phí tuần ${week}\r\n"${row.name}",2,100,Fixture chọn đầu,3,200,Fixture chọn cuối,1e100000\r\n`;
+      const csv = `Tên hạng mục,Tiến độ thực hiện tuần ${first},Kinh phí tuần ${first},Tiến độ thực hiện tuần ${last},Kinh phí tuần ${last},Đánh giá tuần ${first},Đánh giá tuần ${last},Lũy kế kinh phí tuần ${week}\r\n"${row.name}",2,100,3,200,Fixture chọn đầu,Fixture chọn cuối,1e100000\r\n`;
       const file = new File([csv], "284-multiple-weeks.csv", { type: "text/csv" });
       const preview = await api.preview(program, { file, version: v.version, week_id: v.report!.id });
       expect(preview.valid_rows).toBe(1); expect(preview.error_rows).toBe(0);

@@ -241,11 +241,14 @@ function previewFile(report: WeeklyReport, version: number, program: Program, da
   const head=rows[header]!.map(c=>fold(c??"")), name=head.findIndex(c=>c.includes("ten_hang_muc")||c.includes("ten_chuong_trinh"));
   let progress=-1,money=-1,evaluation=-1,note=-1,selected=false;
   const isProgress=(value:string)=>value.includes("tien_do")&&value.includes("tuan")&&!value.includes("luy_ke");
-  for(let j=0;j<head.length;j++){const h=head[j]??"",match=h.includes(`tuan_${report.number}_`)||h.endsWith(`tuan_${report.number}`);if(isProgress(h)&&(!selected||match)){progress=j;selected=match;}if(h.includes("ghi_chu"))note=j;}
+  const headerPeriod=(value:string)=>Number(/(?:^|_)tuan_?([0-9]{1,3})(?:_|$)/.exec(value)?.[1]??0);
+  for(let j=0;j<head.length;j++){const h=head[j]??"",match=headerPeriod(h)===report.number;if(isProgress(h)&&(!selected||match)){progress=j;selected=match;}if(h.includes("ghi_chu"))note=j;}
   let periodEnd=head.length;for(let j=progress+1;j<head.length;j++){if(isProgress(head[j]??"")){periodEnd=j;break;}}
   if(progress>=0&&progress+1<periodEnd&&!(head[progress+1]??""))money=progress+1;
-  for(let j=progress+1;progress>=0&&j<periodEnd;j++){const h=head[j]??"";if(h.includes("luy_ke"))continue;if(h.includes("kinh_phi"))money=j;if(h.includes("danh_gia"))evaluation=j;}
+  for(let j=progress+1;progress>=0&&j<periodEnd;j++){const h=head[j]??"";if(h.includes("luy_ke"))continue;if(h.includes("kinh_phi"))money=j;if(h.includes("danh_gia")&&headerPeriod(h)===0)evaluation=j;}
   if(progress<0||money<0)return invalid("Thiếu cột Tiến độ/Kinh phí tuần cùng kỳ");
+  const period=headerPeriod(head[progress]??"")||report.number;
+  for(let j=0;j<head.length;j++){const h=head[j]??"";if(h.includes("danh_gia")&&!h.includes("luy_ke")&&headerPeriod(h)===period)evaluation=j;}
   const columnLabel=(col:number)=>{if(col<0)return "không có";let n=col+1,name="";while(n){n--;name=String.fromCharCode(65+n%26)+name;n=Math.floor(n/26);}return `${name} ${(rows[header]![col]??"").replace(/\s+/g," ")}`.trim();};
   const source_columns=`${selected?`Số liệu tuần ${report.number}.`:`Không có cột tiến độ ghi rõ tuần ${report.number}; dùng cặp tuần cuối trong tệp.`} Tiến độ: ${columnLabel(progress)}; kinh phí: ${columnLabel(money)}; đánh giá: ${columnLabel(evaluation)}.`;
   const body=rows.slice(header+1).map((cells,index)=>({cells,line:header+index+2})).filter(({cells})=>!!cells[name]?.trim() && fold(cells[name]!)!==fold(program==="information"?"Chương trình thông tin":"Chương trình đào tạo huấn luyện và hợp tác"));

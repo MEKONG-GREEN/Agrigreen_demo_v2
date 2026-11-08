@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -38,6 +39,18 @@ type WeeklyPreview struct {
 	OverwriteRows int                  `json:"overwrite_rows"`
 	ErrorRows     int                  `json:"error_rows"`
 	patches       []domain.WeeklyPatch
+}
+
+var weeklyImportPeriod = regexp.MustCompile(`(?:^|_)tuan_?([0-9]{1,3})(?:_|$)`)
+
+// weeklyColumnPeriod reads only a bounded week label, never a financial value.
+func weeklyColumnPeriod(value string) int {
+	m := weeklyImportPeriod.FindStringSubmatch(tabular.NormalizeHeader(value))
+	if len(m) != 2 {
+		return 0
+	}
+	n, _ := strconv.Atoi(m[1])
+	return n
 }
 
 func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, string, error) {
@@ -120,7 +133,7 @@ func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, s
 	}
 	for c, value := range head {
 		n := tabular.NormalizeHeader(value)
-		matchWeek := strings.Contains(n, fmt.Sprintf("tuan_%d_", week)) || strings.HasSuffix(n, fmt.Sprintf("tuan_%d", week))
+		matchWeek := weeklyColumnPeriod(value) == week
 		if isProgress(value) && (!selected || matchWeek) {
 			progress, selected = c, matchWeek
 		}
@@ -147,12 +160,24 @@ func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, s
 		if strings.Contains(n, "kinh_phi") {
 			money = c
 		}
-		if strings.Contains(n, "danh_gia") {
+		if strings.Contains(n, "danh_gia") && weeklyColumnPeriod(head[c]) == 0 {
 			evaluation = c
 		}
 	}
 	if progress < 0 || money < 0 {
 		return nil, "", fmt.Errorf("thiếu cột Tiến độ thực hiện tuần/Kinh phí thực hiện tuần cùng kỳ")
+	}
+	// The official workbook keeps numbered evaluation columns together after all week pairs.
+	// Match the chosen source period across the entire header; an absent period preserves existing text.
+	period := week
+	if sourcePeriod := weeklyColumnPeriod(head[progress]); sourcePeriod > 0 {
+		period = sourcePeriod
+	}
+	for c, value := range head {
+		n := tabular.NormalizeHeader(value)
+		if strings.Contains(n, "danh_gia") && !strings.Contains(n, "luy_ke") && weeklyColumnPeriod(value) == period {
+			evaluation = c
+		}
 	}
 	columnLabel := func(c int) string {
 		if c < 0 {
