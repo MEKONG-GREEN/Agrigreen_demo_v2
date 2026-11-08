@@ -1229,3 +1229,6 @@ export function registeredKnRoutes(): RouteRegistration[] {
   ];
 }
 // END GENERATED MOCK ROUTES
+
+// Public and authenticated-before-replay hooks cross the existing KN owner adapter, just like context/support guards.
+export { knSupportPublicMock as publicKnRequest, knSupportAdminMock as authorizedKnRequest } from "./kn-contact";

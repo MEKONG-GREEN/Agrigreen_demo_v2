@@ -15,3 +15,17 @@
 | HTTP | code | Khi nào |
 |---|---|---|
 | 503 | `vault.directory_unsupported` | Hiện thực kho (client local) không có phần mở rộng `client.Directory` — lỗi cấu hình |
+
+### Hỗ trợ tài khoản KN — Q10/FN-CH-00.01 (#274)
+
+| HTTP | code | Khi nào |
+|---|---|---|
+| 404 | `contact.support_not_found` | Yêu cầu không có trong tenant hiện tại |
+| 409 | `contact.support_stale` | Phiên bản thay đổi hoặc yêu cầu đã xử lý; tải lại trước thao tác mới |
+| 413 | `contact.support_too_large` | Thân vượt 12 KiB, kể cả không khai Content-Length |
+| 415 | `contact.support_json_required` | Sai Content-Type hoặc gửi tệp |
+| 503 | `contact.support_unavailable` | Chưa cấu hình tenant/chủ thể/khóa công khai hoặc chưa nối vault khi đọc nội dung |
+
+Lỗi vault/audit/commit không trả plaintext hoặc success giả. Mọi response intake/queue/detail/resolution `no-store`.
+
+Các lỗi quyền/MFA, thiếu context, validation/idempotency và giới hạn IP dùng [mã chung](../errors.md); không khai lại mã.

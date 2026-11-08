@@ -39,3 +39,12 @@ Metadata là JSON, nội dung là nhị phân:
 - plaintext, DEK, nonce, ciphertext, wrapped_dek.
 
 Kiểm thử phía Dart: `packages/agrigreen_mobile/test/envelope_vectors_test.dart` (lõi di động dùng chung; vector Go `nacl/box` ở `packages/agrigreen_mobile/test/fixtures/go_nacl_vectors.json`).
+
+
+## Binding riêng của yêu cầu hỗ trợ KN (#274)
+
+Phong bì/tệp phiên bản 1 ở trên và bộ vector giữ nguyên. Kho support riêng của `pf/contact` dùng `SealWithAAD` /
+`DecryptWithDEKAndAAD`: AES-GCM authenticates AAD UTF-8 `kn.account_support/v1` + LF + tenant UUID chuẩn + LF + request UUID chuẩn.
+Không dùng AAD này cho ảnh/tệp hiện hữu. Bản ghi immutable giữ nonce, ciphertext, wrapped DEK và subject ref; khóa bí mật ở vault.
+Subject area `kn_support` và purpose `kn.account_support` chỉ dùng cùng nhau, bắt buộc token Admin thật + MFA.
+Chuyển phong bì sang request/tenant/purpose khác làm giải mã thất bại; audit phải commit trước trả plaintext.

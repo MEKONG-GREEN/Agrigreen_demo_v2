@@ -2283,6 +2283,12 @@ const ADMIN_SYSTEM: Group = {
       "label": "Nhật ký hệ thống",
       "route": "/kn/quan-tri/nhat-ky-he-thong",
       "icon": "shield"
+    },
+    {
+      "key": "admin.qt.ho_tro_tai_khoan",
+      "label": "Yêu cầu hỗ trợ tài khoản",
+      "route": "/kn/quan-tri/yeu-cau-ho-tro",
+      "icon": "phone"
     }
   ]
 };

@@ -4661,6 +4661,15 @@
         "badge_source": null,
         "enabled": true,
         "children": []
+       },
+       {
+        "key": "admin.qt.ho_tro_tai_khoan",
+        "label": "Yêu cầu hỗ trợ tài khoản",
+        "route": "/kn/quan-tri/yeu-cau-ho-tro",
+        "icon": "phone",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
        }
       ]
      },

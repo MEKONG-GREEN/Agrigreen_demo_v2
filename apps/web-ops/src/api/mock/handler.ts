@@ -2,7 +2,7 @@ import { uuidv7 } from "../idempotency";
 import { problem, type Route } from "./http";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { contextProblem, personaForContext } from "./kn";
-import { supportGuard, supportRecord } from "./kn-admin";
+import { supportGuard, supportRecord, publicKnRequest, authorizedKnRequest } from "./kn-admin";
 import { passwordResetMock } from "./password-reset";
 
 // BEGIN GENERATED MOCK ROUTES
@@ -157,6 +157,8 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
     if (opts.latency !== false) await sleep(120 + Math.random() * 220);
     const url = new URL(request.url);
     // Route công khai (không đăng nhập): tự đặt lại mật khẩu qua email (#255).
+    const supportPublic = opts.surface === "app" ? await publicKnRequest(request, url) : null;
+    if (supportPublic) return supportPublic;
     const pub = opts.surface === "app" ? await passwordResetMock(request, url) : null;
     if (pub) return pub;
     const tokenPersona = personaFromAuthHeader(request.headers.get("Authorization"));
@@ -168,6 +170,8 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
     // Bề mặt Admin: mọi route bắt buộc token đã qua yếu tố thứ hai (mục 11).
     if (opts.surface === "admin" && !persona.amr.includes("otp")) return problem(403, "mfa_required", "MFA required");
 
+    const supportAdmin = opts.surface === "app" ? await authorizedKnRequest(request, url, persona) : null;
+    if (supportAdmin) return supportAdmin;
     let body: unknown = undefined;
     // POST bắt buộc Idempotency-Key; PUT/PATCH (KN v7.7 P1/P7) đọc thân như POST, khóa tùy chọn.
     if (request.method === "POST" || ((request.method === "PUT" || request.method === "PATCH") && request.headers.get("Content-Type")?.includes("json"))) {

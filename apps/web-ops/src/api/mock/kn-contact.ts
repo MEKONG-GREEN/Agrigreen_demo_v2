@@ -334,3 +334,6 @@ export const contactRoutes: Route[] = [
     },
   },
 ];
+
+// Account-support public/admin hooks belong to the existing Contact provider.
+export { knSupportAdminMock, knSupportPublicMock } from "./kn-support";

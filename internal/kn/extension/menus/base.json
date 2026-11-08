@@ -221,6 +221,17 @@
           "ComingSoon": false,
           "Needs": "",
           "Children": null
+        },
+        {
+          "Key": "admin.qt.ho_tro_tai_khoan",
+          "Label": "Yêu cầu hỗ trợ tài khoản",
+          "Route": "/kn/quan-tri/yeu-cau-ho-tro",
+          "Icon": "phone",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": null
         }
       ]
     },

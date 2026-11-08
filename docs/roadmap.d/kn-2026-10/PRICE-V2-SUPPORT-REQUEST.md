@@ -1,0 +1,1 @@
+- [ ] PRICE-V2-SUPPORT-REQUEST (#274): Q10/FN-CH-00.01 — public Contact intake, immutable vault envelope + audit/CAS, Admin KN queue/UI; preparation gates and bootstrap/UAT in docs/runbooks/kn-account-support.md. Dependency → data → service → API → UI; no legacy HTX support/reset/PIN/extra messaging workflow.

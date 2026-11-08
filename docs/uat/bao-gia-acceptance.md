@@ -21,3 +21,22 @@ Playwright kiểm luồng browser trên build mock. Đây là ba loại bằng c
 Lệnh chạy: từ gốc worktree dùng `scripts/pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./internal/kn/price/... ./migrations`;
 trong `apps/web-ops` dùng `npm ci`, `npx vitest run src/kn/price/points`, `npm run build:mock` và
 `npx playwright test tests/e2e/price-points182.spec.ts`. Ghi kết quả trên issue đúng SHA sau đủ CI/cổng; chỉ ticket merge vào dev.
+
+
+## FN-CH-00.01 / Q10 — yêu cầu hỗ trợ trong KN (#274)
+
+| Ca | Thao tác | Kết quả |
+|---|---|---|
+| BG274-01 | Từ Login, không đăng nhập, mở Liên hệ quản trị viên; nhập họ tên/contact/nội dung và gửi | Record KN đã commit, 202; thông báo tiếp nhận, không lộ tài khoản hoặc request khác |
+| BG274-02 | Tài khoản không có assignment/phòng ban đang áp dụng | Link liên hệ dùng được, không bắt chọn KN context để gửi |
+| BG274-03 | Thiếu trường, sai contact, quá dài, thêm tenant/actor/role, JSON dư hoặc file | Lỗi đúng trường/413/415/422 trước parse quá giới hạn; không thêm record; không echo PII |
+| BG274-04 | Mất ACK rồi retry cùng UUID; gửi đồng thời cùng UUID | Chỉ một request + sự kiện submitted; UUID khác nội dung bị từ chối |
+| BG274-05 | Admin KN + MFA mở queue/detail | Chỉ tenant hiện tại; queue không PII, detail qua vault purpose riêng và commit audit; script trong message hiện như văn bản |
+| BG274-06 | User thường, realm Admin chưa chọn phiên, foreign Admin, mất MFA/role/assignment; gọi API trực tiếp | Không nhận plaintext/queue khác tenant; kiểm quyền trước retry/cache |
+| BG274-07 | Hai Admin/cửa sổ xử lý cùng version | Một action commit, action stale 409; cùng UUID/action retry trả kết quả đã commit |
+| BG274-08 | Làm hỏng vault/KN audit hoặc chuyển ciphertext sang request khác | Không trả plaintext hoặc success giả; rollback giữ dữ liệu/chuỗi audit hợp lệ |
+| BG274-09 | Đổi account/tenant/context/MFA khi detail đang tải; xem trên mobile/bàn phím | Bỏ response cũ, không giữ PII ở storage/URL; form/loading/error/retry/focus dùng được |
+
+Native PG + HTTP vault thật: `tests/support274`; validation/rate native: `internal/kn/contact/handler`.
+Tương tác và mock contract/quyền: `apps/web-ops/src/kn/support/support274.test.tsx`; browser production dùng bản build mock, riêng với bằng chứng native.
+Provision/deployment: [runbook hỗ trợ KN](../runbooks/kn-account-support.md). Không gửi email/chat cho người thật khi thử.
