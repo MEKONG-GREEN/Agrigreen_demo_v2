@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
@@ -45,9 +46,18 @@ func (h Handler) CNTSWriteAuthorization() gin.HandlerFunc {
 				httpx.Fail(c, problem.Validation.WithField("code_suffix", "mã biểu không hợp lệ"))
 				return
 			}
-			err = h.Svc.AuthorizeCNTSDesignWrite(c.Request.Context(), code)
+			err = h.Svc.CheckCNTSDefinition(c.Request.Context(), "create", code, app.CNTSDesignCreate{CodeSuffix: req.CodeSuffix, Title: req.Title, SourceCode: req.SourceCode, SourceVersion: req.SourceVersion, Fields: req.Fields}, c.GetHeader(idempotency.Header))
 		case "/v1/extension/cnts/form-designs/:code/versions":
-			err = h.Svc.AuthorizeCNTSDesignWrite(c.Request.Context(), c.Param("code"))
+			var req cntsDesignSaveReq
+			if json.Unmarshal(body, &req) != nil {
+				httpx.Fail(c, problem.BadRequest)
+				return
+			}
+			if req.BaseVersion == nil {
+				httpx.Fail(c, problem.Validation.WithField("base_version", "bắt buộc — phiên bản đã đọc"))
+				return
+			}
+			err = h.Svc.CheckCNTSDefinition(c.Request.Context(), "save", c.Param("code"), app.CNTSDesignSave{BaseVersion: *req.BaseVersion, Title: req.Title, Fields: req.Fields}, c.GetHeader(idempotency.Header))
 		case "/v1/extension/cnts/period-series":
 			var req cntsSeriesReq
 			if json.Unmarshal(body, &req) != nil {

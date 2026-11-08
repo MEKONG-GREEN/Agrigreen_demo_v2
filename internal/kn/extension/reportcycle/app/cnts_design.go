@@ -205,17 +205,26 @@ func fieldsError(issues []domain.DesignIssue) error {
 	return problem.Validation.WithField(fmt.Sprintf("fields[%d].%s", x.Line-1, x.Field), x.Message)
 }
 
-func (s *Service) define(ctx context.Context, code, title string, fields []domain.CNTSField, base int64, idem string) (CNTSDesignVersion, error) {
+func (s *Service) define(ctx context.Context, code, title string, fields []domain.CNTSField, base int64, idem, kind string, input any) (CNTSDesignVersion, error) {
 	raw, err := json.Marshal(fields)
 	if err != nil {
 		return CNTSDesignVersion{}, err
 	}
-	ref, err := s.FormsNative.DefineTemplate(ctx, formsport.TemplateDef{Profile: domain.ProfileCNTS, Code: code, Title: title, Fields: raw,
-		BaseVersion: &base}, idem)
+	def, err := s.fenceCNTSDefinition(ctx, kind, code, input, formsport.TemplateDef{Profile: domain.ProfileCNTS, Code: code, Title: title, Fields: raw, BaseVersion: &base}, idem)
 	if err != nil {
 		return CNTSDesignVersion{}, err
 	}
-	return CNTSDesignVersion{TemplateID: ref.ID.String(), Version: ref.Version, Title: ref.Title, Fields: fields}, nil
+	// Keep the native operation key for existing same-code receipts. The KN fence
+	// binds new/first-seen requests across codes before the code-scoped native key.
+	ref, err := s.FormsNative.DefineTemplate(ctx, def, idem)
+	if err != nil {
+		return CNTSDesignVersion{}, err
+	}
+	actual, err := decodeFields(ref.Fields)
+	if err != nil {
+		return CNTSDesignVersion{}, err
+	}
+	return CNTSDesignVersion{TemplateID: ref.ID.String(), Version: ref.Version, Title: ref.Title, Fields: actual}, nil
 }
 
 // SaveCNTSDesign lưu cấu trúc thành phiên bản mới (base_version = phiên bản đã đọc; cap/forms chặn ghi đè khi người khác
@@ -270,7 +279,7 @@ func (s *Service) SaveCNTSDesign(ctx context.Context, code string, in CNTSDesign
 			return CNTSDesignVersion{}, problem.Validation.WithField("fields", is[0].Field+": "+is[0].Message)
 		}
 	}
-	return s.define(ctx, code, title, in.Fields, in.BaseVersion, idem)
+	return s.define(ctx, code, title, in.Fields, in.BaseVersion, idem, "save", in)
 }
 
 // CNTSDesignCreate là yêu cầu tạo biểu điều tra mới hoặc sao chép biểu có sẵn (FN-07 luồng phụ "Sao chép biểu").
@@ -323,7 +332,7 @@ func (s *Service) CreateCNTSDesign(ctx context.Context, in CNTSDesignCreate, ide
 	}
 	// Native base_version=0 and the durable definition receipt distinguish a new
 	// conflicting command from a retry, even after the template head advances.
-	v, err := s.define(ctx, code, title, fields, 0, idem)
+	v, err := s.define(ctx, code, title, fields, 0, idem, "create", in)
 	return code, v, err
 }
 

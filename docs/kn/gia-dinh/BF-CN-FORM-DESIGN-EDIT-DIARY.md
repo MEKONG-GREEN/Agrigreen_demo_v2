@@ -7,7 +7,9 @@ Căn cứ: CNTS Final v4.0 FN-07 B1–B4, BR-01/BR-02/AC-03, UR-TINH-07 và ma t
 - KN ghi command phát hành bất biến trước I/O native; public `DurablePublisher` của actual dev phục hồi đúng creation receipt sau mất ACK. Audit `cnts_publication` và kết quả KN ghi cùng giao dịch. Actor, selected session, quyền hiện tại, payload, target đã giải và tuple phải khớp trước replay; không tạo thêm kỳ/event/audit. Đây là quyền hiện tại do accounts/KN cấp, không suy từ AuthTime hoặc realm alias.
 - Màn BM-17 dùng bộ nhập schema thực khi cấu trúc khác lưới chuẩn; các giá trị và trường của kỳ cũ vẫn đọc theo task đã gắn template. Màn phát hành yêu cầu chọn version, hiển thị version ở preview và gửi nguyên tuple. Đổi biểu/version làm mất preview cũ. Đây là lựa chọn mẫu tại FN-07, không phải màn tham số chung (Q5).
 - Ma trận ghi: selected account context Cấp Tỉnh CNTS phải có nhóm `tong_hop` tường minh; Admin quản lý định nghĩa theo native policy; lãnh đạo, viên chức, nhóm rỗng, chỉ xem, hết hạn, sai phòng/xã không mượn quyền. Template KNQG vẫn khóa qua KN và native REST/Publisher. Native policy kiểm cấu trúc như màn KN.
-- Save kiểm thay đổi với `base_version` thật thay vì head hiện tại, rồi native CAS quyết định. Create mã mới giao kiểm trùng/replay cho durable definition receipt của Forms; retry canonical definition sau head tăng trả đúng original ID/version. Copy phải chọn source_version bất biến. Receipt native hiện chỉ ràng buộc canonical definition; **chưa có chứng cứ provenance copy source ID/version atomic**, phần này thuộc supplier bên dưới.
+- Save kiểm thay đổi với `base_version` thật thay vì head hiện tại, rồi native CAS quyết định. Create/save có KN request fence chỉ ghi thêm: ràng buộc kind, mã đích, actor, selected session, quyền hiện tại và payload trước native I/O; đổi mã sau HTTP cache hết hạn vẫn conflict. Command bất biến được dùng lại sau mất ACK; Native Forms cung cấp canonical definition receipt và audit định nghĩa atomic, không dựng receipt từ head. Copy phải chọn source_version bất biến. Receipt native hiện chỉ ràng buộc canonical definition; **chưa có chứng cứ provenance copy source ID/version atomic**, phần này thuộc supplier bên dưới.
+
+Native key gốc được giữ để retry cùng mã của thao tác cũ còn tìm đúng receipt. Request fence áp cho các khóa mới/được KN ghi nhận lần đầu. Khóa legacy từng được native chia theo mã nhưng chưa có fence không có public operation-key witness để suy ra liên kết toàn bộ mã cũ; không scan head hoặc bịa liên kết/migration. Phần chứng minh/chuẩn hóa namespace legacy tổng quát thuộc #303, chưa được nhận ở đây.
 
 ### Chuỗi phần còn lại chính thức, chờ triển khai
 
@@ -19,8 +21,8 @@ ROOT đã công bố và primary readback chuỗi [#303 runtime/settings/usage](
 
 | Tệp | Bước PLAN-BRD2 | FN/UR |
 |---|---|---|
-| `migrations/pf/*_pf_extension_cnts_publish275.up.sql`, `reportcycle/store/cnts_publish275.go` | 2: dữ liệu append-only/RLS, intent/result | FN-07 B4, BR-01 |
-| `reportcycle/app/cnts_selection275.go`, `cnts_publish275.go`, `cnts_forms.go`, `cnts_publish.go`, `cnts_design.go` | 3: chọn version, current authority, durable replay/CAS | FN-07 BR-01/02, AC-03, UR-TINH-07 |
+| `migrations/pf/*_pf_extension_cnts_publish275.up.sql`, `*_pf_extension_cnts_definition275.up.sql`, `reportcycle/store/cnts_publish275.go`, `cnts_definition275.go` | 2: dữ liệu append-only/RLS, intent/result | FN-07 B4, BR-01 |
+| `reportcycle/app/cnts_selection275.go`, `cnts_publish275.go`, `cnts_definition275.go`, `cnts_forms.go`, `cnts_publish.go`, `cnts_design.go` | 3: chọn version, current authority, durable replay/CAS | FN-07 BR-01/02, AC-03, UR-TINH-07 |
 | `reportcycle/handler/cnts*.go`, `module_cnts275.go`, `module_reportcycle.go`, `module.go`, OpenAPI module fragments | 4: contract, guard trước HTTP cache, native owner policy | FN-07, ma trận FN-07 |
 | `apps/web-ops/src/kn/cnts/periods/*`, `catch/CatchScreen.tsx`, `catch/catch.ts`, mock CNTS design/periods, generated OpenAPI | 5: chọn/giữ version, preview, consumer | FN-07 B1–B4 |
 | `tests/kn77/cnts_*`, `tests/kn77/closed_figures_pub_integration_test.go`, `adhocintegration/dashboard202_live_integration_test.go`, web CNTS tests, tài liệu UAT này | 6: native regression, replay/current authority, consumer nguồn công bố và UI | FN-07; giữ hành vi consumer nguồn |
