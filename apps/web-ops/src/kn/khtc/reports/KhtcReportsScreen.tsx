@@ -100,8 +100,9 @@ function ReportEditor({ d, api, mode, reload, act, save, canAudit }: {
     const history = useLoad(() => api.history(id), [api, id]);
     const words = useLoad(() => api.words(id), [api, id]);
     const dirty = Object.keys(admin).length > 0 || Object.keys(texts).length > 0 || adhocSelection !== undefined;
-    const unresolvedSave = !!save.state.pending || save.state.blocked || !save.state.ready;
-    const writable = d.editable && !act.busy;
+    const awaitingSavedVersion = (save.state.receipt?.applied?.version ?? 0) > d.version;
+    const unresolvedSave = !!save.state.pending || save.state.blocked || !save.state.ready || awaitingSavedVersion;
+    const writable = d.editable && !act.busy && !awaitingSavedVersion;
     const selected=adhocSelection??d.content.adhoc;
     const rows = filterRows(data.template==="adhoc"?(data.rows??[]).filter(r=>selected?.rows.includes(r.ref)):data.rows??[], filter);
     const depts = [...new Set((data.rows ?? []).map(r => r.department).filter(Boolean))];
@@ -109,6 +110,7 @@ function ReportEditor({ d, api, mode, reload, act, save, canAudit }: {
     return <section className="card sec">
   <h2>{data.period.name} · {TEMPLATE_LABEL[data.template]}</h2>
   <p>Phiên bản soạn {d.version} · Kế hoạch v{data.plan.Version} · Ngày chốt {data.period.cutoff.slice(0, 10)}</p>
+  {awaitingSavedVersion && <p role="status">Đang tải phiên bản đã lưu trước khi tiếp tục chỉnh sửa.</p>}
   {d.final ? <p><StatusPill tone="ok">Bản cuối</StatusPill> Đã khóa nội dung và cập nhật số liệu.</p> : null}
   {d.source_changed && <p role="alert" className="alert alert-warn">Nguồn đã thay đổi. Cập nhật số liệu trước khi đánh dấu Bản cuối. Các tệp đã xuất được giữ nguyên.</p>}
   {d.source_error && <p role="alert" className="alert alert-warn">{d.source_error}</p>}

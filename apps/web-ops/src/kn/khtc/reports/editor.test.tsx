@@ -274,3 +274,36 @@ it("232 committed authority A→B→A creates a fresh owner on the same API", as
         expect((await createReportApi(auth.api!).get(p.id)).content.texts.B).toBe("Nháp mới của quyền A232");
     } finally { await release232(pending.release); }
 });
+
+
+it("244 keeps the stale editor locked after a receipt until the acknowledged version reloads", async () => {
+    const reached = deferred232(), release = deferred232();
+    let holdDetail = false;
+    auth.api = api232(async request => {
+        const path = new URL(request.url).pathname;
+        const response = await mockFetchNoDelay(request);
+        if (request.method === "GET" && path.includes("/draft-operations/")) holdDetail = true;
+        if (request.method === "GET" && path.endsWith("/report") && holdDetail) { reached.resolve(); await release.promise; }
+        return response;
+    });
+    const {p, initial} = await report232();
+    const remove = Storage.prototype.removeItem;
+    let failCleanup = true;
+    const spy = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (this: Storage, key: string) {
+        if (failCleanup && key.startsWith("kn:khtc:report-save:v1:")) { failCleanup = false; throw new Error("controlled cleanup failure244"); }
+        return remove.call(this, key);
+    });
+    try {
+        render(<KhtcReportsScreen initialPeriod={p.id} />);
+        fireEvent.change(await screen.findByLabelText("Người ký"), {target: {value: "Đã lưu trước reload244"}});
+        fireEvent.click(screen.getByRole("button", {name: "Lưu bản soạn"}));
+        fireEvent.click(await screen.findByRole("button", {name: "Đối chiếu lần lưu"}));
+        await reached.promise;
+        await waitFor(() => expect(screen.getByRole("button", {name: "Lưu bản soạn"})).toBeDisabled());
+        expect(screen.getByLabelText("Người ký")).toBeDisabled();
+        await release232(release);
+        await screen.findByText(new RegExp(`^Phiên bản soạn ${initial.version + 1} ·`));
+        expect(screen.getByRole("button", {name: "Lưu bản soạn"})).toBeEnabled();
+        expect(screen.getByLabelText("Người ký")).toHaveValue("Đã lưu trước reload244");
+    } finally { await release232(release); spy.mockRestore(); }
+});
