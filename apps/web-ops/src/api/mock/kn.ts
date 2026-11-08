@@ -20,7 +20,7 @@ import { workSchedulePendingBadge } from "./kn-schedules";
 import { cycleBadges } from "./kn-reports/store";
 
 /** domain.MenuVersion. */
-export const MENU_VERSION = "kn.menu/v16";
+export const MENU_VERSION = "kn.menu/v17";
 
 /** Màn Lịch công tác (P5): một đường dẫn cho Cấp Xã (đăng ký) và Cấp Tỉnh/Admin (duyệt) — trang tự chọn theo vai trò. */
 export const WORK_SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
@@ -1507,6 +1507,24 @@ const DEPT_MENUS: Partial<Record<KnMenuProfile, Partial<Record<Exclude<KnRole, "
             "icon": "library"
           }
         ]
+      },
+      {
+        "key": "chuong_trinh_khuyen_nong",
+        "label": "Chương trình khuyến nông",
+        "items": [
+          {
+            "key": "tinh.chuong_trinh.thong_tin",
+            "label": "Chương trình thông tin",
+            "route": "/kn/chuong-trinh-khuyen-nong/thong-tin",
+            "icon": "report"
+          },
+          {
+            "key": "tinh.chuong_trinh.dao_tao",
+            "label": "Đào tạo huấn luyện và hợp tác",
+            "route": "/kn/chuong-trinh-khuyen-nong/dao-tao-hop-tac",
+            "icon": "report"
+          }
+        ]
       }
     ],
     "kn_tw": [
@@ -1984,6 +2002,25 @@ const ADMIN_BUSINESS: Partial<Record<KnMenuProfile, Item[]>> = {
       "label": "Mặt hàng",
       "route": "/kn/bao-gia/mat-hang",
       "icon": "package"
+    },
+    {
+      "key": "tinh.chuong_trinh",
+      "label": "Chương trình khuyến nông",
+      "icon": "report",
+      "children": [
+        {
+          "key": "tinh.chuong_trinh.thong_tin",
+          "label": "Chương trình thông tin",
+          "route": "/kn/chuong-trinh-khuyen-nong/thong-tin",
+          "icon": "report"
+        },
+        {
+          "key": "tinh.chuong_trinh.dao_tao",
+          "label": "Đào tạo huấn luyện và hợp tác",
+          "route": "/kn/chuong-trinh-khuyen-nong/dao-tao-hop-tac",
+          "icon": "report"
+        }
+      ]
     }
   ],
   "hanh_chinh_tong_hop": [

@@ -1,0 +1,11 @@
+{
+  "id": "kn-price-weekly",
+  "source": "./kn-price-weekly",
+  "app": [
+    {
+      "export": "priceWeeklyRoutes",
+      "order": 79
+    }
+  ],
+  "admin": []
+}

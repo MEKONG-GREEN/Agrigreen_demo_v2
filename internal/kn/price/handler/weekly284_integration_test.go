@@ -50,7 +50,7 @@ func weeklyFixture284(t *testing.T) weeklyHTTP284 {
 		t.Fatal(err)
 	}
 	who := map[string]authz.Principal{}
-	for name, role := range map[string]string{"tinh": "kn_tinh", "tinh2": "kn_tinh", "xa": "kn_xa", "tw": "kn_tw", "admin": "admin", "support": "kn_tinh", "other": "kn_tinh", "wrongdept": "kn_tinh", "readonly": "kn_tinh"} {
+	for name, role := range map[string]string{"tinh": "kn_tinh", "tinh2": "kn_tinh", "xa": "kn_xa", "tw": "kn_tw", "admin": "admin", "support": "kn_tinh", "other": "kn_tinh", "wrongdept": "kn_tinh", "readonly": "kn_tinh", "support_nomfa": "kn_tinh"} {
 		k := &authz.KNContext{Role: role, Department: "thong_tin_truyen_thong", Scope: authz.Scope{All: true}}
 		if role == "admin" {
 			k.Department = ""
@@ -64,7 +64,7 @@ func weeklyFixture284(t *testing.T) weeklyHTTP284 {
 		if name == "readonly" {
 			k.ViewOnly = true
 		}
-		if name == "support" {
+		if name == "support" || name == "support_nomfa" {
 			k.Support = &authz.KNSupport{SessionID: ids.New(), Reason: "Hỗ trợ lập báo cáo tuần theo yêu cầu"}
 		}
 		p := authz.Principal{ActorRef: ids.New(), TenantID: tid, KN: k, MFA: name == "support"}
@@ -253,7 +253,7 @@ func TestWeeklyPermissionsNumbersGroups284(t *testing.T) {
 		in := weeklyCommand284(v, "save")
 		e.call(t, as, "information", &in, "", 403, "")
 	}
-	for _, as := range []string{"admin", "wrongdept", "readonly"} {
+	for _, as := range []string{"admin", "wrongdept", "readonly", "support_nomfa"} {
 		e.call(t, as, "information", nil, "", 403, "")
 	}
 	foreign := e.call(t, "other", "information", nil, "", 200, "")
@@ -358,7 +358,11 @@ func TestWeeklyConcurrentCASReplay284(t *testing.T) {
 					}
 					data, _ := json.Marshal(in)
 					<-start
-					w := e.request("tinh", http.MethodPost, "/v1/price/weekly-programs/training/actions", "", data, "application/json")
+					as := "tinh"
+					if j == 1 {
+						as = "tinh2"
+					}
+					w := e.request(as, http.MethodPost, "/v1/price/weekly-programs/training/actions", "", data, "application/json")
 					results <- w.Code
 				}(j, action)
 			}
@@ -427,7 +431,7 @@ func (e weeklyHTTP284) upload(t *testing.T, as, program, action, key string, v a
 		t.Fatal(err)
 	}
 	w := e.request(as, http.MethodPost, "/v1/price/weekly-programs/"+program+"/imports/"+action, key, body.Bytes(), writer.FormDataContentType())
-	if w.Code != want {
+	if want != 0 && w.Code != want {
 		t.Fatalf("import %s: %d want %d: %s", action, w.Code, want, w.Body.String())
 	}
 	return w
@@ -560,4 +564,66 @@ func TestWeeklyExcelPartialTemplateExport284(t *testing.T) {
 	in.Confirm = true
 	closed := e.call(t, "tinh", "information", &in, "", 200, "")
 	e.upload(t, "tinh", "information", "confirm", "", closed, data, preview.SHA256, true, 409)
+}
+
+func TestWeeklyConcurrentOpenImportClose284(t *testing.T) {
+	e := weeklyFixture284(t)
+	start := make(chan struct{})
+	results := make(chan *httptest.ResponseRecorder, 2)
+	for range 2 {
+		go func() {
+			<-start
+			results <- e.request("tinh", http.MethodGet, "/v1/price/weekly-programs/training", "", nil, "")
+		}()
+	}
+	close(start)
+	a, b := <-results, <-results
+	if a.Code != 200 || b.Code != 200 {
+		t.Fatalf("concurrent open: %d/%d", a.Code, b.Code)
+	}
+	var first, second app.WeeklyView
+	if err := json.Unmarshal(a.Body.Bytes(), &first); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(b.Body.Bytes(), &second); err != nil {
+		t.Fatal(err)
+	}
+	if first.Version != 1 || second.Version != 1 || first.Report.ID != second.Report.ID {
+		t.Fatal("concurrent open created duplicate first week")
+	}
+	data := weeklyCSV284(t, [][]string{{"Tên hạng mục", "Tiến độ tuần", "Kinh phí tuần"}, {first.Report.Rows[0].Name, "1", "100"}})
+	previewResponse := e.upload(t, "tinh", "training", "preview", "", first, data, "", false, 200)
+	var preview app.WeeklyPreview
+	if err := json.Unmarshal(previewResponse.Body.Bytes(), &preview); err != nil {
+		t.Fatal(err)
+	}
+	start = make(chan struct{})
+	statuses := make(chan int, 2)
+	go func() {
+		<-start
+		in := weeklyCommand284(first, "close")
+		in.Confirm = true
+		body, _ := json.Marshal(in)
+		statuses <- e.request("tinh", http.MethodPost, "/v1/price/weekly-programs/training/actions", "", body, "application/json").Code
+	}()
+	go func() {
+		<-start
+		statuses <- e.upload(t, "tinh2", "training", "confirm", "", first, data, preview.SHA256, true, 0).Code
+	}()
+	close(start)
+	codes := []int{<-statuses, <-statuses}
+	slices.Sort(codes)
+	if !slices.Equal(codes, []int{200, 409}) {
+		t.Fatal("close/import atomic winner", codes)
+	}
+	latest := e.call(t, "tinh", "training", nil, "", 200, "")
+	if latest.Report.Status == "draft" {
+		in := weeklyCommand284(latest, "close")
+		in.Confirm = true
+		latest = e.call(t, "tinh", "training", &in, "", 200, "")
+	}
+	denied := e.upload(t, "tinh", "training", "confirm", "", latest, data, preview.SHA256, true, 409)
+	if !strings.Contains(denied.Body.String(), "price.weekly_closed") {
+		t.Fatal("closed import must fail on state, not file hash", denied.Body.String())
+	}
 }

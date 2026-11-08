@@ -89,7 +89,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -512,7 +512,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -803,7 +803,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -1235,7 +1235,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -1535,7 +1535,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -1661,7 +1661,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2093,7 +2093,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2300,7 +2300,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2401,7 +2401,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2655,7 +2655,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2757,7 +2757,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -2885,7 +2885,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3145,6 +3145,30 @@
       ]
      },
      {
+      "key": "chuong_trinh_khuyen_nong",
+      "label": "Chương trình khuyến nông",
+      "items": [
+       {
+        "key": "tinh.chuong_trinh.thong_tin",
+        "label": "Chương trình thông tin",
+        "route": "/kn/chuong-trinh-khuyen-nong/thong-tin",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       },
+       {
+        "key": "tinh.chuong_trinh.dao_tao",
+        "label": "Đào tạo huấn luyện và hợp tác",
+        "route": "/kn/chuong-trinh-khuyen-nong/dao-tao-hop-tac",
+        "icon": "report",
+        "badge_source": null,
+        "enabled": true,
+        "children": []
+       }
+      ]
+     },
+     {
       "key": "dung_chung",
       "label": "Dùng chung",
       "items": [
@@ -3196,7 +3220,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3367,7 +3391,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3459,7 +3483,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3761,7 +3785,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -3878,7 +3902,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   },
@@ -4370,6 +4394,34 @@
           "badge_source": null,
           "enabled": false,
           "children": []
+         },
+         {
+          "key": "tinh.chuong_trinh",
+          "label": "Chương trình khuyến nông",
+          "route": null,
+          "icon": "report",
+          "badge_source": null,
+          "enabled": false,
+          "children": [
+           {
+            "key": "tinh.chuong_trinh.thong_tin",
+            "label": "Chương trình thông tin",
+            "route": "/kn/chuong-trinh-khuyen-nong/thong-tin",
+            "icon": "report",
+            "badge_source": null,
+            "enabled": false,
+            "children": []
+           },
+           {
+            "key": "tinh.chuong_trinh.dao_tao",
+            "label": "Đào tạo huấn luyện và hợp tác",
+            "route": "/kn/chuong-trinh-khuyen-nong/dao-tao-hop-tac",
+            "icon": "report",
+            "badge_source": null,
+            "enabled": false,
+            "children": []
+           }
+          ]
          }
         ]
        },
@@ -4680,7 +4732,7 @@
       ]
      }
     ],
-    "menu_version": "kn.menu/v16",
+    "menu_version": "kn.menu/v17",
     "org_ref": null
    }
   }
@@ -4723,5 +4775,5 @@
    "menu_profile": "hanh_chinh_tong_hop"
   }
  ],
- "menu_version": "kn.menu/v16"
+ "menu_version": "kn.menu/v17"
 }

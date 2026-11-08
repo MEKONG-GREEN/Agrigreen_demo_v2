@@ -31,6 +31,7 @@ type weeklyFileRow struct {
 type WeeklyPreview struct {
 	Version       int64                `json:"version"`
 	WeekID        string               `json:"week_id"`
+	SourceColumns string               `json:"source_columns"`
 	SHA256        string               `json:"sha256"`
 	Rows          []domain.WeeklyIssue `json:"rows"`
 	ValidRows     int                  `json:"valid_rows"`
@@ -39,9 +40,9 @@ type WeeklyPreview struct {
 	patches       []domain.WeeklyPatch
 }
 
-func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, error) {
+func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, string, error) {
 	if len(data) == 0 || len(data) > weeklyMaxFile {
-		return nil, tabular.ErrTooLarge
+		return nil, "", tabular.ErrTooLarge
 	}
 	var records []tabular.Row
 	var file *excelize.File
@@ -49,21 +50,21 @@ func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, e
 	if tabular.Detect(data) == tabular.FormatXLSX {
 		f, err := excelize.OpenReader(bytes.NewReader(data), excelize.Options{RawCellValue: true, UnzipSizeLimit: 32 << 20, UnzipXMLSizeLimit: 16 << 20})
 		if err != nil {
-			return nil, tabular.ErrFormat
+			return nil, "", tabular.ErrFormat
 		}
 		defer func() { _ = f.Close() }()
 		file = f
 		names := f.GetSheetList()
 		if len(names) == 0 || len(names) > 20 {
-			return nil, tabular.ErrFormat
+			return nil, "", tabular.ErrFormat
 		}
 		for index, name := range names {
 			raw, err := f.GetRows(name, excelize.Options{RawCellValue: true})
 			if err != nil {
-				return nil, tabular.ErrFormat
+				return nil, "", tabular.ErrFormat
 			}
 			if len(raw) > 2000 {
-				return nil, tabular.ErrTooManyRows
+				return nil, "", tabular.ErrTooManyRows
 			}
 			matches := false
 			for _, row := range raw[:min(30, len(raw))] {
@@ -78,7 +79,7 @@ func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, e
 				records = nil
 				for j, row := range raw {
 					if len(row) > 80 {
-						return nil, tabular.ErrTooManyColumns
+						return nil, "", tabular.ErrTooManyColumns
 					}
 					records = append(records, tabular.Row{Line: j + 1, Cells: row})
 				}
@@ -90,7 +91,7 @@ func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, e
 	} else {
 		t, err := tabular.ReadBytes(data, tabular.Limits{MaxBytes: weeklyMaxFile, MaxRows: 2000, MaxCols: 80})
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		records = append([]tabular.Row{{Line: 1, Cells: t.Header}}, t.Rows...)
 	}
@@ -108,31 +109,63 @@ func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, e
 		}
 	}
 	if h < 0 {
-		return nil, fmt.Errorf("không tìm thấy cột Tên chương trình khuyến nông/Tên hạng mục")
+		return nil, "", fmt.Errorf("không tìm thấy cột Tên chương trình khuyến nông/Tên hạng mục")
 	}
 	progress, money, evaluation, note := -1, -1, -1, -1
-	selectedProgress, selectedEvaluation := false, false
-	for c, value := range records[h].Cells {
+	selected := false
+	head := records[h].Cells
+	isProgress := func(value string) bool {
+		n := tabular.NormalizeHeader(value)
+		return strings.Contains(n, "tien_do") && strings.Contains(n, "tuan") && !strings.Contains(n, "luy_ke")
+	}
+	for c, value := range head {
 		n := tabular.NormalizeHeader(value)
 		matchWeek := strings.Contains(n, fmt.Sprintf("tuan_%d_", week)) || strings.HasSuffix(n, fmt.Sprintf("tuan_%d", week))
-		if strings.Contains(n, "tien_do") && strings.Contains(n, "tuan") && (!selectedProgress || matchWeek) {
-			progress = c
-			money = c + 1
-			selectedProgress = matchWeek
-		}
-		if strings.Contains(n, "kinh_phi") && strings.Contains(n, "tuan") {
-			money = c
-		}
-		if strings.Contains(n, "danh_gia") && (!selectedEvaluation || matchWeek) {
-			evaluation = c
-			selectedEvaluation = matchWeek
+		if isProgress(value) && (!selected || matchWeek) {
+			progress, selected = c, matchWeek
 		}
 		if strings.Contains(n, "ghi_chu") {
 			note = c
 		}
 	}
+	// Keep all weekly inputs inside the selected period; never mix money/evaluation from another week.
+	periodEnd := len(head)
+	for c := progress + 1; c < len(head); c++ {
+		if isProgress(head[c]) {
+			periodEnd = c
+			break
+		}
+	}
+	if progress >= 0 && progress+1 < periodEnd && strings.TrimSpace(head[progress+1]) == "" {
+		money = progress + 1
+	}
+	for c := progress + 1; progress >= 0 && c < periodEnd; c++ {
+		n := tabular.NormalizeHeader(head[c])
+		if strings.Contains(n, "luy_ke") {
+			continue
+		}
+		if strings.Contains(n, "kinh_phi") {
+			money = c
+		}
+		if strings.Contains(n, "danh_gia") {
+			evaluation = c
+		}
+	}
 	if progress < 0 || money < 0 {
-		return nil, fmt.Errorf("thiếu cột Tiến độ thực hiện tuần/Kinh phí thực hiện tuần")
+		return nil, "", fmt.Errorf("thiếu cột Tiến độ thực hiện tuần/Kinh phí thực hiện tuần cùng kỳ")
+	}
+	columnLabel := func(c int) string {
+		if c < 0 {
+			return "không có"
+		}
+		column, _ := excelize.ColumnNumberToName(c + 1)
+		return strings.TrimSpace(column + " " + strings.Join(strings.Fields(head[c]), " "))
+	}
+	source := fmt.Sprintf("Tiến độ: %s; kinh phí: %s; đánh giá: %s.", columnLabel(progress), columnLabel(money), columnLabel(evaluation))
+	if selected {
+		source = fmt.Sprintf("Số liệu tuần %d. %s", week, source)
+	} else {
+		source = fmt.Sprintf("Không có cột tiến độ ghi rõ tuần %d; dùng cặp tuần cuối trong tệp. %s", week, source)
 	}
 	cell := func(row tabular.Row, col int) string {
 		if col < 0 || col >= len(row.Cells) {
@@ -159,7 +192,7 @@ func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, e
 				ref, _ := excelize.CoordinatesToCellName(field.col+1, row.Line)
 				formula, err := file.GetCellFormula(sheet, ref)
 				if err != nil {
-					return nil, tabular.ErrFormat
+					return nil, "", tabular.ErrFormat
 				}
 				if formula != "" {
 					r.err = "cột nhập liệu chứa công thức; nhập giá trị số thay cho công thức"
@@ -172,18 +205,19 @@ func weeklyImportRows(data []byte, program string, week int) ([]weeklyFileRow, e
 		result = append(result, r)
 	}
 	if len(result) == 0 {
-		return nil, tabular.ErrEmpty
+		return nil, "", tabular.ErrEmpty
 	}
-	return result, nil
+	return result, source, nil
 }
 
 func makeWeeklyPreview(v WeeklyView, data []byte) (WeeklyPreview, error) {
 	hash := sha256.Sum256(data)
 	p := WeeklyPreview{Version: v.Version, WeekID: v.Report.ID, SHA256: hex.EncodeToString(hash[:]), Rows: []domain.WeeklyIssue{}}
-	rows, err := weeklyImportRows(data, v.Program, v.Report.Number)
+	rows, source, err := weeklyImportRows(data, v.Program, v.Report.Number)
 	if err != nil {
 		return p, problem.Validation.WithField("file", err.Error())
 	}
+	p.SourceColumns = source
 	counts := map[string]int{}
 	for _, row := range rows {
 		counts[tabular.NormalizeHeader(row.name)]++
@@ -400,11 +434,11 @@ func renderWeekly(v WeeklyView, template bool) (Export, error) {
 		}
 	}
 	for _, set := range []func() error{
-		func() error { return f.SetColWidth(sheet, "A", "A", 6) }, func() error { return f.SetColWidth(sheet, "B", "B", 56) },
-		func() error { return f.SetColWidth(sheet, "C", "C", 22) }, func() error { return f.SetColWidth(sheet, "D", "E", 20) },
-		func() error { return f.SetColWidth(sheet, "F", "F", 50) }, func() error { return f.SetColWidth(sheet, "G", "H", 28) },
-		func() error { return f.SetColWidth(sheet, "I", "I", 40) }, func() error { return f.SetRowHeight(sheet, 4, 70) },
-		func() error { return f.SetRowHeight(sheet, 5, 40) },
+		func() error { return tabular.SetColumnWidth(f, sheet, "A", "A", 6) }, func() error { return tabular.SetColumnWidth(f, sheet, "B", "B", 56) },
+		func() error { return tabular.SetColumnWidth(f, sheet, "C", "C", 22) }, func() error { return tabular.SetColumnWidth(f, sheet, "D", "E", 20) },
+		func() error { return tabular.SetColumnWidth(f, sheet, "F", "F", 50) }, func() error { return tabular.SetColumnWidth(f, sheet, "G", "H", 28) },
+		func() error { return tabular.SetColumnWidth(f, sheet, "I", "I", 40) }, func() error { return tabular.SetRowHeight(f, sheet, 4, 70) },
+		func() error { return tabular.SetRowHeight(f, sheet, 5, 40) },
 		func() error {
 			return f.SetPanes(sheet, &excelize.Panes{Freeze: true, YSplit: 5, TopLeftCell: "A6", ActivePane: "bottomLeft"})
 		},

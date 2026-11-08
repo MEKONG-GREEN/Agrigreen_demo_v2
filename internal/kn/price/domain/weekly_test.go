@@ -1,7 +1,10 @@
 package domain
 
 import (
+	"encoding/json"
 	"github.com/shopspring/decimal"
+	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -72,5 +75,21 @@ func TestWeeklyOfficialCatalog284(t *testing.T) {
 	}
 	if groups != 2 {
 		t.Fatal("official two groups")
+	}
+}
+
+func TestWeeklyOfficialCatalogWebParity284(t *testing.T) {
+	raw, err := os.ReadFile("../../../../apps/web-ops/src/api/mock/fixtures/price-weekly-catalog.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture map[string][]WeeklyCatalogItem
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	for _, program := range []string{"information", "training"} {
+		if !slices.Equal(fixture[program], WeeklyCatalog(program)) {
+			t.Fatal("official catalog drift in web mock", program)
+		}
 	}
 }

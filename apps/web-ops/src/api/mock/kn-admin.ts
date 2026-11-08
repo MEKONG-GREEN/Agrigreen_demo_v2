@@ -11,6 +11,8 @@
 // Cấp Xã chưa gán xã → cảnh báo, Admin chỉ gán qua platform_admin, lý do ≥ 10 ký tự, sổ chỉ ghi thêm.
 // ============================================================================
 import { uuidv7 } from "../idempotency";
+import { weeklyAuthorization } from "./kn-price-weekly";
+import type { MockPersona } from "./personas";
 import type { DepartmentRef, KnRole, RoleAssignment, SessionContext } from "@/kn/contract";
 import { NATIONAL_REF, provinceOrgRef } from "./data";
 import { hasRole, json, problem, problemOf, type Ctx, type Route } from "./http";
@@ -18,6 +20,14 @@ import { findKnAccount, KN_ACCOUNTS, KN_DEPARTMENTS, KN_MENU_PROFILE, type MockK
 import { clearMockKnLoginLock, dropSupportContexts, knStoredContext, mockKnLoginLockedUntil, registerKnContext, knMenu } from "./kn";
 import { stableUuid } from "./kn-schedules";
 import { AG_COMMUNES, AG_PROVINCE, AG_REGIONS, communeName, regionName } from "./kn-reports/store";
+
+/** KN-owned authorization that must run before the transport's idempotency cache. */
+export function knBeforeReplay(request: Request, url: URL, persona: MockPersona): Response | null {
+  if (request.method === "POST" && url.pathname.startsWith("/v1/price/weekly-programs/")) {
+    return weeklyAuthorization(request, persona);
+  }
+  return null;
+}
 
 const AG_REF = provinceOrgRef(1);
 const T0 = "2026-08-20T01:30:00Z";
@@ -1171,8 +1181,9 @@ import { pricePointRoutes as route44 } from "./kn-price-points";
 import { priceReportRoutes as route45 } from "./kn-price-reports";
 import { priceSurveyRoutes as route46 } from "./kn-price-surveys";
 import { priceTicketRoutes as route47 } from "./kn-price-tickets";
-import { reportCycleAppRoutes as route48 } from "./kn-reports/routes";
-import { workScheduleAppRoutes as route49 } from "./kn-schedules";
+import { priceWeeklyRoutes as route48 } from "./kn-price-weekly";
+import { reportCycleAppRoutes as route49 } from "./kn-reports/routes";
+import { workScheduleAppRoutes as route50 } from "./kn-schedules";
 
 export function registeredKnRoutes(): RouteRegistration[] {
   return [
@@ -1224,8 +1235,9 @@ export function registeredKnRoutes(): RouteRegistration[] {
   { surface: "app", order: 27, routes: route45 },
   { surface: "app", order: 78, routes: route46 },
   { surface: "app", order: 13, routes: route47 },
-  { surface: "app", order: 6, routes: route48 },
-  { surface: "app", order: 4, routes: route49 },
+  { surface: "app", order: 79, routes: route48 },
+  { surface: "app", order: 6, routes: route49 },
+  { surface: "app", order: 4, routes: route50 },
   ];
 }
 // END GENERATED MOCK ROUTES

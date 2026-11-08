@@ -2,7 +2,7 @@ import { uuidv7 } from "../idempotency";
 import { problem, type Route } from "./http";
 import { personaFromAuthHeader, type MockPersona } from "./personas";
 import { contextProblem, personaForContext } from "./kn";
-import { supportGuard, supportRecord } from "./kn-admin";
+import { knBeforeReplay, supportGuard, supportRecord } from "./kn-admin";
 import { passwordResetMock } from "./password-reset";
 
 // BEGIN GENERATED MOCK ROUTES
@@ -165,6 +165,8 @@ function createMockFetch(routes: Route[], opts: { surface: "app" | "admin"; late
     const badContext = contextProblem(tokenPersona, request.headers.get("X-AG-Context"));
     if (badContext) return badContext;
     const persona = personaForContext(tokenPersona, request.headers.get("X-AG-Context"));
+    const beforeReplay = knBeforeReplay(request, url, persona);
+    if (beforeReplay) return beforeReplay;
     // Bề mặt Admin: mọi route bắt buộc token đã qua yếu tố thứ hai (mục 11).
     if (opts.surface === "admin" && !persona.amr.includes("otp")) return problem(403, "mfa_required", "MFA required");
 

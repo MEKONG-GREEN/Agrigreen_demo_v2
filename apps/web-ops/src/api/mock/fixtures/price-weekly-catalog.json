@@ -1,0 +1,156 @@
+{
+  "training": [
+    {
+      "code": "train_staff",
+      "parent": "",
+      "name": "Tập huấn nâng cao cho cán bộ/viên chức khuyến nông (lớp)",
+      "plan": "7"
+    },
+    {
+      "code": "train_tot",
+      "parent": "",
+      "name": "Tham dự Tập huấn ToT do Trung ương, Viện, Trường tổ chức (người)",
+      "plan": "30"
+    },
+    {
+      "code": "train_community",
+      "parent": "",
+      "name": "Tập huấn viên chức khuyến nông, Tổ KNCĐ (lớp)",
+      "plan": "10"
+    },
+    {
+      "code": "train_farmers",
+      "parent": "",
+      "name": "Tập huấn nông dân chủ chốt (lớp)",
+      "plan": "12"
+    },
+    {
+      "code": "train_local",
+      "parent": "",
+      "name": "Tập huấn theo nhu cầu địa phương (lớp)",
+      "plan": "10"
+    },
+    {
+      "code": "train_exchange",
+      "parent": "",
+      "name": "Học tập, trao đổi kinh nghiệm (cuộc)",
+      "plan": "3"
+    }
+  ],
+  "information": [
+    {
+      "code": "info_ag",
+      "parent": "",
+      "name": "Tuyên truyền với Báo và PTTH An Giang",
+      "plan": ""
+    },
+    {
+      "code": "info_tv",
+      "parent": "info_ag",
+      "name": "Truyền hình (chuyên mục)",
+      "plan": "28"
+    },
+    {
+      "code": "info_sea",
+      "parent": "info_ag",
+      "name": "Câu chuyện kinh tế biển (câu chuyện)",
+      "plan": "4"
+    },
+    {
+      "code": "info_summary",
+      "parent": "info_ag",
+      "name": "Video clip phóng sự tổng kết (clip)",
+      "plan": "1"
+    },
+    {
+      "code": "info_news",
+      "parent": "info_ag",
+      "name": "Trang báo điện tử An Giang (số báo)",
+      "plan": "28"
+    },
+    {
+      "code": "info_nnmt",
+      "parent": "",
+      "name": "Thông tin trên Báo Nông nghiệp và MT",
+      "plan": ""
+    },
+    {
+      "code": "info_nnmt_news",
+      "parent": "info_nnmt",
+      "name": "Bài viết trên trang báo điện tử NNMT",
+      "plan": "7"
+    },
+    {
+      "code": "info_nnmt_video",
+      "parent": "info_nnmt",
+      "name": "Video clip",
+      "plan": "3"
+    },
+    {
+      "code": "info_danviet",
+      "parent": "",
+      "name": "Bài viết trên Báo điện tử Dân Việt",
+      "plan": "4"
+    },
+    {
+      "code": "info_bulletin",
+      "parent": "",
+      "name": "Bản tin số Khuyến nông và thị trường",
+      "plan": "12"
+    },
+    {
+      "code": "info_prices",
+      "parent": "",
+      "name": "Thu thập thông tin giá cả nông sản (phiếu)",
+      "plan": "6552"
+    },
+    {
+      "code": "info_web",
+      "parent": "",
+      "name": "Trang Website Khuyến nông (tin, bài/quý)",
+      "plan": "510"
+    },
+    {
+      "code": "info_youtube",
+      "parent": "",
+      "name": "Short video trên kênh Youtube KN (video)",
+      "plan": "65"
+    },
+    {
+      "code": "info_print",
+      "parent": "",
+      "name": "In tài liệu kỹ thuật (cuốn)",
+      "plan": "2000"
+    },
+    {
+      "code": "info_visits",
+      "parent": "",
+      "name": "Dẫn đoàn tham quan Hội thảo, hội nghị... (chuyến)",
+      "plan": "5"
+    },
+    {
+      "code": "info_talk",
+      "parent": "",
+      "name": "Tọa đàm chuyên đề (tọa đàm)",
+      "plan": "4"
+    },
+    {
+      "code": "info_harvest",
+      "parent": "",
+      "name": "Tổ chức, tham quan ngày hội thu hoạch (cuộc)",
+      "plan": "4"
+    },
+    {
+      "code": "info_skills",
+      "parent": "",
+      "name": "Tập huấn phương pháp, kỹ năng phục vụ công tác TTTT (lớp)",
+      "plan": "3"
+    },
+    {
+      "code": "info_contest",
+      "parent": "",
+      "name": "Hội thi kỹ năng khuyến nông... (hội thi)",
+      "plan": "1"
+    }
+  ]
+}

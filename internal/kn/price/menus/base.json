@@ -6,7 +6,80 @@
       "/bao-gia-lich": "pf/price"
     },
     "menuModules": {
-      "/kn/bao-gia": "pf/price"
+      "/kn/bao-gia": "pf/price",
+      "/kn/chuong-trinh-khuyen-nong": "pf/price"
+    },
+    "deptMenus": {
+      "thong_tin_truyen_thong": {
+        "kn_tinh": [
+          {
+            "Key": "chuong_trinh_khuyen_nong",
+            "Label": "Chương trình khuyến nông",
+            "Items": [
+              {
+                "Key": "tinh.chuong_trinh.thong_tin",
+                "Label": "Chương trình thông tin",
+                "Route": "/kn/chuong-trinh-khuyen-nong/thong-tin",
+                "Icon": "report",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              },
+              {
+                "Key": "tinh.chuong_trinh.dao_tao",
+                "Label": "Đào tạo huấn luyện và hợp tác",
+                "Route": "/kn/chuong-trinh-khuyen-nong/dao-tao-hop-tac",
+                "Icon": "report",
+                "BadgeSource": "",
+                "Requires": null,
+                "ComingSoon": false,
+                "Needs": "",
+                "Children": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "adminDeptBusiness": {
+      "thong_tin_truyen_thong": [
+        {
+          "Key": "tinh.chuong_trinh",
+          "Label": "Chương trình khuyến nông",
+          "Route": "",
+          "Icon": "report",
+          "BadgeSource": "",
+          "Requires": null,
+          "ComingSoon": false,
+          "Needs": "",
+          "Children": [
+            {
+              "Key": "tinh.chuong_trinh.thong_tin",
+              "Label": "Chương trình thông tin",
+              "Route": "/kn/chuong-trinh-khuyen-nong/thong-tin",
+              "Icon": "report",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
+            },
+            {
+              "Key": "tinh.chuong_trinh.dao_tao",
+              "Label": "Đào tạo huấn luyện và hợp tác",
+              "Route": "/kn/chuong-trinh-khuyen-nong/dao-tao-hop-tac",
+              "Icon": "report",
+              "BadgeSource": "",
+              "Requires": null,
+              "ComingSoon": false,
+              "Needs": "",
+              "Children": null
+            }
+          ]
+        }
+      ]
     }
   },
   "replacements": [

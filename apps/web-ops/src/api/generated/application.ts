@@ -24304,6 +24304,8 @@ export interface components {
             valid_rows: number;
             overwrite_rows: number;
             error_rows: number;
+            /** @description Cột tiến độ/kinh phí/đánh giá cùng kỳ đã chọn; nêu rõ fallback khi không có cột tuần khớp. */
+            source_columns: string;
         };
         KHTCReportSection: {
             key: string;

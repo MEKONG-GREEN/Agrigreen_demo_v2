@@ -108,3 +108,8 @@ func WriteSheetsXLSX(w io.Writer, sheets []Sheet) error {
 func SetColumnWidth(file *excelize.File, sheet, first, last string, width int) error {
 	return file.SetColWidth(sheet, first, last, float64(width))
 }
+
+// SetRowHeight applies presentation-only sizing in whole points.
+func SetRowHeight(file *excelize.File, sheet string, row, height int) error {
+	return file.SetRowHeight(sheet, row, float64(height))
+}

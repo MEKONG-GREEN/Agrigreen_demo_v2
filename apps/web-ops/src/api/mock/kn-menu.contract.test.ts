@@ -115,11 +115,16 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     ["T01 · Tiến độ XG", ...(t02 ? ["T02 · Lúa mùa"] : []), "T03 · Phân trà", "T04 · Rau màu", "T05 · Sâu bệnh lúa", "T06 · Sâu bệnh khác", "T07 · Thu hoạch"];
   const V = ["V01 · 3G3T", "V02 · 1P5G", "V03 · CGH", "V04 · CCG", "V05 · Lượng giống", "V06 · Mô hình"];
 
-  it("mọi phòng ban: Điều hành / Báo cáo / Dữ liệu / Dùng chung, không còn nhóm Nghiệp vụ", () => {
+  it("mọi phòng ban giữ nhóm chung; FN-TI-02.13 thêm Chương trình khuyến nông chỉ Tỉnh TTTT", () => {
     for (const c of cases.filter((x) => x.audience !== "admin")) expect(c.menu.groups.map((g) => g.key)).not.toContain("nghiep_vu");
     for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
-      expect(menuOf(`kn_tinh/${code}`).groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "du_lieu", "dung_chung"]);
+      expect(menuOf(`kn_tinh/${code}`).groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "du_lieu", ...(code === "thong_tin_truyen_thong" ? ["chuong_trinh_khuyen_nong"] : []), "dung_chung"]);
     }
+    expect(menuOf("kn_tinh/thong_tin_truyen_thong").groups.find(g => g.key === "chuong_trinh_khuyen_nong")?.items.map(i => [i.key, i.route, i.enabled])).toEqual([
+      ["tinh.chuong_trinh.thong_tin", "/kn/chuong-trinh-khuyen-nong/thong-tin", true],
+      ["tinh.chuong_trinh.dao_tao", "/kn/chuong-trinh-khuyen-nong/dao-tao-hop-tac", true],
+    ]);
+    for (const audience of ["kn_xa", "kn_tw"]) expect(menuOf(`${audience}/thong_tin_truyen_thong`).groups.map(g => g.key)).not.toContain("chuong_trinh_khuyen_nong");
     // KHTC: Cấp Xã không có menu KHTC.
     expect(menuOf("kn_xa/ke_hoach_tai_chinh").groups.map((g) => g.key)).toEqual(["dieu_hanh", "bao_cao", "dung_chung"]);
   });
