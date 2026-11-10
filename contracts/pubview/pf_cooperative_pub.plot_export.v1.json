@@ -6,7 +6,7 @@
   "package": "KN-STANDALONE-5-TT-DATA (#271)",
   "migration": "pf 20261110013753",
   "consumers": [
-    "pf/extension one-time copy migration pf 20261110013755 (runs as ag_migrator per tenant); r_metrics, r_agg through existing published-schema policy; no KN application reader grant"
+    "pf/extension one-time copy migration pf 20261110013755 (runs as ag_migrator per tenant); r_metrics, r_agg through existing published-schema policy; r_extension inherits SELECT through its existing r_cooperative_pub membership but KN application code does not read this view"
   ],
   "purpose": "One-time export of KN plots (FN-XA-03.05) from the HTX module to the KN store under decision D1. Current projection incl. geometry and v7.7 attributes; consumer skips retired rows.",
   "grain": "tenant x plot",
