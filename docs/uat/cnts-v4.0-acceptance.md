@@ -1,7 +1,9 @@
 # Nghiệm thu CNTS v4.0 (BRD 2.0, CR-CNTS-001)
 
+> Tài liệu nghiệm thu theo BRD 2.0 dùng với người dùng: [cnts-v2-acceptance.md](cnts-v2-acceptance.md) (đủ 21 FN, bước kiểm trên app). Tệp này giữ làm bảng bằng chứng kiểm thử tự động theo gói.
+
 Căn cứ duy nhất: BRD CNTS v4.0. Mỗi gói CNTS v4.0 thêm phần FN mình chạm. Kiểm thử tích hợp chạy trên PostgreSQL thật
-(pg-ephemeral); camera, GPS của Mobile là nguồn giả trong kiểm thử.
+(pg-ephemeral); camera, GPS của Mobile, kho định danh, danh mục, đơn vị hành chính là bản giả trong kiểm thử trừ khi ghi khác.
 
 ## FN-12 — Lịch công tác: check-in, check-out kèm ảnh (CNTS-V4-CHECKOUT-PHOTO #249)
 
@@ -53,10 +55,6 @@ go test ./internal/kn/extension/domain/ ./internal/kn/extension/cntsalert/domain
 cd apps/web-ops; npx vitest run src/kn/schedule/
 cd apps/field-app; flutter test test/work_schedule_checkin_test.dart
 ```
-# Nghiệm thu CNTS v4.0 (BRD 2.0)
-
-Đối chiếu theo BRD CNTS v4.0 (CR-CNTS-001). Mỗi gói thêm mục của FN mình chạm; kiểm thử tích hợp chạy trên PostgreSQL thật
-(pg-ephemeral), kho định danh, danh mục, đơn vị hành chính là bản giả trừ khi ghi khác.
 
 ## FN-10 — Danh sách hộ chăn nuôi (CNTS-V4-HOUSEHOLD-LIST #251)
 
@@ -121,7 +119,6 @@ Nguồn và giới hạn: [giả định](../kn/gia-dinh/CNTS-V4-BM11-TYPES.md),
 
 Chưa nghiệm thu ở gói này: lớp trang trại bản đồ (FN-18, CN-6); FN-17 AC-01 (500 người dùng, < 5 giây trên 3G) cần đo tải trên
 môi trường triển khai.
-hộ từ BM-10 (FN-11, #252 — xem mục FN-11 dưới).
 
 ## FN-11 — Báo cáo dịch bệnh BM-10 nhiều hộ (CNTS-V4-OUTBREAK-MULTI #252)
 

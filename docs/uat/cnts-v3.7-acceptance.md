@@ -1,5 +1,7 @@
 # Nghiệm thu CNTS v3.7 — W11.43 / W11.46
 
+> Tài liệu nghiệm thu theo BRD 2.0 dùng với người dùng: [cnts-v2-acceptance.md](cnts-v2-acceptance.md). Tệp này (CNTS v3.7, W11.43–W11.54) giữ làm bảng bằng chứng kiểm thử tự động.
+
 Phạm vi G1: cảnh báo liên biểu, vòng đời xử lý, nhắc nộp biểu CNTS và lịch trực/tiêm/công tác + check-in.
 Nguồn và các giới hạn: [giả định W11.43](../kn/gia-dinh/W11.43.md).
 Các kiểm thử tích hợp dùng PostgreSQL thật; nguồn bài nộp/danh bạ trong kiểm thử

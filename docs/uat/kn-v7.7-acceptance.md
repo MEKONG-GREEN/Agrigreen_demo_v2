@@ -1,5 +1,7 @@
 # Nghiệm thu KN Phòng Trồng trọt v7.7: yêu cầu → kiểm thử
 
+> Tài liệu nghiệm thu theo BRD 2.0 dùng với người dùng: [trong-trot-v2-acceptance.md](trong-trot-v2-acceptance.md) (đủ 25 FN, bước kiểm trên app). Tệp này giữ làm bảng bằng chứng kiểm thử tự động, kịch bản đầu–cuối và phần phi chức năng.
+
 **Khung** lập ngày 01/10/2026 ở gói P8 đợt 1 (nhánh `kn-p8`, từ `sub/kn-v77`), trước khi có mã của P1–P7. Agent các gói điền cột kiểm thử và trạng thái khi làm; P8 đợt 4 (E2E, hiệu năng) và người tích hợp rà lại toàn bảng trước khi nghiệm thu (như [g4-acceptance.md](g4-acceptance.md)). Mỗi yêu cầu có đúng một dòng. Tên kiểm thử ghi vào bảng phải tra được trong mã; tên kiểm thử mới mang mã FN v7.7 (vd `TestFN_TI_02_04_…`, kế hoạch §1.6).
 
 **Cập nhật W11.01 (10/10/2026), sau W3.3/W6.2, theo [đối chiếu BRD KN 10/2026](../kn/doi-chieu-brd-kn-2026-10.md) (Phụ lục C mục T0, C8; Phụ lục D câu 5):**
