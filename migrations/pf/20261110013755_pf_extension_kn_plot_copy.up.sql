@@ -5,7 +5,8 @@
 -- HTX nền tảng → hồ sơ KN loại HTX đang liên kết (htx_ref của phiên bản mới nhất; nhiều hồ sơ thì mã nhỏ nhất);
 -- không có → NULL (thửa chưa gán HTX của KN), HTX cũ giữ ở legacy_cooperative_ref để đối chiếu.
 -- Vai chạy migration (ag_migrator) NOBYPASSRLS, mọi bảng FORCE RLS: chép theo từng tenant (đặt app.tenant_id); danh sách
--- tenant có thửa lấy từ hợp đồng công bố pf_cooperative_pub.v1_plot_export_tenants.
+-- tenant lấy từ đầu chuỗi băm của mọi sổ (shared.chain_head — siêu dữ liệu không RLS; tenant có thửa luôn có sổ ranh giới),
+-- view công bố tự lọc thửa của tenant đang đặt.
 -- Chạy lại được (bỏ qua thửa đã có ở kho KN). Đếm/so trước–sau và quay lui: scripts/kn271-plot-copy/{count,rollback}.sql.
 SET LOCAL lock_timeout = '5s';
 
@@ -14,7 +15,7 @@ DECLARE
   t uuid;
   prev text := current_setting('app.tenant_id', true);
 BEGIN
-  FOR t IN SELECT tenant_id FROM pf_cooperative_pub.v1_plot_export_tenants ORDER BY tenant_id LOOP
+  FOR t IN SELECT DISTINCT tenant_id FROM shared.chain_head ORDER BY tenant_id LOOP
     PERFORM set_config('app.tenant_id', t::text, true);
 
     INSERT INTO pf_extension.kn_plot_version (id, tenant_id, stream_key, plot_ref, event, code, commune_code, boundary_id, geom,

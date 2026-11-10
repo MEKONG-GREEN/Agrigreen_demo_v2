@@ -1,0 +1,129 @@
+{
+  "view": "pf_cooperative_pub.v1_plot_export",
+  "directive": "pf_cooperative_pub.plot_export/v1",
+  "owner": "pf/cooperative",
+  "status": "published",
+  "package": "KN-STANDALONE-5-TT-DATA (#271)",
+  "migration": "pf 20261110013753",
+  "consumers": [
+    "pf/extension one-time copy migration pf 20261110013755 (runs as ag_migrator per tenant); r_metrics, r_agg through existing published-schema policy; no KN application reader grant"
+  ],
+  "purpose": "One-time export of KN plots (FN-XA-03.05) from the HTX module to the KN store under decision D1. Current projection incl. geometry and v7.7 attributes; consumer skips retired rows.",
+  "grain": "tenant x plot",
+  "key": [
+    "tenant_id",
+    "plot_ref"
+  ],
+  "closed_rule": "Current native projection; no history. The copy is idempotent (skips plots already in the KN store).",
+  "personal_data": false,
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "tenant id"
+    },
+    {
+      "name": "plot_ref",
+      "type": "uuid",
+      "nullable": false,
+      "description": "plot ref"
+    },
+    {
+      "name": "code",
+      "type": "text",
+      "nullable": false,
+      "description": "plot code"
+    },
+    {
+      "name": "commune_code",
+      "type": "text",
+      "nullable": false,
+      "description": "commune code"
+    },
+    {
+      "name": "cooperative_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "platform cooperative ref"
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "nullable": false,
+      "description": "status"
+    },
+    {
+      "name": "current_boundary_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "current boundary version id"
+    },
+    {
+      "name": "geom",
+      "type": "geometry(MultiPolygon,4326)",
+      "nullable": false,
+      "description": "current boundary geometry WGS84"
+    },
+    {
+      "name": "area_ha",
+      "type": "numeric(14,4)",
+      "nullable": false,
+      "description": "geodesic area ha"
+    },
+    {
+      "name": "farmer_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "identity vault ref (no name)"
+    },
+    {
+      "name": "lot_name",
+      "type": "text",
+      "nullable": true,
+      "description": "lot name"
+    },
+    {
+      "name": "note",
+      "type": "text",
+      "nullable": true,
+      "description": "note (no phone/national id, checked on write)"
+    },
+    {
+      "name": "declared_area_ha",
+      "type": "numeric(14,4)",
+      "nullable": true,
+      "description": "declared area ha"
+    },
+    {
+      "name": "shape",
+      "type": "text",
+      "nullable": true,
+      "description": "drawing shape"
+    },
+    {
+      "name": "department_code",
+      "type": "text",
+      "nullable": true,
+      "description": "KN department code"
+    },
+    {
+      "name": "created_by",
+      "type": "uuid",
+      "nullable": false,
+      "description": "creator actor ref"
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "nullable": false,
+      "description": "created at"
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "nullable": false,
+      "description": "updated at"
+    }
+  ]
+}

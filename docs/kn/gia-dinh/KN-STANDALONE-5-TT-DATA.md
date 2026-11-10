@@ -9,9 +9,11 @@
     sau sự việc) và bảng chiếu `pf_extension.kn_plot` (RLS tenant, chặn DELETE/TRUNCATE, `sync_seq`). Mã thửa mới `KT0000001…`
     (dải riêng, không trùng `TH…` của thửa đã chép).
   - `20261110013753_pf_cooperative_pub_plot_export`: view công bố `pf_cooperative_pub.v1_plot_export` (chỉ VIEW, chủ
-    ag_migrator NOBYPASSRLS, chỉ cấp `r_cooperative_pub`) — nguồn đọc của lần chép, KN không nhắc bảng riêng của HTX.
+    ag_migrator NOBYPASSRLS, chỉ cấp `r_cooperative_pub`; khai `//ag:pubview`, hợp đồng `contracts/pubview`) — nguồn đọc
+    của lần chép, KN không nhắc bảng riêng của HTX.
   - `20261110013755_pf_extension_kn_plot_copy`: chép MỘT LẦN thửa chưa ngừng dùng theo từng tenant (đặt `app.tenant_id`;
-    danh sách tenant từ đầu chuỗi băm sổ `pf_geo.plot_boundary` ở `shared.chain_head` vì vai migration không bỏ qua RLS).
+    danh sách tenant từ đầu chuỗi băm `shared.chain_head` vì vai migration không bỏ qua RLS; view công bố tự lọc thửa của
+    tenant đang đặt).
     Giữ ref, mã, hình, diện tích, thuộc tính v7.7 (hồ sơ cây trồng `plot-profiles` vẫn khớp). HTX nền tảng → hồ sơ KN loại
     HTX đang liên kết (`htx_ref` của phiên bản mới nhất; nhiều hồ sơ thì mã nhỏ nhất); không có → thửa chưa gán HTX;
     HTX cũ giữ ở `legacy_cooperative_ref` (chỉ đối chiếu). Chạy lại được. Không UPDATE/DELETE, không DROP; bảng HTX giữ nguyên.

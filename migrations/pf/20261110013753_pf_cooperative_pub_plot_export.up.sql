@@ -9,11 +9,5 @@ CREATE VIEW pf_cooperative_pub.v1_plot_export WITH (security_barrier=true) AS
     farmer_ref, lot_name, note, declared_area_ha, shape, department_code, created_by, created_at, updated_at
   FROM pf_coop.plot;
 
--- Tenant có thửa (để bên đọc lần lượt đặt app.tenant_id — vai migration không bỏ qua RLS): đầu chuỗi băm của sổ phiên bản
--- ranh giới thửa (tên sổ giữ 'pf_geo.plot_boundary' từ trước khi dời schema; mỗi thửa có ít nhất một phiên bản ranh giới).
--- shared.chain_head không RLS (chỉ siêu dữ liệu chuỗi băm); view chỉ trả mã tenant.
-CREATE VIEW pf_cooperative_pub.v1_plot_export_tenants WITH (security_barrier=true) AS
-  SELECT DISTINCT tenant_id FROM shared.chain_head WHERE ledger = 'pf_geo.plot_boundary';
-
-REVOKE ALL ON pf_cooperative_pub.v1_plot_export, pf_cooperative_pub.v1_plot_export_tenants FROM PUBLIC;
-GRANT SELECT ON pf_cooperative_pub.v1_plot_export, pf_cooperative_pub.v1_plot_export_tenants TO r_cooperative_pub;
+REVOKE ALL ON pf_cooperative_pub.v1_plot_export FROM PUBLIC;
+GRANT SELECT ON pf_cooperative_pub.v1_plot_export TO r_cooperative_pub;
