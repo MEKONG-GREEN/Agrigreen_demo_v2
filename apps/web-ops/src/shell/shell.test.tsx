@@ -58,7 +58,7 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
     const hrefs = menuLinks(admin).map((l) => l.node.href);
     expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/kn/phong-ban/trong_trot/danh-muc"]));
     // KN-STANDALONE-1-ADMIN-TOOLS (#264): bỏ nhóm "Công cụ nền tảng (tạm)" (BRD 2.0 không có FN); Cơ cấu tổ chức chỉ còn /kn.
-    expect(hrefs.filter((h) => isKnRemovedTool(h))).toEqual([]);
+    expect(hrefs.filter((h) => h !== undefined && isKnRemovedTool(h))).toEqual([]);
     expect(menuLinks(admin).map((l) => l.node.label)).not.toContain("Công cụ nền tảng (tạm)");
     // BF-ACC-KN-MENU (#120, TT-13): Admin KN quản lý người dùng qua /kn/quan-tri/nguoi-dung; bỏ liên kết native cũ.
     expect(hrefs).not.toContain("/quan-tri/tai-khoan");

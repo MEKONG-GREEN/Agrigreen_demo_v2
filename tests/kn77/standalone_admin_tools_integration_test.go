@@ -3,7 +3,7 @@ package kn77_test
 // KN-STANDALONE-1-ADMIN-TOOLS (#264): BRD 2.0 không có FN cho 10 công cụ nền tảng (/quan-tri/{tham-so,to-chuc,mau-bao-cao,
 // xung-dot,giam-sat-dong-bo,khach-hang-api,su-dung-api,bang-ke,nhat-ky-xuat}, /dong-bo). Trên gốc lắp ráp thật:
 //   - Admin KN (vai "admin", cả khi token mang thêm vai realm quản trị nền tảng) gọi API của các màn đó trong ngữ cảnh
-//     phiên KN (X-AG-Context) → 403 accounts.kn_surface_removed, ở cả Application API và Admin API;
+//     phiên KN (X-AG-Context) → 403 extension.surface_removed (cổng route của chủ KN qua pf/accounts), ở cả Application API và Admin API;
 //   - phần hạ tầng KN còn dùng không bị chặn: /v1/orgs/tree (Cơ cấu tổ chức 3 cấp FN-AD-04.02), đọc tham số
 //     /v1/masterdata/params/value, đăng ký thiết bị POST /v1/devices (đồng bộ ngoại tuyến);
 //   - phiên nền tảng (không ngữ cảnh KN) giữ nguyên quyền theo vai realm — không xóa màn/API khỏi nền tảng.
@@ -23,7 +23,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/tests/e2e/harness"
 )
 
-const knSurfaceRemoved = "accounts.kn_surface_removed"
+const knSurfaceRemoved = "extension.surface_removed"
 
 func TestKNStandaloneAdminToolsClosedForKNSession(t *testing.T) {
 	clk := clock.NewFixed(t36)
