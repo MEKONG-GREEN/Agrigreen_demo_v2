@@ -394,10 +394,7 @@ class BoundaryService {
       if (plotId == null && (commune == null || commune.isEmpty)) {
         throw BoundaryException('Chọn xã của thửa trước khi lưu.');
       }
-      rec = await _outbox.enqueue(
-        entity: pushEntity,
-        payload: payload,
-      );
+      rec = await _outbox.enqueue(entity: pushEntity, payload: payload);
     }
     await clearDraft(plotId);
     return rec;
