@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -34,7 +35,8 @@ func TestParseGeometry(t *testing.T) {
 		`null`: CodeInvalidGeometry,
 	} {
 		_, err := ParseGeometry(json.RawMessage(raw))
-		if v, ok := err.(*Violation); !ok || v.Code != code {
+		var v *Violation
+		if !errors.As(err, &v) || v.Code != code {
 			t.Errorf("%.40s → muốn %s, nhận %v", raw, code, err)
 		}
 	}
