@@ -3,7 +3,7 @@ package knattrs_test
 // BF-SRV-KN-ATTRS (#119): hồ sơ KN riêng trên PostgreSQL thật qua module pf/extension (vai r_extension). Kiểm thử đặt
 // ở tests/ (ngoài module KN) vì phải tạo dữ liệu nguồn HTX bằng SQL — mã KN không được nhắc bảng HTX. HTX và thửa
 // được tạo ở bảng nguồn bằng vai quản trị (như dữ liệu HTX có sẵn) và chỉ được KN đọc qua publication
-// pf_party_pub.v1_org_tree, pf_cooperative_pub.v1_plots. Ngữ cảnh phiên KN đi qua middleware X-AG-Context + projection
+// pf_party_pub.v1_org_tree; thửa ở kho KN pf_extension.kn_plot (#271). Ngữ cảnh phiên KN đi qua middleware X-AG-Context + projection
 // phiên của KN (như tests/kn77, sổ vật tư) — không đặt Principal thẳng vào handler.
 
 import (
@@ -117,11 +117,15 @@ func (f *fix) plotRow(tid, ref uuid.UUID, commune string, coop uuid.UUID, status
 	if coop != uuid.Nil {
 		c = coop
 	}
-	f.admin(`INSERT INTO pf_coop.plot (tenant_id, ref, code, commune_code, cooperative_ref, status, current_version,
-	    current_boundary_id, geom, area_ha, source, created_by)
-	  VALUES ($1, $2, $3, $4, $5::uuid, $6, 1, gen_random_uuid(),
-	    ST_Multi(ST_GeomFromText('POLYGON((105 10, 105.001 10, 105.001 10.001, 105 10.001, 105 10))', 4326)), 1.2::numeric, 'kn_web', gen_random_uuid())`,
-		tid, ref, "T"+ref.String()[24:], commune, c, status)
+	// #271: thửa KN ở kho KN (pf_extension.kn_plot); thửa đã ngừng dùng không được chép sang KN nên không có ở đây.
+	if status == "retired" {
+		return
+	}
+	f.admin(`INSERT INTO pf_extension.kn_plot (tenant_id, ref, code, commune_code, cooperative_ref, version, boundary_id, geom, area_ha,
+	    created_by)
+	  VALUES ($1, $2, $3, $4, $5::uuid, 1, gen_random_uuid(),
+	    ST_Multi(ST_GeomFromText('POLYGON((105 10, 105.001 10, 105.001 10.001, 105 10.001, 105 10))', 4326)), 1.2::numeric, gen_random_uuid())`,
+		tid, ref, "T"+ref.String()[24:], commune, c)
 }
 
 // seed: HTX ở xã 31117 (trong phạm vi), 31120 (ngoài phạm vi), HTX ngừng hoạt động, tổ khuyến nông (Nút của Cấp Xã);
@@ -526,8 +530,8 @@ func TestTT11_PlotCropScopeRolesSession(t *testing.T) {
 		want(t, xa.put("/v1/kn/plot-profiles/"+ref, map[string]any{"crop_code": "lua"}), http.StatusNotFound, "extension.kn_attrs_plot_not_found", "ghi "+ref)
 	}
 	want(t, xa.get("/v1/kn/plot-profiles?commune=31120"), http.StatusForbidden, "extension.out_of_scope", "lọc xã khác")
-	want(t, xa.put("/v1/kn/plot-profiles/"+f.plotRet.String(), map[string]any{"crop_code": "lua"}), http.StatusConflict, "extension.kn_attrs_plot_retired", "thửa ngừng dùng")
-	want(t, xa.get("/v1/kn/plot-profiles/"+f.plotRet.String()), http.StatusOK, "", "thửa ngừng dùng vẫn đọc")
+	// #271: thửa ngừng dùng ở module HTX không thuộc kho KN.
+	want(t, xa.put("/v1/kn/plot-profiles/"+f.plotRet.String(), map[string]any{"crop_code": "lua"}), http.StatusNotFound, "extension.kn_attrs_plot_not_found", "thửa ngừng dùng")
 
 	tinh := f.user(f.tenant, authz.KNTinh, dept, "31117", "31120")
 	if g := tinh.get(path); str(g.body, "crop_code") != "lua" {
