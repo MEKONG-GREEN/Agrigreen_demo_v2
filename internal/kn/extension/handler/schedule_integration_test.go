@@ -749,13 +749,13 @@ func TestFN_XA_03_08_ScheduleHTXFromKNRecords(t *testing.T) {
 		}
 		return ref
 	}
-	item := func(coop uuid.UUID) map[string]any {
-		it := sItem("2026-09-22", "morning", "", "", "Làm việc với HTX")
+	item := func(day string, coop uuid.UUID) map[string]any {
+		it := sItem(day, "morning", "", "", "Làm việc với HTX")
 		it["commune_code"], it["cooperative_ref"] = "30001", coop.String()
 		return it
 	}
 	ok := record("30001", "created")
-	d := p.off30001a.must(p.off30001a.saveSched(nextWeek, "draft", nil, item(ok)), http.StatusCreated, "HTX là hồ sơ KN của xã")
+	d := p.off30001a.must(p.off30001a.saveSched(nextWeek, "draft", nil, item("2026-09-22", ok)), http.StatusCreated, "HTX là hồ sơ KN của xã")
 	if got := items(d, "items"); len(got) != 1 || got[0]["cooperative_ref"] != ok.String() {
 		t.Fatalf("mục công tác giữ mã hồ sơ KN: %v", got)
 	}
@@ -764,7 +764,7 @@ func TestFN_XA_03_08_ScheduleHTXFromKNRecords(t *testing.T) {
 		"hồ sơ HTX xã khác":                  record("30002", "created"),
 		"hồ sơ HTX đã ngừng hoạt động":       record("30001", "deactivated"),
 	} {
-		if r := p.off30001a.saveSched("2026-09-28", "draft", nil, item(ref)); r.status != http.StatusUnprocessableEntity || code(r) != "extension.cooperative_invalid" {
+		if r := p.off30001a.saveSched("2026-09-28", "draft", nil, item("2026-09-29", ref)); r.status != http.StatusUnprocessableEntity || code(r) != "extension.cooperative_invalid" {
 			t.Fatalf("%s → 422 extension.cooperative_invalid: %d %v", what, r.status, r.body)
 		}
 	}
