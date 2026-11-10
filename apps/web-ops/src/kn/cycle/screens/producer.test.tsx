@@ -45,7 +45,7 @@ beforeEach(() => {
     setRecordStatus: vi.fn().mockResolvedValue({ ...rec, status: "inactive", version: 4 }),
     updateRecord: vi.fn().mockResolvedValue({ ...rec, version: 4 }),
     coopMachines: vi.fn(),
-    plots: vi.fn(),
+    plots: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
   };
 });
 

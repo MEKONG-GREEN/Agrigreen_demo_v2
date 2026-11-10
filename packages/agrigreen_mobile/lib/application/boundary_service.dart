@@ -159,6 +159,8 @@ class BoundaryService {
     LocalDb? db,
     Future<double> Function()? deviationLimitPct,
     Future<String?> Function()? ownCooperative,
+    this.plotEntity = RefEntity.plot,
+    this.pushEntity = PushEntity.plotBoundary,
   }) : _outbox = outbox,
        _refs = refs,
        _ids = ids,
@@ -177,6 +179,12 @@ class BoundaryService {
 
   /// `source` của payload (pf/geo `domain.Source*`).
   final String source;
+
+  /// Thực thể thửa chiều xuống và bản ghi ranh giới chiều lên. Mặc định của
+  /// module HTX (`plot`, `plot_boundary`); app hiện trường KN dùng kho KN
+  /// (`kn_plot`, `kn_plot_boundary` — KN-STANDALONE-5-TT-DATA #271).
+  final String plotEntity;
+  final String pushEntity;
 
   static String? _coopOf(Map<String, Object?> d) =>
       (d['cooperative_ref'] ?? d['cooperative_id']) as String?;
@@ -205,7 +213,7 @@ class BoundaryService {
     final v = validateBoundary(points);
     if (!v.ok) return BoundaryCheck(v, const []);
     final hits = <OverlapHit>[];
-    for (final p in await _refs.list(RefEntity.plot)) {
+    for (final p in await _refs.list(plotEntity)) {
       if (p.id == plotId) continue;
       final ring = ringFromGeoJson(p.data['boundary'] ?? p.data['geometry']);
       if (ring == null || ring.length < 3) continue;
@@ -228,7 +236,7 @@ class BoundaryService {
   /// Vòng ranh giới của các thửa khác trên máy (vẽ nền khi đang vẽ).
   Future<List<List<GeoPoint>>> otherRings({String? exceptPlotId}) async {
     final out = <List<GeoPoint>>[];
-    for (final p in await _refs.list(RefEntity.plot)) {
+    for (final p in await _refs.list(plotEntity)) {
       if (p.id == exceptPlotId) continue;
       final r = ringFromGeoJson(p.data['boundary'] ?? p.data['geometry']);
       if (r != null && r.length >= 3) out.add(r);
@@ -304,7 +312,7 @@ class BoundaryService {
   }) async {
     final existing = plotId == null
         ? null
-        : await _refs.get(RefEntity.plot, plotId);
+        : await _refs.get(plotEntity, plotId);
     if (existing != null && !await canEdit(existing)) {
       throw BoundaryException(msgPlotNotOwned);
     }
@@ -377,7 +385,7 @@ class BoundaryService {
         );
       }
       rec = await _outbox.correctRemote(
-        entity: PushEntity.plotBoundary,
+        entity: pushEntity,
         supersedesId: boundaryId,
         reason: reason,
         payload: payload,
@@ -387,7 +395,7 @@ class BoundaryService {
         throw BoundaryException('Chọn xã của thửa trước khi lưu.');
       }
       rec = await _outbox.enqueue(
-        entity: PushEntity.plotBoundary,
+        entity: pushEntity,
         payload: payload,
       );
     }
@@ -397,7 +405,7 @@ class BoundaryService {
 
   /// Trạng thái ranh giới của [plotId] theo bản ghi mới nhất trên máy.
   Future<PlotBoundaryStatus> statusOf(String plotId) async {
-    for (final r in await _outbox.list(entity: PushEntity.plotBoundary)) {
+    for (final r in await _outbox.list(entity: pushEntity)) {
       if (r.payload['plot_ref'] != plotId && r.payload['plot_id'] != plotId) {
         continue;
       }
@@ -409,10 +417,10 @@ class BoundaryService {
   /// Ranh giới vẽ trên máy chưa có thửa trên máy chủ (thửa mới chờ đồng bộ,
   /// xung đột hoặc bị từ chối) — hiện trên bản đồ để không vẽ trùng.
   Future<List<OutboxRecord>> localNewPlots() async {
-    final known = {for (final p in await _refs.list(RefEntity.plot)) p.id};
+    final known = {for (final p in await _refs.list(plotEntity)) p.id};
     final seen = <String>{};
     final out = <OutboxRecord>[];
-    for (final r in await _outbox.list(entity: PushEntity.plotBoundary)) {
+    for (final r in await _outbox.list(entity: pushEntity)) {
       final ref = '${r.payload['plot_ref']}';
       if (r.op != RecordOp.create || known.contains(ref) || !seen.add(ref)) {
         continue;
@@ -428,7 +436,7 @@ class BoundaryService {
   /// Bản ghi `plot_boundary` cần người dùng xem lại (xung đột/bị từ chối).
   Future<List<PlotBoundaryStatus>> needingAttention() async => [
     for (final r in await _outbox.list(
-      entity: PushEntity.plotBoundary,
+      entity: pushEntity,
       statuses: {OutboxStatus.conflict, OutboxStatus.rejected},
     ))
       if (r.replacedBy == null) statusOfRecord(r),
@@ -480,7 +488,7 @@ class BoundaryService {
       return _outbox.replaceRejected(originalId: r.id, payload: payload);
     }
     final rec = await _outbox.correctRemote(
-      entity: PushEntity.plotBoundary,
+      entity: pushEntity,
       supersedesId: r.id,
       reason: 'Xác nhận giữ nguyên chồng lấn sau khi kiểm tra thực địa',
       payload: payload,

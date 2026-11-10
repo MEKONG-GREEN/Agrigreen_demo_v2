@@ -259,8 +259,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Scope: pty.ScopeResolver(), Params: md.Params(), Vault: ext.Vault,
 		Files: ev.Files(), CursorKey: cursorKey(ext),
 		Sources: append([]syncport.Source{md.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource(),
-			kn.ReportSyncSource(), fm.SyncSource()}, coop.SyncSources()...), // KN v7.7 P7: report_task, form_layout, report_submission (Cấp Xã ngoại tuyến); W11.42 forms_task
-		Sinks: append([]syncport.Sink{kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink(), kn.ReportSyncSink(), fm.SyncSink()},
+			kn.ReportSyncSource(), fm.SyncSource(), kn.KNPlotSyncSource()}, coop.SyncSources()...), // KN v7.7 P7: report_task, form_layout, report_submission (Cấp Xã ngoại tuyến); W11.42 forms_task
+		Sinks: append([]syncport.Sink{kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink(), kn.ReportSyncSink(), fm.SyncSink(), kn.KNPlotSyncSink()},
 			coop.SyncSinks()...),
 	})
 	nt.UseSyncEntities(snc.PullEntities())               // KN US-SYNC-02: kiểm entities[] của nudge
@@ -394,8 +394,10 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseXaScopes(acc.XaScopes())           // W11.46: viên chức Cấp Xã CNTS của lịch trực KSGM BM-03
 	kn.UseCNTSModelVault(ext.Vault)          // W11.47: chủ hộ mô hình CNTS ở kho định danh
 	kn.UseKNRecordsVault(ext.Vault)          // #67: người đại diện / chủ hộ của hồ sơ KN riêng HTX/Nông hộ/THT
+	kn.UseKNPlotVault(ext.Vault)            // #271: tên nông dân của thửa KN (FN-XA-03.05)
 	wireCNTSDiary(kn, ev, ext.Vault)         // W11.48: ảnh nhật ký nuôi CNTS qua pf/evidence
 	kn.UseCNTSMapGeometry(g.AdminGeometry()) // W11.52: cảnh báo vùng vẽ ngoài địa giới xã (bản đồ CNTS)
+	kn.UseKNPlotGeometry(g.AdminGeometry())  // #271: thửa KN nằm trong địa giới xã
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).
 	ww := waterway.New(unit, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})

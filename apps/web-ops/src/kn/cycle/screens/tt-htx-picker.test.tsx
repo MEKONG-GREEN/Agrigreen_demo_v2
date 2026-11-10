@@ -4,6 +4,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiProblem } from "@/api/problem";
 import { createCollectApi } from "@/kn/cycle/api";
 import { MachinesScreen } from "./DataScreens";
 import { HTX_PICKER_PAGE, currentHtxLabel, htxOptionOf } from "./HtxRecordPicker";
@@ -38,7 +39,7 @@ const plot = {
   code: "TH-01",
   lot_name: "Lô 1",
   commune_code: "91301",
-  cooperative_ref: "htx-001",
+  cooperative_ref: "kn-001", // #271: HTX của thửa là mã hồ sơ KN
   farmer: { label: "Nguyễn V. A." },
   note: null,
   area_ha: "1.2345",
@@ -66,6 +67,11 @@ beforeEach(() => {
     putMachines: vi.fn().mockResolvedValue({ total: 2 }),
     putMachineProfile: vi.fn().mockResolvedValue({ items: [] }),
     plot: vi.fn().mockResolvedValue(plot),
+    record: vi.fn().mockImplementation(async (ref: string) => {
+      const r = [...MANY, UNLINKED_REC].find((x) => x.ref === ref);
+      if (!r) throw new ApiProblem({ type: "about:blank", title: "Không tìm thấy hồ sơ trong phạm vi phụ trách", status: 404, code: "extension.kn_record_not_found" });
+      return r;
+    }),
     plotProfile: vi.fn().mockResolvedValue({ plot_ref: "plot-1", status: "active", crop_code: "LUA", crop_name: "Lúa" }),
     plotLog: vi.fn().mockResolvedValue({ items: [] }),
     plotShapes: vi.fn().mockResolvedValue({ type: "FeatureCollection", features: [] }),
@@ -141,12 +147,12 @@ describe("Máy móc HTX — bộ chọn theo hồ sơ KN (#162)", () => {
   });
 });
 
-describe("Thửa — ô HTX theo hồ sơ KN (#162)", () => {
+describe("Thửa — ô HTX là hồ sơ KN (#271, kho KN)", () => {
   beforeEach(() => {
     params.id = "plot-1";
   });
 
-  it("thửa cũ tham chiếu HTX có hồ sơ KN liên kết: hiện tên hồ sơ; lưu không đổi HTX thì không gửi cooperative_ref", async () => {
+  it("thửa gán hồ sơ KN: hiện tên hồ sơ; lưu không đổi HTX thì không gửi cooperative_ref", async () => {
     const u = userEvent.setup();
     render(<PlotEditScreen />);
     const name = await screen.findByLabelText(/Tên thửa/);
@@ -154,26 +160,40 @@ describe("Thửa — ô HTX theo hồ sơ KN (#162)", () => {
     await u.type(name, " A");
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(auth.collectApi.updatePlot).toHaveBeenCalledWith("plot-1", { lot_name: "Lô 1 A" }));
+    expect(auth.collectApi.record).toHaveBeenCalledWith("kn-001");
   });
 
-  it("thửa cũ tham chiếu HTX chưa có hồ sơ KN: tên HTX đã công bố + \"chưa liên kết hồ sơ KN\"", async () => {
-    auth.collectApi.plot = vi.fn().mockResolvedValue({ ...plot, cooperative_ref: "htx-legacy" });
+  it("hồ sơ HTX chưa liên kết HTX đã công bố vẫn chọn được; hồ sơ ngoài phạm vi báo rõ", async () => {
+    const u = userEvent.setup();
     render(<PlotEditScreen />);
     await screen.findByLabelText(/Tên thửa/);
-    await waitFor(() => expect(htxSelect().selectedOptions[0]!.textContent).toBe("HTX Cũ Nền Tảng — chưa liên kết hồ sơ KN"));
-    expect(auth.collectApi.htxCandidates).toHaveBeenCalledWith("91301");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tải thêm HTX" })).toBeEnabled());
+    await u.click(screen.getByRole("button", { name: "Tải thêm HTX" }));
+    await u.click(screen.getByRole("button", { name: "Tải thêm HTX" }));
+    await waitFor(() => expect(screen.getByRole("option", { name: "HTX Chưa Liên Kết" })).toBeEnabled());
+    await u.selectOptions(htxSelect(), "kn-x");
+    await u.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(auth.collectApi.updatePlot).toHaveBeenCalledWith("plot-1", { cooperative_ref: "kn-x" }));
+    expect(auth.collectApi.htxCandidates).not.toHaveBeenCalled();
   });
 
-  it("đổi HTX sang hồ sơ ở trang sau: gửi htx_ref của hồ sơ đã chọn", async () => {
+  it("thửa gán hồ sơ không còn trong phạm vi: ghi chú rõ", async () => {
+    auth.collectApi.plot = vi.fn().mockResolvedValue({ ...plot, cooperative_ref: "kn-gone" });
+    render(<PlotEditScreen />);
+    await screen.findByLabelText(/Tên thửa/);
+    expect(await screen.findByRole("note")).toHaveTextContent("Hồ sơ HTX đang chọn không còn trong phạm vi phụ trách.");
+  });
+
+  it("đổi HTX sang hồ sơ ở trang sau: gửi mã hồ sơ KN đã chọn", async () => {
     const u = userEvent.setup();
     render(<PlotEditScreen />);
     await screen.findByLabelText(/Tên thửa/);
     await waitFor(() => expect(screen.getByRole("button", { name: "Tải thêm HTX" })).toBeEnabled());
     await u.click(screen.getByRole("button", { name: "Tải thêm HTX" }));
     await waitFor(() => expect(screen.getByRole("option", { name: "HTX Số 075" })).toBeInTheDocument());
-    await u.selectOptions(htxSelect(), "htx-075");
+    await u.selectOptions(htxSelect(), "kn-075");
     await u.click(screen.getByRole("button", { name: "Lưu" }));
-    await waitFor(() => expect(auth.collectApi.updatePlot).toHaveBeenCalledWith("plot-1", { cooperative_ref: "htx-075" }));
+    await waitFor(() => expect(auth.collectApi.updatePlot).toHaveBeenCalledWith("plot-1", { cooperative_ref: "kn-075" }));
   });
 
   it("Cấp Tỉnh chỉ xem (#104): ô HTX khóa, vẫn hiện tên hồ sơ KN; không tìm/tải danh sách, không Lưu", async () => {
@@ -185,6 +205,6 @@ describe("Thửa — ô HTX theo hồ sơ KN (#162)", () => {
     expect(screen.queryByLabelText("Tìm HTX theo tên")).toBeNull();
     expect(screen.queryByRole("button", { name: "Tải thêm HTX" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Lưu" })).toBeNull();
-    expect(auth.collectApi.records!.mock.calls.every(([q]) => (q as { htx_ref?: string }).htx_ref === "htx-001")).toBe(true);
+    expect(auth.collectApi.records).not.toHaveBeenCalled();
   });
 });

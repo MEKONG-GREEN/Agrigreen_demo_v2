@@ -7,6 +7,8 @@
 //   trang đầu ở client — bài học #67). Phạm vi xã do máy chủ lọc theo ngữ cảnh phiên; web chỉ gửi `commune` đang chọn.
 // - Hồ sơ chưa liên kết HTX đã công bố: hiện nhưng không chọn được (khai báo máy/thửa cần HTX đã công bố).
 // - Dữ liệu cũ tham chiếu HTX nền tảng: đối chiếu qua `htx_ref`; không có hồ sơ KN liên kết → "chưa liên kết hồ sơ KN".
+// - KN-STANDALONE-5-TT-DATA (#271): thửa ruộng ở kho KN, HTX của thửa là CHÍNH hồ sơ KN — `valueBy="record"` lấy giá trị
+//   là mã hồ sơ (`ref`), mọi hồ sơ HTX đang hoạt động chọn được, không cần HTX đã công bố. Máy móc vẫn theo `htx_ref`.
 import { useEffect, useId, useRef, useState } from "react";
 import { ApiProblem } from "@/api/problem";
 import { useAuth } from "@/auth/AuthProvider";
@@ -21,9 +23,12 @@ export const HTX_SEARCH_DELAY = 250;
 export const UNLINKED_LABEL = "chưa liên kết hồ sơ KN";
 
 export type HtxOption = { value: string; label: string; disabled?: boolean };
+/** Giá trị của bộ chọn: `htx` = htx_ref (HTX đã công bố), `record` = mã hồ sơ KN loại HTX. */
+export type HtxValueBy = "htx" | "record";
 
 /** Một hồ sơ HTX → mục chọn: giá trị = htx_ref; chưa liên kết HTX đã công bố → mục khóa (giá trị riêng, không gửi đi). */
-export function htxOptionOf(r: Pick<KnProducer, "ref" | "display_name" | "htx_ref" | "status">): HtxOption {
+export function htxOptionOf(r: Pick<KnProducer, "ref" | "display_name" | "htx_ref" | "status">, by: HtxValueBy = "htx"): HtxOption {
+  if (by === "record") return { value: r.ref, label: r.status === "inactive" ? `${r.display_name} (ngừng hoạt động)` : r.display_name };
   if (!r.htx_ref) return { value: `kn:${r.ref}`, label: `${r.display_name} — chưa liên kết HTX đã công bố`, disabled: true };
   return { value: r.htx_ref, label: r.status === "inactive" ? `${r.display_name} (ngừng hoạt động)` : r.display_name };
 }
@@ -87,9 +92,12 @@ export function useHtxRecordPages(commune: string | undefined, q: string, enable
 }
 
 /** Hồ sơ KN loại HTX liên kết `htxRef` (mọi trạng thái, trong phạm vi phiên) — null khi chưa liên kết. */
-export function useLinkedHtxRecord(htxRef: string) {
+export function useLinkedHtxRecord(htxRef: string, by: HtxValueBy = "htx") {
   const { collectApi } = useAuth();
-  return useLoad(htxRef ? () => collectApi.records({ kind: "cooperative", htx_ref: htxRef, status: "all", limit: 1 }).then((r) => r.items[0] ?? null) : null, [htxRef]);
+  const load = by === "record"
+    ? () => collectApi.record(htxRef).then((r): KnProducer | null => r, (e: unknown) => (e instanceof ApiProblem && e.status === 404 ? null : Promise.reject(e)))
+    : () => collectApi.records({ kind: "cooperative", htx_ref: htxRef, status: "all", limit: 1 }).then((r) => r.items[0] ?? null);
+  return useLoad(htxRef ? load : null, [htxRef, by]);
 }
 
 /**
@@ -105,7 +113,9 @@ export function HtxRecordPicker({
   placeholder = "Chọn HTX",
   fallbackName,
   error,
+  valueBy = "htx",
 }: {
+  valueBy?: HtxValueBy;
   label?: string;
   value: string;
   onChange: (htxRef: string) => void;
@@ -119,15 +129,15 @@ export function HtxRecordPicker({
   const id = useId();
   const [q, setQ] = useState("");
   const pages = useHtxRecordPages(commune, q, !disabled);
-  const linked = useLinkedHtxRecord(value);
-  const listed = uniqueOptions(pages.items.map(htxOptionOf));
+  const linked = useLinkedHtxRecord(value, valueBy);
+  const listed = uniqueOptions(pages.items.map((r) => htxOptionOf(r, valueBy)));
   const inList = !!value && listed.some((o) => o.value === value);
   const unlinked = !!value && !linked.loading && !linked.problem && linked.data === null;
   // Chưa liên kết và màn không có tên dự phòng: lấy tên HTX đã công bố (publication, chỉ đọc) của xã.
-  const pub = useLoad(unlinked && !fallbackName && commune ? () => collectApi.htxCandidates(commune).then((r) => r.items.find((x) => x.htx_ref === value)?.name ?? null) : null, [unlinked, fallbackName, commune, value]);
+  const pub = useLoad(valueBy === "htx" && unlinked && !fallbackName && commune ? () => collectApi.htxCandidates(commune).then((r) => r.items.find((x) => x.htx_ref === value)?.name ?? null) : null, [unlinked, fallbackName, commune, value]);
   const current: HtxOption | null = value && !inList ? { value, label: linked.loading ? "Đang đối chiếu hồ sơ KN…" : currentHtxLabel(linked.data, fallbackName ?? pub.data) } : null;
   const options = current ? [current, ...listed] : listed;
-  const hint = unlinked ? `HTX đang chọn ${UNLINKED_LABEL}: thêm hồ sơ HTX ở Dữ liệu › HTX và liên kết HTX đã công bố để đối chiếu.` : null;
+  const hint = unlinked && valueBy === "record" ? "Hồ sơ HTX đang chọn không còn trong phạm vi phụ trách." : unlinked ? `HTX đang chọn ${UNLINKED_LABEL}: thêm hồ sơ HTX ở Dữ liệu › HTX và liên kết HTX đã công bố để đối chiếu.` : null;
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>

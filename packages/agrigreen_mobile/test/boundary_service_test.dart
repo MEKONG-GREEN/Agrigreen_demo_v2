@@ -165,6 +165,54 @@ void main() {
       expect(r.payload.containsKey('cooperative_ref'), isFalse);
     },
   );
+
+  test(
+    '#271: app KN dùng kho KN — kiểm chồng lấn trên kn_plot, ghi kn_plot_boundary',
+    () async {
+      await h.refs.applyPage(
+        PullPage(
+          changes: [
+            PullChange.fromJson({
+              'entity': 'kn_plot',
+              'id': draftPlot,
+              'version': 1,
+              'op': 'upsert',
+              'data': {
+                'ref': draftPlot,
+                'code': 'KT0000001',
+                'commune_code': '31117',
+                'geometry': toGeoJsonPolygon(square(10.2, 105.77, 100)),
+              },
+            }),
+          ],
+          nextCursor: 'c2',
+          hasMore: false,
+        ),
+      );
+      final kn = BoundaryService(
+        outbox: h.outbox,
+        refs: h.refs,
+        ids: h.ids,
+        plotEntity: 'kn_plot',
+        pushEntity: PushEntity.knPlotBoundary,
+      );
+      // Thửa HTX (entity plot) không còn là nền kiểm của app KN; thửa kho KN thì có.
+      expect((await kn.check(square(10.04, 105.77, 100))).overlaps, isEmpty);
+      expect(
+        (await kn.check(square(10.2, 105.77, 100))).overlaps.single.plotId,
+        draftPlot,
+      );
+      final r = await kn.save(
+        points: square(10.3, 105.77, 100),
+        method: BoundaryMethod.map,
+        communeCode: '31117',
+        lotName: 'Lô 1',
+      );
+      expect(r.entity, PushEntity.knPlotBoundary);
+      expect(await kn.localNewPlots(), hasLength(1));
+      expect(await svc.localNewPlots(), isEmpty);
+    },
+  );
 }
 
 BoundaryService _htx(Harness h) => BoundaryService(

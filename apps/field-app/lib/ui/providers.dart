@@ -324,7 +324,7 @@ final homeSummaryProvider = FutureProvider<HomeSummary>((ref) async {
     counts: await s.outbox.counts(),
     status: await s.sync.status(),
     openTasks: await s.tasks.openCount(),
-    plots: await s.refs.count(RefEntity.plot),
+    plots: await s.refs.count(RefEntity.knPlot),
     pendingFiles: (await s.evidence.pending()).length,
     unreadNotifications: await s.inbox.unreadCount(),
     unackedDirectives: await s.directives.unackedCount(),

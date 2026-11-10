@@ -52,6 +52,7 @@ beforeEach(() => {
       household: Array.from({ length: 230 }, (_, i) => household(i + 1)),
     }),
     record: vi.fn().mockResolvedValue({ ...coop(1), log: [] }),
+    plots: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
     htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
   };
 });
