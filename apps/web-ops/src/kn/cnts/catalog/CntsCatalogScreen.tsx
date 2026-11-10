@@ -868,9 +868,9 @@ function useIndicatorThresholds(at: string) {
   }, [at]);
 }
 
-/** Ngưỡng mặc định: theo chỉ tiêu (sinh từ danh mục) + tham số cảnh báo khác (tham số có phiên bản, đặt → duyệt ở "Tham số"). */
+/** Ngưỡng mặc định: theo chỉ tiêu (sinh từ danh mục) + tham số cảnh báo khác (tham số có phiên bản, giá trị BRD nạp sẵn — Q5). */
 function Thresholds({ at }: { at: string }) {
-  const { api, principal } = useAuth();
+  const { api } = useAuth();
   const ind = useIndicatorThresholds(at);
   const s = useLoad(
     () =>
@@ -883,7 +883,6 @@ function Thresholds({ at }: { at: string }) {
       ),
     [at],
   );
-  const setter = hasRole(principal, ROLES.paramSetter);
   const SOURCE = { param: "Tham số đã duyệt", catalog: "Ngưỡng mặc định của danh mục", none: "—" } as const;
   return (
     <>
@@ -891,14 +890,7 @@ function Thresholds({ at }: { at: string }) {
         <Icon name="info" />
         <span>
           Ngưỡng theo chỉ tiêu lấy từ danh mục &quot;Chỉ tiêu theo dõi&quot; (Admin đặt ngưỡng tối thiểu/tối đa ở form chỉ tiêu, có hiệu lực từ
-          ngày áp dụng). Cấp Tỉnh có thể ghi đè bằng tham số có phiên bản cnts.indicator_min/max:&lt;mã&gt; (người đặt ≠ người duyệt) — tham số
-          đã duyệt được ưu tiên.
-          {setter ? (
-            <>
-              {" "}
-              <a href="/quan-tri/tham-so?prefix=cnts.">Đề xuất giá trị mới</a>
-            </>
-          ) : null}
+          ngày áp dụng). Tham số có phiên bản cnts.indicator_min/max:&lt;mã&gt; đã duyệt (nếu có) được ưu tiên.
         </span>
       </div>
       <section aria-label="Ngưỡng theo chỉ tiêu theo dõi">

@@ -104,6 +104,11 @@ func (h Handler) Middleware() gin.HandlerFunc {
 			httpx.Fail(c, err)
 			return
 		}
+		// KN-STANDALONE-1-ADMIN-TOOLS (#264): công cụ nền tảng ngoài BRD 2.0 không mở trong phiên KN (mọi vai, cả Admin).
+		if knRemovedRoute(c.Request.Method, c.FullPath()) {
+			httpx.Fail(c, ErrKNSurfaceRemoved)
+			return
+		}
 		// W11.07: ngữ cảnh chỉ xem (Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) không ghi được ở BẤT KỲ route
 		// nào — chặn tập trung, không trông vào từng module (đổi ngữ cảnh vẫn được).
 		if kc.ViewOnly && isWrite(c.Request.Method) && !viewOnlyExempt[c.FullPath()] {

@@ -56,7 +56,7 @@ func TestFilterMenuGroups(t *testing.T) {
 	}
 	admin := AdminMenu(uuid.Nil, []port.Department{d})
 	got = viewKeys(FilterMenuGroups(admin.Groups, map[string]bool{"pf/reports": true}))
-	if slices.Contains(got, "admin.pb.mau_bao_cao") || slices.Contains(got, "admin.qt.cong_cu.mau_xuat") || !slices.Contains(got, "admin.pb.tong_hop") {
+	if slices.Contains(got, "admin.pb.mau_bao_cao") || !slices.Contains(got, "admin.pb.tong_hop") {
 		t.Fatalf("tắt pf/reports: %v", got)
 	}
 }
@@ -64,7 +64,7 @@ func TestFilterMenuGroups(t *testing.T) {
 // Mọi module mà bảng menu tham chiếu là module per_tenant có thật (modreg).
 func TestMenuModulesArePerTenant(t *testing.T) {
 	routes := []string{"/kn/dashboard", "/kn/bao-cao/chi-cuc", "/kn/du-lieu/may-moc", "/kn/du-lieu/ve-thua", "/kn/phong-ban/x/danh-muc",
-		"/kn/phong-ban/x/mau-bao-cao", "/kn/bao-gia/xa-bao-gia", "/kn/phong-ban/x/bao-gia-lich", "/quan-tri/tham-so", "/quan-tri/xung-dot", "/quan-tri/bang-ke", "/dong-bo"}
+		"/kn/phong-ban/x/mau-bao-cao", "/kn/bao-gia/xa-bao-gia", "/kn/phong-ban/x/bao-gia-lich"}
 	for _, r := range routes {
 		m := domain.MenuModule(r)
 		if !modreg.PerTenant(m) {
