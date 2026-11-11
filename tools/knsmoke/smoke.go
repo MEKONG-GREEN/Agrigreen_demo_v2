@@ -56,10 +56,18 @@ var goneRoutes = []gone{
 	{module: "pf/content", path: "/v1/documents"},
 }
 
-// removed là bề mặt ngoài BRD đã gỡ khỏi KN bởi một gói gỡ ĐÃ có trên dev: route phải trả 404. Gói gỡ gộp sau thêm
-// dòng của mình ở đây (KN-STANDALONE-10B-PROFILE-CI-GATE).
-var removed = []struct{ pkg, path string }{
-	{"KN-STANDALONE-5-TT-DATA (#271)", "/v1/kn/cooperatives"},
+// removed là bề mặt ngoài BRD đã gỡ khỏi KN bởi một gói gỡ ĐÃ có trên dev. Route gỡ hẳn trả 404; route còn dùng ngoài
+// KN bị từ chối trong phiên KN (X-AG-Context) bằng 403 kèm mã. Gói gỡ gộp sau thêm dòng của mình ở đây
+// (KN-STANDALONE-10B-PROFILE-CI-GATE).
+var removed = []struct {
+	pkg, path string
+	status    int
+	code      string // rỗng → không kiểm mã
+}{
+	{"KN-STANDALONE-5-TT-DATA (#271)", "/v1/kn/cooperatives", http.StatusNotFound, ""},
+	{"KN-STANDALONE-1-ADMIN-TOOLS (#264)", "/v1/reports/templates", http.StatusForbidden, "extension.surface_removed"},
+	{"KN-STANDALONE-1-ADMIN-TOOLS (#264)", "/v1/reports/schedules", http.StatusForbidden, "extension.surface_removed"},
+	{"KN-STANDALONE-1-ADMIN-TOOLS (#264)", "/v1/geo/conflicts", http.StatusForbidden, "extension.surface_removed"},
 }
 
 // probe là một lời gọi đọc đại diện cho một FN BRD 2.0 của phòng ban, gọi bằng ngữ cảnh Cấp Tỉnh của phòng đó.
@@ -298,14 +306,6 @@ func Run(ctx context.Context, cfg Config) error {
 		r.check(got.status == http.StatusForbidden && got.code() == "module_not_enabled", "GET "+g.path+" → 403 module_not_enabled ("+g.module+" tắt)", got)
 	}
 
-	for _, x := range removed {
-		got, err := r.do(ctx, false, http.MethodGet, x.path, user, "", nil)
-		if err != nil {
-			return err
-		}
-		r.check(got.status == http.StatusNotFound, "GET "+x.path+" → 404 (đã gỡ bởi "+x.pkg+")", got)
-	}
-
 	// Mỗi phòng: chọn ngữ cảnh, menu của phòng trả về, vài FN đại diện đọc được.
 	for _, dept := range departments {
 		sel, err := r.do(ctx, false, http.MethodPost, "/v1/me/context", user, "", map[string]any{"assignment_id": assignment, "department_code": dept})
@@ -323,6 +323,16 @@ func Run(ctx context.Context, cfg Config) error {
 		}
 		r.check(menu.status == http.StatusOK && str(obj(menu.body, "department"), "code") == dept && len(items(menu.body, "groups")) > 0,
 			"GET /v1/menu phòng "+dept+" trả menu có nhóm", menu)
+		if dept == departments[0] { // bề mặt đã gỡ: kiểm một lần, trong phiên KN
+			for _, x := range removed {
+				got, err := r.do(ctx, false, http.MethodGet, x.path, user, kctx, nil)
+				if err != nil {
+					return err
+				}
+				r.check(got.status == x.status && (x.code == "" || got.code() == x.code),
+					fmt.Sprintf("GET %s → %d %s (đã gỡ bởi %s)", x.path, x.status, x.code, x.pkg), got)
+			}
+		}
 		for _, p := range probes {
 			if p.dept != dept {
 				continue

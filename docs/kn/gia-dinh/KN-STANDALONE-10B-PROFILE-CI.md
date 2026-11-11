@@ -96,9 +96,10 @@ Bằng tài khoản Cấp Tỉnh của tenant mới, token thật của realm `k
 | | FN-07 Quản lý hồ sơ nhân sự | `GET /v1/hrm/staff` |
 | | FN-13 Contact | `GET /v1/contacts/units` |
 
-Kiểm âm cho bề mặt đã gỡ (bảng `removed` của `tools/knsmoke/smoke.go`): lúc gói này gộp `origin/dev` đã có #271
-(KN-STANDALONE-5-TT-DATA) nên kiểm `GET /v1/kn/cooperatives` → 404. #264 (KN-STANDALONE-1-ADMIN-TOOLS) **chưa có** trên
-`dev` nên chưa thêm; ghi ở #310 cùng các gói gỡ gộp sau.
+Kiểm âm cho bề mặt đã gỡ (bảng `removed` của `tools/knsmoke/smoke.go`, gọi trong phiên KN): lúc gói này gộp `origin/dev`
+đã có hai gói gỡ. #271 (KN-STANDALONE-5-TT-DATA): `GET /v1/kn/cooperatives` → 404. #264 (KN-STANDALONE-1-ADMIN-TOOLS):
+`GET /v1/reports/templates`, `/v1/reports/schedules`, `/v1/geo/conflicts` → 403 `extension.surface_removed`.
+Gói gỡ gộp sau thêm dòng của mình (#310).
 
 ### Giới hạn đã biết
 
