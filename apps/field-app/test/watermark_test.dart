@@ -2,13 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:agrigreen_field/application/consent_service.dart';
-import 'package:agrigreen_field/application/task_service.dart';
 import 'package:agrigreen_mobile/data/crypto/envelope.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
 import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
-import 'package:agrigreen_mobile/domain/outbox_record.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:pinenacl/x25519.dart' as nacl;
@@ -34,7 +31,7 @@ class _Camera implements CameraSource {
 }
 
 void main() {
-  group('đồng ý mrv.evidence trước khi thu minh chứng', () {
+  group('watermark ảnh trước khi mã hóa', () {
     late Harness h;
     final sk = nacl.PrivateKey.generate();
     setUp(() async {
@@ -61,9 +58,6 @@ void main() {
     });
     tearDown(() => h.dispose());
 
-    ConsentService consents() =>
-        ConsentService(db: h.db, outbox: h.outbox, clock: h.clock);
-
     PhotoPipeline pipeline(_Camera cam, {Watermarker? wm}) => PhotoPipeline(
       camera: cam,
       location: const FixedLocationSource(
@@ -77,61 +71,10 @@ void main() {
       cipher: EnvelopeCipher(),
       refs: h.refs,
       evidence: h.evidence,
-      consent: consents(),
       watermarker: wm ?? const NoopWatermarker(),
     );
 
-    test('chưa đồng ý → chặn, không mở camera, nêu lý do', () async {
-      final cam = _Camera(greenJpeg());
-      final p = pipeline(cam);
-      expect(await p.blockReason('hh1'), contains('mrv.evidence'));
-      await expectLater(
-        p.capture(subjectRef: 'hh1'),
-        throwsA(isA<ConsentRequiredException>()),
-      );
-      expect(cam.calls, 0);
-      expect(await h.evidence.pending(), isEmpty);
-    });
-
-    test('ghi đồng ý → bản ghi consent đúng SyncConsentPayload; chụp được; rút lại → chặn lại', () async {
-      final rec = await consents().record(
-        subjectRef: 'hh1',
-        status: ConsentStatus.granted,
-      );
-      expect(rec.entity, PushEntity.consent);
-      expect(rec.op, RecordOp.create);
-      expect(rec.payload, {
-        'subject_ref': 'hh1',
-        'purpose': 'mrv.evidence',
-        'text_version': mrvConsentTextVersion,
-        'status': 'granted',
-        'channel': 'field_app',
-      });
-      final cam = _Camera(greenJpeg());
-      expect(await pipeline(cam).blockReason('hh1'), isNull);
-      expect(await pipeline(cam).capture(subjectRef: 'hh1'), isNotNull);
-
-      // Đồng bộ + purge 48 giờ: sổ đồng ý cục bộ vẫn giữ trạng thái.
-      await h.sync.syncOnce();
-      h.clock.advance(const Duration(hours: 49));
-      await h.sync.syncOnce(force: true);
-      expect(await h.outbox.list(entity: PushEntity.consent), isEmpty);
-      expect(await consents().isGranted('hh1', mrvEvidencePurpose), isTrue);
-
-      final w = await consents().record(
-        subjectRef: 'hh1',
-        status: ConsentStatus.withdrawn,
-      );
-      expect(w.op, RecordOp.create); // rút lại = bản ghi mới
-      expect(w.payload['status'], 'withdrawn');
-      await expectLater(
-        pipeline(cam).capture(subjectRef: 'hh1'),
-        throwsA(isA<ConsentRequiredException>()),
-      );
-    });
-
     test('watermark GPS + thời gian được đóng vào ảnh TRƯỚC khi mã hóa; không bản rõ trên đĩa', () async {
-      await consents().record(subjectRef: 'hh1', status: ConsentStatus.granted);
       final jpeg = greenJpeg();
       final out = await pipeline(
         _Camera(jpeg),
@@ -200,32 +143,5 @@ void main() {
     expect(f.existsSync(), isFalse);
     await shredFile(f); // không lỗi khi đã xóa
     await dir.delete(recursive: true);
-  });
-
-  group('SLA nhiệm vụ (US-TASK-02)', () {
-    final now = DateTime.utc(2026, 12, 2, 1);
-    test('đếm ngược, sắp hết hạn, quá hạn, đã xong', () {
-      final ok = slaFor('2026-12-03T01:00:00Z', now);
-      expect(ok.level, SlaLevel.ok);
-      expect(ok.label, 'Còn 1 ngày 0 giờ');
-      final soon = slaFor('2026-12-02T03:30:00Z', now);
-      expect(soon.level, SlaLevel.soon);
-      expect(soon.label, 'Còn 2 giờ 30 phút');
-      final late = slaFor('2026-12-01T23:15:00Z', now);
-      expect(late.level, SlaLevel.overdue);
-      expect(late.label, 'Quá hạn 1 giờ 45 phút');
-      expect(
-        slaFor('2026-12-01T23:15:00Z', now, closed: true).level,
-        SlaLevel.none,
-      );
-      expect(slaFor(null, now).level, SlaLevel.none);
-      expect(slaFor('2026-12-02T01:10:00Z', now).label, 'Còn 10 phút');
-    });
-
-    test('task_update gửi action theo pf/extension', () {
-      expect(TaskStatus.done.action, 'resolved');
-      expect(TaskStatus.inProgress.action, 'progress');
-      expect(TaskStatus.parse('resolved'), TaskStatus.done);
-    });
   });
 }

@@ -1,6 +1,6 @@
 # App hiện trường AgriGreen (`apps/field-app`)
 
-App Flutter ngoại tuyến cho cán bộ khuyến nông xã, quản lý HTX và nông dân (ADR-0010). Nói chuyện với máy chủ theo `docs/dev/sync-contract.md`. Mã hóa ảnh theo `docs/dev/envelope-format.md` (mục 10.2, ADR-0004).
+App Khuyến nông (App KN): app Flutter ngoại tuyến cho cán bộ khuyến nông Cấp Xã (ADR-0010). Bản build chỉ có màn KN theo BRD 2.0 và chỉ gọi route của module KN + hạ tầng KN (KN-STANDALONE-9 #270); quản lý HTX và nông dân dùng `apps/htx-app`. Nói chuyện với máy chủ theo `docs/dev/sync-contract.md`. Mã hóa ảnh theo `docs/dev/envelope-format.md` (mục 10.2, ADR-0004).
 
 - Flutter 3.47 / Dart 3.13.
 - Android 8.0 (API 26) trở lên.
@@ -34,37 +34,28 @@ packages/agrigreen_mobile/lib/
 └── ui/            # chủ đề, widget chung (BigTile, StatusChip, …), OfflineFirstTileProvider
 
 apps/field-app/lib/
-├── domain/        # báo cáo hiện trường
-├── application/   # use case KN: báo cáo, ranh giới, nhiệm vụ (SLA), chỉ đạo, thư viện, đồng ý, minh chứng MRV,
-│                  # danh bạ trực, AppServices (ghép toàn bộ)
+├── domain/        # ngữ cảnh phiên KN, báo cáo theo biểu mẫu, biểu kỳ CNTS, lịch công tác
+├── application/   # use case KN: ngữ cảnh, menu, báo cáo (TT FN-XA-03.02), biểu kỳ CNTS (FN-08/09), thu thập dữ liệu
+│                  # (FN-XA-03.03..03.06), lịch công tác (FN-XA-03.08, CNTS FN-12), AppServices (ghép toàn bộ)
 └── ui/            # Riverpod (MIT) + màn hình
 ```
 
 Quản lý trạng thái dùng Riverpod. `AppController` giữ luồng đăng nhập: đăng nhập trực tuyến → vào thẳng; phiên ngoại tuyến còn hạn (72 giờ) mở thẳng, bảo vệ bằng khóa màn hình của thiết bị. App KN không có PIN (BRD 2.0 FN-CH-00.01, FN-05 — ADR-0057). Đăng xuất đóng CSDL và xóa token.
 
-Màn hình:
-- đăng nhập;
-- trang chủ: trạng thái đồng bộ, số bản ghi chờ, bị từ chối, xung đột, số nhiệm vụ;
-- danh sách thửa;
-- vẽ ranh giới trên bản đồ `flutter_map`: chấm điểm, lấy điểm GPS, cảnh báo chồng lấn;
-- báo cáo hiện trường / nhật ký canh tác;
-- chụp ảnh minh chứng;
-- nhiệm vụ hỗ trợ, đếm ngược SLA (còn/quá hạn, đổi màu dưới 4 giờ);
-- hàng đợi đồng bộ, có nút tạo bản ghi bù, nút "Xác nhận giữ nguyên" cho ranh giới;
-- chuông thông báo + số chưa đọc, hộp thư, mở đúng màn hình theo `deep_link`;
-- chỉ đạo: đọc, xác nhận đã đọc (ngoại tuyến được);
-- thư viện kỹ thuật: "Tài liệu" và "Đã lưu" (lưu/bỏ lưu ngoại tuyến được; tài liệu đã gỡ giữ bản đã tải, nhãn "đã gỡ");
-- ghi nhận đồng ý của nông hộ (`mrv.evidence`) — bắt buộc trước khi chụp ảnh minh chứng;
-- bản đồ ngoại tuyến: tải vùng đang xem, danh sách gói, xóa gói;
-- danh bạ trực (cần mạng): ai đang trực trong phạm vi, cán bộ tỉnh dự phòng; nút "Gọi"/"Nhắn tin" đọc số lúc bấm (`GET /v1/extension/roster/{id}/contact`, không lưu trên máy) rồi mở `tel:`/`sms:`; tự khai "Đang trực"/"Tạm nghỉ" (KN US-DIR-01/02).
+Màn hình (chỉ màn KN theo BRD 2.0; trang chủ cũ và 10 màn ngoài BRD — thửa/ranh giới HTX, minh chứng MRV, chỉ đạo, thư viện, danh bạ trực, báo cáo hiện trường, nhiệm vụ hỗ trợ, đồng ý, hộp thư — đã gỡ khỏi app, #270):
+- đăng nhập; chọn vai trò và phòng ban; **"Không có quyền"** cho tài khoản không có ngữ cảnh KN (chỉ đăng xuất được);
+- trang Cấp Xã: menu từ `GET /v1/menu`, "Công việc cần làm", nhập báo cáo theo biểu mẫu, "Báo cáo của xã";
+- biểu kỳ CNTS, danh mục CNTS ngoại tuyến;
+- thu thập dữ liệu: HTX/nông hộ/tổ hợp tác (hồ sơ KN), máy móc, vẽ thửa ruộng (bản đồ `flutter_map`, gói bản đồ ngoại tuyến), vật tư;
+- lịch công tác tuần, check-in/check-out;
+- hàng đợi đồng bộ, có nút tạo bản ghi bù và nút "Xác nhận giữ nguyên" cho ranh giới.
 
 ### Thông báo và kênh đẩy (pf/notify, ADR-0015)
 
-- **Hộp thư** = entity đồng bộ `notification` (30 ngày; máy tự bỏ bản cũ hơn). Đọc được khi mất mạng.
-- **Đánh dấu đã đọc / đọc hết**, **xác nhận chỉ đạo**, **lưu/bỏ lưu tài liệu** là lệnh POST idempotent. Máy ghi lệnh vào bảng `api_action` (có `seq`), hiện trạng thái ngay, và phát lại theo thứ tự ở mỗi lượt đồng bộ (sau push, trước pull) với `Idempotency-Key = act:<uuid>` cố định → app chết giữa chừng thì gửi lại cùng khóa, máy chủ không làm hai lần. 404/403/422 → bỏ lệnh (không chặn lệnh sau); lỗi mạng/5xx → lùi thử lại.
+- Nội dung thông báo = entity đồng bộ `notification` (30 ngày; máy tự bỏ bản cũ hơn) — dùng để hiện thông báo cục bộ; app không còn màn hộp thư.
 - **FCM chỉ dữ liệu** sau lớp `PushMessaging` (kiểm thử dùng `FakePushMessaging`, không cần Firebase). Chỉ bật khi có `--dart-define=AG_FCM_PROJECT_ID/AG_FCM_APP_ID/AG_FCM_API_KEY/AG_FCM_SENDER_ID`; không dùng `google-services.json`.
   - `{kind: "sync_now"}` → đồng bộ ngay (US-SYNC-02). Đang khóa → bỏ qua; app đồng bộ khi mở khóa.
-  - G2 (hợp đồng, app làm ở đợt 2): `sync_now` có thể mang `entities: "plot,task"` (KN US-SYNC-02) → pull `GET /v1/sync/pull?entities=plot,task`. Bản hiện tại bỏ qua khóa này và pull toàn bộ — vẫn đúng (docs/dev/sync-contract.md).
+  - `sync_now` có thể mang `entities: "kn_plot,report_task"` (KN US-SYNC-02) → pull `GET /v1/sync/pull?entities=…` chỉ các entity đó, giao với danh sách nguồn KN của app (docs/dev/sync-contract.md).
   - `{kind, notification_id}` → pull, rồi hiện thông báo cục bộ (`flutter_local_notifications`). **Tiêu đề "Có thông báo mới"** khi app chưa mở khóa, không ở tiền cảnh, hoặc nội dung chưa về; chỉ hiện tiêu đề thật khi đã mở khóa và đang mở app. `visibility: private` trên Android. Thông điệp khi app tắt/ở nền: CSDL đang khóa nên chỉ hiện thông báo chung.
 - **Token đẩy**: `POST /v1/devices/{device_id}/push-token {provider: fcm, token}` ngay sau đăng ký thiết bị (trong `beforeSync`), mỗi lần mở khóa và khi FCM đổi token. Token chỉ nằm trong CSDL SQLCipher; khóa idempotency chứa băm SHA-256 rút gọn của token, không chứa token.
 
@@ -102,23 +93,11 @@ Màn hình:
 - **Lùi thử lại.** Khi lỗi mạng hoặc lỗi 5xx/429/409-in-progress, máy chờ lâu dần theo lũy thừa: 5 giây × 2ⁿ, tối đa 30 phút, có jitter.
   - Số lần lỗi và thời điểm thử lại lưu trong CSDL, nên sống qua lần khởi động lại.
   - Có mạng trở lại (`connectivity_plus`) thì đồng bộ ngay.
-- **Đồng ý trước minh chứng.** Bản ghi `consent` (`{subject_ref, purpose: mrv.evidence, text_version, status, channel: field_app}`, chỉ `create`; rút lại = bản ghi mới `withdrawn`) và sổ `consent_local` ghi trong **một giao dịch**. Chưa có đồng ý trên máy → không mở camera, hiện lý do và nút ghi nhận đồng ý.
 - **Pull.**
+  - **Chỉ kéo nguồn KN.** Mọi lượt pull gửi `?entities=` = `knPullEntities` (`application/app_services.dart`): `admin_unit`, `catalog_item`, `notification`, `kn_plot`, `report_task`, `form_layout`, `report_submission`, `forms_task`. Không kéo nguồn HTX/MRV/nông dân (`plot`, `season`, `farm_log`, `sop_version`, `mrv_catalog`, `support_request`, `pubkey`) hay nguồn của màn cũ (`task`, `directive`, `document`, `library_item`). `sync_now` có `entities` → giao với danh sách này; trang `reset` nạp lại đúng danh sách này (`SyncService.pullEntities` ở lõi; App HTX/MKG không khai nên vẫn pull tất cả).
   - Mỗi trang và con trỏ mới được áp **trong một giao dịch**. App chết giữa trang thì lần sau pull lại từ con trỏ cũ. Áp lặp vô hại vì máy so `version`.
   - `tombstone` ẩn bản ghi và bỏ dữ liệu khỏi máy.
   - `reset: true` → thay toàn bộ dữ liệu tham chiếu. `400 sync.cursor_invalid` → pull lại từ đầu (một lần).
-  - `pubkey` theo "lượt": `data = {ref, area_code, public_key}`; bản ghi đánh dấu `id = 00000000-…`, `tombstone`, version V → xóa khóa có version < V.
-  - Nông hộ chỉ giữ các trường nhãn: `label`, `display_label`, `code`, `cooperative_id`, `admin_unit_code`, `status`. Họ tên, SĐT, CCCD, địa chỉ bị loại trước khi ghi (mục 10.4).
-- **Báo cáo hiện trường** (`field_report`) theo `ReportPayload`: `sowing_progress` / `growth_pest`, số là chuỗi decimal, kỳ `YYYY-MM` giờ Việt Nam, kiểm như máy chủ trước khi lưu. Bản ghi bù giữ loại/xã/HTX/kỳ (+ vụ/giống).
-- **Minh chứng MRV** (`evidence`) theo `CapturePayload`: biểu mẫu dựng từ danh mục đã duyệt (đệm từ `GET /v1/mrv/catalog`), ghim `catalog_version`, `values` đúng kiểu, `file_refs` = file_ref + sha256 ciphertext, `gps` chuỗi decimal, bắt buộc đồng ý khi có hộ.
-- **Ảnh minh chứng.** Luồng xử lý:
-  1. Chụp ảnh.
-  2. Gắn GPS và thời gian vào metadata.
-  3. Mã hóa phong bì **ngay** bằng khóa công khai của hộ.
-  4. Chỉ ghi ciphertext xuống đĩa (watermark GPS + thời gian được đóng lên ảnh **trong bộ nhớ, trước khi mã hóa**).
-  5. `POST /v1/files` với `Idempotency-Key = file:<id>` và `file_ref = <id>`.
-  6. Khi **mọi** ảnh của biểu mẫu MRV đã tải, trong **một giao dịch**: tạo bản ghi `evidence` (`file_refs`) và đánh dấu biểu mẫu đã xếp hàng. Ảnh hỏng vĩnh viễn → biểu mẫu `blocked`.
-  7. Xóa ciphertext cục bộ.
 
 ## Lệnh
 
@@ -152,17 +131,18 @@ Kiểm thử chính (`test/` của app; tệp đánh dấu *lõi* nằm ở `pac
 | *lõi* `envelope_test.dart`, `envelope_vectors_test.dart` | round-trip, sửa tag, sai khóa; vector Go `nacl/box.SealAnonymous` (`packages/agrigreen_mobile/test/fixtures/go_nacl_vectors.json`); bộ chung `internal/shared/envelope/testdata/vectors.json` (bỏ qua nếu chưa có) |
 | `boundary_test.dart` | ≥3 điểm (A2, tam giác hợp lệ), thẳng hàng, tự cắt, lõm, diện tích ha (sai lệch <1 %), chồng lấn, GeoJSON, chặn/xác nhận chồng lấn |
 | *lõi* `photo_pipeline_test.dart` | không có bản rõ trên đĩa; tải tệp mất phản hồi + crash → một bản ghi evidence |
-| `task_service_test.dart` | nhiệm vụ hỗ trợ: đóng cần kết quả, chuyển tiếp cần ghi chú |
 | *lõi* `big_tile_small_screen_test.dart` | BigTile không tràn trên màn hình nhỏ |
 | *lõi* `http_sync_api_test.dart` | hình dạng request/response theo hợp đồng |
 | *lõi* `http_contract_g1_test.dart` | `X-Device-Id`; push-token; lệnh xếp hàng; `file_ref`; `reset` |
-| `inbox_library_directive_test.dart` | hộp thư: chưa đọc, đã đọc ngoại tuyến → phát lại đúng một lần qua crash, đọc hết, 404 bỏ lệnh, bỏ bản > 30 ngày; deep link; "Đã lưu" (lưu/bỏ lưu, đã gỡ, tombstone); xác nhận chỉ đạo |
+| `inbox_test.dart` | nội dung thông báo (lõi `InboxService`): chưa đọc, đã đọc ngoại tuyến → phát lại đúng một lần qua crash, đọc hết, 404 bỏ lệnh, bỏ bản > 30 ngày; deep link |
 | *lõi* `push_test.dart` | `sync_now`; thông báo cục bộ **không lộ nội dung** khi khóa/nền/chưa về; token khi mở khóa/đổi; không có Firebase; `PushTokenRegistrar` (sau đăng ký, mỗi lần khởi động, lỗi 503 không chặn) |
-| `consent_watermark_test.dart` | chặn chụp khi chưa đồng ý; payload `consent`; rút lại; sổ đồng ý sống qua purge; watermark có trong ảnh đã giải mã; không JPEG bản rõ trên đĩa; `shredFile`; SLA |
+| `watermark_test.dart` | lõi: watermark có trong ảnh đã giải mã; không JPEG bản rõ trên đĩa; `shredFile` |
+| *lõi* `sync_pull_entities_test.dart` | `SyncService.pullEntities`: mọi lượt pull chỉ đòi entity của app; giao với `sync_now.entities`; `reset` không rơi về pull tất cả; không khai → như cũ |
 | *lõi* `tiles_pull_test.dart` | toán tile; giới hạn khung/zoom/diện tích/số tile/dung lượng; tải, đọc lại, tải tiếp, lỗi tile, dừng; pubkey theo lượt; `reset`; `cursor_invalid` |
-| `payload_contract_test.dart` | `field_report`/`evidence` so với fixture JSON rút từ quy tắc Go (`test/fixtures/contract/`); lỗi theo trường như máy chủ; khóa bản ghi bù; biểu mẫu MRV: tải danh mục, đồng ý, 2 ảnh, mất mạng giữa hai ảnh → evidence chỉ tạo khi đủ ảnh |
-| `offline_flow_http_test.dart` | kịch bản tích hợp qua **HTTP thật** tới máy chủ giả `dart:io` (cùng kịch bản với emulator) |
-| `integration_test/app_flow_test.dart` | **emulator** (CI `field-app-emulator`): đăng nhập chế độ kiểm thử → đăng ký thiết bị + token → pull → vẽ thửa khi mất mạng → có mạng + `sync_now` → push accepted → đồng ý + ảnh mã hóa tải lên (mở bằng khóa hộ, có watermark) → thông báo đẩy → đánh dấu đã đọc → chuông |
+| `payload_contract_test.dart` | lõi `domain/mrv.dart`: `evidence` so với fixture JSON rút từ quy tắc Go (`test/fixtures/contract/`); lỗi theo trường như máy chủ |
+| `kn_only_surface_test.dart` | #270: mã app không còn lớp màn cũ và không gọi route HTX/MRV/route cũ; menu chỉ mở màn KN; tài khoản không có ngữ cảnh KN → "Không có quyền" |
+| `offline_flow_http_test.dart` | kịch bản KN qua **HTTP thật** tới máy chủ giả `dart:io` **không có route HTX/MRV** (cùng kịch bản với emulator): chỉ pull nguồn KN, không lời gọi nào nhận 404 |
+| `integration_test/app_flow_test.dart` | **emulator** (CI `field-app-emulator`): đăng nhập chế độ kiểm thử → trang Cấp Xã → đăng ký thiết bị + token → pull nguồn KN → mất mạng: vẽ thửa + gửi báo cáo tuần → có mạng + `sync_now` → push accepted → thông báo đẩy |
 
 ## Ghi chú bảo mật
 

@@ -237,7 +237,7 @@ void main() {
     },
   );
 
-  testWidgets('KN P1 không có phân công KN → giữ màn hình chủ cũ', (
+  testWidgets('KN P1 không có phân công KN → màn "Không có quyền"', (
     tester,
   ) async {
     final env = (await tester.runAsync(_Env.create))!;
@@ -252,7 +252,7 @@ void main() {
       ),
     );
     await settle(tester);
-    expect(find.text('AgriGreen Hiện trường'), findsOneWidget);
+    expect(find.text('Không có quyền'), findsOneWidget);
     expect(find.byType(KnHomeScreen), findsNothing);
     await _finish(tester, env);
   });

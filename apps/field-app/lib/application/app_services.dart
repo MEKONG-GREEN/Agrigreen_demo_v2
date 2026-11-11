@@ -10,9 +10,7 @@ import 'package:agrigreen_mobile/data/actions/action_queue.dart';
 import 'package:agrigreen_mobile/data/auth/device_service.dart';
 import 'package:agrigreen_mobile/data/auth/wipe_service.dart';
 import 'package:agrigreen_mobile/data/catalog/catalog_cache.dart';
-import 'package:agrigreen_mobile/data/crypto/envelope.dart';
 import 'package:agrigreen_mobile/data/db/local_db.dart';
-import 'package:agrigreen_mobile/data/dial/dialer.dart';
 import 'package:agrigreen_mobile/data/files/blob_store.dart';
 import 'package:agrigreen_mobile/data/files/evidence_repository.dart';
 import 'package:agrigreen_mobile/data/map/tile_store.dart';
@@ -31,18 +29,28 @@ import 'package:path/path.dart' as p;
 import 'package:agrigreen_mobile/application/boundary_service.dart';
 
 import 'cnts_period_service.dart';
-import 'consent_service.dart';
-import 'directive_service.dart';
-import 'evidence_service.dart';
-import 'field_report_service.dart';
-import 'library_service.dart';
-import 'roster_service.dart';
-import 'task_service.dart';
 import 'kn_collection_service.dart';
 import 'kn_context_service.dart';
 import 'kn_menu_service.dart';
 import 'kn_report_service.dart';
+import '../domain/cnts_period.dart';
+import '../domain/kn_report.dart';
 import 'work_schedule_service.dart';
+
+/// Nguồn đồng bộ chiều xuống của App KN (KN-STANDALONE-9 #270): chỉ entity của
+/// module KN và hạ tầng KN (danh mục, đơn vị hành chính, thông báo). Không kéo
+/// nguồn HTX/MRV/nông dân (`plot`, `season`, `farm_log`, `sop_version`,
+/// `mrv_catalog`, `support_request`, `pubkey`…) hay nguồn của màn cũ đã gỡ
+/// (`task`, `directive`, `document`, `library_item`).
+const knPullEntities = {
+  RefEntity.catalogItem, // CNTS FN-06: danh mục CNTS ngoại tuyến
+  RefEntity.adminUnit, // TT FN-XA-03.05: chọn xã cho thửa mới
+  RefEntity.notification, // nhắc việc (pf/notify)
+  RefEntity.knPlot, // TT FN-XA-03.05
+  // TT FN-XA-03.02: report_task, form_layout, report_submission
+  ...KnEntity.all,
+  FormsEntity.task, // CNTS FN-08/09: forms_task
+};
 
 /// Phụ thuộc nền tảng, thay được trong kiểm thử.
 class AppPlatform {
@@ -59,8 +67,6 @@ class AppPlatform {
     this.appVersion = '0.1.0',
     this.push = const NoopPushMessaging(),
     this.notifier = const NoopLocalNotifier(),
-    this.watermarker = const ImageWatermarker(),
-    this.dialer = const UrlLauncherDialer(),
   });
 
   final AppConfig config;
@@ -79,10 +85,6 @@ class AppPlatform {
   final String appVersion;
   final PushMessaging push;
   final LocalNotifier notifier;
-  final Watermarker watermarker;
-
-  /// Mở ứng dụng gọi/nhắn tin (tel:/sms:) cho danh bạ trực.
-  final Dialer dialer;
 }
 
 /// Toàn bộ dịch vụ sau khi mở khóa (CSDL đã mở).
@@ -96,20 +98,12 @@ class AppServices {
     required this.evidence,
     required this.wipe,
     required this.sync,
-    required this.photos,
-    required this.reports,
     required this.boundaries,
-    required this.tasks,
     required this.actions,
     required this.inbox,
-    required this.library,
-    required this.directives,
-    required this.consents,
     required this.tiles,
     required this.pushTokens,
     required this.catalogs,
-    required this.mrv,
-    required this.roster,
     required this.schedules,
     required this.knContext,
     required this.knMenu,
@@ -126,22 +120,12 @@ class AppServices {
   final EvidenceRepository evidence;
   final WipeService wipe;
   final SyncService sync;
-  final PhotoPipeline photos;
-  final FieldReportService reports;
   final BoundaryService boundaries;
-  final TaskService tasks;
   final ActionQueue actions;
   final InboxService inbox;
-  final LibraryService library;
-  final DirectiveService directives;
-  final ConsentService consents;
   final TilePackService tiles;
   final PushTokenRegistrar pushTokens;
   final CatalogCache catalogs;
-  final EvidenceService mrv;
-
-  /// Danh bạ trực (trực tuyến; số điện thoại đọc lúc bấm, không lưu máy).
-  final RosterService roster;
 
   /// Lịch công tác tuần (KN v7.7 P5): bản đệm + nháp trên máy, lưu/gửi qua
   /// hàng đợi lệnh.
@@ -191,7 +175,6 @@ class AppServices {
       extraKinds: CntsActionKind.values,
     );
     final pushTokens = PushTokenRegistrar(db, startedAt: pf.clock.now());
-    final consents = ConsentService(db: db, outbox: outbox, clock: pf.clock);
     final catalogs = CatalogCache(db, pf.clock);
     final evidence = EvidenceRepository(db: db, blobs: blobs, clock: pf.clock);
     final wipe = WipeService(
@@ -215,17 +198,14 @@ class AppServices {
       pullLimit: pf.config.pullLimit,
       retention: pf.config.ackRetention,
       actions: actions,
+      pullEntities: knPullEntities,
       beforeSync: () async {
         await devices.ensureRegistered(api, appVersion: pf.appVersion);
         // Sau đăng ký thiết bị: gắn token đẩy (mỗi lần khởi động, khi đổi).
         await pushTokens.flush(api, deviceId);
       },
-      // Danh mục không có entity đồng bộ: tải qua API sau mỗi lượt pull.
-      afterPull: () async {
-        await catalogs.refresh(api);
-        // Lệnh lưu lịch tuần vừa phát lại → tải bản mới, bỏ nháp đã lên máy chủ.
-        await schedules.refreshAfterSync();
-      },
+      // Lệnh lưu lịch tuần vừa phát lại → tải bản mới, bỏ nháp đã lên máy chủ.
+      afterPull: () => schedules.refreshAfterSync(),
     );
     schedules = WorkScheduleService(
       db: db,
@@ -277,18 +257,6 @@ class AppServices {
       clock: pf.clock,
       localTodoCount: knReports.todoCount,
     );
-    final photos = PhotoPipeline(
-      camera: pf.camera,
-      location: pf.location,
-      clock: pf.clock,
-      ids: pf.ids,
-      cipher: EnvelopeCipher(),
-      refs: refs,
-      evidence: evidence,
-      maxBytes: pf.config.maxFileBytes,
-      watermarker: pf.watermarker,
-      consent: consents,
-    );
     return AppServices._(
       platform: pf,
       db: db,
@@ -298,8 +266,6 @@ class AppServices {
       evidence: evidence,
       wipe: wipe,
       sync: sync,
-      photos: photos,
-      reports: FieldReportService(outbox: outbox, clock: pf.clock),
       // #271: thửa KN ở kho KN — đồng bộ kn_plot / kn_plot_boundary.
       boundaries: BoundaryService(
         outbox: outbox,
@@ -309,16 +275,8 @@ class AppServices {
         plotEntity: RefEntity.knPlot,
         pushEntity: PushEntity.knPlotBoundary,
       ),
-      tasks: TaskService(outbox: outbox, refs: refs),
       actions: actions,
       inbox: InboxService(refs: refs, actions: actions, clock: pf.clock),
-      library: LibraryService(refs: refs, actions: actions),
-      directives: DirectiveService(
-        refs: refs,
-        actions: actions,
-        clock: pf.clock,
-      ),
-      consents: consents,
       tiles: TilePackService(
         store: TileStore(db),
         urlTemplate: pf.config.tileUrlTemplate,
@@ -327,16 +285,6 @@ class AppServices {
       ),
       pushTokens: pushTokens,
       catalogs: catalogs,
-      mrv: EvidenceService(
-        catalogs: catalogs,
-        evidence: evidence,
-        photos: photos,
-        location: pf.location,
-        consent: consents,
-        clock: pf.clock,
-        ids: pf.ids,
-      ),
-      roster: RosterService(api: api, dialer: pf.dialer, ids: pf.ids),
       schedules: schedules,
       knContext: knContext,
       knMenu: knMenu,

@@ -1,3 +1,4 @@
+import 'package:agrigreen_mobile/application/boundary_service.dart';
 import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
 import 'package:agrigreen_mobile/domain/outbox_record.dart';
 import 'package:agrigreen_mobile/ui/theme.dart';
@@ -5,14 +6,53 @@ import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/field_report_service.dart';
 import '../providers.dart';
-import 'field_report_screen.dart' show reportSummary;
-import 'plots_screen.dart' show confirmBoundary;
 
 final queueProvider = FutureProvider.autoDispose<List<OutboxRecord>>(
   (ref) => servicesOf(ref).outbox.list(limit: 300),
 );
+
+/// Xác nhận giữ nguyên chồng lấn/lệch diện tích sau phản hồi của máy chủ.
+Future<void> confirmBoundary(
+  BuildContext context,
+  WidgetRef ref,
+  PlotBoundaryStatus st,
+) async {
+  final r = st.record;
+  if (r == null) return;
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Xác nhận giữ nguyên ranh giới'),
+      content: Text(
+        'Máy chủ báo ranh giới chồng lấn với thửa cùng HTX/thửa nháp hoặc lệch '
+        'diện tích khai báo${st.detail == null ? '' : ' (${st.detail})'}. '
+        'Bạn đã kiểm tra thực địa và xác nhận giữ nguyên?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Để sau'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Xác nhận'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  try {
+    final s = ref.services;
+    await s.boundaries.confirmAfterServer(r);
+    s.sync.syncOnce(force: true).ignore();
+    if (context.mounted) {
+      showMessage(context, 'Đã gửi xác nhận. Chờ đồng bộ.');
+    }
+  } on BoundaryException catch (e) {
+    if (context.mounted) showMessage(context, e.message, error: true);
+  }
+}
 
 /// Hàng đợi đồng bộ: bản ghi chờ gửi, đã gửi (giữ 48 giờ), xung đột, bị từ chối.
 class SyncQueueScreen extends ConsumerWidget {
@@ -100,12 +140,6 @@ class _RecordCard extends ConsumerWidget {
           originalId: record.id,
           payload: {...record.payload, 'note': note.text},
         );
-      } else if (record.entity == PushEntity.fieldReport) {
-        await s.reports.correct(
-          original: record,
-          reason: reason.text,
-          note: note.text,
-        );
       } else {
         await s.outbox.correct(
           originalId: record.id,
@@ -117,8 +151,6 @@ class _RecordCard extends ConsumerWidget {
       ref.invalidate(queueProvider);
     } on OutboxException catch (e) {
       if (context.mounted) showMessage(context, e.message, error: true);
-    } on FieldReportError catch (e) {
-      if (context.mounted) showMessage(context, e.reason, error: true);
     }
   }
 
@@ -141,9 +173,6 @@ class _RecordCard extends ConsumerWidget {
         (r.status == OutboxStatus.rejected ||
             r.status == OutboxStatus.sent ||
             r.status == OutboxStatus.conflict);
-    final activity = r.entity == PushEntity.fieldReport
-        ? reportSummary(r.payload)
-        : null;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -154,7 +183,7 @@ class _RecordCard extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '${entityLabel(r.entity)}${activity != null ? ' · $activity' : ''}',
+                    entityLabel(r.entity),
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,

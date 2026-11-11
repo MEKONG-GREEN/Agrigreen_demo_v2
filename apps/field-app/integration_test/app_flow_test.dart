@@ -2,18 +2,18 @@ import 'dart:io';
 
 import 'package:agrigreen_field/application/app_services.dart';
 import 'package:agrigreen_field/ui/app.dart';
+import 'package:agrigreen_field/ui/kn/kn_home_screen.dart';
 import 'package:agrigreen_field/ui/providers.dart';
-import 'package:agrigreen_field/ui/screens/home_screen.dart';
 import 'package:agrigreen_mobile/core/clock.dart';
 import 'package:agrigreen_mobile/core/config.dart';
 import 'package:agrigreen_mobile/core/ids.dart';
 import 'package:agrigreen_mobile/data/crypto/envelope.dart';
 import 'package:agrigreen_mobile/data/db/sqlcipher_opener.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
 import 'package:agrigreen_mobile/data/push/push_messaging.dart';
 import 'package:agrigreen_mobile/data/secure/secure_store.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -27,7 +27,13 @@ import 'support/scenario.dart';
 /// SQLCipher thật, Keystore thật (flutter_secure_storage), giao diện thật;
 /// máy chủ API giả chạy ngay trong tiến trình kiểm thử (dart:io, 127.0.0.1).
 /// OIDC ở chế độ kiểm thử (không có Keycloak); FCM/thông báo cục bộ là bản giả
-/// sau lớp trừu tượng.
+/// sau lớp trừu tượng. Máy chủ giả là profile chỉ-KN: không có route HTX/MRV
+/// (KN-STANDALONE-9 #270).
+class _NoCamera implements CameraSource {
+  @override
+  Future<CapturedImage?> capture() async => null;
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -43,11 +49,10 @@ void main() {
     }
   }
 
-  testWidgets('đăng nhập (chế độ kiểm thử) → đồng bộ ngoại tuyến đầu–cuối', (
-    tester,
-  ) async {
+  testWidgets('đăng nhập (chế độ kiểm thử) → trang Cấp Xã → đồng bộ KN ngoại '
+      'tuyến đầu–cuối, máy chủ không có route HTX/MRV', (tester) async {
     final server = await MockApiServer.start();
-    final sk = seedServer(server);
+    seedServer(server);
     final store = FlutterSecureStore();
     await store.deleteAll();
     final support = await getApplicationSupportDirectory();
@@ -74,7 +79,7 @@ void main() {
         deviceId: deviceId,
         timeout: const Duration(seconds: 5),
       ),
-      camera: GeneratedJpegCamera(),
+      camera: _NoCamera(),
       location: const FixedLocationSource(
         LocationResult(
           GpsStatus.ok,
@@ -98,29 +103,26 @@ void main() {
     // Đăng nhập chế độ kiểm thử → vào thẳng (không có PIN — BRD 2.0 FN-CH-00.01, ADR-0057).
     await pumpUntil(tester, find.text('Đăng nhập'));
     await tester.tap(find.text('Đăng nhập'));
-    await pumpUntil(tester, find.byType(HomeScreen));
+    // Một phân công KN → vào thẳng trang Cấp Xã với menu từ GET /v1/menu.
+    await pumpUntil(tester, find.byType(KnHomeScreen));
 
     final container = ProviderScope.containerOf(
-      tester.element(find.byType(HomeScreen)),
+      tester.element(find.byType(KnHomeScreen)),
     );
     final services = container.read(appControllerProvider).services!;
     // Khóa SQLCipher dạng raw key nằm trong Keystore.
     expect(await store.read(SecureKeys.dbKey), hasLength(64));
 
     try {
-      await runOfflineFieldScenario(
+      await runOfflineKnScenario(
         s: services,
         server: server,
-        householdKey: sk,
         fcm: fcm,
         notes: notes,
         tick: () => tester.pump(const Duration(milliseconds: 100)),
       );
-      // Chuông hiện số chưa đọc; mở hộp thư bằng chạm.
-      container.invalidate(homeSummaryProvider);
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.byIcon(Icons.notifications).first);
-      await pumpUntil(tester, find.text('Tài liệu mới: phòng trừ rầy nâu'));
+      // Công việc báo cáo đã pull hiện ở trang "Công việc cần làm".
+      await pumpUntil(tester, find.textContaining('Tiến độ xuống giống lúa'));
     } finally {
       await server.close();
     }

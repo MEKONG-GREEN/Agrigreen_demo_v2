@@ -1,9 +1,18 @@
-import 'field_report.dart' show containsPii, vietnamTime;
-
 /// Lịch công tác tuần (KN v7.7 FN-XA-03.08, OpenAPI `ExtWorkSchedule*`).
 ///
 /// Ngày nghiệp vụ tính theo giờ Việt Nam (UTC+7, không giờ mùa hè). Ngày
 /// trong lịch là `DateTime.utc(y, m, d)` (chỉ phần ngày), dạng dây `YYYY-MM-DD`.
+library;
+
+// `domain.phoneRe`, `domain.nationalIDRe` (task.go): ghi chú không chứa SĐT/CCCD.
+final _phoneRe = RegExp(r'(?:\+?84|\b0)[\s.-]?(?:\d[\s.-]?){8,9}\d\b');
+final _nationalIdRe = RegExp(r'\b\d{12}\b');
+
+/// Ghi chú có SĐT hoặc số CCCD (máy chủ từ chối: `ErrPIIInText`).
+bool containsPii(String s) => _phoneRe.hasMatch(s) || _nationalIdRe.hasMatch(s);
+
+/// Giờ Việt Nam (UTC+7, không có giờ mùa hè) — kỳ báo cáo và ngày nghiệp vụ.
+DateTime vietnamTime(DateTime t) => t.toUtc().add(const Duration(hours: 7));
 
 // ---------------------------------------------------------------- tuần
 

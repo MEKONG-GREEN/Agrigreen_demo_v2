@@ -7,8 +7,8 @@ import '../application/kn_context_service.dart';
 import 'kn/kn_context_picker_screen.dart';
 import 'kn/kn_home_screen.dart';
 import 'providers.dart';
-import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/no_access_screen.dart';
 
 class FieldApp extends StatelessWidget {
   const FieldApp({super.key});
@@ -44,13 +44,14 @@ class _AuthGate extends ConsumerWidget {
             ? const LoginScreen()
             : switch (st.kn?.stage) {
                 // KN v7.7: nhiều (vai trò, phòng ban) → chọn; có ngữ cảnh →
-                // trang Cấp Xã; tài khoản không có phân công KN → màn cũ.
+                // trang Cấp Xã; tài khoản không có ngữ cảnh KN → màn
+                // "Không có quyền" (#270: App KN chỉ có màn BRD 2.0).
                 KnContextStage.picker => KnContextPickerScreen(
                   choices: st.kn!.choices,
                   message: st.kn!.message,
                 ),
                 KnContextStage.ready => const KnHomeScreen(),
-                _ => const HomeScreen(),
+                _ => const NoKnAccessScreen(),
               },
     };
   }

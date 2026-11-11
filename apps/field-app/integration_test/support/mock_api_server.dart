@@ -14,12 +14,19 @@ class ReceivedFile {
   final String idempotencyKey;
 }
 
-/// Application API giả chạy **trong tiến trình kiểm thử** (dart:io HttpServer
-/// trên 127.0.0.1) — dùng cho kiểm thử tích hợp trên emulator và kiểm thử
-/// HTTP thật trên Dart VM. Hành vi theo docs/dev/sync-contract.md:
+/// Application API giả của **profile chỉ-KN** chạy trong tiến trình kiểm thử
+/// (dart:io HttpServer trên 127.0.0.1) — dùng cho kiểm thử tích hợp trên
+/// emulator và kiểm thử HTTP thật trên Dart VM. Chỉ có route của module KN và
+/// hạ tầng KN (KN-STANDALONE-9 #270): KHÔNG có route HTX/MRV (`/v1/mrv/*`,
+/// `/v1/cooperatives`, `/v1/cropcycle/*`) hay route cũ ngoài BRD 2.0
+/// (`/v1/extension/{directives,tasks,roster,field-reports}`, `/v1/documents`);
+/// lời gọi tới đó nhận 404 và được ghi vào [notFound]. Hành vi theo
+/// docs/dev/sync-contract.md:
+/// - ngữ cảnh phiên KN: `GET /v1/me/contexts`, `POST /v1/me/context`; menu
+///   `GET /v1/menu`, số đếm `GET /v1/extension/report-badges`;
 /// - đăng ký thiết bị, mọi lời gọi đồng bộ bắt buộc `X-Device-Id` đã đăng ký;
 /// - push theo lô, chống trùng theo `idem_key`, kết quả từng bản ghi;
-/// - pull theo cursor; lệnh idempotent theo `Idempotency-Key`;
+/// - pull theo cursor, lọc theo `?entities=`;
 /// - `POST /v1/files` multipart (meta, blob, file_ref), kiểm SHA-256.
 ///
 /// [offline] = true: đóng kết nối ngay (máy thấy lỗi mạng).
@@ -45,12 +52,19 @@ class MockApiServer {
   final ledger = <String, Map<String, Object?>>{};
   final _batchResponses = <String, String>{};
   final files = <String, ReceivedFile>{};
-  final actions = <String, String>{}; // Idempotency-Key → path
   final requests = <String>[];
-  int pullCalls = 0;
 
-  /// Danh mục trường MRV đã duyệt (GET /v1/mrv/catalog?evidence_type=).
-  final mrvCatalogs = <String, Map<String, Object?>>{};
+  /// Lời gọi tới route không có ở profile chỉ-KN (đã trả 404).
+  final notFound = <String>[];
+
+  /// `?entities=` của từng lượt pull (null = máy đòi mọi entity).
+  final pullEntities = <List<String>?>[];
+
+  /// Phân công KN của tài khoản (`GET /v1/me/contexts`).
+  var assignments = <Map<String, Object?>>[];
+
+  /// Menu Cấp Xã (`GET /v1/menu`).
+  var menu = <String, Object?>{'groups': <Object?>[]};
 
   /// Danh mục masterdata (GET /v1/masterdata/catalogs/{catalog}).
   final masterdata = <String, List<Map<String, Object?>>>{};
@@ -118,10 +132,34 @@ class MockApiServer {
           return await _problem(req, 403, 'sync.device_unregistered');
         }
       }
-      if (req.method == 'GET' && path == '/v1/mrv/catalog') {
-        final c = mrvCatalogs[req.uri.queryParameters['evidence_type']];
-        if (c == null) return await _problem(req, 404, 'mrv.catalog_not_found');
-        return await _json(req, 200, c);
+      if (req.method == 'GET' && path == '/v1/me/contexts') {
+        return await _json(req, 200, {'assignments': assignments});
+      }
+      if (req.method == 'POST' && path == '/v1/me/context') {
+        final j = jsonDecode(utf8.decode(body)) as Map;
+        final a = assignments.firstWhere(
+          (a) => a['assignment_id'] == j['assignment_id'],
+        );
+        return await _json(req, 201, {
+          'context_id': 'ctx-${j['assignment_id']}',
+          'assignment_id': j['assignment_id'],
+          'role': a['role'],
+          'department_code': j['department_code'],
+          'department_name': 'Trồng trọt',
+          'org_ref': null,
+          'org_name': a['org_name'],
+          'communes': a['communes'],
+          'default_route': '/kn/nhiem-vu/cong-viec',
+          'expires_at': '2099-01-01T00:00:00Z',
+          'support_session_id': null,
+          'on_behalf_of': null,
+        });
+      }
+      if (req.method == 'GET' && path == '/v1/menu') {
+        return await _json(req, 200, menu);
+      }
+      if (req.method == 'GET' && path == '/v1/extension/report-badges') {
+        return await _json(req, 200, {'counts': <String, int>{}});
       }
       final md = RegExp(r'^/v1/masterdata/catalogs/([a-z_]+)$')
           .firstMatch(path);
@@ -133,14 +171,18 @@ class MockApiServer {
         return await _json(req, 200, {'items': items, 'next_cursor': null});
       }
       if (req.method == 'GET' && path == '/v1/sync/pull') {
-        pullCalls++;
+        final only = req.uri.queryParameters['entities']?.split(',');
+        pullEntities.add(only);
         final cur = int.tryParse(req.uri.queryParameters['cursor'] ?? '') ?? 0;
         final limit =
             int.tryParse(req.uri.queryParameters['limit'] ?? '') ?? 500;
         final page = _changes.skip(cur).take(limit).toList();
         final next = cur + page.length;
         return await _json(req, 200, {
-          'changes': page,
+          'changes': [
+            for (final c in page)
+              if (only == null || only.contains(c['entity'])) c,
+          ],
           'next_cursor': '$next',
           'has_more': next < _changes.length,
           'server_time': DateTime.now().toUtc().toIso8601String(),
@@ -174,24 +216,6 @@ class MockApiServer {
           if (ledger.containsKey(key)) {
             results.add({'id': r['id'], 'status': 'duplicate'});
             continue;
-          }
-          if (r['entity'] == 'evidence') {
-            final p = r['payload']! as Map;
-            final refs = ((p['file_refs'] as List?) ?? const [])
-                .cast<Map<String, Object?>>();
-            if (refs.isEmpty ||
-                refs.any(
-                  (f) =>
-                      files[f['file_ref']]?.meta['sha256_ciphertext'] !=
-                      f['sha256'],
-                )) {
-              results.add({
-                'id': r['id'],
-                'status': 'rejected',
-                'code': 'mrv.file_not_found',
-              });
-              continue;
-            }
           }
           ledger[key] = r;
           results.add({'id': r['id'], 'status': 'accepted'});
@@ -228,16 +252,7 @@ class MockApiServer {
           'size': blob.length,
         });
       }
-      if (req.method == 'POST' &&
-          (path.startsWith('/v1/notifications') ||
-              path.startsWith('/v1/extension/directives/') ||
-              path.startsWith('/v1/documents/'))) {
-        if (idem == null) {
-          return await _problem(req, 400, 'idempotency_required');
-        }
-        actions.putIfAbsent(idem, () => path);
-        return await _json(req, 200, {'ok': true});
-      }
+      notFound.add('${req.method} $path');
       return await _problem(req, 404, 'not_found');
     } catch (e) {
       return await _problem(req, 500, 'internal_error');

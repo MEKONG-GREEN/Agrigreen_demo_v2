@@ -4,8 +4,6 @@ import 'package:agrigreen_mobile/application/auth_flow.dart';
 import 'package:agrigreen_mobile/application/push_coordinator.dart';
 import 'package:agrigreen_mobile/data/auth/oidc_client.dart';
 import 'package:agrigreen_mobile/data/auth/session_service.dart';
-import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
-import 'package:agrigreen_mobile/data/reference/reference_repository.dart';
 import 'package:agrigreen_mobile/data/sync/sync_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
@@ -46,7 +44,7 @@ final pushCoordinatorProvider = Provider<PushCoordinator>((ref) {
   return c;
 });
 
-/// Đường dẫn trong app chờ mở (từ thông báo được chạm). HomeScreen tiêu thụ.
+/// Đường dẫn trong app chờ mở (từ thông báo được chạm).
 class PendingDeepLink extends Notifier<String?> {
   @override
   String? build() => null;
@@ -286,49 +284,8 @@ AppServices servicesOf(Ref ref) {
   return s;
 }
 
-class HomeSummary {
-  const HomeSummary({
-    required this.counts,
-    required this.status,
-    required this.openTasks,
-    required this.plots,
-    required this.pendingFiles,
-    this.unreadNotifications = 0,
-    this.unackedDirectives = 0,
-    this.pendingActions = 0,
-    this.boundaryAttention = 0,
-  });
-  final OutboxCounts counts;
-  final SyncStatus status;
-  final int openTasks;
-  final int plots;
-  final int pendingFiles;
-  final int unreadNotifications;
-  final int unackedDirectives;
-  final int pendingActions;
-
-  /// Ranh giới xung đột/bị từ chối chưa xử lý.
-  final int boundaryAttention;
-}
-
 /// Làm mới khi trạng thái đồng bộ đổi.
 final syncStatusStreamProvider = StreamProvider<SyncStatus>((ref) {
   final s = servicesOf(ref);
   return s.sync.statusStream;
-});
-
-final homeSummaryProvider = FutureProvider<HomeSummary>((ref) async {
-  ref.watch(syncStatusStreamProvider);
-  final s = servicesOf(ref);
-  return HomeSummary(
-    counts: await s.outbox.counts(),
-    status: await s.sync.status(),
-    openTasks: await s.tasks.openCount(),
-    plots: await s.refs.count(RefEntity.knPlot),
-    pendingFiles: (await s.evidence.pending()).length,
-    unreadNotifications: await s.inbox.unreadCount(),
-    unackedDirectives: await s.directives.unackedCount(),
-    pendingActions: await s.actions.pendingCount(),
-    boundaryAttention: (await s.boundaries.needingAttention()).length,
-  );
 });
