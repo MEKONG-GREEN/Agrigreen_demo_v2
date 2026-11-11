@@ -56,6 +56,12 @@ var goneRoutes = []gone{
 	{module: "pf/content", path: "/v1/documents"},
 }
 
+// removed là bề mặt ngoài BRD đã gỡ khỏi KN bởi một gói gỡ ĐÃ có trên dev: route phải trả 404. Gói gỡ gộp sau thêm
+// dòng của mình ở đây (KN-STANDALONE-10B-PROFILE-CI-GATE).
+var removed = []struct{ pkg, path string }{
+	{"KN-STANDALONE-5-TT-DATA (#271)", "/v1/kn/cooperatives"},
+}
+
 // probe là một lời gọi đọc đại diện cho một FN BRD 2.0 của phòng ban, gọi bằng ngữ cảnh Cấp Tỉnh của phòng đó.
 type probe struct{ dept, fn, path string }
 
@@ -63,6 +69,7 @@ var probes = []probe{
 	{"trong_trot", "Trồng trọt FN-TI-02.01 Dashboard trồng trọt toàn tỉnh", "/v1/extension/kn-dashboard"},
 	{"trong_trot", "Trồng trọt FN-TI-02.02/02.03 Phát hành biểu mẫu, theo dõi nộp", "/v1/extension/report-batches"},
 	{"trong_trot", "Trồng trọt FN-XA-03.03 Quản lý HTX & nông hộ", "/v1/kn/producer-records?kind=cooperative"},
+	{"trong_trot", "Trồng trọt FN-XA-03.05 Vẽ ranh giới thửa ruộng (kho thửa KN, pf/cooperative tắt)", "/v1/kn/plots"},
 	{"chan_nuoi_thuy_san", "CNTS FN-13 Theo dõi công việc cấp xã (theo dõi nộp biểu kỳ)", "/v1/extension/cnts/period-tracking"},
 	{"chan_nuoi_thuy_san", "CNTS FN-11 Báo cáo dịch bệnh & báo nghi dịch", "/v1/extension/cnts/outbreaks"},
 	{"chan_nuoi_thuy_san", "CNTS FN-18 Bản đồ vùng nuôi, vùng dịch", "/v1/extension/cnts/map/layers"},
@@ -289,6 +296,14 @@ func Run(ctx context.Context, cfg Config) error {
 			return err
 		}
 		r.check(got.status == http.StatusForbidden && got.code() == "module_not_enabled", "GET "+g.path+" → 403 module_not_enabled ("+g.module+" tắt)", got)
+	}
+
+	for _, x := range removed {
+		got, err := r.do(ctx, false, http.MethodGet, x.path, user, "", nil)
+		if err != nil {
+			return err
+		}
+		r.check(got.status == http.StatusNotFound, "GET "+x.path+" → 404 (đã gỡ bởi "+x.pkg+")", got)
 	}
 
 	// Mỗi phòng: chọn ngữ cảnh, menu của phòng trả về, vài FN đại diện đọc được.

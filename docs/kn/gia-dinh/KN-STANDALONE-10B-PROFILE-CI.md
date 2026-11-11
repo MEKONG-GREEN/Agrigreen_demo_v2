@@ -82,6 +82,7 @@ Bằng tài khoản Cấp Tỉnh của tenant mới, token thật của realm `k
 | Trồng trọt v7.7 | FN-TI-02.01 Dashboard trồng trọt toàn tỉnh | `GET /v1/extension/kn-dashboard` |
 | | FN-TI-02.02/02.03 Phát hành biểu mẫu, theo dõi nộp | `GET /v1/extension/report-batches` |
 | | FN-XA-03.03 Quản lý HTX & nông hộ | `GET /v1/kn/producer-records?kind=cooperative` |
+| | FN-XA-03.05 Vẽ ranh giới thửa ruộng (kho thửa KN, `pf/cooperative` tắt) | `GET /v1/kn/plots` |
 | CNTS v4.0 | FN-13 Theo dõi công việc cấp xã | `GET /v1/extension/cnts/period-tracking` |
 | | FN-11 Báo cáo dịch bệnh & báo nghi dịch | `GET /v1/extension/cnts/outbreaks` |
 | | FN-18 Bản đồ vùng nuôi, vùng dịch | `GET /v1/extension/cnts/map/layers` |
@@ -95,15 +96,16 @@ Bằng tài khoản Cấp Tỉnh của tenant mới, token thật của realm `k
 | | FN-07 Quản lý hồ sơ nhân sự | `GET /v1/hrm/staff` |
 | | FN-13 Contact | `GET /v1/contacts/units` |
 
-Kiểm âm 404/403 cho bề mặt đã gỡ: lúc gói này gộp `origin/dev` **chưa có** #264 (KN-STANDALONE-1-ADMIN-TOOLS) và #271
-(KN-STANDALONE-5-TT-DATA) nên chưa thêm; ghi ở #310.
+Kiểm âm cho bề mặt đã gỡ (bảng `removed` của `tools/knsmoke/smoke.go`): lúc gói này gộp `origin/dev` đã có #271
+(KN-STANDALONE-5-TT-DATA) nên kiểm `GET /v1/kn/cooperatives` → 404. #264 (KN-STANDALONE-1-ADMIN-TOOLS) **chưa có** trên
+`dev` nên chưa thêm; ghi ở #310 cùng các gói gỡ gộp sau.
 
 ### Giới hạn đã biết
 
 - Kiểm khói đọc (GET) với tenant rỗng; chưa chạy luồng ghi của từng FN và chưa mở trình duyệt (đăng nhập authorization
   code qua `kn-web`) — #310.
-- Trồng trọt FN-XA-03.04 (máy móc) và FN-XA-03.05 (thửa ruộng) còn dựa `pf/mechanization`, `pf/cooperative` cho tới khi
-  #271 gộp; với tenant KN mới hai FN này chưa chạy. Thêm vào kiểm khói ở #310.
+- Trồng trọt FN-XA-03.04 (máy móc) còn dựa `pf/mechanization` (phần máy của #271 chưa làm); với tenant KN mới FN này
+  chưa chạy. Thêm vào kiểm khói ở #310.
 - Chặn mạng ra ngoài làm ở runner CI bằng `iptables` chuỗi `DOCKER-USER`; chạy cục bộ không tự chặn.
 - Tài khoản do `pf/accounts` tạo cần email kích hoạt; profile `kn` không có SMTP nên kiểm khói đặt mật khẩu qua Keycloak
   Admin REST thay bước bấm liên kết (chỉ Local/CI).
