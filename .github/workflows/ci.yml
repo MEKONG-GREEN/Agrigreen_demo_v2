@@ -750,6 +750,106 @@ jobs:
       - name: Dọn
         if: always()
         run: docker compose -f "$COMPOSE_FILE" down -v --remove-orphans
+
+  # KN-STANDALONE-10B-PROFILE-CI (PLAN-KN-STANDALONE nguyên tắc 3): hệ thống Khuyến nông chạy độc lập. Dựng profile
+  # `kn` (docker-compose.kn.yml: không api-internal, worker-internal, ingest, edge-sim*, optimizer, web-internal; Keycloak
+  # realm riêng `kn`), seed một tenant KN MỚI qua Admin API, tắt module ngoài KN, rồi kiểm khói bằng API thật (không mock)
+  # trong lúc chặn mạng ra ngoài của các container. Job compose-smoke (toàn stack) giữ nguyên, chạy song song.
+  kn-standalone:
+    name: KN độc lập — profile kn, realm kn, tenant KN mới, kiểm khói 5 phòng
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      KN_COMPOSE: -f deploy/compose/docker-compose.yml -f deploy/compose/docker-compose.kn.yml
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Giải phóng dung lượng runner (build 5 image Go + web-ops)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache \
+            /usr/share/swift /usr/local/share/powershell /usr/local/share/chromium /usr/local/lib/node_modules \
+            /opt/microsoft /opt/google /opt/az
+          sudo docker image prune -af > /dev/null || true
+          df -h /
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with: { go-version-file: go.mod }
+      - name: Sinh bí mật dev (deploy/compose/.env, không commit)
+        run: sh scripts/gen-dev-secrets.sh --force
+      - name: Profile kn chỉ gồm dịch vụ của KN
+        run: |
+          set -eu
+          docker compose $KN_COMPOSE config --quiet
+          got=$(docker compose $KN_COMPOSE config --services | sort | tr '\n' ' ')
+          want="api-platform identity-vault keycloak migrate-bootstrap migrate-up otel-collector outbox-publisher pgbouncer postgres rabbitmq rabbitmq-init s3-init seaweedfs valkey web-ops worker "
+          echo "$got"
+          test "$got" = "$want"
+      - name: Dựng profile kn và chờ healthy
+        run: docker compose $KN_COMPOSE up -d --build --wait --wait-timeout 900
+      - name: healthz/readyz, web, realm kn
+        run: |
+          set -eu
+          check() {
+            echo "→ $1"
+            curl -fsS --max-time 5 --retry 30 --retry-delay 2 --retry-all-errors -o /dev/null -w "%{http_code}\n" "$1"
+          }
+          check http://127.0.0.1:8080/healthz
+          check http://127.0.0.1:8080/readyz
+          check http://127.0.0.1:8082/healthz
+          check http://127.0.0.1:8082/readyz
+          check http://127.0.0.1:8090/healthz
+          check http://127.0.0.1:8090/readyz
+          check http://127.0.0.1:3000/
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/v1/me)" = 401
+          # Không tiến trình nào của hệ ngoài KN.
+          running=$(docker compose $KN_COMPOSE ps --services)
+          for s in api-internal worker-internal ingest edge-sim optimizer web-internal api-public integration-gateway; do
+            if echo "$running" | grep -qx "$s"; then echo "dịch vụ ngoài KN đang chạy: $s" >&2; exit 1; fi
+          done
+          # Chỉ có realm kn (Q8); realm agrigreen dùng chung không được nhập.
+          iss=$(curl -fsS --retry 30 --retry-delay 2 --retry-all-errors http://127.0.0.1:8180/realms/kn/.well-known/openid-configuration | jq -r .issuer)
+          test "$iss" = "http://localhost:8180/realms/kn"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8180/realms/agrigreen/.well-known/openid-configuration)" = 404
+          # Trang "Quên mật khẩu" gốc của Keycloak tắt, client đăng nhập chỉ có kn-web và kn-field.
+          pw=$(sed -n 's/^KEYCLOAK_ADMIN_PASSWORD=//p' deploy/compose/.env)
+          tok=$(curl -fsS -d grant_type=password -d client_id=admin-cli -d username=admin --data-urlencode "password=$pw" \
+            http://127.0.0.1:8180/realms/master/protocol/openid-connect/token | jq -r .access_token)
+          test "$(curl -fsS -H "Authorization: Bearer $tok" http://127.0.0.1:8180/admin/realms/kn | jq -r .resetPasswordAllowed)" = false
+          login=$(curl -fsS -H "Authorization: Bearer $tok" http://127.0.0.1:8180/admin/realms/kn/clients \
+            | jq -r '[.[] | select(.standardFlowEnabled and (.clientId | startswith("kn-"))) | .clientId] | sort | join(" ")')
+          echo "client đăng nhập: $login"
+          test "$login" = "kn-field kn-web"
+      - name: Chặn mạng ra ngoài của các container
+        run: |
+          set -eu
+          net=agrigreen-kn_default
+          subnet=$(docker network inspect -f '{{(index .IPAM.Config 0).Subnet}}' "$net")
+          sudo iptables -I DOCKER-USER -s "$subnet" ! -d "$subnet" -m conntrack --ctstate NEW -j REJECT
+          # Container trong mạng compose không còn ra được internet; trong mạng vẫn thông.
+          if docker run --rm --network "$net" curlimages/curl:8.15.0 -sS --max-time 8 -o /dev/null https://github.com; then
+            echo "container vẫn ra được mạng ngoài" >&2; exit 1
+          fi
+          docker run --rm --network "$net" curlimages/curl:8.15.0 -fsS --max-time 8 -o /dev/null http://api-platform:8080/healthz
+      - name: Seed tenant KN mới và kiểm khói (tools/knsmoke — API thật, không mock)
+        run: |
+          set -eu
+          KEYCLOAK_ADMIN_PASSWORD=$(sed -n 's/^KEYCLOAK_ADMIN_PASSWORD=//p' deploy/compose/.env)
+          export KEYCLOAK_ADMIN_PASSWORD
+          go run ./tools/knsmoke
+      - name: Bề mặt KN ⊆ danh sách FN (docs/kn/brd-surface.yaml) — CHẾ ĐỘ BÁO CÁO
+        # Cổng chặn bật ở gói KN-STANDALONE-10B-PROFILE-CI-GATE sau khi BRD-SURFACE-MAP (#262) gộp. Bước này không bao giờ đỏ.
+        run: |
+          if [ -f docs/kn/brd-surface.yaml ]; then
+            echo "::notice::docs/kn/brd-surface.yaml có $(grep -c . docs/kn/brd-surface.yaml) dòng — cổng chặn chưa bật (KN-STANDALONE-10B-PROFILE-CI-GATE)"
+          else
+            echo "::notice::Chưa có docs/kn/brd-surface.yaml (#262) — kiểm bề mặt KN ⊆ FN đang ở chế độ báo cáo"
+          fi
+      - name: Trạng thái và log khi hỏng
+        if: failure()
+        run: |
+          docker compose $KN_COMPOSE ps -a
+          docker compose $KN_COMPOSE logs --no-color --timestamps --tail 400
+      - name: Dọn
+        if: always()
+        run: docker compose $KN_COMPOSE down -v --remove-orphans
 # ============================================================================
 #  HAI JOB THEM VAO .github/workflows/ci.yml
 #
