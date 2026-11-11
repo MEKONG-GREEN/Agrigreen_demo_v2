@@ -22,7 +22,8 @@ người dùng; tệp cũ giữ lại làm bảng bằng chứng kiểm thử t�
 - Cột **Kết quả UAT** để trống cho người kiểm điền (Đạt / Không đạt + ghi chú, ngày, người kiểm).
 - Tài liệu sẽ chạy trên **profile chỉ-KN** (Compose profile `kn`, realm Keycloak `kn`, tenant KN mới, module HTX/CGH/MKG/Public
   API tắt) khi gói KN-STANDALONE-10B-PROFILE-CI (#272) gộp. Các FN dùng dữ liệu HTX, máy móc, thửa ruộng (FN-XA-03.03 … 03.05,
-  03.08) chỉ chạy được trên profile này sau khi dữ liệu về kho KN tự quản (#271, #306).
+  03.08) dùng dữ liệu KN tự quản: thửa ruộng và lựa chọn HTX ở lịch công tác đã về kho KN (#271 đã gộp); máy móc và việc ẩn ứng viên HTX
+  đã công bố còn ở #306.
 
 ## 2. Chuẩn bị dữ liệu trên một tenant KN mới
 
@@ -58,7 +59,7 @@ Tài khoản kiểm tối thiểu (mật khẩu do Admin đặt khi tạo, khôn
 |---|---|---|---|
 | Hoãn pha kết nối | Tạo đường link Google Sheet và gửi link cho Chi cục. Email kèm tệp Excel/PDF và link tải vẫn nghiệm thu | FN-TI-02.06 (phần Google Sheet) | #40 |
 | Chờ đầu vào | Cấu trúc 14 mẫu biểu theo tệp Excel gốc: T02, T03, T07, V03, V06, T05, T06, V01, V02 còn lệch; các mẫu còn lại chưa đối chiếu | FN-XA-03.02, FN-TI-02.05, FN-AD-04.06 | #157, #39 |
-| Đang làm | Thửa ruộng, máy móc, lựa chọn HTX ở lịch công tác về kho KN tự quản (chạy khi tắt module HTX/CGH) | FN-XA-03.03, 03.04, 03.05, 03.08, FN-TI-02.07 | #271, #306 |
+| Đang làm | Máy móc HTX về kho KN tự quản; ẩn ứng viên HTX đã công bố từ hệ ngoài (thửa ruộng và HTX ở lịch công tác đã xong ở #271) | FN-XA-03.04, FN-XA-03.03 | #306 |
 | Đang làm | Menu từng phòng chỉ còn FN của phòng đó ("Quy trình, văn bản", "Trang chủ phòng", "Báo cáo đột xuất", "Dùng chung" ở Trồng trọt đang gỡ) | FN-CH-00.01 | #265 |
 | Khoảng trống, chưa có issue | Đăng nhập nhanh PIN 6 số trên Mobile và dòng "số lần thử còn lại" (FN-CH-00.01); sắp xếp ĐVHC có ánh xạ mã và nạp ranh giới trên màn (FN-AD-04.01); "Lấy từ đợt trước" cho cột Tỉnh giao (FN-TI-02.02); tải tệp KML/Shapefile/GeoJSON khi vẽ thửa (FN-XA-03.05); nạp/xuất Excel danh sách HTX (FN-XA-03.03); số liệu so sánh cùng kỳ năm trước và báo cáo năm (FN-TW-01.02); đo tải 500 người dùng (FN-TW-01.01) | — | chưa có issue |
 
@@ -293,9 +294,9 @@ Kiểm thử tự động: `TestFN_XA_03_02_T01Layout`, `TestFN_XA_03_02_T03TraE
 | LP | Vô hiệu hóa HTX có thửa ruộng, máy móc → cảnh báo | Vô hiệu hóa HTX đã khai máy | Cảnh báo số máy, thửa; bắt lý do | Đạt | |
 | QT | Chỉ thao tác trong xã phụ trách; vô hiệu hóa thay xóa cứng; SĐT che một phần | X-A thêm HTX ở xã C; xem cột SĐT | 403; SĐT che | Đạt | |
 | AC | Không thao tác được ngoài phạm vi; không xóa được HTX đã có dữ liệu liên kết | Tìm nút Xóa | Không có, chỉ Vô hiệu hóa | Đạt | |
-| Độc lập | Chạy khi tenant KN tắt module HTX; không hiện ứng viên HTX đã công bố từ hệ ngoài | Chạy trên profile chỉ-KN | Mọi bước trên vẫn chạy | Thiếu: #271 (đang gộp), #306 | |
+| Độc lập | Chạy khi tenant KN tắt module HTX; không hiện ứng viên HTX đã công bố từ hệ ngoài | Chạy trên profile chỉ-KN | Mọi bước trên vẫn chạy | Đạt phần HTX, nông hộ là hồ sơ KN. Thiếu: ẩn ứng viên HTX đã công bố — #306 | |
 
-Kiểm thử tự động: `TestFN_XA_03_03_CooperativeReadScope`, `TestFN_XA_03_03_DeactivateReasonMinMatchesLedgerCheck`, `TestKN77AnGiangTuan36` (bước 12);
+Kiểm thử tự động: `TestFN_XA_03_03_DeactivateReasonMinMatchesLedgerCheck`, `TestKN77AnGiangTuan36` (bước 12);
 vitest `cycle/screens/tt-htx.test.tsx`, `producer.test.tsx`; Flutter `kn_widgets_test.dart` ("FN-XA-03.03 danh sách HTX").
 
 ### FN-XA-03.04 — Quản lý máy móc của HTX
@@ -328,10 +329,10 @@ Kiểm thử tự động: `TestFN_XA_03_04_MachineCountsDeclareTotalsLog`, `Tes
 | LP | Mất mạng → lưu tạm, tự đồng bộ | Vẽ trên app khi mất mạng | Đồng bộ đủ khi có mạng | Đạt | |
 | QT | Diện tích luôn tự tính, không nhập tay đè; chỉ vẽ trong địa bàn được phân công | Vẽ ở xã C | 403 | Đạt | |
 | AC | Không lưu được ranh giới không khép kín hoặc chồng lấn; vẽ offline đồng bộ đủ 100% | Như LP | Như trên | Đạt | |
-| Độc lập | Thửa ruộng lưu ở kho KN, chạy khi tắt module HTX | Chạy trên profile chỉ-KN | Mọi bước trên vẫn chạy | Thiếu: #271 (đang gộp) | |
+| Độc lập | Thửa ruộng lưu ở kho KN, chạy khi tắt module HTX | Chạy trên profile chỉ-KN | Mọi bước trên vẫn chạy | Đạt (#271: thửa ở kho KN, chạy khi tắt module HTX) | |
 
-Kiểm thử tự động: `TestFN_XA_03_05_CreateListGetUpdateCorrectLog`, `TestFN_XA_03_05_OverlapBlockedAndInvalidShape`, `TestFN_XA_03_05_ScopeRolesTenantDepartment`,
-`TestFN_XA_03_05_OfflineSyncKNCaller`; vitest `cycle/screens/tt-plot.test.tsx`.
+Kiểm thử tự động: `TestFN_XA_03_05_StandaloneWithHTXModulesDisabled`, `TestFN_XA_03_05_OverlapAndGeometry`, `TestFN_XA_03_05_RolesScopeTenantDepartment`,
+`TestFN_XA_03_05_OfflineSync`; vitest `cycle/screens/tt-plot.test.tsx`.
 
 ### FN-XA-03.06 — Nhập thông tin vật tư
 
@@ -367,14 +368,14 @@ Kiểm thử tự động: `TestFN_TI_02_KN77FullCycle`; vitest `cycle/screens/X
 
 | Mã | Yêu cầu BRD (trích) | Bước kiểm | Kết quả mong đợi | Trạng thái trên dev | Kết quả UAT |
 |---|---|---|---|---|---|
-| B1–B2 | Chọn tuần (mặc định tuần kế tiếp); thêm mục công tác: nội dung, địa điểm (xã, HTX), thành phần phối hợp, ghi chú | Thêm 3 mục, 1 mục chọn HTX | Lưu nháp được | Đạt (danh sách HTX lấy từ hồ sơ KN khi tắt module HTX: #271) | |
+| B1–B2 | Chọn tuần (mặc định tuần kế tiếp); thêm mục công tác: nội dung, địa điểm (xã, HTX), thành phần phối hợp, ghi chú | Thêm 3 mục, 1 mục chọn HTX | Lưu nháp được | Đạt (HTX chọn từ hồ sơ KN, #271) | |
 | B3–B4 | "Gửi duyệt" → "Chờ duyệt"; nhận kết quả; "Yêu cầu chỉnh sửa" thì sửa và gửi lại | Gửi; T-TP yêu cầu chỉnh sửa; sửa, gửi lại | Trạng thái đi đúng vòng | Đạt | |
 | LP | Sao chép tuần trước; điều chỉnh lịch đã duyệt → phần điều chỉnh chờ duyệt lại | Sửa lịch đã duyệt | Về Chờ duyệt | Đạt | |
 | LP | Trùng thời gian → cảnh báo; quá hạn đăng ký → nhãn "Đăng ký muộn" | Thêm 2 mục trùng giờ; gửi sau hạn | Có cảnh báo; nhãn Đăng ký muộn | Đạt | |
 | QT | Nháp → Chờ duyệt → Đã duyệt / Yêu cầu chỉnh sửa; lịch tuần đã kết thúc bị khóa | Sửa lịch tuần trước | Bị khóa | Đạt | |
 | AC | Cán bộ xã nhận thông báo kết quả duyệt kèm lý do | Xem chuông sau khi T-TP trả lời | Có thông báo + lý do | Đạt | |
 
-Kiểm thử tự động: `TestFN_XA_03_08_RegisterSubmitReviewFlow`, `TestFN_XA_03_08_AmendmentVersioning`, `TestFN_XA_03_08_CopyPreviousAndValidation`,
+Kiểm thử tự động: `TestFN_XA_03_08_RegisterSubmitReviewFlow`, `TestFN_XA_03_08_AmendmentVersioning`, `TestFN_XA_03_08_CopyPreviousAndValidation`, `TestFN_XA_03_08_ScheduleHTXFromKNRecords`,
 `TestFN_XA_03_08_WeekRules`; vitest `schedule/schedule.test.tsx`; Playwright `kn-lich-cong-tac.spec.ts`.
 
 ### FN-AD-04.01 — Danh mục đơn vị hành chính
@@ -506,12 +507,12 @@ Kiểm thử tự động: `TestFN_AD_04_07_SupportModeAuditTrail`, `TestKN77AnG
 | FN-TI-02.07 | Duyệt lịch công tác | Đạt |
 | FN-XA-03.01 | Công việc cần làm | Đạt |
 | FN-XA-03.02 | Nhập báo cáo theo biểu mẫu | Thiếu: cấu trúc 13/14 mẫu theo tệp gốc (#157, #39) |
-| FN-XA-03.03 | HTX & nông hộ | Thiếu: nạp/xuất Excel; chạy độc lập (#271, #306) |
-| FN-XA-03.04 | Máy móc của HTX | Thiếu: chạy độc lập (#306) |
-| FN-XA-03.05 | Vẽ ranh giới thửa ruộng | Thiếu: tải tệp KML/Shapefile/GeoJSON; chạy độc lập (#271) |
+| FN-XA-03.03 | HTX & nông hộ | Thiếu: nạp/xuất Excel; ẩn ứng viên HTX đã công bố (#306) |
+| FN-XA-03.04 | Máy móc của HTX | Thiếu: số máy về kho KN (#306) |
+| FN-XA-03.05 | Vẽ ranh giới thửa ruộng | Thiếu: tải tệp KML/Shapefile/GeoJSON |
 | FN-XA-03.06 | Vật tư | Đạt |
 | FN-XA-03.07 | Báo cáo của xã | Đạt |
-| FN-XA-03.08 | Đăng ký lịch công tác | Đạt; chọn HTX từ hồ sơ KN chờ #271 |
+| FN-XA-03.08 | Đăng ký lịch công tác | Đạt |
 | FN-AD-04.01 | Đơn vị hành chính | Thiếu: sắp xếp ĐVHC có ánh xạ, nạp ranh giới |
 | FN-AD-04.02 | Cơ cấu tổ chức 3 cấp | Đạt |
 | FN-AD-04.03 | Danh mục phòng ban | Đạt |
@@ -521,5 +522,5 @@ Kiểm thử tự động: `TestFN_AD_04_07_SupportModeAuditTrail`, `TestKN77AnG
 | FN-AD-04.07 | Menu các cấp | Đạt |
 
 Đạt trọn: 14/25. Còn thiếu ít nhất một ý: 11/25; lý do chính là 14 mẫu biểu chưa khớp tệp Excel gốc (#157, #39 — chờ đầu vào),
-dữ liệu HTX/máy/thửa đang chuyển về kho KN (#271, #306) và các ý nhỏ chưa có issue (mục 3). Hoãn pha kết nối: phần Google Sheet
+số máy và ứng viên HTX còn chờ #306 và các ý nhỏ chưa có issue (mục 3). Hoãn pha kết nối: phần Google Sheet
 của FN-TI-02.06 (#40).
