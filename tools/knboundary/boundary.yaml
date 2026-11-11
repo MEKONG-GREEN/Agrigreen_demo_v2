@@ -116,7 +116,6 @@ kn_htx_write_prefixes:
   - /v1/kn/cooperatives
   - /v1/kn/households
   - /v1/kn/plots
-  - /v1/kn/machine-counts
 
 web:
   root: apps/web-ops/src

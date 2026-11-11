@@ -14,7 +14,7 @@ import { LoadState, useAction, useCommuneNames, useCycleReadOnly, useLoad } from
 import { vnDate } from "@/kn/schedule/week";
 import { normalizeNumberInput } from "@/lib/exactDecimal";
 import { HtxRecordPicker, UNLINKED_LABEL } from "./HtxRecordPicker";
-import { HouseholdAddRoute, ProducerCreateRoute, ProducerDetailScreen, ProducerListScreen, loadAllRecords } from "./ProducerScreens";
+import { HouseholdAddRoute, ProducerCreateRoute, ProducerDetailScreen, ProducerListScreen } from "./ProducerScreens";
 
 /** Ghi chú phần còn ở nơi khác (nạp Excel, vẽ bản đồ ngoại tuyến…). */
 export function GapNotice({ what }: { what: string }) {

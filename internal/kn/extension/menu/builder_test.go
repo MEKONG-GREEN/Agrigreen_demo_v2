@@ -243,7 +243,7 @@ func TestRouteOwnership(t *testing.T) {
 		"/kn/nhan-su/dashboard":                    "pf/hrm",
 		"/kn/bao-gia/nhap":                         "pf/price",
 		"/kn/phong-ban/{department}/danh-muc-cnts": "pf/masterdata",
-		"/kn/du-lieu/may-moc":                      "pf/mechanization",
+		"/kn/du-lieu/may-moc":                      "pf/extension", // #306: máy móc HTX ở kho KN
 		"/kn/phong-ban/{department}/mau-bao-cao":   "pf/reports",
 		"/kn/phong-ban/{department}/bao-gia-lich":  "pf/price",
 		"/kn/phong-ban/{department}/ke-hoach-nam":  "pf/party",

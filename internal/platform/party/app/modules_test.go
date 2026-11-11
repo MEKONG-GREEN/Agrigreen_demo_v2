@@ -40,18 +40,17 @@ func TestFilterMenuGroups(t *testing.T) {
 		t.Fatal("không tắt gì phải giữ nguyên")
 	}
 	got := viewKeys(FilterMenuGroups(xa.Groups, map[string]bool{"pf/mechanization": true, "pf/geo": true}))
-	for _, gone := range []string{"xa.thu_thap.may_moc", "xa.thu_thap.thua"} {
-		if slices.Contains(got, gone) {
-			t.Fatalf("còn %s: %v", gone, got)
-		}
+	if slices.Contains(got, "xa.thu_thap.thua") {
+		t.Fatalf("còn xa.thu_thap.thua: %v", got)
 	}
-	if !slices.Contains(got, "xa.thu_thap.htx") || !slices.Contains(got, "xa.nhiem_vu.cong_viec") {
+	// #306: Máy móc HTX ở kho KN (pf/extension) — tắt pf/mechanization không ẩn mục này.
+	if !slices.Contains(got, "xa.thu_thap.may_moc") || !slices.Contains(got, "xa.thu_thap.htx") || !slices.Contains(got, "xa.nhiem_vu.cong_viec") {
 		t.Fatalf("mất màn của module bật: %v", got)
 	}
 	// Tắt pf/extension: nhóm Điều hành/Báo cáo của Cấp Xã rỗng → bỏ; còn Dữ liệu › HTX (lõi pf/party).
 	got = viewKeys(FilterMenuGroups(xa.Groups, map[string]bool{"pf/extension": true}))
 	if slices.Contains(got, "group:dieu_hanh") || slices.Contains(got, "group:bao_cao") || !slices.Contains(got, "xa.thu_thap.htx") ||
-		slices.Contains(got, "xa.thu_thap.vat_tu") {
+		slices.Contains(got, "xa.thu_thap.vat_tu") || slices.Contains(got, "xa.thu_thap.may_moc") {
 		t.Fatalf("tắt pf/extension: %v", got)
 	}
 	admin := AdminMenu(uuid.Nil, []port.Department{d})

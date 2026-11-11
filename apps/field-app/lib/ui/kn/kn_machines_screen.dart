@@ -8,6 +8,13 @@ import 'kn_common.dart';
 import 'kn_providers.dart';
 import '../../domain/pii_hint.dart';
 
+/// Tên HTX của một khai báo máy; khai báo đã chép của HTX cũ chưa có hồ sơ KN
+/// (#306) có tên rỗng.
+String _coopName(Map<String, Object?> c) {
+  final n = c['name'] as String?;
+  return n == null || n.isEmpty ? 'HTX cũ (chưa có hồ sơ KN)' : n;
+}
+
 /// Máy móc HTX (FN-XA-03.04): tổng theo loại của xã = Σ các HTX; mở HTX để
 /// khai báo số lượng từng loại máy.
 class KnMachinesScreen extends ConsumerStatefulWidget {
@@ -119,7 +126,7 @@ class _MachinesState extends ConsumerState<KnMachinesScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: ListTile(
                   key: ValueKey('kn-mc-${c['cooperative_ref']}'),
-                  title: Text('${c['name']}'),
+                  title: Text(_coopName(c)),
                   subtitle: Text(
                     [
                       for (final l in (c['lines'] as List?) ?? const [])
@@ -132,7 +139,9 @@ class _MachinesState extends ConsumerState<KnMachinesScreen> {
                     await Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => Scaffold(
-                          appBar: AppBar(title: Text('Máy móc · ${c['name']}')),
+                          appBar: AppBar(
+                            title: Text('Máy móc · ${_coopName(c)}'),
+                          ),
                           body: KnMachineEditor(
                             cooperativeRef: '${c['cooperative_ref']}',
                           ),

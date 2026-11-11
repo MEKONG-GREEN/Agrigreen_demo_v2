@@ -10,8 +10,8 @@ import 'kn_providers.dart';
 
 // FN-XA-03.03 HTX / Tổ hợp tác / Nông hộ — KNSPLIT-2-KN-RECORDS (#67, #161):
 // mọi màn chạy trên hồ sơ KN riêng `/v1/kn/producer-records`. KN không
-// tạo/sửa HTX nền tảng; HTX đã công bố chỉ để liên kết đối chiếu (`htx_ref`),
-// máy móc và thửa ruộng đọc theo `htx_ref`.
+// tạo/sửa HTX nền tảng. #271, #306: máy móc và thửa ruộng ở kho KN, đọc theo
+// mã hồ sơ KN; không còn liên kết HTX đã công bố (hoãn pha kết nối).
 
 String _person(Map<String, Object?> c, String key) {
   final r = c[key];
@@ -231,9 +231,6 @@ class _CoopFormState extends ConsumerState<KnCooperativeFormScreen> {
   final _repName = TextEditingController();
   final _repPhone = TextEditingController();
   String? _commune;
-  String? _htxRef;
-  List<Map<String, Object?>>? _candidates;
-  String? _candidatesFor;
   bool _busy = false;
 
   String get _kind => (widget.existing?['kind'] as String?) ?? widget.kind;
@@ -247,7 +244,6 @@ class _CoopFormState extends ConsumerState<KnCooperativeFormScreen> {
   void initState() {
     super.initState();
     _commune = widget.existing?['commune_code'] as String?;
-    _htxRef = widget.existing?['htx_ref'] as String?;
   }
 
   @override
@@ -256,23 +252,6 @@ class _CoopFormState extends ConsumerState<KnCooperativeFormScreen> {
       c.dispose();
     }
     super.dispose();
-  }
-
-  /// Danh sách HTX đã công bố của xã (liên kết đối chiếu) — cần mạng; lỗi thì
-  /// bỏ qua ô chọn (liên kết là tùy chọn).
-  Future<void> _loadCandidates(String commune) async {
-    if (_kind != KnRecordKind.cooperative || _candidatesFor == commune) return;
-    _candidatesFor = commune;
-    List<Map<String, Object?>>? items;
-    try {
-      items = await ref
-          .read(knCollectionServiceProvider)
-          .htxCandidates(commune);
-    } on Object {
-      items = null;
-    }
-    if (!mounted || _candidatesFor != commune) return;
-    setState(() => _candidates = items);
   }
 
   Future<void> _save() async {
@@ -303,7 +282,6 @@ class _CoopFormState extends ConsumerState<KnCooperativeFormScreen> {
               address: _address.text,
               personName: _repName.text,
               personPhone: _repPhone.text,
-              htxRef: _htxRef,
             )
           : svc.updateRecord(
               ex,
@@ -313,7 +291,6 @@ class _CoopFormState extends ConsumerState<KnCooperativeFormScreen> {
               address: _address.text,
               personName: _repName.text,
               personPhone: _repPhone.text,
-              htxRef: _htxRef ?? '',
             ),
       done: ex == null ? 'Đã thêm $label.' : 'Đã lưu thay đổi.',
     );
@@ -331,10 +308,6 @@ class _CoopFormState extends ConsumerState<KnCooperativeFormScreen> {
     final edit = widget.existing != null;
     final label = _kindLabel(_kind);
     final coop = _kind == KnRecordKind.cooperative;
-    final commune =
-        _commune ?? (communes.length == 1 ? communes.first.code : null);
-    if (coop && commune != null) _loadCandidates(commune);
-    final cands = _candidates ?? const <Map<String, Object?>>[];
     Widget f(
       String key,
       TextEditingController c,
@@ -367,10 +340,7 @@ class _CoopFormState extends ConsumerState<KnCooperativeFormScreen> {
                   for (final c in communes)
                     DropdownMenuItem(value: c.code, child: Text(c.name)),
                 ],
-                onChanged: (v) => setState(() {
-                  _commune = v;
-                  _htxRef = null;
-                }),
+                onChanged: (v) => setState(() => _commune = v),
               ),
             ),
           f(
@@ -394,40 +364,6 @@ class _CoopFormState extends ConsumerState<KnCooperativeFormScreen> {
             edit ? 'SĐT người đại diện mới' : 'SĐT người đại diện *',
             kb: TextInputType.phone,
           ),
-          if (coop && (cands.isNotEmpty || _htxRef != null))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: DropdownButtonFormField<String?>(
-                key: const ValueKey('kn-coop-f-htx'),
-                isExpanded: true,
-                initialValue: _htxRef,
-                decoration: const InputDecoration(
-                  labelText: 'Liên kết HTX đã công bố (tùy chọn)',
-                ),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Không liên kết'),
-                  ),
-                  if (_htxRef != null &&
-                      !cands.any((c) => c['htx_ref'] == _htxRef))
-                    DropdownMenuItem<String?>(
-                      value: _htxRef,
-                      child: Text(
-                        '${widget.existing?['htx_name'] ?? 'HTX đã liên kết'}',
-                      ),
-                    ),
-                  for (final c in cands)
-                    if (c['linked_ref'] == null ||
-                        c['linked_ref'] == widget.existing?['ref'])
-                      DropdownMenuItem<String?>(
-                        value: c['htx_ref'] as String?,
-                        child: Text('${c['name']}'),
-                      ),
-                ],
-                onChanged: (v) => setState(() => _htxRef = v),
-              ),
-            ),
           const SizedBox(height: 8),
           FilledButton(
             key: const ValueKey('kn-coop-f-save'),
@@ -583,15 +519,7 @@ class _CoopDetailState extends ConsumerState<KnCooperativeDetailScreen> {
     final kind = (c?['kind'] as String?) ?? KnRecordKind.cooperative;
     final label = _kindLabel(kind);
     final coop = kind == KnRecordKind.cooperative;
-    final htxRef = c?['htx_ref'] as String?;
     final inactive = c != null && _inactive(c);
-    Widget noHtx() => const Padding(
-      padding: EdgeInsets.all(16),
-      child: Text(
-        'Chưa liên kết HTX đã công bố — máy móc, thửa ruộng theo HTX đã '
-        'công bố. Sửa hồ sơ để chọn liên kết.',
-      ),
-    );
     return DefaultTabController(
       length: coop ? 3 : 1,
       child: Scaffold(
@@ -701,13 +629,9 @@ class _CoopDetailState extends ConsumerState<KnCooperativeDetailScreen> {
                             ),
                     ),
                   ),
+                  // #306: máy khóa theo CHÍNH hồ sơ KN loại HTX (kho KN).
                   if (coop)
-                    htxRef == null
-                        ? noHtx()
-                        : KnMachineEditor(
-                            cooperativeRef: htxRef,
-                            embedded: true,
-                          ),
+                    KnMachineEditor(cooperativeRef: widget.ref, embedded: true),
                   // #271: thửa gán CHÍNH hồ sơ KN loại HTX (kho KN), không cần
                   // liên kết HTX đã công bố.
                   if (coop) KnPlotsList(cooperativeRef: widget.ref),

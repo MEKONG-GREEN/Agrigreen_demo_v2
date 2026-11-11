@@ -134,7 +134,6 @@ void main() {
       address: 'Ấp 3',
       personName: 'Nguyễn Văn A',
       personPhone: '0912345123',
-      htxRef: 'htx-pub-1',
     );
     expect(ok.queued, isFalse);
     final (path, key) = h.fake.actionCalls.single;
@@ -147,7 +146,6 @@ void main() {
       'area_ha': '12.5',
       'address': 'Ấp 3',
       'representative': {'full_name': 'Nguyễn Văn A', 'phone': '0912345123'},
-      'htx_ref': 'htx-pub-1',
     });
 
     h.fake.actionErrors['/v1/kn/producer-records'] = (
@@ -180,7 +178,6 @@ void main() {
       personName: 'Lê Văn C',
       personPhone: '0987654321',
       taxCode: '0123456789',
-      htxRef: 'x',
     );
     expect(q.queued, isTrue);
     final qa = (await h.actions.pending()).single;
@@ -284,14 +281,14 @@ void main() {
       'version': 4,
     };
     h.fake.failNextActions = 1;
-    final r = await svc.updateRecord(coop, areaHa: '13,75', htxRef: '');
+    final r = await svc.updateRecord(coop, areaHa: '13,75');
     expect(r.queued, isTrue);
     final a = (await h.actions.pending()).single;
     expect(a.kind, ApiActionKind.knRecordUpdate);
     expect(a.method, 'POST');
     expect(a.path, '/v1/kn/producer-records/c1');
-    // Máy chủ thay toàn bộ trường: giữ tên/MST/địa chỉ hiện có, bỏ liên kết
-    // HTX khi chọn "Không liên kết"; người đại diện không gửi = giữ nguyên.
+    // Máy chủ thay toàn bộ trường: giữ tên/MST/địa chỉ hiện có; #306 không gửi
+    // htx_ref (máy chủ giữ liên kết cũ); người đại diện không gửi = giữ nguyên.
     expect(a.body, {
       'kind': 'cooperative',
       'commune_code': '30280',

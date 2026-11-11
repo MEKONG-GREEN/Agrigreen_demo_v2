@@ -306,6 +306,8 @@ class KnCollectionService {
   // KNSPLIT-2-KN-RECORDS (#67, #161): HTX / Nông hộ / Tổ hợp tác của màn KN là
   // hồ sơ KN riêng (`/v1/kn/producer-records`, sổ `pf_extension.kn_producer`).
   // KN KHÔNG tạo/sửa HTX nền tảng: không còn lệnh ghi `/v1/kn/cooperatives…`.
+  // #306: không còn liên kết HTX đã công bố (`htx_ref`, hoãn pha kết nối) —
+  // máy chủ giữ nguyên liên kết cũ khi sửa.
 
   static const _records = '/v1/kn/producer-records';
 
@@ -338,19 +340,6 @@ class KnCollectionService {
     cursor: cursor,
   );
 
-  /// HTX đã công bố trong phạm vi (chỉ đọc) — chọn để liên kết đối chiếu
-  /// (`htx_ref`) khi thêm/sửa hồ sơ HTX; máy móc, thửa đọc theo `htx_ref`.
-  Future<List<Map<String, Object?>>> htxCandidates(String commune) async {
-    final (j, _) = await _getCached(
-      '/v1/kn/producer-htx-candidates',
-      query: {'commune': commune},
-    );
-    return [
-      for (final i in (j['items'] as List?) ?? const [])
-        if (i is Map) i.cast<String, Object?>(),
-    ];
-  }
-
   static String? _opt(String? v) {
     final t = v?.trim();
     return t == null || t.isEmpty ? null : t;
@@ -370,7 +359,7 @@ class KnCollectionService {
 
   /// Thêm hồ sơ KN. HTX, THT: [name], người đại diện ([personName],
   /// [personPhone]) bắt buộc; Nông hộ: chủ hộ bắt buộc, thuộc [parentRef]
-  /// (HTX/THT), không tên/địa chỉ/MST. [htxRef] chỉ cho HTX.
+  /// (HTX/THT), không tên/địa chỉ/MST.
   Future<KnCommandResult> createRecord({
     required String kind,
     required String communeCode,
@@ -381,7 +370,6 @@ class KnCollectionService {
     String? personName,
     String? personPhone,
     String? parentRef,
-    String? htxRef,
   }) {
     final household = kind == KnRecordKind.household;
     final area = _area(areaHa);
@@ -403,7 +391,6 @@ class KnCollectionService {
         if (!household) 'address': ?_opt(address),
         (household ? 'holder' : 'representative'): person,
         if (household) 'parent_ref': ?_opt(parentRef),
-        if (kind == KnRecordKind.cooperative) 'htx_ref': ?_opt(htxRef),
       },
     );
   }
@@ -420,7 +407,6 @@ class KnCollectionService {
     String? address,
     String? personName,
     String? personPhone,
-    String? htxRef,
   }) {
     final ref = existing['ref'] as String?;
     final version = existing['version'];
@@ -445,8 +431,6 @@ class KnCollectionService {
         if (!household) 'address': ?_opt(address ?? cur('address')),
         (household ? 'holder' : 'representative'): ?person,
         if (household) 'parent_ref': ?cur('parent_ref'),
-        if (kind == KnRecordKind.cooperative)
-          'htx_ref': ?_opt(htxRef ?? cur('htx_ref')),
         'base_version': version,
       },
     );
@@ -482,6 +466,9 @@ class KnCollectionService {
   }
 
   // ------------------------------------------------- Máy móc HTX (03.04)
+  //
+  // #306: khai báo máy ở kho KN, [coopRef] là mã hồ sơ KN loại HTX
+  // (`producer-records`), không phải HTX đã công bố.
 
   Future<(Map<String, Object?>, bool)> machineCounts({String? commune}) =>
       _getCached('/v1/kn/machine-counts', query: {'commune': ?commune});
