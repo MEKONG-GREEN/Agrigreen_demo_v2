@@ -89,7 +89,11 @@ class SyncService {
     this.beforeSync,
     this.afterPull,
     ActionQueue? actions,
+    Set<String>? pullEntities,
   }) : _actions = actions,
+       _pullEntities = pullEntities == null
+           ? null
+           : (pullEntities.toList()..sort()),
        _db = db,
        _api = api,
        _outbox = outbox,
@@ -114,6 +118,11 @@ class SyncService {
   final Duration retention;
   final Random _random;
   final ActionQueue? _actions;
+
+  /// Các entity chiều xuống của app này (đã sắp xếp). null = pull tất cả (App
+  /// HTX, App MKG). Có giá trị (App KN — KN-STANDALONE-9 #270): MỌI lượt pull
+  /// chỉ kéo các entity này (`?entities=`), kể cả lượt nạp lại sau `reset`.
+  final List<String>? _pullEntities;
 
   /// Chạy trước mỗi lượt (ví dụ đăng ký thiết bị).
   final Future<void> Function()? beforeSync;
@@ -155,14 +164,21 @@ class SyncService {
   /// [entities] (KN US-SYNC-02, thông điệp `sync_now` có khóa `entities`):
   /// chiều lên vẫn gửi hết, chiều xuống chỉ pull các entity này
   /// (`?entities=`). Máy chủ giữ vị trí con trỏ của entity không đọc nên lượt
-  /// đầy đủ sau đó không mất thay đổi. null/rỗng = pull toàn bộ.
+  /// đầy đủ sau đó không mất thay đổi. null/rỗng = pull toàn bộ (toàn bộ của
+  /// app này nếu app khai `pullEntities`; [entities] khi đó giao với danh sách
+  /// của app).
   Future<SyncReport?> syncOnce({bool force = false, Set<String>? entities}) {
     if (_wipe.wiped) return Future.value(null);
     final running = _running;
     if (running != null) return running.then((_) => null);
-    final only = entities == null || entities.isEmpty
-        ? null
-        : (entities.toList()..sort());
+    final base = _pullEntities;
+    var only = base;
+    if (entities != null && entities.isNotEmpty) {
+      final narrowed =
+          entities.where((e) => base == null || base.contains(e)).toList()
+            ..sort();
+      if (narrowed.isNotEmpty) only = narrowed;
+    }
     final f = _run(force, only);
     _running = f;
     return f.whenComplete(() => _running = null);
@@ -351,11 +367,14 @@ class SyncService {
         }
         rethrow;
       }
-      if (entities != null && page.reset) {
+      if (entities != null &&
+          page.reset &&
+          !identical(entities, _pullEntities)) {
         // Phạm vi đã đổi: trang `reset` chỉ mang một phần entity mà áp nó sẽ
         // thay TOÀN BỘ dữ liệu tham chiếu → bỏ trang, pull đầy đủ từ con trỏ cũ
-        // (máy chủ trả lại `reset` cho lượt đầy đủ).
-        entities = null;
+        // (máy chủ trả lại `reset` cho lượt đầy đủ). Đầy đủ = danh sách của app
+        // nếu có khai (trang `reset` của chính danh sách đó thì áp).
+        entities = _pullEntities;
         continue;
       }
       await _refs.applyPage(page);
