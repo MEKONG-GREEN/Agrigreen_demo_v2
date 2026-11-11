@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND GIẢ LẬP thửa KN (FN-XA-03.05, TT-11 #104): /v1/kn/plots (pf/cooperative) + /v1/kn/plot-profiles (hồ sơ KN
+// BACKEND GIẢ LẬP thửa KN (FN-XA-03.05, TT-11 #104): /v1/kn/plots (kho KN pf_extension, #271) + /v1/kn/plot-profiles (hồ sơ KN
 // riêng #119). Quy tắc như Go ở mức màn web cần: Tên thửa, Chủ hộ, Xã bắt buộc; diện tích tính từ hình; mọi chồng lấn bị
 // chặn (409 geo.plot_overlap — giả lập so khung bao); sửa ranh giới = phiên bản mới thay supersedes_boundary_id, lý do
 // ≥ 10 ký tự; cây trồng bắt buộc, thuộc danh mục crop đang dùng, thửa ngừng dùng → 409.
@@ -9,6 +9,7 @@ import { uuidv7 } from "../idempotency";
 import { CATALOGS } from "./data";
 import { json, problem, type Ctx, type Route } from "./http";
 import type { Caller } from "./kn-reports/store";
+import { knCoopRecordRef } from "./kn-schedules";
 
 type Polygon = { type: "Polygon"; coordinates: LngLat[][] };
 interface Plot {
@@ -72,7 +73,7 @@ function seed(coops: PlotCoop[]): void {
       code: `TH-${x.code}-01`,
       lot_name: `Lô 1 ${x.name.replace(/^HTX /, "")}`,
       commune_code: x.commune_code,
-      cooperative_ref: x.ref,
+      cooperative_ref: knCoopRecordRef(i), // #271: HTX của thửa là hồ sơ KN
       farmer_label: "Nguyễn V. A.",
       note: null,
       area_ha: areaHa(geometry).toFixed(4),

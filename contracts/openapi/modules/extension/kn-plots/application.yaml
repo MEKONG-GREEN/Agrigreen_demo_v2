@@ -4,11 +4,11 @@ paths:
     get:
       summary: "FN-XA-03.05: danh sách thửa trong phạm vi ngữ cảnh (không hình học)"
       operationId: knListPlots
-      tags: [geo]
+      tags: [extension]
       parameters:
         - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: commune, in: query, schema: {type: string}, description: "Vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 geo.out_of_scope"}
-        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
+        - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}, description: "Hồ sơ KN loại HTX"}
         - {name: cursor, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
       responses:
@@ -27,7 +27,7 @@ paths:
     post:
       summary: "FN-XA-03.05: vẽ lô mới (Cấp Xã, Admin) — chặn mọi chồng lấn, diện tích tự tính"
       operationId: knCreatePlot
-      tags: [geo]
+      tags: [extension]
       parameters:
         - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -44,15 +44,15 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNPlotWrite"}
         "403": {description: "geo.read_only | forbidden | geo.out_of_scope", $ref: "#/components/responses/Problem"}
-        "409": {description: "geo.plot_overlap (kèm overlaps) | geo.plot_exists", $ref: "#/components/responses/Problem"}
-        "422": {description: "validation_failed | geo.too_few_points | geo.invalid_geometry | geo.area_out_of_range | geo.outside_commune | geo.cooperative_invalid | geo.support_reason_required", $ref: "#/components/responses/Problem"}
+        "409": {description: "geo.plot_overlap (kèm overlaps) | geo.plot_state_conflict", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed | geo.too_few_points | geo.invalid_geometry | geo.area_out_of_range | geo.outside_commune | geo.support_reason_required", $ref: "#/components/responses/Problem"}
         "503": {description: geo.dependency_unavailable, $ref: "#/components/responses/Problem"}
 # @ag-order: 275
   /v1/kn/plots/export:
     get:
       summary: "FN-XA-03.05: tải thửa của một xã (GeoJSON | KML)"
       operationId: knExportPlots
-      tags: [geo]
+      tags: [extension]
       parameters:
         - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
         - {name: commune, in: query, required: true, schema: {type: string}}
@@ -75,7 +75,7 @@ paths:
     get:
       summary: "FN-XA-03.05: chi tiết thửa kèm hình (ngoài phạm vi/phòng ban → 404)"
       operationId: knGetPlot
-      tags: [geo]
+      tags: [extension]
       responses:
         "200":
           description: Thửa
@@ -86,7 +86,7 @@ paths:
     put:
       summary: "FN-XA-03.05: sửa thuộc tính (sự kiện bù attributes_changed, Log). Trường vắng = giữ nguyên; null = xóa"
       operationId: knUpdatePlot
-      tags: [geo]
+      tags: [extension]
       parameters:
         - {name: Idempotency-Key, in: header, required: false, schema: {type: string}, description: "Tùy chọn: PUT lặp cùng khóa → cùng kết quả"}
       requestBody:
@@ -99,7 +99,7 @@ paths:
                 lot_name: {type: string, maxLength: 200}
                 note: {type: [string, "null"], maxLength: 1000}
                 farmer_name: {type: [string, "null"], maxLength: 200, description: "→ kho định danh; null/'' = bỏ"}
-                cooperative_ref: {type: [string, "null"], format: uuid}
+                cooperative_ref: {type: [string, "null"], format: uuid, description: "Hồ sơ KN loại HTX (/v1/kn/producer-records, kind cooperative) — #271"}
                 declared_area_ha: {type: [string, "null"], description: "decimal > 0"}
                 reason: {type: string, maxLength: 500}
       responses:
@@ -117,7 +117,7 @@ paths:
     post:
       summary: "FN-XA-03.05: sửa ranh giới — phiên bản mới thay supersedes_boundary_id (chặn mọi chồng lấn)"
       operationId: knCorrectPlotBoundary
-      tags: [geo]
+      tags: [extension]
       parameters:
         - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
@@ -148,7 +148,7 @@ paths:
     get:
       summary: "FN-XA-03.05: lịch sử thửa (thuộc tính + phiên bản ranh giới), mới nhất trước"
       operationId: knPlotLog
-      tags: [geo]
+      tags: [extension]
       parameters:
         - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
@@ -156,7 +156,7 @@ paths:
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
         "200":
-          description: "Log; event ∈ created|assigned|retired|restored|attributes_changed|boundary_recorded|boundary_corrected"
+          description: "Log; event ∈ migrated|created|attributes_changed|boundary_corrected (ảnh chụp sổ kn_plot_version)"
           content:
             application/json:
               schema: {$ref: "#/components/schemas/KNRecordLogPage"}
@@ -179,7 +179,7 @@ components:
       properties:
         plot_ref: {type: string, format: uuid, description: UUIDv7 (tùy chọn)}
         commune_code: {type: string}
-        cooperative_ref: {type: [string, "null"], format: uuid}
+        cooperative_ref: {type: [string, "null"], format: uuid, description: "Hồ sơ KN loại HTX (/v1/kn/producer-records, kind cooperative) — #271"}
         farmer_name: {type: string, maxLength: 200, description: "→ kho định danh (farmer_ref); API chỉ trả nhãn đã che"}
         lot_name: {type: string, maxLength: 200}
         note: {type: string, maxLength: 1000}
@@ -195,7 +195,7 @@ components:
         code: {type: string}
         lot_name: {type: [string, "null"]}
         commune_code: {type: string}
-        cooperative_ref: {type: [string, "null"], format: uuid}
+        cooperative_ref: {type: [string, "null"], format: uuid, description: "Hồ sơ KN loại HTX (/v1/kn/producer-records, kind cooperative) — #271"}
         farmer:
           type: [object, "null"]
           properties:

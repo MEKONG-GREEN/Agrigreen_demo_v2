@@ -7,18 +7,19 @@ package extension
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/htxread"
 	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
 	kahandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/handler"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/platformread"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
 // newKNAttrs dựng use case từ pool gốc (bộ đọc publication tự gắn vai r_extension) và pool đã gắn vai của module.
-func newKNAttrs(pool, moduleDB tenant.Beginner, clk clock.Clock, catalogs mdport.Catalogs) *kaapp.Service {
-	return &kaapp.Service{DB: moduleDB, Clock: clk, Catalogs: catalogs, Orgs: platformread.NewOrganizations(pool), Plots: htxread.New(pool)}
+// Thửa đọc từ kho KN (knplot, #271) thay publication HTX pf_cooperative_pub.v1_plots.
+func newKNAttrs(pool, moduleDB tenant.Beginner, clk clock.Clock, catalogs mdport.Catalogs, plots port.PlotDirectory) *kaapp.Service {
+	return &kaapp.Service{DB: moduleDB, Clock: clk, Catalogs: catalogs, Orgs: platformread.NewOrganizations(pool), Plots: plots}
 }
 
 func (m *Module) registerKNAttrs(rg *gin.RouterGroup) {

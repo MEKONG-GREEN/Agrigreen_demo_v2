@@ -708,10 +708,9 @@ class _CoopDetailState extends ConsumerState<KnCooperativeDetailScreen> {
                             cooperativeRef: htxRef,
                             embedded: true,
                           ),
-                  if (coop)
-                    htxRef == null
-                        ? noHtx()
-                        : KnPlotsList(cooperativeRef: htxRef),
+                  // #271: thửa gán CHÍNH hồ sơ KN loại HTX (kho KN), không cần
+                  // liên kết HTX đã công bố.
+                  if (coop) KnPlotsList(cooperativeRef: widget.ref),
                 ],
               ),
             ),

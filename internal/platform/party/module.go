@@ -80,7 +80,6 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Me{Reg: m.reg}.Register(rg)
 	handler.Sharing{Svc: m.share}.RegisterApp(rg)
 	handler.KN{Svc: m.kn}.RegisterApp(rg)
-	handler.KN{Svc: m.kn}.RegisterKNCollect(rg)  // KN v7.7 FN-XA-03.03: /v1/kn/cooperatives* (nông hộ: pf/cooperative)
 	handler.Modules{Svc: m.mods}.RegisterApp(rg) // W1.4: GET /v1/me/modules
 }
 

@@ -537,7 +537,7 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 	s.wantCode(tw.post("/v1/extension/consolidations", map[string]any{"period_id": s.period}), http.StatusForbidden, "extension.read_only", "TW cập nhật")
 	s.wantCode(agSubmit(tw, t1c1, "submitted", map[string]string{"F": "1"}), http.StatusForbidden, "extension.read_only", "TW gửi")
 	s.wantCode(tw.post("/v1/extension/report-periods/"+s.period+"/close", map[string]any{}), http.StatusForbidden, "extension.read_only", "TW chốt")
-	s.wantCode(tw.post("/v1/kn/cooperatives", map[string]any{"name": "HTX TW", "commune_code": agC1}), http.StatusMethodNotAllowed, "method_not_allowed", "TW không còn route ghi HTX legacy")
+	s.wantCode(tw.post("/v1/kn/cooperatives", map[string]any{"name": "HTX TW", "commune_code": agC1}), http.StatusNotFound, "not_found", "TW không còn route HTX legacy (#271)")
 	s.wantCode(tw.post("/v1/kn/materials", map[string]any{"commune_code": agC1, "recorded_on": "2026-08-31", "lines": []any{map[string]any{"material_code": "PHAN_URE", "quantity": "1"}}}),
 		http.StatusForbidden, "", "TW ghi vật tư")
 
@@ -667,10 +667,9 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 		"created_by": "mkg", "new_cooperative": map[string]any{"name": "HTX Nông nghiệp Mỹ Hòa Hưng", "admin_unit_code": agC1, "parent_ref": nodes[agC1], "profile": map[string]any{"area_ha": "85.5"}},
 	}), http.StatusCreated, "Admin MKG lập HTX native qua Neo")
 	cref := str(seed.body, "org_ref")
-	coop := s.want(xa1.get("/v1/kn/cooperatives/"+cref), http.StatusOK, "KN đọc HTX native có sẵn")
-	s.noPII("HTX", coop.raw)
-	s.want(xa1.get("/v1/kn/cooperatives/"+cref+"/log"), http.StatusOK, "Log HTX vẫn đọc")
-	s.wantCode(xa2.get("/v1/kn/cooperatives/"+cref), http.StatusNotFound, "party.org_not_found", "Cán bộ xã khác đọc HTX")
+	// #271 (KN-STANDALONE-5-TT-DATA): KN không còn đọc HTX nền tảng qua /v1/kn/cooperatives* — HTX của KN là hồ sơ KN.
+	s.wantCode(xa1.get("/v1/kn/cooperatives/"+cref), http.StatusNotFound, "not_found", "KN không đọc HTX nền tảng")
+	s.wantCode(xa1.get("/v1/kn/cooperatives/"+cref+"/log"), http.StatusNotFound, "not_found", "KN không đọc Log HTX nền tảng")
 	mc := s.want(xa1.app(http.MethodPut, "/v1/kn/machine-counts/"+cref, map[string]any{"lines": []any{map[string]any{"machine_type": "MLD", "quantity": 2},
 		map[string]any{"machine_type": "MGD", "quantity": 1}}}), http.StatusOK, "khai báo máy")
 	if num(mc.body, "total") != 3 {
@@ -722,8 +721,8 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 		status       int
 		code         string
 	}{
-		{http.MethodPost, "/v1/kn/cooperatives", http.StatusMethodNotAllowed, "method_not_allowed"},
-		{http.MethodPut, "/v1/kn/cooperatives/" + cref, http.StatusMethodNotAllowed, "method_not_allowed"},
+		{http.MethodPost, "/v1/kn/cooperatives", http.StatusNotFound, "not_found"},
+		{http.MethodPut, "/v1/kn/cooperatives/" + cref, http.StatusNotFound, "not_found"},
 		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/deactivate", http.StatusNotFound, "not_found"},
 		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/reactivate", http.StatusNotFound, "not_found"},
 		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/households", http.StatusMethodNotAllowed, "method_not_allowed"},

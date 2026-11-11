@@ -99,47 +99,6 @@ paths:
         "404": {description: "party.household_not_found", $ref: "#/components/responses/Problem"}
         "409": {description: "party.membership_unchanged | party.org_state_conflict", $ref: "#/components/responses/Problem"}
         "422": {description: "party.membership_reason_required", $ref: "#/components/responses/Problem"}
-# @ag-order: 263
-  /v1/kn/cooperatives:
-    get:
-      tags: [party]
-      summary: "Danh sách HTX trên các xã phụ trách (FN-XA-03.03)"
-      operationId: knListCooperatives
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: commune, in: query, schema: {type: string}, description: "Mã xã; vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 party.out_of_scope"}
-        - {name: status, in: query, schema: {type: string, enum: [active, inactive, all], default: active}}
-        - {name: q, in: query, schema: {type: string}, description: "Tìm theo tên, Mã HTX, mã số thuế"}
-        - {name: area_min, in: query, schema: {type: string}, description: "Diện tích tối thiểu (ha, decimal)"}
-        - {name: area_max, in: query, schema: {type: string}, description: "Diện tích tối đa (ha, decimal)"}
-        - {name: confirmation, in: query, description: "D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận)", schema: {$ref: "#/components/schemas/HTXConfirmationStatus"}}
-        - {name: cursor, in: query, schema: {type: string}}
-        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
-      responses:
-        "200":
-          description: Một trang HTX
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNCooperativeList"}
-        "403": {$ref: "#/components/responses/Problem"}
-        "422": {$ref: "#/components/responses/Problem"}
-        "428": {$ref: "#/components/responses/Problem"}
-# @ag-order: 264
-  /v1/kn/cooperatives/{ref}:
-    get:
-      tags: [party]
-      summary: "Chi tiết HTX (ngoài phạm vi → 404)"
-      operationId: knGetCooperative
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-      responses:
-        "200":
-          description: HTX
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNCooperative"}
-        "404": {$ref: "#/components/responses/Problem"}
 # @ag-order: 267
   /v1/kn/cooperatives/{ref}/households:
     get:
@@ -157,24 +116,6 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/KNHouseholdList"}
-        "404": {$ref: "#/components/responses/Problem"}
-# @ag-order: 268
-  /v1/kn/cooperatives/{ref}/log:
-    get:
-      tags: [party]
-      summary: "Log HTX: tạo, vô hiệu hóa/kích hoạt lại, sửa hồ sơ (cũ → mới, không PII)"
-      operationId: knCooperativeLog
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-        - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "Vị trí trong Log đã gộp (next_cursor)"}
-        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
-      responses:
-        "200":
-          description: Log
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNLogPage"}
         "404": {$ref: "#/components/responses/Problem"}
 # @ag-order: 270
   /v1/kn/households/{ref}/log:
