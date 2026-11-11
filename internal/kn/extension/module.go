@@ -35,6 +35,7 @@ import (
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
 	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knaudit"
+	kpapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knplot/app"
 	krapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knrecords/app"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/handler"
@@ -127,6 +128,8 @@ type Module struct {
 	knqg *knqgService
 	// KNSPLIT-2-KN-RECORDS (#67): hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (module_knrecords.go).
 	records *krapp.Service
+	// KN-STANDALONE-5-TT-DATA (#271): thửa ruộng KN ở pf_extension (module_knplot.go).
+	plots *kpapp.Service
 	// AUDIT-LOG-KN (#73): nguồn nhật ký KN, quyền xem, sổ lượt xem bền (module_knaudit.go).
 	audit *knaudit.Service
 	// KNSPLIT-2-PARTY-KN-ROUTES (#118): danh mục phòng ban của pf/party, binding HTTP do KN sở hữu (extension/departments).
@@ -157,7 +160,8 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.rc.BM11Programs = m.bm11Programs // W11.45: kết quả CT/DA cho Báo cáo phòng BM-11
 	m.rc.BM11Herds = m.bm11Herds       // #253: hộ, trang trại theo loại chăn nuôi cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()
-	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs)
+	m.plots = m.newKNPlots(db, clk, d.Params)
+	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs, m.plots)
 	m.records = m.newKNRecords(pool, db, clk, d.Units)
 	m.audit = newKNAudit(db, clk)
 	return m
@@ -188,6 +192,7 @@ func (m *Module) UseRoleHolders(h accport.RoleHolders) { m.svc.Holders = h }
 // xuất nội bộ: ghi egress_event, không bao giờ bị chặn kể cả AG_EGRESS_MODE=enforce.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
+	m.plots.Egress, m.plots.EgressMode, m.plots.Log = cp, mode, log // FN-XA-03.05: tải tệp thửa
 	if m.khtcReports != nil {
 		m.khtcReports.Egress, m.khtcReports.EgressMode = cp, mode
 	}
@@ -243,6 +248,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerKNAttrs(rg)                                   // BF-SRV-KN-ATTRS
 	m.registerCNTSKNQG(rg)                                  // W11.53
 	m.registerKNRecords(rg)                                 // KNSPLIT-2-KN-RECORDS
+	m.registerKNPlots(rg)                                   // KN-STANDALONE-5-TT-DATA (#271)
 	departments.Handler{Svc: m.departments}.RegisterApp(rg) // KNSPLIT-2 #118, #222: GET /v1/departments, /v1/menu, /v1/departments/{code}/modules
 }
 

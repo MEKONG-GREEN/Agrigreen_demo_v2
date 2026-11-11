@@ -488,7 +488,7 @@ export function createCollectApi(opts: KnHttpOptions) {
     materialLog: (id: string) => call<A["KNRecordLogPage"]>("GET", `/v1/kn/materials/${id}/log`),
     /** BF-TT-MAT "Nạp Excel": máy chủ đọc tệp CSV/.xlsx thành dòng của bảng nhập — không ghi sổ. */
     importMaterials: (file: RawFile) => call<MaterialImport>("POST", "/v1/kn/materials/import", file),
-    // TT-11 (#104): thửa — hình, tên, chủ hộ ở pf/cooperative (/v1/kn/plots); cây trồng ở hồ sơ KN riêng (#119).
+    // TT-11 (#104): thửa — hình, tên, chủ hộ ở kho KN (/v1/kn/plots, pf_extension — #271); cây trồng ở hồ sơ KN riêng (#119).
     plot: (ref: string) => call<KnPlotDetail>("GET", `/v1/kn/plots/${ref}`),
     plotLog: (ref: string) => call<A["KNRecordLogPage"]>("GET", `/v1/kn/plots/${ref}/log`),
     /** GeoJSON thửa của một xã (có hình) — lớp ngữ cảnh khi vẽ/sửa. */

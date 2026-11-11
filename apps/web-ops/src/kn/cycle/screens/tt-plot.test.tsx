@@ -43,7 +43,7 @@ const plot = {
   code: "TH-01",
   lot_name: "Lô 1",
   commune_code: "91301",
-  cooperative_ref: "htx-1",
+  cooperative_ref: "kn-1", // #271: HTX của thửa là mã hồ sơ KN
   farmer: { label: "Nguyễn V. A." },
   note: null,
   area_ha: "1.2345",
@@ -70,6 +70,7 @@ beforeEach(() => {
     plotLog: vi.fn().mockResolvedValue({ items: [] }),
     plotShapes: vi.fn().mockResolvedValue({ type: "FeatureCollection", features: [] }),
     records: recordsMock([knHtxRecord("kn-1", "HTX Mỹ Hòa", "htx-1")]),
+    record: vi.fn().mockResolvedValue(knHtxRecord("kn-1", "HTX Mỹ Hòa", "htx-1")),
     htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
     crops: vi.fn().mockResolvedValue(CROPS),
     createPlot: vi.fn().mockResolvedValue({ ...plot, ref: "plot-new" }),
@@ -104,7 +105,7 @@ describe("TT-11 quy tắc (thuần)", () => {
   });
 
   it("PUT chỉ gửi trường đã đổi; Chủ hộ trống = giữ nguyên; không đổi gì → không gọi", () => {
-    const base = { lot_name: "Lô 1", farmer_name: "", cooperative_ref: "htx-1", note: "" };
+    const base = { lot_name: "Lô 1", farmer_name: "", cooperative_ref: "kn-1", note: "" };
     expect(plotUpdateBody(plot, base)).toBeNull();
     expect(plotUpdateBody(plot, { ...base, lot_name: " Lô 1A ", farmer_name: "Trần Văn B", cooperative_ref: "" })).toEqual({ lot_name: "Lô 1A", farmer_name: "Trần Văn B", cooperative_ref: null });
   });

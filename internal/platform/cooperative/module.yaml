@@ -49,6 +49,7 @@ provides:
   publications:
     - pf_cooperative_pub.confirmations/v1
     - pf_cooperative_pub.cooperatives/v1
+    - pf_cooperative_pub.plot_export/v1
     - pf_cooperative_pub.plots/v1
     - pf_cooperative_pub.seasons/v1
   data_products: []

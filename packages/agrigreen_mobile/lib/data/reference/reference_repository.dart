@@ -36,6 +36,9 @@ abstract final class RefEntity {
   static const cooperative = 'cooperative';
   static const household = 'household';
   static const plot = 'plot';
+
+  /// Thửa ruộng của KN (kho KN pf_extension, #271) — app hiện trường KN.
+  static const knPlot = 'kn_plot';
   static const task = 'task';
   static const directive = 'directive';
   static const document = 'document';

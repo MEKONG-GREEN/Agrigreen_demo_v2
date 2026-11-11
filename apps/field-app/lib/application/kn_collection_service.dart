@@ -351,19 +351,6 @@ class KnCollectionService {
     ];
   }
 
-  /// HTX nền tảng (legacy GET, CHỈ ĐỌC) — bộ chọn HTX của màn Thửa (khai báo
-  /// thửa, máy vẫn ở module nền, #162). Không dùng để ghi.
-  Future<KnPage> cooperatives({
-    String? commune,
-    String status = 'active',
-    String? q,
-    String? cursor,
-  }) => _page('/v1/kn/cooperatives', {
-    'commune': ?commune,
-    'status': status,
-    if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
-  }, cursor: cursor);
-
   static String? _opt(String? v) {
     final t = v?.trim();
     return t == null || t.isEmpty ? null : t;

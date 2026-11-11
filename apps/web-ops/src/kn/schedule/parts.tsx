@@ -13,7 +13,7 @@ import { logEventLabel, placeBySession, SESSIONS, SESSION_LABEL, statusLabel, ST
 import { addDays, currentWeekStart, dayColumnLabel, weekDays, weekRangeLabel } from "./week";
 
 // ---------------------------------------------------------------------------
-// Tra tên xã, HTX (masterdata / registry) — có bộ nhớ đệm trong tab
+// Tra tên xã (masterdata), HTX (hồ sơ KN riêng) — có bộ nhớ đệm trong tab
 // ---------------------------------------------------------------------------
 const COMMUNE_CACHE = new Map<string, string>();
 const COOP_CACHE = new Map<string, { ref: string; name: string }[]>();
@@ -48,20 +48,30 @@ export function useCommuneNames(api: ApiClient, codes: readonly string[], known:
   return (code) => (code ? (known.find((k) => k.code === code)?.name ?? COMMUNE_CACHE.get(code) ?? code) : "");
 }
 
-/** HTX của một xã (GET /v1/cooperatives?admin_unit=…) cho ô "Địa điểm: HTX". */
+/**
+ * HTX của một xã từ hồ sơ KN riêng (GET /v1/kn/producer-records?kind=cooperative, FN-XA-03.03) — KN-STANDALONE-5-TT-DATA
+ * (#271): KN tự quản danh sách HTX, không đọc HTX nền tảng (/v1/cooperatives) của module HTX. Lỗi đọc → danh sách rỗng.
+ */
+async function loadKnCoops(api: ApiClient, communeCode: string): Promise<void> {
+  try {
+    // X-AG-Context do middleware của createApiClient gắn (hợp đồng khai header bắt buộc).
+    const header = {} as { "X-AG-Context": string };
+    const res = await api.GET("/v1/kn/producer-records", { params: { header, query: { kind: "cooperative", commune: communeCode, status: "active", limit: 200 } } });
+    const list = (res.data?.items ?? []).map((c) => ({ ref: c.ref, name: c.display_name }));
+    list.forEach((c) => COOP_NAMES.set(c.ref, c.name));
+    COOP_CACHE.set(communeCode, list);
+  } catch {
+    COOP_CACHE.set(communeCode, []);
+  }
+}
+
+/** HTX (hồ sơ KN) của một xã cho ô "Địa điểm: HTX". */
 export function useCoops(api: ApiClient, communeCode: string | null | undefined): { ref: string; name: string }[] {
   const [, setTick] = useState(0);
   useEffect(() => {
     if (!communeCode || COOP_CACHE.has(communeCode)) return;
     let active = true;
-    api
-      .GET("/v1/cooperatives", { params: { query: { admin_unit: communeCode, limit: 200 } } })
-      .then((res) => {
-        const list = (res.data?.items ?? []).map((c) => ({ ref: c.ref, name: c.name }));
-        list.forEach((c) => COOP_NAMES.set(c.ref, c.name));
-        COOP_CACHE.set(communeCode, list);
-      })
-      .catch(() => COOP_CACHE.set(communeCode, []))
+    loadKnCoops(api, communeCode)
       .finally(() => {
         if (active) setTick((t) => t + 1);
       });
@@ -82,14 +92,7 @@ export function usePreloadCoops(api: ApiClient, communeCodes: readonly string[])
     let active = true;
     void Promise.all(
       missing.map((code) =>
-        api
-          .GET("/v1/cooperatives", { params: { query: { admin_unit: code, limit: 200 } } })
-          .then((res) => {
-            const list = (res.data?.items ?? []).map((c) => ({ ref: c.ref, name: c.name }));
-            list.forEach((c) => COOP_NAMES.set(c.ref, c.name));
-            COOP_CACHE.set(code, list);
-          })
-          .catch(() => COOP_CACHE.set(code, [])),
+        loadKnCoops(api, code),
       ),
     ).then(() => {
       if (active) setTick((t) => t + 1);

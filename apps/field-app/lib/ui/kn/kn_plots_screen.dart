@@ -6,6 +6,7 @@ import 'package:agrigreen_mobile/ui/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../application/kn_collection_service.dart' show KnRecordKind;
 import '../providers.dart';
 import 'kn_common.dart';
 import 'kn_providers.dart';
@@ -23,8 +24,14 @@ Future<bool?> openKnPlotEditor(
   final pf = ref.read(platformProvider);
   var coops = <(String, String)>[];
   try {
-    final page = await ref.read(knCollectionServiceProvider).cooperatives();
-    coops = [for (final c in page.items) ('${c['ref']}', '${c['name']}')];
+    // #271: HTX của thửa là hồ sơ KN loại HTX (FN-XA-03.03), không phải HTX
+    // nền tảng — KN không còn đọc /v1/kn/cooperatives.
+    final page = await ref
+        .read(knCollectionServiceProvider)
+        .records(kind: KnRecordKind.cooperative);
+    coops = [
+      for (final c in page.items) ('${c['ref']}', '${c['display_name']}'),
+    ];
   } on Object {
     // ngoại tuyến không có bản đệm: bỏ chọn HTX
   }
@@ -173,7 +180,7 @@ class KnPlotsListState extends ConsumerState<KnPlotsList> {
           trailing: const Icon(Icons.edit_location_alt),
           onTap: () async {
             final s = ref.services;
-            final row = await s.refs.get(RefEntity.plot, '${p['ref']}');
+            final row = await s.refs.get(RefEntity.knPlot, '${p['ref']}');
             if (!ctx.mounted) return;
             if (row == null) {
               showMessage(
