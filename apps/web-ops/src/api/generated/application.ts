@@ -4949,40 +4949,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kn/cooperatives": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Danh sách HTX trên các xã phụ trách (FN-XA-03.03) */
-        get: operations["knListCooperatives"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/kn/cooperatives/{ref}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Chi tiết HTX (ngoài phạm vi → 404) */
-        get: operations["knGetCooperative"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/kn/cooperatives/{ref}/households": {
         parameters: {
             query?: never;
@@ -4992,23 +4958,6 @@ export interface paths {
         };
         /** Nông hộ thành viên của HTX (tab Nông hộ) */
         get: operations["knListHouseholds"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/kn/cooperatives/{ref}/log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Log HTX: tạo, vô hiệu hóa/kích hoạt lại, sửa hồ sơ (cũ → mới, không PII) */
-        get: operations["knCooperativeLog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -18311,7 +18260,10 @@ export interface components {
              */
             plot_ref?: string;
             commune_code: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description Hồ sơ KN loại HTX (/v1/kn/producer-records, kind cooperative) — #271
+             */
             cooperative_ref?: string | null;
             /** @description → kho định danh (farmer_ref); API chỉ trả nhãn đã che */
             farmer_name?: string;
@@ -18332,7 +18284,10 @@ export interface components {
             code: string;
             lot_name: string | null;
             commune_code: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description Hồ sơ KN loại HTX (/v1/kn/producer-records, kind cooperative) — #271
+             */
             cooperative_ref: string | null;
             farmer: {
                 label?: string | null;
@@ -36887,72 +36842,6 @@ export interface operations {
             502: components["responses"]["Problem"];
         };
     };
-    knListCooperatives: {
-        parameters: {
-            query?: {
-                /** @description Mã xã; vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 party.out_of_scope */
-                commune?: string;
-                status?: "active" | "inactive" | "all";
-                /** @description Tìm theo tên, Mã HTX, mã số thuế */
-                q?: string;
-                /** @description Diện tích tối thiểu (ha, decimal) */
-                area_min?: string;
-                /** @description Diện tích tối đa (ha, decimal) */
-                area_max?: string;
-                /** @description D2: lọc theo trạng thái xác nhận; vắng = mọi HTX (gồm HTX tạm Chưa xác nhận) */
-                confirmation?: components["schemas"]["HTXConfirmationStatus"];
-                cursor?: string;
-                limit?: number;
-            };
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Một trang HTX */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNCooperativeList"];
-                };
-            };
-            403: components["responses"]["Problem"];
-            422: components["responses"]["Problem"];
-            428: components["responses"]["Problem"];
-        };
-    };
-    knGetCooperative: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description HTX */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNCooperative"];
-                };
-            };
-            404: components["responses"]["Problem"];
-        };
-    };
     knListHouseholds: {
         parameters: {
             query?: {
@@ -36977,36 +36866,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KNHouseholdList"];
-                };
-            };
-            404: components["responses"]["Problem"];
-        };
-    };
-    knCooperativeLog: {
-        parameters: {
-            query?: {
-                /** @description Vị trí trong Log đã gộp (next_cursor) */
-                cursor?: number;
-                limit?: number;
-            };
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Log */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNLogPage"];
                 };
             };
             404: components["responses"]["Problem"];
@@ -37168,6 +37027,7 @@ export interface operations {
             query?: {
                 /** @description Vắng = mọi xã trong phạm vi; ngoài phạm vi → 403 geo.out_of_scope */
                 commune?: string;
+                /** @description Hồ sơ KN loại HTX */
                 cooperative_ref?: string;
                 cursor?: string;
                 limit?: number;
@@ -37228,9 +37088,9 @@ export interface operations {
             };
             /** @description geo.read_only | forbidden | geo.out_of_scope */
             403: components["responses"]["Problem"];
-            /** @description geo.plot_overlap (kèm overlaps) | geo.plot_exists */
+            /** @description geo.plot_overlap (kèm overlaps) | geo.plot_state_conflict */
             409: components["responses"]["Problem"];
-            /** @description validation_failed | geo.too_few_points | geo.invalid_geometry | geo.area_out_of_range | geo.outside_commune | geo.cooperative_invalid | geo.support_reason_required */
+            /** @description validation_failed | geo.too_few_points | geo.invalid_geometry | geo.area_out_of_range | geo.outside_commune | geo.support_reason_required */
             422: components["responses"]["Problem"];
             /** @description geo.dependency_unavailable */
             503: components["responses"]["Problem"];
@@ -37311,7 +37171,10 @@ export interface operations {
                     note?: string | null;
                     /** @description → kho định danh; null/'' = bỏ */
                     farmer_name?: string | null;
-                    /** Format: uuid */
+                    /**
+                     * Format: uuid
+                     * @description Hồ sơ KN loại HTX (/v1/kn/producer-records, kind cooperative) — #271
+                     */
                     cooperative_ref?: string | null;
                     /** @description decimal > 0 */
                     declared_area_ha?: string | null;
@@ -37395,7 +37258,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Log; event ∈ created|assigned|retired|restored|attributes_changed|boundary_recorded|boundary_corrected */
+            /** @description Log; event ∈ migrated|created|attributes_changed|boundary_corrected (ảnh chụp sổ kn_plot_version) */
             200: {
                 headers: {
                     [name: string]: unknown;

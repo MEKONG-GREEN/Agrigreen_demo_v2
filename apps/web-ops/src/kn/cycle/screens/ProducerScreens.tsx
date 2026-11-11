@@ -231,7 +231,7 @@ export function ProducerDetailScreen({ kind }: { kind: KnProducerKind }) {
     const [hh, mm, pl] = await Promise.all([
       c.kind === "household" ? Promise.resolve([] as KnProducer[]) : loadAllRecords(collectApi, { kind: "household", parent_ref: id, status: "all" }),
       c.htx_ref ? collectApi.coopMachines(c.htx_ref).catch(() => null) : Promise.resolve(null),
-      c.htx_ref ? collectApi.plots({ cooperative_ref: c.htx_ref }).catch(() => null) : Promise.resolve(null),
+      c.kind === "cooperative" ? collectApi.plots({ cooperative_ref: c.ref }).catch(() => null) : Promise.resolve(null), // #271: thửa gán hồ sơ KN
     ]);
     return { c, hh, mm, pl: pl?.items ?? [] };
   }, [id, act.note]);

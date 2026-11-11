@@ -11,6 +11,10 @@
     },
     {
       "Reader": "r_agg",
+      "View": "pf_cooperative_pub.v1_plot_export"
+    },
+    {
+      "Reader": "r_agg",
       "View": "pf_cooperative_pub.v1_plots"
     },
     {
@@ -24,6 +28,10 @@
     {
       "Reader": "r_metrics",
       "View": "pf_cooperative_pub.v1_cooperatives"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_cooperative_pub.v1_plot_export"
     },
     {
       "Reader": "r_metrics",

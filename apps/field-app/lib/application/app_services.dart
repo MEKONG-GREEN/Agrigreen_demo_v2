@@ -17,6 +17,7 @@ import 'package:agrigreen_mobile/data/files/blob_store.dart';
 import 'package:agrigreen_mobile/data/files/evidence_repository.dart';
 import 'package:agrigreen_mobile/data/map/tile_store.dart';
 import 'package:agrigreen_mobile/data/outbox/outbox_repository.dart';
+import 'package:agrigreen_mobile/domain/outbox_record.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
 import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
 import 'package:agrigreen_mobile/data/push/push_messaging.dart';
@@ -299,11 +300,14 @@ class AppServices {
       sync: sync,
       photos: photos,
       reports: FieldReportService(outbox: outbox, clock: pf.clock),
+      // #271: thửa KN ở kho KN — đồng bộ kn_plot / kn_plot_boundary.
       boundaries: BoundaryService(
         outbox: outbox,
         refs: refs,
         ids: pf.ids,
         db: db,
+        plotEntity: RefEntity.knPlot,
+        pushEntity: PushEntity.knPlotBoundary,
       ),
       tasks: TaskService(outbox: outbox, refs: refs),
       actions: actions,

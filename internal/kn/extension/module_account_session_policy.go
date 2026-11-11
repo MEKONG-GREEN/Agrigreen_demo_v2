@@ -28,7 +28,7 @@ type AccountHomeUnits interface {
 func AccountSessionPolicies(home AccountHomeUnits) accountsport.SessionPolicies {
 	return accountsport.SessionPolicies{SupportAudit: accountSupportAudit, DefaultUnit: func(ctx context.Context) (uuid.UUID, bool, error) {
 		return accountDefaultUnit(ctx, home)
-	}}
+	}, RouteGate: accountRouteGate} // #264: công cụ nền tảng ngoài BRD 2.0 đóng trong phiên KN
 }
 
 // accountSupportAudit trả nhãn nhật ký hỗ trợ của phiên chủ KN đã chọn. Phiên không ở chế độ hỗ trợ (hoặc mã phiên hỗ

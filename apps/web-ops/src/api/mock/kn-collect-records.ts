@@ -8,6 +8,7 @@
 import { uuidv7 } from "../idempotency";
 import { json, problem, type Ctx, type Route } from "./http";
 import type { Caller } from "./kn-reports/store";
+import { knCoopRecordRef } from "./kn-schedules";
 
 type Kind = "cooperative" | "household" | "coop_group";
 const KIND_LABEL: Record<Kind, string> = { cooperative: "HTX", household: "Nông hộ", coop_group: "Tổ hợp tác" };
@@ -71,7 +72,7 @@ function seed(coops: PublishedCoop[]): void {
   const base = () => ({ status: "active" as const, status_reason: null, version: 1, updated_at: at, log: [{ ...entry("created", 1), at }] });
   // Hồ sơ HTX của KN liên kết đối chiếu HTX đã công bố (htx_ref) — dữ liệu demo liên tục với màn Máy móc/Thửa.
   const htx: Rec[] = coops.map((c, i) => ({
-    ref: `01927b3e-0000-7000-8000-0000000e${String(i + 1).padStart(4, "0")}`,
+    ref: knCoopRecordRef(i),
     kind: "cooperative",
     commune_code: c.commune_code,
     name: c.name,

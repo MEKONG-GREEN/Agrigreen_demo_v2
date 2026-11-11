@@ -6,7 +6,7 @@ import { KN_ACCOUNTS } from "@/api/mock/kn-accounts";
 import type { MenuTree } from "@/kn/contract";
 import type { KnSessionState } from "@/auth/AuthProvider";
 import { buildPrincipal } from "@/auth/principal";
-import { activeMenu, isAllowed, isBareRoute } from "@/components/AppShell";
+import { activeMenu, isAllowed, isBareRoute, isKnRemovedTool } from "@/components/AppShell";
 import { AccountMenu } from "./AccountMenu";
 import { Breadcrumb } from "./Breadcrumb";
 import { LoginCard } from "./LoginCard";
@@ -56,7 +56,10 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
       ["2 phòng khác", "not_open"],
     ]);
     const hrefs = menuLinks(admin).map((l) => l.node.href);
-    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/quan-tri/to-chuc", "/kn/phong-ban/trong_trot/danh-muc", "/quan-tri/mau-bao-cao"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/kn/phong-ban/trong_trot/danh-muc"]));
+    // KN-STANDALONE-1-ADMIN-TOOLS (#264): bỏ nhóm "Công cụ nền tảng (tạm)" (BRD 2.0 không có FN); Cơ cấu tổ chức chỉ còn /kn.
+    expect(hrefs.filter((h) => h !== undefined && isKnRemovedTool(h))).toEqual([]);
+    expect(menuLinks(admin).map((l) => l.node.label)).not.toContain("Công cụ nền tảng (tạm)");
     // BF-ACC-KN-MENU (#120, TT-13): Admin KN quản lý người dùng qua /kn/quan-tri/nguoi-dung; bỏ liên kết native cũ.
     expect(hrefs).not.toContain("/quan-tri/tai-khoan");
     expect(menuLinks(admin).map((l) => l.node.label)).not.toContain("Tài khoản cán bộ (G1)");
@@ -348,6 +351,20 @@ describe("AppShell: nguồn menu và kiểm hiển thị", () => {
     expect(isAllowed("/kn/nhiem-vu/cong-viec", active, tinh, tinhPrincipal)).toBe(false);
     expect(isAllowed("/thong-bao", active, tinh, tinhPrincipal)).toBe(true);
     expect(isAllowed("/quan-tri/tai-khoan", active, tinh, tinhPrincipal)).toBe(false);
+  });
+
+  it("KN-STANDALONE-1-ADMIN-TOOLS (#264): phiên KN không vào 10 công cụ nền tảng dù có vai realm quản trị; phiên nền tảng giữ nguyên", () => {
+    const adminPrincipal = buildPrincipal({ sub: "a", amr: ["pwd", "otp"], realm_access: { roles: ["platform_admin", "param_setter", "param_approver", "registry_admin", "reports_admin", "sync_conflict_resolver", "device_admin", "api_client_admin", "metering_viewer"] } }, null);
+    const knAdmin: KnSessionState = { status: "active", assignments: [], context: null, menu: admin, badges: null };
+    const tools = ["/quan-tri/tham-so", "/quan-tri/to-chuc", "/quan-tri/mau-bao-cao", "/quan-tri/xung-dot", "/quan-tri/giam-sat-dong-bo", "/dong-bo",
+      "/quan-tri/khach-hang-api", "/quan-tri/su-dung-api", "/quan-tri/bang-ke", "/quan-tri/nhat-ky-xuat"];
+    for (const path of tools) {
+      expect(isAllowed(path, knAdmin, admin, adminPrincipal)).toBe(false);
+      expect(isAllowed(`${path}/x`, knAdmin, admin, adminPrincipal)).toBe(false);
+      expect(isAllowed(path, legacy, activeMenu(legacy, adminPrincipal), adminPrincipal)).toBe(true);
+    }
+    expect(isKnRemovedTool("/dong-bo-x")).toBe(false);
+    expect(isAllowed("/kn/quan-tri/co-cau-to-chuc", knAdmin, admin, adminPrincipal)).toBe(true);
   });
 
   it("trang không khung: đăng nhập, chọn vai trò", () => {
