@@ -41,10 +41,9 @@ beforeEach(() => {
   auth.collectApi = {
     record: vi.fn().mockResolvedValue(rec),
     records: vi.fn().mockResolvedValue({ items: [hh], next_cursor: null }),
-    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
     setRecordStatus: vi.fn().mockResolvedValue({ ...rec, status: "inactive", version: 4 }),
     updateRecord: vi.fn().mockResolvedValue({ ...rec, version: 4 }),
-    coopMachines: vi.fn(),
+    coopMachines: vi.fn().mockResolvedValue({ cooperative_ref: "rec-1", name: "HTX Mỹ Hòa", commune_code: "91301", lines: [], total: 0 }), // #306: máy theo hồ sơ KN
     plots: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
   };
 });
@@ -89,7 +88,7 @@ describe("Hồ sơ KN riêng — chi tiết, vô hiệu hóa, sửa (#67)", () =
     await u.type(name, "HTX Mỹ Hòa Mới");
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() =>
-      expect(auth.collectApi.updateRecord).toHaveBeenCalledWith("rec-1", { kind: "cooperative", commune_code: "91301", name: "HTX Mỹ Hòa Mới", area_ha: "120", address: "Ấp 1", tax_code: null, htx_ref: null, base_version: 3 }),
+      expect(auth.collectApi.updateRecord).toHaveBeenCalledWith("rec-1", { kind: "cooperative", commune_code: "91301", name: "HTX Mỹ Hòa Mới", area_ha: "120", address: "Ấp 1", tax_code: null, base_version: 3 }),
     );
     expect(push).toHaveBeenCalledWith("/kn/du-lieu/htx/rec-1");
   });

@@ -4949,40 +4949,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/kn/cooperatives/{ref}/households": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Nông hộ thành viên của HTX (tab Nông hộ) */
-        get: operations["knListHouseholds"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/kn/households/{ref}/log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Log nông hộ: tạo và các lần sửa diện tích */
-        get: operations["knHouseholdLog"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/kn/machine-counts": {
         parameters: {
             query?: never;
@@ -4990,7 +4956,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX) */
+        /**
+         * FN-XA-03.04: khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX)
+         * @description Máy móc HTX ở kho KN (pf_extension, #306): HTX là hồ sơ KN loại HTX (/v1/kn/producer-records). HTX cũ đã chép chưa có hồ sơ KN vẫn có trong danh sách (name rỗng) để tổng theo xã không đổi.
+         */
         get: operations["knMachineCountsOverview"];
         put?: never;
         post?: never;
@@ -5011,7 +4980,7 @@ export interface paths {
         get: operations["knCoopMachineCounts"];
         /**
          * Thay toàn bộ khai báo máy của HTX (mỗi loại đổi = một sự kiện set/removed)
-         * @description Loại máy thuộc danh mục masterdata machine_type đang dùng (mechanization.machine_type_unknown); số lượng phải là số JSON nguyên 0–1.000.000 (mechanization.machine_quantity_invalid); trùng loại trong request → mechanization.machine_type_duplicate (gợi ý cập nhật dòng đã có); HTX ngừng hoạt động → mechanization.cooperative_invalid. Gửi lại cùng Idempotency-Key → khai báo hiện tại, không ghi thêm. Admin: tham số department (mặc định trong_trot).
+         * @description Loại máy thuộc danh mục masterdata machine_type đang dùng (mechanization.machine_type_unknown); số lượng phải là số JSON nguyên 1–1.000.000, kiểm cú pháp trước khi parse (mechanization.machine_quantity_invalid); trùng loại trong request → mechanization.machine_type_duplicate (gợi ý cập nhật dòng đã có); HTX ngừng hoạt động → mechanization.cooperative_invalid. Gửi lại cùng Idempotency-Key → khai báo hiện tại, không ghi thêm. Admin: tham số department (mặc định trong_trot).
          */
         put: operations["knPutMachineCounts"];
         post?: never;
@@ -10953,8 +10922,8 @@ export interface paths {
          * @description HTX, THT: name, representative {full_name, phone} bắt buộc. Nông hộ: holder {full_name, phone} bắt buộc (tên hộ = chủ hộ,
          *     lưu kho định danh), không nhận name/tax_code/address; parent_ref tùy chọn (HTX/THT đang hoạt động trong phạm vi).
          *     area_ha: số thập phân thường ≥ 0, ≤ 1.000.000, tối đa 4 chữ số lẻ (không số mũ). Trùng tên cùng loại, cùng xã (đang hoạt
-         *     động) → 409; trùng chủ hộ → 409. htx_ref (chỉ HTX): HTX đã công bố, đang hoạt động, cùng xã — chỉ đối chiếu, KN không ghi
-         *     gì về HTX đó. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
+         *     động) → 409; trùng chủ hộ → 409. htx_ref: KN chạy độc lập (#306) — liên kết HTX đã công bố hoãn tới pha kết nối, gửi
+         *     htx_ref → 422; liên kết đã có từ trước giữ nguyên (chỉ đọc), htx_name luôn null. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
          */
         post: operations["knCreateProducerRecord"];
         delete?: never;
@@ -11013,23 +10982,6 @@ export interface paths {
         put?: never;
         /** Kích hoạt lại hồ sơ — lý do bắt buộc; trùng tên/chủ hộ với hồ sơ đang hoạt động → 409 */
         post: operations["knReactivateProducerRecord"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/kn/producer-htx-candidates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** HTX đã công bố (pf_party_pub.v1_org_tree), đang hoạt động, trong phạm vi — chỉ đọc, để liên kết đối chiếu htx_ref */
-        get: operations["knListProducerHTXCandidates"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -36842,64 +36794,6 @@ export interface operations {
             502: components["responses"]["Problem"];
         };
     };
-    knListHouseholds: {
-        parameters: {
-            query?: {
-                cursor?: string;
-                limit?: number;
-            };
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Một trang nông hộ */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNHouseholdList"];
-                };
-            };
-            404: components["responses"]["Problem"];
-        };
-    };
-    knHouseholdLog: {
-        parameters: {
-            query?: {
-                cursor?: number;
-                limit?: number;
-            };
-            header: {
-                /** @description Ngữ cảnh phiên KN (P1) */
-                "X-AG-Context": string;
-            };
-            path: {
-                ref: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Log */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["KNLogPage"];
-                };
-            };
-            404: components["responses"]["Problem"];
-        };
-    };
     knMachineCountsOverview: {
         parameters: {
             query?: {
@@ -36935,7 +36829,7 @@ export interface operations {
                 "X-AG-Context": string;
             };
             path: {
-                /** @description cooperative_ref của HTX */
+                /** @description Mã hồ sơ KN loại HTX (producer-records) */
                 ref: string;
             };
             cookie?: never;
@@ -36966,7 +36860,7 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
-                /** @description cooperative_ref của HTX */
+                /** @description Mã hồ sơ KN loại HTX (producer-records) */
                 ref: string;
             };
             cookie?: never;
@@ -37003,7 +36897,7 @@ export interface operations {
                 "X-AG-Context": string;
             };
             path: {
-                /** @description cooperative_ref của HTX */
+                /** @description Mã hồ sơ KN loại HTX (producer-records) */
                 ref: string;
             };
             cookie?: never;
@@ -50020,49 +49914,6 @@ export interface operations {
             409: components["responses"]["Problem"];
             /** @description validation_failed */
             422: components["responses"]["Problem"];
-        };
-    };
-    knListProducerHTXCandidates: {
-        parameters: {
-            query?: {
-                /** @description Bắt buộc với phạm vi toàn quốc */
-                commune?: string;
-            };
-            header: {
-                "X-AG-Context": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Tối đa 200 HTX */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        items: {
-                            /** Format: uuid */
-                            htx_ref: string;
-                            name: string;
-                            commune_code: string;
-                            /**
-                             * Format: uuid
-                             * @description Hồ sơ KN đang liên kết (nếu có)
-                             */
-                            linked_ref: string | null;
-                        }[];
-                    };
-                };
-            };
-            /** @description extension.out_of_scope */
-            403: components["responses"]["Problem"];
-            /** @description validation_failed */
-            422: components["responses"]["Problem"];
-            /** @description extension.dependency_unavailable */
-            503: components["responses"]["Problem"];
         };
     };
     extensionCntsListCampaigns: {

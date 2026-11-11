@@ -58,18 +58,14 @@ const (
 	MaxLogVersions = 100
 )
 
-// HTXDirectory đọc HTX ĐÃ CÔNG BỐ (pf_party_pub.v1_org_tree — platformread.Organizations). Chỉ đọc.
-type HTXDirectory interface {
-	Get(ctx context.Context, ref uuid.UUID) (partyport.Org, error)
-	OrgsOfKind(ctx context.Context, kind partyport.OrgKind, units []string, activeOnly bool) ([]partyport.Org, error)
-}
+// errHTXLinkDeferred: KN chạy độc lập (KN-STANDALONE, #306) — không liên kết hồ sơ với HTX của hệ khác.
+const errHTXLinkDeferred = "liên kết HTX đã công bố chưa mở (hoãn tới pha kết nối)"
 
 // Service là use case hồ sơ KN riêng.
 type Service struct {
 	DB    tenant.Beginner // pool vai r_extension (db.ForModule)
 	Clock clock.Clock
 	Units partyport.AdminUnits // tùy chọn: kiểm mã xã; nil → chỉ dựa vào phạm vi phiên (Admin toàn quốc → 503)
-	HTX   HTXDirectory         // publication HTX (liên kết đối chiếu); nil → htx_ref trả 503
 	Vault client.Client        // kho định danh; nil → ghi trả 503, đọc không có nhãn
 	Names func() partyport.ActorNames
 }
@@ -325,12 +321,6 @@ func (s *Service) Get(ctx context.Context, ref uuid.UUID) (View, error) {
 	v := View{Producer: cur, Status: domain.StatusOf(cur.Event), MemberCount: counts[ref], Versions: vs, CanEdit: s.canEdit(c, cur)}
 	s.parentInfo(c, &v, parents)
 	v.Person = s.person(ctx, cur.PersonRef)
-	if cur.HTXRef != nil && s.HTX != nil {
-		if o, err := s.HTX.Get(ctx, *cur.HTXRef); err == nil && o.Kind == partyport.OrgCooperative && c.sees(o.AdminUnitCode) {
-			n := o.Name
-			v.HTXName = &n
-		}
-	}
 	v.Names = s.names(ctx, vs)
 	return v, nil
 }
@@ -353,73 +343,6 @@ func (s *Service) names(ctx context.Context, vs []store.Producer) map[uuid.UUID]
 		return out
 	}
 	return m
-}
-
-// PublishedHTX là một HTX đã công bố trong phạm vi (để liên kết đối chiếu khi thêm hồ sơ HTX).
-type PublishedHTX struct {
-	Ref         uuid.UUID
-	Name        string
-	CommuneCode string
-	LinkedRef   *uuid.UUID // hồ sơ KN đang liên kết (nếu có)
-}
-
-// PublishedHTXs liệt kê HTX đã công bố, đang hoạt động, trong phạm vi phiên (chỉ đọc publication).
-func (s *Service) PublishedHTXs(ctx context.Context, commune string) ([]PublishedHTX, error) {
-	c, err := s.reader(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if s.HTX == nil {
-		return nil, ErrDependency.WithDetail("chưa nối danh mục HTX đã công bố")
-	}
-	commune = strings.TrimSpace(commune)
-	var units []string
-	switch {
-	case commune != "":
-		if !c.k.Scope.Allows(commune) {
-			return nil, ErrOutOfScope.WithDetail("xã ngoài phạm vi phụ trách")
-		}
-		units = []string{commune}
-	case c.k.Scope.All:
-		return nil, ErrInvalid.WithField("commune", "bắt buộc khi phạm vi toàn quốc")
-	case c.k.Scope.Empty():
-		return []PublishedHTX{}, nil
-	default:
-		units = append([]string{}, c.k.Scope.Units...)
-	}
-	orgs, err := s.HTX.OrgsOfKind(ctx, partyport.OrgCooperative, units, true)
-	if err != nil {
-		return nil, ErrDependency.WithDetail("không đọc được HTX đã công bố").WithCause(err)
-	}
-	out := make([]PublishedHTX, 0, len(orgs))
-	for _, o := range orgs {
-		if !c.sees(o.AdminUnitCode) {
-			continue
-		}
-		out = append(out, PublishedHTX{Ref: o.Ref, Name: o.Name, CommuneCode: o.AdminUnitCode})
-		if len(out) >= MaxLimit {
-			break
-		}
-	}
-	if len(out) == 0 {
-		return out, nil
-	}
-	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
-		for i := range out {
-			ref := out[i].Ref
-			rows, e := store.List(ctx, tx, store.Filter{Kind: domain.KindCooperative, All: c.k.Scope.All, Units: c.k.Scope.Units,
-				Status: domain.StatusActive, HTX: &ref, Limit: 1})
-			if e != nil {
-				return e
-			}
-			if len(rows) == 1 {
-				r := rows[0].Ref
-				out[i].LinkedRef = &r
-			}
-		}
-		return nil
-	})
-	return out, err
 }
 
 // ---------------------------------------------------------------------------
@@ -469,8 +392,8 @@ func (s *Service) validate(ctx context.Context, c caller, in *Input, create bool
 	if in.ParentRef != nil && in.Kind != domain.KindHousehold {
 		es = append(es, domain.FieldError{Field: "parent_ref", Reason: "chỉ Nông hộ thuộc HTX/Tổ hợp tác"})
 	}
-	if in.HTXRef != nil && in.Kind != domain.KindCooperative {
-		es = append(es, domain.FieldError{Field: "htx_ref", Reason: "chỉ hồ sơ HTX liên kết HTX đã công bố"})
+	if create && in.HTXRef != nil {
+		es = append(es, domain.FieldError{Field: "htx_ref", Reason: errHTXLinkDeferred})
 	}
 	if len(es) > 0 {
 		return checked{}, fields(es)
@@ -481,11 +404,6 @@ func (s *Service) validate(ctx context.Context, c caller, in *Input, create bool
 	}
 	if err := s.commune(ctx, c, in.CommuneCode); err != nil {
 		return checked{}, err
-	}
-	if in.HTXRef != nil {
-		if err := s.htxLink(ctx, c, *in.HTXRef, in.CommuneCode); err != nil {
-			return checked{}, err
-		}
 	}
 	return checked{rec: in.Record, parent: in.ParentRef, htx: in.HTXRef}, nil
 }
@@ -507,27 +425,6 @@ func (s *Service) commune(ctx context.Context, c caller, code string) error {
 	}
 	if u.Level != partyport.LevelCommune {
 		return ErrInvalid.WithField("commune_code", "phải là xã/phường")
-	}
-	return nil
-}
-
-// htxLink kiểm HTX đã công bố (chỉ đọc publication): là HTX, đang hoạt động, cùng xã, trong phạm vi.
-func (s *Service) htxLink(ctx context.Context, c caller, ref uuid.UUID, commune string) error {
-	if s.HTX == nil {
-		return ErrDependency.WithDetail("chưa nối danh mục HTX đã công bố")
-	}
-	o, err := s.HTX.Get(ctx, ref)
-	if errors.Is(err, partyport.ErrOrgNotFound) {
-		return ErrInvalid.WithField("htx_ref", "không có HTX đã công bố")
-	}
-	if err != nil {
-		return ErrDependency.WithDetail("không tra được HTX đã công bố").WithCause(err)
-	}
-	if o.Kind != partyport.OrgCooperative || !c.sees(o.AdminUnitCode) || !o.Active {
-		return ErrInvalid.WithField("htx_ref", "không có HTX đã công bố, đang hoạt động trong phạm vi")
-	}
-	if o.AdminUnitCode != commune {
-		return ErrInvalid.WithField("htx_ref", "HTX đã công bố ở xã khác")
 	}
 	return nil
 }
@@ -753,6 +650,11 @@ func (s *Service) Update(ctx context.Context, ref uuid.UUID, in Input) (View, er
 	if *in.BaseVersion != cur.Seq {
 		return View{}, ErrVersion
 	}
+	// #306: liên kết HTX đã công bố không còn ghi được (hoãn pha kết nối) — liên kết cũ giữ nguyên, chỉ đọc.
+	if in.HTXRef != nil && (cur.HTXRef == nil || *in.HTXRef != *cur.HTXRef) {
+		return View{}, ErrInvalid.WithField("htx_ref", errHTXLinkDeferred)
+	}
+	in.HTXRef = cur.HTXRef
 	ok, err := s.validate(ctx, c, &in, false)
 	if err != nil {
 		return View{}, err

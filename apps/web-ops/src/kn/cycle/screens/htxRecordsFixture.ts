@@ -16,7 +16,7 @@ export function knHtxRecord(ref: string, name: string, htxRef: string | null, ex
     parent_name: null,
     parent_kind: null,
     htx_ref: htxRef,
-    htx_name: htxRef ? name : null,
+    htx_name: null, // #306: máy chủ không còn tra tên HTX đã công bố
     area_ha: null,
     tax_code: null,
     address: null,
@@ -30,7 +30,7 @@ export function knHtxRecord(ref: string, name: string, htxRef: string | null, ex
   } as KnProducer;
 }
 
-/** records(q) giả lập: lọc kind/commune/status/q/htx_ref, phân trang theo con trỏ (cursor = ref cuối trang trước). */
+/** records(q) giả lập: lọc kind/commune/status/q, phân trang theo con trỏ (cursor = ref cuối trang trước). */
 export function recordsMock(list: KnProducer[]) {
   return vi.fn(async (q: KnProducerPageQuery) => {
     const st = q.status ?? "active";
@@ -39,8 +39,7 @@ export function recordsMock(list: KnProducer[]) {
         r.kind === q.kind &&
         (!q.commune || r.commune_code === q.commune) &&
         (st === "all" || r.status === st) &&
-        (!q.q || (r.name ?? "").toLowerCase().includes(q.q.toLowerCase())) &&
-        (!q.htx_ref || r.htx_ref === q.htx_ref),
+        (!q.q || (r.name ?? "").toLowerCase().includes(q.q.toLowerCase())),
     );
     const lim = q.limit ?? 50;
     const start = q.cursor ? items.findIndex((r) => r.ref === q.cursor) + 1 : 0;

@@ -1,0 +1,82 @@
+{
+  "view": "pf_mechanization_pub.v1_machine_count_export",
+  "directive": "pf_mechanization_pub.machine_count_export/v1",
+  "owner": "pf/mechanization",
+  "status": "published",
+  "package": "KN-STANDALONE-5-TT-DATA-MAY (#306)",
+  "migration": "pf 20261111002852",
+  "consumers": [
+    "pf/extension one-time copy migration pf 20261111002854 (runs as ag_migrator per tenant); r_metrics through existing published-schema policy; KN application code does not read this view"
+  ],
+  "purpose": "One-time export of machine counts by type per cooperative (KN FN-XA-03.04) from the CGH module to the KN store under decision D1. Current projection; consumer copies active rows only.",
+  "grain": "tenant x cooperative x machine type",
+  "key": [
+    "tenant_id",
+    "cooperative_ref",
+    "machine_type"
+  ],
+  "closed_rule": "Current native projection; no history. The copy is idempotent (skips rows already copied to the KN store).",
+  "personal_data": false,
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "tenant id"
+    },
+    {
+      "name": "cooperative_ref",
+      "type": "uuid",
+      "nullable": false,
+      "description": "platform cooperative ref"
+    },
+    {
+      "name": "machine_type",
+      "type": "text",
+      "nullable": false,
+      "description": "machine type code (masterdata machine_type)"
+    },
+    {
+      "name": "quantity",
+      "type": "integer",
+      "nullable": false,
+      "description": "declared quantity (0 when the row is no longer active)"
+    },
+    {
+      "name": "note",
+      "type": "text",
+      "nullable": true,
+      "description": "note"
+    },
+    {
+      "name": "commune_code",
+      "type": "text",
+      "nullable": false,
+      "description": "commune code"
+    },
+    {
+      "name": "department_code",
+      "type": "text",
+      "nullable": false,
+      "description": "department of the last writer"
+    },
+    {
+      "name": "active",
+      "type": "boolean",
+      "nullable": false,
+      "description": "row is currently declared"
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "nullable": false,
+      "description": "updated at"
+    },
+    {
+      "name": "updated_by",
+      "type": "uuid",
+      "nullable": false,
+      "description": "account ref of the last writer"
+    }
+  ]
+}

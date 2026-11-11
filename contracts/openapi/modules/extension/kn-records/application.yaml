@@ -39,8 +39,8 @@ paths:
         HTX, THT: name, representative {full_name, phone} bắt buộc. Nông hộ: holder {full_name, phone} bắt buộc (tên hộ = chủ hộ,
         lưu kho định danh), không nhận name/tax_code/address; parent_ref tùy chọn (HTX/THT đang hoạt động trong phạm vi).
         area_ha: số thập phân thường ≥ 0, ≤ 1.000.000, tối đa 4 chữ số lẻ (không số mũ). Trùng tên cùng loại, cùng xã (đang hoạt
-        động) → 409; trùng chủ hộ → 409. htx_ref (chỉ HTX): HTX đã công bố, đang hoạt động, cùng xã — chỉ đối chiếu, KN không ghi
-        gì về HTX đó. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
+        động) → 409; trùng chủ hộ → 409. htx_ref: KN chạy độc lập (#306) — liên kết HTX đã công bố hoãn tới pha kết nối, gửi
+        htx_ref → 422; liên kết đã có từ trước giữ nguyên (chỉ đọc), htx_name luôn null. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
       operationId: knCreateProducerRecord
       tags: [extension]
       parameters:
@@ -163,37 +163,6 @@ paths:
         "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: "extension.kn_record_version_conflict | extension.kn_record_state_conflict | extension.kn_record_name_taken | extension.kn_record_household_exists", $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
-# @ag-order: 20514
-  /v1/kn/producer-htx-candidates:
-    get:
-      summary: "HTX đã công bố (pf_party_pub.v1_org_tree), đang hoạt động, trong phạm vi — chỉ đọc, để liên kết đối chiếu htx_ref"
-      operationId: knListProducerHTXCandidates
-      tags: [extension]
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
-        - {name: commune, in: query, schema: {type: string}, description: "Bắt buộc với phạm vi toàn quốc"}
-      responses:
-        "200":
-          description: Tối đa 200 HTX
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      required: [htx_ref, name, commune_code, linked_ref]
-                      properties:
-                        htx_ref: {type: string, format: uuid}
-                        name: {type: string}
-                        commune_code: {type: string}
-                        linked_ref: {type: [string, "null"], format: uuid, description: "Hồ sơ KN đang liên kết (nếu có)"}
-        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
-        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
-        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
 components:
   schemas:
 # @ag-order: 30510

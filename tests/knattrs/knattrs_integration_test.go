@@ -112,6 +112,25 @@ func (f *fix) org(tid, ref uuid.UUID, kind partyport.OrgKind, unit string, activ
 	  VALUES ($1, $2, $3, $4, $4, $5, $6, $7, 1)`, tid, ref, string(kind), "O"+ref.String()[24:], unit, active, ids.New())
 }
 
+// knCoop ghi một hồ sơ KN loại HTX (sổ kn_producer) trực tiếp — như dữ liệu KN đã tự nhập; active = false → đã vô hiệu hóa.
+func (f *fix) knCoop(tid, ref uuid.UUID, unit string, active bool) {
+	events := []string{"created"}
+	if !active {
+		events = append(events, "deactivated")
+	}
+	for i, ev := range events {
+		var reason *string
+		if ev == "deactivated" {
+			r := "HTX giải thể theo quyết định"
+			reason = &r
+		}
+		f.admin(`INSERT INTO pf_extension.kn_producer (id, tenant_id, stream_key, producer_ref, kind, event, commune_code, name, person_ref,
+		    status_reason, event_time, actor_ref, idem_key, rule_version)
+		  VALUES ($1, $2, $3, $4, 'cooperative', $5, $6, $7, $8, $9, now(), $8, $10, 'test')`,
+			ids.New(), tid, "kn_producer:"+ref.String(), ref, ev, unit, "HTX "+ref.String()[24:], ids.New(), reason, "seed:"+ref.String()+string(rune('0'+i)))
+	}
+}
+
 func (f *fix) plotRow(tid, ref uuid.UUID, commune string, coop uuid.UUID, status string) {
 	var c any
 	if coop != uuid.Nil {
@@ -132,9 +151,12 @@ func (f *fix) plotRow(tid, ref uuid.UUID, commune string, coop uuid.UUID, status
 // thửa có HTX, thửa nháp, thửa xã khác, thửa ngừng dùng.
 func (f *fix) seed() {
 	f.coop, f.coopOther, f.coopInactive, f.team = ids.New(), ids.New(), ids.New(), ids.New()
-	f.org(f.tenant, f.coop, partyport.OrgCooperative, "31117", true)
+	// #306: HTX của hồ sơ năm máy là hồ sơ KN loại HTX (pf_extension.kn_producer), không phải HTX nền tảng.
+	f.org(f.tenant, f.coop, partyport.OrgCooperative, "31117", true) // HTX nền tảng cùng mã: chỉ để đếm bảng HTX không đổi
 	f.org(f.tenant, f.coopOther, partyport.OrgCooperative, "31120", true)
-	f.org(f.tenant, f.coopInactive, partyport.OrgCooperative, "31117", false)
+	f.knCoop(f.tenant, f.coop, "31117", true)
+	f.knCoop(f.tenant, f.coopOther, "31120", true)
+	f.knCoop(f.tenant, f.coopInactive, "31117", false)
 	f.org(f.tenant, f.team, partyport.OrgExtensionTeam, "31117", true)
 	f.admin(`INSERT INTO pf_coop.cooperative (tenant_id, org_ref) VALUES ($1, $2), ($1, $3)`, f.tenant, f.coop, f.coopOther)
 	f.plot, f.plotDraft, f.plotOther, f.plotRet = ids.New(), ids.New(), ids.New(), ids.New()

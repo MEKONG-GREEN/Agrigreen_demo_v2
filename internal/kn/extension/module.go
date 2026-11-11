@@ -35,6 +35,7 @@ import (
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
 	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knaudit"
+	kmapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knmachine/app"
 	kpapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knplot/app"
 	krapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knrecords/app"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/app"
@@ -130,6 +131,8 @@ type Module struct {
 	records *krapp.Service
 	// KN-STANDALONE-5-TT-DATA (#271): thửa ruộng KN ở pf_extension (module_knplot.go).
 	plots *kpapp.Service
+	// KN-STANDALONE-5-TT-DATA-MAY (#306): số máy theo loại của HTX ở pf_extension (module_knmachine.go).
+	machines *kmapp.Service
 	// AUDIT-LOG-KN (#73): nguồn nhật ký KN, quyền xem, sổ lượt xem bền (module_knaudit.go).
 	audit *knaudit.Service
 	// KNSPLIT-2-PARTY-KN-ROUTES (#118): danh mục phòng ban của pf/party, binding HTTP do KN sở hữu (extension/departments).
@@ -138,7 +141,6 @@ type Module struct {
 
 // New tạo module với pool của vai extension_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
-	pool := db
 	db = forModule(db)
 	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
@@ -161,8 +163,9 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.rc.BM11Herds = m.bm11Herds       // #253: hộ, trang trại theo loại chăn nuôi cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()
 	m.plots = m.newKNPlots(db, clk, d.Params)
-	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs, m.plots)
-	m.records = m.newKNRecords(pool, db, clk, d.Units)
+	m.machines = &kmapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs}
+	m.attrs = newKNAttrs(db, clk, d.Catalogs, m.machines, m.plots)
+	m.records = m.newKNRecords(db, clk, d.Units)
 	m.audit = newKNAudit(db, clk)
 	return m
 }
@@ -249,6 +252,7 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerCNTSKNQG(rg)                                  // W11.53
 	m.registerKNRecords(rg)                                 // KNSPLIT-2-KN-RECORDS
 	m.registerKNPlots(rg)                                   // KN-STANDALONE-5-TT-DATA (#271)
+	m.registerKNMachines(rg)                                // KN-STANDALONE-5-TT-DATA-MAY (#306)
 	departments.Handler{Svc: m.departments}.RegisterApp(rg) // KNSPLIT-2 #118, #222: GET /v1/departments, /v1/menu, /v1/departments/{code}/modules
 }
 

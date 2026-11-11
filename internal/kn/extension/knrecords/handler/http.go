@@ -34,7 +34,6 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/kn/producer-records/:ref", h.update)
 	rg.POST("/kn/producer-records/:ref/deactivate", h.status(true))
 	rg.POST("/kn/producer-records/:ref/reactivate", h.status(false))
-	rg.GET("/kn/producer-htx-candidates", h.htxCandidates)
 }
 
 func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
@@ -340,17 +339,4 @@ func (h Handler) status(deactivate bool) gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, detailDTO(v))
 	}
-}
-
-func (h Handler) htxCandidates(c *gin.Context) {
-	out, err := h.Svc.PublishedHTXs(c.Request.Context(), c.Query("commune"))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	items := make([]gin.H, 0, len(out))
-	for _, o := range out {
-		items = append(items, gin.H{"htx_ref": o.Ref.String(), "name": o.Name, "commune_code": o.CommuneCode, "linked_ref": refp(o.LinkedRef)})
-	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
 }

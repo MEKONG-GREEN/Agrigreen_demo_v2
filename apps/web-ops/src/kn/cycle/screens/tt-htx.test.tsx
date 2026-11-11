@@ -34,7 +34,6 @@ beforeEach(() => {
   auth.role = "kn_xa";
   auth.collectApi = {
     records: vi.fn().mockImplementation(async (q: { kind: string }) => ({ items: q.kind === "cooperative" ? [htx] : q.kind === "coop_group" ? [tht] : [hh], next_cursor: null })),
-    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
     createRecord: vi.fn().mockImplementation(async (b: { kind: string }) => ({ ...hh, ref: "new-1", kind: b.kind })),
   };
 });

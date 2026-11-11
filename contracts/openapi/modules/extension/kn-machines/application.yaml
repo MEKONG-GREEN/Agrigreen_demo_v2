@@ -2,8 +2,11 @@ paths:
 # @ag-order: 271
   /v1/kn/machine-counts:
     get:
-      tags: [mechanization]
-      summary: "Khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX)"
+      tags: [extension]
+      summary: "FN-XA-03.04: khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX)"
+      description: >-
+        Máy móc HTX ở kho KN (pf_extension, #306): HTX là hồ sơ KN loại HTX (/v1/kn/producer-records). HTX cũ đã chép chưa
+        có hồ sơ KN vẫn có trong danh sách (name rỗng) để tổng theo xã không đổi.
       operationId: knMachineCountsOverview
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
@@ -18,12 +21,12 @@ paths:
 # @ag-order: 272
   /v1/kn/machine-counts/{ref}:
     get:
-      tags: [mechanization]
+      tags: [extension]
       summary: "Khai báo máy hiện hành của một HTX"
       operationId: knCoopMachineCounts
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "Mã hồ sơ KN loại HTX (producer-records)", schema: {type: string, format: uuid}}
       responses:
         "200":
           description: Khai báo
@@ -32,17 +35,17 @@ paths:
               schema: {$ref: "#/components/schemas/KNCoopMachines"}
         "404": {$ref: "#/components/responses/Problem"}
     put:
-      tags: [mechanization]
+      tags: [extension]
       summary: "Thay toàn bộ khai báo máy của HTX (mỗi loại đổi = một sự kiện set/removed)"
       description: >-
         Loại máy thuộc danh mục masterdata machine_type đang dùng (mechanization.machine_type_unknown); số lượng phải là
-        số JSON nguyên 0–1.000.000 (mechanization.machine_quantity_invalid); trùng loại trong request →
+        số JSON nguyên 1–1.000.000, kiểm cú pháp trước khi parse (mechanization.machine_quantity_invalid); trùng loại trong request →
         mechanization.machine_type_duplicate (gợi ý cập nhật dòng đã có); HTX ngừng hoạt động → mechanization.cooperative_invalid.
         Gửi lại cùng Idempotency-Key → khai báo hiện tại, không ghi thêm. Admin: tham số department (mặc định trong_trot).
       operationId: knPutMachineCounts
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "Mã hồ sơ KN loại HTX (producer-records)", schema: {type: string, format: uuid}}
         - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban của bản ghi"}
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -62,12 +65,12 @@ paths:
 # @ag-order: 273
   /v1/kn/machine-counts/{ref}/log:
     get:
-      tags: [mechanization]
+      tags: [extension]
       summary: "Lịch sử thay đổi số lượng máy của HTX"
       operationId: knMachineCountLog
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "Mã hồ sơ KN loại HTX (producer-records)", schema: {type: string, format: uuid}}
         - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
@@ -77,7 +80,6 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNMachineLogPage"}
         "404": {$ref: "#/components/responses/Problem"}
-  # ---- KN v7.7 P7 (FN-XA-03.05/03.06: thửa, vật tư) ----
 components:
   schemas:
 # @ag-order: 838

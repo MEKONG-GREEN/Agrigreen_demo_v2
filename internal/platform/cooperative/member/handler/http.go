@@ -2,11 +2,11 @@
 // và mã lỗi giữ nguyên). Application API:
 //
 //	GET  /v1/cooperatives/{ref}/households, POST /v1/households, POST /v1/households/copy,
-//	GET  /v1/households/{ref}/contact, POST /v1/households/{ref}/membership,
-//	GET /v1/kn/cooperatives/{ref}/households, GET /v1/kn/households/{ref}/log.
+//	GET  /v1/households/{ref}/contact, POST /v1/households/{ref}/membership.
 //
-// Admin API: POST /v1/households/import. Các route HTX hướng Nút (/v1/cooperatives, /v1/cooperatives/{ref},
-// /v1/kn/cooperatives*, …) ở lại pf/party.
+// Admin API: POST /v1/households/import. Các route HTX hướng Nút (/v1/cooperatives, /v1/cooperatives/{ref}, …) ở lại
+// pf/party. Route nông hộ của KN (/v1/kn/cooperatives/{ref}/households, /v1/kn/households/{ref}/log) đã gỡ (#306): nông hộ
+// của KN là hồ sơ KN riêng (/v1/kn/producer-records).
 package handler
 
 import (
@@ -37,7 +37,6 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/households/copy", h.copyHouseholds)
 	rg.GET("/households/:ref/contact", h.householdContact)
 	rg.POST("/households/:ref/membership", h.changeMembership)
-	h.registerKN(rg)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
@@ -92,11 +91,6 @@ func queryLimit(c *gin.Context) int {
 		}
 	}
 	return 50
-}
-
-func limitOf(c *gin.Context) int {
-	n, _ := strconv.Atoi(c.Query("limit"))
-	return n
 }
 
 // pathRef đọc {ref} của HTX; không phải UUID → 404 party.org_not_found.

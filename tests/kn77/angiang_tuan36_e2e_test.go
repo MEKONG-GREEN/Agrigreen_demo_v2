@@ -670,14 +670,19 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 	// #271 (KN-STANDALONE-5-TT-DATA): KN không còn đọc HTX nền tảng qua /v1/kn/cooperatives* — HTX của KN là hồ sơ KN.
 	s.wantCode(xa1.get("/v1/kn/cooperatives/"+cref), http.StatusNotFound, "not_found", "KN không đọc HTX nền tảng")
 	s.wantCode(xa1.get("/v1/kn/cooperatives/"+cref+"/log"), http.StatusNotFound, "not_found", "KN không đọc Log HTX nền tảng")
-	mc := s.want(xa1.app(http.MethodPut, "/v1/kn/machine-counts/"+cref, map[string]any{"lines": []any{map[string]any{"machine_type": "MLD", "quantity": 2},
+	// #306 (KN-STANDALONE-5-TT-DATA-MAY): máy móc HTX ở kho KN, khóa theo hồ sơ KN loại HTX — mã HTX nền tảng không dùng được.
+	s.wantCode(xa1.app(http.MethodPut, "/v1/kn/machine-counts/"+cref, map[string]any{"lines": []any{map[string]any{"machine_type": "MLD", "quantity": 2}}}),
+		http.StatusNotFound, "mechanization.cooperative_not_found", "khai máy theo mã HTX nền tảng")
+	knCoop := str(s.want(xa1.post("/v1/kn/producer-records", map[string]any{"kind": "cooperative", "commune_code": agC1, "name": "HTX Mỹ Hòa Hưng (hồ sơ KN)",
+		"representative": map[string]any{"full_name": "Lê Văn Tám", "phone": "0917000306"}}), http.StatusCreated, "hồ sơ KN loại HTX").body, "ref")
+	mc := s.want(xa1.app(http.MethodPut, "/v1/kn/machine-counts/"+knCoop, map[string]any{"lines": []any{map[string]any{"machine_type": "MLD", "quantity": 2},
 		map[string]any{"machine_type": "MGD", "quantity": 1}}}), http.StatusOK, "khai báo máy")
 	if num(mc.body, "total") != 3 {
 		t.Fatalf("tổng máy HTX: %s", mc.raw)
 	}
-	s.wantCode(xa1.app(http.MethodPut, "/v1/kn/machine-counts/"+cref, map[string]any{"lines": []any{map[string]any{"machine_type": "MLD", "quantity": -1}}}),
+	s.wantCode(xa1.app(http.MethodPut, "/v1/kn/machine-counts/"+knCoop, map[string]any{"lines": []any{map[string]any{"machine_type": "MLD", "quantity": -1}}}),
 		http.StatusUnprocessableEntity, "", "số máy âm")
-	s.wantCode(tinh.app(http.MethodPut, "/v1/kn/machine-counts/"+cref, map[string]any{"lines": []any{}}), http.StatusForbidden, "mechanization.read_only", "Cấp Tỉnh khai máy")
+	s.wantCode(tinh.app(http.MethodPut, "/v1/kn/machine-counts/"+knCoop, map[string]any{"lines": []any{}}), http.StatusForbidden, "mechanization.read_only", "Cấp Tỉnh khai máy")
 	if ov := s.want(xa1.get("/v1/kn/machine-counts?commune="+agC1), http.StatusOK, "tổng xã"); !strings.Contains(string(ov.raw), "MLD") {
 		t.Fatalf("tổng xã theo loại máy: %s", ov.raw)
 	}
@@ -725,7 +730,7 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 		{http.MethodPut, "/v1/kn/cooperatives/" + cref, http.StatusNotFound, "not_found"},
 		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/deactivate", http.StatusNotFound, "not_found"},
 		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/reactivate", http.StatusNotFound, "not_found"},
-		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/households", http.StatusMethodNotAllowed, "method_not_allowed"},
+		{http.MethodPost, "/v1/kn/cooperatives/" + cref + "/households", http.StatusNotFound, "not_found"},
 		{http.MethodPut, "/v1/kn/households/" + uuid.NewString(), http.StatusNotFound, "not_found"},
 	} {
 		s.wantCode(xa1.app(route.method, route.path, map[string]any{"reason": "Không được ghi dữ liệu HTX", "name": "Không tạo", "commune_code": agC1}), route.status, route.code, "route ghi KN legacy nghỉ")
@@ -734,7 +739,10 @@ func TestKN77AnGiangTuan36(t *testing.T) {
 		t.Fatalf("legacy calls changed native HTX state: %v -> %v", beforeLegacyWrites, after)
 	}
 	t.Logf("#160 native HTX org_event/household/profile counts unchanged: %v", beforeLegacyWrites)
-	s.want(xa1.get("/v1/kn/cooperatives/"+cref+"/households"), http.StatusOK, "GET nông hộ vẫn đăng ký")
+	// #306: KN không còn đọc nông hộ của HTX nền tảng, ứng viên HTX đã công bố.
+	s.wantCode(xa1.get("/v1/kn/cooperatives/"+cref+"/households"), http.StatusNotFound, "not_found", "KN không đọc nông hộ HTX nền tảng")
+	s.wantCode(xa1.get("/v1/kn/households/"+uuid.NewString()+"/log"), http.StatusNotFound, "not_found", "KN không đọc Log nông hộ HTX nền tảng")
+	s.wantCode(xa1.get("/v1/kn/producer-htx-candidates"), http.StatusNotFound, "not_found", "KN không đọc ứng viên HTX đã công bố")
 
 	// ---- 13. Sổ chỉ ghi thêm, chuỗi băm, cách ly tenant, không PII ----
 	s.step("verify_chain mọi sổ KN, thử UPDATE/DELETE sổ, cách ly tenant, không PII trong log")
@@ -782,7 +790,7 @@ var knLedgers = []string{
 	"pf_reports.form_assignment_event", "pf_reports.form_template_event", "pf_reports.dispatch_recipient_event", "pf_reports.dispatch_event",
 	"pf_extension.report_batch_event", "pf_extension.report_task_event", "pf_extension.provincial_value", "pf_extension.submission_version",
 	"pf_extension.review_event", "pf_extension.reminder_event", "pf_extension.period_event", "pf_extension.consolidation_run",
-	"pf_extension.work_schedule_event", "pf_extension.work_schedule_item", "pf_extension.material_record", "pf_mechanization.coop_machine_count_event",
+	"pf_extension.work_schedule_event", "pf_extension.work_schedule_item", "pf_extension.material_record", "pf_extension.kn_machine_count_event",
 }
 
 // verifyLedgers kiểm chuỗi sổ KN đang hoạt động; #160 sổ hồ sơ HTX legacy phải KHÔNG có dòng từ KN.

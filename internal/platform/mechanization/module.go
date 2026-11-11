@@ -53,7 +53,6 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 // RegisterApp gắn route Application API (đọc — Cục KTHT và Admin).
 func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Handler{Svc: m.svc}.RegisterApp(rg)
-	handler.Handler{Svc: m.svc}.RegisterKNMachineCounts(rg) // KN v7.7 FN-XA-03.04: /v1/kn/machine-counts*
 }
 
 // RegisterAdmin gắn route Admin API (ghi dữ liệu chủ, vụ mùa, chạy cân đối; MFA bắt buộc ở router).

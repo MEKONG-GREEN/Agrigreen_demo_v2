@@ -7,11 +7,19 @@
     },
     {
       "Reader": "r_agg",
+      "View": "pf_mechanization_pub.v1_machine_count_export"
+    },
+    {
+      "Reader": "r_agg",
       "View": "pf_party_pub.v1_org_tree"
     },
     {
       "Reader": "r_metrics",
       "View": "pf_masterdata_pub.v1_admin_units"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_mechanization_pub.v1_machine_count_export"
     },
     {
       "Reader": "r_metrics",

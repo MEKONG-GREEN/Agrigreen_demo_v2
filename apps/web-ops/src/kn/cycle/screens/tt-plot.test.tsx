@@ -71,7 +71,6 @@ beforeEach(() => {
     plotShapes: vi.fn().mockResolvedValue({ type: "FeatureCollection", features: [] }),
     records: recordsMock([knHtxRecord("kn-1", "HTX Mỹ Hòa", "htx-1")]),
     record: vi.fn().mockResolvedValue(knHtxRecord("kn-1", "HTX Mỹ Hòa", "htx-1")),
-    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
     crops: vi.fn().mockResolvedValue(CROPS),
     createPlot: vi.fn().mockResolvedValue({ ...plot, ref: "plot-new" }),
     updatePlot: vi.fn().mockResolvedValue(plot),

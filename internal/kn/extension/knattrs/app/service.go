@@ -1,7 +1,7 @@
 // Package app: hồ sơ KN riêng — năm sản xuất theo loại máy của HTX (TT-10) và cây trồng của thửa (TT-11), gói
-// BF-SRV-KN-ATTRS (#119). Khai báo loại × số lượng máy (pf/mechanization) và hình thửa (pf/cooperative) giữ nguyên ở
-// module nền; KN chỉ đọc HTX/thửa qua publication (pf_party_pub.v1_org_tree, pf_cooperative_pub.v1_plots) TRƯỚC giao
-// dịch ghi và ghi sổ của chính mình (pf_extension.kn_machine_year, kn_plot_crop). Quyền theo ngữ cảnh phiên KN
+// BF-SRV-KN-ATTRS (#119). Từ #271 và #306 HTX và thửa là dữ liệu của KN: HTX là hồ sơ KN loại HTX (cùng khóa với khai
+// báo số máy, knmachine), thửa ở kho KN (knplot) — đọc TRƯỚC giao dịch ghi, rồi ghi sổ của chính mình
+// (pf_extension.kn_machine_year, kn_plot_crop). Không đọc HTX nền tảng. Quyền theo ngữ cảnh phiên KN
 // (port.RequireSession): Cấp Xã và Admin ghi trong xã phụ trách; Cấp Tỉnh/Quốc gia chỉ xem; phòng ban tách hồ sơ.
 package app
 
@@ -21,7 +21,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
-	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
@@ -53,9 +52,9 @@ var deptRe = regexp.MustCompile(`^[a-z][a-z0-9_]{1,39}$`)
 type Service struct {
 	DB       tenant.Beginner // pool vai r_extension (db.ForModule)
 	Clock    clock.Clock
-	Catalogs mdport.Catalogs    // danh mục machine_type, crop
-	Orgs     partyport.Orgs     // HTX qua pf_party_pub.v1_org_tree
-	Plots    port.PlotDirectory // thửa qua pf_cooperative_pub.v1_plots
+	Catalogs mdport.Catalogs           // danh mục machine_type, crop
+	Coops    port.CooperativeDirectory // HTX của KN (hồ sơ KN loại HTX — knmachine, #306)
+	Plots    port.PlotDirectory        // thửa ở kho KN (knplot, #271)
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
@@ -156,22 +155,19 @@ type Cooperative struct {
 	Active      bool
 }
 
-// cooperative đọc HTX qua publication (trước giao dịch) và kiểm xã thuộc phạm vi phiên; ngoài phạm vi → 404.
+// cooperative đọc HTX của KN (trước giao dịch) và kiểm xã thuộc phạm vi phiên; không có hoặc ngoài phạm vi → 404.
 func (s *Service) cooperative(ctx context.Context, c caller, ref uuid.UUID) (Cooperative, error) {
-	if s.Orgs == nil {
-		return Cooperative{}, ErrDependency.WithDetail("chưa nối danh mục tổ chức")
+	if s.Coops == nil {
+		return Cooperative{}, ErrDependency.WithDetail("chưa nối hồ sơ HTX của KN")
 	}
-	o, err := s.Orgs.Get(ctx, ref)
-	if errors.Is(err, partyport.ErrOrgNotFound) {
-		return Cooperative{}, ErrCoopNotFound
-	}
+	o, ok, err := s.Coops.Cooperative(ctx, ref)
 	if err != nil {
 		return Cooperative{}, ErrDependency.WithDetail("không tra được HTX").WithCause(err)
 	}
-	if o.Kind != partyport.OrgCooperative || o.AdminUnitCode == "" || !c.k.Scope.Allows(o.AdminUnitCode) {
+	if !ok || !c.k.Scope.Allows(o.CommuneCode) {
 		return Cooperative{}, ErrCoopNotFound
 	}
-	return Cooperative{Ref: o.Ref, CommuneCode: o.AdminUnitCode, Active: o.Active}, nil
+	return Cooperative{Ref: o.Ref, CommuneCode: o.CommuneCode, Active: o.Active}, nil
 }
 
 // MachineProfile là hồ sơ năm sản xuất máy của một HTX trong một phòng ban.

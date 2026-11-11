@@ -68,18 +68,22 @@ describe("thu thập dữ liệu Cấp Xã giả lập (P7)", () => {
     expect(await code(tinh.createRecord({ kind: "cooperative", commune_code: "91301", name: "X", representative: { full_name: "A B", phone: "0912000777" } }))).toBe("403 forbidden");
   });
 
-  it("#67: liên kết HTX đã công bố chỉ đọc — ứng viên trong phạm vi, khác xã bị chặn", async () => {
+  it("#306: liên kết HTX đã công bố hoãn — htx_ref không ghi được, liên kết cũ giữ nguyên khi sửa", async () => {
     const xa = await clientFor("kn-an", "asg-an-xa");
-    const cands = (await xa.htxCandidates("91301")).items;
-    expect(cands.length).toBeGreaterThan(0);
-    expect(cands.every((x) => x.commune_code === "91301" && x.linked_ref)).toBe(true); // hồ sơ demo đã liên kết
-    const other = (await xa.htxCandidates("91302")).items[0]!;
-    expect(await code(xa.createRecord({ kind: "cooperative", commune_code: "91301", name: "HTX Liên Kết Sai", htx_ref: other.htx_ref, representative: { full_name: "Lê Văn C", phone: "0912000555" } }))).toBe("422 validation_failed");
+    const old = (await xa.records({ kind: "cooperative", commune: "91301" })).items[0]!;
+    expect(old.htx_ref).toBeTruthy();
+    expect(old.htx_name).toBeNull();
+    expect(await code(xa.createRecord({ kind: "cooperative", commune_code: "91301", name: "HTX Liên Kết Mới", htx_ref: old.htx_ref, representative: { full_name: "Lê Văn C", phone: "0912000555" } }))).toBe("422 validation_failed");
+    const upd = await xa.updateRecord(old.ref, { kind: "cooperative", commune_code: "91301", name: `${old.name} (đổi tên)`, base_version: old.version });
+    expect(upd.htx_ref).toBe(old.htx_ref);
   });
   it("FN-XA-03.04 / 03.06: khai báo máy (nguyên, không trùng loại, tổng xã = Σ HTX); vật tư + tổng hợp theo xã", async () => {
     const xa = await clientFor("kn-an", "asg-an-xa");
-    // #162: HTX chọn theo hồ sơ KN riêng; khai báo máy tham chiếu HTX đã công bố liên kết (htx_ref).
-    const coop = { ref: (await xa.records({ kind: "cooperative", commune: "91301" })).items[0]!.htx_ref! };
+    // #306: khai báo máy khóa theo hồ sơ KN loại HTX; mã HTX đã công bố không dùng được.
+    const rec = (await xa.records({ kind: "cooperative", commune: "91301" })).items[0]!;
+    const coop = { ref: rec.ref };
+    expect(await code(xa.coopMachines(rec.htx_ref!))).toBe("404 mechanization.cooperative_not_found");
+    expect(await code(xa.machineProfile(rec.htx_ref!))).toBe("404 extension.kn_attrs_cooperative_not_found");
     expect(await code(xa.putMachines(coop.ref, [{ machine_type: "may_cay", quantity: 1.5 }]))).toBe("422 mechanization.machine_quantity_invalid");
     expect(await code(xa.putMachines(coop.ref, [{ machine_type: "may_cay", quantity: 1 }, { machine_type: "may_cay", quantity: 2 }]))).toBe("422 mechanization.machine_type_duplicate");
     expect((await xa.putMachines(coop.ref, [{ machine_type: "may_cay", quantity: 3 }])).total).toBe(3);

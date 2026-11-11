@@ -6952,46 +6952,13 @@ paths:
   # ---- KN v7.7 P7 (FN-XA-03.03/03.04: HTX, nông hộ, máy móc HTX) ----
   # Mọi route cần X-AG-Context. Cấp Xã (kn_xa) ghi trong xã phụ trách; Cấp Tỉnh xem trong tỉnh; Cấp Quốc gia xem;
   # Admin mọi thứ (chế độ hỗ trợ: header X-AG-Reason ≥ 10 ký tự). Cấp Tỉnh/Quốc gia ghi → 403 party.read_only.
-  /v1/kn/cooperatives/{ref}/households:
-    get:
-      tags: [party]
-      summary: "Nông hộ thành viên của HTX (tab Nông hộ)"
-      operationId: knListHouseholds
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-        - {name: cursor, in: query, schema: {type: string}}
-        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
-      responses:
-        "200":
-          description: Một trang nông hộ
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNHouseholdList"}
-        "404": {$ref: "#/components/responses/Problem"}
-  /v1/kn/households/{ref}/log:
-    get:
-      tags: [party]
-      summary: "Log nông hộ: tạo và các lần sửa diện tích"
-      operationId: knHouseholdLog
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
-        - {name: cursor, in: query, schema: {type: integer, minimum: 0}}
-        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
-      responses:
-        "200":
-          description: Log
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/KNLogPage"}
-        "404": {$ref: "#/components/responses/Problem"}
-
-  # FN-XA-03.04 — Máy móc HTX (khai báo số lượng theo loại máy). Cấp Tỉnh/Quốc gia ghi → 403 mechanization.read_only.
   /v1/kn/machine-counts:
     get:
-      tags: [mechanization]
-      summary: "Khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX)"
+      tags: [extension]
+      summary: "FN-XA-03.04: khai báo máy của các HTX trong phạm vi + tổng xã theo loại máy (= Σ HTX)"
+      description: >-
+        Máy móc HTX ở kho KN (pf_extension, #306): HTX là hồ sơ KN loại HTX (/v1/kn/producer-records). HTX cũ đã chép chưa
+        có hồ sơ KN vẫn có trong danh sách (name rỗng) để tổng theo xã không đổi.
       operationId: knMachineCountsOverview
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
@@ -7005,12 +6972,12 @@ paths:
         "403": {$ref: "#/components/responses/Problem"}
   /v1/kn/machine-counts/{ref}:
     get:
-      tags: [mechanization]
+      tags: [extension]
       summary: "Khai báo máy hiện hành của một HTX"
       operationId: knCoopMachineCounts
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "Mã hồ sơ KN loại HTX (producer-records)", schema: {type: string, format: uuid}}
       responses:
         "200":
           description: Khai báo
@@ -7019,17 +6986,17 @@ paths:
               schema: {$ref: "#/components/schemas/KNCoopMachines"}
         "404": {$ref: "#/components/responses/Problem"}
     put:
-      tags: [mechanization]
+      tags: [extension]
       summary: "Thay toàn bộ khai báo máy của HTX (mỗi loại đổi = một sự kiện set/removed)"
       description: >-
         Loại máy thuộc danh mục masterdata machine_type đang dùng (mechanization.machine_type_unknown); số lượng phải là
-        số JSON nguyên 0–1.000.000 (mechanization.machine_quantity_invalid); trùng loại trong request →
+        số JSON nguyên 1–1.000.000, kiểm cú pháp trước khi parse (mechanization.machine_quantity_invalid); trùng loại trong request →
         mechanization.machine_type_duplicate (gợi ý cập nhật dòng đã có); HTX ngừng hoạt động → mechanization.cooperative_invalid.
         Gửi lại cùng Idempotency-Key → khai báo hiện tại, không ghi thêm. Admin: tham số department (mặc định trong_trot).
       operationId: knPutMachineCounts
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "Mã hồ sơ KN loại HTX (producer-records)", schema: {type: string, format: uuid}}
         - {name: department, in: query, schema: {type: string}, description: "Chỉ Admin: phòng ban của bản ghi"}
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -7048,12 +7015,12 @@ paths:
         "422": {$ref: "#/components/responses/Problem"}
   /v1/kn/machine-counts/{ref}/log:
     get:
-      tags: [mechanization]
+      tags: [extension]
       summary: "Lịch sử thay đổi số lượng máy của HTX"
       operationId: knMachineCountLog
       parameters:
         - {name: X-AG-Context, in: header, required: true, description: "Ngữ cảnh phiên KN (P1)", schema: {type: string, format: uuid}}
-        - {name: ref, in: path, required: true, description: "cooperative_ref của HTX", schema: {type: string, format: uuid}}
+        - {name: ref, in: path, required: true, description: "Mã hồ sơ KN loại HTX (producer-records)", schema: {type: string, format: uuid}}
         - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
@@ -7063,7 +7030,6 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/KNMachineLogPage"}
         "404": {$ref: "#/components/responses/Problem"}
-  # ---- KN v7.7 P7 (FN-XA-03.05/03.06: thửa, vật tư) ----
   /v1/kn/plots:
     get:
       summary: "FN-XA-03.05: danh sách thửa trong phạm vi ngữ cảnh (không hình học)"
@@ -15249,8 +15215,8 @@ paths:
         HTX, THT: name, representative {full_name, phone} bắt buộc. Nông hộ: holder {full_name, phone} bắt buộc (tên hộ = chủ hộ,
         lưu kho định danh), không nhận name/tax_code/address; parent_ref tùy chọn (HTX/THT đang hoạt động trong phạm vi).
         area_ha: số thập phân thường ≥ 0, ≤ 1.000.000, tối đa 4 chữ số lẻ (không số mũ). Trùng tên cùng loại, cùng xã (đang hoạt
-        động) → 409; trùng chủ hộ → 409. htx_ref (chỉ HTX): HTX đã công bố, đang hoạt động, cùng xã — chỉ đối chiếu, KN không ghi
-        gì về HTX đó. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
+        động) → 409; trùng chủ hộ → 409. htx_ref: KN chạy độc lập (#306) — liên kết HTX đã công bố hoãn tới pha kết nối, gửi
+        htx_ref → 422; liên kết đã có từ trước giữ nguyên (chỉ đọc), htx_name luôn null. Lặp cùng Idempotency-Key → trả hồ sơ đã tạo (200).
       operationId: knCreateProducerRecord
       tags: [extension]
       parameters:
@@ -15370,36 +15336,6 @@ paths:
         "404": {description: extension.kn_record_not_found, $ref: "#/components/responses/Problem"}
         "409": {description: "extension.kn_record_version_conflict | extension.kn_record_state_conflict | extension.kn_record_name_taken | extension.kn_record_household_exists", $ref: "#/components/responses/Problem"}
         "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
-  /v1/kn/producer-htx-candidates:
-    get:
-      summary: "HTX đã công bố (pf_party_pub.v1_org_tree), đang hoạt động, trong phạm vi — chỉ đọc, để liên kết đối chiếu htx_ref"
-      operationId: knListProducerHTXCandidates
-      tags: [extension]
-      parameters:
-        - {name: X-AG-Context, in: header, required: true, schema: {type: string, format: uuid}}
-        - {name: commune, in: query, schema: {type: string}, description: "Bắt buộc với phạm vi toàn quốc"}
-      responses:
-        "200":
-          description: Tối đa 200 HTX
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      required: [htx_ref, name, commune_code, linked_ref]
-                      properties:
-                        htx_ref: {type: string, format: uuid}
-                        name: {type: string}
-                        commune_code: {type: string}
-                        linked_ref: {type: [string, "null"], format: uuid, description: "Hồ sơ KN đang liên kết (nếu có)"}
-        "403": {description: extension.out_of_scope, $ref: "#/components/responses/Problem"}
-        "422": {description: validation_failed, $ref: "#/components/responses/Problem"}
-        "503": {description: extension.dependency_unavailable, $ref: "#/components/responses/Problem"}
   /v1/extension/cnts/campaigns:
     get:
       summary: "Danh sách đợt điều tra CNTS (W11.50 — FN-21) kèm tiến độ"

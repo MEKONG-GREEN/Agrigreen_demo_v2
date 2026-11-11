@@ -50,5 +50,18 @@ type PlotLocation struct {
 	Status         string    // draft | active | retired
 }
 
+// CooperativeDirectory tra HTX của KN theo khóa của khai báo máy (KN-STANDALONE-5-TT-DATA-MAY #306): hồ sơ KN loại HTX
+// (pf_extension.kn_producer), hoặc HTX cũ đã chép chưa có hồ sơ KN. Không đọc HTX nền tảng. ok = false khi không có.
+type CooperativeDirectory interface {
+	Cooperative(ctx context.Context, ref uuid.UUID) (CooperativeRecord, bool, error)
+}
+
+// CooperativeRecord là xã và trạng thái của một HTX của KN.
+type CooperativeRecord struct {
+	Ref         uuid.UUID
+	CommuneCode string
+	Active      bool
+}
+
 // PlotRetired là trạng thái thửa đã ngừng dùng trong publication.
 const PlotRetired = "retired"

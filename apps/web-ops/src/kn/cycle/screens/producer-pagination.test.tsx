@@ -53,7 +53,7 @@ beforeEach(() => {
     }),
     record: vi.fn().mockResolvedValue({ ...coop(1), log: [] }),
     plots: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
-    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
+    coopMachines: vi.fn().mockResolvedValue({ cooperative_ref: "rec-1", name: "HTX Mỹ Hòa", commune_code: "91301", lines: [], total: 0 }), // #306: máy theo hồ sơ KN
   };
 });
 

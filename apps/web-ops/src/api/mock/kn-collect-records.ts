@@ -1,9 +1,9 @@
 // ============================================================================
 // BACKEND GIẢ LẬP hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (KNSPLIT-2-KN-RECORDS #67, application.yaml
-// /v1/kn/producer-records, /v1/kn/producer-htx-candidates). Quy tắc như Go knrecords ở mức màn web cần: phạm vi xã của
+// /v1/kn/producer-records). Quy tắc như Go knrecords ở mức màn web cần: phạm vi xã của
 // ngữ cảnh (Cấp Xã ghi trong xã phụ trách; Cấp Tỉnh, Quốc gia chỉ xem), bắt buộc theo TT-08, SĐT che, trùng tên/chủ hộ
 // 409, khóa lạc quan base_version, vô hiệu hóa thay xóa (lý do 10–1000), diện tích thập phân thường. KN không ghi HTX:
-// HTX đã công bố (danh sách HTX giả lập của kn-collect) chỉ được đọc để liên kết htx_ref.
+// #306: không còn ứng viên/liên kết HTX đã công bố (hoãn tới pha kết nối) — htx_ref cũ giữ nguyên, chỉ đọc.
 // ============================================================================
 import { uuidv7 } from "../idempotency";
 import { json, problem, type Ctx, type Route } from "./http";
@@ -123,6 +123,13 @@ function seed(coops: PublishedCoop[]): void {
   RECS = [...htx, ...groups, ...households];
 }
 
+/** #306: hồ sơ KN loại HTX theo mã (mọi trạng thái) — khóa của khai báo máy và năm sản xuất giả lập. */
+export function knCooperativeRecord(coops: PublishedCoop[], ref: string | undefined): { ref: string; name: string; commune_code: string; active: boolean } | undefined {
+  seed(coops);
+  const r = RECS.find((x) => x.ref === ref && x.kind === "cooperative");
+  return r ? { ref: r.ref, name: r.name ?? "", commune_code: r.commune_code, active: r.status === "active" } : undefined;
+}
+
 /** Cho kiểm thử. */
 export function resetKnRecords(): void {
   seeded = false;
@@ -139,9 +146,8 @@ function canWrite(c: Caller): Response | null {
 }
 const memberCount = (ref: string) => RECS.filter((r) => r.kind === "household" && r.parent_ref === ref && r.status === "active").length;
 
-function wire(r: Rec, c: Caller, coops: PublishedCoop[]) {
+function wire(r: Rec, c: Caller) {
   const parent = r.parent_ref ? RECS.find((p) => p.ref === r.parent_ref && inScope(c, p.commune_code)) : undefined;
-  const htx = r.htx_ref ? coops.find((x) => x.ref === r.htx_ref) : undefined;
   return {
     ref: r.ref,
     kind: r.kind,
@@ -155,7 +161,7 @@ function wire(r: Rec, c: Caller, coops: PublishedCoop[]) {
     parent_name: parent?.name ?? null,
     parent_kind: parent?.kind ?? null,
     htx_ref: r.htx_ref,
-    htx_name: htx?.name ?? null,
+    htx_name: null,
     area_ha: r.area_ha,
     tax_code: r.tax_code,
     address: r.address,
@@ -167,7 +173,7 @@ function wire(r: Rec, c: Caller, coops: PublishedCoop[]) {
     updated_at: r.updated_at,
   };
 }
-const detail = (r: Rec, c: Caller, coops: PublishedCoop[]) => ({ ...wire(r, c, coops), log: [...r.log].reverse() });
+const detail = (r: Rec, c: Caller) => ({ ...wire(r, c), log: [...r.log].reverse() });
 
 type Body = {
   kind?: string;
@@ -184,7 +190,7 @@ type Body = {
 };
 
 /** Kiểm thân tạo/sửa; trả lỗi hoặc bản ghi đã chuẩn hóa (chưa gắn ref/phiên bản). */
-function check(b: Body, c: Caller, coops: PublishedCoop[], kind: Kind, create: boolean, self?: string): Response | Omit<Rec, "ref" | "status" | "status_reason" | "version" | "updated_at" | "log"> {
+function check(b: Body, c: Caller, kind: Kind, create: boolean, self?: string): Response | Omit<Rec, "ref" | "status" | "status_reason" | "version" | "updated_at" | "log"> {
   const errs: { field: string; reason: string }[] = [];
   const commune = String(b.commune_code ?? "").trim();
   if (!commune) errs.push({ field: "commune_code", reason: "bắt buộc" });
@@ -214,20 +220,16 @@ function check(b: Body, c: Caller, coops: PublishedCoop[], kind: Kind, create: b
     else if (!/^0[1-9]\d{8}$/.test(phone)) errs.push({ field: `${pk}.phone`, reason: "số điện thoại Việt Nam không hợp lệ (10 chữ số, bắt đầu bằng 0)" });
   }
   if (b.parent_ref && kind !== "household") errs.push({ field: "parent_ref", reason: "chỉ Nông hộ thuộc HTX/Tổ hợp tác" });
-  if (b.htx_ref && kind !== "cooperative") errs.push({ field: "htx_ref", reason: "chỉ hồ sơ HTX liên kết HTX đã công bố" });
+  const cur = self ? RECS.find((x) => x.ref === self) : undefined;
+  // #306: liên kết HTX đã công bố không còn ghi được; liên kết cũ giữ nguyên khi sửa.
+  if (b.htx_ref && b.htx_ref !== cur?.htx_ref) errs.push({ field: "htx_ref", reason: "liên kết HTX đã công bố chưa mở (hoãn tới pha kết nối)" });
   if (errs.length) return field(errs);
   if (!inScope(c, commune)) return problem(403, "extension.out_of_scope", "Ngoài phạm vi phụ trách");
-  if (b.htx_ref) {
-    const h = coops.find((x) => x.ref === b.htx_ref);
-    if (!h || !h.active || !inScope(c, h.commune_code)) return field([{ field: "htx_ref", reason: "không có HTX đã công bố, đang hoạt động trong phạm vi" }]);
-    if (h.commune_code !== commune) return field([{ field: "htx_ref", reason: "HTX đã công bố ở xã khác" }]);
-  }
   if (b.parent_ref) {
     const par = RECS.find((x) => x.ref === b.parent_ref);
     if (!par || par.ref === self || par.kind === "household" || !inScope(c, par.commune_code)) return field([{ field: "parent_ref", reason: "không có HTX/Tổ hợp tác trong phạm vi" }]);
     if (par.status !== "active") return field([{ field: "parent_ref", reason: "HTX/Tổ hợp tác đã ngừng hoạt động" }]);
   }
-  const cur = self ? RECS.find((x) => x.ref === self) : undefined;
   const person = p !== undefined ? { label: shortName(String(p.full_name)), masked_phone: mask(phone) } : cur!.person;
   return {
     kind,
@@ -236,7 +238,7 @@ function check(b: Body, c: Caller, coops: PublishedCoop[], kind: Kind, create: b
     person,
     phone: p !== undefined ? phone : cur!.phone,
     parent_ref: b.parent_ref || null,
-    htx_ref: b.htx_ref || null,
+    htx_ref: cur?.htx_ref ?? null,
     area_ha: area,
     tax_code: kind === "cooperative" ? b.tax_code || null : null,
     address: kind === "household" ? null : (b.address ?? "").trim() || null,
@@ -256,18 +258,17 @@ const re = (s: string) => new RegExp(`^${s.replaceAll("{id}", UUID)}$`);
 const KINDS: Kind[] = ["cooperative", "household", "coop_group"];
 
 export function knRecordRoutes(getCoops: () => PublishedCoop[], wrap: Wrap): Route[] {
-  const w = (h: (ctx: Ctx, c: Caller, coops: PublishedCoop[]) => Response) =>
+  const w = (h: (ctx: Ctx, c: Caller) => Response) =>
     wrap((ctx, c) => {
-      const coops = getCoops();
-      seed(coops);
-      return h(ctx, c, coops);
+      seed(getCoops());
+      return h(ctx, c);
     });
   const find = (c: Caller, ref: string | undefined) => RECS.find((x) => x.ref === ref && inScope(c, x.commune_code));
   return [
     {
       method: "GET",
       pattern: re("/v1/kn/producer-records"),
-      handler: w(({ url }, c, coops) => {
+      handler: w(({ url }, c) => {
         const p = (k: string) => url.searchParams.get(k) ?? "";
         const kind = p("kind") as Kind;
         if (!KINDS.includes(kind)) return field([{ field: "kind", reason: "bắt buộc: cooperative | household | coop_group" }]);
@@ -294,39 +295,39 @@ export function knRecordRoutes(getCoops: () => PublishedCoop[], wrap: Wrap): Rou
         if (cur && start === 0) return field([{ field: "cursor", reason: "con trỏ không hợp lệ" }]);
         const pageItems = items.slice(start, start + lim);
         const more = start + lim < items.length;
-        return json({ items: pageItems.map((x) => wire(x, c, coops)), next_cursor: more ? pageItems.at(-1)!.ref : null });
+        return json({ items: pageItems.map((x) => wire(x, c)), next_cursor: more ? pageItems.at(-1)!.ref : null });
       }),
     },
     {
       method: "POST",
       pattern: re("/v1/kn/producer-records"),
-      handler: w(({ body }, c, coops) => {
+      handler: w(({ body }, c) => {
         const deny = canWrite(c);
         if (deny) return deny;
         const b = (body ?? {}) as Body;
         const kind = b.kind as Kind;
         if (!KINDS.includes(kind)) return field([{ field: "kind", reason: "bắt buộc: cooperative | household | coop_group" }]);
-        const v = check(b, c, coops, kind, true);
+        const v = check(b, c, kind, true);
         if (v instanceof Response) return v;
         const dup = conflict(v);
         if (dup) return dup;
         const r: Rec = { ...v, ref: uuidv7(), status: "active", status_reason: null, version: 1, updated_at: now(), log: [entry("created", 1)] };
         RECS.push(r);
-        return json(detail(r, c, coops), 201);
+        return json(detail(r, c), 201);
       }),
     },
     {
       method: "GET",
       pattern: re("/v1/kn/producer-records/{id}"),
-      handler: w(({ params }, c, coops) => {
+      handler: w(({ params }, c) => {
         const r = find(c, params[0]);
-        return r ? json(detail(r, c, coops)) : notFound();
+        return r ? json(detail(r, c)) : notFound();
       }),
     },
     {
       method: "POST",
       pattern: re("/v1/kn/producer-records/{id}"),
-      handler: w(({ params, body }, c, coops) => {
+      handler: w(({ params, body }, c) => {
         const deny = canWrite(c);
         if (deny) return deny;
         const r = find(c, params[0]);
@@ -335,21 +336,21 @@ export function knRecordRoutes(getCoops: () => PublishedCoop[], wrap: Wrap): Rou
         if (b.kind && b.kind !== r.kind) return field([{ field: "kind", reason: "không đổi loại hồ sơ" }]);
         if (r.status !== "active") return problem(409, "extension.kn_record_state_conflict", "Hồ sơ đã ngừng hoạt động — kích hoạt lại trước khi sửa");
         if (b.base_version !== r.version) return problem(409, "extension.kn_record_version_conflict", "Hồ sơ đã được người khác cập nhật — tải lại rồi sửa");
-        const v = check(b, c, coops, r.kind, false, r.ref);
+        const v = check(b, c, r.kind, false, r.ref);
         if (v instanceof Response) return v;
         const same = (Object.keys(v) as (keyof typeof v)[]).every((k) => JSON.stringify(v[k]) === JSON.stringify(r[k]));
-        if (same) return json(detail(r, c, coops));
+        if (same) return json(detail(r, c));
         const dup = conflict(v, r.ref);
         if (dup) return dup;
         Object.assign(r, v, { version: r.version + 1, updated_at: now(), status_reason: null });
         r.log.push(entry("updated", r.version));
-        return json(detail(r, c, coops));
+        return json(detail(r, c));
       }),
     },
     ...(["deactivate", "reactivate"] as const).map((op) => ({
       method: "POST",
       pattern: re(`/v1/kn/producer-records/{id}/${op}`),
-      handler: w(({ params, body }, c, coops) => {
+      handler: w(({ params, body }, c) => {
         const deny = canWrite(c);
         if (deny) return deny;
         const r = find(c, params[0]);
@@ -366,21 +367,8 @@ export function knRecordRoutes(getCoops: () => PublishedCoop[], wrap: Wrap): Rou
         }
         Object.assign(r, { status: op === "deactivate" ? "inactive" : "active", status_reason: reason, version: r.version + 1, updated_at: now() });
         r.log.push(entry(op === "deactivate" ? "deactivated" : "reactivated", r.version, reason));
-        return json(detail(r, c, coops));
+        return json(detail(r, c));
       }),
     })),
-    {
-      method: "GET",
-      pattern: re("/v1/kn/producer-htx-candidates"),
-      handler: w(({ url }, c, coops) => {
-        const commune = url.searchParams.get("commune") ?? "";
-        if (commune && !inScope(c, commune)) return problem(403, "extension.out_of_scope", "Ngoài phạm vi phụ trách");
-        if (!commune && c.role !== "kn_xa" && c.role !== "kn_tinh") return field([{ field: "commune", reason: "bắt buộc khi phạm vi toàn quốc" }]);
-        const items = coops
-          .filter((x) => x.active && inScope(c, x.commune_code) && (!commune || x.commune_code === commune))
-          .map((x) => ({ htx_ref: x.ref, name: x.name, commune_code: x.commune_code, linked_ref: RECS.find((r) => r.kind === "cooperative" && r.status === "active" && r.htx_ref === x.ref)?.ref ?? null }));
-        return json({ items });
-      }),
-    },
   ];
 }

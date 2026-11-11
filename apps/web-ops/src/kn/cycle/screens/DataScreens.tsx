@@ -131,10 +131,10 @@ function CellInput({ label, value, error, disabled, onChange, onBlur }: { label:
 /**
  * FN-XA-03.04 Máy móc HTX: trái danh sách HTX + tổng xã theo loại; phải bảng khai báo của HTX đã chọn.
  * TT-10 (#103): HTX bắt buộc chọn trước khi khai báo; mỗi dòng bắt buộc Loại máy, Số lượng > 0, Năm SX (1900 – năm hiện
- * tại). Số lượng lưu ở pf/mechanization (/v1/kn/machine-counts), năm ở hồ sơ KN riêng (/v1/kn/machine-profiles, #119):
- * lưu số lượng trước rồi năm trong cùng một lượt thao tác (bấm lại sau lỗi dùng lại khóa chống gửi trùng).
- * #162 mục 1: chọn HTX theo hồ sơ KN riêng (/v1/kn/producer-records, phân trang + tìm ở máy chủ), giá trị = htx_ref; HTX đã
- * khai báo máy được đối chiếu với hồ sơ KN qua htx_ref, chưa có hồ sơ liên kết → "chưa liên kết hồ sơ KN" (vẫn xem/chọn được).
+ * tại). Số lượng (/v1/kn/machine-counts) và năm (/v1/kn/machine-profiles, #119) đều ở kho KN, khóa theo hồ sơ KN loại HTX
+ * (#306): lưu số lượng trước rồi năm trong cùng một lượt thao tác (bấm lại sau lỗi dùng lại khóa chống gửi trùng).
+ * Chọn HTX theo hồ sơ KN riêng (/v1/kn/producer-records, phân trang + tìm ở máy chủ), giá trị = mã hồ sơ. Khai báo đã chép
+ * của HTX cũ chưa có hồ sơ KN (tên rỗng) hiện "chưa có hồ sơ KN" — vẫn xem/sửa được, tổng xã không đổi.
  */
 export function MachinesScreen() {
   const { collectApi } = useAuth();
@@ -142,12 +142,7 @@ export function MachinesScreen() {
   const f = useCommuneFilter();
   const act = useAction();
   const overview = useLoad(() => collectApi.machines(f.commune || undefined), [f.commune, act.note]);
-  // Đối chiếu HTX đã khai báo máy (tham chiếu HTX nền tảng) với hồ sơ KN qua htx_ref — đọc đủ mọi trang của xã đang lọc.
   const declared = overview.data?.cooperatives ?? [];
-  const links = useLoad(
-    declared.length ? () => loadAllRecords(collectApi, { kind: "cooperative", status: "all", ...(f.commune ? { commune: f.commune } : {}) }).then((rs) => new Map(rs.filter((r) => r.htx_ref).map((r) => [r.htx_ref!, r]))) : null,
-    [f.commune, declared.length],
-  );
   const [ref, setRef] = useState("");
   const cur = useLoad(
     ref
@@ -257,7 +252,7 @@ export function MachinesScreen() {
         {f.chip}
       </FilterBar>
       <div className="card sec" style={{ marginBottom: 12 }}>
-        <HtxRecordPicker value={ref} commune={f.commune || undefined} fallbackName={cur.data?.name ?? declared.find((c) => c.cooperative_ref === ref)?.name} onChange={pick} />
+        <HtxRecordPicker value={ref} commune={f.commune || undefined} fallbackName={cur.data?.name || declared.find((c) => c.cooperative_ref === ref)?.name} onChange={pick} />
       </div>
       {act.view}
       <DetailLayout
@@ -266,7 +261,7 @@ export function MachinesScreen() {
             <LoadState s={cur}>
               {(m) => (
                 <>
-                  <h2>{m.name}</h2>
+                  <h2>{m.name || `HTX cũ — ${UNLINKED_LABEL}`}</h2>
                   <DataTable caption="Khai báo máy" columns={machineCols} rows={rows.map((l, i) => ({ ...l, i }))} rowKey={(l) => String(l.i)} empty="HTX chưa khai báo máy." />
                   {readOnly ? null : (
                     <div className="row" style={{ gap: 8, marginTop: 8 }}>
@@ -291,17 +286,14 @@ export function MachinesScreen() {
             <h2>HTX đã khai báo máy</h2>
             {declared.length ? (
               <ul className="list-plain">
-                {declared.map((c) => {
-                  const r = links.data?.get(c.cooperative_ref);
-                  return (
-                    <li key={c.cooperative_ref}>
-                      <button type="button" className="btn btn-o btn-sm" aria-pressed={c.cooperative_ref === ref} onClick={() => pick(c.cooperative_ref)}>
-                        {r ? r.display_name : c.name}
-                      </button>{" "}
-                      · {c.total} máy {r ? null : links.loading ? null : <StatusPill tone="warn">{links.problem || links.data === null ? "chưa đối chiếu được hồ sơ KN" : UNLINKED_LABEL}</StatusPill>}
-                    </li>
-                  );
-                })}
+                {declared.map((c) => (
+                  <li key={c.cooperative_ref}>
+                    <button type="button" className="btn btn-o btn-sm" aria-pressed={c.cooperative_ref === ref} onClick={() => pick(c.cooperative_ref)}>
+                      {c.name || "HTX cũ"}
+                    </button>{" "}
+                    · {c.total} máy {c.name ? null : <StatusPill tone="warn">{UNLINKED_LABEL}</StatusPill>}
+                  </li>
+                ))}
               </ul>
             ) : (
               <p className="mute">Chưa có HTX khai báo máy.</p>

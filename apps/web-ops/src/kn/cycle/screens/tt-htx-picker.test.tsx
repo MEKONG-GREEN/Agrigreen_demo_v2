@@ -1,6 +1,7 @@
 // KNSPLIT-2-KN-RECORDS-HTX-READ (#162, mục 1): bộ chọn HTX của Máy móc/Thửa đọc hồ sơ KN riêng (/v1/kn/producer-records)
-// theo trang và tìm của máy chủ (không cắt trang đầu); dữ liệu cũ tham chiếu HTX nền tảng đối chiếu qua htx_ref, chưa liên
-// kết → "chưa liên kết hồ sơ KN"; Cấp Tỉnh vẫn chỉ xem thửa (#104); web KN không còn GET /v1/kn/cooperatives.
+// theo trang và tìm của máy chủ (không cắt trang đầu); giá trị chọn là mã hồ sơ KN (#271 thửa, #306 máy móc — kho KN);
+// khai báo máy đã chép của HTX cũ chưa có hồ sơ KN → "chưa có hồ sơ KN"; Cấp Tỉnh vẫn chỉ xem thửa (#104); web KN không
+// còn GET /v1/kn/cooperatives, không còn đọc ứng viên HTX đã công bố.
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,7 +30,7 @@ vi.mock("@/auth/AuthProvider", () => ({
 }));
 
 const pad = (i: number) => String(i).padStart(3, "0");
-// 120 hồ sơ HTX liên kết HTX đã công bố (htx-001…htx-120) + 1 hồ sơ chưa liên kết.
+// 120 hồ sơ HTX có liên kết cũ tới HTX đã công bố (htx-001…htx-120, chỉ đọc) + 1 hồ sơ không liên kết.
 const MANY = Array.from({ length: 120 }, (_, k) => knHtxRecord(`kn-${pad(k + 1)}`, `HTX Số ${pad(k + 1)}`, `htx-${pad(k + 1)}`));
 const UNLINKED_REC = knHtxRecord("kn-x", "HTX Chưa Liên Kết", null);
 const machinesOf = (ref: string, name: string) => ({ cooperative_ref: ref, name, commune_code: "91301", lines: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", quantity: 2, note: null }], total: 2 });
@@ -60,9 +61,8 @@ beforeEach(() => {
   for (const k of Object.keys(params)) delete params[k];
   auth.collectApi = {
     records: recordsMock([...MANY, UNLINKED_REC]),
-    htxCandidates: vi.fn().mockResolvedValue({ items: [{ htx_ref: "htx-legacy", name: "HTX Cũ Nền Tảng", commune_code: "91301", linked_ref: null }] }),
     machines: vi.fn().mockResolvedValue({ cooperatives: [], commune_totals: [] }),
-    coopMachines: vi.fn().mockImplementation(async (ref: string) => machinesOf(ref, ref === "htx-legacy" ? "HTX Cũ Nền Tảng" : `HTX ${ref}`)),
+    coopMachines: vi.fn().mockImplementation(async (ref: string) => machinesOf(ref, ref === "htx-legacy" ? "" : `HTX ${ref}`)),
     machineProfile: vi.fn().mockResolvedValue({ items: [] }),
     putMachines: vi.fn().mockResolvedValue({ total: 2 }),
     putMachineProfile: vi.fn().mockResolvedValue({ items: [] }),
@@ -82,18 +82,19 @@ beforeEach(() => {
 });
 
 describe("#162 quy tắc bộ chọn (thuần)", () => {
-  it("hồ sơ liên kết → giá trị htx_ref; chưa liên kết HTX đã công bố → mục khóa; dữ liệu cũ chưa có hồ sơ → nhãn rõ", () => {
-    expect(htxOptionOf(MANY[0]!)).toEqual({ value: "htx-001", label: "HTX Số 001" });
-    expect(htxOptionOf(UNLINKED_REC)).toEqual({ value: "kn:kn-x", label: "HTX Chưa Liên Kết — chưa liên kết HTX đã công bố", disabled: true });
+  it("giá trị = mã hồ sơ KN (#306), có hay không liên kết cũ đều chọn được; mã không có hồ sơ → nhãn rõ", () => {
+    expect(htxOptionOf(MANY[0]!)).toEqual({ value: "kn-001", label: "HTX Số 001" });
+    expect(htxOptionOf(UNLINKED_REC)).toEqual({ value: "kn-x", label: "HTX Chưa Liên Kết" });
     expect(htxOptionOf({ ...MANY[0]!, status: "inactive" }).label).toBe("HTX Số 001 (ngừng hoạt động)");
-    expect(currentHtxLabel(null, "HTX Cũ")).toBe("HTX Cũ — chưa liên kết hồ sơ KN");
-    expect(currentHtxLabel(null)).toBe("HTX hiện tại — chưa liên kết hồ sơ KN");
+    expect(currentHtxLabel(null, "HTX Cũ")).toBe("HTX Cũ — chưa có hồ sơ KN");
+    expect(currentHtxLabel(null)).toBe("HTX hiện tại — chưa có hồ sơ KN");
     expect(currentHtxLabel(MANY[1]!)).toBe("HTX Số 002");
   });
 
-  it("client web KN không còn GET legacy /v1/kn/cooperatives", () => {
+  it("client web KN không còn GET legacy /v1/kn/cooperatives, không còn đọc ứng viên HTX đã công bố (#306)", () => {
     const api = createCollectApi({ baseUrl: "http://x", getAccessToken: () => "t", getContextId: () => "c", fetch: async () => new Response("{}") });
     expect(api).not.toHaveProperty("cooperatives");
+    expect(api).not.toHaveProperty("htxCandidates");
   });
 });
 
@@ -110,11 +111,14 @@ describe("Máy móc HTX — bộ chọn theo hồ sơ KN (#162)", () => {
     await u.click(screen.getByRole("button", { name: "Tải thêm HTX" }));
     await waitFor(() => expect(screen.getByRole("option", { name: "HTX Số 120" })).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Tải thêm HTX" })).toBeNull();
-    // Hồ sơ chưa liên kết HTX đã công bố hiện nhưng không chọn được.
-    expect(screen.getByRole("option", { name: /HTX Chưa Liên Kết — chưa liên kết HTX đã công bố/ })).toBeDisabled();
-    await u.selectOptions(htxSelect(), "htx-120");
+    // #306: hồ sơ không liên kết HTX đã công bố vẫn chọn được — máy khóa theo mã hồ sơ KN.
+    expect(screen.getByRole("option", { name: "HTX Chưa Liên Kết" })).toBeEnabled();
+    await u.selectOptions(htxSelect(), "kn-120");
     expect(await screen.findByRole("table", { name: "Khai báo máy" })).toBeInTheDocument();
-    expect(auth.collectApi.coopMachines).toHaveBeenCalledWith("htx-120");
+    expect(auth.collectApi.coopMachines).toHaveBeenCalledWith("kn-120");
+    expect(auth.collectApi.machineProfile).toHaveBeenCalledWith("kn-120");
+    await u.selectOptions(htxSelect(), "kn-x");
+    await waitFor(() => expect(auth.collectApi.coopMachines).toHaveBeenCalledWith("kn-x"));
   });
 
   it("tìm theo tên gửi q lên máy chủ (không lọc trang đầu ở client)", async () => {
@@ -126,24 +130,26 @@ describe("Máy móc HTX — bộ chọn theo hồ sơ KN (#162)", () => {
     expect(auth.collectApi.records).toHaveBeenLastCalledWith({ kind: "cooperative", status: "active", q: "Số 11", limit: HTX_PICKER_PAGE });
   });
 
-  it("HTX đã khai báo máy (tham chiếu HTX nền tảng): liên kết → tên hồ sơ KN; chưa liên kết → ghi rõ và vẫn xem được", async () => {
+  it("HTX đã khai báo máy: tên hồ sơ KN do máy chủ trả; khai báo đã chép của HTX cũ chưa có hồ sơ KN → ghi rõ và vẫn xem được", async () => {
     auth.collectApi.machines = vi.fn().mockResolvedValue({
-      cooperatives: [machinesOf("htx-007", "Tên nền tảng 007"), machinesOf("htx-legacy", "HTX Cũ Nền Tảng")],
+      cooperatives: [machinesOf("kn-007", "HTX Số 007"), machinesOf("htx-legacy", "")],
       commune_totals: [],
     });
     const u = userEvent.setup();
     render(<MachinesScreen />);
     const panel = await screen.findByRole("complementary", { name: "HTX đã khai báo máy" });
     await waitFor(() => expect(within(panel).getByRole("button", { name: "HTX Số 007" })).toBeInTheDocument());
-    const legacy = within(panel).getByRole("button", { name: "HTX Cũ Nền Tảng" });
-    expect(within(panel).getByText("chưa liên kết hồ sơ KN")).toBeInTheDocument();
+    const legacy = within(panel).getByRole("button", { name: "HTX cũ" });
+    expect(within(panel).getByText("chưa có hồ sơ KN")).toBeInTheDocument();
     await u.click(legacy);
     expect(await screen.findByRole("table", { name: "Khai báo máy" })).toBeInTheDocument();
     expect(htxSelect()).toHaveValue("htx-legacy");
-    await waitFor(() => expect(htxSelect().selectedOptions[0]!.textContent).toBe("HTX Cũ Nền Tảng — chưa liên kết hồ sơ KN"));
-    expect(screen.getByRole("note")).toHaveTextContent("chưa liên kết hồ sơ KN");
-    // Đối chiếu qua hồ sơ KN (records … htx_ref), không qua GET legacy.
-    expect(auth.collectApi.records).toHaveBeenCalledWith({ kind: "cooperative", htx_ref: "htx-legacy", status: "all", limit: 1 });
+    await waitFor(() => expect(htxSelect().selectedOptions[0]!.textContent).toBe("HTX hiện tại — chưa có hồ sơ KN"));
+    expect(screen.getByRole("note")).toHaveTextContent("chưa có hồ sơ KN");
+    expect(screen.getByRole("heading", { name: "HTX cũ — chưa có hồ sơ KN" })).toBeInTheDocument();
+    // Đối chiếu bằng mã hồ sơ KN (record), không lọc theo htx_ref, không đọc HTX đã công bố.
+    expect(auth.collectApi.record).toHaveBeenCalledWith("htx-legacy");
+    expect(auth.collectApi.records).not.toHaveBeenCalledWith(expect.objectContaining({ htx_ref: expect.anything() }));
   });
 });
 
@@ -174,14 +180,13 @@ describe("Thửa — ô HTX là hồ sơ KN (#271, kho KN)", () => {
     await u.selectOptions(htxSelect(), "kn-x");
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(auth.collectApi.updatePlot).toHaveBeenCalledWith("plot-1", { cooperative_ref: "kn-x" }));
-    expect(auth.collectApi.htxCandidates).not.toHaveBeenCalled();
   });
 
   it("thửa gán hồ sơ không còn trong phạm vi: ghi chú rõ", async () => {
     auth.collectApi.plot = vi.fn().mockResolvedValue({ ...plot, cooperative_ref: "kn-gone" });
     render(<PlotEditScreen />);
     await screen.findByLabelText(/Tên thửa/);
-    expect(await screen.findByRole("note")).toHaveTextContent("Hồ sơ HTX đang chọn không còn trong phạm vi phụ trách.");
+    expect(await screen.findByRole("note")).toHaveTextContent("HTX đang chọn chưa có hồ sơ KN trong phạm vi phụ trách.");
   });
 
   it("đổi HTX sang hồ sơ ở trang sau: gửi mã hồ sơ KN đã chọn", async () => {

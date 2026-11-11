@@ -1,5 +1,5 @@
 // BF-TT-MACH-WEB (#103, TT-10): Máy móc HTX — Năm SX bắt buộc (1900 – năm hiện tại giờ VN), Số lượng nguyên > 0,
-// không trùng loại; lưu số lượng (pf/mechanization) rồi năm (hồ sơ KN riêng #119); lỗi theo trường máy chủ hiện dưới ô.
+// không trùng loại; lưu số lượng rồi năm (đều ở kho KN, khóa theo hồ sơ KN — #119, #306); lỗi theo trường máy chủ hiện dưới ô.
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,9 +31,9 @@ const YEAR = vnYear();
 beforeEach(() => {
   auth.role = "kn_xa";
   auth.collectApi = {
-    // #162: bộ chọn HTX đọc hồ sơ KN riêng; giá trị = htx_ref (HTX đã công bố mà khai báo máy tham chiếu).
-    records: recordsMock([knHtxRecord("kn-1", "HTX Mỹ Hòa", "htx-1")]),
-    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
+    // #306: bộ chọn HTX đọc hồ sơ KN riêng; giá trị = mã hồ sơ KN (khai báo máy ở kho KN).
+    records: recordsMock([knHtxRecord("htx-1", "HTX Mỹ Hòa", null)]),
+    record: vi.fn().mockResolvedValue(knHtxRecord("htx-1", "HTX Mỹ Hòa", null)),
     machines: vi.fn().mockResolvedValue({ commune_totals: [] }),
     coopMachines: vi.fn().mockResolvedValue({ cooperative_ref: "htx-1", name: "HTX Mỹ Hòa", lines: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", quantity: 2, note: null }], total: 2 }),
     machineProfile: vi.fn().mockResolvedValue({ cooperative_ref: "htx-1", commune_code: "91301", department_code: "trong_trot", items: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", year_made: 2019 }] }),

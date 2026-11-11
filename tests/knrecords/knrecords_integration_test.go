@@ -539,61 +539,84 @@ func TestKNRecords_RolesScopeTenantSession(t *testing.T) {
 	want(t, xa.get(path), http.StatusForbidden, "", "phiên thu hồi")
 }
 
-// HTX đã công bố chỉ ĐỌC qua publication: danh sách ứng viên liên kết, liên kết đối chiếu htx_ref.
-func TestKNRecords_PublishedHTXLink(t *testing.T) {
+// #306 (KN-STANDALONE-5-TT-DATA-MAY): KN chạy độc lập — ứng viên HTX đã công bố không còn trên bề mặt KN (404), htx_ref
+// không còn ghi được (422); liên kết đã có từ trước giữ nguyên qua các lần sửa, chỉ đọc, không tra tên HTX đã công bố.
+func TestKNRecords_PublishedHTXLinkDeferred(t *testing.T) {
 	f := newFix(t)
 	xa := f.user(f.tenant, authz.KNXa, "31117")
-	r := xa.get("/v1/kn/producer-htx-candidates")
-	want(t, r, http.StatusOK, "", "ứng viên")
-	if l := items(r); len(l) != 1 || str(l[0], "htx_ref") != f.htx.String() || l[0]["linked_ref"] != nil {
-		t.Fatalf("ứng viên (chỉ HTX đang hoạt động trong phạm vi): %s", r.raw)
-	}
-	want(t, xa.get("/v1/kn/producer-htx-candidates?commune=31120"), http.StatusForbidden, "extension.out_of_scope", "ứng viên ngoài phạm vi")
+	want(t, xa.get("/v1/kn/producer-htx-candidates"), http.StatusNotFound, "", "ứng viên đã gỡ")
+	want(t, xa.get("/v1/kn/producer-htx-candidates?commune=31117"), http.StatusNotFound, "", "ứng viên theo xã đã gỡ")
 	b := coop("HTX Nông nghiệp Bình Hòa", "31117", "0916000001")
-	b["htx_ref"] = f.htxOther.String()
-	want(t, xa.post(base, b), http.StatusUnprocessableEntity, "validation_failed", "HTX xã khác")
-	b["htx_ref"] = f.htxInactive.String()
-	want(t, xa.post(base, b), http.StatusUnprocessableEntity, "validation_failed", "HTX ngừng")
-	b["htx_ref"] = f.team.String()
-	want(t, xa.post(base, b), http.StatusUnprocessableEntity, "validation_failed", "không phải HTX")
-	b["htx_ref"] = f.htx.String()
-	c := xa.post(base, b)
-	want(t, c, http.StatusCreated, "", "liên kết HTX đã công bố")
-	if str(c.body, "htx_ref") != f.htx.String() || str(c.body, "htx_name") != "HTX Nông nghiệp Bình Hòa" {
-		t.Fatalf("liên kết: %s", c.raw)
-	}
-	if l := items(xa.get("/v1/kn/producer-htx-candidates")); len(l) != 1 || str(l[0], "linked_ref") != str(c.body, "ref") {
-		t.Fatalf("ứng viên đã liên kết: %v", l)
-	}
-	if l := items(xa.get(base + "?kind=cooperative&htx_ref=" + f.htx.String())); len(l) != 1 {
-		t.Fatalf("lọc theo htx_ref: %v", l)
+	for _, ref := range []uuid.UUID{f.htx, f.htxOther, f.htxInactive, f.team} {
+		b["htx_ref"] = ref.String()
+		r := xa.post(base, b)
+		want(t, r, http.StatusUnprocessableEntity, "validation_failed", "tạo kèm htx_ref")
+		fieldErr(t, r, "htx_ref")
 	}
 	hb := hh("31117", "0916000002", "")
 	hb["htx_ref"] = f.htx.String()
 	want(t, xa.post(base, hb), http.StatusUnprocessableEntity, "validation_failed", "htx_ref cho nông hộ")
+	if n := f.count(); n != 0 {
+		t.Fatalf("request kèm htx_ref không được ghi sổ: %d", n)
+	}
+	delete(b, "htx_ref")
+	c := xa.post(base, b)
+	want(t, c, http.StatusCreated, "", "tạo không liên kết")
+	if c.body["htx_ref"] != nil || c.body["htx_name"] != nil {
+		t.Fatalf("hồ sơ mới không có liên kết: %s", c.raw)
+	}
+	upd := coop("HTX Nông nghiệp Bình Hòa", "31117", "0916000001")
+	upd["base_version"], upd["htx_ref"] = 1, f.htx.String()
+	r := xa.post(base+"/"+str(c.body, "ref"), upd)
+	want(t, r, http.StatusUnprocessableEntity, "validation_failed", "sửa để thêm liên kết")
+	fieldErr(t, r, "htx_ref")
+
+	// Hồ sơ đã liên kết từ trước (ghi thẳng sổ như dữ liệu cũ): đọc thấy htx_ref, sửa giữ nguyên liên kết, không đổi được.
+	old := ids.New()
+	f.admin(`INSERT INTO pf_extension.kn_producer (id, tenant_id, stream_key, producer_ref, kind, event, commune_code, name, person_ref,
+	    htx_ref, event_time, actor_ref, idem_key, rule_version)
+	  VALUES ($1, $2, $3, $4, 'cooperative', 'created', '31117', 'HTX Liên Kết Cũ', $5, $6, now(), $5, $7, 'test')`,
+		ids.New(), f.tenant, "kn_producer:"+old.String(), old, ids.New(), f.htx, "seed:"+old.String())
+	g := xa.get(base + "/" + old.String())
+	want(t, g, http.StatusOK, "", "đọc hồ sơ liên kết cũ")
+	if str(g.body, "htx_ref") != f.htx.String() || g.body["htx_name"] != nil {
+		t.Fatalf("liên kết cũ chỉ đọc, không tên HTX đã công bố: %s", g.raw)
+	}
+	if l := items(xa.get(base + "?kind=cooperative&htx_ref=" + f.htx.String())); len(l) != 1 || str(l[0], "ref") != old.String() {
+		t.Fatalf("lọc theo htx_ref (dữ liệu của KN): %v", l)
+	}
+	ver := int(g.body["version"].(float64))
+	keep := map[string]any{"commune_code": "31117", "name": "HTX Liên Kết Cũ Đổi Tên", "base_version": ver, "area_ha": "12.5"}
+	r = xa.post(base+"/"+old.String(), keep)
+	want(t, r, http.StatusOK, "", "sửa hồ sơ liên kết cũ không gửi htx_ref")
+	if str(r.body, "htx_ref") != f.htx.String() || str(r.body, "name") != "HTX Liên Kết Cũ Đổi Tên" {
+		t.Fatalf("sửa phải giữ nguyên liên kết cũ: %s", r.raw)
+	}
+	keep["base_version"], keep["htx_ref"], keep["name"] = ver+1, f.htx.String(), "HTX Liên Kết Cũ Đổi Tên 2"
+	want(t, xa.post(base+"/"+old.String(), keep), http.StatusOK, "", "sửa gửi lại đúng liên kết cũ")
+	keep["base_version"], keep["htx_ref"] = ver+2, f.htxOther.String()
+	want(t, xa.post(base+"/"+old.String(), keep), http.StatusUnprocessableEntity, "validation_failed", "đổi liên kết cũ")
 }
 
-// Hồi quy CORE RULE: mọi thao tác hồ sơ KN (tạo, sửa, vô hiệu, kích hoạt, liên kết HTX đã công bố, đọc) KHÔNG ghi một
+// Hồi quy CORE RULE: mọi thao tác hồ sơ KN (tạo, sửa, vô hiệu, kích hoạt, đọc) KHÔNG ghi một
 // dòng nào vào bảng HTX; và vai r_extension không có quyền ghi bảng HTX nào.
 func TestKNRecords_NoWriteToHTXTables(t *testing.T) {
 	f := newFix(t)
 	before := f.htxSnapshot()
 	xa := f.user(f.tenant, authz.KNXa, "31117")
 	b := coop("HTX Ranh Giới", "31117", "0917000001")
-	b["htx_ref"] = f.htx.String()
 	c := xa.post(base, b)
-	want(t, c, http.StatusCreated, "", "tạo HTX liên kết")
+	want(t, c, http.StatusCreated, "", "tạo HTX")
 	ref := str(c.body, "ref")
 	want(t, xa.post(base, hh("31117", "0917000002", ref)), http.StatusCreated, "", "tạo nông hộ")
 	want(t, xa.post(base, map[string]any{"kind": "coop_group", "commune_code": "31117", "name": "THT Ranh Giới",
 		"representative": map[string]any{"full_name": "Đỗ Văn Khang", "phone": "0917000003"}}), http.StatusCreated, "", "tạo THT")
 	upd := coop("HTX Ranh Giới 2", "31117", "0917000004")
-	upd["base_version"], upd["htx_ref"] = 1, f.htx.String()
+	upd["base_version"] = 1
 	want(t, xa.post(base+"/"+ref, upd), http.StatusOK, "", "sửa")
 	want(t, xa.post(base+"/"+ref+"/deactivate", map[string]any{"reason": "kiểm ranh giới không ghi HTX", "base_version": 2}), http.StatusOK, "", "vô hiệu")
 	want(t, xa.post(base+"/"+ref+"/reactivate", map[string]any{"reason": "kiểm ranh giới không ghi HTX", "base_version": 3}), http.StatusOK, "", "kích hoạt")
 	want(t, xa.get(base+"/"+ref), http.StatusOK, "", "đọc")
-	want(t, xa.get("/v1/kn/producer-htx-candidates"), http.StatusOK, "", "ứng viên")
 	if n := f.count(); n != 6 {
 		t.Fatalf("sổ KN: %d", n)
 	}

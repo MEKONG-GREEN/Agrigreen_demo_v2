@@ -28,6 +28,7 @@ provides:
     - AdministrativeUnits
     - CNTSCatalogs
     - ClosedFigures
+    - CooperativeDirectory
     - CooperativeStatistics
     - HTXConfirmationHistory
     - HTXConfirmations

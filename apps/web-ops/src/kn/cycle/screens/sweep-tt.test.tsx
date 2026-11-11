@@ -45,7 +45,6 @@ beforeEach(() => {
   auth.collectApi = {
     records: vi.fn().mockResolvedValue({ items: [rec] }),
     record: vi.fn().mockResolvedValue(rec),
-    htxCandidates: vi.fn().mockResolvedValue({ items: [] }),
     createRecord: vi.fn().mockImplementation(async (b: { kind: string }) => ({ ...rec, ref: b.kind === "household" ? "hh-1" : "htx-new", kind: b.kind })),
     machines: vi.fn().mockResolvedValue({ commune_totals: [] }),
     coopMachines: vi.fn().mockResolvedValue({ cooperative_ref: "htx-1", name: "HTX Mỹ Hòa", lines: [{ machine_type: "may_gat", machine_type_name: "Máy gặt", quantity: 2, note: null }], total: 2 }),
@@ -89,7 +88,7 @@ describe("Dữ liệu xã — Thêm HTX, nông hộ trên trang riêng (R-A2, R-
     await u.type(screen.getByLabelText(/Điện thoại/), "0912345678");
     await u.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/kn/du-lieu/htx/htx-new"));
-    expect(auth.collectApi.createRecord).toHaveBeenCalledWith({ kind: "cooperative", name: "HTX Bình Đức", commune_code: "91302", area_ha: "1234.5", address: null, tax_code: null, htx_ref: null, representative: { full_name: "Nguyễn Văn A", phone: "0912345678" } });
+    expect(auth.collectApi.createRecord).toHaveBeenCalledWith({ kind: "cooperative", name: "HTX Bình Đức", commune_code: "91302", area_ha: "1234.5", address: null, tax_code: null, representative: { full_name: "Nguyễn Văn A", phone: "0912345678" } });
   });
 
   it("Thêm nông hộ: diện tích âm bị chặn; hợp lệ thì gọi API và quay về chi tiết HTX", async () => {
@@ -111,8 +110,8 @@ describe("Dữ liệu xã — Thêm HTX, nông hộ trên trang riêng (R-A2, R-
   });
 
   it("Máy móc: bảng có STT; số lượng phải là số nguyên > 0 (TT-10) trước khi lưu", async () => {
-    // #162: bộ chọn HTX đọc hồ sơ KN; hồ sơ phải liên kết HTX đã công bố (htx_ref) mới chọn được để khai báo máy.
-    auth.collectApi.records = vi.fn().mockResolvedValue({ items: [{ ...rec, htx_ref: "htx-1" }], next_cursor: null });
+    // #306: bộ chọn HTX đọc hồ sơ KN; giá trị là mã hồ sơ KN (không cần liên kết HTX đã công bố).
+    auth.collectApi.records = vi.fn().mockResolvedValue({ items: [rec], next_cursor: null });
     const u = userEvent.setup();
     render(<MachinesScreen />);
     await waitFor(() => expect(screen.getByRole("option", { name: "HTX Mỹ Hòa" })).toBeInTheDocument());

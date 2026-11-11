@@ -2,8 +2,8 @@
 
 // KNSPLIT-2-KN-RECORDS (#67): màn hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác trên /v1/kn/producer-records — thay đường
 // ghi legacy /v1/kn/cooperatives (KN không tạo/sửa HTX nền tảng). Danh sách, chi tiết (Log bên phải), thêm/sửa trên
-// trang riêng (R-A2), bắt buộc theo TT-08 (R-A4), số không âm (R-A1), STT (R-A5). HTX đã công bố chỉ để liên kết đối
-// chiếu; máy móc và thửa của HTX vẫn khai báo ở màn riêng (module nền), đọc theo HTX đã liên kết.
+// trang riêng (R-A2), bắt buộc theo TT-08 (R-A4), số không âm (R-A1), STT (R-A5). Máy móc và thửa của HTX khai báo ở màn
+// riêng, ở kho KN, đọc theo mã hồ sơ KN (#271, #306). Không còn liên kết HTX đã công bố (hoãn tới pha kết nối).
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -219,7 +219,7 @@ function CursorPager({ page, rows, busy, hasNext, onPrev, onNext }: { page: numb
   );
 }
 
-/** Chi tiết HTX / Tổ hợp tác: Thông tin chung, Nông hộ, (HTX đã liên kết) Máy móc, Thửa; Log bên phải. */
+/** Chi tiết HTX / Tổ hợp tác: Thông tin chung, Nông hộ, (HTX) Máy móc, Thửa; Log bên phải. */
 export function ProducerDetailScreen({ kind }: { kind: KnProducerKind }) {
   const { id } = useParams<{ id: string }>();
   const { collectApi } = useAuth();
@@ -230,7 +230,7 @@ export function ProducerDetailScreen({ kind }: { kind: KnProducerKind }) {
     const c = await collectApi.record(id);
     const [hh, mm, pl] = await Promise.all([
       c.kind === "household" ? Promise.resolve([] as KnProducer[]) : loadAllRecords(collectApi, { kind: "household", parent_ref: id, status: "all" }),
-      c.htx_ref ? collectApi.coopMachines(c.htx_ref).catch(() => null) : Promise.resolve(null),
+      c.kind === "cooperative" ? collectApi.coopMachines(c.ref).catch(() => null) : Promise.resolve(null), // #306: máy khóa theo hồ sơ KN
       c.kind === "cooperative" ? collectApi.plots({ cooperative_ref: c.ref }).catch(() => null) : Promise.resolve(null), // #271: thửa gán hồ sơ KN
     ]);
     return { c, hh, mm, pl: pl?.items ?? [] };
@@ -276,7 +276,7 @@ export function ProducerDetailScreen({ kind }: { kind: KnProducerKind }) {
                       items={[
                         { label: "Loại", value: c.kind_label },
                         { label: c.kind === "household" ? "Chủ hộ" : "Người đại diện", value: p ? `${p.label}${p.masked_phone ? ` · ${p.masked_phone}` : ""}` : "—" },
-                        ...(c.kind === "cooperative" ? [{ label: "Mã số thuế", value: c.tax_code }, { label: "HTX đã công bố (liên kết)", value: c.htx_name }] : []),
+                        ...(c.kind === "cooperative" ? [{ label: "Mã số thuế", value: c.tax_code }] : []),
                         ...(c.kind === "household" ? [{ label: "Thuộc HTX/THT", value: c.parent_name }] : []),
                         { label: "Lý do trạng thái", value: c.status_reason },
                       ]}
@@ -300,7 +300,7 @@ export function ProducerDetailScreen({ kind }: { kind: KnProducerKind }) {
                               <p className="mute">Chưa có nông hộ.</p>
                             ),
                           },
-                          ...(c.htx_ref
+                          ...(c.kind === "cooperative"
                             ? [
                                 { id: "mm", label: `Máy móc (${mm?.total ?? 0})`, content: <ul className="list-plain">{(mm?.lines ?? []).map((l) => <li key={l.machine_type}>{l.machine_type_name}: {l.quantity}</li>)}</ul> },
                                 { id: "pl", label: `Thửa ruộng (${pl.length})`, content: <ul className="list-plain">{pl.map((x) => <li key={x.ref}>{x.lot_name ?? x.code} · {num(x.area_ha, 2)} ha</li>)}</ul> },
@@ -348,8 +348,8 @@ export function ProducerDetailScreen({ kind }: { kind: KnProducerKind }) {
   );
 }
 
-type Form = { kind: string; commune_code: string; name: string; area_ha: string; tax_code: string; address: string; rep: string; phone: string; parent_ref: string; htx_ref: string };
-const EMPTY: Form = { kind: "", commune_code: "", name: "", area_ha: "", tax_code: "", address: "", rep: "", phone: "", parent_ref: "", htx_ref: "" };
+type Form = { kind: string; commune_code: string; name: string; area_ha: string; tax_code: string; address: string; rep: string; phone: string; parent_ref: string };
+const EMPTY: Form = { kind: "", commune_code: "", name: "", area_ha: "", tax_code: "", address: "", rep: "", phone: "", parent_ref: "" };
 const AREA_RULE = { maxDecimals: 4, max: 1_000_000 } as const;
 
 /** Thân gửi máy chủ từ form đã kiểm (trường tùy chọn rỗng → null; người đại diện chỉ gửi khi có nhập). */
@@ -359,10 +359,7 @@ export function producerBody(kind: KnProducerKind, b: Form, withPerson: boolean)
     out.name = b.name.trim();
     out.address = b.address.trim() || null;
   }
-  if (kind === "cooperative") {
-    out.tax_code = b.tax_code.trim() || null;
-    out.htx_ref = b.htx_ref || null;
-  }
+  if (kind === "cooperative") out.tax_code = b.tax_code.trim() || null;
   if (kind === "household") out.parent_ref = b.parent_ref || null;
   if (withPerson) {
     const p = { full_name: b.rep.trim(), phone: b.phone.trim() };
@@ -390,14 +387,13 @@ export function ProducerFormScreen({ kind: fixedKind, kinds, parentRef, editRef,
   if (cur.data && loaded !== cur.data.ref) {
     const d = cur.data;
     setLoaded(d.ref);
-    setForm({ ...EMPTY, kind: d.kind, commune_code: d.commune_code, name: d.name ?? "", area_ha: d.area_ha ?? "", tax_code: d.tax_code ?? "", address: d.address ?? "", parent_ref: d.parent_ref ?? "", htx_ref: d.htx_ref ?? "" });
+    setForm({ ...EMPTY, kind: d.kind, commune_code: d.commune_code, name: d.name ?? "", area_ha: d.area_ha ?? "", tax_code: d.tax_code ?? "", address: d.address ?? "", parent_ref: d.parent_ref ?? "" });
   }
   if (parent.data && !editRef && form.commune_code === "" && loaded !== parent.data.ref) {
     setLoaded(parent.data.ref);
     setForm((x) => ({ ...x, commune_code: parent.data!.commune_code }));
   }
   const kind = (cur.data?.kind ?? form.kind) as KnProducerKind | "";
-  const candidates = useLoad(kind === "cooperative" && form.commune_code ? () => collectApi.htxCandidates(form.commune_code) : null, [kind, form.commune_code]);
   const parents = useLoad(kind === "household" && !parentRef ? () => loadParents(collectApi) : null, [kind, parentRef]);
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const server = act.problem ? fieldErrorMap(act.problem) : {};
@@ -446,8 +442,8 @@ export function ProducerFormScreen({ kind: fixedKind, kinds, parentRef, editRef,
     >
       {act.view}
       <div className="grid2">
-        {!editing && kindOptions.length > 1 ? <SelectField label="Loại" required value={form.kind} onChange={(v) => setForm((x) => ({ ...x, kind: v, parent_ref: "", htx_ref: "" }))} error={errors.kind ?? server.kind} options={kindOptions} /> : null}
-        <SelectField label="Xã/phường" required value={form.commune_code} onChange={(v) => setForm((x) => ({ ...x, commune_code: v, htx_ref: "" }))} error={errors.commune_code ?? server.commune_code} options={communeOptions} />
+        {!editing && kindOptions.length > 1 ? <SelectField label="Loại" required value={form.kind} onChange={(v) => setForm((x) => ({ ...x, kind: v, parent_ref: "" }))} error={errors.kind ?? server.kind} options={kindOptions} /> : null}
+        <SelectField label="Xã/phường" required value={form.commune_code} onChange={set("commune_code")} error={errors.commune_code ?? server.commune_code} options={communeOptions} />
         {kind && kind !== "household" ? <TextField label={PRODUCER_KINDS[kind].nameLabel} required value={form.name} onChange={set("name")} error={errors.name ?? server.name} maxLength={200} /> : null}
         <TextField
           label={editing ? `${personLabel} mới (để trống = giữ ${cur.data ? (person(cur.data)?.label ?? "người hiện tại") : "người hiện tại"})` : personLabel}
@@ -465,16 +461,6 @@ export function ProducerFormScreen({ kind: fixedKind, kinds, parentRef, editRef,
           <SelectField label="Thuộc HTX/Tổ hợp tác" value={form.parent_ref} onChange={set("parent_ref")} error={server.parent_ref} placeholder="Không thuộc HTX/THT" options={[{ value: "", label: "Không thuộc HTX/THT" }, ...(parents.data ?? []).map((p) => ({ value: p.ref, label: `${p.kind_label}: ${p.display_name}` }))]} />
         ) : null}
         {kind === "household" && parentRef ? <TextField label="Thuộc HTX/Tổ hợp tác" value={parent.data?.display_name ?? ""} onChange={() => undefined} disabled /> : null}
-        {kind === "cooperative" ? (
-          <SelectField
-            label="Liên kết HTX đã công bố (tùy chọn)"
-            value={form.htx_ref}
-            onChange={set("htx_ref")}
-            error={server.htx_ref}
-            placeholder="Không liên kết"
-            options={[{ value: "", label: "Không liên kết" }, ...(candidates.data?.items ?? []).filter((x) => !x.linked_ref || x.linked_ref === editRef || x.htx_ref === form.htx_ref).map((x) => ({ value: x.htx_ref, label: x.name }))]}
-          />
-        ) : null}
       </div>
     </DetailPage>
   );

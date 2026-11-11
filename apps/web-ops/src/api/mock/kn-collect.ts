@@ -2,18 +2,19 @@
 // BACKEND GIẢ LẬP thu thập dữ liệu Cấp Xã KN v7.7 (P7, application.yaml /v1/kn/*): HTX + nông hộ (FN-XA-03.03),
 // máy móc theo HTX (FN-XA-03.04), thửa (FN-XA-03.05, danh sách), vật tư (FN-XA-03.06). Quy tắc như Go P7 ở mức màn web
 // cần: phạm vi theo ngữ cảnh, SĐT che; HTX/nông hộ legacy CHỈ ĐỌC (#160), hồ sơ KN ghi ở kn-collect-records (#67/#161),
-// số máy nguyên 1–1.000.000 (#113), năm SX ở hồ sơ KN riêng 1900–năm hiện tại VN (#119), trùng loại bị chặn,
+// số máy nguyên 1–1.000.000 (#113), năm SX ở hồ sơ KN riêng 1900–năm hiện tại VN (#119), trùng loại bị chặn; máy và năm
+// khóa theo hồ sơ KN loại HTX (#306, kho KN — không theo HTX nền tảng),
 // vật tư sửa = bản ghi bù có lý do.
 // ============================================================================
 import { uuidv7 } from "../idempotency";
 import { CATALOGS } from "./data";
 import { json, problem, type Ctx, type Route } from "./http";
-import { KN_COOPS } from "./kn-schedules";
+import { KN_COOPS, knCoopRecordRef } from "./kn-schedules";
 import { callerOf, isErr, type Caller } from "./kn-reports/store";
 import { vnDate } from "@/kn/schedule/week";
 import { parseCsvText } from "@/lib/csv";
 import { knPlotRoutes, resetKnPlots } from "./kn-collect-plots";
-import { knRecordRoutes, resetKnRecords } from "./kn-collect-records";
+import { knCooperativeRecord, knRecordRoutes, resetKnRecords } from "./kn-collect-records";
 
 interface Coop {
   ref: string;
@@ -108,8 +109,8 @@ function seed(): void {
   HH = COOPS.flatMap((c, i) =>
     Array.from({ length: 2 + (i % 2) }, (_, k) => ({ ref: uuidv7(), coop: c.ref, holder: { label: `Hộ ${k + 1} ${c.name.replace(/^HTX /, "")}`, masked_phone: `0987•••${String(10 * i + k).padStart(3, "0")}` }, cultivated_area_ha: String(1.5 + k), active: true, since_date: "2025-03-01" })),
   );
-  MACH = new Map(COOPS.slice(0, 3).map((c, i) => [c.ref, [{ machine_type: "may_gat", machine_type_name: MACHINE_TYPES.may_gat!, quantity: 2 + i, note: null, updated_at: "2026-08-25T02:00:00Z", updated_by: "00000000-0000-7000-8000-00000000c004" }]]));
-  YEARS = new Map(COOPS.slice(0, 2).map((c, i) => [c.ref, new Map([["may_gat", { year_made: 2018 + i, updated_at: "2026-08-25T02:00:00Z", actor_ref: "00000000-0000-7000-8000-00000000c004" }]])]));
+  MACH = new Map(COOPS.slice(0, 3).map((_, i) => [knCoopRecordRef(i), [{ machine_type: "may_gat", machine_type_name: MACHINE_TYPES.may_gat!, quantity: 2 + i, note: null, updated_at: "2026-08-25T02:00:00Z", updated_by: "00000000-0000-7000-8000-00000000c004" }]]));
+  YEARS = new Map(COOPS.slice(0, 2).map((_, i) => [knCoopRecordRef(i), new Map([["may_gat", { year_made: 2018 + i, updated_at: "2026-08-25T02:00:00Z", actor_ref: "00000000-0000-7000-8000-00000000c004" }]])]));
   MATS = [];
 }
 
@@ -152,13 +153,20 @@ const notFound = () => problem(404, "party.org_not_found", "Không tìm thấy H
 const fieldErr = (field: string, reason: string) => problem(422, "validation_failed", "Dữ liệu không hợp lệ", { errors: [{ field, reason }] });
 const UUID = "([0-9a-f-]{36})";
 const re = (s: string) => new RegExp(`^${s.replaceAll("{id}", UUID)}$`);
-const profileWire = (x: Coop, c: Caller) => ({
+const publishedCoops = () => COOPS.map((x) => ({ ref: x.ref, name: x.name, commune_code: x.commune_code, active: x.active }));
+type MachineCoop = { ref: string; name: string; commune_code: string; active: boolean };
+/** #306: HTX của khai báo máy là hồ sơ KN loại HTX trong phạm vi. */
+const findMachineCoop = (c: Caller, ref: string | undefined): MachineCoop | undefined => {
+  const r = knCooperativeRecord(publishedCoops(), ref);
+  return r && inScope(c, r.commune_code) ? r : undefined;
+};
+const profileWire = (x: MachineCoop, c: Caller) => ({
   cooperative_ref: x.ref,
   commune_code: x.commune_code,
   department_code: c.dept ?? "trong_trot",
   items: [...(YEARS.get(x.ref) ?? new Map()).entries()].map(([t, v]) => ({ machine_type: t, machine_type_name: MACHINE_TYPES[t] ?? t, ...v })),
 });
-const coopLines = (x: Coop) => {
+const coopLines = (x: MachineCoop) => {
   const lines = MACH.get(x.ref) ?? [];
   return { cooperative_ref: x.ref, name: x.name, commune_code: x.commune_code, lines, total: lines.reduce((s, l) => s + l.quantity, 0) };
 };
@@ -196,7 +204,7 @@ export const knCollectRoutes: Route[] = [
     method: "GET",
     pattern: re("/v1/kn/machine-profiles/{id}"),
     handler: wrap(({ params }, c) => {
-      const x = findCoop(c, params[0]);
+      const x = findMachineCoop(c, params[0]);
       return x ? json(profileWire(x, c)) : problem(404, "extension.kn_attrs_cooperative_not_found", "Không tìm thấy HTX");
     }),
   },
@@ -206,7 +214,7 @@ export const knCollectRoutes: Route[] = [
     handler: wrap(({ params, body }, c) => {
       const deny = canWrite(c, "extension.read_only");
       if (deny) return deny;
-      const x = findCoop(c, params[0]);
+      const x = findMachineCoop(c, params[0]);
       if (!x) return problem(404, "extension.kn_attrs_cooperative_not_found", "Không tìm thấy HTX");
       if (!x.active) return fieldErr("cooperative_ref", "HTX đã ngừng hoạt động");
       const lines = ((body as { lines?: unknown[] } | undefined)?.lines ?? []) as { machine_type?: string; year_made?: unknown }[];
@@ -236,7 +244,7 @@ export const knCollectRoutes: Route[] = [
     handler: wrap(({ url }, c) => {
       const commune = url.searchParams.get("commune");
       if (commune && !inScope(c, commune)) return problem(403, "mechanization.out_of_scope", "Ngoài phạm vi phụ trách");
-      const coops = COOPS.filter((x) => inScope(c, x.commune_code) && (!commune || x.commune_code === commune));
+      const coops = [...MACH.keys()].map((ref) => findMachineCoop(c, ref)).filter((x): x is MachineCoop => !!x && (!commune || x.commune_code === commune));
       const totals = new Map<string, { commune_code: string; machine_type: string; machine_type_name: string; quantity: number }>();
       for (const x of coops)
         for (const l of MACH.get(x.ref) ?? []) {
@@ -252,7 +260,7 @@ export const knCollectRoutes: Route[] = [
     method: "GET",
     pattern: re("/v1/kn/machine-counts/{id}"),
     handler: wrap(({ params }, c) => {
-      const x = findCoop(c, params[0]);
+      const x = findMachineCoop(c, params[0]);
       return x ? json(coopLines(x)) : problem(404, "mechanization.cooperative_not_found", "Không tìm thấy HTX");
     }),
   },
@@ -262,7 +270,7 @@ export const knCollectRoutes: Route[] = [
     handler: wrap(({ params, body }, c) => {
       const deny = canWrite(c, "mechanization.read_only");
       if (deny) return deny;
-      const x = findCoop(c, params[0]);
+      const x = findMachineCoop(c, params[0]);
       if (!x) return problem(404, "mechanization.cooperative_not_found", "Không tìm thấy HTX");
       if (!x.active) return problem(422, "mechanization.cooperative_invalid", "HTX ngừng hoạt động");
       const lines = ((body as { lines?: unknown[] } | undefined)?.lines ?? []) as { machine_type: string; quantity: unknown; note?: string | null }[];
@@ -358,7 +366,7 @@ export const knCollectRoutes: Route[] = [
   // Thửa (pf/cooperative) + cây trồng (hồ sơ KN #119) — TT-11 #104.
   ...knPlotRoutes(() => COOPS, wrap),
   // Hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác — KNSPLIT-2-KN-RECORDS #67 (HTX giả lập ở trên = HTX đã công bố, chỉ đọc).
-  ...knRecordRoutes(() => COOPS.map((x) => ({ ref: x.ref, name: x.name, commune_code: x.commune_code, active: x.active })), wrap),
+  ...knRecordRoutes(publishedCoops, wrap),
 ];
 
 /** Giả lập POST /v1/kn/materials/import (BF-TT-MAT #105): chỉ đọc CSV UTF-8 — máy chủ thật đọc cả .xlsx. */

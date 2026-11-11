@@ -440,17 +440,16 @@ export type KnMachineProfile = A["KNMachineProfile"];
 
 /**
  * KNSPLIT-2-KN-RECORDS (#67): hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (pf_extension, /v1/kn/producer-records) — thay
- * đường ghi legacy /v1/kn/cooperatives: KN không tạo/sửa HTX nền tảng. HTX đã công bố chỉ để liên kết đối chiếu (htx_ref).
+ * đường ghi legacy /v1/kn/cooperatives: KN không tạo/sửa HTX nền tảng. Liên kết HTX đã công bố (htx_ref) hoãn tới pha kết nối (#306).
  */
 export type KnProducerKind = A["KNProducerKind"];
 export type KnProducer = A["KNProducerRecord"];
 export type KnProducerDetail = A["KNProducerRecordDetail"];
 export type KnProducerWrite = A["KNProducerRecordWrite"];
-export type KnProducerQuery = { kind: KnProducerKind; commune?: string; status?: "active" | "inactive" | "all"; q?: string; parent_ref?: string; htx_ref?: string };
+export type KnProducerQuery = { kind: KnProducerKind; commune?: string; status?: "active" | "inactive" | "all"; q?: string; parent_ref?: string };
 /** Một trang danh sách hồ sơ: `cursor` = next_cursor của trang trước (không gửi = trang đầu), `limit` ≤ 200. */
 export type KnProducerPageQuery = KnProducerQuery & { cursor?: string; limit?: number };
 export type KnProducerPage = { items: KnProducer[]; next_cursor: string | null };
-export type KnHTXCandidate = { htx_ref: string; name: string; commune_code: string; linked_ref: string | null };
 
 export type CollectApi = ReturnType<typeof createCollectApi>;
 
@@ -465,10 +464,8 @@ export function createCollectApi(opts: KnHttpOptions) {
     updateRecord: (ref: string, b: KnProducerWrite & { base_version: number }, idem?: string) => call<KnProducerDetail>("POST", `/v1/kn/producer-records/${ref}`, b, undefined, idem),
     setRecordStatus: (ref: string, deactivate: boolean, b: { reason: string; base_version: number }, idem?: string) =>
       call<KnProducerDetail>("POST", `/v1/kn/producer-records/${ref}/${deactivate ? "deactivate" : "reactivate"}`, b, undefined, idem),
-    /** HTX đã công bố trong phạm vi (chỉ đọc) — chọn để liên kết đối chiếu khi thêm hồ sơ HTX. */
-    htxCandidates: (commune?: string) => call<{ items: KnHTXCandidate[] }>("GET", "/v1/kn/producer-htx-candidates", undefined, { commune }),
-    // #162 mục 1: web KN không còn đọc GET legacy /v1/kn/cooperatives — bộ chọn HTX của Máy móc/Thửa đọc hồ sơ KN (records,
-    // htx_ref) và tên HTX đã công bố qua htxCandidates. Khai báo máy/thửa vẫn ghi module nền (mục 2–3 chờ PO).
+    // #162 mục 1: web KN không còn đọc GET legacy /v1/kn/cooperatives — bộ chọn HTX của Máy móc/Thửa đọc hồ sơ KN (records).
+    // #306: khai báo máy và năm sản xuất ở kho KN, `ref` là mã hồ sơ KN loại HTX; không còn đọc ứng viên HTX đã công bố.
     machines: (commune?: string) => call<KnMachineOverview>("GET", "/v1/kn/machine-counts", undefined, { commune }),
     coopMachines: (ref: string) => call<KnCoopMachines>("GET", `/v1/kn/machine-counts/${ref}`),
     putMachines: (ref: string, lines: { machine_type: string; quantity: number; note?: string | null }[], idem?: string) =>
