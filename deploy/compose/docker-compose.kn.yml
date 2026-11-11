@@ -17,7 +17,7 @@
 name: agrigreen-kn
 
 x-kn-oidc-env: &kn-oidc-env
-  AG_OIDC_ISSUER: http://localhost:8180/realms/kn
+  AG_OIDC_ISSUER: http://localhost:8180/realms/agrigreen
   AG_OIDC_JWKS_URL: http://keycloak:8080/realms/kn/protocol/openid-connect/certs
 
 x-kn-kc-admin-env: &kn-kc-admin-env
