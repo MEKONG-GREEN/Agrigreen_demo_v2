@@ -250,7 +250,7 @@ func TestRouteOwnership(t *testing.T) {
 		"/kn/dung-chung/contact":                   "pf/contact",
 		"/kn/du-lieu/htx":                          "pf/party",
 		"/kn/tong-quan":                            "pf/party",
-		"/dong-bo":                                 "pf/sync",
+		"/dong-bo":                                 "", // KN-STANDALONE-1-ADMIN-TOOLS #264: không còn trong menu KN
 	} {
 		if owner[pattern] != want {
 			t.Errorf("%s owned by %q, want %q", pattern, owner[pattern], want)
@@ -363,9 +363,44 @@ func TestAdminMenuDropsNativeAccountLink(t *testing.T) {
 	if it := items["admin.qt.nguoi_dung"]; it.Route != "/kn/quan-tri/nguoi-dung" || !it.Enabled || it.Status == "coming_soon" {
 		t.Fatalf("Admin KN mất màn Người dùng mới: %+v", it)
 	}
-	for _, key := range []string{"admin.qt.cong_cu.tham_so", "admin.qt.cong_cu.to_chuc"} {
-		if _, ok := items[key]; !ok {
-			t.Fatalf("gỡ nhầm mục công cụ nền tảng khác %s", key)
+}
+
+// KN-STANDALONE-1-ADMIN-TOOLS (#264): BRD 2.0 không có FN cho nhóm "Công cụ nền tảng (tạm)" — menu Admin KN không còn 10
+// mục /quan-tri/{tham-so,to-chuc,mau-bao-cao,xung-dot,giam-sat-dong-bo,khach-hang-api,su-dung-api,bang-ke,nhat-ky-xuat} và
+// /dong-bo. Cây tổ chức G1 trùng FN-AD-04.02: chỉ giữ Cơ cấu tổ chức 3 cấp /kn/quan-tri/co-cau-to-chuc.
+func TestAdminMenuDropsPlatformTools(t *testing.T) {
+	c := catalog(t)
+	reg, err := c.Registry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit := uuid.New()
+	request := partyport.MenuBuildRequest{NavigationRequest: partyport.NavigationRequest{Audience: partyport.AudienceAdmin, UnitRef: unit}, Mode: partyport.MenuAdmin,
+		Departments: []partyport.Department{department(unit, "trong_trot", partyport.MenuProfileTrongTrot)}}
+	def, err := reg.Build(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed := []string{"/quan-tri/tham-so", "/quan-tri/to-chuc", "/quan-tri/mau-bao-cao", "/quan-tri/xung-dot", "/quan-tri/giam-sat-dong-bo",
+		"/dong-bo", "/quan-tri/khach-hang-api", "/quan-tri/su-dung-api", "/quan-tri/bang-ke", "/quan-tri/nhat-ky-xuat"}
+	var visit func([]partyport.MenuItem)
+	visit = func(items []partyport.MenuItem) {
+		for _, it := range items {
+			if strings.HasPrefix(it.Key, "admin.qt.cong_cu") {
+				t.Fatalf("menu Admin KN còn mục công cụ nền tảng %s", it.Key)
+			}
+			for _, r := range removed {
+				if it.Route == r || strings.HasPrefix(it.Route, r+"/") || strings.HasPrefix(it.Route, r+"?") {
+					t.Fatalf("menu Admin KN còn liên kết %s: %+v", r, it)
+				}
+			}
+			visit(it.Children)
 		}
+	}
+	for _, g := range def.Groups {
+		visit(g.Items)
+	}
+	if it := leaves(def.Groups)["admin.qt.co_cau"]; it.Route != "/kn/quan-tri/co-cau-to-chuc" || !it.Enabled {
+		t.Fatalf("Admin KN mất Cơ cấu tổ chức 3 cấp (FN-AD-04.02): %+v", it)
 	}
 }

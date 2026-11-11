@@ -79,128 +79,6 @@
           "Children": null
         },
         {
-          "Key": "admin.qt.cong_cu",
-          "Label": "Công cụ nền tảng (tạm)",
-          "Route": "",
-          "Icon": "param",
-          "BadgeSource": "",
-          "Requires": null,
-          "ComingSoon": false,
-          "Needs": "",
-          "Children": [
-            {
-              "Key": "admin.qt.cong_cu.tham_so",
-              "Label": "Tham số & phê duyệt",
-              "Route": "/quan-tri/tham-so",
-              "Icon": "param",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.to_chuc",
-              "Label": "Cây tổ chức (G1)",
-              "Route": "/quan-tri/to-chuc",
-              "Icon": "org",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.mau_xuat",
-              "Label": "Mẫu xuất & lịch gửi",
-              "Route": "/quan-tri/mau-bao-cao",
-              "Icon": "report",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.xung_dot",
-              "Label": "Xung đột đồng bộ",
-              "Route": "/quan-tri/xung-dot",
-              "Icon": "conflict",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.giam_sat",
-              "Label": "Giám sát đồng bộ",
-              "Route": "/quan-tri/giam-sat-dong-bo",
-              "Icon": "sync",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.thiet_bi",
-              "Label": "Đồng bộ thiết bị",
-              "Route": "/dong-bo",
-              "Icon": "sync",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.khach_hang_api",
-              "Label": "Khách hàng Public API",
-              "Route": "/quan-tri/khach-hang-api",
-              "Icon": "key",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.su_dung_api",
-              "Label": "Sử dụng Public API",
-              "Route": "/quan-tri/su-dung-api",
-              "Icon": "chart",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.bang_ke",
-              "Label": "Bảng kê sử dụng",
-              "Route": "/quan-tri/bang-ke",
-              "Icon": "report",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            },
-            {
-              "Key": "admin.qt.cong_cu.nhat_ky_xuat",
-              "Label": "Nhật ký xuất dữ liệu",
-              "Route": "/quan-tri/nhat-ky-xuat",
-              "Icon": "shield",
-              "BadgeSource": "",
-              "Requires": null,
-              "ComingSoon": false,
-              "Needs": "",
-              "Children": null
-            }
-          ]
-        },
-        {
           "Key": "admin.qt.mau_van_ban",
           "Label": "Mẫu văn bản & lịch sử xuất",
           "Route": "/kn/quan-tri/mau-van-ban",
@@ -2341,7 +2219,6 @@
       "/tong-hop": "pf/extension"
     },
     "menuModules": {
-      "/dong-bo": "pf/sync",
       "/kn/bao-cao": "pf/extension",
       "/kn/bao-cao-khtc": "pf/extension",
       "/kn/bao-cao/chi-cuc": "pf/reports",
@@ -2353,14 +2230,7 @@
       "/kn/du-lieu/ve-thua": "pf/geo",
       "/kn/khtc": "pf/extension",
       "/kn/nhiem-vu": "pf/extension",
-      "/kn/quan-tri/don-vi-hanh-chinh": "pf/masterdata",
-      "/quan-tri/bang-ke": "pf/metering",
-      "/quan-tri/giam-sat-dong-bo": "pf/sync",
-      "/quan-tri/mau-bao-cao": "pf/reports",
-      "/quan-tri/nhat-ky-xuat": "pf/metering",
-      "/quan-tri/su-dung-api": "pf/metering",
-      "/quan-tri/tham-so": "pf/masterdata",
-      "/quan-tri/xung-dot": "pf/sync"
+      "/kn/quan-tri/don-vi-hanh-chinh": "pf/masterdata"
     },
     "trongTrotMenus": {
       "kn_tinh": [

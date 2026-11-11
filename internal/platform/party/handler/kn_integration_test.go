@@ -499,6 +499,16 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 		strings.Contains(raw, `"/quan-tri/tai-khoan`) || !slices.Contains(keys, "admin.qt.nguoi_dung") || !strings.Contains(raw, `"/kn/quan-tri/nguoi-dung"`) {
 		t.Fatalf("menu Admin KN còn /quan-tri/tai-khoan hoặc mất /kn/quan-tri/nguoi-dung: %v", keys)
 	}
+	// KN-STANDALONE-1-ADMIN-TOOLS (#264): GET /v1/menu Admin không còn 10 công cụ nền tảng ngoài BRD 2.0; giữ Cơ cấu 3 cấp.
+	if raw := mustJSON(t, r.body); strings.Contains(raw, "admin.qt.cong_cu") || strings.Contains(raw, `"/dong-bo"`) ||
+		!strings.Contains(raw, `"/kn/quan-tri/co-cau-to-chuc"`) {
+		t.Fatalf("menu Admin KN còn công cụ nền tảng: %v", raw)
+	}
+	for _, gone := range []string{"tham-so", "to-chuc", "mau-bao-cao", "xung-dot", "giam-sat-dong-bo", "khach-hang-api", "su-dung-api", "bang-ke", "nhat-ky-xuat"} {
+		if raw := mustJSON(t, r.body); strings.Contains(raw, `"/quan-tri/`+gone+`"`) {
+			t.Fatalf("menu Admin KN còn /quan-tri/%s", gone)
+		}
+	}
 	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true ||
 		!hasMenuChildren(it, []string{"admin.pb.theo_doi_nop", "admin.pb.tong_hop", "admin.pb.du_lieu_bao_cao", "admin.pb.thu_thap", "admin.pb.lich_cong_tac", "admin.pb.danh_muc", "admin.pb.mau_bao_cao", "admin.pb.bao_cao_khtc"}) ||
 		!hasMenuChild(it, "admin.pb.mau_bao_cao", "/kn/phong-ban/trong_trot/mau-bao-cao") ||

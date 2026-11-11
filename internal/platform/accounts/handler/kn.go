@@ -104,6 +104,13 @@ func (h Handler) Middleware() gin.HandlerFunc {
 			httpx.Fail(c, err)
 			return
 		}
+		// KN-STANDALONE-1-ADMIN-TOOLS (#264): chủ phiên đóng route ngoài bề mặt của mình cho phiên đã chọn (mọi vai).
+		if gate := h.Svc.SessionPolicies.RouteGate; gate != nil {
+			if err := gate(c.Request.Method, c.FullPath()); err != nil {
+				httpx.Fail(c, err)
+				return
+			}
+		}
 		// W11.07: ngữ cảnh chỉ xem (Lãnh đạo đơn vị ở phòng ban khác, Ban Giám đốc) không ghi được ở BẤT KỲ route
 		// nào — chặn tập trung, không trông vào từng module (đổi ngữ cảnh vẫn được).
 		if kc.ViewOnly && isWrite(c.Request.Method) && !viewOnlyExempt[c.FullPath()] {
