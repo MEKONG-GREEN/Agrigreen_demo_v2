@@ -138,20 +138,11 @@ func TestModuleEnablement(t *testing.T) {
 		t.Fatalf("Admin liệt kê: %v", m)
 	}
 
-	// Menu không hiện màn của module đã tắt; màn của module khác giữ nguyên.
+	// Menu Admin KN giữ màn lõi khi tắt module. Màn pf/metering không còn ở menu KN (KN-STANDALONE-1-ADMIN-TOOLS #264,
+	// BRD 2.0 không có FN); lọc menu theo module tắt kiểm ở TestFilterMenuGroups.
 	keys := menuKeys(root.menu(port.MenuQuery{Audience: port.AudienceAdmin}))
-	for _, gone := range []string{"admin.qt.cong_cu.su_dung_api", "admin.qt.cong_cu.bang_ke", "admin.qt.cong_cu.nhat_ky_xuat"} {
-		if slices.Contains(keys, gone) {
-			t.Fatalf("menu còn %s: %v", gone, keys)
-		}
-	}
-	for _, kept := range []string{"admin.qt.cong_cu.tham_so", "admin.qt.cong_cu.khach_hang_api", "admin.qt.phong_ban"} {
-		if !slices.Contains(keys, kept) {
-			t.Fatalf("menu mất %s: %v", kept, keys)
-		}
-	}
-	if keys := menuKeys(other.menu(port.MenuQuery{Audience: port.AudienceAdmin})); !slices.Contains(keys, "admin.qt.cong_cu.su_dung_api") {
-		t.Fatalf("menu tenant khác: %v", keys)
+	if !slices.Contains(keys, "admin.qt.phong_ban") || slices.Contains(keys, "admin.qt.cong_cu.su_dung_api") {
+		t.Fatalf("menu Admin: %v", keys)
 	}
 
 	// Bật lại: cổng mở ngay trong tiến trình (xóa đệm), Log đủ hai dòng.

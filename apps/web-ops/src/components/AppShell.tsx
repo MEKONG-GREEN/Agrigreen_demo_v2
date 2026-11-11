@@ -37,10 +37,24 @@ export function activeMenu(kn: KnSessionState, principal: Principal | null, disa
 }
 
 /**
+ * KN-STANDALONE-1-ADMIN-TOOLS (#264): 10 công cụ nền tảng không có FN trong BRD 2.0 — phiên KN không vào được (kể cả khi
+ * tài khoản có vai realm quản trị). Màn vẫn mở cho phiên nền tảng (không ngữ cảnh KN) theo vai ở nav.ts.
+ */
+const KN_REMOVED_TOOLS = [
+  "/quan-tri/tham-so", "/quan-tri/to-chuc", "/quan-tri/mau-bao-cao", "/quan-tri/xung-dot", "/quan-tri/giam-sat-dong-bo",
+  "/dong-bo", "/quan-tri/khach-hang-api", "/quan-tri/su-dung-api", "/quan-tri/bang-ke", "/quan-tri/nhat-ky-xuat",
+] as const;
+
+export function isKnRemovedTool(pathname: string): boolean {
+  return KN_REMOVED_TOOLS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+}
+
+/**
  * Hiện màn hình được không (chỉ ẩn/hiện — backend vẫn kiểm từng lời gọi, R-55).
  * Bề mặt KN: đường /kn/* phải nằm trong menu của ngữ cảnh; màn hiện có ngoài /kn vẫn theo vai (canSee).
  */
 export function isAllowed(pathname: string, kn: KnSessionState, menu: MenuTree, principal: Principal | null, disabled: DisabledModules = NO_MODULES): boolean {
+  if (kn.status === "active" && isKnRemovedTool(pathname)) return false;
   if (kn.status === "active" && pathname.startsWith("/kn")) return menuAllows(menu, pathname);
   const item = findNavItem(pathname);
   return !item || canSee(item, principal, disabled);
