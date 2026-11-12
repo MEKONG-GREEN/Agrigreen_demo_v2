@@ -8,12 +8,12 @@ jira:
   site: mkg-apphtx.atlassian.net
   project: AH
   label: brd-app-htx-khmv
-  # Project AH chỉ có Task và Sub-task: Story -> Task, Sub-task -> Sub-task,
-  # Epic -> label epic-e0x (không có ticket). Phụ thuộc Story ghi bằng link Blocks.
+  # Cấu trúc Epic -> Story -> Sub-task. Mỗi ticket còn label epic-e0x.
+  # Phụ thuộc giữa Story ghi bằng link Blocks.
 items:
   - id: E01
     loai: epic
-    jira_label: epic-e01
+    jira: AH-208
   - id: E01-S01
     loai: story
     cha: E01
@@ -148,7 +148,7 @@ items:
     jira: AH-167
   - id: E02
     loai: epic
-    jira_label: epic-e02
+    jira: AH-209
   - id: E02-S01
     loai: story
     cha: E02
@@ -303,7 +303,7 @@ items:
     jira: AH-170
   - id: E03
     loai: epic
-    jira_label: epic-e03
+    jira: AH-215
   - id: E03-S01
     loai: story
     cha: E03
@@ -440,7 +440,7 @@ items:
     jira: AH-148
   - id: E04
     loai: epic
-    jira_label: epic-e04
+    jira: AH-210
   - id: E04-S01
     loai: story
     cha: E04
@@ -518,7 +518,7 @@ items:
     jira: AH-134
   - id: E05
     loai: epic
-    jira_label: epic-e05
+    jira: AH-211
   - id: E05-S01
     loai: story
     cha: E05
@@ -686,7 +686,7 @@ items:
     jira: AH-151
   - id: E06
     loai: epic
-    jira_label: epic-e06
+    jira: AH-212
   - id: E06-S01
     loai: story
     cha: E06
@@ -819,7 +819,7 @@ items:
     jira: AH-160
   - id: E07
     loai: epic
-    jira_label: epic-e07
+    jira: AH-213
   - id: E07-S01
     loai: story
     cha: E07
@@ -875,7 +875,7 @@ items:
     jira: AH-203
   - id: E08
     loai: epic
-    jira_label: epic-e08
+    jira: AH-214
   - id: E08-S01
     loai: story
     cha: E08
