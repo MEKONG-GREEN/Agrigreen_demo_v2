@@ -1,0 +1,1009 @@
+he: app-htx-khmv
+brd:
+  link: https://drive.google.com/file/d/1rkPH25UOG2zntcdlndMbiF5a5dIJmI05/view
+  file_id: 1rkPH25UOG2zntcdlndMbiF5a5dIJmI05
+  phien_ban: v3.9
+  modified_time: 2026-11-04T08:29:57Z
+jira:
+  site: mkg-apphtx.atlassian.net
+  project: AH
+  label: brd-app-htx-khmv
+  # Project AH chỉ có Task và Sub-task: Story -> Task, Sub-task -> Sub-task,
+  # Epic -> label epic-e0x (không có ticket). Phụ thuộc Story ghi bằng link Blocks.
+items:
+  - id: E01
+    loai: epic
+    jira_label: epic-e01
+  - id: E01-S01
+    loai: story
+    cha: E01
+    jira: AH-2
+    sprint: 1
+    muc_brd: ["§V FN-01 B1–B4, EX-01..04, BR-01, BR-02, BR-06"]
+    ma_yc: ["FN-01", "FN-01.1", "FN-01-EX-01", "FN-01-EX-02", "FN-01-EX-03", "FN-01-EX-04", "FN-01-BR-01", "FN-01-BR-02", "FN-01-BR-06", "DATA-01"]
+  - id: E01-S01-T01
+    loai: subtask
+    cha: E01-S01
+    jira: AH-3
+  - id: E01-S01-T02
+    loai: subtask
+    cha: E01-S01
+    jira: AH-4
+  - id: E01-S01-T03
+    loai: subtask
+    cha: E01-S01
+    jira: AH-5
+  - id: E01-S01-T04
+    loai: subtask
+    cha: E01-S01
+    jira: AH-6
+  - id: E01-S02
+    loai: story
+    cha: E01
+    jira: AH-7
+    sprint: 1
+    muc_brd: ["§V FN-01 luồng phụ Mùa vụ, BR-07"]
+    ma_yc: ["FN-01.8", "FN-01-BS-01", "FN-01-BR-07"]
+  - id: E01-S02-T01
+    loai: subtask
+    cha: E01-S02
+    jira: AH-10
+  - id: E01-S02-T02
+    loai: subtask
+    cha: E01-S02
+    jira: AH-11
+  - id: E01-S02-T03
+    loai: subtask
+    cha: E01-S02
+    jira: AH-12
+  - id: E01-S03
+    loai: story
+    cha: E01
+    jira: AH-8
+    sprint: 1
+    muc_brd: ["§V FN-01 B3–B5, EX-05, BR-03..05"]
+    ma_yc: ["FN-01.2", "FN-01.3", "FN-01-B4", "FN-01-B5", "FN-01-BS-03", "FN-01-EX-05", "FN-01-BR-03", "FN-01-BR-04", "FN-01-BR-05"]
+  - id: E01-S03-T01
+    loai: subtask
+    cha: E01-S03
+    jira: AH-13
+  - id: E01-S03-T02
+    loai: subtask
+    cha: E01-S03
+    jira: AH-14
+  - id: E01-S03-T03
+    loai: subtask
+    cha: E01-S03
+    jira: AH-15
+  - id: E01-S03-T04
+    loai: subtask
+    cha: E01-S03
+    jira: AH-16
+  - id: E01-S03-T05
+    loai: subtask
+    cha: E01-S03
+    jira: AH-17
+  - id: E01-S04
+    loai: story
+    cha: E01
+    jira: AH-38
+    sprint: 3
+    muc_brd: ["§V FN-01 luồng phụ Nhập Excel", "AC-04"]
+    ma_yc: ["FN-01.4"]
+  - id: E01-S04-T01
+    loai: subtask
+    cha: E01-S04
+    jira: AH-41
+  - id: E01-S04-T02
+    loai: subtask
+    cha: E01-S04
+    jira: AH-42
+  - id: E01-S04-T03
+    loai: subtask
+    cha: E01-S04
+    jira: AH-43
+  - id: E01-S05
+    loai: story
+    cha: E01
+    jira: AH-21
+    sprint: 2
+    muc_brd: ["§V FN-01 luồng phụ Nhân bản, Phiên bản", "EX-03"]
+    ma_yc: ["FN-01.5", "FN-01.6"]
+  - id: E01-S05-T01
+    loai: subtask
+    cha: E01-S05
+    jira: AH-25
+  - id: E01-S05-T02
+    loai: subtask
+    cha: E01-S05
+    jira: AH-26
+  - id: E01-S05-T03
+    loai: subtask
+    cha: E01-S05
+    jira: AH-27
+  - id: E01-S06
+    loai: story
+    cha: E01
+    jira: AH-161
+    sprint: 11
+    muc_brd: ["§V FN-01 luồng phụ Áp SOP bản mới", "§III.2 NTF-07"]
+    ma_yc: ["FN-01.7", "FN-01-BS-02", "NTF-07", "NTF.4"]
+    blocked: true
+    cau_hoi_chan: ["Q-03"]
+  - id: E01-S06-T01
+    loai: subtask
+    cha: E01-S06
+    jira: AH-164
+  - id: E01-S06-T02
+    loai: subtask
+    cha: E01-S06
+    jira: AH-165
+  - id: E01-S06-T03
+    loai: subtask
+    cha: E01-S06
+    jira: AH-166
+  - id: E01-S06-T04
+    loai: subtask
+    cha: E01-S06
+    jira: AH-167
+  - id: E02
+    loai: epic
+    jira_label: epic-e02
+  - id: E02-S01
+    loai: story
+    cha: E02
+    jira: AH-50
+    sprint: 4
+    muc_brd: ["§V FN-02", "§III.1 UX-05", "§III.3 DATA-05", "§IV.3"]
+    ma_yc: ["FN-02", "FN-02.1", "FN-02-EX-01", "FN-02-BR-02", "FN-02-BR-03", "FN-03-BR-09", "UX-05", "DATA-05", "IV3-07"]
+    blocked: true
+    cau_hoi_chan: ["Q-02"]
+  - id: E02-S01-T01
+    loai: subtask
+    cha: E02-S01
+    jira: AH-52
+  - id: E02-S01-T02
+    loai: subtask
+    cha: E02-S01
+    jira: AH-53
+  - id: E02-S01-T03
+    loai: subtask
+    cha: E02-S01
+    jira: AH-54
+  - id: E02-S01-T04
+    loai: subtask
+    cha: E02-S01
+    jira: AH-55
+  - id: E02-S01-T05
+    loai: subtask
+    cha: E02-S01
+    jira: AH-56
+  - id: E02-S02
+    loai: story
+    cha: E02
+    jira: AH-61
+    sprint: 4
+    muc_brd: ["§V FN-03 luồng A B1–B8, EX-01/03/05/06/09, BR-01..03", "§IV.3"]
+    ma_yc: ["FN-03", "FN-03.1", "FN-03.2", "FN-03-B2", "FN-03-B5", "FN-03-B6", "FN-03-B8", "FN-03-EX-01", "FN-03-EX-03", "FN-03-EX-05", "FN-03-EX-06", "FN-03-EX-09", "FN-03-BR-01", "FN-03-BR-02", "FN-03-BR-03", "IV3-01", "FN-03-AC-01", "REQ-004"]
+    blocked: true
+    cau_hoi_chan: ["Q-02"]
+  - id: E02-S02-T01
+    loai: subtask
+    cha: E02-S02
+    jira: AH-62
+  - id: E02-S02-T02
+    loai: subtask
+    cha: E02-S02
+    jira: AH-63
+  - id: E02-S02-T03
+    loai: subtask
+    cha: E02-S02
+    jira: AH-64
+  - id: E02-S02-T04
+    loai: subtask
+    cha: E02-S02
+    jira: AH-65
+  - id: E02-S02-T05
+    loai: subtask
+    cha: E02-S02
+    jira: AH-66
+  - id: E02-S02-T06
+    loai: subtask
+    cha: E02-S02
+    jira: AH-67
+  - id: E02-S03
+    loai: story
+    cha: E02
+    jira: AH-113
+    sprint: 8
+    muc_brd: ["§V FN-03 B6, luồng phụ Tùy chỉnh, EX-04, BR-04, BR-06", "§III.1 UX-07", "§III.3 DATA-04"]
+    ma_yc: ["FN-03.3", "FN-03.6", "FN-03-BS-03", "FN-03-EX-04", "FN-03-BR-04", "FN-03-BR-06", "UX-07", "DATA-04"]
+  - id: E02-S03-T01
+    loai: subtask
+    cha: E02-S03
+    jira: AH-115
+  - id: E02-S03-T02
+    loai: subtask
+    cha: E02-S03
+    jira: AH-116
+  - id: E02-S03-T03
+    loai: subtask
+    cha: E02-S03
+    jira: AH-117
+  - id: E02-S03-T04
+    loai: subtask
+    cha: E02-S03
+    jira: AH-118
+  - id: E02-S03-T05
+    loai: subtask
+    cha: E02-S03
+    jira: AH-119
+  - id: E02-S04
+    loai: story
+    cha: E02
+    jira: AH-68
+    sprint: 5
+    muc_brd: ["§V FN-03 luồng phụ Mở nhiều vụ, EX-02", "§III.1 UX-09"]
+    ma_yc: ["FN-03.4", "FN-03-BS-01", "FN-03-EX-02", "UX-09", "FN-03-AC-02"]
+  - id: E02-S04-T01
+    loai: subtask
+    cha: E02-S04
+    jira: AH-72
+  - id: E02-S04-T02
+    loai: subtask
+    cha: E02-S04
+    jira: AH-73
+  - id: E02-S04-T03
+    loai: subtask
+    cha: E02-S04
+    jira: AH-74
+  - id: E02-S05
+    loai: story
+    cha: E02
+    jira: AH-139
+    sprint: 10
+    muc_brd: ["§V FN-03 luồng phụ Sao chép vụ trước"]
+    ma_yc: ["FN-03.5", "FN-03-BS-02"]
+  - id: E02-S05-T01
+    loai: subtask
+    cha: E02-S05
+    jira: AH-142
+  - id: E02-S05-T02
+    loai: subtask
+    cha: E02-S05
+    jira: AH-143
+  - id: E02-S05-T03
+    loai: subtask
+    cha: E02-S05
+    jira: AH-144
+  - id: E02-S05-T04
+    loai: subtask
+    cha: E02-S05
+    jira: AH-145
+  - id: E02-S06
+    loai: story
+    cha: E02
+    jira: AH-162
+    sprint: 11
+    muc_brd: ["§V FN-03 B6, EX-03"]
+    ma_yc: ["FN-03-EX-03"]
+    blocked: true
+    cau_hoi_chan: ["Q-04"]
+  - id: E02-S06-T01
+    loai: subtask
+    cha: E02-S06
+    jira: AH-168
+  - id: E02-S06-T02
+    loai: subtask
+    cha: E02-S06
+    jira: AH-169
+  - id: E02-S06-T03
+    loai: subtask
+    cha: E02-S06
+    jira: AH-170
+  - id: E03
+    loai: epic
+    jira_label: epic-e03
+  - id: E03-S01
+    loai: story
+    cha: E03
+    jira: AH-51
+    sprint: 4
+    muc_brd: ["§V FN-03 luồng phụ Lịch thời vụ", "§V NTF EX-03", "§III.2 NTF-01"]
+    ma_yc: ["FN-03.7", "FN-03-BS-04", "NTF-01", "NTF.1", "NTF-EX-03"]
+  - id: E03-S01-T01
+    loai: subtask
+    cha: E03-S01
+    jira: AH-57
+  - id: E03-S01-T02
+    loai: subtask
+    cha: E03-S01
+    jira: AH-58
+  - id: E03-S01-T03
+    loai: subtask
+    cha: E03-S01
+    jira: AH-59
+  - id: E03-S01-T04
+    loai: subtask
+    cha: E03-S01
+    jira: AH-60
+  - id: E03-S02
+    loai: story
+    cha: E03
+    jira: AH-69
+    sprint: 5
+    muc_brd: ["§V FN-03 luồng phụ Lịch thời vụ (TV)"]
+    ma_yc: ["FN-03.8"]
+  - id: E03-S02-T01
+    loai: subtask
+    cha: E03-S02
+    jira: AH-75
+  - id: E03-S02-T02
+    loai: subtask
+    cha: E03-S02
+    jira: AH-76
+  - id: E03-S02-T03
+    loai: subtask
+    cha: E03-S02
+    jira: AH-77
+  - id: E03-S03
+    loai: story
+    cha: E03
+    jira: AH-175
+    sprint: 12
+    muc_brd: ["§V FN-03 luồng phụ Sửa vụ, EX-08, BR-10..13", "§V FN-04 luồng phụ"]
+    ma_yc: ["FN-03.9", "FN-03-EX-08", "FN-03-BR-10", "FN-03-BR-11", "FN-03-BR-12", "FN-03-BR-13", "FN-04-BS-01"]
+  - id: E03-S03-T01
+    loai: subtask
+    cha: E03-S03
+    jira: AH-178
+  - id: E03-S03-T02
+    loai: subtask
+    cha: E03-S03
+    jira: AH-179
+  - id: E03-S03-T03
+    loai: subtask
+    cha: E03-S03
+    jira: AH-180
+  - id: E03-S03-T04
+    loai: subtask
+    cha: E03-S03
+    jira: AH-181
+  - id: E03-S03-T05
+    loai: subtask
+    cha: E03-S03
+    jira: AH-182
+  - id: E03-S04
+    loai: story
+    cha: E03
+    jira: AH-70
+    sprint: 5
+    muc_brd: ["§V FN-03 luồng phụ Dừng vụ, EX-07, BR-05", "§IV.3"]
+    ma_yc: ["FN-03.10", "FN-03-EX-07", "FN-03-BR-05", "IV3-04", "IV3-06"]
+  - id: E03-S04-T01
+    loai: subtask
+    cha: E03-S04
+    jira: AH-78
+  - id: E03-S04-T02
+    loai: subtask
+    cha: E03-S04
+    jira: AH-79
+  - id: E03-S04-T03
+    loai: subtask
+    cha: E03-S04
+    jira: AH-80
+  - id: E03-S04-T04
+    loai: subtask
+    cha: E03-S04
+    jira: AH-81
+  - id: E03-S05
+    loai: story
+    cha: E03
+    jira: AH-124
+    sprint: 9
+    muc_brd: ["§V FN-03 luồng phụ Chi tiết vụ"]
+    ma_yc: ["FN-03.11"]
+  - id: E03-S05-T01
+    loai: subtask
+    cha: E03-S05
+    jira: AH-127
+  - id: E03-S05-T02
+    loai: subtask
+    cha: E03-S05
+    jira: AH-128
+  - id: E03-S05-T03
+    loai: subtask
+    cha: E03-S05
+    jira: AH-129
+  - id: E03-S05-T04
+    loai: subtask
+    cha: E03-S05
+    jira: AH-130
+  - id: E03-S06
+    loai: story
+    cha: E03
+    jira: AH-140
+    sprint: 10
+    muc_brd: ["§V FN-03 luồng phụ ĐD xem vụ, BR-08", "§III.3 DATA-03"]
+    ma_yc: ["FN-03.12", "FN-03-BR-08", "DATA-03"]
+  - id: E03-S06-T01
+    loai: subtask
+    cha: E03-S06
+    jira: AH-146
+  - id: E03-S06-T02
+    loai: subtask
+    cha: E03-S06
+    jira: AH-147
+  - id: E03-S06-T03
+    loai: subtask
+    cha: E03-S06
+    jira: AH-148
+  - id: E04
+    loai: epic
+    jira_label: epic-e04
+  - id: E04-S01
+    loai: story
+    cha: E04
+    jira: AH-71
+    sprint: 5
+    muc_brd: ["§V FN-04 B1, EX-01, BR-01, BR-04"]
+    ma_yc: ["FN-04", "FN-04.1", "FN-04-EX-01", "FN-04-BR-01", "FN-04-BR-04", "FN-03-BR-07"]
+  - id: E04-S01-T01
+    loai: subtask
+    cha: E04-S01
+    jira: AH-82
+  - id: E04-S01-T02
+    loai: subtask
+    cha: E04-S01
+    jira: AH-83
+  - id: E04-S01-T03
+    loai: subtask
+    cha: E04-S01
+    jira: AH-84
+  - id: E04-S01-T04
+    loai: subtask
+    cha: E04-S01
+    jira: AH-85
+  - id: E04-S01-T05
+    loai: subtask
+    cha: E04-S01
+    jira: AH-86
+  - id: E04-S02
+    loai: story
+    cha: E04
+    jira: AH-87
+    sprint: 6
+    muc_brd: ["§V FN-04 B2, B3, EX-02, EX-04, BR-02, BR-03"]
+    ma_yc: ["FN-04.2", "FN-04.3", "FN-04-EX-02", "FN-04-EX-04", "FN-04-BR-02", "FN-04-BR-03", "FN-06-BR-07"]
+    blocked: true
+    cau_hoi_chan: ["Q-05"]
+  - id: E04-S02-T01
+    loai: subtask
+    cha: E04-S02
+    jira: AH-89
+  - id: E04-S02-T02
+    loai: subtask
+    cha: E04-S02
+    jira: AH-90
+  - id: E04-S02-T03
+    loai: subtask
+    cha: E04-S02
+    jira: AH-91
+  - id: E04-S02-T04
+    loai: subtask
+    cha: E04-S02
+    jira: AH-92
+  - id: E04-S03
+    loai: story
+    cha: E04
+    jira: AH-125
+    sprint: 9
+    muc_brd: ["§V FN-04 B4, EX-03, BR-05", "§III.1 UX-04"]
+    ma_yc: ["FN-04.4", "FN-04-EX-03", "FN-04-BR-05", "UX-04"]
+  - id: E04-S03-T01
+    loai: subtask
+    cha: E04-S03
+    jira: AH-131
+  - id: E04-S03-T02
+    loai: subtask
+    cha: E04-S03
+    jira: AH-132
+  - id: E04-S03-T03
+    loai: subtask
+    cha: E04-S03
+    jira: AH-133
+  - id: E04-S03-T04
+    loai: subtask
+    cha: E04-S03
+    jira: AH-134
+  - id: E05
+    loai: epic
+    jira_label: epic-e05
+  - id: E05-S01
+    loai: story
+    cha: E05
+    jira: AH-88
+    sprint: 6
+    muc_brd: ["§V FN-05 B1–B3, EX-01, EX-06, BR-01, BR-03", "§III.1 UX-02", "§III.3 DATA-02", "§III.6 TECH-02", "§IV.3"]
+    ma_yc: ["FN-05", "FN-05.1", "FN-05-B2", "FN-05-B3", "FN-05-EX-01", "FN-05-EX-06", "FN-05-BR-01", "FN-05-BR-03", "IV3-08", "IV3-09", "IV3-10", "UX-02", "REQ-010", "DATA-02", "TECH-02", "REQ-005", "FN-05-AC-01"]
+  - id: E05-S01-T01
+    loai: subtask
+    cha: E05-S01
+    jira: AH-93
+  - id: E05-S01-T02
+    loai: subtask
+    cha: E05-S01
+    jira: AH-94
+  - id: E05-S01-T03
+    loai: subtask
+    cha: E05-S01
+    jira: AH-95
+  - id: E05-S01-T04
+    loai: subtask
+    cha: E05-S01
+    jira: AH-96
+  - id: E05-S01-T05
+    loai: subtask
+    cha: E05-S01
+    jira: AH-97
+  - id: E05-S01-T06
+    loai: subtask
+    cha: E05-S01
+    jira: AH-98
+  - id: E05-S02
+    loai: story
+    cha: E05
+    jira: AH-99
+    sprint: 7
+    muc_brd: ["§V FN-05 B4–B5, EX-04, EX-05, BR-04", "§VII Ảnh minh chứng", "§I.8.2 A8"]
+    ma_yc: ["FN-05-B5", "FN-05-EX-04", "FN-05-EX-05", "FN-05-BR-04", "NFR-13", "REQ-007"]
+  - id: E05-S02-T01
+    loai: subtask
+    cha: E05-S02
+    jira: AH-102
+  - id: E05-S02-T02
+    loai: subtask
+    cha: E05-S02
+    jira: AH-103
+  - id: E05-S02-T03
+    loai: subtask
+    cha: E05-S02
+    jira: AH-104
+  - id: E05-S02-T04
+    loai: subtask
+    cha: E05-S02
+    jira: AH-105
+  - id: E05-S02-T05
+    loai: subtask
+    cha: E05-S02
+    jira: AH-106
+  - id: E05-S03
+    loai: story
+    cha: E05
+    jira: AH-114
+    sprint: 8
+    muc_brd: ["§V FN-05 B4, EX-02, EX-03, EX-07, BR-02, BR-05", "§III.1 UX-06", "§III.6 TECH-01", "§VII Offline"]
+    ma_yc: ["FN-05.2", "FN-05-EX-02", "FN-05-EX-03", "FN-05-EX-07", "FN-05-BR-02", "FN-05-BR-05", "TECH-01", "UX-06", "NFR-07"]
+  - id: E05-S03-T01
+    loai: subtask
+    cha: E05-S03
+    jira: AH-120
+  - id: E05-S03-T02
+    loai: subtask
+    cha: E05-S03
+    jira: AH-121
+  - id: E05-S03-T03
+    loai: subtask
+    cha: E05-S03
+    jira: AH-122
+  - id: E05-S03-T04
+    loai: subtask
+    cha: E05-S03
+    jira: AH-123
+  - id: E05-S04
+    loai: story
+    cha: E05
+    jira: AH-163
+    sprint: 11
+    muc_brd: ["§V FN-05 luồng phụ Việc phát sinh"]
+    ma_yc: ["FN-05.3", "FN-05-BS-02"]
+  - id: E05-S04-T01
+    loai: subtask
+    cha: E05-S04
+    jira: AH-171
+  - id: E05-S04-T02
+    loai: subtask
+    cha: E05-S04
+    jira: AH-172
+  - id: E05-S04-T03
+    loai: subtask
+    cha: E05-S04
+    jira: AH-173
+  - id: E05-S04-T04
+    loai: subtask
+    cha: E05-S04
+    jira: AH-174
+  - id: E05-S05
+    loai: story
+    cha: E05
+    jira: AH-176
+    sprint: 12
+    muc_brd: ["§V FN-05 luồng phụ Ghi nhiều vụ"]
+    ma_yc: ["REQ-012", "FN-05-BS-01"]
+  - id: E05-S05-T01
+    loai: subtask
+    cha: E05-S05
+    jira: AH-183
+  - id: E05-S05-T02
+    loai: subtask
+    cha: E05-S05
+    jira: AH-184
+  - id: E05-S05-T03
+    loai: subtask
+    cha: E05-S05
+    jira: AH-185
+  - id: E05-S06
+    loai: story
+    cha: E05
+    jira: AH-126
+    sprint: 9
+    muc_brd: ["§V FN-05 luồng phụ Xem/sửa/xóa, BR-07"]
+    ma_yc: ["FN-05.4", "FN-05-BS-03", "FN-05-BS-04", "FN-05-BR-07"]
+  - id: E05-S06-T01
+    loai: subtask
+    cha: E05-S06
+    jira: AH-135
+  - id: E05-S06-T02
+    loai: subtask
+    cha: E05-S06
+    jira: AH-136
+  - id: E05-S06-T03
+    loai: subtask
+    cha: E05-S06
+    jira: AH-137
+  - id: E05-S06-T04
+    loai: subtask
+    cha: E05-S06
+    jira: AH-138
+  - id: E05-S07
+    loai: story
+    cha: E05
+    jira: AH-141
+    sprint: 10
+    muc_brd: ["§V FN-05 luồng phụ ĐD xem nhật ký"]
+    ma_yc: ["FN-05.5"]
+  - id: E05-S07-T01
+    loai: subtask
+    cha: E05-S07
+    jira: AH-149
+  - id: E05-S07-T02
+    loai: subtask
+    cha: E05-S07
+    jira: AH-150
+  - id: E05-S07-T03
+    loai: subtask
+    cha: E05-S07
+    jira: AH-151
+  - id: E06
+    loai: epic
+    jira_label: epic-e06
+  - id: E06-S01
+    loai: story
+    cha: E06
+    jira: AH-100
+    sprint: 7
+    muc_brd: ["§V FN-06 B1–B3, EX-01/02/06, BR-01/02/06", "§V FN-05 BR-06", "§IV.3"]
+    ma_yc: ["FN-06", "FN-06.1", "FN-06-B3", "FN-06-EX-01", "FN-06-EX-02", "FN-06-EX-06", "FN-06-BR-01", "FN-06-BR-02", "FN-06-BR-06", "FN-05-BR-06", "IV3-02"]
+    blocked: true
+    cau_hoi_chan: ["Q-05"]
+  - id: E06-S01-T01
+    loai: subtask
+    cha: E06-S01
+    jira: AH-107
+  - id: E06-S01-T02
+    loai: subtask
+    cha: E06-S01
+    jira: AH-108
+  - id: E06-S01-T03
+    loai: subtask
+    cha: E06-S01
+    jira: AH-109
+  - id: E06-S01-T04
+    loai: subtask
+    cha: E06-S01
+    jira: AH-110
+  - id: E06-S02
+    loai: story
+    cha: E06
+    jira: AH-177
+    sprint: 12
+    muc_brd: ["§V FN-06 luồng phụ Nhập hàng loạt, EX-03", "§III.1 UX-11"]
+    ma_yc: ["FN-06.2", "FN-06-EX-03", "UX-11"]
+  - id: E06-S02-T01
+    loai: subtask
+    cha: E06-S02
+    jira: AH-186
+  - id: E06-S02-T02
+    loai: subtask
+    cha: E06-S02
+    jira: AH-187
+  - id: E06-S02-T03
+    loai: subtask
+    cha: E06-S02
+    jira: AH-188
+  - id: E06-S03
+    loai: story
+    cha: E06
+    jira: AH-189
+    sprint: 13
+    muc_brd: ["§V FN-06 luồng phụ Sửa, Hủy, EX-07, EX-08, BR-04", "§IV.3"]
+    ma_yc: ["FN-06.3", "FN-06.4", "FN-06-BS-01", "FN-06-BS-02", "FN-06-EX-07", "FN-06-EX-08", "FN-06-BR-04", "IV3-05"]
+  - id: E06-S03-T01
+    loai: subtask
+    cha: E06-S03
+    jira: AH-193
+  - id: E06-S03-T02
+    loai: subtask
+    cha: E06-S03
+    jira: AH-194
+  - id: E06-S03-T03
+    loai: subtask
+    cha: E06-S03
+    jira: AH-195
+  - id: E06-S03-T04
+    loai: subtask
+    cha: E06-S03
+    jira: AH-196
+  - id: E06-S04
+    loai: story
+    cha: E06
+    jira: AH-152
+    sprint: 10
+    muc_brd: ["§V FN-06 B4, EX-05, BR-05", "§IV.3"]
+    ma_yc: ["FN-06.5", "FN-06-B4", "FN-06-EX-05", "FN-06-BR-05", "IV3-03"]
+    blocked: true
+    cau_hoi_chan: ["Q-05"]
+  - id: E06-S04-T01
+    loai: subtask
+    cha: E06-S04
+    jira: AH-154
+  - id: E06-S04-T02
+    loai: subtask
+    cha: E06-S04
+    jira: AH-155
+  - id: E06-S04-T03
+    loai: subtask
+    cha: E06-S04
+    jira: AH-156
+  - id: E06-S04-T04
+    loai: subtask
+    cha: E06-S04
+    jira: AH-157
+  - id: E06-S05
+    loai: story
+    cha: E06
+    jira: AH-190
+    sprint: 13
+    muc_brd: ["§V FN-06 EX-04, EX-09, BR-03"]
+    ma_yc: ["FN-06-EX-04", "FN-06-EX-09", "FN-06-BR-03"]
+  - id: E06-S05-T01
+    loai: subtask
+    cha: E06-S05
+    jira: AH-197
+  - id: E06-S05-T02
+    loai: subtask
+    cha: E06-S05
+    jira: AH-198
+  - id: E06-S05-T03
+    loai: subtask
+    cha: E06-S05
+    jira: AH-199
+  - id: E06-S06
+    loai: story
+    cha: E06
+    jira: AH-153
+    sprint: 10
+    muc_brd: ["§V FN-06 luồng phụ ĐD xem sản lượng", "§III.3 DATA-03"]
+    ma_yc: ["FN-06.6"]
+  - id: E06-S06-T01
+    loai: subtask
+    cha: E06-S06
+    jira: AH-158
+  - id: E06-S06-T02
+    loai: subtask
+    cha: E06-S06
+    jira: AH-159
+  - id: E06-S06-T03
+    loai: subtask
+    cha: E06-S06
+    jira: AH-160
+  - id: E07
+    loai: epic
+    jira_label: epic-e07
+  - id: E07-S01
+    loai: story
+    cha: E07
+    jira: AH-22
+    sprint: 2
+    muc_brd: ["§V NTF B1–B3, EX-01, BR-01, BR-02", "§III.1 UX-08", "§III.2 NTF.5"]
+    ma_yc: ["NTF", "NTF.5", "UX-08", "NTF-BR-01", "NTF-BR-02", "NTF-EX-01"]
+  - id: E07-S01-T01
+    loai: subtask
+    cha: E07-S01
+    jira: AH-28
+  - id: E07-S01-T02
+    loai: subtask
+    cha: E07-S01
+    jira: AH-29
+  - id: E07-S01-T03
+    loai: subtask
+    cha: E07-S01
+    jira: AH-30
+  - id: E07-S01-T04
+    loai: subtask
+    cha: E07-S01
+    jira: AH-31
+  - id: E07-S02
+    loai: story
+    cha: E07
+    jira: AH-191
+    sprint: 13
+    muc_brd: ["§V NTF luồng phụ NTF.2, BR-03, BR-04, EX-02", "§III.2 NTF-05"]
+    ma_yc: ["NTF-05", "NTF.2", "NTF-BR-03", "NTF-BR-04", "NTF-EX-02"]
+  - id: E07-S02-T01
+    loai: subtask
+    cha: E07-S02
+    jira: AH-200
+  - id: E07-S02-T02
+    loai: subtask
+    cha: E07-S02
+    jira: AH-201
+  - id: E07-S03
+    loai: story
+    cha: E07
+    jira: AH-192
+    sprint: 13
+    muc_brd: ["§V NTF luồng phụ NTF.3", "§III.2 NTF-04"]
+    ma_yc: ["NTF-04", "NTF.3", "NTF-BS-01"]
+  - id: E07-S03-T01
+    loai: subtask
+    cha: E07-S03
+    jira: AH-202
+  - id: E07-S03-T02
+    loai: subtask
+    cha: E07-S03
+    jira: AH-203
+  - id: E08
+    loai: epic
+    jira_label: epic-e08
+  - id: E08-S01
+    loai: story
+    cha: E08
+    jira: AH-39
+    sprint: 3
+    muc_brd: ["§III.4 ADM-01", "§VI", "§I.4", "§VII Bảo mật"]
+    ma_yc: ["ADM-01", "REQ-006", "REQ-008", "FN-02-BR-01", "NFR-05"]
+    blocked: true
+    cau_hoi_chan: ["Q-02"]
+  - id: E08-S01-T01
+    loai: subtask
+    cha: E08-S01
+    jira: AH-44
+  - id: E08-S01-T02
+    loai: subtask
+    cha: E08-S01
+    jira: AH-45
+  - id: E08-S01-T03
+    loai: subtask
+    cha: E08-S01
+    jira: AH-46
+  - id: E08-S02
+    loai: story
+    cha: E08
+    jira: AH-9
+    sprint: 1
+    muc_brd: ["§III.5 LEGAL-01", "§I.8.1", "§VII Bảo mật, Tuân thủ"]
+    ma_yc: ["LEGAL-01", "REQ-003", "NFR-06", "NFR-12"]
+  - id: E08-S02-T01
+    loai: subtask
+    cha: E08-S02
+    jira: AH-18
+  - id: E08-S02-T02
+    loai: subtask
+    cha: E08-S02
+    jira: AH-19
+  - id: E08-S02-T03
+    loai: subtask
+    cha: E08-S02
+    jira: AH-20
+  - id: E08-S03
+    loai: story
+    cha: E08
+    jira: AH-23
+    sprint: 2
+    muc_brd: ["§III.5 dòng LEGAL thứ hai"]
+    ma_yc: ["REQ-011"]
+  - id: E08-S03-T01
+    loai: subtask
+    cha: E08-S03
+    jira: AH-32
+  - id: E08-S03-T02
+    loai: subtask
+    cha: E08-S03
+    jira: AH-33
+  - id: E08-S03-T03
+    loai: subtask
+    cha: E08-S03
+    jira: AH-34
+  - id: E08-S04
+    loai: story
+    cha: E08
+    jira: AH-101
+    sprint: 7
+    muc_brd: ["§III.1 UX-03"]
+    ma_yc: ["UX-03"]
+  - id: E08-S04-T01
+    loai: subtask
+    cha: E08-S04
+    jira: AH-111
+  - id: E08-S04-T02
+    loai: subtask
+    cha: E08-S04
+    jira: AH-112
+  - id: E08-S05
+    loai: story
+    cha: E08
+    jira: AH-204
+    sprint: 14
+    muc_brd: ["§VII Hiệu năng, Mở rộng, Tương thích, Danh sách lớn", "§III.6 TECH-03"]
+    ma_yc: ["NFR-01", "NFR-02", "NFR-08", "NFR-09", "NFR-14", "TECH-03"]
+  - id: E08-S05-T01
+    loai: subtask
+    cha: E08-S05
+    jira: AH-205
+  - id: E08-S05-T02
+    loai: subtask
+    cha: E08-S05
+    jira: AH-206
+  - id: E08-S05-T03
+    loai: subtask
+    cha: E08-S05
+    jira: AH-207
+  - id: E08-S06
+    loai: story
+    cha: E08
+    jira: AH-40
+    sprint: 3
+    muc_brd: ["§VII Sẵn sàng, Sao lưu"]
+    ma_yc: ["NFR-03", "NFR-04", "NFR-10", "NFR-11"]
+  - id: E08-S06-T01
+    loai: subtask
+    cha: E08-S06
+    jira: AH-47
+  - id: E08-S06-T02
+    loai: subtask
+    cha: E08-S06
+    jira: AH-48
+  - id: E08-S06-T03
+    loai: subtask
+    cha: E08-S06
+    jira: AH-49
+  - id: E08-S07
+    loai: story
+    cha: E08
+    jira: AH-24
+    sprint: 2
+    muc_brd: ["§III.1 UX-01, UX-10, UX-12", "§I.3", "§I.8.1", "§VIII"]
+    ma_yc: ["UX-01", "UX-10", "UX-12", "REQ-001", "REQ-002", "REQ-009"]
+  - id: E08-S07-T01
+    loai: subtask
+    cha: E08-S07
+    jira: AH-35
+  - id: E08-S07-T02
+    loai: subtask
+    cha: E08-S07
+    jira: AH-36
+  - id: E08-S07-T03
+    loai: subtask
+    cha: E08-S07
+    jira: AH-37
