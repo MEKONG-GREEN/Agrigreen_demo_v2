@@ -21,7 +21,7 @@ Luật owner sản xuất, seed và 30 ngày giữ nguyên #195. Chỉ fixture k
 ## Kiểm lại
 
 ```powershell
-$env:GOTOOLCHAIN='go1.26.10'
+$env:GOTOOLCHAIN='go1.26.11'
 go run ./tools/modgen -check
 go run ./tools/migratecheck -base origin/dev migrations
 .\scripts\pg-ephemeral.ps1 run go test -count=1 -p 1 -timeout 55m -v ./internal/platform/accounts/... ./internal/kn/extension ./tests/knaccounts ./tests/contextdata ./tests/notify ./cmd/api-platform/assembly ./cmd/worker ./internal/kn/hrm/... ./migrations
