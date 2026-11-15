@@ -266,17 +266,21 @@ type ReviewGuard interface {
 type TemplateDef struct {
 	Profile, Code, Title string
 	Fields               json.RawMessage
+	Runtime              *RuntimeDefinition
+	Fixture              bool
 	// BaseVersion is mandatory with a definition policy; 0 creates a new code.
 	BaseVersion *int64
 }
 
 // TemplateRef là phiên bản biểu đã có.
 type TemplateRef struct {
-	ID      uuid.UUID
-	Code    string
-	Version int64
-	Title   string
-	Fields  json.RawMessage
+	ID       uuid.UUID
+	Code     string
+	Version  int64
+	Title    string
+	Fields   json.RawMessage
+	Runtime  *RuntimeDefinition
+	Identity TemplateIdentity
 }
 
 // PeriodDef là một kỳ của lô phát hành (khóa kỳ theo lịch kỳ hệ thống, hạn riêng).

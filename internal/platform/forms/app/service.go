@@ -42,7 +42,8 @@ type Service struct {
 	// ReviewGuards: kiểm quyền rà soát thêm của bên dùng theo profile (gọi ngoài giao dịch, trước khi ghi).
 	ReviewGuards map[string]port.ReviewGuard
 	// DefinitionPolicies are registered before serving; owner callbacks run outside TX.
-	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
+	DefinitionPolicies  map[string]port.TemplateDefinitionPolicy
+	TemplateUsePolicies map[string]port.TemplateUsePolicy
 	// PeriodOperationPolicies are registered by owners before serving; nil disables receipts.
 	PeriodOperationPolicies map[string]port.PeriodOperationPolicy
 	// PublishOperationPolicies authorize the additive batch receipt capability before native TX.
@@ -223,6 +224,8 @@ func classify(err error) error {
 		return port.ErrPeriodClosed.WithCause(err)
 	case pg.Code == "AGF03":
 		return port.ErrSubmissionLimit.WithCause(err)
+	case pg.Code == "AGF05":
+		return port.ErrTemplateInUse.WithCause(err)
 	case pg.Code == "AGF04":
 		return port.ErrVersionConflict.WithCause(err)
 	case pg.Code == "23514" && pg.ConstraintName == "review_four_eyes":

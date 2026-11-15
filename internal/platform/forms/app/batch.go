@@ -7,9 +7,11 @@ package app
 //   - danh sách công việc (kỳ × đơn vị trong phạm vi) cho màn "Công việc cần làm".
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -79,10 +81,15 @@ func unitKindOf(prof port.Profile, kind string) string {
 // DefineTemplate thực hiện port.Publisher.
 func (pb Publisher) DefineTemplate(ctx context.Context, def port.TemplateDef, idem string) (port.TemplateRef, error) {
 	var fields []domain.Field
-	if err := json.Unmarshal(def.Fields, &fields); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(def.Fields))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&fields); err != nil {
 		return port.TemplateRef{}, port.ErrInvalidTemplate.WithField("fields", "JSON mảng trường")
 	}
-	t, err := pb.Svc.DefineTemplate(ctx, TemplateInput{Profile: def.Profile, Code: def.Code, Title: def.Title, Fields: fields, BaseVersion: def.BaseVersion}, idem)
+	if decoder.Decode(new(any)) != io.EOF {
+		return port.TemplateRef{}, port.ErrInvalidTemplate.WithField("fields", "một mảng JSON duy nhất")
+	}
+	t, err := pb.Svc.DefineTemplate(ctx, TemplateInput{Profile: def.Profile, Code: def.Code, Title: def.Title, Fields: fields, Runtime: def.Runtime, Fixture: def.Fixture, BaseVersion: def.BaseVersion}, idem)
 	if err != nil {
 		return port.TemplateRef{}, err
 	}
@@ -105,7 +112,7 @@ func (pb Publisher) LatestTemplate(ctx context.Context, profile, code string) (p
 
 func refOf(t store.Template) (port.TemplateRef, error) {
 	raw, err := json.Marshal(t.Fields)
-	return port.TemplateRef{ID: t.ID, Code: t.Code, Version: t.Version, Title: t.Title, Fields: raw}, err
+	return port.TemplateRef{ID: t.ID, Code: t.Code, Version: t.Version, Title: t.Title, Fields: raw, Runtime: t.Runtime, Identity: t.Identity()}, err
 }
 
 // PublishBatch thực hiện port.Publisher: mọi kỳ của lô cùng biểu, cùng đơn vị nhận, trong MỘT giao dịch.

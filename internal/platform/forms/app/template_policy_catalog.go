@@ -104,7 +104,7 @@ func catalogVersion(t store.Template) (port.TemplateVersion, error) {
 	if err != nil {
 		return port.TemplateVersion{}, err
 	}
-	return port.TemplateVersion{ID: t.ID, Profile: t.Profile, Code: t.Code, Version: t.Version, Title: t.Title, Fields: fields, Fixture: t.Fixture}, nil
+	return port.TemplateVersion{ID: t.ID, Profile: t.Profile, Code: t.Code, Version: t.Version, Title: t.Title, Fields: fields, Fixture: t.Fixture, Runtime: t.Runtime, Identity: t.Identity()}, nil
 }
 
 func catalogVersions(ts []store.Template) ([]port.TemplateVersion, error) {

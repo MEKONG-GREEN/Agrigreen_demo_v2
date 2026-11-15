@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 )
 
@@ -24,24 +25,39 @@ func Lock(ctx context.Context, tx pgx.Tx, periodRef uuid.UUID) error {
 
 // Template là một phiên bản biểu.
 type Template struct {
-	ID         uuid.UUID
-	Profile    string
-	Code       string
-	Version    int64
-	Title      string
-	Fields     []domain.Field
-	Fixture    bool
-	ActorRef   uuid.UUID
-	EventTime  time.Time
-	RecordedAt time.Time
+	TenantID                            uuid.UUID
+	Runtime                             *port.RuntimeDefinition
+	Tracked                             bool
+	SchemaDigest, RuntimeDigest, Digest string
+	ID                                  uuid.UUID
+	Profile                             string
+	Code                                string
+	Version                             int64
+	Title                               string
+	Fields                              []domain.Field
+	Fixture                             bool
+	ActorRef                            uuid.UUID
+	EventTime                           time.Time
+	RecordedAt                          time.Time
 }
 
-const tplCols = `id, profile, code, seq, title, fields::text, fixture, actor_ref, event_time, recorded_at`
+const tplRuntime = `coalesce((SELECT d.runtime FROM pf_forms.template_definition d WHERE d.tenant_id=template.tenant_id AND d.template_id=template.id),'null'::jsonb)`
+const tplCols = `id, profile, code, seq, title, fields::text, fixture, actor_ref, event_time, recorded_at,tenant_id,` + tplRuntime + `::text,
+ EXISTS(SELECT 1 FROM pf_forms.template_definition d WHERE d.tenant_id=template.tenant_id AND d.template_id=template.id),
+ encode(sha256(convert_to(fields::text,'UTF8')),'hex'),encode(sha256(convert_to(` + tplRuntime + `::text,'UTF8')),'hex'),
+ pf_forms.definition_digest303(tenant_id,id,profile,code,seq,title,fields,fixture,` + tplRuntime + `)`
+
+func (t Template) Identity() port.TemplateIdentity {
+	return port.TemplateIdentity{Schema: port.TemplateIdentityV1, TenantID: t.TenantID, ID: t.ID, Profile: t.Profile, Code: t.Code, Version: t.Version, SchemaDigest: t.SchemaDigest, RuntimeDigest: t.RuntimeDigest, Digest: t.Digest}
+}
 
 func scanTemplate(row pgx.Row) (Template, error) {
 	var t Template
-	var fields string
-	if err := row.Scan(&t.ID, &t.Profile, &t.Code, &t.Version, &t.Title, &fields, &t.Fixture, &t.ActorRef, &t.EventTime, &t.RecordedAt); err != nil {
+	var fields, runtime string
+	if err := row.Scan(&t.ID, &t.Profile, &t.Code, &t.Version, &t.Title, &fields, &t.Fixture, &t.ActorRef, &t.EventTime, &t.RecordedAt, &t.TenantID, &runtime, &t.Tracked, &t.SchemaDigest, &t.RuntimeDigest, &t.Digest); err != nil {
+		return t, err
+	}
+	if err := json.Unmarshal([]byte(runtime), &t.Runtime); err != nil {
 		return t, err
 	}
 	return t, json.Unmarshal([]byte(fields), &t.Fields)

@@ -33,6 +33,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/forms/templates", h.define)
 	rg.POST("/forms/templates/fixtures", h.fixtures)
 	rg.GET("/forms/templates/:id", h.template)
+	rg.GET("/forms/templates/:id/usage", h.templateUsage)
+	rg.POST("/forms/templates/:id/copy", h.copyTemplate)
 	rg.GET("/forms/template-versions", h.templateVersions)
 	rg.GET("/forms/template-versions/:version", h.templateVersion)
 	rg.GET("/forms/periods", h.periods)
@@ -70,20 +72,22 @@ type profileDTO struct {
 }
 
 type templateDTO struct {
-	ID        string         `json:"id"`
-	Profile   string         `json:"profile"`
-	Code      string         `json:"code"`
-	Version   int64          `json:"version"`
-	Title     string         `json:"title"`
-	Fields    []domain.Field `json:"fields"`
-	Fixture   bool           `json:"fixture"`
-	CreatedBy string         `json:"created_by"`
-	CreatedAt string         `json:"created_at"`
+	Runtime   *port.RuntimeDefinition `json:"runtime,omitempty"`
+	Identity  port.TemplateIdentity   `json:"identity"`
+	ID        string                  `json:"id"`
+	Profile   string                  `json:"profile"`
+	Code      string                  `json:"code"`
+	Version   int64                   `json:"version"`
+	Title     string                  `json:"title"`
+	Fields    []domain.Field          `json:"fields"`
+	Fixture   bool                    `json:"fixture"`
+	CreatedBy string                  `json:"created_by"`
+	CreatedAt string                  `json:"created_at"`
 }
 
 func templateOf(t store.Template) templateDTO {
 	return templateDTO{ID: t.ID.String(), Profile: t.Profile, Code: t.Code, Version: t.Version, Title: t.Title, Fields: t.Fields,
-		Fixture: t.Fixture, CreatedBy: t.ActorRef.String(), CreatedAt: ts(t.EventTime)}
+		Runtime: t.Runtime, Identity: t.Identity(), Fixture: t.Fixture, CreatedBy: t.ActorRef.String(), CreatedAt: ts(t.EventTime)}
 }
 
 type periodDTO struct {
@@ -318,21 +322,22 @@ func (h Handler) templates(c *gin.Context) {
 }
 
 type defineReq struct {
-	Profile     string         `json:"profile"`
-	Code        string         `json:"code"`
-	Title       string         `json:"title"`
-	Fields      []domain.Field `json:"fields"`
-	Fixture     bool           `json:"fixture"`
-	BaseVersion *int64         `json:"base_version"`
+	Profile     string                  `json:"profile"`
+	Code        string                  `json:"code"`
+	Title       string                  `json:"title"`
+	Fields      []domain.Field          `json:"fields"`
+	Fixture     bool                    `json:"fixture"`
+	BaseVersion *int64                  `json:"base_version"`
+	Runtime     *port.RuntimeDefinition `json:"runtime,omitempty"`
 }
 
 func (h Handler) define(c *gin.Context) {
 	var req defineReq
-	if !bindJSON(c, &req) {
+	if !bindTemplateJSON(c, &req) {
 		return
 	}
 	t, err := h.Svc.DefineTemplate(c.Request.Context(), app.TemplateInput{Profile: req.Profile, Code: req.Code, Title: req.Title,
-		Fields: req.Fields, Fixture: req.Fixture, BaseVersion: req.BaseVersion}, idemKey(c))
+		Fields: req.Fields, Runtime: req.Runtime, Fixture: req.Fixture, BaseVersion: req.BaseVersion}, idemKey(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return

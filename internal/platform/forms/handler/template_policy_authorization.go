@@ -2,12 +2,12 @@ package handler
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/domain"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/gin-gonic/gin"
@@ -31,11 +31,20 @@ func (h Handler) TemplateDefinitionAuthorization() gin.HandlerFunc {
 			}
 			c.Request.Body = io.NopCloser(bytes.NewReader(body))
 			var req defineReq
-			if err := json.Unmarshal(body, &req); err != nil {
+			if err := decodeTemplateJSON(body, &req); err != nil {
 				httpx.Fail(c, problem.BadRequest)
 				return
 			}
-			if err := h.Svc.AuthorizeTemplateDefinition(c.Request.Context(), app.TemplateInput{Profile: req.Profile, Code: req.Code, Title: req.Title, Fields: req.Fields, Fixture: req.Fixture}, req.BaseVersion); err != nil {
+			if err := h.Svc.AuthorizeTemplateDefinition(c.Request.Context(), app.TemplateInput{Profile: req.Profile, Code: req.Code, Title: req.Title, Fields: req.Fields, Runtime: req.Runtime, Fixture: req.Fixture}, req.BaseVersion); err != nil {
+				httpx.Fail(c, err)
+				return
+			}
+		case "/v1/forms/templates/:id/copy":
+			var req port.TemplateCopy
+			if !readTemplateCopy(c, &req) {
+				return
+			}
+			if err := h.Svc.AuthorizeTemplateCopy(c.Request.Context(), req); err != nil {
 				httpx.Fail(c, err)
 				return
 			}

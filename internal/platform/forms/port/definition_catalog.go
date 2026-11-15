@@ -10,13 +10,15 @@ import (
 // TemplateVersion is an immutable catalog entry. Consumers pin ID when creating a
 // period; selecting a newer catalog version never changes an existing period.
 type TemplateVersion struct {
-	ID      uuid.UUID
-	Profile string
-	Code    string
-	Version int64
-	Title   string
-	Fields  json.RawMessage
-	Fixture bool
+	ID       uuid.UUID
+	Profile  string
+	Code     string
+	Version  int64
+	Title    string
+	Fields   json.RawMessage
+	Fixture  bool
+	Runtime  *RuntimeDefinition
+	Identity TemplateIdentity
 }
 
 // TemplateCatalog extends the read capability without changing Publisher's

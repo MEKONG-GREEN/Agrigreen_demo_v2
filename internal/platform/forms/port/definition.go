@@ -17,6 +17,7 @@ type TemplateDefinition struct {
 	Title   string
 	Fields  json.RawMessage
 	Fixture bool
+	Runtime *RuntimeDefinition
 }
 
 // TemplateDefinitionRequest is evaluated outside the forms write transaction.
@@ -31,11 +32,19 @@ type TemplateDefinitionRequest struct {
 	CurrentID      uuid.UUID
 	CurrentVersion int64
 	BaseVersion    *int64
+	CopySource     *TemplateVersion
 }
 
 // TemplateDefinitionDecision defaults to denial. A registered owner policy must
 // explicitly allow the invocation; errors never fall back to Profile.DefineBy.
-type TemplateDefinitionDecision struct{ Allowed bool }
+type TemplateDefinitionDecision struct {
+	Allowed bool
+	// RuntimeValidated explicitly acknowledges the owner contract/config; legacy
+	// policies cannot silently accept metadata they have never validated.
+	RuntimeValidated bool
+	// Binding identifies current owner authorization, required for runtime definitions.
+	Binding string
+}
 
 // TemplateDefinitionPolicy authorizes writes only. AllowsTemplate remains a read
 // filter, including for templates whose structure the owner has locked.

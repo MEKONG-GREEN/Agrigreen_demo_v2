@@ -51,7 +51,8 @@ type Deps struct {
 	// ReviewGuards: kiểm quyền rà soát thêm theo profile (BF-CN-XA-DATA #175 — kn_cnts: chỉ người phụ trách biểu).
 	ReviewGuards map[string]port.ReviewGuard
 	// DefinitionPolicies are application-owned write rules, registered before serving.
-	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
+	DefinitionPolicies  map[string]port.TemplateDefinitionPolicy
+	TemplateUsePolicies map[string]port.TemplateUsePolicy
 }
 
 // Module là pf/forms đã nối.
@@ -69,6 +70,7 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) (*Module, error) {
 		return nil, err
 	}
 	svc.Facilities, svc.Validators, svc.ReviewGuards = d.Facilities, d.Validators, d.ReviewGuards
+	svc.TemplateUsePolicies = d.TemplateUsePolicies
 	m := &Module{svc: svc}
 	for profile, policy := range d.DefinitionPolicies {
 		if err := m.UseDefinitionPolicy(profile, policy); err != nil {
@@ -100,6 +102,10 @@ func (m *Module) UseDefinitionPolicy(profile string, policy port.TemplateDefinit
 
 // TemplateCatalog is the scoped read capability, including immutable versions.
 func (m *Module) TemplateCatalog() port.TemplateCatalog { return app.Publisher{Svc: m.svc} }
+
+// TemplateUsages and TemplateCopies are optional, version-pinned owner capabilities.
+func (m *Module) TemplateUsages() port.TemplateUsages { return app.Publisher{Svc: m.svc} }
+func (m *Module) TemplateCopies() port.TemplateCopies { return app.Publisher{Svc: m.svc} }
 
 // Middleware rechecks definition permission after session resolution and before
 // HTTP idempotency replay. It preserves upstream account/session scope bindings.

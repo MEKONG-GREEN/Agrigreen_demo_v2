@@ -33,6 +33,8 @@ type TemplateInput struct {
 	Fields      []domain.Field
 	Fixture     bool
 	BaseVersion *int64
+	Runtime     *port.RuntimeDefinition
+	copySource  *port.TemplateVersion
 }
 
 // DefineTemplate ghi phiên bản mới của biểu (profile, code) — phiên bản cũ giữ nguyên, kỳ đã phát hành giữ phiên
