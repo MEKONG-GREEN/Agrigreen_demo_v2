@@ -1,5 +1,5 @@
 // BACKEND GIẢ LẬP — pf/metrics (G3): định nghĩa chỉ số có phiên bản, lịch sử giá trị ngày đã chốt
-// (KN US-DASH-01/02, CGH FN-10/11), nhật ký lớp GIS + ảnh chụp cuối ngày + phát lại (GIS US-EVL-01,
+// (CGH FN-10/11), nhật ký lớp GIS + ảnh chụp cuối ngày + phát lại (GIS US-EVL-01,
 // US-SNAP-01, US-REPLAY-01). Dữ liệu tổng hợp, ổn định theo hạt giống; hình dạng đúng contracts/openapi.
 import type { GisLayerEvent, GisLayerFeature, GisLayerState, MetricDefinition, MetricValue } from "../types";
 import { cutoffOf, addDays, isIsoDate, vnToday, daysBetween } from "@/lib/vnDate";
@@ -28,13 +28,12 @@ function seedOf(s: string): number {
 }
 
 // --------------------------------------------------------------------------
-// Định nghĩa chỉ số (bản sao internal/platform/metrics/defs/*.yaml + một phiên bản 2 minh hoạ)
+// Định nghĩa chỉ số (bản sao internal/platform/metrics/defs/*.yaml; PA1 #314: không còn chỉ số kn.*)
 // --------------------------------------------------------------------------
 interface MockDef extends MetricDefinition {
   viewer_roles: string[];
 }
 
-const KN_VIEW = ["kn_national_admin", "kn_province_admin", "kn_officer"];
 const CC_VIEW = ["coop_manager", "kn_national_admin", "kn_province_admin", "cgh_viewer"];
 const CGH_VIEW = ["cgh_viewer", "cgh_admin"];
 const PENDING = "tich-hop-g3 (tạm, chờ khách)";
@@ -49,15 +48,7 @@ function def(d: Omit<MockDef, "proposed_by" | "approved_by" | "file" | "effectiv
   };
 }
 
-/** Ngày hiệu lực phiên bản 2 của kn.sown_area_ha (tương đối, để luôn nằm trong 30 ngày gần nhất). */
-export const SOWN_V2_FROM = addDays(vnToday(), -12);
-
 export const METRIC_DEFS: MockDef[] = [
-  def({ key: "kn.sown_area_ha", version: 1, title: "Diện tích đã sạ báo cáo (kỳ tháng)", description: "Tổng sown_area_ha của phiên bản báo cáo gieo sạ mới nhất theo từng khóa phiên bản, của kỳ tháng chứa ngày D, chỉ tính bản ghi có recorded_at < Cutoff(D).", unit: "ha", grain: "day", aggregation: "sum", source_module: "pf/extension", source: "pf_extension.field_report (sổ, phiên bản mới nhất theo stream_key)", rule_version: "kn.dash.v1", viewer_roles: KN_VIEW }),
-  def({ key: "kn.sown_area_ha", version: 2, effective_from: SOWN_V2_FROM, title: "Diện tích đã sạ báo cáo (kỳ tháng)", description: "Như phiên bản 1, loại báo cáo của xã đã sáp nhập (mã hết hiệu lực) — minh hoạ phiên bản mới, không sửa phiên bản cũ.", unit: "ha", grain: "day", aggregation: "sum", source_module: "pf/extension", source: "pf_extension.field_report (sổ, phiên bản mới nhất theo stream_key)", rule_version: "kn.dash.v2", viewer_roles: KN_VIEW }),
-  def({ key: "kn.cooperatives_reported", version: 1, title: "Số HTX có báo cáo gieo sạ (kỳ tháng)", description: "Số cooperative_ref khác nhau trong các phiên bản báo cáo gieo sạ mới nhất của kỳ tháng chứa ngày D (recorded_at < Cutoff(D)).", unit: "count", grain: "day", aggregation: "count", source_module: "pf/extension", source: "pf_extension.field_report (sổ)", rule_version: "kn.dash.v1", viewer_roles: KN_VIEW }),
-  def({ key: "kn.open_tasks", version: 1, title: "Nhiệm vụ hỗ trợ đang mở (cuối ngày)", description: "Số nhiệm vụ mà sự việc mới nhất (theo seq) có recorded_at < Cutoff(D) mang status_after khác resolved.", unit: "count", grain: "day", aggregation: "last", source_module: "pf/extension", source: "pf_extension.task_event (sổ)", rule_version: "kn.dash.v1", viewer_roles: KN_VIEW }),
-  def({ key: "kn.directive_ack_rate_pct", version: 1, title: "Tỷ lệ xác nhận đọc chỉ đạo (kỳ tháng)", description: "100 × số lượt xác nhận ÷ số lượt nhận của chỉ đạo ban hành trong kỳ tháng chứa D. Không có lượt nhận → 0.", unit: "%", grain: "day", aggregation: "avg", source_module: "pf/extension", source: "pf_extension.directive, directive_target, directive_ack", rule_version: "kn.dash.v1", viewer_roles: KN_VIEW }),
   def({ key: "geo.plots_digitised", version: 1, title: "Số thửa đã số hoá", description: "Số thửa có ít nhất một phiên bản ranh giới hiện hành ghi nhận trước Cutoff(D) và chưa ngừng dùng.", unit: "count", grain: "day", aggregation: "count", source_module: "pf/geo", source: "pf_geo.plot_event, plot_boundary (sổ)", rule_version: "geo.plot.v1", viewer_roles: ["geo_admin", "plot_viewer", "plot_editor", "kn_national_admin", "kn_province_admin"] }),
   def({ key: "cc.season_area_ha", version: 1, title: "Diện tích vụ (theo vụ)", description: "Tổng area_ha của sự việc mới nhất của mỗi vụ thửa thuộc vụ Scope.Dimension, trừ vụ đã hủy.", unit: "ha", grain: "season", aggregation: "sum", source_module: "pf/cropcycle", source: "pf_cropcycle.season_event (sổ)", rule_version: "cc.season.v1", viewer_roles: CC_VIEW }),
   def({ key: "cc.yield_t_per_ha", version: 1, title: "Năng suất bình quân (theo vụ)", description: "Σ mass_kg ÷ 1000 ÷ Σ area_ha của khai báo sản lượng mới nhất của mỗi vụ thửa thuộc vụ Scope.Dimension.", unit: "t/ha", grain: "season", aggregation: "avg", source_module: "pf/cropcycle", source: "pf_cropcycle.harvest_declaration (sổ)", rule_version: "cc.harvest.v1", viewer_roles: CC_VIEW }),
@@ -86,17 +77,8 @@ export const CORRECTION_REASON = "Tính lại sau khi xã bổ sung báo cáo gi
 
 function valueOf(key: string, unit: string, dimension: string, date: string, r: () => number): string {
   const scale = unit === "" ? 12 : unit.length <= 2 ? 3 : 0.4;
-  const dom = Number(date.slice(8, 10));
   const noise = r();
   switch (key) {
-    case "kn.sown_area_ha":
-      return (scale * 10_000 * (0.25 + (0.75 * dom) / 31) * (0.98 + noise * 0.04)).toFixed(2);
-    case "kn.cooperatives_reported":
-      return String(Math.round(scale * 12 * (0.3 + (0.7 * dom) / 31)));
-    case "kn.open_tasks":
-      return String(Math.max(0, Math.round(scale * 6 + (noise - 0.5) * 6 * Math.max(1, scale / 3))));
-    case "kn.directive_ack_rate_pct":
-      return (62 + (30 * dom) / 31 + (noise - 0.5) * 6).toFixed(1);
     case "geo.plots_digitised":
       return String(Math.round(scale * 900 + daysBetween("2026-01-01", date) * scale * 1.5));
     case "cc.season_area_ha":

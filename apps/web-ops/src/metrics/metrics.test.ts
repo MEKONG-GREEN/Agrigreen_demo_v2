@@ -152,12 +152,19 @@ async function get(persona: string, path: string) {
 
 describe("backend giả lập pf/metrics khớp hợp đồng", () => {
   it("phạm vi: toàn tenant chỉ cho TW; tỉnh xem được tỉnh mình", async () => {
-    expect((await get("tinh", "/v1/metrics/kn.sown_area_ha/values")).status).toBe(403);
-    const r = await get("tinh", "/v1/metrics/kn.sown_area_ha/values?unit=82&history=true");
+    expect((await get("tinh", "/v1/metrics/geo.plots_digitised/values")).status).toBe(403);
+    const r = await get("tinh", "/v1/metrics/geo.plots_digitised/values?unit=82&history=true");
     expect(r.status).toBe(200);
     const items = r.body.items as MetricValue[];
     expect(items.some((i) => !i.current)).toBe(true);
     expect(items.filter((i) => i.current).every((i, k, a) => k === 0 || a[k - 1]!.business_date < i.business_date)).toBe(true);
+  });
+
+  it("PA1 (#314): không còn chỉ số kn.* — định nghĩa không có, khóa cũ 404", async () => {
+    const defs = (await get("setter", "/v1/metrics/definitions")).body.items as MetricDefinition[];
+    expect(defs.map((d) => d.key)).toEqual(expect.not.arrayContaining([expect.stringMatching(/^kn\./)]));
+    expect(defs.every((d) => d.source_module !== "pf/extension")).toBe(true);
+    expect((await get("tw", "/v1/metrics/kn.sown_area_ha/values")).status).toBe(404);
   });
 
   it("chỉ số theo vụ thiếu dimension → items rỗng + danh sách vụ", async () => {

@@ -36,7 +36,11 @@ func (f *fixture) metric(src pubgolden.AsOfAter, key metricsport.Key, cutoff tim
 func TestKNDash01MetricsAsOfExcludesLateRecords(t *testing.T) {
 	f := newFixture(t)
 	p := f.seedPeople()
-	src := pubgolden.Compare(t, "pf/extension", f.mod.MetricsSource()) // W6.3: đối chứng nguồn view _pub
+	// PA1 (#314): pf/metrics không còn nguồn trên view _pub của KN — kiểm nguồn của chính module, không đối chứng.
+	src := f.mod.MetricsSource().(interface {
+		pubgolden.AsOfAter
+		metricsport.ScopeLister
+	})
 	before := f.dbNow()
 	p.off30001a.must(p.off30001a.post("/v1/extension/field-reports", sowing("30001", f.org.c1.String(), "10")), http.StatusCreated, "báo cáo")
 	p.off30001a.createTask("30001", nil)

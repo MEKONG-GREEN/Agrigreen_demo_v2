@@ -13,10 +13,11 @@ Chỉ số hiện có:
 
 | Key | Grain | Nguồn (sổ) | Phạm vi ghi sổ |
 |---|---|---|---|
-| `kn.sown_area_ha`, `kn.cooperatives_reported`, `kn.open_tasks`, `kn.directive_ack_rate_pct` | ngày | `pf_extension.field_report`, `task_event`, `directive*` | toàn tenant + tỉnh |
 | `cgh.coop_sufficiency_pct`, `cgh.coops_shortage` | vụ | `pf_mechanization.balance_run/result` (lần cân đối đã lưu) | toàn tenant + tỉnh, theo vụ |
 | `cc.season_area_ha`, `cc.yield_t_per_ha` | vụ | `pf_cropcycle.season_event`, `harvest_declaration` | toàn tenant + xã, theo vụ (năm D và 2 năm trước) |
 | `geo.plots_digitised` | ngày | `pf_geo.plot_event`, `plot_boundary` | toàn tenant + xã |
+
+PA1 (#314, 16/11/2026): bốn chỉ số Khuyến nông `kn.sown_area_ha`, `kn.cooperatives_reported`, `kn.open_tasks`, `kn.directive_ack_rate_pct` đã gỡ. pf/metrics không còn đọc view công bố của KN (`pf/extension`, `pf/forms`, `pf/price`). Giá trị đã ghi sổ trước đây vẫn nằm trong `pf_metrics.daily_value`; API trả `metrics.unknown_metric` cho các khóa này.
 
 ## 2. Giá trị theo ngày
 
@@ -30,7 +31,7 @@ Chỉ số hiện có:
 ### Backfill / tính lại
 
 ```
-worker -metrics-backfill=2026-09-01:2026-09-29 [-metrics-tenant=<uuid>] [-metrics-keys=kn.open_tasks,cgh.coops_shortage]
+worker -metrics-backfill=2026-09-01:2026-09-29 [-metrics-tenant=<uuid>] [-metrics-keys=geo.plots_digitised,cgh.coops_shortage]
 ```
 
 - Lệnh chạy lần lượt từng ngày đã kết thúc, ghi sổ chỉ số, rồi chụp các lớp chưa có ảnh chụp.

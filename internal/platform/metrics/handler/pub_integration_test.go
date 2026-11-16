@@ -62,12 +62,13 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 	admin := env.AdminPool(t, migrations.PF)
 	ctx := context.Background()
 	views := pubViews(t)
-	if len(views) != 9 { // HTX-DATA-A: + pf/cooperative; W11.76: + pf/price; PFPUB: + pf/forms (pf_forms_pub)
+	if len(views) != 9 { // HTX-DATA-A: + pf/cooperative; W11.76: + pf/price; PFPUB: + pf/forms
 		t.Fatalf("module công bố view _pub: %v", views)
 	}
-	// W6.3: 11 view (pf 000124); W11.10: + pf_extension_pub.v1_consolidation_closed (pf 000144); W11.76: +
-	// pf_price_pub.v1_board_daily, v1_ticket_week (pf 000152); PFPUB (ADR-0053): + họ closed_figures/v1 —
-	// pf_forms_pub.v1_closed_figures, pf_extension_pub.v1_closed_figures (pf 20261013150108, 20261013150110).
+	// W6.3: 11 view (pf 000124); W11.10: + consolidation_closed của pf/extension (pf 000144); W11.76: + board_daily,
+	// ticket_week của pf/price (pf 000152); PFPUB (ADR-0053): + họ closed_figures/v1 của pf/forms và pf/extension
+	// (pf 20261013150108, 20261013150110). PA1 (#314): pf/metrics không còn ĐỌC view của KN (pf/extension, pf/forms,
+	// pf/price); view và quyền giữ nguyên (không DROP) tới bước gỡ KN.
 	if n := countViews(views); n != 23 { // HTX-DATA-A: +4 published views; #271: + pf_cooperative_pub.v1_plot_export
 		t.Fatalf("số view _pub đã khai: %d", n)
 	}
@@ -212,10 +213,11 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 // R-DB-10: mã không phải kiểm thử của pf/metrics chỉ nhắc schema của chính nó (pf_metrics), k_ref, shared và view
 // _pub đã khai — không bảng nội bộ của module khác.
 func TestMetricsReadsOnlyDeclaredPubViews_W63(t *testing.T) {
-	declared := map[string]bool{}
-	for _, vs := range pubViews(t) {
+	declared, kn := map[string]bool{}, map[string]bool{}
+	for mod, vs := range pubViews(t) {
 		for _, v := range vs {
 			declared[v.View()] = true
+			kn[v.View()] = slices.Contains(knModules, mod) // PA1 (#314): view KN không bắt buộc pf/metrics đọc
 		}
 	}
 	re := regexp.MustCompile(`\b((?:pf|mkg|ts)_[a-z0-9_]+)\.([a-z_][a-z0-9_]*)`)
@@ -266,7 +268,7 @@ func TestMetricsReadsOnlyDeclaredPubViews_W63(t *testing.T) {
 	}
 	want := make([]string, 0, len(declared))
 	for v := range declared {
-		if !others[v] || slices.Contains(used, v) {
+		if (!others[v] && !kn[v]) || slices.Contains(used, v) {
 			want = append(want, v)
 		}
 	}

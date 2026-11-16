@@ -23,8 +23,9 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
-// PubSourceModules là các module chủ dữ liệu có nguồn chỉ số trên view _pub (Definition.SourceModule).
-var PubSourceModules = []string{"pf/cropcycle", "pf/extension", "pf/geo", "pf/mechanization"}
+// PubSourceModules là các module chủ dữ liệu có nguồn chỉ số trên view _pub (Definition.SourceModule). PA1 (#314):
+// không còn nguồn của Khuyến nông (pf/extension) — metrics không đọc view công bố nào của KN.
+var PubSourceModules = []string{"pf/cropcycle", "pf/geo", "pf/mechanization"}
 
 // PubSource là port.Source + port.ScopeLister trên view _pub của một module chủ dữ liệu; AsOfAt tính với mốc
 // recorded_at tường minh (kiểm thử "bản ghi ghi nhận muộn bị loại").
@@ -48,8 +49,6 @@ func (s *Service) PubSource(module string) PubSource {
 	switch module {
 	case "pf/cropcycle":
 		return ccPub{s}
-	case "pf/extension":
-		return knPub{s}
 	case "pf/geo":
 		return geoPub{s}
 	case "pf/mechanization":
@@ -203,115 +202,6 @@ func (p ccPub) Scopes(ctx context.Context, key port.Key, d clock.Date, tid uuid.
 			out = append(out, port.Scope{TenantID: tid, Dimension: dim, Units: []string{commune}})
 		}
 		return rows.Err()
-	})
-	return out, err
-}
-
-// ---------------------------------------------------------------------------
-// pf/extension — kn.* (KN US-DASH-01/02)
-// ---------------------------------------------------------------------------
-
-const (
-	keySownAreaHa       port.Key = "kn.sown_area_ha"
-	keyCoopsReported    port.Key = "kn.cooperatives_reported"
-	keyOpenTasks        port.Key = "kn.open_tasks"
-	keyDirectiveAckRate port.Key = "kn.directive_ack_rate_pct"
-)
-
-type knPub struct{ s *Service }
-
-func (p knPub) AsOf(ctx context.Context, key port.Key, d clock.Date, sc port.Scope) (port.Value, error) {
-	return asOfClosed(p.s, ctx, key, d, sc, p.AsOfAt)
-}
-
-// knPeriod trả kỳ tháng "YYYY-MM" chứa d và [đầu kỳ, đầu kỳ sau) giờ VN.
-func knPeriod(d clock.Date) (string, time.Time, time.Time) {
-	start := time.Date(d.Year, d.Month, 1, 0, 0, 0, 0, clock.Zone())
-	return start.Format("2006-01"), start.UTC(), start.AddDate(0, 1, 0).UTC()
-}
-
-func (p knPub) AsOfAt(ctx context.Context, key port.Key, d clock.Date, cutoff time.Time, sc port.Scope) (port.Value, error) {
-	v := newValue(ctx, key, d, cutoff, sc)
-	period, pStart, pEnd := knPeriod(d)
-	units := unitsOf(sc)
-	err := p.s.pubRead(ctx, sc.TenantID, cutoff, func(tx pgx.Tx) error {
-		var wmID *uuid.UUID
-		var wmAt *time.Time
-		switch key {
-		case keySownAreaHa, keyCoopsReported:
-			var sum string
-			var coops int64
-			if err := tx.QueryRow(ctx, `WITH cur AS (
-			    SELECT DISTINCT ON (stream_key) id, recorded_at, report_kind, period, sown_area_ha, cooperative_ref, province_code, commune_code
-			    FROM pf_extension_pub.v1_field_report WHERE recorded_at < $1 ORDER BY stream_key, seq DESC)
-			  SELECT coalesce(sum(sown_area_ha), 0)::text, count(DISTINCT cooperative_ref),
-			         (array_agg(id ORDER BY recorded_at DESC, id DESC))[1], max(recorded_at)
-			  FROM cur WHERE report_kind = 'sowing_progress' AND period = $2
-			    AND ($3::text[] IS NULL OR province_code = ANY($3) OR commune_code = ANY($3))`,
-				cutoff.UTC(), period, units).Scan(&sum, &coops, &wmID, &wmAt); err != nil {
-				return err
-			}
-			if key == keyCoopsReported {
-				v.Value = decimal.NewFromInt(coops)
-			} else {
-				var err error
-				if v.Value, err = decimal.NewFromString(sum); err != nil {
-					return err
-				}
-			}
-		case keyOpenTasks:
-			var open int64
-			if err := tx.QueryRow(ctx, `WITH last AS (
-			    SELECT DISTINCT ON (task_id) task_id, id, recorded_at, status_after
-			    FROM pf_extension_pub.v1_task_event WHERE recorded_at < $1 ORDER BY task_id, seq DESC)
-			  SELECT count(*) FILTER (WHERE l.status_after <> 'resolved'),
-			         (array_agg(l.id ORDER BY l.recorded_at DESC, l.id DESC))[1], max(l.recorded_at)
-			  FROM last l JOIN pf_extension_pub.v1_task t ON t.task_id = l.task_id
-			  WHERE ($2::text[] IS NULL OR t.province_code = ANY($2) OR t.commune_code = ANY($2))`,
-				cutoff.UTC(), units).Scan(&open, &wmID, &wmAt); err != nil {
-				return err
-			}
-			v.Value = decimal.NewFromInt(open)
-		case keyDirectiveAckRate:
-			var targets, acks int64
-			if err := tx.QueryRow(ctx, `SELECT count(*), count(acked_at) FILTER (WHERE acked_at < $1),
-			         greatest(max(directive_recorded_at), max(acked_at) FILTER (WHERE acked_at < $1))
-			  FROM pf_extension_pub.v1_directive_target_ack
-			  WHERE directive_recorded_at < $1 AND issued_at >= $2 AND issued_at < $3
-			    AND ($4::text[] IS NULL OR province_code = ANY($4) OR unit_code = ANY($4))`,
-				cutoff.UTC(), pStart, pEnd, units).Scan(&targets, &acks, &wmAt); err != nil {
-				return err
-			}
-			v.Value = decimal.Zero
-			if targets > 0 {
-				v.Value = decimal.NewFromInt(acks * 100).Div(decimal.NewFromInt(targets)).Round(2)
-			}
-		default:
-			return port.ErrUnknownMetric
-		}
-		setWatermark(&v, wmID, wmAt)
-		return nil
-	})
-	return v, err
-}
-
-// Scopes: toàn tenant + từng tỉnh có dữ liệu.
-func (p knPub) Scopes(ctx context.Context, _ port.Key, d clock.Date, tid uuid.UUID) ([]port.Scope, error) {
-	out := []port.Scope{{TenantID: tid}}
-	cutoff := port.Cutoff(d)
-	err := p.s.pubRead(ctx, tid, cutoff, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT province_code FROM pf_extension_pub.v1_field_report WHERE recorded_at < $1
-		  UNION SELECT province_code FROM pf_extension_pub.v1_task WHERE created_at < $1
-		  UNION SELECT province_code FROM pf_extension_pub.v1_directive_target_ack WHERE target_issued_at < $1
-		  ORDER BY 1`, cutoff.UTC())
-		if err != nil {
-			return err
-		}
-		codes, err := pgx.CollectRows(rows, pgx.RowTo[string])
-		for _, c := range codes {
-			out = append(out, port.Scope{TenantID: tid, Units: []string{c}})
-		}
-		return err
 	})
 	return out, err
 }
