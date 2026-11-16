@@ -63,7 +63,8 @@ Vai đã khai trong `internal/shared/dbadmin/dbadmin.go` và userlist PgBouncer 
 | `pf.cropcycle.harvest.declared` | cropcycle | dashboard |
 | `pf.cropcycle.coop_season_area.changed` | cropcycle | mechanization → `AreaFeed.ApplySyncedArea` (CGH FN-07) |
 | `pf.party.household.registered` / `.membership_changed` | party | notify (KN US-HTX-05) |
-| `pf.extension.support_request.submitted`, `pf.extension.task.created` | extension | extension (tự sinh nhiệm vụ ≤ 1 phút, KN US-TASK-01), notify |
+| `pf.cooperative.support_request.submitted` (#313, thay `pf.extension.support_request.submitted`) | cooperative | log GPS `pf.cropcycle.gps_log` (GIS) |
+| `pf.extension.task.created` | extension (từ #313 không còn nguồn phát) | notify |
 | `pf.geo.cooperative_boundary.recorded`, `pf.geo.facility.recorded` | geo | GIS |
 | `pf.waterway.network.published` | waterway | simulation |
 | `pf.simulation.job.requested` / `.completed` | simulation | optimizer / notify |
