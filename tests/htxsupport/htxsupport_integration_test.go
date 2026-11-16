@@ -170,14 +170,15 @@ func TestSupportRequestsWithExtensionDisabled_PA1_313(t *testing.T) {
 		t.Fatal("consumer log GPS phải đăng ký sự kiện yêu cầu hỗ trợ")
 	}
 	var ev outbox.Envelope
-	if err := tenant.WithTenantTx(ctx, pool, tid, func(tx pgx.Tx) error {
+	coopDB := shareddb.ForModule(pool, cooperative.DBModule)
+	if err := tenant.WithTenantTx(ctx, coopDB, tid, func(tx pgx.Tx) error {
 		ev = outbox.Envelope{TenantID: tid, SchemaVersion: 1}
 		return tx.QueryRow(ctx, `SELECT id, event_type, payload FROM shared.outbox WHERE event_type = $1`, coopport.EventSupportRequestSubmitted).
 			Scan(&ev.EventID, &ev.EventType, &ev.Payload)
 	}); err != nil {
 		t.Fatalf("sự kiện %s: %v", coopport.EventSupportRequestSubmitted, err)
 	}
-	if _, err := inbox.Process(ctx, shareddb.ForModule(pool, cooperative.DBModule), coopport.GpsLogConsumer, ev, mod.GpsLogHandler()); err != nil {
+	if _, err := inbox.Process(ctx, coopDB, coopport.GpsLogConsumer, ev, mod.GpsLogHandler()); err != nil {
 		t.Fatal(err)
 	}
 	fx, ok := gl.fixes["extension:support_request:"+id]
