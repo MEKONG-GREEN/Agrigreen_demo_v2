@@ -2,6 +2,8 @@
 
 **Trạng thái:** Chốt ranh giới và phạm vi G1 theo PO; D2-KN-01 đã chốt: G1 chỉ hồ sơ KN, luồng đề nghị để sau G1. **Ngày:** 16/10/2026 (KNSPLIT-0). **Nguồn:** trả lời PO 14–15/10/2026 và CODEX-G1 mục 5–6.
 
+**Thay thế một phần bởi:** [ADR-0060](0060-kn-he-vat-ly-rieng-app-kn.md) (Q-KNS-02, bảng Binary/realm) — 16/11/2026, PA1: App KN chạy trên APP_KN_v1.0.
+
 **Thay thế một phần:** [ADR-0049](0049-cap-price-pf-price.md) (Báo giá thuộc KN), [ADR-0054](0054-cap-directory-pf-contact.md) (Contact thuộc KN).
 **Liên quan:** [ADR-0052/D2](0052-dong-so-huu-mkg-htx-neo-mst.md), [ADR-0041](0041-mfa-theo-nhom-d24.md), [ADR-0020](0020-lien-thong-platform-mkg-khac-tenant.md), [ADR-0033](0033-cong-tich-hop-mkg-nhu-moi-doi-tac.md), [ADR-0027](0027-bon-tang-module-tep-khai-bao.md), [ADR-0028](0028-vai-dang-nhap-theo-don-vi-trien-khai.md), [ADR-0030](0030-doc-tai-cho-co-cap-phep.md), [ADR-0031](0031-vai-tong-hop-r-agg.md), [ADR-0035](0035-cap-phep-tong-hop-theo-xa-nguong-k.md), [ADR-0053](0053-hop-dong-so-lieu-da-chot-closed-figures.md).
 **Bằng chứng:** [kiểm kê](../kn/tach-he-thong/kiem-ke.md), `tools/knboundary`, `migrations/kn_split_boundary_integration_test.go`.
