@@ -39,7 +39,7 @@ jobs:
           ALLOCATION_MODE207: ${{ matrix.mode }}
           ALLOCATION_PROCS207: ${{ matrix.procs }}
         run: |
-          export GOTOOLCHAIN=go1.26.10
+          export GOTOOLCHAIN=go1.26.11
           go version
           go env GOOS GOARCH CGO_ENABLED
           gcc --version | head -n 1
@@ -49,7 +49,7 @@ jobs:
           ALLOCATION_MODE207: ${{ matrix.mode }}
           ALLOCATION_PROCS207: ${{ matrix.procs }}
         run: |
-          export GOTOOLCHAIN=go1.26.10
+          export GOTOOLCHAIN=go1.26.11
           if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
           flags207=()
           if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
@@ -59,7 +59,7 @@ jobs:
           ALLOCATION_MODE207: ${{ matrix.mode }}
           ALLOCATION_PROCS207: ${{ matrix.procs }}
         run: |
-          export GOTOOLCHAIN=go1.26.10
+          export GOTOOLCHAIN=go1.26.11
           if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
           flags207=()
           if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
@@ -69,7 +69,7 @@ jobs:
           ALLOCATION_MODE207: ${{ matrix.mode }}
           ALLOCATION_PROCS207: ${{ matrix.procs }}
         run: |
-          export GOTOOLCHAIN=go1.26.10
+          export GOTOOLCHAIN=go1.26.11
           if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
           flags207=()
           if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
@@ -79,7 +79,7 @@ jobs:
           ALLOCATION_MODE207: ${{ matrix.mode }}
           ALLOCATION_PROCS207: ${{ matrix.procs }}
         run: |
-          export GOTOOLCHAIN=go1.26.10
+          export GOTOOLCHAIN=go1.26.11
           if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
           flags207=()
           if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
@@ -99,7 +99,7 @@ jobs:
           ALLOCATION_MODE207: ${{ matrix.mode }}
           ALLOCATION_PROCS207: ${{ matrix.procs }}
         run: |
-          export GOTOOLCHAIN=go1.26.10
+          export GOTOOLCHAIN=go1.26.11
           if [ "$ALLOCATION_PROCS207" = default ]; then unset GOMAXPROCS; else export GOMAXPROCS="$ALLOCATION_PROCS207"; fi
           flags207=()
           if [ "$ALLOCATION_MODE207" = race ]; then flags207+=(-race); fi
