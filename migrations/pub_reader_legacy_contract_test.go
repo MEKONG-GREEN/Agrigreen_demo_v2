@@ -188,6 +188,20 @@ func TestLegacyPublishedReaderAccessContract(t *testing.T) {
 	}
 	additions.Access = append(additions.Access, platformKN.Access...)
 	additions.Memberships = append(additions.Memberships, platformKN.Memberships...)
+	// PA1-HTX-SUPPORT-GPSLOG (#313): view chỉ-để-chép pf_extension_pub.v1_support_request_export — đọc qua membership
+	// r_extension_pub sẵn có (không thêm membership, không mã ứng dụng nào đọc).
+	supportRaw, err := os.ReadFile("../tests/golden/pa1-support-export-access-additions.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var support snapshot
+	if err := json.Unmarshal(supportRaw, &support); err != nil {
+		t.Fatal(err)
+	}
+	if len(support.Roles) != 0 || len(support.Memberships) != 0 {
+		t.Fatal("#313 support export adds view access only")
+	}
+	additions.Access = append(additions.Access, support.Access...)
 	// #184 adds a new dormant capability role, not a change to any frozen OLD role.
 	// Keep its flags exact and leave Access/Memberships empty: any inherited or
 	// direct published-view grant to r_guestlink must still fail this snapshot.

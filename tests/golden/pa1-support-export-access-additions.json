@@ -1,0 +1,18 @@
+{
+  "Roles": [],
+  "Access": [
+    {
+      "Reader": "r_agg",
+      "View": "pf_extension_pub.v1_support_request_export"
+    },
+    {
+      "Reader": "r_extension",
+      "View": "pf_extension_pub.v1_support_request_export"
+    },
+    {
+      "Reader": "r_metrics",
+      "View": "pf_extension_pub.v1_support_request_export"
+    }
+  ],
+  "Memberships": []
+}
