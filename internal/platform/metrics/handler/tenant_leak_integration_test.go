@@ -291,8 +291,8 @@ func TestMetricsTenantLeakParallel(t *testing.T) {
 	pools := []lkPool{{role: metrics.DBRole, pool: f.pool, tables: lkTables(ctx, t, f.pool, schema)}}
 	t.Logf("%s: %d bảng: %v", schema, len(pools[0].tables), pools[0].tables)
 	svc := f.mod.Service()
-	key := port.Key("kn.sown_area_ha")
-	f.src.set(key, "", "", "120.5")
+	key := port.Key("geo.plots_digitised")
+	f.src.set(key, "", "", "120")
 	today := clock.BusinessDate(now)
 
 	prepare := func(i int, tid uuid.UUID) func(context.Context, int) error {

@@ -35,9 +35,9 @@ const DBRole = port.DBRole
 
 // Deps là phụ thuộc của module.
 type Deps struct {
-	// Sources: nguồn chỉ số theo module chủ dữ liệu ("pf/extension", "pf/mechanization", "pf/cropcycle",
-	// "pf/geo"). Nil → nguồn trên view công bố _pub (R-DB-10, W6.3): module đọc pf_<module>_pub.v<N>_* bằng vai
-	// của chính nó (r_metrics ∈ r_<module>_pub), không đọc bảng nội bộ, không qua port của module chủ.
+	// Sources: nguồn chỉ số theo module chủ dữ liệu ("pf/mechanization", "pf/cropcycle", "pf/geo"). Nil → nguồn
+	// trên view công bố _pub (R-DB-10, W6.3): module đọc pf_<module>_pub.v<N>_* bằng vai của chính nó
+	// (r_metrics ∈ r_<module>_pub), không đọc bảng nội bộ, không qua port của module chủ.
 	Sources map[string]port.Source
 	Scope   partyport.ScopeResolver
 	// Geometry: hình học as-of cho phát lại lớp GIS. Nil → pf_geo_pub.v1_layer_geometry (W6.3).

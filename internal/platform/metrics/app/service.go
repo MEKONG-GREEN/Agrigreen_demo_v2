@@ -45,7 +45,7 @@ type Service struct {
 	Replica tenant.Beginner
 	Clock   clock.Clock
 	Catalog *domain.Catalog
-	// Sources: nguồn theo module chủ dữ liệu (Definition.SourceModule, vd "pf/extension") — mặc định nguồn view
+	// Sources: nguồn theo module chủ dữ liệu (Definition.SourceModule, vd "pf/geo") — mặc định nguồn view
 	// _pub của chính module (PubSources, W6.3); kiểm thử thay nguồn giả.
 	Sources  map[string]port.Source
 	Scope    partyport.ScopeResolver

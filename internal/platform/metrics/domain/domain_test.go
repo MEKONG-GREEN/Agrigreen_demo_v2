@@ -16,16 +16,15 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 )
 
-// Mọi tệp định nghĩa trong kho mã hợp lệ và phủ đủ 4 KPI KN US-DASH-01, mức đủ máy CGH
-// FN-10 theo vụ, diện tích/năng suất vụ, số thửa đã số hoá.
+// Mọi tệp định nghĩa trong kho mã hợp lệ và phủ đủ mức đủ máy CGH FN-10 theo vụ, diện tích/năng
+// suất vụ, số thửa đã số hoá. PA1 (#314): không còn chỉ số Khuyến nông (kn.*).
 func TestRepoDefinitionsLoad(t *testing.T) {
 	c, err := Load(defs.FS)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := map[port.Key]port.Grain{
-		"kn.sown_area_ha": port.GrainDay, "kn.cooperatives_reported": port.GrainDay, "kn.open_tasks": port.GrainDay,
-		"kn.directive_ack_rate_pct": port.GrainDay, "cgh.coop_sufficiency_pct": port.GrainSeason, "cgh.coops_shortage": port.GrainSeason,
+		"cgh.coop_sufficiency_pct": port.GrainSeason, "cgh.coops_shortage": port.GrainSeason,
 		"cc.season_area_ha": port.GrainSeason, "cc.yield_t_per_ha": port.GrainSeason, "geo.plots_digitised": port.GrainDay,
 	}
 	for k, g := range want {
@@ -37,7 +36,7 @@ func TestRepoDefinitionsLoad(t *testing.T) {
 	if len(c.Keys()) != len(want) {
 		t.Fatalf("số key %d", len(c.Keys()))
 	}
-	if _, ok := c.Effective("kn.sown_area_ha", clock.Date{Year: 2025, Month: 12, Day: 31}); ok {
+	if _, ok := c.Effective("geo.plots_digitised", clock.Date{Year: 2025, Month: 12, Day: 31}); ok {
 		t.Fatal("trước effective_from không có định nghĩa hiệu lực")
 	}
 }

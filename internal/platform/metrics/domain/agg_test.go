@@ -35,7 +35,7 @@ func TestValidateAggJob_W64(t *testing.T) {
 			j.Query = `SELECT commune_code, sum(mass_kg)::text FROM pf_cropcycle.harvest_declaration GROUP BY 1`
 		}, ErrAggQuery},
 		{"đọc view không khai", func(j *AggJob) {
-			j.Query = `SELECT province_code, count(*)::text FROM pf_extension_pub.v1_field_report GROUP BY 1`
+			j.Query = `SELECT commune_code, count(*)::text FROM pf_geo_pub.v1_plot_event GROUP BY 1`
 		}, ErrAggQuery},
 		{"đọc k_ref", func(j *AggJob) { j.Query += ` UNION ALL SELECT tenant_id::text, '0' FROM k_ref.org` }, ErrAggQuery},
 		{"tự đặt tenant", func(j *AggJob) { j.Query = `SELECT set_config('app.tenant_id', '', true), '0'` }, errAggTenantRefs},
