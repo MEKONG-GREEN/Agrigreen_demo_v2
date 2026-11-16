@@ -2084,8 +2084,8 @@ paths:
     get:
       summary: Log toạ độ GPS (HTX US-GPS-03) — chỉ đọc, mới nhất trước, theo phạm vi xã (quản lý HTX chỉ log gắn HTX mình; log không xác định được xã chỉ toàn quốc thấy)
       description: >-
-        Ghi log chỉ qua port geo.GpsLog: consumer outbox pf.cropcycle.gps_log (mở vụ, nhật ký, khai sản lượng) và
-        pf.extension.gps_log (yêu cầu hỗ trợ) ghi SAU khi nghiệp vụ commit, idempotent theo bản ghi. Log giữ ≥ 12 tháng,
+        Ghi log chỉ qua port geo.GpsLog: consumer outbox pf.cropcycle.gps_log (mở vụ, nhật ký, khai sản lượng, yêu cầu
+        hỗ trợ) ghi SAU khi nghiệp vụ commit, idempotent theo bản ghi. Log giữ ≥ 12 tháng,
         không bao giờ xóa. Vai farmer (nông dân) chỉ thấy log do chính mình ghi và log gắn với thửa của nông hộ liên kết
         với tài khoản; chưa nối liên kết tài khoản → 503 geo.dependency_unavailable.
       operationId: geoListGpsFixes
@@ -2187,23 +2187,22 @@ paths:
                   items: {type: array, items: {$ref: "#/components/schemas/ExtTask"}}
                   next_cursor: {type: [string, "null"]}
         "403": {$ref: "#/components/responses/Problem"}
-  /v1/extension/support-requests:
+  /v1/cropcycle/support-requests:
     get:
-      summary: Yêu cầu hỗ trợ của nông dân cho cán bộ (HTX US-SUPPORT-01, KN US-TASK-01/03) — kèm nhiệm vụ tự sinh hiện hành
+      summary: Yêu cầu hỗ trợ của nông dân cho quản lý HTX (HTX US-SUPPORT-01) — module chủ HTX (#313)
       description: |
-        Vai coop_manager (chỉ HTX của mình = org_ref; hỏi HTX khác → 403 extension.out_of_scope), kn_officer /
-        kn_province_admin / kn_national_admin (xã/tỉnh trong phạm vi, cộng nhiệm vụ được giao cho mình), platform_admin (mọi nơi).
-        Mới nhất trước; cursor là next_cursor của trang trước. Không trả toạ độ — chỉ trạng thái GPS; ảnh là mã tệp (pf/files).
-      operationId: extListSupportRequests
-      tags: [extension]
+        Vai coop_manager (chỉ HTX của mình = org_ref; hỏi HTX khác → 403 cropcycle.out_of_scope), platform_admin (toàn
+        tenant, lọc cooperative_ref được). Mới nhất trước; cursor là next_cursor (id) của trang trước. Không trả toạ độ —
+        chỉ trạng thái GPS; ảnh là mã tệp (pf/files). Thay GET /v1/extension/support-requests (gỡ cùng pf/extension).
+      operationId: listCoopSupportRequests
+      tags: [cropcycle]
       parameters:
-        - {name: task_status, in: query, schema: {type: string, enum: [new, assigned, accepted, in_progress, resolved]}, description: "Trạng thái nhiệm vụ tự sinh"}
         - {name: category, in: query, schema: {type: string, enum: [dich_hai, benh_lua, thoi_tiet, ky_thuat, may_moc, khac]}}
         - {name: urgency, in: query, schema: {type: string, enum: [binh_thuong, khan]}}
         - {name: commune_code, in: query, schema: {type: string}}
         - {name: cooperative_ref, in: query, schema: {type: string, format: uuid}}
         - {name: gps_missing, in: query, schema: {type: boolean}, description: "true = chỉ yêu cầu thiếu vị trí GPS"}
-        - {name: cursor, in: query, schema: {type: string}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
       responses:
         "200":
@@ -2214,11 +2213,10 @@ paths:
                 type: object
                 required: [items, next_cursor]
                 properties:
-                  items: {type: array, items: {$ref: "#/components/schemas/SupportRequestStaff"}}
+                  items: {type: array, items: {$ref: "#/components/schemas/CoopSupportRequest"}}
                   next_cursor: {type: [string, "null"]}
-        "403": {description: "forbidden | extension.out_of_scope", $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | cropcycle.out_of_scope", $ref: "#/components/responses/Problem"}
         "422": {description: "validation_failed", $ref: "#/components/responses/Problem"}
-        "503": {$ref: "#/components/responses/Problem"}
   /v1/extension/tasks/bulk-assign:
     post:
       summary: Phân công hàng loạt trong một lần xác nhận (US-TASK-04) — chia vòng tròn; một nhiệm vụ lỗi thì cả lô không đổi
@@ -5488,9 +5486,9 @@ paths:
         "422": {description: "party.membership_reason_required", $ref: "#/components/responses/Problem"}
   /v1/support-requests:
     get:
-      summary: Yêu cầu hỗ trợ của (các) nông hộ của nông dân, kèm trạng thái nhiệm vụ (HTX US-SUPPORT-01)
+      summary: Yêu cầu hỗ trợ của (các) nông hộ của nông dân (HTX US-SUPPORT-01) — module chủ HTX (#313)
       operationId: listMySupportRequests
-      tags: [extension]
+      tags: [cropcycle]
       parameters:
         - {name: cursor, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
@@ -5505,14 +5503,15 @@ paths:
                 properties:
                   items: {type: array, items: {$ref: "#/components/schemas/SupportRequest"}}
                   next_cursor: {type: [string, "null"]}
-        "403": {description: "forbidden | extension.farmer_household_required", $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | cropcycle.farmer_household_required", $ref: "#/components/responses/Problem"}
     post:
-      summary: Nông dân gửi yêu cầu hỗ trợ (HTX US-SUPPORT-01) — cùng giao dịch tự sinh nhiệm vụ cho cán bộ khuyến nông (KN US-TASK-01)
+      summary: Nông dân gửi yêu cầu hỗ trợ (HTX US-SUPPORT-01) — module chủ HTX, phát pf.cooperative.support_request.submitted
       description: |
-        Vai farmer. Người nhận: cán bộ xã đang trực → cán bộ tỉnh đang trực → cán bộ tỉnh → để trống (admin_queue, báo quản trị tỉnh).
-        Thiếu vị trí GPS vẫn nhận (nhãn "Thiếu vị trí GPS"). Ngoại tuyến: gửi qua pf/sync entity support_request (cùng payload).
+        Vai farmer. Quản lý HTX xem qua GET /v1/cropcycle/support-requests; log GPS ghi sau commit (consumer pf.cropcycle.gps_log).
+        Từ #313 không còn tự sinh nhiệm vụ khuyến nông. Thiếu vị trí GPS vẫn nhận (nhãn "Thiếu vị trí GPS").
+        Ngoại tuyến: gửi qua pf/sync entity support_request (cùng payload).
       operationId: submitSupportRequest
-      tags: [extension]
+      tags: [cropcycle]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -5522,7 +5521,7 @@ paths:
             schema: {$ref: "#/components/schemas/SupportRequestInput"}
       responses:
         "201":
-          description: Đã nhận, nhiệm vụ đã sinh
+          description: Đã nhận
           content:
             application/json:
               schema:
@@ -5530,10 +5529,10 @@ paths:
                 properties:
                   support_request: {$ref: "#/components/schemas/SupportRequest"}
                   replayed: {type: boolean}
-        "403": {description: "forbidden | extension.farmer_household_required", $ref: "#/components/responses/Problem"}
-        "409": {description: "extension.id_reused", $ref: "#/components/responses/Problem"}
-        "422": {description: "validation_failed (\"Vui lòng nhập mô tả và chọn loại sự cố trước khi gửi.\", tối đa 5 ảnh) | extension.household_invalid", $ref: "#/components/responses/Problem"}
-        "503": {description: "extension.dependency_unavailable", $ref: "#/components/responses/Problem"}
+        "403": {description: "forbidden | cropcycle.farmer_household_required", $ref: "#/components/responses/Problem"}
+        "409": {description: "cropcycle.id_reused", $ref: "#/components/responses/Problem"}
+        "422": {description: "validation_failed (\"Vui lòng nhập mô tả và chọn loại sự cố trước khi gửi.\", tối đa 5 ảnh) | cropcycle.household_invalid | cropcycle.household_no_cooperative", $ref: "#/components/responses/Problem"}
+        "503": {description: "cropcycle.dependency_unavailable", $ref: "#/components/responses/Problem"}
   # --- hết G2 ---
 
   # --- pf/simulation ---
@@ -21085,16 +21084,12 @@ components:
         labels: {type: array, items: {type: string}, description: "vd \"Thiếu vị trí GPS\""}
         event_time: {type: string, format: date-time}
         received_at: {type: string, format: date-time}
-        task_id: {type: string, format: uuid}
-        task_status: {type: string, enum: [new, assigned, accepted, in_progress, resolved]}
-        assigned: {type: boolean}
-        last_note: {type: string}
-        task_created_at: {type: string, format: date-time}
-    SupportRequestStaff:
+        task_status: {type: [string, "null"], enum: [new, assigned, accepted, in_progress, resolved, null], description: "Chỉ yêu cầu chép từ pf/extension (#313): trạng thái nhiệm vụ khuyến nông lúc chép; null với yêu cầu mới"}
+    CoopSupportRequest:
       type: object
-      description: Yêu cầu hỗ trợ trong danh sách của cán bộ (không có toạ độ, không PII).
+      description: Yêu cầu hỗ trợ trong danh sách của quản lý HTX (không có toạ độ, không PII) — #313.
       required: [id, household_ref, plot_ref, cooperative_ref, commune_code, province_code, category, urgency, description,
-        photo_refs, photo_count, gps_missing, gps_accuracy_m, labels, event_time, received_at, assignment_rule, task]
+        photo_refs, photo_count, gps_missing, gps_accuracy_m, labels, event_time, received_at, legacy_task_status]
       properties:
         id: {type: string, format: uuid}
         household_ref: {type: string, format: uuid}
@@ -21111,9 +21106,8 @@ components:
         gps_accuracy_m: {type: [string, "null"], description: "Độ chính xác GPS (m, decimal)"}
         labels: {type: array, items: {type: string}, description: "vd \"Thiếu vị trí GPS\""}
         event_time: {type: string, format: date-time, description: "Lúc bấm Gửi trên máy"}
-        received_at: {type: string, format: date-time, description: "Lúc máy chủ nhận (mốc SLA 1 phút)"}
-        assignment_rule: {type: string, enum: [commune_on_duty, province_on_duty, province_officer, admin_queue]}
-        task: {$ref: "#/components/schemas/ExtTask"}
+        received_at: {type: string, format: date-time, description: "Lúc máy chủ nhận"}
+        legacy_task_status: {type: [string, "null"], enum: [new, assigned, accepted, in_progress, resolved, null], description: "Chỉ yêu cầu chép từ pf/extension: trạng thái nhiệm vụ khuyến nông lúc chép"}
     # --- pf/simulation ---
 
     SimLatLng:

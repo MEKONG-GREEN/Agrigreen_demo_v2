@@ -1508,7 +1508,7 @@ export interface paths {
         };
         /**
          * Log toạ độ GPS (HTX US-GPS-03) — chỉ đọc, mới nhất trước, theo phạm vi xã (quản lý HTX chỉ log gắn HTX mình; log không xác định được xã chỉ toàn quốc thấy)
-         * @description Ghi log chỉ qua port geo.GpsLog: consumer outbox pf.cropcycle.gps_log (mở vụ, nhật ký, khai sản lượng) và pf.extension.gps_log (yêu cầu hỗ trợ) ghi SAU khi nghiệp vụ commit, idempotent theo bản ghi. Log giữ ≥ 12 tháng, không bao giờ xóa. Vai farmer (nông dân) chỉ thấy log do chính mình ghi và log gắn với thửa của nông hộ liên kết với tài khoản; chưa nối liên kết tài khoản → 503 geo.dependency_unavailable.
+         * @description Ghi log chỉ qua port geo.GpsLog: consumer outbox pf.cropcycle.gps_log (mở vụ, nhật ký, khai sản lượng, yêu cầu hỗ trợ) ghi SAU khi nghiệp vụ commit, idempotent theo bản ghi. Log giữ ≥ 12 tháng, không bao giờ xóa. Vai farmer (nông dân) chỉ thấy log do chính mình ghi và log gắn với thửa của nông hộ liên kết với tài khoản; chưa nối liên kết tài khoản → 503 geo.dependency_unavailable.
          */
         get: operations["geoListGpsFixes"];
         put?: never;
@@ -1556,7 +1556,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/extension/support-requests": {
+    "/v1/cropcycle/support-requests": {
         parameters: {
             query?: never;
             header?: never;
@@ -1564,12 +1564,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Yêu cầu hỗ trợ của nông dân cho cán bộ (HTX US-SUPPORT-01, KN US-TASK-01/03) — kèm nhiệm vụ tự sinh hiện hành
-         * @description Vai coop_manager (chỉ HTX của mình = org_ref; hỏi HTX khác → 403 extension.out_of_scope), kn_officer /
-         *     kn_province_admin / kn_national_admin (xã/tỉnh trong phạm vi, cộng nhiệm vụ được giao cho mình), platform_admin (mọi nơi).
-         *     Mới nhất trước; cursor là next_cursor của trang trước. Không trả toạ độ — chỉ trạng thái GPS; ảnh là mã tệp (pf/files).
+         * Yêu cầu hỗ trợ của nông dân cho quản lý HTX (HTX US-SUPPORT-01) — module chủ HTX (#313)
+         * @description Vai coop_manager (chỉ HTX của mình = org_ref; hỏi HTX khác → 403 cropcycle.out_of_scope), platform_admin (toàn
+         *     tenant, lọc cooperative_ref được). Mới nhất trước; cursor là next_cursor (id) của trang trước. Không trả toạ độ —
+         *     chỉ trạng thái GPS; ảnh là mã tệp (pf/files). Thay GET /v1/extension/support-requests (gỡ cùng pf/extension).
          */
-        get: operations["extListSupportRequests"];
+        get: operations["listCoopSupportRequests"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3907,13 +3907,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Yêu cầu hỗ trợ của (các) nông hộ của nông dân, kèm trạng thái nhiệm vụ (HTX US-SUPPORT-01) */
+        /** Yêu cầu hỗ trợ của (các) nông hộ của nông dân (HTX US-SUPPORT-01) — module chủ HTX (#313) */
         get: operations["listMySupportRequests"];
         put?: never;
         /**
-         * Nông dân gửi yêu cầu hỗ trợ (HTX US-SUPPORT-01) — cùng giao dịch tự sinh nhiệm vụ cho cán bộ khuyến nông (KN US-TASK-01)
-         * @description Vai farmer. Người nhận: cán bộ xã đang trực → cán bộ tỉnh đang trực → cán bộ tỉnh → để trống (admin_queue, báo quản trị tỉnh).
-         *     Thiếu vị trí GPS vẫn nhận (nhãn "Thiếu vị trí GPS"). Ngoại tuyến: gửi qua pf/sync entity support_request (cùng payload).
+         * Nông dân gửi yêu cầu hỗ trợ (HTX US-SUPPORT-01) — module chủ HTX, phát pf.cooperative.support_request.submitted
+         * @description Vai farmer. Quản lý HTX xem qua GET /v1/cropcycle/support-requests; log GPS ghi sau commit (consumer pf.cropcycle.gps_log).
+         *     Từ #313 không còn tự sinh nhiệm vụ khuyến nông. Thiếu vị trí GPS vẫn nhận (nhãn "Thiếu vị trí GPS").
+         *     Ngoại tuyến: gửi qua pf/sync entity support_request (cùng payload).
          */
         post: operations["submitSupportRequest"];
         delete?: never;
@@ -16621,17 +16622,14 @@ export interface components {
             event_time?: string;
             /** Format: date-time */
             received_at?: string;
-            /** Format: uuid */
-            task_id?: string;
-            /** @enum {string} */
-            task_status?: "new" | "assigned" | "accepted" | "in_progress" | "resolved";
-            assigned?: boolean;
-            last_note?: string;
-            /** Format: date-time */
-            task_created_at?: string;
+            /**
+             * @description Chỉ yêu cầu chép từ pf/extension (#313): trạng thái nhiệm vụ khuyến nông lúc chép; null với yêu cầu mới
+             * @enum {string|null}
+             */
+            task_status?: "new" | "assigned" | "accepted" | "in_progress" | "resolved" | null;
         };
-        /** @description Yêu cầu hỗ trợ trong danh sách của cán bộ (không có toạ độ, không PII). */
-        SupportRequestStaff: {
+        /** @description Yêu cầu hỗ trợ trong danh sách của quản lý HTX (không có toạ độ, không PII) — */
+        CoopSupportRequest: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -16662,12 +16660,14 @@ export interface components {
             event_time: string;
             /**
              * Format: date-time
-             * @description Lúc máy chủ nhận (mốc SLA 1 phút)
+             * @description Lúc máy chủ nhận
              */
             received_at: string;
-            /** @enum {string} */
-            assignment_rule: "commune_on_duty" | "province_on_duty" | "province_officer" | "admin_queue";
-            task: components["schemas"]["ExtTask"];
+            /**
+             * @description Chỉ yêu cầu chép từ pf/extension: trạng thái nhiệm vụ khuyến nông lúc chép
+             * @enum {string|null}
+             */
+            legacy_task_status: "new" | "assigned" | "accepted" | "in_progress" | "resolved" | null;
         };
         SimLatLng: {
             lat: number;
@@ -30174,11 +30174,9 @@ export interface operations {
             503: components["responses"]["Problem"];
         };
     };
-    extListSupportRequests: {
+    listCoopSupportRequests: {
         parameters: {
             query?: {
-                /** @description Trạng thái nhiệm vụ tự sinh */
-                task_status?: "new" | "assigned" | "accepted" | "in_progress" | "resolved";
                 category?: "dich_hai" | "benh_lua" | "thoi_tiet" | "ky_thuat" | "may_moc" | "khac";
                 urgency?: "binh_thuong" | "khan";
                 commune_code?: string;
@@ -30201,16 +30199,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        items: components["schemas"]["SupportRequestStaff"][];
+                        items: components["schemas"]["CoopSupportRequest"][];
                         next_cursor: string | null;
                     };
                 };
             };
-            /** @description forbidden | extension.out_of_scope */
+            /** @description forbidden | cropcycle.out_of_scope */
             403: components["responses"]["Problem"];
             /** @description validation_failed */
             422: components["responses"]["Problem"];
-            503: components["responses"]["Problem"];
         };
     };
     extBulkAssign: {
@@ -34832,7 +34829,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description forbidden | extension.farmer_household_required */
+            /** @description forbidden | cropcycle.farmer_household_required */
             403: components["responses"]["Problem"];
         };
     };
@@ -34851,7 +34848,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Đã nhận, nhiệm vụ đã sinh */
+            /** @description Đã nhận */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -34863,13 +34860,13 @@ export interface operations {
                     };
                 };
             };
-            /** @description forbidden | extension.farmer_household_required */
+            /** @description forbidden | cropcycle.farmer_household_required */
             403: components["responses"]["Problem"];
-            /** @description extension.id_reused */
+            /** @description cropcycle.id_reused */
             409: components["responses"]["Problem"];
-            /** @description validation_failed ("Vui lòng nhập mô tả và chọn loại sự cố trước khi gửi.", tối đa 5 ảnh) | extension.household_invalid */
+            /** @description validation_failed ("Vui lòng nhập mô tả và chọn loại sự cố trước khi gửi.", tối đa 5 ảnh) | cropcycle.household_invalid | cropcycle.household_no_cooperative */
             422: components["responses"]["Problem"];
-            /** @description extension.dependency_unavailable */
+            /** @description cropcycle.dependency_unavailable */
             503: components["responses"]["Problem"];
         };
     };

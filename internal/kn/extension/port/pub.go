@@ -10,10 +10,14 @@ package port
 // PFPUB (pf 20261013150110, ADR-0053): v1_closed_figures — cùng số liệu chiếu về họ hợp đồng thống nhất "closed_figures/v1"
 // (cột, thứ tự giống hệt pf_forms_pub.v1_closed_figures của kỳ native). Bên đọc KHTC: ClosedFigures (closedfig.go).
 //
+// PA1-HTX-SUPPORT-GPSLOG (#313, pf 20261116020729): v1_support_request_export — nguồn đọc của migration chép một lần yêu
+// cầu hỗ trợ App HTX sang module chủ HTX pf/cooperative (pf 20261116020731); không mã ứng dụng nào đọc.
+//
 //ag:pubview pf_extension_pub.field_report v1
 //ag:pubview pf_extension_pub.task_event v1
 //ag:pubview pf_extension_pub.task v1
 //ag:pubview pf_extension_pub.directive_target_ack v1
 //ag:pubview pf_extension_pub.consolidation_closed v1
 //ag:pubview pf_extension_pub.closed_figures v1
+//ag:pubview pf_extension_pub.support_request_export v1
 const PubSchema = "pf_extension_pub"

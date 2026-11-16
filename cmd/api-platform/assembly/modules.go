@@ -227,7 +227,6 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	coop.UseSharing(pty.PartnerAccess())
 	cc.UseSharing(pty.PartnerAccess(), pty.ValveGrants())
 	mrvMod.UseValveGrants(pty.ValveGrants())
-	kn.UseGpsLog(g.GpsLog()) // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
 
 	cntsCatalogs := extension.NewCNTSCatalogs(md.EffectiveCatalogs(), clk)
 	kn.UseCNTSCatalogs(cntsCatalogs) // W11.49: bệnh, vật nuôi của Báo cáo dịch bệnh BM-10 (danh mục CNTS theo ngày)
@@ -315,9 +314,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if c := acc.StaffContacts(); c != nil {
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}
-	kn.UseFarmers(acc.FarmerHouseholds())                                                         // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
 	snc.UseFarmers(acc.FarmerHouseholds())                                                        // App HTX: pull của nông dân theo nông hộ liên kết
-	coop.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()})                            // HTX US-SEASON-01: thửa của nông hộ mình
+	coop.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()})                            // HTX US-SEASON-01, US-SUPPORT-01 (#313): nông hộ của nông dân
 	g.UseFarmers(farmerHouseholds{acc.FarmerHouseholds()})                                        // HTX US-GPS-03: nông dân đọc log GPS của mình
 	nt.UseAreaFarmers(AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03
 

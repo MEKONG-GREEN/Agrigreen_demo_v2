@@ -18,7 +18,6 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -80,11 +79,6 @@ type Service struct {
 	Coops port.CooperativeStatistics
 	// Contacts (tùy chọn): số điện thoại cán bộ ở pf/accounts cho "gọi/nhắn 1 chạm" (US-DIR-02).
 	Contacts accport.StaffContacts
-	// Farmers: liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) cho yêu cầu hỗ trợ
-	// từ App HTX (HTX US-SUPPORT-01). Nil → route yêu cầu hỗ trợ trả 503.
-	Farmers accport.FarmerHouseholds
-	// GpsLog (tùy chọn): log GPS của pf/geo cho consumer port.GpsLogConsumer (HTX US-GPS-03).
-	GpsLog geoport.GpsLog
 	// KNContext, KNDirectory (tùy chọn, P1): ngữ cảnh phiên KN và danh bạ gán vai trò cho lịch công tác (P5).
 	// Thiếu → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
 	KNContext   accport.KNContextResolver

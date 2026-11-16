@@ -58,6 +58,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 
 	// Bề mặt đối tác (ADR-0020): ngày gieo / thu hoạch của vụ cho bên nhận cấp quyền season_harvest_dates.
 	rg.GET("/partner/season-harvest-dates", h.partnerHarvestDates)
+
+	h.registerSupport(rg)
 }
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc): soạn, phát hành SOP; dựng lại bảng chiếu.

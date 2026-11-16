@@ -30,6 +30,7 @@ provides:
     - Resolve
     - Seasons
   events:
+    - pf.cooperative.support_request.submitted/v1
     - pf.cropcycle.coop_season_area.changed/v1
     - pf.cropcycle.farm_log.recorded/v1
     - pf.cropcycle.farm_log.reviewed/v1

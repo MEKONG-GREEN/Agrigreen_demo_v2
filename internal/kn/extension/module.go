@@ -45,14 +45,12 @@ import (
 	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/app"
 	rchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/handler"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
@@ -171,13 +169,6 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 // "ĐT viên chức" của lịch trực KSGM BM-03 (BF-CN-DUTY).
 func (m *Module) UseContacts(c accport.StaffContacts) { m.svc.Contacts, m.cal.Contacts = c, c }
 
-// UseFarmers nối cổng liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) — yêu cầu
-// hỗ trợ từ App HTX (HTX US-SUPPORT-01 → KN US-TASK-01). Gốc lắp ráp gọi sau khi dựng pf/accounts.
-func (m *Module) UseFarmers(f accport.FarmerHouseholds) { m.svc.Farmers = f }
-
-// UseGpsLog nối log GPS của pf/geo (consumer port.GpsLogConsumer, HTX US-GPS-03).
-func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
-
 // UseKNContext nối ngữ cảnh phiên KN và danh bạ gán vai trò của P1 (pf/accounts) cho lịch công tác (KN v7.7 P5).
 // Chưa nối → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
 func (m *Module) UseKNContext(c accport.KNContextResolver, d accport.KNDirectory) {
@@ -213,9 +204,6 @@ func (m *Module) UseXaScopes(x accport.XaScopes) { m.cal.Officers, m.model.Offic
 
 // UseTablePDF nối bộ dựng PDF bảng (pf/reports) cho "Xuất PDF" lịch công tác.
 func (m *Module) UseTablePDF(p port.TablePDF) { m.svc.TablePDF = p }
-
-// GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (vai extension_app).
-func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
 
 // UseContactNames (W11.23, Q-072 — đề xuất của dev: Contact thay danh bạ trực): tên cán bộ đọc từ Contact dùng chung
 // (hồ sơ nhân sự + kho định danh) TRƯỚC; cột display_name dạng rõ của pf_extension.staff chỉ còn là nguồn dự phòng cho

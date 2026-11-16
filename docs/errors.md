@@ -191,11 +191,8 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.unit_invalid` | pf/extension: mã đơn vị hành chính không còn hiệu lực hoặc sai cấp (nhiệm vụ/báo cáo gắn xã; chốt kỳ theo tỉnh) |
 | 404 | `extension.staff_not_found` | pf/extension: cán bộ chưa có (hoặc đã ngừng) trong danh bạ trực |
 | 404 | `extension.contact_unavailable` | pf/extension: cán bộ trong danh bạ chưa khai số điện thoại ở tài khoản (hoặc tài khoản đã khóa) — không gọi/nhắn 1 chạm được (US-DIR-02) |
-| 403 | `extension.farmer_household_required` | pf/extension: tài khoản nông dân chưa liên kết nông hộ nào (HTX US-SUPPORT-01) |
-| 422 | `extension.household_invalid` | pf/extension: `household_ref` của yêu cầu hỗ trợ không thuộc tài khoản, hoặc tài khoản có nhiều nông hộ mà không chọn |
-| 404 | `extension.support_request_not_found` | pf/extension: không có yêu cầu hỗ trợ |
 | 409 | `extension.id_reused` | pf/extension: `id` do máy sinh đã dùng cho bản ghi khác |
-| 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục); consumer `pf.extension.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
+| 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục); consumer `pf.extension.gps_log` (gỡ ở #313) chưa nối log GPS pf/geo |
 | 404 | `extension.program_report_not_found` | pf/extension: không có báo cáo tiến độ Đề án (FR-03), hoặc ngoài phạm vi đọc |
 | 409 | `extension.program_report_approved` | pf/extension: phiên bản tiến độ Đề án đã được duyệt |
 | 404 | `extension.schedule_not_found` | pf/extension (KN v7.7 P5): không có lịch công tác, hoặc ngoài phạm vi (Cấp Xã: không phải lịch của mình; Cấp Tỉnh: khác phòng ban/tỉnh) — không lộ sự tồn tại |
@@ -428,6 +425,9 @@ Cổng `geo.GpsLog.RecordFix` (module khác gọi, không qua HTTP) trả lỗi 
 | 409 | `cropcycle.collection_statement_stale` | pf/cropcycle (G3-2): phản hồi theo `revision` cũ — MKG đã gửi bản sửa; `current_revision` là bản hiện hành |
 | 403 | `cropcycle.collection_manager_only` | pf/cropcycle (G3-2): chỉ `coop_manager` của đúng HTX (`org_ref`) được xác nhận/tranh chấp bảng kê |
 | 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`); consumer `pf.cropcycle.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại). G5: nguồn sản phẩm `collection_volume` chưa nối `geoport.PlotFacts` / `AdminUnits` hoặc không đọc được |
+| 403 | `cropcycle.farmer_household_required` | pf/cooperative (#313, thay `extension.farmer_household_required`): tài khoản nông dân chưa liên kết nông hộ nào — gửi/xem yêu cầu hỗ trợ (HTX US-SUPPORT-01) |
+| 422 | `cropcycle.household_invalid` | pf/cooperative (#313, thay `extension.household_invalid`): `household_ref` của yêu cầu hỗ trợ không thuộc tài khoản, hoặc tài khoản có nhiều nông hộ mà không chọn |
+| 422 | `cropcycle.household_no_cooperative` | pf/cooperative (#313): nông hộ của yêu cầu hỗ trợ chưa là xã viên một HTX đang hoạt động |
 
 Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.gps_match_tolerance_m`, mặc định 50 m) | `mismatch` | `missing`; nguồn `gps_source` luôn có. Thiếu GPS hoặc không đo được **không** chặn lưu.
 

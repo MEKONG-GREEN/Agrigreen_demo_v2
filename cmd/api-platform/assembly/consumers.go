@@ -39,7 +39,7 @@ type Consumer struct {
 //   - pf.geo.hub_valve: van công bố MKG hub_facility / hub_capacity → mô hình đọc hub;
 //   - pf.cropcycle.htx_collection_valve (G3-2): van MKG collection_schedule / htx_collection_statement
 //     → sổ nhận + bảng chiếu cho quản lý HTX (kiểm hợp đồng van lúc chạy);
-//   - pf.cropcycle.gps_log, pf.extension.gps_log: log GPS sau commit (HTX US-GPS-03);
+//   - pf.cropcycle.gps_log: log GPS sau commit (HTX US-GPS-03; vụ, nhật ký, sản lượng, yêu cầu hỗ trợ — #313);
 //   - pf.simulation.snapshot: ảnh chụp đầu vào qua SupplySource + WaterwayRouter;
 //   - pf.mrv.farm_log_link, pf.mrv.collection_evidence (G3): liên kết nhật ký HTX / van
 //     mrv_collection_evidence → pf/mrv, ước tính CO2 TẠM đọc tham số masterdata.
@@ -54,8 +54,6 @@ var Consumers = []Consumer{
 		Handler: func(m Modules) inbox.Handler { return m.CropCycle.CollectionValveHandler() }},
 	{Name: coopport.GpsLogConsumer, Module: cooperative.DBModule, Events: coopport.GpsLogEvents,
 		Handler: func(m Modules) inbox.Handler { return m.Cooperative.GpsLogHandler() }},
-	{Name: extport.GpsLogConsumer, Module: extension.DBModule, Events: []string{extport.EventSupportRequestSubmitted},
-		Handler: func(m Modules) inbox.Handler { return m.Extension.GpsLogHandler() }},
 	// W11.43: quy tắc liên biểu + cảnh báo CNTS sau commit (bài nộp kn_cnts, ổ dịch mới).
 	{Name: extport.CNTSAlertConsumer, Module: extension.DBModule, Events: extension.CNTSAlertEvents,
 		Handler: func(m Modules) inbox.Handler { return m.Extension.CNTSAlertHandler() }},
