@@ -69,7 +69,7 @@ func TestPubViewsDeclaredAndPrivileges_W63(t *testing.T) {
 	// ticket_week của pf/price (pf 000152); PFPUB (ADR-0053): + họ closed_figures/v1 của pf/forms và pf/extension
 	// (pf 20261013150108, 20261013150110). PA1 (#314): pf/metrics không còn ĐỌC view của KN (pf/extension, pf/forms,
 	// pf/price); view và quyền giữ nguyên (không DROP) tới bước gỡ KN.
-	if n := countViews(views); n != 24 { // HTX-DATA-A: +4 published views; #271: + pf_cooperative_pub.v1_plot_export; #313: + pf_extension_pub.v1_support_request_export
+	if n := countViews(views); n != 24 { // HTX-DATA-A: +4 published views; #271: + pf_cooperative_pub.v1_plot_export; #313: + view chỉ-để-chép support_request_export của pf/extension
 		t.Fatalf("số view _pub đã khai: %d", n)
 	}
 	declared := map[string]bool{}
