@@ -196,6 +196,12 @@ jobs:
             done
             grep -E '^(AG_ENV|AG_DEPLOY_ENV|AG_MFA_DISABLED)=' "$E"
 
+            # docker-compose.vps.yml bind-mount ./.vps/notify (tep khoa FCM, tuy chon) voi create_host_path: false.
+            # May dung truoc khi deploy/vps/prepare.sh tao thu muc nay thi "compose up" dung giua chung (26/10/2026).
+            # De rong = kenh day FCM tat (fail-closed).
+            mkdir -p deploy/compose/.vps/notify
+            chmod 755 deploy/compose/.vps deploy/compose/.vps/notify
+
             docker compose $C config --quiet
 
             # Kho goi cua repo rieng tu nen phai dang nhap moi keo duoc anh.
