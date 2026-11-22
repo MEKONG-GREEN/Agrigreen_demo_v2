@@ -219,3 +219,27 @@ func LastClosedCutoff(ctx context.Context, tx pgx.Tx, year int) (*time.Time, err
 	                  AND e.action = 'closed')`, year).Scan(&t)
 	return t, err
 }
+
+func PeriodsForReader(ctx context.Context, tx pgx.Tx, year, limit int, includeAdhoc bool) ([]Period, error) {
+	rows, err := tx.Query(ctx, `SELECT `+periodCols+` FROM pf_extension.khtc_period WHERE ($1=0 OR plan_year=$1) AND ($3 OR report_type<>'adhoc') ORDER BY id DESC LIMIT $2`, year, limit, includeAdhoc)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Period, error) { return scanPeriod(r) })
+}
+
+// AdhocReportPeriods cannot be starved by unrelated adhoc/month/year records.
+func AdhocReportPeriods(ctx context.Context, tx pgx.Tx, year int, current uuid.UUID, end time.Time) ([]Period, error) {
+	rows, err := tx.Query(ctx, `SELECT `+periodCols+` FROM pf_extension.khtc_period p
+ WHERE p.plan_year=$1 AND (p.report_type='week' OR p.id=$2) AND p.period_to<=$3::date
+ AND NOT EXISTS(SELECT 1 FROM pf_extension.khtc_period_event e WHERE e.tenant_id=p.tenant_id AND e.period_id=p.id AND e.action='cancelled')
+ ORDER BY p.id LIMIT 1001`, year, current, end.Format(time.DateOnly))
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Period, error) { return scanPeriod(r) })
+	if err == nil && len(out) > 1000 {
+		return nil, errors.New("quá 1000 kỳ nguồn tuần trong một năm")
+	}
+	return out, err
+}

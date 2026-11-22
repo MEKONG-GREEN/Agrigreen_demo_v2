@@ -9,6 +9,7 @@ package handler_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,14 +18,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -41,8 +45,10 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
@@ -69,21 +75,26 @@ func (units) Get(_ context.Context, code string, _ time.Time) (partyport.AdminUn
 func (units) Descendants(context.Context, string, time.Time) ([]string, error) { return nil, nil }
 func (units) Current(context.Context, string, time.Time) ([]string, error)     { return nil, nil }
 
-type catalogs struct{ knport.CNTSCatalogs }
+type catalogs struct {
+	knport.CNTSCatalogs
+	g *txGuard
+}
 
 var items = map[string]mdport.CatalogItem{
 	"cnts_model_type:GA_TP": {Catalog: "cnts_model_type", Code: "GA_TP", Name: "Gà thương phẩm", Active: true},
 	"cnts_model_type:CA":    {Catalog: "cnts_model_type", Code: "CA", Name: "Cá", Active: true},
 }
 
-func (catalogs) ItemAt(_ context.Context, catalog, code string, _ time.Time) (mdport.CatalogItem, error) {
+func (c catalogs) ItemAt(_ context.Context, catalog, code string, _ time.Time) (mdport.CatalogItem, error) {
+	c.g.port("catalogs.ItemAt " + catalog)
 	if it, ok := items[catalog+":"+code]; ok {
 		return it, nil
 	}
 	return mdport.CatalogItem{}, fmt.Errorf("giả: %w", mdport.ErrCatalogItemNotFound)
 }
 
-func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport.CatalogItem, error) {
+func (c catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport.CatalogItem, error) {
+	c.g.port("catalogs.ListAt " + catalog)
 	out := []mdport.CatalogItem{}
 	for _, it := range items {
 		if it.Catalog == catalog {
@@ -91,6 +102,93 @@ func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport
 		}
 	}
 	return out, nil
+}
+
+// txGuard bọc pool của module (Codex #170 [P2]): đếm giao dịch đang mở; port của module khác (tham số, danh mục, đơn vị hành
+// chính) được gọi từ mã cntsdiary trong lúc có giao dịch đang mở → ghi vi phạm (AUTO-REVIEW §4: không gọi port trong TX).
+// Test chạy tuần tự từng request nên một bộ đếm chung đủ.
+type txGuard struct {
+	b      tenant.Beginner
+	active atomic.Int64
+	mu     sync.Mutex
+	calls  int
+	bad    []string
+}
+
+type guardTx struct {
+	pgx.Tx
+	g    *txGuard
+	done atomic.Bool
+}
+
+func (g *txGuard) BeginTx(ctx context.Context, o pgx.TxOptions) (pgx.Tx, error) {
+	tx, err := g.b.BeginTx(ctx, o)
+	if err != nil {
+		return nil, err
+	}
+	g.active.Add(1)
+	return &guardTx{Tx: tx, g: g}, nil
+}
+
+func (x *guardTx) end() {
+	if x.done.CompareAndSwap(false, true) {
+		x.g.active.Add(-1)
+	}
+}
+func (x *guardTx) Commit(ctx context.Context) error   { defer x.end(); return x.Tx.Commit(ctx) }
+func (x *guardTx) Rollback(ctx context.Context) error { defer x.end(); return x.Tx.Rollback(ctx) }
+
+// port ghi lời gọi port; gọi từ mã cntsdiary khi đang có giao dịch → vi phạm.
+func (g *txGuard) port(what string) {
+	if g == nil {
+		return
+	}
+	pcs := make([]uintptr, 64)
+	n := runtime.Callers(2, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+	diary := false
+	for {
+		fr, more := frames.Next()
+		if strings.Contains(fr.Function, "/cntsdiary/app.") {
+			diary = true
+		}
+		if !more {
+			break
+		}
+	}
+	if !diary {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.calls++
+	if g.active.Load() > 0 {
+		g.bad = append(g.bad, what)
+	}
+}
+
+func (g *txGuard) report() (int, []string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.calls, slices.Clone(g.bad)
+}
+
+// guardParams: chưa có tham số đã duyệt nào (như Params nil) nhưng ghi lời gọi để txGuard kiểm.
+type guardParams struct{ g *txGuard }
+
+func (p guardParams) At(_ context.Context, key string, _ time.Time) (params.ParamValue, error) {
+	p.g.port("params.At " + key)
+	return params.ParamValue{}, params.ErrParamNotFound
+}
+
+type guardUnits struct {
+	units
+	g *txGuard
+}
+
+func (u guardUnits) Get(ctx context.Context, code string, at time.Time) (partyport.AdminUnit, error) {
+	u.g.port("units.Get " + code)
+	return u.units.Get(ctx, code, at)
 }
 
 type xaScopes struct{ list []accport.XaScope }
@@ -107,6 +205,7 @@ type files struct {
 	byRef    map[uuid.UUID]evport.File
 	blobs    map[uuid.UUID][]byte
 	purposes []string
+	attaches int // số lần Attach thật (phát lại Idempotency-Key không được gọi lại — #172)
 }
 
 func (f *files) Attach(ctx context.Context, in evport.AttachInput) (evport.File, bool, error) {
@@ -126,6 +225,7 @@ func (f *files) Attach(ctx context.Context, in evport.AttachInput) (evport.File,
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.byRef[ref], f.blobs[ref] = file, append([]byte(nil), in.Blob...)
+	f.attaches++
 	return file, true, nil
 }
 
@@ -165,6 +265,7 @@ type fix struct {
 	xa     *xaScopes
 	vault  *clienttest.Fake
 	files  *files
+	guard  *txGuard
 }
 
 func newFix(t *testing.T) *fix {
@@ -172,8 +273,9 @@ func newFix(t *testing.T) *fix {
 	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, vault: clienttest.New(),
 		clk: clock.NewFixed(t0)}
 	f.pool = env.AdminPool(t, migrations.PF)
-	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, extension.Deps{Units: units{}})
-	mod.UseCNTSCatalogs(catalogs{})
+	f.guard = &txGuard{b: env.Pool(t, migrations.PF, dbadmin.AppPlatform)}
+	mod := extension.New(f.guard, f.clk, extension.Deps{Units: guardUnits{g: f.guard}, Params: guardParams{g: f.guard}})
+	mod.UseCNTSCatalogs(catalogs{g: f.guard})
 	mod.UseXaScopes(f.xa)
 	mod.UseCNTSModelVault(f.vault)
 	f.files = &files{resolver: mod.DiaryFileResolver(), vault: f.vault, byRef: map[uuid.UUID]evport.File{}, blobs: map[uuid.UUID][]byte{}}
@@ -292,6 +394,27 @@ func (u user) upload(household, kind string, content []byte) resp {
 	r, _ := http.NewRequest(http.MethodPost, u.f.srv.URL+base+"diary-photos", &buf)
 	r.Header.Set("Content-Type", w.FormDataContentType())
 	return u.send(r, key())
+}
+
+// photoBody dựng thân multipart TẤT ĐỊNH như web (#172: boundary cố định, id + captured_at do client giữ khi bấm lại).
+func photoBody(household, kind, id string, content []byte) ([]byte, string) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	_ = w.SetBoundary("----AgFormBoundary172photo")
+	_ = w.WriteField("household_ref", household)
+	_ = w.WriteField("kind", kind)
+	_ = w.WriteField("id", id)
+	_ = w.WriteField("captured_at", t0.Add(-time.Hour).Format(time.RFC3339))
+	fw, _ := w.CreateFormFile("file", "anh.jpg")
+	_, _ = fw.Write(content)
+	_ = w.Close()
+	return buf.Bytes(), w.FormDataContentType()
+}
+
+func (u user) uploadRaw(k, ctype string, body []byte) resp {
+	r, _ := http.NewRequest(http.MethodPost, u.f.srv.URL+base+"diary-photos", bytes.NewReader(body))
+	r.Header.Set("Content-Type", ctype)
+	return u.send(r, k)
 }
 
 func key() string                            { return "k-" + ids.New().String() }
@@ -473,6 +596,7 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	if l := list(want(t, chu.get(base+"diary-entries?flagged=true&cycle_ref="+cref), 200, "", "lọc có cảnh báo"), "items"); len(l) != 1 {
 		t.Fatalf("lọc lần ghi có cảnh báo: %v", l)
 	}
+	diaryProvinceList(t, viewer, other, offlineID, e2ref)
 	want(t, viewer.post(base+"diary-entries/"+e2ref+"/verify", map[string]any{"base_version": 1}), 403, "", "viên chức không xác thực")
 	want(t, officer.post(base+"diary-entries/"+e2ref+"/verify", map[string]any{"base_version": 1}), 403, "", "người ghi không xác thực")
 	want(t, chu.post(base+"diary-entries/"+e2ref+"/return", map[string]any{"base_version": 1, "reason": ""}), 422, "", "thiếu lý do")
@@ -557,6 +681,40 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	if len(blob) == 0 || bytes.Contains(blob, []byte("IHDR")) {
 		t.Fatal("kho tệp phải giữ bản mã, không giữ ảnh rõ")
 	}
+	// #172: mất phản hồi sau khi đã lưu → web gửi lại đúng thân multipart (cùng id, cùng boundary) với cùng khóa → máy chủ
+	// phát lại ảnh đã lưu, không mã hóa/lưu lần hai; cùng khóa mà khác ảnh → idempotency_key_reused.
+	pid := ids.New().String()
+	pb, pct := photoBody(hCa, "weighing", pid, pngBytes)
+	pk := key()
+	p1 := officer.uploadRaw(pk, pct, pb)
+	want(t, p1, 201, "", "tải ảnh (multipart tất định)")
+	f.files.mu.Lock()
+	before := f.files.attaches
+	f.files.mu.Unlock()
+	p2 := officer.uploadRaw(pk, pct, pb)
+	if want(t, p2, 201, "", "bấm lại sau mất phản hồi"); str(p2.body, "file_ref") != pid || !bytes.Equal(p2.raw, p1.raw) {
+		t.Fatalf("phải phát lại đúng ảnh đã lưu: %s / %s", p1.raw, p2.raw)
+	}
+	f.files.mu.Lock()
+	after := f.files.attaches
+	f.files.mu.Unlock()
+	if after != before {
+		t.Fatalf("phát lại không được lưu ảnh lần hai: %d → %d", before, after)
+	}
+	ob, oct := photoBody(hCa, "weighing", pid, append(bytes.Clone(pngBytes), 0))
+	want(t, officer.uploadRaw(pk, oct, ob), 422, "idempotency_key_reused", "cùng khóa, khác ảnh")
+	// Review #172: khác ảnh + khóa mới nhưng dùng lại id ảnh đã lưu (cùng hộ) → 422 "mã ảnh đã dùng", không còn 409
+	// "chủ hộ chưa có khóa", và không mã hóa/lưu gì thêm.
+	reused := officer.uploadRaw(key(), oct, ob)
+	if want(t, reused, 422, "extension.cnts_diary_photo_invalid", "khóa mới, id ảnh đã dùng"); !bytes.Contains(reused.raw, []byte("mã ảnh đã dùng")) {
+		t.Fatalf("id ảnh đã dùng phải báo ở trường id: %s", reused.raw)
+	}
+	f.files.mu.Lock()
+	reAttach := f.files.attaches
+	f.files.mu.Unlock()
+	if reAttach != after {
+		t.Fatalf("id ảnh đã dùng không được Attach: %d → %d", after, reAttach)
+	}
 	want(t, officer.post(base+"diary-entries", merge(fish, map[string]any{"photo_refs": []string{ids.New().String()},
 		"metrics": merge(fish["metrics"].(map[string]any), map[string]any{"action_note": "Thay 30% nước"})})), 422,
 		"extension.cnts_diary_entry_invalid", "ảnh chưa tải")
@@ -607,14 +765,37 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	want(t, chu.post(base+"diary-cycles/"+cref+"/reopen", map[string]any{"base_version": json.Number(num(cl, "version")),
 		"reason": "Bổ sung lần ghi"}), 200, "", "chủ nhiệm mở lại lứa")
 
+	// ----- BF-CN-CATALOG #170: Admin thêm chỉ tiêu nhiệt độ có ngưỡng vào danh mục → lần ghi vượt ngưỡng có cảnh báo -----
+	items["cnts_indicator:NHIET_DO_AO"] = mdport.CatalogItem{Catalog: "cnts_indicator", Code: "NHIET_DO_AO", Name: "Nhiệt độ nước ao", Active: true,
+		Attrs: map[string]string{"value_type": "decimal", "unit": "°C", "diary_metric": "temp_c", "threshold_min": "25", "threshold_max": "32"}}
+	t.Cleanup(func() { delete(items, "cnts_indicator:NHIET_DO_AO") })
+
 	// ----- Hạn sửa 7 ngày, dọn tọa độ, xóa định danh chủ hộ -----
 	draft := want(t, officer.post(base+"diary-entries", map[string]any{"cycle_ref": ccref, "entry_kind": "env",
-		"metrics": map[string]any{"loss": "0", "ph": "7.8", "do_mgl": "5", "feed_kg": "35"}}), 201, "", "nháp")
+		"metrics": map[string]any{"loss": "0", "ph": "7.8", "do_mgl": "5", "temp_c": "34.5", "feed_kg": "35"}}), 201, "", "nháp")
 	if str(draft, "status") != "draft" {
 		t.Fatalf("nháp: %s", draft)
 	}
+	if got := checkCodes(draft); !slices.Contains(got, "temp_c_out_of_range") || slices.Contains(got, "ph_out_of_range") {
+		t.Fatalf("nhiệt độ 34,5 vượt ngưỡng 25–32 của chỉ tiêu mới: %v", got)
+	}
 	if l := list(want(t, chu.get(base+"diary-entries?cycle_ref="+ccref), 200, "", "chủ nhiệm"), "items"); len(l) != 1 {
 		t.Fatalf("bản nháp chỉ người ghi thấy: %v", l)
+	}
+	// Sửa + gửi (đường change: cập nhật rồi gửi) vẫn áp ngưỡng mới; NT-12 bắt biện pháp xử lý.
+	envM := map[string]any{"loss": "0", "ph": "7.8", "do_mgl": "5", "temp_c": "34.5", "feed_kg": "35"}
+	want(t, officer.post(base+"diary-entries/"+str(draft, "ref"), map[string]any{"base_version": json.Number(num(draft, "version")),
+		"entry_kind": "env", "metrics": envM, "submit": true}), 422, "extension.cnts_diary_entry_blocked", "NT-12: vượt ngưỡng nhiệt độ phải ghi biện pháp")
+	envM["action_note"] = "Thay 30% nước, che lưới"
+	draft = want(t, officer.get(base+"diary-entries/"+str(draft, "ref")), 200, "", "bản nháp đã sửa (bước gửi bị chặn)")
+	sent := want(t, officer.post(base+"diary-entries/"+str(draft, "ref"), map[string]any{"base_version": json.Number(num(draft, "version")),
+		"entry_kind": "env", "metrics": envM, "submit": true}), 200, "", "gửi lần ghi môi trường có biện pháp")
+	if got := checkCodes(sent); str(sent, "status") != "submitted" || !slices.Contains(got, "temp_c_out_of_range") {
+		t.Fatalf("gửi: %s %v", str(sent, "status"), got)
+	}
+	// Codex #170 [P2]: ngưỡng/tham số/tỉnh của xã nạp NGOÀI giao dịch ghi — không lời gọi port nào từ cntsdiary trong TX.
+	if calls, bad := f.guard.report(); calls == 0 || len(bad) > 0 {
+		t.Fatalf("port của module khác gọi trong giao dịch nhật ký (%d lời gọi): %v", calls, bad)
 	}
 	f.clk.Advance(9 * 24 * time.Hour)
 	want(t, officer.post(base+"diary-entries/"+str(fe, "ref"), map[string]any{"base_version": 1, "entry_kind": "growth_env",
@@ -637,6 +818,129 @@ func TestCNTSDiary_W1148(t *testing.T) {
 	if rr := open(chu); rr.status == 200 {
 		t.Fatal("xóa định danh chủ hộ → ảnh không còn đọc được")
 	}
+	if calls, bad := f.guard.report(); calls == 0 || len(bad) > 0 {
+		t.Fatalf("port của module khác gọi trong giao dịch nhật ký (%d lời gọi): %v", calls, bad)
+	}
 }
 
 func r(m map[string]any) []byte { b, _ := json.Marshal(m); return b }
+
+// BF-CN-DIARY (#109, CN-08/CN-12): nhật ký BM-08/BM-09 đủ trường sổ gốc 2026 — đầu sổ (mô hình, thời gian thực hiện, cán bộ
+// theo dõi), mục 1 vật tư (vật tư + chủng loại), mục 4 mua nguyên liệu thức ăn (cộng vào gợi ý chi thức ăn NC-15), mục 5 ghi chú
+// tiêm phòng, phần 3 họ tên cán bộ; sổ vịt xiêm vẫn không có phòng/trị bệnh, xuất bán.
+func TestCNTSDiary_BFCNDiaryPaperFields(t *testing.T) {
+	f := newFix(t)
+	chu := f.user(tinh("chu_nhiem"))
+	officer := f.user(xa("30001"))
+	f.xa.list = []accport.XaScope{{ActorRef: officer.ref, Communes: []string{"30001"}}}
+	p := want(t, chu.post(base+"projects", map[string]any{"code": "da-vit-2027", "name": "Mô hình vịt xiêm ATSH 2027", "kind": "tinh",
+		"start_date": "2027-03-01", "end_date": "2027-12-31"}), 201, "", "dự án")
+	s := want(t, chu.post(base+"demo-sites", map[string]any{"project_ref": str(p, "ref"), "commune_code": "30001", "name": "Điểm vịt Bình Hòa",
+		"model_type_code": "GA_TP", "officer_ref": officer.ref.String(), "diary_form": "BM-09",
+		"location": map[string]any{"lat": 10.38, "lng": 105.43, "source": "map"}}), 201, "", "điểm BM-09")
+	h := str(want(t, officer.post(base+"model-households", map[string]any{"site_ref": str(s, "ref"), "owner_name": "Lê Văn Vịt",
+		"owner_phone": "0912333444", "keeper_kind": "officer", "keeper_ref": officer.ref.String(), "location": map[string]any{"lat": 10.381,
+			"lng": 105.431, "source": "gps"}}), 201, "", "hộ"), "ref")
+
+	cyc := map[string]any{"household_ref": h, "breed": "Vịt xiêm Pháp", "received_date": "2027-10-01", "initial_count": 300, "age_days": 1,
+		"supplies": []map[string]any{
+			{"item": "Con giống", "date": "2027-10-01", "kind": "Vịt xiêm Pháp 1 ngày tuổi", "quantity": "300", "unit": "con"},
+			{"item": "Thức ăn vịt con", "date": "2027-10-01", "kind": "", "quantity": "200", "unit": "kg"},
+			{"date": "2027-10-01", "kind": "Vaccine viêm gan vịt", "quantity": "3", "unit": "lọ"}}}
+	want(t, officer.post(base+"diary-cycles", merge(cyc, map[string]any{"supplies": []map[string]any{{"date": "2027-10-01", "kind": "",
+		"quantity": "1", "unit": ""}}})), 422, "extension.cnts_diary_cycle_invalid", "mục 1: thiếu cả vật tư và chủng loại")
+	cy := want(t, officer.post(base+"diary-cycles", cyc), 201, "", "mở lứa vịt")
+	cref := str(cy, "ref")
+	d := want(t, officer.get(base+"diary-cycles/"+cref), 200, "", "chi tiết lứa")
+	sup := list(d, "supplies")
+	if len(sup) != 3 || str(sup[0].(map[string]any), "item") != "Con giống" || str(sup[1].(map[string]any), "item") != "Thức ăn vịt con" {
+		t.Fatalf("mục 1 vật tư: %v", sup)
+	}
+	if str(d, "project_name") != "Mô hình vịt xiêm ATSH 2027" || str(d, "project_start") != "2027-03-01" || str(d, "project_end") != "2027-12-31" ||
+		str(d, "officer_ref") != officer.ref.String() {
+		t.Fatalf("đầu sổ NC-01 (mô hình, thời gian thực hiện, cán bộ theo dõi): %v", d)
+	}
+
+	day := map[string]any{"cycle_ref": cref, "entry_kind": "daily", "metrics": map[string]any{"alive": "298", "dead": "2", "death_cause": "yeu",
+		"feed_kg": "6"}, "location": map[string]any{"lat": 10.3811, "lng": 105.4311, "accuracy_m": "8"}, "submit": true,
+		"tables": map[string]any{
+			"feed_purchases": []map[string]any{{"date": "2027-10-12", "name": "Cám vịt con", "quantity_kg": "25", "unit_price": "12000", "note": "đại lý"}},
+			"feed_materials": []map[string]any{{"date": "2027-10-12", "name": "Lúa", "quantity_kg": "10.5", "unit_price": "8000", "note": "tự trộn"}},
+			"vaccinations": []map[string]any{{"vaccine": "Dịch tả vịt", "shot": 0, "date": "2027-10-12", "dosage": "1 liều/con",
+				"method": "tiêm dưới da", "mfg_date": "2027-09-01", "note": "lô 0927"}},
+			"officer_notes": []map[string]any{{"date": "2027-10-12", "officer": "Nguyễn Văn Cán", "content": "Rửa máng uống hằng ngày",
+				"farmer_opinion": "Đồng ý"}}}}
+	want(t, officer.post(base+"diary-entries", merge(day, map[string]any{"tables": map[string]any{"treatments": []map[string]any{{"date": "2027-10-12",
+		"drug": "X", "withdrawal_days": 1}}}})), 422, "extension.cnts_diary_entry_invalid", "sổ vịt xiêm 2026 không có phòng và trị bệnh")
+	e := want(t, officer.post(base+"diary-entries", day), 201, "", "lần ghi đủ trường sổ gốc")
+	tb := obj(e, "tables")
+	fm := list(tb, "feed_materials")
+	if len(fm) != 1 || str(fm[0].(map[string]any), "name") != "Lúa" || str(fm[0].(map[string]any), "quantity_kg") != "10.5" {
+		t.Fatalf("mục 4 nguyên liệu thức ăn: %v", tb)
+	}
+	if v := list(tb, "vaccinations")[0].(map[string]any); str(v, "note") != "lô 0927" || str(v, "method") != "tiêm dưới da" {
+		t.Fatalf("mục 5 tiêm phòng: %v", v)
+	}
+	if o := list(tb, "officer_notes")[0].(map[string]any); str(o, "officer") != "Nguyễn Văn Cán" {
+		t.Fatalf("phần 3 họ tên cán bộ: %v", o)
+	}
+	if n := f.count(`SELECT count(*) FROM pf_extension.cnts_diary_entry WHERE tenant_id = $1 AND entry_ref = $2
+	    AND tables -> 'feed_materials' -> 0 ->> 'name' = 'Lúa'`, f.tenant, str(e, "ref")); n != 1 {
+		t.Fatalf("sổ lần ghi lưu mục 4: %d", n)
+	}
+	d = want(t, officer.get(base+"diary-cycles/"+cref), 200, "", "gợi ý hạch toán")
+	if fc := str(obj(d, "suggest"), "feed_cost"); fc != "384000" { // 25×12.000 + 10,5×8.000
+		t.Fatalf("NC-09 mục 3 + mục 4 cộng vào gợi ý chi thức ăn: %s", fc)
+	}
+}
+
+// diaryProvinceList: BF-CN-XA-DATA (#175) — màn Tỉnh "Số liệu cấp xã › Nhật ký sản xuất": lọc xã, mẫu, khoảng ngày ở máy
+// chủ; trang theo con trỏ (khóa entry_date, captured_at, entry_ref giảm dần); xã ngoài phạm vi → rỗng; tham số sai → 422.
+func diaryProvinceList(t *testing.T, viewer, outsider user, e1, e2 string) {
+	t.Helper()
+	p1 := want(t, viewer.get(base+"diary-entries?limit=1"), 200, "", "trang 1")
+	l1 := list(p1, "items")
+	if len(l1) != 1 || str(l1[0].(map[string]any), "ref") != e2 || str(p1, "next_cursor") == "" {
+		t.Fatalf("trang 1 (mới trước, còn trang sau): %v", p1)
+	}
+	p2 := want(t, viewer.get(base+"diary-entries?limit=1&cursor="+str(p1, "next_cursor")), 200, "", "trang 2")
+	l2 := list(p2, "items")
+	if len(l2) != 1 || str(l2[0].(map[string]any), "ref") != e1 || p2["next_cursor"] != nil {
+		t.Fatalf("trang 2 (hết): %v", p2)
+	}
+	if all := want(t, viewer.get(base+"diary-entries"), 200, "", "không limit"); len(list(all, "items")) != 2 || all["next_cursor"] != nil {
+		t.Fatalf("không limit: %v", all)
+	}
+	for q, n := range map[string]int{
+		"commune=30001":                             2,
+		"commune=30002":                             0,
+		"commune=30001&form=BM-19":                  0,
+		"form=BM-08&from=2027-10-12&to=2027-10-12":  1,
+		"from=2027-10-13":                           0,
+		"to=2027-10-11":                             1,
+		"commune=30001&status=submitted&form=BM-08": 2,
+		"commune=30001&status=verified":             0,
+	} {
+		if l := list(want(t, viewer.get(base+"diary-entries?"+q), 200, "", q), "items"); len(l) != n {
+			t.Fatalf("%s: %d lần ghi, muốn %d", q, len(l), n)
+		}
+	}
+	if l := list(want(t, outsider.get(base+"diary-entries?commune=30001"), 200, "", "xã ngoài phạm vi"), "items"); len(l) != 0 {
+		t.Fatalf("xã ngoài phạm vi phải rỗng: %v", l)
+	}
+	// #175 review [P2]: phân trang SAU khi lọc phạm vi — tài khoản xã 30002 không thấy lần ghi nào của xã 30001 thì không
+	// được nhận con trỏ (con trỏ cũ mang ngày ghi, captured_at, UUID của lần ghi ngoài phạm vi).
+	for _, q := range []string{"limit=1", "limit=2", ""} {
+		p := want(t, outsider.get(base+"diary-entries?"+q), 200, "", "ngoài phạm vi "+q)
+		if len(list(p, "items")) != 0 || p["next_cursor"] != nil {
+			t.Fatalf("ngoài phạm vi (%q) phải rỗng và không con trỏ: %v", q, p)
+		}
+	}
+	// Con trỏ chỉ mang khóa của dòng cuối ĐÃ TRẢ cho người gọi.
+	if raw, err := base64.RawURLEncoding.DecodeString(str(p1, "next_cursor")); err != nil || !strings.HasSuffix(string(raw), "|"+e2) {
+		t.Fatalf("con trỏ trang 1 phải là khóa của %s: %q %v", e2, raw, err)
+	}
+	for _, q := range []string{"form=BM-99", "limit=0", "limit=201", "limit=x", "cursor=YWJj", "cursor=!!!", "from=2027-10-12&to=2027-10-11", "from=12/10/2027"} {
+		want(t, viewer.get(base+"diary-entries?"+q), 422, "", "tham số sai: "+q)
+	}
+}

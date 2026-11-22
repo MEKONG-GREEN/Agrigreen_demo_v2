@@ -140,10 +140,10 @@ describe("W11.63 phiếu KHTC — giả lập theo hợp đồng", () => {
     expect(await code(forms.draft(p.id, dept, c, 1))).toBe(
       "extension.khtc_form_locked",
     );
-    expect(await code(forms.review(p.id, dept, "returned", ""))).toBe(
+    expect(await code(forms.review(p.id, dept, { decision: "returned", note: "", expected_submission_id: f.submissions[0]!.id, base_attempt: f.attempt }, "review-empty-241"))).toBe(
       "validation_failed",
     );
-    f = await forms.review(p.id, dept, "returned", "Bổ sung nội dung tin");
+    f = await forms.review(p.id, dept, { decision: "returned", note: "Bổ sung nội dung tin", expected_submission_id: f.submissions[0]!.id, base_attempt: f.attempt }, "review-return-241");
     expect(f.state).toBe("supplement");
     expect((await forms.get(p.id, dept)).request_note).toBe(
       "Bổ sung nội dung tin",
@@ -153,7 +153,7 @@ describe("W11.63 phiếu KHTC — giả lập theo hợp đồng", () => {
     );
     f = await forms.submit(p.id, dept, c, 1);
     expect(f.attempt).toBe(2);
-    f = await forms.review(p.id, dept, "accepted");
+    f = await forms.review(p.id, dept, { decision: "accepted", expected_submission_id: f.submissions[0]!.id, base_attempt: f.attempt }, "review-accept-241");
     expect(f.state).toBe("confirmed");
   });
 });

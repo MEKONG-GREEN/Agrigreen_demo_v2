@@ -1,7 +1,8 @@
 "use client";
 
 // Màn Cấp Tỉnh "Lịch công tác · duyệt lịch Cấp Xã" (FN-TI-02.07, Hình 12). Admin: chỉ xem (không có nút duyệt).
-// Tab Chờ duyệt / Đã duyệt / Chưa đăng ký / Lịch của tôi; lưới tuần dòng = cán bộ (kèm xã phụ trách), cột = 7 ngày.
+// Tab Chờ duyệt / Đã duyệt / Chưa đăng ký / Check-in, check-out / Lịch của tôi; lưới tuần dòng = cán bộ (kèm xã phụ trách),
+// cột = 7 ngày. Tab Check-in, check-out: màn theo dõi của BRD CNTS v4.0 Hình 49 (#250).
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -20,11 +21,12 @@ import type { WorkScheduleApi } from "./api";
 import { placeByDay, STATUS_LABEL, type WsCounts, type WsListItem, type WsStatus, type WsUnregistered } from "./model";
 import { ItemCard, ReasonDialog, ScheduleTags, useCommuneNames, usePreloadCoops, WeekPicker } from "./parts";
 import { RegisterSchedule } from "./RegisterSchedule";
+import { VisitMonitor } from "./Visits";
 import { dayColumnLabel, nextWeekStart, weekDays, weekRangeLabel } from "./week";
 
 export const SCHEDULE_ROUTE = "/kn/nhiem-vu/lich-cong-tac";
 
-type View = "list" | "unregistered" | "mine";
+type View = "list" | "unregistered" | "visits" | "mine";
 
 interface Loaded {
   key: string;
@@ -100,6 +102,15 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
   const coopName = usePreloadCoops(api, communeCodes);
 
   const rows = useMemo(() => (shown?.list ?? []).filter((s) => !search.trim() || fold(s.owner_display ?? "").includes(fold(search.trim()))), [shown, search]);
+  // Màn theo dõi check-in, check-out (Hình 49): mọi lịch của tuần theo bộ lọc xã, tìm cán bộ.
+  const visitSchedules = useMemo(
+    () =>
+      (shown?.all ?? []).filter(
+        (s) => (!commune || s.commune_codes.includes(commune) || s.items.some((i) => i.commune_code === commune)) && (!search.trim() || fold(s.owner_display ?? "").includes(fold(search.trim()))),
+      ),
+    [shown, commune, search],
+  );
+  const noCheckout = (shown?.all ?? []).reduce((n, s) => n + (s.no_checkout_count ?? 0), 0);
   const unregRows = useMemo(() => (shown?.unregistered ?? []).filter((u) => !search.trim() || fold(u.actor_display ?? "").includes(fold(search.trim()))), [shown, search]);
   const pendingRows = rows.filter((r) => r.status === "pending" && !r.locked);
   const selectedRows = rows.filter((r) => selected.has(r.id));
@@ -193,13 +204,14 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
     { id: "approved", label: `Đã duyệt${counts ? ` (${counts.approved})` : ""}` },
     ...(tabId === "filter" ? [{ id: "filter", label: `Lọc: ${status ? STATUS_LABEL[status] : "Tất cả trạng thái"} (${rows.length})` }] : []),
     { id: "unregistered", label: `Chưa đăng ký${counts ? ` (${counts.unregistered})` : ""}` },
+    { id: "visits", label: `Check-in, check-out${noCheckout ? ` (${noCheckout} chưa check-out)` : ""}` },
     ...(readOnly ? [] : [{ id: "mine", label: "Lịch của tôi" }]),
   ];
   const onTab = (id: string) => {
     setSelected(new Set());
     setNotice(null);
     if (id === "pending" || id === "approved") changeStatus(id);
-    else if (id === "unregistered" || id === "mine") setView(id);
+    else if (id === "unregistered" || id === "visits" || id === "mine") setView(id);
   };
 
   const showActions = !readOnly && view === "list";
@@ -308,6 +320,10 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
         <ProblemAlert problem={err} onRetry={reload} />
       ) : !shown ? (
         <Loading />
+      ) : view === "visits" ? (
+        <div role="tabpanel" aria-label={tabs.find((t) => t.id === tabId)?.label}>
+          <VisitMonitor schedules={visitSchedules} communeName={communeName} loadPhoto={(id, itemId, kind) => ws.visitPhoto(id, itemId, kind)} />
+        </div>
       ) : (
         <div role="tabpanel" aria-label={tabs.find((t) => t.id === tabId)?.label}>
           <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -362,6 +378,7 @@ export function ApproveSchedules({ ws, api, readOnly = false }: { ws: WorkSchedu
                                 {r.conflict_count ? <StatusPill tone="warn">{r.conflict_count} mục trùng giờ</StatusPill> : null}
                                 {r.checkin_enabled && r.checkin_count ? <StatusPill tone="ok">{r.checkin_count} check-in</StatusPill> : null}
                                 {r.checkin_enabled && r.missed_checkin_count ? <StatusPill tone="bad">{r.missed_checkin_count} chưa check-in</StatusPill> : null}
+                                {r.checkin_enabled && r.no_checkout_count ? <StatusPill tone="bad">{r.no_checkout_count} chưa check-out</StatusPill> : null}
                               </span>
                             </th>
                             {cells.map((c, i) => (

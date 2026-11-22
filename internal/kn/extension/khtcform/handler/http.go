@@ -4,6 +4,8 @@
 package handler
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,10 +26,13 @@ type Handler struct{ Svc *app.Service }
 
 // RegisterApp gắn route vào nhóm /v1.
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
+	h.registerAdhocRequests(rg)
 	g := rg.Group("/extension/khtc")
 	g.GET("/form-templates", h.templates)
 	g.GET("/my-forms", h.tasks)
 	g.GET("/periods/:id/forms/:dept", h.get)
+	g.GET("/periods/:id/forms/:dept/submissions", h.submissionHistory)
+	g.GET("/periods/:id/forms/:dept/submissions/:submissionID", h.historicalSubmission)
 	g.POST("/periods/:id/forms/:dept/draft", h.draft)
 	g.POST("/periods/:id/forms/:dept/submit", h.submit)
 	g.POST("/periods/:id/forms/:dept/review", h.review)
@@ -122,6 +127,7 @@ type adjPeriodDTO struct {
 }
 
 type submissionDTO struct {
+	NativeLate  *bool      `json:"native_late,omitempty"`
 	ID          string     `json:"id"`
 	Attempt     int64      `json:"attempt"`
 	SubmittedAt time.Time  `json:"submitted_at"`
@@ -132,36 +138,37 @@ type submissionDTO struct {
 }
 
 type formDTO struct {
-	Period               periodDTO       `json:"period"`
-	Department           string          `json:"department"`
-	DepartmentName       string          `json:"department_name"`
-	State                string          `json:"state"`
-	StateLabel           string          `json:"state_label"`
-	Attempt              int64           `json:"attempt"`
-	LimitReached         bool            `json:"limit_reached"`
-	CanRequestSupplement bool            `json:"can_request_supplement"`
-	CanConfirm           bool            `json:"can_confirm"`
-	CanReview            bool            `json:"can_review"`
-	Editable             bool            `json:"editable"`
-	Overdue              bool            `json:"overdue"`
-	RequestNote          string          `json:"request_note"`
-	Template             templateDTO     `json:"template"`
-	Grid                 bool            `json:"grid"`
-	PlanMissing          bool            `json:"plan_missing"`
-	Plan                 *planDTO        `json:"plan"`
-	Tabs                 []tabDTO        `json:"tabs"`
-	Content              domain.Sheet    `json:"content"`
-	ContentSource        string          `json:"content_source"`
-	DraftAt              *time.Time      `json:"draft_at"`
-	Valid                bool            `json:"valid"`
-	Issues               []domain.Issue  `json:"issues"`
-	AdjPeriods           []adjPeriodDTO  `json:"adj_periods"`
-	Submissions          []submissionDTO `json:"submissions"`
+	Supplement           *app.AdhocRequestView `json:"supplement,omitempty"`
+	Period               periodDTO             `json:"period"`
+	Department           string                `json:"department"`
+	DepartmentName       string                `json:"department_name"`
+	State                string                `json:"state"`
+	StateLabel           string                `json:"state_label"`
+	Attempt              int64                 `json:"attempt"`
+	LimitReached         bool                  `json:"limit_reached"`
+	CanRequestSupplement bool                  `json:"can_request_supplement"`
+	CanConfirm           bool                  `json:"can_confirm"`
+	CanReview            bool                  `json:"can_review"`
+	Editable             bool                  `json:"editable"`
+	Overdue              bool                  `json:"overdue"`
+	RequestNote          string                `json:"request_note"`
+	Template             templateDTO           `json:"template"`
+	Grid                 bool                  `json:"grid"`
+	PlanMissing          bool                  `json:"plan_missing"`
+	Plan                 *planDTO              `json:"plan"`
+	Tabs                 []tabDTO              `json:"tabs"`
+	Content              domain.Sheet          `json:"content"`
+	ContentSource        string                `json:"content_source"`
+	DraftAt              *time.Time            `json:"draft_at"`
+	Valid                bool                  `json:"valid"`
+	Issues               []domain.Issue        `json:"issues"`
+	AdjPeriods           []adjPeriodDTO        `json:"adj_periods"`
+	Submissions          []submissionDTO       `json:"submissions"`
 }
 
 func formOf(f app.Form) formDTO {
 	p := f.Period
-	out := formDTO{Period: periodDTO{ID: p.ID.String(), Name: p.Name, ReportType: p.Type, Year: p.Year, FromDate: day(p.From), ToDate: day(p.To),
+	out := formDTO{Supplement: f.Supplement, Period: periodDTO{ID: p.ID.String(), Name: p.Name, ReportType: p.Type, Year: p.Year, FromDate: day(p.From), ToDate: day(p.To),
 		CutoffDate: day(p.Cutoff), DueAt: f.DueAt, MaxSubmissions: p.MaxSubmissions, Terminal: f.Terminal},
 		Department: f.Department, DepartmentName: f.DepartmentName, State: f.View.State, StateLabel: pdomain.FormLabels[f.View.State],
 		Attempt: f.View.Attempt, LimitReached: f.View.LimitReached, CanRequestSupplement: f.View.CanRequestSupplement && f.CanReview,
@@ -202,7 +209,7 @@ func formOf(f app.Form) formDTO {
 		out.AdjPeriods = append(out.AdjPeriods, adjPeriodDTO{ID: a.ID.String(), Name: a.Name, Year: a.Year})
 	}
 	for _, s := range f.Submissions {
-		out.Submissions = append(out.Submissions, submissionDTO{ID: s.ID.String(), Attempt: s.Attempt, SubmittedAt: s.SubmittedAt, Late: s.Late,
+		out.Submissions = append(out.Submissions, submissionDTO{NativeLate: s.NativeLate, ID: s.ID.String(), Attempt: s.Attempt, SubmittedAt: s.SubmittedAt, Late: s.Late,
 			Decision: s.Decision, ReviewNote: s.ReviewNote, ReviewedAt: s.ReviewedAt})
 	}
 	return out
@@ -312,18 +319,22 @@ func (h Handler) review(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var r struct {
-		Decision string `json:"decision"`
-		Note     string `json:"note"`
-	}
-	if err := c.ShouldBindJSON(&r); err != nil {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
+	var r app.ReviewInput
+	decoder := json.NewDecoder(c.Request.Body)
+	if err := decoder.Decode(&r); err != nil || decoder.Decode(&struct{}{}) != io.EOF {
 		httpx.Fail(c, problem.BadRequest.WithDetail("Thân request phải là JSON hợp lệ"))
 		return
 	}
-	f, err := h.Svc.Review(c.Request.Context(), id, dept, r.Decision, r.Note, idempotency.KeyFromContext(c.Request.Context()))
+	f, err := h.Svc.Review(c.Request.Context(), id, dept, r, idempotency.KeyFromContext(c.Request.Context()))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, formOf(f))
+	c.JSON(http.StatusOK, struct {
+		formDTO
+		ReviewedSubmissionID uuid.UUID `json:"reviewed_submission_id"`
+		ReviewedAttempt      int64     `json:"reviewed_attempt"`
+		ReviewDecision       string    `json:"review_decision"`
+	}{formOf(f.Form), f.ReviewedSubmissionID, f.ReviewedAttempt, f.ReviewDecision})
 }

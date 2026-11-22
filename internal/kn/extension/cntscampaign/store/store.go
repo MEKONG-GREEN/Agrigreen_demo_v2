@@ -5,6 +5,7 @@ package store
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,18 +16,22 @@ import (
 
 // Version là một phiên bản nội dung đợt.
 type Version struct {
-	RowID             uuid.UUID
-	CampaignID        uuid.UUID
-	Seq               int64
-	OrgRef            uuid.UUID
-	Province          *string
-	Name              string
-	Goal              *string
-	Field             string
-	TemplateCode      string
-	ScopeMode         string
-	Regions           []string
-	Units             []string
+	RowID           uuid.UUID
+	CampaignID      uuid.UUID
+	Seq             int64
+	OrgRef          uuid.UUID
+	Province        *string
+	Name            string
+	Goal            *string
+	Field           string
+	TemplateCode    string
+	TemplateVersion *int64 // phiên bản biểu đã chọn (#192); nil = Nháp ghi trước #192 → mới nhất lúc phát hành
+	ScopeMode       string
+	Regions         []string
+	Units           []string
+	// Households: phạm vi theo hộ (#236) — household_ref của sổ hộ chăn nuôi (#251); nil với phạm vi khác. Units khi đó là các
+	// xã chứa hộ.
+	Households        []uuid.UUID
 	From, To          time.Time
 	DueAt             time.Time
 	OwnerRef          *uuid.UUID
@@ -36,14 +41,26 @@ type Version struct {
 	RecordedAt        time.Time
 }
 
-const versionCols = `id, campaign_id, seq, org_ref, province_code, name, goal, field, template_code, scope_mode, regions, units,
-  period_from, period_to, due_at, owner_ref, remind_before_hours, actor_ref, event_time, recorded_at`
+const versionCols = `id, campaign_id, seq, org_ref, province_code, name, goal, field, template_code, template_version, scope_mode,
+  regions, units, period_from, period_to, due_at, owner_ref, remind_before_hours, actor_ref, event_time, recorded_at, households`
 
 func scanVersion(row pgx.Row) (Version, error) {
 	var v Version
-	err := row.Scan(&v.RowID, &v.CampaignID, &v.Seq, &v.OrgRef, &v.Province, &v.Name, &v.Goal, &v.Field, &v.TemplateCode, &v.ScopeMode,
-		&v.Regions, &v.Units, &v.From, &v.To, &v.DueAt, &v.OwnerRef, &v.RemindBeforeHours, &v.ActorRef, &v.EventTime, &v.RecordedAt)
-	return v, err
+	var hs []string
+	err := row.Scan(&v.RowID, &v.CampaignID, &v.Seq, &v.OrgRef, &v.Province, &v.Name, &v.Goal, &v.Field, &v.TemplateCode, &v.TemplateVersion, &v.ScopeMode,
+		&v.Regions, &v.Units, &v.From, &v.To, &v.DueAt, &v.OwnerRef, &v.RemindBeforeHours, &v.ActorRef, &v.EventTime, &v.RecordedAt,
+		&hs)
+	if err != nil {
+		return v, err
+	}
+	for _, h := range hs {
+		r, err := uuid.Parse(h)
+		if err != nil {
+			return v, err
+		}
+		v.Households = append(v.Households, r)
+	}
+	return v, nil
 }
 
 func dateOnly(t time.Time) string { return t.Format(time.DateOnly) }
@@ -53,15 +70,50 @@ func InsertVersion(ctx context.Context, tx pgx.Tx, tid uuid.UUID, v *Version, id
 	if v.Regions == nil {
 		v.Regions = []string{}
 	}
+	var hs []string // NULL với phạm vi không theo hộ
+	if v.Households != nil {
+		hs = strIDs(v.Households)
+	}
 	return tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_campaign (id, tenant_id, stream_key, campaign_id, org_ref, province_code, name,
 	    goal, field, template_code, scope_mode, regions, units, period_from, period_to, due_at, owner_ref, remind_before_hours,
-	    event_time, actor_ref, idem_key, rule_version)
+	    event_time, actor_ref, idem_key, rule_version, template_version, households)
 	  VALUES ($1, $2, 'cnts_campaign:' || $3::uuid::text, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::date, $14::date, $15, $16, $17,
-	    $18, $19, $20, $21)
+	    $18, $19, $20, $21, $22, $23::uuid[])
 	  RETURNING seq, recorded_at`,
 		v.RowID, tid, v.CampaignID, v.OrgRef, v.Province, v.Name, v.Goal, v.Field, v.TemplateCode, v.ScopeMode, v.Regions, v.Units,
 		dateOnly(v.From), dateOnly(v.To), v.DueAt.UTC(), v.OwnerRef, v.RemindBeforeHours, v.EventTime.UTC(), v.ActorRef, idem,
-		domain.RuleVersion).Scan(&v.Seq, &v.RecordedAt)
+		domain.RuleVersion, v.TemplateVersion, hs).Scan(&v.Seq, &v.RecordedAt)
+}
+
+// Household là bản hiện hành của một hộ chăn nuôi (sổ pf_extension.cnts_livestock_household — #251, ADR-0056 mục 9: bên đọc
+// cùng module đọc thẳng bảng theo household_ref).
+type Household struct {
+	Ref     uuid.UUID
+	Code    string // HCN-01
+	Status  string // active | pending_location | deactivated
+	Commune string // HCN-04 xã
+}
+
+// Households đọc bản hiện hành của các hộ refs (hộ không có trong tenant không có trong kết quả).
+func Households(ctx context.Context, tx pgx.Tx, refs []uuid.UUID) (map[uuid.UUID]Household, error) {
+	out := map[uuid.UUID]Household{}
+	if len(refs) == 0 {
+		return out, nil
+	}
+	rows, err := tx.Query(ctx, `SELECT DISTINCT ON (household_ref) household_ref, code, status, commune_code
+	  FROM pf_extension.cnts_livestock_household WHERE household_ref = ANY ($1::uuid[]) ORDER BY household_ref, seq DESC`, strIDs(refs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var h Household
+		if err := rows.Scan(&h.Ref, &h.Code, &h.Status, &h.Commune); err != nil {
+			return nil, err
+		}
+		out[h.Ref] = h
+	}
+	return out, rows.Err()
 }
 
 // VersionByIdem đọc phiên bản đã ghi với khóa idempotent (nil nếu chưa có).
@@ -178,6 +230,105 @@ func Events(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUID][]Ev
 // Lock giữ khóa tư vấn của đợt trong giao dịch (cùng khóa của hai trigger) — tuần tự hóa thao tác ghi đồng thời.
 func Lock(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) error {
 	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('cnts_campaign:' || $1::text || ':' || $2::text, 0))`, tid.String(), id.String())
+	return err
+}
+
+// Claim ghi ý định thao tác của đợt (BF-CNTS-CAMPAIGN-POOL, #156; pf 20261028222212) hạn lease tính bằng giờ DB; ý định khác
+// còn hạn → false. Gọi trong giao dịch đã giữ Lock.
+func Claim(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, action string, lease time.Duration) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_campaign_intent (tenant_id, campaign_id, claim_id, action, claim_until, updated_at)
+	  VALUES ($1, $2, $3, $4, now() + $5::interval, now())
+	  ON CONFLICT (tenant_id, campaign_id) DO UPDATE SET claim_id = EXCLUDED.claim_id, action = EXCLUDED.action,
+	    claim_until = EXCLUDED.claim_until, updated_at = now(),
+	    rev_period_id = NULL, rev_profile = NULL, rev_event_seq = NULL, rev_due_seq = NULL
+	  WHERE cnts_campaign_intent.claim_until IS NULL OR cnts_campaign_intent.claim_until <= now()
+	  RETURNING true`, tid, id, token, action, strconv.FormatInt(int64(lease/time.Second), 10)+" seconds").Scan(&ok)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return ok, err
+}
+
+// Release bỏ ý định của token. live → chỉ khi ý định CÒN HẠN (giờ DB). released=false: token không còn giữ ý định (hết hạn /
+// người khác đã nhận) — bên gọi quyết định đó có phải lỗi (ghi kết quả: có; bỏ khi lỗi: không, ý định đã tự hết).
+func Release(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, live bool) (released bool, err error) {
+	q := `UPDATE pf_extension.cnts_campaign_intent SET claim_id = NULL, action = NULL, claim_until = NULL, updated_at = now(),
+	    rev_period_id = NULL, rev_profile = NULL, rev_event_seq = NULL, rev_due_seq = NULL
+	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3`
+	if live {
+		q += ` AND claim_until > now()`
+	}
+	tag, err := tx.Exec(ctx, q, tid, id, token)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// Renew gia hạn ý định CÒN HẠN của token thêm lease (giờ DB). false: token không còn giữ ý định.
+func Renew(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, lease time.Duration) (bool, error) {
+	tag, err := tx.Exec(ctx, `UPDATE pf_extension.cnts_campaign_intent SET claim_until = now() + $4::interval, updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3 AND claim_until > now()`,
+		tid, id, token, strconv.FormatInt(int64(lease/time.Second), 10)+" seconds")
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// Revision là revision kỳ native (formsport.PeriodRevision) ghi bền trong ý định của token (BF-CNTS-CAMPAIGN-CAS-CONSUMER,
+// #201; pf 20261103152426).
+type Revision struct {
+	PeriodID uuid.UUID
+	Profile  string
+	EventSeq int64
+	DueSeq   int64
+}
+
+// BindRevision ghi revision kỳ native vào ý định của token khi token CÒN GIỮ ý định còn hạn (giờ DB) và trả revision đọc lại
+// từ dòng ý định — giá trị bên gọi truyền vào lời gọi CAS ở cap/forms. ok=false: token không còn giữ ý định (không ghi gì;
+// bên gọi KHÔNG được gọi cap/forms). Gọi trong giao dịch đã giữ Lock.
+func BindRevision(ctx context.Context, tx pgx.Tx, tid, id, token uuid.UUID, r Revision) (Revision, bool, error) {
+	var out Revision
+	err := tx.QueryRow(ctx, `UPDATE pf_extension.cnts_campaign_intent
+	  SET rev_period_id = $4, rev_profile = $5, rev_event_seq = $6, rev_due_seq = $7, updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2 AND claim_id = $3 AND claim_until > now()
+	  RETURNING rev_period_id, rev_profile, rev_event_seq, rev_due_seq`, tid, id, token, r.PeriodID, r.Profile, r.EventSeq, r.DueSeq).
+		Scan(&out.PeriodID, &out.Profile, &out.EventSeq, &out.DueSeq)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Revision{}, false, nil
+	}
+	if err != nil {
+		return Revision{}, false, err
+	}
+	return out, true, nil
+}
+
+// MarkStale ghi nhận kỳ native của đợt có thể lệch sổ đợt (review #156 [P2]): một lời gọi cap/forms ghi kỳ native đã trả về
+// mà yêu cầu gọi nó không còn giữ ý định (hoặc không rõ kết quả). Gọi trong giao dịch đã giữ Lock, SAU khi lời gọi đã trả về.
+func MarkStale(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) error {
+	_, err := tx.Exec(ctx, `INSERT INTO pf_extension.cnts_campaign_intent (tenant_id, campaign_id, stale_gen, updated_at)
+	  VALUES ($1, $2, 1, now())
+	  ON CONFLICT (tenant_id, campaign_id) DO UPDATE SET stale_gen = cnts_campaign_intent.stale_gen + 1, updated_at = now()`, tid, id)
+	return err
+}
+
+// StaleGen đọc thế hệ lệch hiện tại; dirty = còn lần lệch chưa đối soát.
+func StaleGen(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID) (gen int64, dirty bool, err error) {
+	var synced int64
+	err = tx.QueryRow(ctx, `SELECT stale_gen, synced_gen FROM pf_extension.cnts_campaign_intent WHERE tenant_id = $1 AND campaign_id = $2`,
+		tid, id).Scan(&gen, &synced)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	return gen, gen > synced, err
+}
+
+// MarkSynced ghi nhận kỳ native đã khớp sổ đợt tới thế hệ gen (đọc TRƯỚC khi đối soát).
+func MarkSynced(ctx context.Context, tx pgx.Tx, tid, id uuid.UUID, gen int64) error {
+	_, err := tx.Exec(ctx, `UPDATE pf_extension.cnts_campaign_intent SET synced_gen = GREATEST(synced_gen, $3), updated_at = now()
+	  WHERE tenant_id = $1 AND campaign_id = $2`, tid, id, gen)
 	return err
 }
 

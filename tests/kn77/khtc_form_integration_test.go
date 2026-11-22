@@ -44,7 +44,10 @@ const (
 // kfFx là fixture phiếu KHTC: Kỳ KHTC + phiếu + Kế hoạch năm 2026 có hạng mục của TT (nhập + nguồn module), TTTT (số phiếu giá
 // nguồn module + tin bài), CNTS.
 type kfFx struct {
-	ext *extension.Module
+	nativeForms   formsport.Publisher
+	nativeControl formsport.PeriodControl
+	nativeEntry   formsport.Entry
+	ext           *extension.Module
 	*khtcFx
 	khtcUser uuid.UUID
 	item     string // TT "Mô hình lúa chất lượng cao" — 100 ha
@@ -54,7 +57,14 @@ type kfFx struct {
 	planBody map[string]any
 }
 
-func newKHTCFormFx(t *testing.T) *kfFx {
+func newKHTCFormFx(t *testing.T) *kfFx { return newKHTCFormFxWith(t, nil) }
+
+// newKHTCFormFxWith: wrapControl khác nil bọc cổng điều khiển kỳ native cap/forms (P0-POOL-SHARED-2: chặn/làm chậm CancelPeriod).
+func newKHTCFormFxWith(t *testing.T, wrapControl func(formsport.PeriodControl) formsport.PeriodControl) *kfFx {
+	return newKHTCFormFxPorts(t, wrapControl, nil)
+}
+
+func newKHTCFormFxPorts(t *testing.T, wrapControl func(formsport.PeriodControl) formsport.PeriodControl, wrapEntry func(formsport.Entry) formsport.Entry) *kfFx {
 	env := pgtest.Get(t)
 	pool := env.Pool(t, migrations.PF, dbadmin.AppPlatform)
 	ops := env.Pool(t, migrations.PF, "platform_api")
@@ -66,7 +76,15 @@ func newKHTCFormFx(t *testing.T) *kfFx {
 		t.Fatal(err)
 	}
 	cw := &crosswalk{closed: true}
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), Entry: fm.Entry(), Crosswalk: cw,
+	control := fm.Control()
+	if wrapControl != nil {
+		control = wrapControl(control)
+	}
+	entry := fm.Entry()
+	if wrapEntry != nil {
+		entry = wrapEntry(entry)
+	}
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: control, Entry: entry, Crosswalk: cw,
 		MaxSubmissions: platformasm.KNKHTCProfile.MaxSubmissions})
 	base := &khtcFx{t: t, clk: clk, cw: cw, tid: ids.New(), node: ids.New()}
 	base.eng = httpx.NewEngine(slog.New(slog.NewTextHandler(io.MultiWriter(io.Discard, tlog{t}), nil)), 8<<20)
@@ -86,15 +104,18 @@ func newKHTCFormFx(t *testing.T) *kfFx {
 		var k authz.KNContext
 		_ = json.Unmarshal([]byte(c.GetHeader("X-Test-KN")), &k)
 		actor, _ := uuid.Parse(c.GetHeader("X-Test-Actor"))
+		if k.ID == uuid.Nil {
+			k.ID = uuid.NewSHA1(base.tid, []byte(actor.String()+":"+k.Role+":"+k.Department))
+		}
 		// Như httpx.Authenticate: người gọi + tenant ở ctx (cổng Kế hoạch năm đọc tenant từ ctx).
 		ctx := tenant.WithID(c.Request.Context(), base.tid)
-		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k})))
+		c.Request = c.Request.WithContext(authz.WithPrincipal(ctx, bindKNTestSession(t, authz.Principal{ActorRef: actor, TenantID: base.tid, KN: &k, MFA: k.Role == authz.KNAdmin && c.GetHeader("X-Test-No-MFA") != "true"})))
 		scope, _ := json.Marshal(k)
 		c.Request = c.Request.WithContext(idempotency.WithAuthorizationScope(c.Request.Context(), scope))
 	}, idempotency.Middleware(ops))
 	fm.RegisterApp(g)
 	kn.RegisterApp(g)
-	f := &kfFx{khtcFx: base, khtcUser: ids.New(), ext: kn}
+	f := &kfFx{khtcFx: base, khtcUser: ids.New(), ext: kn, nativeForms: fm.Publisher(), nativeControl: control, nativeEntry: fm.Entry()}
 	f.seedPlan()
 	c, b := f.do(http.MethodPost, "/v1/extension/khtc/form-template/install", authz.KNAdmin, "", uuid.Nil, "", nil)
 	f.ok(c, b, nil)
@@ -226,8 +247,9 @@ func (f *kfFx) send(pid, dept, op string, base int64, sheet map[string]any) (int
 }
 
 func (f *kfFx) reviewForm(pid, dept, decision, note string) (int, []byte) {
+	id, attempt := reviewTarget241(f, pid, dept)
 	return f.do(http.MethodPost, formPath(pid, dept)+"/review", authz.KNTinh, khtcDept, f.khtcUser, "",
-		map[string]any{"decision": decision, "note": note})
+		map[string]any{"decision": decision, "note": note, "expected_submission_id": id, "base_attempt": attempt})
 }
 
 func ttSheet(item, done string) map[string]any {
@@ -411,7 +433,9 @@ func TestKH_FN_TI_02_04_ReviewRulesAndRequest(t *testing.T) {
 		!r.CanRequestSupplement || !r.CanConfirm {
 		t.Fatalf("rà soát: %+v", r)
 	}
-	c, b = f.do(http.MethodPost, formPath(p.ID, dTT)+"/review", authz.KNTinh, dTT, uuid.Nil, "", map[string]any{"decision": "accepted"})
+	target, attempt := reviewTarget241(f, p.ID, dTT)
+	c, b = f.do(http.MethodPost, formPath(p.ID, dTT)+"/review", authz.KNTinh, dTT, uuid.Nil, "",
+		map[string]any{"decision": "accepted", "expected_submission_id": target, "base_attempt": attempt})
 	f.fail(c, b, "forbidden")
 	c, b = f.reviewForm(p.ID, dTT, "returned", "")
 	f.fail(c, b, "validation_failed")

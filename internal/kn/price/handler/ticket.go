@@ -311,9 +311,39 @@ type entryReq struct {
 	Lines   []lineReq `json:"lines"`
 }
 
+const maxTicketDecimalBytes = 512
+
+// Scan before decimal construction; exponent syntax must never reach rescaling.
+func plainTicketDecimal(raw string) bool {
+	start := 0
+	if len(raw) > 0 && raw[0] == '-' {
+		start = 1
+	}
+	if start == len(raw) {
+		return false
+	}
+	dot := false
+	for i := start; i < len(raw); i++ {
+		c := raw[i]
+		if c >= '0' && c <= '9' {
+			continue
+		}
+		if c != '.' || dot || i == start || i == len(raw)-1 {
+			return false
+		}
+		dot = true
+	}
+	return true
+}
+
 func parseDec(s *string, field string) (*decimal.Decimal, error) {
 	if s == nil || *s == "" {
 		return nil, nil
+	}
+	// Resource policy, not a money cap: accept bounded leading/trailing zeros and
+	// leave positivity/scale/value rules to each existing business flow (including keep).
+	if len(*s) > maxTicketDecimalBytes || !plainTicketDecimal(*s) {
+		return nil, problem.Validation.WithField(field, "phải là số thập phân thường, tối đa 512 ký tự")
 	}
 	d, err := decimal.NewFromString(*s)
 	if err != nil {

@@ -80,7 +80,6 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	handler.Me{Reg: m.reg}.Register(rg)
 	handler.Sharing{Svc: m.share}.RegisterApp(rg)
 	handler.KN{Svc: m.kn}.RegisterApp(rg)
-	handler.KN{Svc: m.kn}.RegisterKNCollect(rg)  // KN v7.7 FN-XA-03.03: /v1/kn/cooperatives* (nông hộ: pf/cooperative)
 	handler.Modules{Svc: m.mods}.RegisterApp(rg) // W1.4: GET /v1/me/modules
 }
 
@@ -189,6 +188,10 @@ func (m *Module) UseMachineCounts(c port.CoopMachineCounts) { m.reg.Machines = c
 
 // UseActorNames nối danh bạ tên người thao tác cho khung Log.
 func (m *Module) UseActorNames(n port.ActorNames) { m.kn.Names = n }
+
+// DepartmentAdmin cho chủ HTTP danh mục phòng ban (KNSPLIT-2 #118): pf/party không còn đăng ký /v1/departments,
+// /v1/departments/{id}*; gốc lắp ráp nối cổng này vào module chủ KN (extension.UseDepartmentAdmin).
+func (m *Module) DepartmentAdmin() port.DepartmentAdmin { return m.kn }
 
 // CooperativeRegistrar tạo Nút HTX qua cổng nội bộ có kiểm vai cho luồng Neo D2.
 func (m *Module) CooperativeRegistrar() port.CooperativeRegistrar { return m.reg }

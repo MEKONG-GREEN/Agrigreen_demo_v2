@@ -17,6 +17,12 @@ func (s *Service) JobTenant(ctx context.Context, tid uuid.UUID, now time.Time) (
 	if r.Overdue, err = s.EscalateOverdue(ctx, tid, now); err != nil {
 		return r, err
 	}
-	r.Reminders, r.Streaks, err = s.Remind(ctx, tid, now)
+	if r.Reminders, r.Streaks, err = s.Remind(ctx, tid, now); err != nil {
+		return r, err
+	}
+	if r.Vaccines, err = s.VaccineOverdue(ctx, tid, now); err != nil { // BF-CN-VACC: dòng 11 mũi tiêm quá hạn
+		return r, err
+	}
+	r.NoCheckouts, err = s.NoCheckout(ctx, tid, now) // CNTS v4.0: dòng 13 Chưa check-out
 	return r, err
 }

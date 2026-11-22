@@ -6,6 +6,8 @@
 // - Thanh trượt ngày: chọn ngày cũ thấy vùng đã lưu của ngày đó (BR-01, AC-03).
 // - Cán bộ phụ trách dịch Cấp Tỉnh: vẽ đa giác, theo bán kính, hướng di chuyển; khoanh vùng 500 m/3 km/10 km từ ổ dịch;
 //   sửa (phiên bản mới có lý do), ngưng/khôi phục; tải GeoJSON lên/xuống. Cấp Xã chỉ xem xã mình (AC-02).
+// - CNTS v4.0 (CR-CNTS-001): lớp trang trại (hộ chăn nuôi Đang dùng loại trang trại, vị trí check-in tại nhà hộ); vùng
+//   dịch, vùng bị uy hiếp, vùng đệm hiện số hộ bị ảnh hưởng và diện tích thủy sản bị ảnh hưởng (FN-18 BR-02).
 // Nền bản đồ: LayerMap dùng chung (NEXT_PUBLIC_MAP_STYLE_URL trong lãnh thổ, mặc định nền trơn — RB-7).
 import type { LayerSpecification } from "maplibre-gl";
 import { useMemo, useState, type ChangeEvent } from "react";
@@ -28,6 +30,7 @@ import {
   draftToGeometry,
   geometryFromGeoJSON,
   geometryToDraft,
+  impactText,
   zoneErrors,
   zonesGeoJSON,
   type CntsMapApi,
@@ -45,6 +48,7 @@ const LAYERS: LayerSpecification[] = [
   { id: "preview-line", type: "line", source: "preview", paint: { "line-color": "#1565c0", "line-width": 2, "line-dasharray": [2, 1] } },
   { id: "sites", type: "circle", source: "sites", paint: { "circle-radius": 6, "circle-color": "#0f766e", "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } },
   { id: "households", type: "circle", source: "households", paint: { "circle-radius": 4, "circle-color": "#2563eb", "circle-stroke-color": "#fff", "circle-stroke-width": 1 } },
+  { id: "farms", type: "circle", source: "farms", paint: { "circle-radius": 6, "circle-color": "#92400e", "circle-stroke-color": "#fde68a", "circle-stroke-width": 2 } },
   {
     id: "outbreaks",
     type: "circle",
@@ -58,6 +62,7 @@ const TOGGLES: { key: string; label: string; layers: string[] }[] = [
   { key: "outbreaks", label: "Ổ dịch", layers: ["outbreaks"] },
   { key: "sites", label: "Điểm trình diễn", layers: ["sites"] },
   { key: "households", label: "Hộ mô hình", layers: ["households"] },
+  { key: "farms", label: "Trang trại", layers: ["farms"] },
 ];
 
 const today = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
@@ -127,10 +132,10 @@ function DayBar({ day, setDay }: { day: string; setDay: (d: string) => void }) {
 
 function MapBody({ mapi, d, day, reload }: { mapi: CntsMapApi; d: MapLayers; day: string; reload: () => void }) {
   const { kn } = useAuth();
-  const communeName = useCommuneNames([...d.zones.flatMap((z) => z.communes), ...d.outbreaks.map((o) => o.commune_code), ...d.places.map((p) => p.commune_code)]);
-  const [show, setShow] = useState<Record<string, boolean>>({ zones: true, outbreaks: true, sites: true, households: true });
+  const communeName = useCommuneNames([...d.zones.flatMap((z) => z.communes), ...d.outbreaks.map((o) => o.commune_code), ...d.places.map((p) => p.commune_code), ...d.farms.map((f) => f.commune_code)]);
+  const [show, setShow] = useState<Record<string, boolean>>({ zones: true, outbreaks: true, sites: true, households: true, farms: true });
   const [kinds, setKinds] = useState<ZoneKind[]>([...KINDS]);
-  const [selected, setSelected] = useState<{ type: "zone" | "outbreak" | "place"; ref: string } | null>(null);
+  const [selected, setSelected] = useState<{ type: "zone" | "outbreak" | "place" | "farm"; ref: string } | null>(null);
   const [editing, setEditing] = useState<Zone | "new" | null>(null);
   const [draw, setDraw] = useState<Draw | null>(null);
   const zones = d.zones.filter((z) => kinds.includes(z.kind));
@@ -141,17 +146,18 @@ function MapBody({ mapi, d, day, reload }: { mapi: CntsMapApi; d: MapLayers; day
       outbreaks: fc(d.outbreaks.map((o) => ({ type: "Feature", geometry: { type: "Point", coordinates: [o.lng, o.lat] }, properties: { ref: o.ref, status: o.status } }))),
       sites: fc(d.places.filter((p) => p.kind === "site").map((p) => ({ type: "Feature", geometry: { type: "Point", coordinates: [p.lng, p.lat] }, properties: { ref: p.ref } }))),
       households: fc(d.places.filter((p) => p.kind === "household").map((p) => ({ type: "Feature", geometry: { type: "Point", coordinates: [p.lng, p.lat] }, properties: { ref: p.ref } }))),
+      farms: fc(d.farms.map((f) => ({ type: "Feature", geometry: { type: "Point", coordinates: [f.lng, f.lat] }, properties: { ref: f.household_ref } }))),
       preview: fc(draw?.mode === "radius" && draw.center ? [{ type: "Feature", geometry: circlePolygon(draw.center, draw.radius ?? 3000), properties: {} }] : []),
     }),
-    [zones, d.outbreaks, d.places, draw],
+    [zones, d.outbreaks, d.places, d.farms, draw],
   );
   const knownCommunes = [...new Set([...(kn.context?.communes ?? []).map((c) => c.code), ...d.outbreaks.map((o) => o.commune_code), ...d.places.map((p) => p.commune_code), ...d.zones.flatMap((z) => z.communes)])].sort();
   const focus = useMemo(() => {
-    const pts: LngLat[] = [...d.outbreaks.map((o) => [o.lng, o.lat] as LngLat), ...d.places.map((p) => [p.lng, p.lat] as LngLat)];
+    const pts: LngLat[] = [...d.outbreaks.map((o) => [o.lng, o.lat] as LngLat), ...d.places.map((p) => [p.lng, p.lat] as LngLat), ...d.farms.map((f) => [f.lng, f.lat] as LngLat)];
     if (!pts.length) return null;
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
     return { key: "init", bounds: [[Math.min(...xs) - 0.05, Math.min(...ys) - 0.05], [Math.max(...xs) + 0.05, Math.max(...ys) + 0.05]] as [LngLat, LngLat] };
-  }, [d.outbreaks, d.places]);
+  }, [d.outbreaks, d.places, d.farms]);
   const onClick = (at: LngLat) => {
     if (!draw) return;
     if (draw.mode === "radius") setDraw({ ...draw, center: at, radius: draw.radius ?? 3000 });
@@ -182,7 +188,7 @@ function MapBody({ mapi, d, day, reload }: { mapi: CntsMapApi; d: MapLayers; day
           onFeatureClick={(layer, p) => {
             const ref = String(p.ref ?? "");
             if (!ref) return;
-            setSelected({ type: layer.startsWith("zone") ? "zone" : layer === "outbreaks" ? "outbreak" : "place", ref });
+            setSelected({ type: layer.startsWith("zone") ? "zone" : layer === "outbreaks" ? "outbreak" : layer === "farms" ? "farm" : "place", ref });
           }}
           draft={draw && draw.mode !== "radius" ? { mode: draw.mode, coords: draw.coords, onMove: (i, to) => setDraw({ ...draw, coords: draw.coords.map((c, j) => (j === i ? to : c)) }) } : null}
           focus={focus}
@@ -231,6 +237,8 @@ function MapBody({ mapi, d, day, reload }: { mapi: CntsMapApi; d: MapLayers; day
           <ZonePanel mapi={mapi} refId={selected.ref} day={day} communeName={communeName} onClose={() => setSelected(null)} onEdit={(z) => (setEditing(z), setDraw({ mode: z.draw_mode, coords: geometryToDraft(z.geometry), center: z.center ? [z.center.lng, z.center.lat] : null, radius: z.radius_m ?? undefined }))} reload={reload} />
         ) : selected?.type === "outbreak" ? (
           <OutbreakPanel mapi={mapi} d={d} refId={selected.ref} canDraw={d.can_draw} communeName={communeName} onClose={() => setSelected(null)} reload={reload} />
+        ) : selected?.type === "farm" ? (
+          <FarmPanel d={d} refId={selected.ref} communeName={communeName} onClose={() => setSelected(null)} />
         ) : selected?.type === "place" ? (
           <PlacePanel d={d} refId={selected.ref} communeName={communeName} onClose={() => setSelected(null)} />
         ) : (
@@ -242,6 +250,7 @@ function MapBody({ mapi, d, day, reload }: { mapi: CntsMapApi; d: MapLayers; day
 }
 
 function ZoneList({ d, zones, communeName, onPick, onNew }: { d: MapLayers; zones: Zone[]; communeName: (c: string) => string; onPick: (ref: string) => void; onNew: () => void }) {
+  const impacts = new Map(d.zone_impacts.map((i) => [i.zone_ref, i]));
   return (
     <>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -253,7 +262,7 @@ function ZoneList({ d, zones, communeName, onPick, onNew }: { d: MapLayers; zone
         ) : null}
       </div>
       <p className="mute">
-        {d.outbreaks.length} ổ dịch · {d.places.filter((p) => p.kind === "site").length} điểm trình diễn · {d.places.filter((p) => p.kind === "household").length} hộ mô hình
+        {d.outbreaks.length} ổ dịch · {d.places.filter((p) => p.kind === "site").length} điểm trình diễn · {d.places.filter((p) => p.kind === "household").length} hộ mô hình · {d.farms.length} trang trại
       </p>
       <div className="row" style={{ gap: 8 }}>
         <button className="btn" onClick={() => download(`vung-cnts-${d.date}.geojson`, zonesGeoJSON(zones))} disabled={!zones.length}>
@@ -272,6 +281,7 @@ function ZoneList({ d, zones, communeName, onPick, onNew }: { d: MapLayers; zone
               {z.radius_m ? ` · bán kính ${z.radius_m.toLocaleString("vi-VN")} m` : ""}
               {z.area_ha ? ` · ${Number(z.area_ha).toLocaleString("vi-VN")} ha` : ""} · từ {dmy(z.effective_on)} (bản {z.version})
             </div>
+            {impacts.get(z.ref) ? <div>{impactText(impacts.get(z.ref)!)}</div> : null}
           </li>
         ))}
       </ul>
@@ -306,12 +316,19 @@ function ZonePanel({ mapi, refId, day, communeName, onClose, onEdit, reload }: {
           <LoadState s={inside}>
             {(c) => (
               <div>
-                <strong>Trong vùng ngày {dmy(c.date)}:</strong> {c.site_count} điểm trình diễn, {c.household_count} hộ mô hình, {c.outbreak_count} ổ dịch
+                <strong>Trong vùng ngày {dmy(c.date)}:</strong> {c.site_count} điểm trình diễn, {c.household_count} hộ mô hình, {c.farm_count} trang trại, {c.outbreak_count} ổ dịch
+                {c.impact ? <p>{impactText(c.impact)}</p> : null}
                 <ul>
                   {c.places.slice(0, 50).map((p) => (
                     <li key={p.ref}>
                       {p.kind === "site" ? "Điểm" : "Hộ"} · {p.name} · {communeName(p.commune_code)}
                       {p.distance_m != null ? ` · cách tâm ${Math.round(p.distance_m).toLocaleString("vi-VN")} m` : ""}
+                    </li>
+                  ))}
+                  {c.farms.slice(0, 50).map((f) => (
+                    <li key={f.household_ref}>
+                      Trang trại · {f.code} · {f.livestock_type_label} · {communeName(f.commune_code)}
+                      {f.distance_m != null ? ` · cách tâm ${Math.round(f.distance_m).toLocaleString("vi-VN")} m` : ""}
                     </li>
                   ))}
                 </ul>
@@ -379,6 +396,9 @@ function OutbreakPanel({ mapi, d, refId, canDraw, communeName, onClose, reload }
         {communeName(o.commune_code)} · {o.species_name ?? o.species_code} · {OUTBREAK_STATUS_LABEL[o.status]}
         <br />
         Diễn biến ngày {dmy(o.as_of)}: đàn {o.herd_size}, chết {o.dead}
+        <br />
+        {o.legacy ? "Dữ liệu cũ (một hộ)" : `${o.affected_households} hộ bị ảnh hưởng`}
+        {o.aqua_farmed_ha != null || o.aqua_wild_ha != null ? ` · thủy sản bị ảnh hưởng: nuôi trồng ${o.aqua_farmed_ha ?? "0.00"} ha, khai thác ${o.aqua_wild_ha ?? "0.00"} ha` : ""}
       </p>
       {linked.length ? <p className="mute">Đã khoanh: {linked.map((z) => KIND_LABEL[z.kind]).join(", ")}</p> : null}
       {act.view}
@@ -402,6 +422,28 @@ function OutbreakPanel({ mapi, d, refId, canDraw, communeName, onClose, reload }
           </button>
         </div>
       ) : null}
+    </>
+  );
+}
+
+function FarmPanel({ d, refId, communeName, onClose }: { d: MapLayers; refId: string; communeName: (c: string) => string; onClose: () => void }) {
+  const f = d.farms.find((x) => x.household_ref === refId);
+  if (!f) return null;
+  return (
+    <>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>Trang trại {f.code}</h3>
+        <button className="btn" onClick={onClose} aria-label="Đóng">
+          ✕
+        </button>
+      </div>
+      <p>
+        {f.livestock_type_label} · {f.hamlet ? `${f.hamlet}, ` : ""}
+        {communeName(f.commune_code)}
+        <br />
+        {f.animals.map((a) => `${a.species_name ?? a.species_code}: ${a.head_count.toLocaleString("vi-VN")} con`).join(" · ")}
+      </p>
+      <p className="mute">Vị trí lấy khi cán bộ check-in tại nhà hộ. Thông tin chủ hộ xem ở Danh sách hộ chăn nuôi.</p>
     </>
   );
 }

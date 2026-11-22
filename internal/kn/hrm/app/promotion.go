@@ -29,8 +29,7 @@ import (
 
 // PromotionConfig là phần cấu hình nâng bậc của Service.
 type PromotionConfig struct {
-	Notifier port.PromotionNotifier
-	Writer   port.PromotionWriter // W10.17 — Word; nil → chỉ Excel
+	Writer port.PromotionWriter // W10.17 — Word; nil → chỉ Excel
 }
 
 // promoCaller: xem/xuất cần export = all (FN-09 "Cấp Tỉnh – HCTH, Admin"); ghi cần thêm profile.edit = all.
@@ -693,6 +692,9 @@ func (s *Service) SetRating(ctx context.Context, id uuid.UUID, in RatingInput, i
 	row := store.RatingRow{ID: ids.New(), StaffID: id, Year: in.Year, Rating: in.Rating, Source: in.Source, Void: in.Rating == "", Actor: c.ref}
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		if _, e := s.editable(ctx, tx, c, id, domain.PermEdit); e != nil {
+			return e
+		}
+		if e := store.LockRating(ctx, tx, c.tenant, id); e != nil {
 			return e
 		}
 		rows, e := store.Ratings(ctx, tx, id)

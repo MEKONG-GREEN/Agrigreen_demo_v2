@@ -45,6 +45,9 @@ func FormProfiles() []formsport.Profile {
 		UnitKinds:         []string{formsport.UnitCommune, formsport.UnitFacility, formsport.UnitHousehold},
 		Departments:       []string{partyport.DeptChanNuoiThuySan},
 		RequireLateReason: true,
+		// #192 (FN-07 BR-02, UR-TINH-07): mọi phiên bản biểu kn_cnts đi qua Module.CNTSDefinitionPolicy (khóa mẫu KNQG,
+		// cán bộ tổng hợp Cấp Tỉnh, chỉ thêm chỉ tiêu); thiếu đăng ký → từ chối, không rơi về DefineBy.
+		RequireDefinitionPolicy: true,
 	}
 
 	// KNKHTCProfile là cấu hình cap/forms của phiếu "Báo cáo cho KHTC" (W11.05, BRD KHTC v2.2): đơn vị lá là PHÒNG BAN.
@@ -52,8 +55,9 @@ func FormProfiles() []formsport.Profile {
 	// hủy kỳ; Cấp Tỉnh các phòng khác nộp phiếu của phòng mình. Tối đa 3 lần gửi, lần 3 tự khóa (FN-TI-02.03 — Q-081 đề
 	// xuất "tối đa 3, tham số"). KHTC không mở lại kỳ đã đóng: route mở lại vẫn có nhưng màn KHTC (W11.62) không dùng.
 	planning := formsport.Profile{
-		Name:      "kn_khtc",
-		Hierarchy: []string{"TINH", "PHONG"},
+		AuthorizeOperation: extport.AuthorizeKHTCOperation,
+		Name:               "kn_khtc",
+		Hierarchy:          []string{"TINH", "PHONG"},
 		Roles: map[string]string{
 			extport.SessionRoleProvince + "@" + partyport.DeptKeHoachTaiChinh: "TINH",
 			extport.SessionRoleProvince:                                       "PHONG",
@@ -85,6 +89,26 @@ func resolveFormActor(ctx context.Context, p authz.Principal, profile formsport.
 	}
 	if len(profile.Departments) > 0 && k.Role != extport.SessionRoleAdmin && !slices.Contains(profile.Departments, k.Department) {
 		return formsport.ResolvedActor{}, true, problem.Forbidden.WithDetail("cấu hình biểu " + profile.Name + " không dành cho phòng ban của phiên")
+	}
+	if slices.Contains(profile.Departments, partyport.DeptChanNuoiThuySan) {
+		// #71 (FN-14 AC-01…AC-03, BR-02): biểu kỳ CNTS dùng phạm vi quyền FN-14 trong payload chủ. Chưa từng được cấp →
+		// AllowsTemplate nil + giới hạn W11.07 như cũ; tường minh → biểu, xã, cơ sở, hộ chỉ theo quyền đang hiệu lực
+		// (rỗng = chặn). Closure đọc bản sao bất biến của payload request này.
+		a := formsport.ResolvedActor{Role: k.Role, Department: k.Department, Scope: k.CNTSScope(), Node: k.OrgRef,
+			AllowsTarget: func(kind string, ref uuid.UUID) bool {
+				switch kind {
+				case formsport.UnitFacility:
+					return k.AllowsCNTSFacility(ref)
+				case formsport.UnitHousehold:
+					return k.AllowsCNTSHousehold(ref)
+				default:
+					return true
+				}
+			}}
+		if k.Role == extport.SessionRoleCommune && k.CNTSGrant != nil {
+			a.AllowsTemplate = k.AllowsCNTSForm
+		}
+		return a, true, nil
 	}
 	return formsport.ResolvedActor{
 		Role: k.Role, Department: k.Department, Scope: k.Scope, Node: k.OrgRef,

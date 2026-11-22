@@ -7,25 +7,42 @@
 // Tọa độ lưu sẵn cho lớp bản đồ (GET /v1/extension/cnts/outbreak-points) — bản đồ vùng dịch là W11.52 (GĐ2).
 // BF-SWEEP-CNTS (#101): ô số dùng NumberField (quy mô đàn nguyên > 0, số con nguyên ≥ 0, kg/lít ≥ 0), bảng có STT, lý do
 // kết thúc / mở lại / bác bỏ nhập trong pop-up ngắn. Biểu "Bản đồ vùng dịch" (CN-15: Tên vùng, Loại, Xã/phường bắt buộc,
-// diện tích > 0) chưa có trên web — TODO(#111). Biểu nhập BM-10 vẫn mở ngay trên trang này — đổi sang trang riêng ở #111.
+// diện tích > 0) ở màn Bản đồ vùng dịch (#28).
+// BF-CN-OUTBREAK (#111, UP-07/UP-08): 4 thẻ thống kê (Tổng, Chờ xác nhận, Đang theo dõi, Đã kết thúc), tìm kiếm + lọc Bệnh,
+// Xã, Trạng thái, bảng Mã/Bệnh/Xã/Tiếp nhận/Quy mô đàn/Số chết/Nguồn tin/Trạng thái có trạng thái rỗng và phân trang; lập
+// báo cáo trên trang riêng /kn/cnts/dich-benh/tao-moi (3 phần); Xuất Word BM-10 (pf/export), xem trên bản đồ.
+// CNTS-V4-OUTBREAK-MULTI (#252, BRD CNTS v4.0 FN-11 BR-03, AC-04, AC-05; UR-XA-10 Hình 10): DB-04 chọn một hoặc nhiều hộ trong
+// danh sách hộ chăn nuôi của xã hoặc nhập hộ chưa có (tạo hộ "Chờ bổ sung vị trí"), DB-14 loại chăn nuôi theo hộ, DB-15 số
+// hộ tự đếm (không sửa tay), DB-16 diện tích thủy sản (nuôi trồng, khai thác) khi bệnh thuộc nhóm thủy sản. Ổ dịch trước
+// CNTS v4.0 hiện nhãn "Dữ liệu cũ".
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { unwrap } from "@/api/client";
 import { ApiProblem } from "@/api/problem";
 import type { CatalogItem } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { NumberField, SelectField, TextField, parseNumberInput, type NumberRule } from "@/components/form";
-import { DataTable, PageHeader, StatusPill } from "@/components/patterns/list";
+import { DataTable, FilterBar, FilterChip, PageHeader, SearchBox, StatusPill } from "@/components/patterns/list";
 import { LoadState, dt, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
 import { ReasonDialog } from "../ReasonDialog";
 import {
   EVENT_LABEL,
+  HH_STATUS_LABEL,
   OUTBREAK_RULES,
   SOURCE_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
   SUSPECT_LABEL,
+  TYPE_LABEL,
+  affectedCount,
+  emptyNewHousehold,
+  isAquatic,
   createOutbreakApi,
+  createOutbreakWordApi,
   emptyForm,
+  outbreakCode,
+  searchOutbreaks,
+  statCards,
   formErrors,
   formOf,
   payload,
@@ -34,13 +51,23 @@ import {
   type OutbreakApi,
   type OutbreakForm,
   type OutbreakStatus,
+  type LivestockType,
+  type NewHouseholdForm,
   type Suspect,
 } from "./api";
 
 /** Số con của tin báo: số nguyên ≥ 0, không bắt buộc. */
 const SUSPECT_COUNT: NumberRule = { integer: true, max: 999_999_999 };
 
-type Mode = { kind: "new" } | { kind: "progress"; o: Outbreak } | { kind: "confirm"; s: Suspect };
+/** Ô văn bản/số của biểu (không gồm danh sách hộ DB-04). */
+type TextKey = { [K in keyof OutbreakForm]: OutbreakForm[K] extends string ? K : never }[keyof OutbreakForm];
+
+export type Mode = { kind: "new" } | { kind: "progress"; o: Outbreak } | { kind: "confirm"; s: Suspect };
+
+/** Trang lập báo cáo dịch bệnh (UP-08). */
+export const CREATE_ROUTE = "/kn/cnts/dich-benh/tao-moi";
+export const MAP_ROUTE = "/kn/cnts/ban-do-dich";
+const PAGE_SIZE = 10;
 
 const ymd = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
 
@@ -59,13 +86,27 @@ export function OutbreakScreen() {
   const readOnly = !!kn.context?.read_only;
   const myCommunes = (kn.context?.communes ?? []).map((c) => c.code);
 
-  const [status, setStatus] = useState<OutbreakStatus | "">("");
-  const [disease, setDisease] = useState("");
+  const [status, setStatusRaw] = useState<OutbreakStatus | "">("");
+  const [disease, setDiseaseRaw] = useState("");
+  const [commune, setCommuneRaw] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [q, setQRaw] = useState("");
+  const [page, setPage] = useState(1);
+  const reset1 = <T,>(f: (v: T) => void) => (v: T) => {
+    f(v);
+    setPage(1);
+  };
+  const setStatus = reset1(setStatusRaw);
+  const setDisease = reset1(setDiseaseRaw);
+  const setCommune = reset1(setCommuneRaw);
+  const setQ = reset1(setQRaw);
   const list = useLoad(
-    oapi ? () => oapi.list({ ...(status ? { status } : {}), ...(disease ? { disease } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) }) : null,
-    [oapi, status, disease, from, to],
+    oapi
+      ? () =>
+          oapi.list({ ...(status ? { status } : {}), ...(disease ? { disease } : {}), ...(commune ? { commune } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) })
+      : null,
+    [oapi, status, disease, commune, from, to],
   );
   const suspects = useLoad(oapi ? () => oapi.suspects() : null, [oapi]);
   const catalog = (name: "cnts_disease" | "cnts_species") => async () =>
@@ -90,9 +131,9 @@ export function OutbreakScreen() {
         actions={
           xa && !readOnly && role === "kn_xa" ? (
             <div className="row">
-              <button className="btn btn-primary" onClick={() => setMode({ kind: "new" })}>
+              <Link className="btn btn-primary" href={CREATE_ROUTE}>
                 Lập báo cáo dịch bệnh
-              </button>
+              </Link>
               <button className="btn" onClick={() => setNewSuspect(true)}>
                 Ghi nhận tin báo nghi dịch
               </button>
@@ -136,58 +177,91 @@ export function OutbreakScreen() {
         />
       ) : null}
 
-      <section className="card sec" aria-label="Ổ dịch">
+      <section className="sec" aria-label="Ổ dịch">
         <h2>Ổ dịch</h2>
-        <div className="row">
-          <div className="row" role="tablist" aria-label="Trạng thái">
-            <button role="tab" aria-selected={status === ""} className={`btn btn-sm${status === "" ? " btn-primary" : ""}`} onClick={() => setStatus("")}>
-              Tất cả
+        <div className="hot-grid" role="group" aria-label="Thống kê ổ dịch">
+          {statCards((list.data?.by_status ?? []).map((c) => ({ key: c.key, count: c.count }))).map((c) => (
+            <button
+              key={c.key || "all"}
+              type="button"
+              className="card hot"
+              style={{ minHeight: 0, paddingBottom: 14, textAlign: "left", cursor: "pointer", outline: status === c.key ? "2px solid var(--primary)" : undefined }}
+              aria-pressed={status === c.key}
+              onClick={() => setStatus(c.key)}
+            >
+              <span className="lb">{c.label}</span>
+              <span className="vl">{c.count}</span>
             </button>
-            {(list.data?.by_status ?? []).map((c) => (
-              <button
-                key={c.key}
-                role="tab"
-                aria-selected={status === c.key}
-                className={`btn btn-sm${status === c.key ? " btn-primary" : ""}`}
-                onClick={() => setStatus(c.key as OutbreakStatus)}
-              >
-                {c.label} ({c.count})
-              </button>
-            ))}
-          </div>
-          <select className="select" aria-label="Lọc bệnh" value={disease} onChange={(e) => setDisease(e.target.value)}>
-            <option value="">Mọi bệnh</option>
-            {(diseases.data ?? []).map((d) => (
-              <option key={d.code} value={d.code}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+          ))}
+        </div>
+        <FilterBar
+          onReset={() => {
+            setStatusRaw("");
+            setDiseaseRaw("");
+            setCommuneRaw("");
+            setFrom("");
+            setTo("");
+            setQ("");
+          }}
+        >
+          <SearchBox value={q} onChange={setQ} placeholder="Tìm mã, bệnh, xã, địa bàn" />
+          <FilterChip
+            label="Bệnh"
+            value={disease}
+            onChange={setDisease}
+            options={[{ value: "", label: "Tất cả" }, ...(diseases.data ?? []).map((d) => ({ value: d.code, label: d.name }))]}
+          />
+          <FilterChip
+            label="Xã"
+            value={commune}
+            onChange={setCommune}
+            options={[
+              { value: "", label: "Tất cả" },
+              ...[...new Set([...myCommunes, ...(list.data?.items ?? []).map((o) => o.commune_code)])].sort().map((c) => ({ value: c, label: communeName(c) })),
+            ]}
+          />
+          <FilterChip
+            label="Trạng thái"
+            value={status}
+            onChange={(v) => setStatus(v as OutbreakStatus | "")}
+            options={[{ value: "", label: "Tất cả" }, ...(Object.entries(STATUS_LABEL) as [OutbreakStatus, string][]).map(([k, v]) => ({ value: k, label: v }))]}
+          />
           <label className="row small">
             Tiếp nhận từ <input className="input" type="date" aria-label="Từ ngày" value={from} onChange={(e) => setFrom(e.target.value)} />
           </label>
           <label className="row small">
             đến <input className="input" type="date" aria-label="Đến ngày" value={to} onChange={(e) => setTo(e.target.value)} />
           </label>
-        </div>
+        </FilterBar>
         <LoadState s={list}>
-          {(d) => (
-            <>
-              {d.by_disease.length ? (
-                <p className="mute small">Theo bệnh: {d.by_disease.map((c) => `${c.label} ${c.count}`).join(" · ")}</p>
-              ) : null}
+          {(d) => {
+            const rows = searchOutbreaks(d.items, q, communeName);
+            const last = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+            const cur = Math.min(page, last);
+            return (
               <DataTable
                 caption="Danh sách ổ dịch"
-                rows={d.items}
+                rows={rows.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE)}
                 rowKey={(o) => o.ref}
-                empty="Không có ổ dịch."
+                page={cur}
+                pageSize={PAGE_SIZE}
+                total={rows.length}
+                onPage={setPage}
+                empty={
+                  q || disease || commune || status || from || to
+                    ? "Không có ổ dịch phù hợp bộ lọc."
+                    : role === "kn_xa"
+                      ? "Chưa có ổ dịch nào. Bấm “Lập báo cáo dịch bệnh” khi phát hiện dịch."
+                      : "Chưa có ổ dịch nào được báo cáo."
+                }
                 columns={[
-                  { key: "disease", header: "Bệnh", cell: (o) => o.disease_name },
-                  { key: "species", header: "Vật nuôi", cell: (o) => o.species_name },
+                  { key: "code", header: "Mã", cell: (o) => <b>{outbreakCode(o.ref)}</b> },
+                  { key: "disease", header: "Bệnh", cell: (o) => `${o.disease_name} · ${o.species_name}` },
                   { key: "commune", header: "Xã", cell: (o) => communeName(o.commune_code) },
                   { key: "recv", header: "Tiếp nhận", cell: (o) => dt(o.received_at) },
-                  { key: "asof", header: "Diễn biến đến", cell: (o) => ymd(o.as_of) },
-                  { key: "dead", header: "Chết / quy mô", cell: (o) => `${o.dead} / ${o.herd_size}` },
+                  { key: "herd", header: "Quy mô đàn", className: "num", cell: (o) => o.herd_size },
+                  { key: "dead", header: "Số chết", className: "num", cell: (o) => o.dead },
+                  { key: "src", header: "Nguồn tin", cell: (o) => SOURCE_LABEL[o.source] },
                   {
                     key: "st",
                     header: "Trạng thái",
@@ -209,8 +283,8 @@ export function OutbreakScreen() {
                   },
                 ]}
               />
-            </>
-          )}
+            );
+          }}
         </LoadState>
       </section>
 
@@ -271,6 +345,22 @@ function OutbreakDetailView({
   const detail = useLoad(() => oapi.get(oref), [oapi, oref]);
   const act = useAction();
   const [asking, setAsking] = useState(false);
+  const { api } = useAuth();
+  const wapi = useMemo(() => createOutbreakWordApi(api), [api]);
+  const exportWord = async () => {
+    const r = await act.run(async () => {
+      const run = await wapi.export(oref);
+      const blob = await wapi.download(oref, run.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = run.file_name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return run;
+    });
+    if (r) act.setNote(`Đã xuất Word BM-10 — số ${r.doc_number || "(chưa cấp)"}.`);
+  };
   return (
     <section className="card sec" aria-label="Chi tiết ổ dịch">
       <LoadState s={detail}>
@@ -288,7 +378,7 @@ function OutbreakDetailView({
           return (
             <>
               <h2>
-                {o.disease_name} — {o.species_name} · {communeName(o.commune_code)}{" "}
+                {outbreakCode(o.ref)} · {o.disease_name} — {o.species_name} · {communeName(o.commune_code)}{" "}
                 <StatusPill tone={STATUS_TONE[o.status]}>{STATUS_LABEL[o.status]}</StatusPill>
               </h2>
               {act.view}
@@ -298,8 +388,35 @@ function OutbreakDetailView({
                   {dt(o.received_at)} · {SOURCE_LABEL[o.source]}
                   {o.suspect_ref ? " · từ tin báo nghi dịch" : ""}
                 </dd>
-                <dt>Địa bàn (DB-04)</dt>
-                <dd>{o.locality ?? "—"}</dd>
+                <dt>Hộ chăn nuôi bị ảnh hưởng (DB-04)</dt>
+                <dd>
+                  {o.legacy ? (
+                    <>
+                      <StatusPill tone="neutral">Dữ liệu cũ</StatusPill> Báo cáo trước CNTS v4.0 — {o.locality ?? "một hộ"}; không có loại chăn nuôi, diện tích thủy sản.
+                    </>
+                  ) : (
+                    <ul aria-label="Hộ chăn nuôi bị ảnh hưởng">
+                      {o.households.map((h) => (
+                        <li key={h.household_ref}>
+                          {h.code} · {h.owner_label ?? "—"}
+                          {h.hamlet ? ` · ${h.hamlet}` : ""} · {TYPE_LABEL[h.livestock_type]}
+                          {h.status !== "active" ? ` (${HH_STATUS_LABEL[h.status]})` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {!o.legacy && o.locality ? <span className="mute small">Địa bàn: {o.locality}</span> : null}
+                </dd>
+                <dt>Số hộ bị ảnh hưởng (DB-15)</dt>
+                <dd>{o.affected_households}</dd>
+                {o.aqua_farmed_ha !== null || o.aqua_wild_ha !== null ? (
+                  <>
+                    <dt>Diện tích thủy sản bị ảnh hưởng (DB-16)</dt>
+                    <dd>
+                      Nuôi trồng {o.aqua_farmed_ha ?? "0"} ha; khai thác {o.aqua_wild_ha ?? "0"} ha
+                    </dd>
+                  </>
+                ) : null}
                 <dt>Vị trí (DB-05)</dt>
                 <dd>
                   {o.location ? `${o.location.lat}, ${o.location.lon}` : "—"}
@@ -333,6 +450,7 @@ function OutbreakDetailView({
                   { key: "ver", header: "Phiên bản", cell: (v) => `v${v.version}` },
                   { key: "ev", header: "Sự việc", cell: (v) => EVENT_LABEL[v.event] },
                   { key: "asof", header: "Ngày", cell: (v) => ymd(v.as_of) },
+                  { key: "hh", header: "Số hộ", cell: (v) => (v.legacy ? `${v.affected_households} (dữ liệu cũ)` : v.affected_households) },
                   { key: "dead", header: "Chết", cell: (v) => v.dead },
                   { key: "culled", header: "Tiêu hủy", cell: (v) => v.culled_head ?? "—" },
                   { key: "note", header: "Ghi chú", cell: (v) => v.status_reason ?? v.progress_note ?? "—" },
@@ -344,6 +462,14 @@ function OutbreakDetailView({
                   <button className="btn btn-primary" onClick={() => onUpdate(o)}>
                     Cập nhật diễn biến
                   </button>
+                ) : null}
+                <button className="btn" disabled={act.busy} onClick={exportWord}>
+                  Xuất Word (BM-10)
+                </button>
+                {o.location ? (
+                  <Link className="btn" href={MAP_ROUTE}>
+                    Xem trên bản đồ
+                  </Link>
                 ) : null}
                 {canClose ? (
                   <button className={o.status === "closed" ? "btn" : "btn btn-primary"} disabled={act.busy} onClick={() => setAsking(true)}>
@@ -465,7 +591,7 @@ function SuspectTable({
   );
 }
 
-function useGps(set: (lat: string, lon: string, acc: string) => void) {
+export function useGps(set: (lat: string, lon: string, acc: string) => void) {
   const [msg, setMsg] = useState<string | null>(null);
   const locate = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -485,7 +611,7 @@ function useGps(set: (lat: string, lon: string, acc: string) => void) {
   return { locate, msg };
 }
 
-function OutbreakEditor({
+export function OutbreakEditor({
   mode,
   oapi,
   communes,
@@ -523,20 +649,26 @@ function OutbreakEditor({
   const dz = diseases.find((d) => d.code === f.disease_code);
   const allowed = (dz?.attrs.species ?? "").split(",").map((x) => x.trim()).filter(Boolean);
   const speciesOpts = allowed.length ? species.filter((s) => allowed.includes(s.code)) : species;
+  const aquatic = isAquatic(dz, f.species_code, species);
+  const hhs = useLoad(f.commune_code ? () => oapi.households(f.commune_code) : null, [oapi, f.commune_code]);
+  const toggleHH = (ref: string, on: boolean) =>
+    setF((x) => ({ ...x, household_refs: on ? [...x.household_refs, ref] : x.household_refs.filter((r) => r !== ref) }));
+  const upNew = (i: number, patch: Partial<NewHouseholdForm>) =>
+    setF((x) => ({ ...x, new_households: x.new_households.map((h, j) => (j === i ? { ...h, ...patch } : h)) }));
   const title = mode.kind === "new" ? "Lập báo cáo dịch bệnh (BM-10)" : mode.kind === "progress" ? `Cập nhật diễn biến — phiên bản ${mode.o.version + 1}` : "Xác nhận tin báo → báo cáo dịch bệnh";
 
   const submit = async () => {
-    const fe = formErrors(f);
+    const fe = formErrors(f, aquatic);
     setErrs(fe);
     if (Object.keys(fe).length) return;
     try {
       // P0-WEB-IDEMKEY: trong phiên thao tác của act — gửi lại sau lỗi mạng dùng lại khóa cũ.
       const o = await act.idem(() =>
         mode.kind === "new"
-          ? oapi.report(payload(f))
+          ? oapi.report(payload(f, undefined, aquatic))
           : mode.kind === "progress"
-            ? oapi.progress(mode.o.ref, payload(f, mode.o.version))
-            : oapi.confirm(mode.s.ref, payload(f, mode.s.version)),
+            ? oapi.progress(mode.o.ref, payload(f, mode.o.version, aquatic))
+            : oapi.confirm(mode.s.ref, payload(f, mode.s.version, aquatic)),
       );
       onDone(o.ref);
     } catch (e) {
@@ -549,7 +681,7 @@ function OutbreakEditor({
     }
   };
 
-  const field = (key: keyof OutbreakForm, label: string, opts: { req?: boolean; type?: string; area?: boolean; ph?: string; err?: string } = {}) => {
+  const field = (key: TextKey, label: string, opts: { req?: boolean; type?: string; area?: boolean; ph?: string; err?: string } = {}) => {
     const error = errs[opts.err ?? key];
     const onChange = (v: string) => up({ [key]: v } as Partial<OutbreakForm>);
     if (key in OUTBREAK_RULES) {
@@ -594,6 +726,10 @@ function OutbreakEditor({
           </button>
         </div>
       ) : null}
+      <fieldset className="field">
+        <legend>
+          <b>Phần 1. Tình hình dịch</b>
+        </legend>
       <div className="ws-two">
         <label className="field">
           <span>
@@ -652,8 +788,91 @@ function OutbreakEditor({
           </select>
           {errs.source ? <span className="err">{errs.source}</span> : null}
         </label>
-        {field("locality", "DB-04 Hộ chăn nuôi — địa bàn (ấp, khu vực)", { req: true, ph: "Không ghi họ tên, số điện thoại" })}
+        {field("locality", "Địa bàn (ấp, khu vực) — ghi chú", { ph: "Không ghi họ tên, số điện thoại" })}
       </div>
+      <fieldset className="field" aria-label="DB-04 Hộ chăn nuôi bị ảnh hưởng">
+        <legend>
+          DB-04 Hộ chăn nuôi bị ảnh hưởng<span className="req"> *</span>
+        </legend>
+        {mode.kind === "progress" && mode.o.legacy ? (
+          <p className="mute small">Báo cáo này lập trước CNTS v4.0 (dữ liệu cũ, một hộ/địa bàn). Lần cập nhật này chọn hộ theo danh sách hộ chăn nuôi.</p>
+        ) : null}
+        {!f.commune_code ? (
+          <p className="mute small">Chọn xã để hiện danh sách hộ chăn nuôi của xã.</p>
+        ) : (hhs.data ?? []).length === 0 ? (
+          <p className="mute small">Xã chưa có hộ trong danh sách hộ chăn nuôi — nhập hộ chưa có ở dưới.</p>
+        ) : (
+          <ul className="plain" aria-label="Chọn hộ trong danh sách">
+            {(hhs.data ?? []).map((h) => (
+              <li key={h.id}>
+                <label className="row small">
+                  <input type="checkbox" checked={f.household_refs.includes(h.id)} onChange={(e) => toggleHH(h.id, e.target.checked)} />
+                  {h.code} · {h.owner_label ?? "—"}
+                  {h.hamlet ? ` · ${h.hamlet}` : ""} · DB-14 {TYPE_LABEL[h.livestock_type]}
+                  {h.status === "pending_location" ? " (Chờ bổ sung vị trí)" : ""}
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+        {f.new_households.map((h, i) => {
+          const k = (x: string) => errs[`new_households[${i}].${x}`];
+          return (
+            <fieldset className="field" key={i} aria-label={`Hộ chưa có ${i + 1}`}>
+              <legend>Hộ chưa có {i + 1} — sẽ thêm vào danh sách ở trạng thái “Chờ bổ sung vị trí”</legend>
+              <div className="ws-two">
+                <TextField label="Họ tên chủ hộ / tên trang trại" required maxLength={200} value={h.owner_name} onChange={(v) => upNew(i, { owner_name: v })} error={k("owner_name")} />
+                <TextField label="Số điện thoại" value={h.owner_phone} onChange={(v) => upNew(i, { owner_phone: v })} error={k("owner_phone")} />
+                <TextField label="Ấp, khu phố" maxLength={200} value={h.hamlet} onChange={(v) => upNew(i, { hamlet: v })} error={k("hamlet")} />
+                <SelectField
+                  label="DB-14 Loại chăn nuôi"
+                  required
+                  value={h.livestock_type}
+                  onChange={(v) => upNew(i, { livestock_type: v as LivestockType | "" })}
+                  options={(Object.keys(TYPE_LABEL) as LivestockType[]).map((t) => ({ value: t, label: TYPE_LABEL[t] }))}
+                  error={k("livestock_type")}
+                />
+                <SelectField
+                  label="Vật nuôi của hộ"
+                  required
+                  value={h.species_code}
+                  onChange={(v) => upNew(i, { species_code: v })}
+                  options={species.map((s) => ({ value: s.code, label: s.name }))}
+                  error={k("animals[0].species_code")}
+                />
+                <TextField label="Số con của hộ" required value={h.head_count} onChange={(v) => upNew(i, { head_count: v })} error={k("animals[0].head_count")} />
+              </div>
+              <button className="btn btn-sm" type="button" onClick={() => setF((x) => ({ ...x, new_households: x.new_households.filter((_, j) => j !== i) }))}>
+                Bỏ hộ này
+              </button>
+            </fieldset>
+          );
+        })}
+        <div className="row">
+          <button className="btn btn-sm" type="button" onClick={() => setF((x) => ({ ...x, new_households: [...x.new_households, emptyNewHousehold()] }))}>
+            Nhập hộ chưa có
+          </button>
+          <span aria-live="polite">
+            DB-15 Số hộ bị ảnh hưởng: <b>{affectedCount(f)}</b> (tự đếm)
+          </span>
+        </div>
+        {errs.households ? (
+          <span className="err" role="alert">
+            {errs.households}
+          </span>
+        ) : null}
+      </fieldset>
+      {aquatic ? (
+        <fieldset className="field" aria-label="DB-16 Diện tích thủy sản bị ảnh hưởng">
+          <legend>
+            DB-16 Diện tích thủy sản bị ảnh hưởng (ha)<span className="req"> *</span>
+          </legend>
+          <div className="row">
+            <TextField label="Nuôi trồng (ha)" required value={f.aqua_farmed_ha} onChange={(v) => up({ aqua_farmed_ha: v })} error={errs.aqua_farmed_ha} />
+            <TextField label="Khai thác (ha)" required value={f.aqua_wild_ha} onChange={(v) => up({ aqua_wild_ha: v })} error={errs.aqua_wild_ha} />
+          </div>
+        </fieldset>
+      ) : null}
       <fieldset className="field">
         <legend>
           DB-05 Vị trí ổ dịch<span className="req"> *</span>
@@ -667,7 +886,7 @@ function OutbreakEditor({
           </button>
         </div>
         {gps.msg ? <p className="mute small">{gps.msg}</p> : null}
-        <p className="mute small">Chọn trên bản đồ: giai đoạn 2 (bản đồ vùng dịch). Có thể nhập tọa độ đọc từ bản đồ khác (nguồn = bản đồ).</p>
+        <p className="mute small">Bấm “Lấy GPS” tại ổ dịch, hoặc nhập tọa độ đọc từ bản đồ (đánh dấu “chọn trên bản đồ”). Ổ dịch có tọa độ hiện trên Bản đồ vùng dịch.</p>
         <label className="row small">
           <input type="checkbox" checked={f.location_source === "map"} onChange={(e) => up({ location_source: e.target.checked ? "map" : "gps" })} /> Tọa độ chọn trên bản đồ
         </label>
@@ -677,17 +896,32 @@ function OutbreakEditor({
         {field("herd_age_days", "Ngày tuổi")}
         {field("dead", "DB-07 Số con chết (lũy kế)")}
         {field("symptoms", "DB-08 Triệu chứng", { req: true, area: true })}
-        {field("sample_date", "DB-09 Ngày lấy mẫu", { type: "date" })}
-        {field("lab_name", "Nơi xét nghiệm")}
-        {field("lab_result", "Kết quả xét nghiệm", { area: true })}
-        {field("culled_head", "DB-10 Tiêu hủy (con, lũy kế)")}
-        {field("culled_kg", "Tiêu hủy (kg)")}
-        {field("chemical_liters", "Hóa chất (lít)")}
-        {field("buffer_note", "DB-11 Vùng đệm, vùng bị uy hiếp", { area: true })}
-        {field("prevention_note", "DB-12 Công tác phòng chống; kiến nghị", { area: true })}
-        {mode.kind === "progress" ? field("as_of", "Ngày diễn biến (trống = hôm nay)", { type: "date" }) : null}
-        {mode.kind === "progress" ? field("progress_note", "Diễn biến lần này", { area: true }) : null}
       </div>
+      </fieldset>
+      <fieldset className="field">
+        <legend>
+          <b>Phần 2. Xét nghiệm, xử lý, khoanh vùng</b>
+        </legend>
+        <div className="ws-two">
+          {field("sample_date", "DB-09 Ngày lấy mẫu", { type: "date" })}
+          {field("lab_name", "Nơi xét nghiệm")}
+          {field("lab_result", "Kết quả xét nghiệm", { area: true })}
+          {field("culled_head", "DB-10 Tiêu hủy (con, lũy kế)")}
+          {field("culled_kg", "Tiêu hủy (kg)")}
+          {field("chemical_liters", "Hóa chất (lít)")}
+          {field("buffer_note", "DB-11 Vùng đệm, vùng bị uy hiếp", { area: true })}
+        </div>
+      </fieldset>
+      <fieldset className="field">
+        <legend>
+          <b>Phần 3. Phòng chống, kiến nghị</b>
+        </legend>
+        <div className="ws-two">
+          {field("prevention_note", "DB-12 Công tác phòng chống; kiến nghị", { area: true })}
+          {mode.kind === "progress" ? field("as_of", "Ngày diễn biến (trống = hôm nay)", { type: "date" }) : null}
+          {mode.kind === "progress" ? field("progress_note", "Diễn biến lần này", { area: true }) : null}
+        </div>
+      </fieldset>
       <p className="mute small">DB-13 Đính kèm (ảnh, PDF): tải tệp từ ứng dụng di động; web hiển thị mã tệp đã gắn.</p>
       <div className="row">
         <button className="btn btn-primary" disabled={act.busy} onClick={submit}>

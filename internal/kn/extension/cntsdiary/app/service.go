@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -24,6 +25,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	alertapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/app"
+	caldomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/store"
 	mdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/domain"
@@ -90,10 +92,18 @@ type Alerts interface {
 	LogVerdict(ctx context.Context, tx pgx.Tx, tid uuid.UUID, a alertapp.LogAlert) error
 }
 
+// Vaccinations là cổng ghi ngày tiêm NC-11 sang lịch tiêm BM-07 (extension/cntscal — quy tắc liên biểu số 7, BF-CN-VACC
+// #168), trong giao dịch ghi của nhật ký.
+type Vaccinations interface {
+	RecordFromDiary(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r caldomain.DiaryRecord) error
+}
+
 // Service là use case nhật ký nuôi CNTS.
 type Service struct {
-	DB    tenant.Beginner // pool vai extension_app (db.ForModule)
-	Clock clock.Clock
+	// Vaccinations (tùy chọn): NC-11 → lịch tiêm của lứa có vaccination_batch_ref. nil → không đồng bộ.
+	Vaccinations Vaccinations
+	DB           tenant.Beginner // pool vai extension_app (db.ForModule)
+	Clock        clock.Clock
 	// Units: tỉnh của xã (cảnh báo). nil → ghi trả 503.
 	Units partyport.AdminUnits
 	// Params (tùy chọn): ngưỡng; thiếu → mặc định trong mã.
@@ -106,6 +116,8 @@ type Service struct {
 	Files evport.Files
 	// Names (tùy chọn): tên cán bộ.
 	Names func() partyport.ActorNames
+	// Catalogs (tùy chọn, BF-CN-CATALOG #170): ngưỡng mặc định của danh mục chỉ tiêu theo dõi. nil → chỉ tham số + mặc định.
+	Catalogs knport.CNTSCatalogs
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }
@@ -116,39 +128,221 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 	return tenant.WithTenantTx(ctx, s.DB, tid, fn)
 }
 
-func (s *Service) param(ctx context.Context, key string, def string) decimal.Decimal {
-	if v := s.optParam(ctx, key); v != nil {
-		return *v
+// param: tham số đã duyệt, chưa có → mặc định def; lỗi tra cứu → 503 (không âm thầm rơi về mặc định, như dayParam).
+// Chỉ gọi NGOÀI giao dịch ghi (port masterdata mở giao dịch riêng trên cùng pool — AUTO-REVIEW §4, #170).
+func (s *Service) param(ctx context.Context, key string, def string) (decimal.Decimal, error) {
+	v, err := s.optParam(ctx, key)
+	if err != nil {
+		return decimal.Decimal{}, err
 	}
-	return decimal.RequireFromString(def)
+	if v != nil {
+		return *v, nil
+	}
+	return decimal.RequireFromString(def), nil
 }
 
-func (s *Service) optParam(ctx context.Context, key string) *decimal.Decimal {
+// optParam: tham số đã duyệt có hiệu lực; chưa có phiên bản đã duyệt (hoặc chưa nối Params) → nil; lỗi khác → 503.
+func (s *Service) optParam(ctx context.Context, key string) (*decimal.Decimal, error) {
 	if s.Params == nil {
-		return nil
+		return nil, nil
 	}
 	v, err := s.Params.At(ctx, key, s.now())
+	if errors.Is(err, params.ErrParamNotFound) {
+		return nil, nil
+	}
 	if err != nil {
-		return nil
+		return nil, ErrDependency.WithDetail("không đọc được tham số " + key).WithCause(err)
 	}
 	d := v.Value
-	return &d
+	return &d, nil
 }
 
-func (s *Service) thresholds(ctx context.Context, modelType string) domain.Thresholds {
-	phMin, phMax, doMin := s.param(ctx, ParamPHMin, "7.5"), s.param(ctx, ParamPHMax, "8.5"), s.param(ctx, ParamDOMin, "4")
-	return domain.Thresholds{PHMin: &phMin, PHMax: &phMax, DOMin: &doMin, MortalityMaxPct: s.optParam(ctx, ParamMortality+":"+modelType)}
+// indicatorRange là ngưỡng mặc định của danh mục chỉ tiêu theo dõi gắn với một chỉ số nhật ký (BF-CN-CATALOG #170).
+type indicatorRange struct {
+	code   string
+	lo, hi *decimal.Decimal
 }
 
-// EditDays: lần ghi đã gửi chưa xác thực sửa được trong 7 ngày kể từ ngày ghi (Mục III.5). FixRetentionDays: hạn lưu tọa độ
-// GPS lúc ghi (tạm 365 ngày, chờ DPIA Q-005). Hằng số trong mã — kho tham số KN đang đóng băng danh mục (pf/masterdata
-// TestParametersRequireRegistration); tham số hóa cần ticket làn shared (gia-dinh/W11.48).
-const (
-	EditDays         = 7
-	FixRetentionDays = 365
-)
+// legacyIndicator: chỉ tiêu PH, DO nạp sẵn trước #170 chưa có diary_metric vẫn áp vào ph, do_mgl như cũ.
+var legacyIndicator = map[string]string{"ph": "PH", "do_mgl": "DO"}
 
-func (s *Service) editDays(context.Context) int { return EditDays }
+// indicatorRanges đọc danh mục chỉ tiêu (đang dùng hôm nay) NGOÀI giao dịch ghi: chỉ số nhật ký → MỌI chỉ tiêu gắn chỉ số
+// đó, theo thứ tự mã. Nhiều chỉ tiêu cùng gắn một chỉ số (vd seed NHIET_DO chưa có ngưỡng và NHIET_DO_AO 25–32 cùng temp_c)
+// thì giữ cả; thresholds lấy từng biên từ chỉ tiêu đầu tiên CÓ biên đó — chỉ tiêu chưa đặt ngưỡng không che ngưỡng của chỉ
+// tiêu khác. Chưa nối danh mục → rỗng (chỉ dùng tham số và mặc định trong mã).
+func (s *Service) indicatorRanges(ctx context.Context) (map[string][]indicatorRange, error) {
+	out := map[string][]indicatorRange{}
+	if s.Catalogs == nil {
+		return out, nil
+	}
+	items, err := s.Catalogs.ListAt(ctx, knport.CatalogCNTSIndicator, s.today())
+	if err != nil {
+		return nil, ErrDependency.WithDetail("không đọc được danh mục chỉ tiêu theo dõi")
+	}
+	order := make([]int, len(items))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortFunc(order, func(a, b int) int { return strings.Compare(items[a].Code, items[b].Code) })
+	for _, i := range order {
+		it := items[i]
+		metric := it.Attrs[knport.AttrDiaryMetric]
+		if metric == "" {
+			for m, code := range legacyIndicator {
+				if code == it.Code {
+					metric = m
+				}
+			}
+		}
+		if metric == "" || !slices.Contains(knport.DiaryWaterMetrics, metric) {
+			continue
+		}
+		out[metric] = append(out[metric], indicatorRange{code: it.Code, lo: knport.ParseThreshold(it.Attrs[knport.AttrThresholdMin]),
+			hi: knport.ParseThreshold(it.Attrs[knport.AttrThresholdMax])})
+	}
+	return out, nil
+}
+
+// indicatorParam: tham số đã duyệt theo loại mô hình, rồi theo chỉ tiêu (ghi đè ngưỡng mặc định của danh mục).
+func (s *Service) indicatorParam(ctx context.Context, prefix, code, modelType string) (*decimal.Decimal, error) {
+	if modelType != "" {
+		if v, err := s.optParam(ctx, knport.IndicatorKey(prefix, code, modelType)); err != nil || v != nil {
+			return v, err
+		}
+	}
+	return s.optParam(ctx, knport.IndicatorKey(prefix, code, ""))
+}
+
+// thresholds: ngưỡng của lần ghi — chỉ gọi NGOÀI giao dịch ghi (loadEnv). Mỗi biên của mỗi chỉ số môi trường nước: tham số
+// đã duyệt (loại mô hình → chỉ tiêu; chỉ tiêu đầu tiên theo mã có tham số) > ngưỡng mặc định của danh mục chỉ tiêu (cat; chỉ
+// tiêu đầu tiên có biên đó) > mặc định trong mã (chỉ pH 7,5–8,5, oxy ≥ 4 như trước #170). Lỗi tra tham số → 503.
+func (s *Service) thresholds(ctx context.Context, modelType string, cat map[string][]indicatorRange) (domain.Thresholds, error) {
+	resolve := func(metric string) (lo, hi *decimal.Decimal, err error) {
+		rs, ok := cat[metric]
+		if !ok && legacyIndicator[metric] != "" {
+			rs = []indicatorRange{{code: legacyIndicator[metric]}}
+		}
+		for _, r := range rs {
+			if lo == nil {
+				if lo, err = s.indicatorParam(ctx, knport.ParamCNTSIndicatorMinPrefix, r.code, modelType); err != nil {
+					return nil, nil, err
+				}
+			}
+			if hi == nil {
+				if hi, err = s.indicatorParam(ctx, knport.ParamCNTSIndicatorMaxPrefix, r.code, modelType); err != nil {
+					return nil, nil, err
+				}
+			}
+		}
+		for _, r := range rs {
+			if lo == nil {
+				lo = r.lo
+			}
+			if hi == nil {
+				hi = r.hi
+			}
+		}
+		return lo, hi, nil
+	}
+	def := func(d *decimal.Decimal, v string) *decimal.Decimal {
+		if d != nil {
+			return d
+		}
+		x := decimal.RequireFromString(v)
+		return &x
+	}
+	var t domain.Thresholds
+	var err error
+	if modelType != "" {
+		if t.MortalityMaxPct, err = s.optParam(ctx, ParamMortality+":"+modelType); err != nil {
+			return t, err
+		}
+	}
+	if t.PHMin, t.PHMax, err = resolve("ph"); err != nil {
+		return t, err
+	}
+	t.PHMin, t.PHMax = def(t.PHMin, "7.5"), def(t.PHMax, "8.5")
+	if t.DOMin, t.DOMax, err = resolve("do_mgl"); err != nil {
+		return t, err
+	}
+	t.DOMin = def(t.DOMin, "4")
+	for _, m := range knport.DiaryWaterMetrics {
+		if _, legacy := legacyIndicator[m]; legacy {
+			continue
+		}
+		lo, hi, err := resolve(m)
+		if err != nil {
+			return t, err
+		}
+		if lo != nil || hi != nil {
+			if t.Others == nil {
+				t.Others = map[string]domain.Range{}
+			}
+			t.Others[m] = domain.Range{Min: lo, Max: hi}
+		}
+	}
+	return t, nil
+}
+
+// evalEnv là dữ liệu của module khác mà kiểm tra tự động và cảnh báo của một lần ghi cần — tham số đã duyệt (pf/masterdata),
+// danh mục chỉ tiêu, tỉnh của xã (pf/party) — nạp NGOÀI giao dịch ghi rồi truyền dạng dữ liệu thuần vào giao dịch (AUTO-REVIEW
+// §4, #170: port của module khác mở giao dịch riêng trên cùng pool). Nạp theo loại mô hình của điểm và xã đọc trước; trong
+// giao dịch hai giá trị này khác → errEnvStale, nạp lại.
+type evalEnv struct {
+	modelType, commune, province string
+	th                           domain.Thresholds
+	maxDist, maxAcc              decimal.Decimal
+	vnames                       map[string]string // BF-CN-VACC: mã → tên vaccine cho NC-11 → lịch tiêm
+}
+
+// errEnvStale: loại mô hình của điểm hoặc xã đổi giữa lúc nạp evalEnv và giao dịch ghi.
+var errEnvStale = errors.New("cntsdiary: loại mô hình hoặc xã đổi trong lúc nạp tham số")
+
+// envRetries: số lần nạp lại evalEnv khi errEnvStale trước khi trả xung đột.
+const envRetries = 3
+
+// loadEnv nạp evalEnv (gọi NGOÀI giao dịch).
+func (s *Service) loadEnv(ctx context.Context, modelType, commune string) (evalEnv, error) {
+	e := evalEnv{modelType: modelType, commune: commune}
+	cat, err := s.indicatorRanges(ctx)
+	if err != nil {
+		return e, err
+	}
+	if e.th, err = s.thresholds(ctx, modelType, cat); err != nil {
+		return e, err
+	}
+	if e.maxDist, err = s.param(ctx, ParamDistance, "200"); err != nil {
+		return e, err
+	}
+	if e.maxAcc, err = s.param(ctx, ParamAccuracy, "50"); err != nil {
+		return e, err
+	}
+	e.province = s.provinceOf(ctx, commune)
+	e.vnames = s.vaccineNames(ctx)
+	return e, nil
+}
+
+// check: loại mô hình, xã đọc trong giao dịch khớp lúc nạp.
+func (e evalEnv) check(modelType, commune string) error {
+	if e.modelType != modelType || e.commune != commune {
+		return errEnvStale
+	}
+	return nil
+}
+
+// peekHousehold đọc (giao dịch đọc ngắn, trước giao dịch ghi) loại mô hình của điểm và xã của hộ. Không có hộ/điểm → rỗng
+// (giao dịch ghi tự trả lỗi không tìm thấy).
+func peekHousehold(ctx context.Context, tx pgx.Tx, household uuid.UUID) (modelType, commune string, err error) {
+	h, err := mstore.LatestHousehold(ctx, tx, household)
+	if err != nil || h == nil {
+		return "", "", err
+	}
+	x, err := mstore.LatestSite(ctx, tx, h.SiteRef)
+	if err != nil || x == nil {
+		return "", h.CommuneCode, err
+	}
+	return x.ModelType, h.CommuneCode, nil
+}
 
 // caller là người gọi đã giải ngữ cảnh phiên KN.
 type caller struct {

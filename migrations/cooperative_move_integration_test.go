@@ -280,8 +280,11 @@ func TestCooperativeSchemaMoveRehearsal_W33(t *testing.T) {
 	if pubAfter := pubCounts(ctx, t, pool, tenants); !maps.Equal(pubAfter, pubBefore) {
 		t.Errorf("view _pub: trước %v, sau %v", pubBefore, pubAfter)
 	}
-	if len(ledgersAfter) != len(ledgersBefore) {
-		t.Errorf("sổ trước %v, sau %v", ledgersBefore, ledgersAfter)
+	// #271: migration chép một lần (pf 20261110013755) ghi thửa sang sổ KN mới — sổ duy nhất được phép xuất hiện thêm.
+	for l := range ledgersAfter {
+		if _, ok := ledgersBefore[l]; !ok && l != "pf_extension.kn_plot_version" {
+			t.Errorf("sổ mới ngoài dự kiến %s (trước %v, sau %v)", l, ledgersBefore, ledgersAfter)
+		}
 	}
 	for l, n := range ledgersBefore {
 		if ledgersAfter[l] != n {

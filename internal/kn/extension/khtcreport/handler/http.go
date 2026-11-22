@@ -9,6 +9,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
+	templatedomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtctemplate/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
@@ -20,6 +21,10 @@ import (
 type Handler struct{ Svc *app.Service }
 
 func (h Handler) RegisterApp(rg *gin.RouterGroup) {
+	rg.GET("/extension/khtc/exported-reports", h.archive)
+	rg.GET("/extension/khtc/exported-reports/periods", h.archive)
+	rg.GET("/extension/khtc/exported-reports/fields", h.archive)
+	rg.POST("/extension/khtc/exported-reports/zip", h.archiveZIP)
 	g := rg.Group("/extension/khtc/periods/:id/report")
 	g.GET("", h.get)
 	g.POST("/draft", h.save)
@@ -27,6 +32,9 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/exports", h.history)
 	g.POST("/exports", h.export)
 	g.GET("/exports/:exportID/download", h.download)
+	g.GET("/exports/:exportID/preview", h.previewExport)
+	g.GET("/exports/:exportID/words", h.archiveWords)
+	g.GET("/exports/:exportID/words/:runID/download", h.archiveWordDownload)
 	g.POST("/exports/:exportID/final", h.finalize)
 	// W10.17: Word (.docx) qua pf/export, dựng từ nội dung đóng băng của một bản Excel.
 	g.POST("/exports/:exportID/word", h.exportWord)
@@ -63,21 +71,23 @@ type finalDTO struct {
 	At       time.Time `json:"at"`
 }
 type detailDTO struct {
-	PeriodID      uuid.UUID        `json:"period_id"`
-	DraftID       *uuid.UUID       `json:"draft_id"`
-	Version       int64            `json:"version"`
-	Content       domain.Draft     `json:"content"`
-	Sections      []domain.Section `json:"sections"`
-	Final         *finalDTO        `json:"final"`
-	Editable      bool             `json:"editable"`
-	CanRefresh    bool             `json:"can_refresh"`
-	SourceChanged bool             `json:"source_changed"`
-	SourceError   string           `json:"source_error"`
-	Terminal      string           `json:"terminal"`
+	PeriodID      uuid.UUID                `json:"period_id"`
+	DraftID       *uuid.UUID               `json:"draft_id"`
+	Version       int64                    `json:"version"`
+	Content       domain.Draft             `json:"content"`
+	Sections      []domain.Section         `json:"sections"`
+	Final         *finalDTO                `json:"final"`
+	Editable      bool                     `json:"editable"`
+	CanRefresh    bool                     `json:"can_refresh"`
+	SourceChanged bool                     `json:"source_changed"`
+	SourceError   string                   `json:"source_error"`
+	Terminal      string                   `json:"terminal"`
+	Document      *templatedomain.Rendered `json:"template_document,omitempty"`
+	LockedAdmin   []string                 `json:"locked_admin,omitempty"`
 }
 
 func detailOf(d app.Detail) detailDTO {
-	out := detailDTO{PeriodID: d.PeriodID, DraftID: d.DraftID, Version: d.Version, Content: d.Content, Sections: domain.Sections(d.Content.Data.Template), Editable: d.Editable, CanRefresh: d.CanRefresh, SourceChanged: d.SourceChanged, SourceError: d.SourceError, Terminal: d.Terminal}
+	out := detailDTO{PeriodID: d.PeriodID, DraftID: d.DraftID, Version: d.Version, Content: d.Content, Sections: d.Sections, Document: d.Document, LockedAdmin: d.LockedAdmin, Editable: d.Editable, CanRefresh: d.CanRefresh, SourceChanged: d.SourceChanged, SourceError: d.SourceError, Terminal: d.Terminal}
 	if d.Final != nil {
 		out.Final = &finalDTO{ExportID: d.Final.ExportID, Actor: d.Final.ActorRef, At: d.Final.At}
 	}
@@ -153,7 +163,17 @@ func (h Handler) history(c *gin.Context) {
 	if !ok {
 		return
 	}
-	rows, err := h.Svc.History(c.Request.Context(), id)
+	field, err := archiveFieldQuery(c.Request.URL.Query())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	var rows []store.Export
+	if field.Code != "" || field.Status != "" {
+		rows, err = h.Svc.ArchiveHistory(c.Request.Context(), id, field)
+	} else {
+		rows, err = h.Svc.History(c.Request.Context(), id)
+	}
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -190,7 +210,12 @@ func (h Handler) download(c *gin.Context) {
 	if !ok {
 		return
 	}
-	row, err := h.Svc.Download(c.Request.Context(), id, exportID)
+	field, err := archiveFieldQuery(c.Request.URL.Query())
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	row, err := h.Svc.DownloadArchiveExcel(c.Request.Context(), id, exportID, field)
 	if err != nil {
 		httpx.Fail(c, err)
 		return

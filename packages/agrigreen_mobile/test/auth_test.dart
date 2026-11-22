@@ -162,4 +162,38 @@ void main() {
       expect(v.message, 'Đã hủy đăng nhập.');
     });
   });
+
+  group('không có PIN (App KN — BRD 2.0 FN-CH-00.01, FN-05; ADR-0057)', () {
+    test('đăng nhập trực tuyến mở thẳng, không có bước PIN; phiên 72 giờ giữ nguyên', () async {
+      final flow = AuthFlow(session: session);
+      expect((await flow.start()).stage, AuthStage.needsOnlineLogin);
+      expect((await flow.loginOnline()).stage, AuthStage.unlocked);
+      expect(store.values.keys.where((k) => k.contains('pin')), isEmpty);
+
+      final restarted = AuthFlow(session: session);
+      clock.advance(const Duration(hours: 72));
+      expect((await restarted.start()).stage, AuthStage.unlocked);
+      clock.advance(const Duration(seconds: 1));
+      final v = await restarted.start();
+      expect(v.stage, AuthStage.needsOnlineLogin);
+      expect(v.message, contains('72 giờ'));
+    });
+
+    test('setPin/unlock không có tác dụng khi không có PIN', () async {
+      final flow = AuthFlow(session: session);
+      await flow.loginOnline();
+      expect((await flow.setPin('123456', '123456')).stage, AuthStage.unlocked);
+      expect((await flow.unlock('000000')).stage, AuthStage.unlocked);
+      expect(store.values.keys.where((k) => k.contains('pin')), isEmpty);
+    });
+
+    test('đăng xuất xóa token và buộc đăng nhập trực tuyến lại', () async {
+      final flow = AuthFlow(session: session);
+      await flow.loginOnline();
+      expect((await flow.signOut()).stage, AuthStage.needsOnlineLogin);
+      expect(store.values[SecureKeys.accessToken], isNull);
+      expect(store.values[SecureKeys.refreshToken], isNull);
+      expect((await flow.start()).stage, AuthStage.needsOnlineLogin);
+    });
+  });
 }

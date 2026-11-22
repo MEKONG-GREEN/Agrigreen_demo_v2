@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -175,6 +176,21 @@ func optRef(u *uuid.UUID) any {
 	return u.String()
 }
 
+func optDay(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.Format(time.DateOnly)
+}
+
+// officerName là tên cán bộ theo dõi điểm (NC-01) — null khi điểm chưa có cán bộ hoặc chưa tra được tên.
+func officerName(ref *uuid.UUID, names map[uuid.UUID]string) any {
+	if ref == nil {
+		return nil
+	}
+	return optStr(names[*ref])
+}
+
 func optDec(d *decimal.Decimal) any {
 	if d == nil {
 		return nil
@@ -267,6 +283,8 @@ func cycleOut(v app.CycleView, names map[uuid.UUID]string) gin.H {
 		"initial_weight_g": optDec(v.InitialWeightG), "age_days": v.AgeDays, "supplies": supplies,
 		"vaccination_batch_ref": optRef(v.VaccinationBatch), "note": optStr(v.Note), "status_reason": optStr(v.StatusReason),
 		"site_name": v.SiteName, "project_code": v.ProjectCode, "owner_label": optStr(v.OwnerLabel), "can_edit": v.CanEdit,
+		"project_name": v.ProjectName, "project_start": v.ProjectStart.Format(time.DateOnly), "project_end": optDay(v.ProjectEnd),
+		"officer_ref": optRef(v.OfficerRef), "officer_display": officerName(v.OfficerRef, names),
 		"accounting": gin.H{"cost_seed": optDec(v.CostSeed), "cost_feed": optDec(v.CostFeed), "cost_depreciation": optDec(v.CostDepreciation),
 			"cost_transport": optDec(v.CostTransport), "cost_vet": optDec(v.CostVet), "cost_probiotic": optDec(v.CostProbiotic),
 			"revenue_heads": v.RevenueHeads, "revenue_output_kg": optDec(v.OutputKg), "revenue_price": optDec(v.Price),
@@ -530,7 +548,20 @@ func (h Handler) writeEntry(c *gin.Context, v app.EntryView, err error, code int
 func (h Handler) listEntries(c *gin.Context) {
 	f := newForm()
 	q := app.EntryQuery{Cycle: queryRef(c, f, "cycle_ref"), Household: queryRef(c, f, "household_ref"), Project: queryRef(c, f, "project_ref"),
-		Status: c.Query("status"), Review: c.Query("review") == "true", Flagged: c.Query("flagged") == "true"}
+		Status: c.Query("status"), Review: c.Query("review") == "true", Flagged: c.Query("flagged") == "true",
+		Commune: c.Query("commune"), Form: c.Query("form"), Cursor: c.Query("cursor")}
+	from, to := c.Query("from"), c.Query("to")
+	q.From, q.To = f.date("from", &from), f.date("to", &to)
+	if s := c.Query("limit"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 || n > app.MaxEntryPage {
+			f.fail("limit", "số nguyên 1–200")
+		}
+		q.Limit = n
+	}
+	if len(q.Commune) > 20 {
+		f.fail("commune", "mã xã tối đa 20 ký tự")
+	}
 	if !f.done(c) {
 		return
 	}
@@ -543,7 +574,7 @@ func (h Handler) listEntries(c *gin.Context) {
 	for _, v := range l.Items {
 		items = append(items, entryOut(v, l.Names))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
+	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": optStr(l.NextCursor)})
 }
 
 func (h Handler) createEntry(c *gin.Context) {

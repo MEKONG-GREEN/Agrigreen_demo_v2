@@ -9,12 +9,13 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Icon } from "@/components/Icon";
 import { ActionBar, BackLink, LogPanel } from "@/components/patterns/detail";
 import { DataTable, FilterBar, FilterChip, PageHeader, StatusPill, type Column } from "@/components/patterns/list";
-import { appEvaluator, formLayout } from "@/kn/forms/api";
+import { appEvaluator, downloadTemplateXlsx, formLayout } from "@/kn/forms/api";
 import type { FormDefinition } from "@/kn/forms/types";
-import { FormEntry, communeRows, type GridCommune, type GridValues } from "@/kn/grid";
+import { FormEntry, communeRows, mergeGridImport, type GridCommune, type GridValues } from "@/kn/grid";
+import { saveBlob } from "@/lib/files";
 import { useBreadcrumbTail } from "@/shell/Breadcrumb";
-import type { RcTask, RcTaskDetail } from "../api";
-import { LoadState, TASK_STATUS_LABEL, TaskPill, ddmm, dt, num, taskAction, toLog, useAction, useLoad } from "../common";
+import { RawFile, type RcTask, type RcTaskDetail } from "../api";
+import { LoadState, TASK_STATUS_LABEL, TT_FORM_CODES, TaskPill, ddmm, dt, num, taskAction, toLog, useAction, useLoad } from "../common";
 
 const PAGE = 10;
 const TODO = new Set(["not_started", "draft", "adjustment_requested", "overdue"]);
@@ -60,7 +61,7 @@ export function TasksScreen({ periodType, title = "Công việc cần làm" }: {
           onChange={(status) => set({ status })}
           options={[{ value: "todo", label: "Cần làm" }, { value: "", label: "Tất cả" }, ...Object.entries(TASK_STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
         />
-        <FilterChip label="Biểu" value={f.form} onChange={(form) => set({ form })} options={[{ value: "", label: "Tất cả" }, ...["T01", "T03", "T04", "T05", "T06", "T07", "M01"].map((x) => ({ value: x, label: x }))]} />
+        <FilterChip label="Biểu" value={f.form} onChange={(form) => set({ form })} options={[{ value: "", label: "Tất cả" }, ...TT_FORM_CODES.map((x) => ({ value: x, label: x }))]} />
       </FilterBar>
       <LoadState s={s}>
         {(d) => {
@@ -128,6 +129,49 @@ export function TasksScreen({ periodType, title = "Công việc cần làm" }: {
   );
 }
 
+/**
+ * UP-04 thanh chọn kỳ: lùi/tiến giữa các kỳ của cùng đợt × biểu × xã, kèm hạn nộp và tên mẫu. Kỳ khác mở đúng công việc
+ * (đúng biểu, đúng kỳ, đúng xã) — chỉ kỳ đã phát hành, không tự tạo kỳ.
+ */
+export function PeriodBar({ detail }: { detail: RcTaskDetail }) {
+  const { cycleApi } = useAuth();
+  const t = detail.task;
+  const s = useLoad(() => cycleApi.tasks({ batch_id: t.batch_id, form_code: t.form_code, commune: t.commune_code }), [t.batch_id, t.form_code, t.commune_code]);
+  const list = [...(s.data?.items ?? [])].sort((a, b) => a.slot - b.slot);
+  const i = list.findIndex((x) => x.id === t.id);
+  const prev = i > 0 ? list[i - 1] : undefined;
+  const next = i >= 0 && i < list.length - 1 ? list[i + 1] : undefined;
+  const nav = (x: RcTask | undefined, label: string, dir: "prev" | "next") =>
+    x ? (
+      <Link className="btn btn-o btn-sm" href={`/kn/nhiem-vu/cong-viec/${x.id}`} aria-label={`${label}: ${x.period_label} (${x.period_range})`}>
+        {dir === "prev" ? <Icon name="chevronLeft" size={15} /> : null}
+        {label}
+        {dir === "next" ? <Icon name="chevronRight" size={15} /> : null}
+      </Link>
+    ) : (
+      <button type="button" className="btn btn-o btn-sm" disabled aria-label={`${label}: không có`}>
+        {dir === "prev" ? <Icon name="chevronLeft" size={15} /> : null}
+        {label}
+        {dir === "next" ? <Icon name="chevronRight" size={15} /> : null}
+      </button>
+    );
+  return (
+    <nav className="card sec row" aria-label="Chọn kỳ báo cáo" style={{ gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+      {nav(prev, "Kỳ trước", "prev")}
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <b>
+          {detail.period.label} ({detail.period.range_label})
+        </b>
+        {list.length > 1 && i >= 0 ? <span className="mute"> · kỳ {i + 1}/{list.length}</span> : null}
+        <div className="small">
+          Hạn nộp <b>{dt(detail.period.due_at)}</b> · Mẫu {t.form_code} — {detail.form_name}
+        </div>
+      </div>
+      {nav(next, "Kỳ sau", "next")}
+    </nav>
+  );
+}
+
 interface EntryData {
   detail: RcTaskDetail;
   siblings: RcTaskDetail[];
@@ -182,6 +226,25 @@ export function EntryScreen() {
             const col = d.def.columns.find((c) => c.letter === letter);
             return !!col && (col.kind === "input" || (col.kind === "per_period" && t.layout.open_slots.includes(col.period_slot ?? 0)));
           };
+          const downloadTemplate = async () => {
+            const form = t.batch.forms.find((x) => x.template_id === t.task.template_id);
+            if (!form) return;
+            await act.run(async () => {
+              const f = await downloadTemplateXlsx(api, form.template_id, form.version, `${t.task.form_code}-v${form.version}.xlsx`);
+              saveBlob(f.blob, f.name);
+            });
+          };
+          const importExcel = async (file: File) => {
+            setIssues([]);
+            const type = /\.xlsx$/i.test(file.name) ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv; charset=utf-8";
+            const r = await act.run(async () => cycleApi.importGrid(t.task.id, new RawFile(await file.arrayBuffer(), type)));
+            if (!r) return;
+            const openCommunes = gridCommunes.filter((c) => open.some((x) => x.task.commune_code === c.code));
+            const m = mergeGridImport(d.def, openCommunes, cur, r.rows, editable);
+            setValues(m.values);
+            act.setNote(`Đã nhập ${m.applied} dòng từ “${file.name}” vào bảng — kiểm tra rồi Lưu nháp hoặc Gửi.${m.skipped.length ? ` Bỏ qua ${m.skipped.length} dòng.` : ""}`);
+            if (m.skipped.length) setIssues(m.skipped.slice(0, 20).map((x) => `Dòng ${x.line} của tệp: ${x.reason}.`));
+          };
           const save = async (kind: "draft" | "submitted") => {
             setIssues([]);
             const targets = open.filter((x) => {
@@ -215,6 +278,27 @@ export function EntryScreen() {
                 {t.batch.season_label} · {t.period.label} ({t.period.range_label}) · Hạn nộp {dt(t.period.due_at)} · Sheet mẫu “{d.def.sheet_name}”
               </PageHeader>
               <ActionBar>
+                <a className="btn btn-o btn-sm" href="#lich-su-sua">
+                  <Icon name="clock" size={15} /> Lịch sử sửa
+                </a>
+                <button type="button" className="btn btn-o btn-sm" disabled={act.busy} onClick={() => void downloadTemplate()}>
+                  <Icon name="download" size={15} /> Tải mẫu Excel
+                </button>
+                <label className={`btn btn-o btn-sm${act.busy || !open.length ? " disabled" : ""}`}>
+                  <Icon name="upload" size={15} /> Nhập từ Excel
+                  <input
+                    type="file"
+                    accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    aria-label="Tệp Excel số liệu"
+                    style={{ display: "none" }}
+                    disabled={act.busy || !open.length}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) void importExcel(f);
+                    }}
+                  />
+                </label>
                 <button type="button" className="btn btn-o btn-sm" disabled={act.busy || !open.length} onClick={() => void save("draft")}>
                   Lưu nháp
                 </button>
@@ -222,9 +306,10 @@ export function EntryScreen() {
                   <Icon name="send" size={15} /> Gửi báo cáo
                 </button>
                 <button type="button" className="btn btn-o btn-sm" onClick={() => router.push("/kn/bao-cao/cua-xa")}>
-                  Lịch sử / Báo cáo của xã
+                  Báo cáo của xã
                 </button>
               </ActionBar>
+              <PeriodBar detail={t} />
               {!open.length ? (
                 <div className="alert alert-warn" role="status">
                   <Icon name="lock" />
@@ -268,7 +353,7 @@ export function EntryScreen() {
                   ariaLabel={`Nhập ${t.task.form_code}`}
                 />
               ) : null}
-              <section className="card sec" style={{ marginTop: 16 }} aria-label="Lịch sử sửa">
+              <section id="lich-su-sua" className="card sec" style={{ marginTop: 16 }} aria-label="Lịch sử sửa">
                 <h2>Lịch sử sửa (phiên bản bất biến)</h2>
                 <ul className="list-plain">
                   {d.siblings.flatMap((x) =>

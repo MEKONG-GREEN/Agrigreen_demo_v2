@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
@@ -136,25 +136,18 @@ describe("danh mục nhân sự — backend giả lập theo hợp đồng /v1/h
 describe("màn Danh mục nhân sự", () => {
   beforeEach(() => resetHrm());
 
-  it("Admin: thấy nhãn dữ liệu mẫu, lưới ngạch, bảng hệ số và thêm chức vụ", async () => {
+  it("Admin: dữ liệu mẫu, bảng hệ số, STT và liên kết Thêm/Sửa/Lịch sử trên trang riêng", async () => {
     auth.api = (await clientFor("kn-admin", "asg-admin")).api;
     const user = userEvent.setup();
     render(<HrmCatalogScreen />);
     expect(await screen.findByText(/dữ liệu mẫu/)).toBeInTheDocument();
     expect(await screen.findByText("01.002")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Chuyên viên chính/ }));
-    expect(
-      await screen.findByText(/Bảng hệ số — Chuyên viên chính/),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Chuyên viên chính/ })).toHaveAttribute("href", expect.stringContaining("/he-so/01.002?at="));
     await user.click(screen.getByRole("button", { name: /^Chức vụ/ }));
-    await user.click(await screen.findByRole("button", { name: "Thêm" }));
-    const dlg = await screen.findByRole("dialog");
-    await user.type(within(dlg).getByLabelText(/^Mã/), "truong_tram");
-    await user.type(within(dlg).getByLabelText(/^Tên/), "Trạm trưởng");
-    await user.click(within(dlg).getByRole("button", { name: "Lưu" }));
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-    );
-    expect(await screen.findByText("Trạm trưởng")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Thêm" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/them-moi");
+    expect(screen.getByRole("link", { name: "Sửa vien_chuc" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/muc/vien_chuc/sua");
+    expect(screen.getByRole("link", { name: "vien_chuc" })).toHaveAttribute("href", "/kn/nhan-su/danh-muc/position/muc/vien_chuc");
+    expect(screen.getByRole("columnheader", { name: "STT" })).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

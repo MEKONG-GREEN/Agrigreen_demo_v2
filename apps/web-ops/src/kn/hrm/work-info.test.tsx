@@ -5,6 +5,7 @@ import { createApiClient, type ApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetHrm } from "@/api/mock/kn-hrm";
 import { resetHrmStaff } from "@/api/mock/kn-hrm-staff";
+import * as StaffScreens from "./StaffScreens";
 import { hrmDashboardAlerts } from "./dashboard-alerts";
 import type { PromotionList } from "./promotion-api";
 import { createStaffApi, type HrmStaffEvent, type HrmStaffItem } from "./staff-api";
@@ -20,14 +21,15 @@ import {
   validateWork,
   workKpis,
 } from "./work-info";
-import { HrmWorkInfoDetailScreen, HrmWorkInfoScreen } from "./WorkInfoScreens";
+import { WorkEditor, HrmWorkInfoDetailScreen, HrmWorkInfoEditScreen, HrmWorkInfoScreen } from "./WorkInfoScreens";
 
 // W11.29 — FN-08 Thông tin làm việc (màn `tl`, `tl.d` của prototype HCTH) và khối Cảnh báo của Dashboard nhân sự.
 
+const push = vi.fn();
 const params: { id: string } = { id: "" };
 vi.mock("next/navigation", () => ({
   usePathname: () => "/kn/nhan-su/ho-so/thong-tin-lam-viec",
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), push }),
   useParams: () => params,
 }));
 const auth: { api: ApiClient | null } = { api: null };
@@ -174,11 +176,12 @@ describe("Dashboard nhân sự — Cảnh báo (prototype `dash`)", () => {
 
 describe("màn Thông tin làm việc (giả lập API /v1/hrm/staff*)", () => {
   beforeEach(() => {
+    push.mockClear();
     resetHrm();
     resetHrmStaff();
   });
 
-  it("Admin: thẻ số liệu, cập nhật ngày nghỉ việc qua hộp thoại → Đã nghỉ việc; chi tiết có ảnh hưởng NS01/NS02", async () => {
+  it("Admin: thẻ số liệu, cập nhật ngày nghỉ việc qua route → Đã nghỉ việc; chi tiết có ảnh hưởng NS01/NS02", async () => {
     const c = await clientFor("kn-admin", "asg-admin");
     auth.api = c.api;
     const user = userEvent.setup();
@@ -187,18 +190,21 @@ describe("màn Thông tin làm việc (giả lập API /v1/hrm/staff*)", () => {
     expect(await within(table).findByText("VC-00001")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Đang làm việc/ })).toHaveTextContent("3");
 
-    await user.click(screen.getByRole("button", { name: "Cập nhật VC-00001" }));
-    const dlg = await screen.findByRole("dialog");
-    await user.click(within(dlg).getByRole("button", { name: "Lưu" }));
-    expect(within(dlg).getByRole("alert")).toHaveTextContent("Không có thay đổi để lưu.");
-    await user.type(within(dlg).getByLabelText("Ngày nghỉ việc"), "2026-09-30");
-    await waitFor(() => expect(within(dlg).getByLabelText("Lý do nghỉ")).toBeEnabled());
-    await user.selectOptions(within(dlg).getByLabelText("Lý do nghỉ"), "nghi_huu");
-    await user.click(within(dlg).getByRole("button", { name: "Lưu" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(await screen.findByText(/Hồ sơ chuyển “Đã nghỉ việc”/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Đang làm việc/ })).toHaveTextContent("2"));
-    list.unmount();
+    const vc = (await c.sa.list({ q: "VC-00001" })).items[0]!;
+    expect(screen.getByRole("link", { name: "Cập nhật VC-00001" })).toHaveAttribute("href", `/kn/nhan-su/ho-so/thong-tin-lam-viec/${vc.id}/sua`);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    list.unmount(); params.id = vc.id;
+    const editor = render(<HrmWorkInfoEditScreen />);
+    await screen.findByRole("heading", { name: /Cập nhật thông tin làm việc/ });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Lưu" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Không có thay đổi để lưu.");
+    await user.type(screen.getByLabelText("Ngày nghỉ việc"), "2026-09-30");
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /Lý do nghỉ/ })).toBeEnabled());
+    await user.selectOptions(screen.getByRole("combobox", { name: /Lý do nghỉ/ }), "nghi_huu");
+    await user.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/kn/nhan-su/ho-so/thong-tin-lam-viec/${vc.id}`));
+    editor.unmount();
 
     const vc1 = (await c.sa.list({ q: "VC-00001" })).items[0]!;
     expect(vc1.current).toMatchObject({ status: "left", ended_on: "2026-09-30", leave_reason: "nghi_huu" });
@@ -217,4 +223,60 @@ describe("màn Thông tin làm việc (giả lập API /v1/hrm/staff*)", () => {
     expect(await screen.findByText("Bạn không có quyền thực hiện thao tác này.")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
+  it("route sửa: lỗi từng trường chặn ghi; Hủy về danh sách", async () => {
+    const c = await clientFor("kn-admin", "asg-admin"); auth.api = c.api;
+    const vc = (await c.sa.list({ q: "VC-00001" })).items[0]!; params.id = vc.id;
+    const before = (await c.sa.get(vc.id)).events.length;
+    const user = userEvent.setup(); render(<HrmWorkInfoEditScreen />);
+    const start = await screen.findByLabelText(/Ngày vào làm/);
+    await user.clear(start); await user.click(screen.getByRole("button", { name: "Lưu" }));
+    expect(start).toHaveAttribute("aria-invalid", "true");
+    expect(start).toHaveAccessibleDescription("Nhập ngày vào làm.");
+    expect((await c.sa.get(vc.id)).events).toHaveLength(before);
+    await user.type(start, "2012-03-01");
+    await user.type(screen.getByLabelText("Ngày nghỉ việc"), "2026-09-30");
+    await user.click(screen.getByRole("button", { name: "Lưu" }));
+    expect(screen.getByRole("combobox", { name: /Lý do nghỉ/ })).toHaveAttribute("aria-invalid", "true");
+    expect((await c.sa.get(vc.id)).events).toHaveLength(before);
+    await user.click(screen.getByRole("button", { name: "Hủy" }));
+    expect(push).toHaveBeenCalledWith("/kn/nhan-su/ho-so/thong-tin-lam-viec");
+  });
+  it("route sửa trực tiếp: cấp Xã không có form ghi", async () => {
+    auth.api = (await clientFor("kn-loc", "asg-loc-xa", "chan_nuoi_thuy_san")).api;
+    params.id = "00000000-0000-0000-0000-000000000001"; render(<HrmWorkInfoEditScreen />);
+    expect(await screen.findByText("Bạn không có quyền thực hiện thao tác này.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Lưu" })).not.toBeInTheDocument();
+  });
+
+  it("validation guard: ngày nghỉ trước ngày vào làm không gọi API ghi", async () => {
+    const c = await clientFor("kn-admin", "asg-admin"); auth.api = c.api;
+    const vc = (await c.sa.list({ q: "VC-00001" })).items[0]!;
+    const d = await c.sa.get(vc.id);
+    const add = vi.spyOn(c.sa, "addEvent").mockResolvedValue({} as Awaited<ReturnType<typeof c.sa.addEvent>>);
+    const replace = vi.spyOn(c.sa, "replaceEvent");
+    const user = userEvent.setup();
+    render(<WorkEditor sa={c.sa} d={d} reasons={[{code:"nghi_huu",name:"Nghỉ hưu"}]} onClose={vi.fn()} onDone={vi.fn()} />);
+    await user.type(screen.getByLabelText("Ngày nghỉ việc"), "1900-01-01");
+    await user.selectOptions(screen.getByRole("combobox", { name: /Lý do nghỉ/ }), "nghi_huu");
+    await user.click(screen.getByRole("button", { name: "Lưu" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Ngày nghỉ việc không được trước ngày vào làm.");
+    expect(add).not.toHaveBeenCalled(); expect(replace).not.toHaveBeenCalled();
+  });
+
+  it.each(["scope", "record"])("route sửa fail-closed khi thiếu quyền %s", async (missing) => {
+    const c = await clientFor("kn-admin", "asg-admin"); auth.api = c.api;
+    const vc = (await c.sa.list({ q: "VC-00001" })).items[0]!; params.id = vc.id;
+    const d = await c.sa.get(vc.id); const a = await c.sa.access();
+    const get = vi.fn().mockResolvedValue({ ...d, can: {} });
+    const hook = vi.spyOn(StaffScreens, "useStaffApi").mockReturnValue({ ...c.sa, get,
+      access: async () => missing === "scope" ? { ...a, perms: {} } : a });
+    try {
+      render(<HrmWorkInfoEditScreen />);
+      expect(await screen.findByRole("alert")).toHaveTextContent(missing === "scope"
+        ? "Bạn không có quyền cập nhật thông tin làm việc." : "Bạn không có quyền cập nhật hồ sơ này.");
+      expect(screen.queryByRole("button", { name: "Lưu" })).not.toBeInTheDocument();
+      if (missing === "scope") expect(get).not.toHaveBeenCalled();
+    } finally { hook.mockRestore(); }
+  });
+
 });

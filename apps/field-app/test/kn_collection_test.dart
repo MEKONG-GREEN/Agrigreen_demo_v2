@@ -25,36 +25,52 @@ void main() {
   });
   tearDown(() => h.dispose());
 
-  test('FN-XA-03.03 danh sách HTX: phân trang cursor, SĐT che, xem bản đệm khi ngoại tuyến', () async {
+  test('FN-XA-03.03 / #161 danh sách hồ sơ KN: /v1/kn/producer-records theo loại, phân trang cursor, SĐT che, bản đệm khi ngoại tuyến', () async {
     var offline = false;
+    final paths = <String>[];
     h.fake.onGet = (path, q) async {
       if (offline) throw NetworkException('offline');
       queries.add(q);
-      if (path != '/v1/kn/cooperatives') return null;
+      paths.add(path);
+      if (path != '/v1/kn/producer-records') return null;
+      if (q?['kind'] == 'household') {
+        return {
+          'items': [
+            {'ref': 'hh-1', 'kind': 'household', 'display_name': 'Trần T. B'},
+          ],
+          'next_cursor': null,
+        };
+      }
       return q?['cursor'] == null
           ? {
               'items': [
                 {
                   'ref': 'c1',
+                  'kind': 'cooperative',
                   'name': 'HTX Mỹ Hòa',
                   'representative': {
                     'label': 'Nguyễn V. A',
                     'masked_phone': '0912•••123',
                   },
                 },
-                {'ref': 'c2', 'name': 'HTX Tân Lập'},
+                {'ref': 'c2', 'kind': 'cooperative', 'name': 'HTX Tân Lập'},
               ],
               'next_cursor': 'p2',
             }
           : {
               'items': [
-                {'ref': 'c3', 'name': 'HTX Phú Lộc'},
+                {'ref': 'c3', 'kind': 'cooperative', 'name': 'HTX Phú Lộc'},
               ],
               'next_cursor': null,
             };
     };
-    final p1 = await svc.cooperatives(commune: '30280', q: ' Mỹ ');
+    final p1 = await svc.records(
+      kind: KnRecordKind.cooperative,
+      commune: '30280',
+      q: ' Mỹ ',
+    );
     expect(queries.last, {
+      'kind': 'cooperative',
       'commune': '30280',
       'status': 'active',
       'q': 'Mỹ',
@@ -66,59 +82,112 @@ void main() {
       (p1.items.first['representative'] as Map)['masked_phone'],
       '0912•••123',
     );
-    final p2 = await svc.cooperatives(
+    final p2 = await svc.records(
+      kind: KnRecordKind.cooperative,
       commune: '30280',
       q: 'Mỹ',
       cursor: p1.nextCursor,
     );
     expect(p2.items.single['ref'], 'c3');
     expect(p2.hasMore, isFalse);
+    // Nông hộ của một HTX: lọc parent_ref, không gửi q (tên chủ hộ ở kho định danh).
+    final hh = await svc.households('c1');
+    expect(queries.last, {
+      'kind': 'household',
+      'status': 'active',
+      'parent_ref': 'c1',
+      'limit': '2',
+    });
+    expect(hh.items.single['ref'], 'hh-1');
+    expect(paths.toSet(), {'/v1/kn/producer-records'});
     offline = true;
-    final cached = await svc.cooperatives(commune: '30280', q: 'Mỹ');
+    final cached = await svc.records(
+      kind: KnRecordKind.cooperative,
+      commune: '30280',
+      q: 'Mỹ',
+    );
     expect(cached.fromCache, isTrue);
     expect(cached.items, hasLength(2));
     await expectLater(
-      svc.cooperatives(commune: '30280', q: 'Mỹ', cursor: 'p2'),
+      svc.records(
+        kind: KnRecordKind.cooperative,
+        commune: '30280',
+        q: 'Mỹ',
+        cursor: 'p2',
+      ),
       throwsA(isA<NetworkException>()),
     );
   });
 
-  test('FN-XA-03.03 thêm HTX: Idempotency-Key cố định; trùng tên 409 → báo lỗi; mất mạng → xếp hàng rồi phát lại', () async {
-    final ok = await svc.createCooperative(
+  test('FN-XA-03.03 / #161 thêm HTX = POST /v1/kn/producer-records: Idempotency-Key cố định; trùng tên 409 → báo lỗi; mất mạng → xếp hàng rồi phát lại', () async {
+    final bodies = <Map<String, Object?>?>[];
+    h.fake.onPost = (path, body) async {
+      bodies.add(body);
+      return null;
+    };
+    final ok = await svc.createRecord(
+      kind: KnRecordKind.cooperative,
       name: ' HTX Mỹ Hòa ',
       communeCode: '30280',
       areaHa: '12,5',
-      repName: 'Nguyễn Văn A',
-      repPhone: '0912345123',
+      taxCode: ' ',
+      address: 'Ấp 3',
+      personName: 'Nguyễn Văn A',
+      personPhone: '0912345123',
+      htxRef: 'htx-pub-1',
     );
     expect(ok.queued, isFalse);
     final (path, key) = h.fake.actionCalls.single;
-    expect(path, '/v1/kn/cooperatives');
+    expect(path, '/v1/kn/producer-records');
     expect(key, startsWith('act:'));
+    expect(bodies.single, {
+      'kind': 'cooperative',
+      'commune_code': '30280',
+      'name': 'HTX Mỹ Hòa',
+      'area_ha': '12.5',
+      'address': 'Ấp 3',
+      'representative': {'full_name': 'Nguyễn Văn A', 'phone': '0912345123'},
+      'htx_ref': 'htx-pub-1',
+    });
 
-    h.fake.actionErrors['/v1/kn/cooperatives'] = (
+    h.fake.actionErrors['/v1/kn/producer-records'] = (
       409,
-      'party.cooperative_name_taken',
+      'extension.kn_record_name_taken',
     );
     await expectLater(
-      svc.createCooperative(name: 'HTX Mỹ Hòa', communeCode: '30280'),
+      svc.createRecord(
+        kind: KnRecordKind.cooperative,
+        name: 'HTX Mỹ Hòa',
+        communeCode: '30280',
+        personName: 'Nguyễn Văn A',
+        personPhone: '0912345123',
+      ),
       throwsA(
         isA<KnCommandError>().having(
           (e) => e.message,
           'message',
-          'Tên HTX đã có. Đặt tên khác.',
+          'Tên đã có trong xã (cùng loại, đang hoạt động). Đặt tên khác.',
         ),
       ),
     );
     h.fake.actionErrors.clear();
 
     h.fake.failNextActions = 1;
-    final q = await svc.createCooperative(
-      name: 'HTX Tân Lập',
+    final q = await svc.createRecord(
+      kind: KnRecordKind.coopGroup,
+      name: 'THT Tân Lập',
       communeCode: '30281',
+      personName: 'Lê Văn C',
+      personPhone: '0987654321',
+      taxCode: '0123456789',
+      htxRef: 'x',
     );
     expect(q.queued, isTrue);
     final qa = (await h.actions.pending()).single;
+    expect(qa.kind, ApiActionKind.knRecordCreate);
+    // THT: không MST, không liên kết HTX đã công bố.
+    expect(qa.body!.containsKey('tax_code'), isFalse);
+    expect(qa.body!.containsKey('htx_ref'), isFalse);
     await h.sync.syncOnce(force: true);
     expect(await h.actions.pendingCount(), 0);
     // Phát lại cùng Idempotency-Key (máy chủ chỉ thực hiện một lần).
@@ -126,53 +195,196 @@ void main() {
       h.fake.actionCalls.where((c) => c.$2 == qa.idempotencyKey),
       hasLength(2),
     );
+    expect(
+      h.fake.actionCalls.map((c) => c.$1),
+      everyElement('/v1/kn/producer-records'),
+    );
   });
 
-  test('FN-XA-03.03 sửa HTX / nông hộ = PUT; ngoại tuyến xếp hàng, SyncService phát lại bằng PUT', () async {
-    var down = true;
-    h.fake.onSend = (method, path, body) async {
-      if (down) throw NetworkException('offline');
-      return null;
-    };
-    final r = await svc.updateHousehold(
-      'hh-1',
-      areaHa: '1,25',
-      reason: 'đo lại',
-    );
-    expect(r.queued, isTrue);
-    final a = (await h.actions.pending()).single;
-    expect(a.kind, ApiActionKind.knHouseholdUpdate);
-    expect(a.method, 'PUT');
-    expect(a.body, {'cultivated_area_ha': '1.25', 'reason': 'đo lại'});
-    down = false;
-    await h.sync.syncOnce(force: true);
-    final last = h.fake.sendCalls.last;
-    expect(last.$1, 'PUT');
-    expect(last.$2, '/v1/kn/households/hh-1');
-    expect(last.$3, a.idempotencyKey);
-    expect(await h.actions.pendingCount(), 0);
-  });
-
-  test('FN-XA-03.03 vô hiệu hóa: lý do ≥ 20 ký tự (= CHECK sổ org_event), trả cảnh báo dữ liệu liên kết', () async {
+  test('#161 thêm nông hộ: kind household, chủ hộ (holder), thuộc HTX (parent_ref), không tên/MST/địa chỉ; thiếu chủ hộ chặn trên máy', () async {
     expect(
-      () => svc.deactivateCooperative('c1', 'ngắn'),
-      throwsA(isA<KnCommandError>()),
-    );
-    // 19 ký tự (có dấu): máy chủ từ chối → chặn ngay trên máy, không xếp hàng.
-    expect(
-      () => svc.deactivateCooperative(
-        'c1',
-        'HTX giải thể QĐ 12'.padRight(19, '.'),
+      () => svc.createRecord(
+        kind: KnRecordKind.household,
+        communeCode: '30280',
+        parentRef: 'c1',
       ),
       throwsA(isA<KnCommandError>()),
     );
-    h.fake.onPost = (path, body) async => {
-      'cooperative': {'ref': 'c1', 'active': false},
-      'warnings': {'households': 3, 'plots': 2, 'machines': 0},
+    expect(h.fake.actionCalls, isEmpty);
+    h.fake.failNextActions = 1;
+    final r = await svc.createRecord(
+      kind: KnRecordKind.household,
+      communeCode: '30280',
+      parentRef: 'c1',
+      name: 'bỏ qua',
+      address: 'bỏ qua',
+      personName: ' Trần Thị B ',
+      personPhone: '0911222333',
+      areaHa: '1,25',
+    );
+    expect(r.queued, isTrue);
+    final a = (await h.actions.pending()).single;
+    expect(a.path, '/v1/kn/producer-records');
+    expect(a.body, {
+      'kind': 'household',
+      'commune_code': '30280',
+      'area_ha': '1.25',
+      'holder': {'full_name': 'Trần Thị B', 'phone': '0911222333'},
+      'parent_ref': 'c1',
+    });
+  });
+
+  test('#161 diện tích: số thập phân thường, kiểm chuỗi trước khi đọc số (1e5, chuỗi dài, > 1.000.000, > 4 chữ số lẻ bị chặn)', () async {
+    expect(normalizeAreaHa(' 12,5 '), ('12.5', null));
+    expect(normalizeAreaHa(''), (null, null));
+    expect(normalizeAreaHa('1000000'), ('1000000', null));
+    expect(normalizeAreaHa('1000000.0000'), ('1000000.0000', null));
+    for (final bad in [
+      '1e5',
+      '1e100000',
+      '1e-100000',
+      '-1',
+      '+1',
+      '1.23456',
+      '1000000.0001',
+      '9999999',
+      '1' * 40,
+      '0x10',
+      '1,2,3',
+      'NaN',
+    ]) {
+      expect(normalizeAreaHa(bad).$2, isNotNull, reason: bad);
+      expect(
+        () => svc.createRecord(
+          kind: KnRecordKind.cooperative,
+          communeCode: '30280',
+          name: 'HTX A',
+          personName: 'Nguyễn Văn A',
+          personPhone: '0912345123',
+          areaHa: bad,
+        ),
+        throwsA(isA<KnCommandError>()),
+        reason: bad,
+      );
+    }
+    expect(h.fake.actionCalls, isEmpty);
+  });
+
+  test('#161 sửa hồ sơ = POST /{ref} gửi đủ trường + base_version; ngoại tuyến xếp hàng, phát lại bằng POST cùng khóa', () async {
+    const coop = {
+      'ref': 'c1',
+      'kind': 'cooperative',
+      'commune_code': '30280',
+      'name': 'HTX Mỹ Hòa',
+      'area_ha': '12.5',
+      'tax_code': '0123456789',
+      'address': 'Ấp 3',
+      'htx_ref': 'htx-pub-1',
+      'parent_ref': null,
+      'version': 4,
     };
-    final r = await svc.deactivateCooperative('c1', 'HTX giải thể theo QĐ 12');
-    expect((r.response!['warnings'] as Map)['plots'], 2);
-    expect(h.fake.actionCalls.single.$1, '/v1/kn/cooperatives/c1/deactivate');
+    h.fake.failNextActions = 1;
+    final r = await svc.updateRecord(coop, areaHa: '13,75', htxRef: '');
+    expect(r.queued, isTrue);
+    final a = (await h.actions.pending()).single;
+    expect(a.kind, ApiActionKind.knRecordUpdate);
+    expect(a.method, 'POST');
+    expect(a.path, '/v1/kn/producer-records/c1');
+    // Máy chủ thay toàn bộ trường: giữ tên/MST/địa chỉ hiện có, bỏ liên kết
+    // HTX khi chọn "Không liên kết"; người đại diện không gửi = giữ nguyên.
+    expect(a.body, {
+      'kind': 'cooperative',
+      'commune_code': '30280',
+      'name': 'HTX Mỹ Hòa',
+      'area_ha': '13.75',
+      'tax_code': '0123456789',
+      'address': 'Ấp 3',
+      'base_version': 4,
+    });
+    await h.sync.syncOnce(force: true);
+    expect(h.fake.actionCalls.last, (
+      '/v1/kn/producer-records/c1',
+      a.idempotencyKey,
+    ));
+    expect(h.fake.sendCalls, isEmpty);
+    expect(await h.actions.pendingCount(), 0);
+
+    // Nông hộ: chỉ đổi diện tích, giữ HTX cha; xung đột phiên bản → thông điệp.
+    h.fake.actionErrors['/v1/kn/producer-records/hh-1'] = (
+      409,
+      'extension.kn_record_version_conflict',
+    );
+    await expectLater(
+      svc.updateRecord(const {
+        'ref': 'hh-1',
+        'kind': 'household',
+        'commune_code': '30280',
+        'parent_ref': 'c1',
+        'area_ha': '1',
+        'version': 2,
+      }, areaHa: '1,5'),
+      throwsA(
+        isA<KnCommandError>().having(
+          (e) => e.message,
+          'message',
+          'Hồ sơ đã được người khác cập nhật — tải lại rồi sửa.',
+        ),
+      ),
+    );
+    final failed = (await h.actions.ofKind(ApiActionKind.knRecordUpdate)).last;
+    expect(failed.body, {
+      'kind': 'household',
+      'commune_code': '30280',
+      'area_ha': '1.5',
+      'parent_ref': 'c1',
+      'base_version': 2,
+    });
+    // Thiếu phiên bản (bản cũ) → không gửi.
+    expect(
+      () => svc.updateRecord(const {'ref': 'c9', 'kind': 'cooperative'}),
+      throwsA(isA<KnCommandError>()),
+    );
+  });
+
+  test('#161 vô hiệu hóa / kích hoạt lại: lý do 10–1000 ký tự kiểm trên máy, gửi base_version', () async {
+    const rec = {'ref': 'c1', 'kind': 'cooperative', 'version': 3};
+    expect(
+      () => svc.setRecordStatus(rec, deactivate: true, reason: 'ngắn'),
+      throwsA(isA<KnCommandError>()),
+    );
+    // 9 ký tự có dấu: chặn ngay trên máy, không xếp hàng.
+    expect(
+      () => svc.setRecordStatus(rec, deactivate: true, reason: 'giải thể'),
+      throwsA(isA<KnCommandError>()),
+    );
+    expect(
+      () => svc.setRecordStatus(rec, deactivate: true, reason: 'a' * 1001),
+      throwsA(isA<KnCommandError>()),
+    );
+    expect(await h.actions.pending(), isEmpty);
+    final bodies = <Map<String, Object?>?>[];
+    h.fake.onPost = (path, body) async {
+      bodies.add(body);
+      return null;
+    };
+    await svc.setRecordStatus(
+      rec,
+      deactivate: true,
+      reason: ' HTX giải thể theo QĐ 12 ',
+    );
+    await svc.setRecordStatus(
+      const {'ref': 'c1', 'kind': 'cooperative', 'version': 4},
+      deactivate: false,
+      reason: 'Hoạt động trở lại',
+    );
+    expect(h.fake.actionCalls.map((c) => c.$1), [
+      '/v1/kn/producer-records/c1/deactivate',
+      '/v1/kn/producer-records/c1/reactivate',
+    ]);
+    expect(bodies, [
+      {'reason': 'HTX giải thể theo QĐ 12', 'base_version': 3},
+      {'reason': 'Hoạt động trở lại', 'base_version': 4},
+    ]);
   });
 
   test('FN-XA-03.04 máy móc: số nguyên ≥ 0, trùng loại gợi ý cập nhật dòng có sẵn, PUT thay toàn bộ', () async {

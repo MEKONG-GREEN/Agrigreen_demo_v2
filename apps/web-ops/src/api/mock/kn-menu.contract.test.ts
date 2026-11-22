@@ -87,6 +87,20 @@ describe("fromKnMenu — trình bày Hình 3c", () => {
     const odd: KnMenu = { ...admin, groups: [{ key: "x", label: "X", items: [{ ...admin.groups[0]!.items[0]!, icon: "khong-co" }] }] };
     expect(fromKnMenu(odd).groups[0]!.items[0]!.icon).toBe("file");
   });
+
+  it("Admin: khóa phòng ban có hậu tố .<org_ref> (trùng mã giữa hai đơn vị, #122) vẫn ra tên ngắn", () => {
+    const admin = cases.find((c) => c.name === "admin")!.menu;
+    const suffixed: KnMenu = {
+      ...admin,
+      groups: admin.groups.map((g) =>
+        g.key === "phong_ban"
+          ? { ...g, items: g.items.map((it) => (it.enabled ? it : { ...it, key: `${it.key}.0b7a5c1e-1f2d-4c3b-9a8e-7d6c5b4a3f21` })) }
+          : g,
+      ),
+    };
+    const pb = fromKnMenu(suffixed).groups.find((g) => g.key === "phong_ban")!;
+    expect(pb.items.slice(1, 3).map((i) => i.label)).toEqual(["Chăn nuôi - TS", "Kế hoạch - TC"]);
+  });
 });
 
 describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): menu theo Update prototype và hình khách gửi", () => {
@@ -134,10 +148,13 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     expect(groupsOf("kn_xa/chan_nuoi_thuy_san")).toEqual({
       "Điều hành": ["Việc cần làm", "Lịch trực KSGM của tôi", "Lịch công tác"],
       "Báo cáo": ["KSGM hằng ngày", "Nhập liệu tuần chăn nuôi", "Khai thác thủy sản tuần", "Báo cáo công việc tuần", "Báo cáo dịch bệnh"],
-      "Dữ liệu": ["Hộ mô hình", ["Nhật ký sản xuất", ["Thủy sản", "Chăn nuôi"]], "Lịch tiêm phòng", "Bản đồ vùng dịch", "Điểm trình diễn", "Quy trình, văn bản"],
+      "Dữ liệu": ["Hộ mô hình", "Danh sách hộ chăn nuôi", ["Nhật ký sản xuất", ["Thủy sản", "Chăn nuôi"]], "Lịch tiêm phòng", "Bản đồ vùng dịch", "Điểm trình diễn", "Quy trình, văn bản"],
       "Dùng chung": ["Contact"],
     });
     expect(menuOf("kn_xa/chan_nuoi_thuy_san").default_route).toBe("/kn/cnts/bao-cao-ky");
+    // BF-CN-CATCH #112 (UP-09): "Khai thác thủy sản tuần" mở màn 4 sheet ĐÁNH BẮT riêng.
+    const bc = menuOf("kn_xa/chan_nuoi_thuy_san").groups.find((g) => g.label === "Báo cáo")!;
+    expect(bc.items.find((i) => i.label === "Khai thác thủy sản tuần")!.route).toBe("/kn/cnts/khai-thac-thuy-san");
   });
 
   it("UP-10 CNTS Cấp Tỉnh đúng hình khách gửi 23/10", () => {
@@ -146,15 +163,16 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
       "Trang chủ phòng", // W11.54: trang chủ phòng (FN-17); "Trang chủ" theo hình giữ Dashboard
       "Trang chủ",
       "Cảnh báo",
-      ["Biểu mẫu", ["Thiết kế biểu mẫu*", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
+      ["Biểu mẫu", ["Thiết kế biểu mẫu", "Phát hành, theo dõi nộp", "Cấu hình nhắc nhở", "Rà soát nhật ký", "Cấp quyền"]],
       ["Lịch", ["Lịch trực KSGM", "Lịch tiêm phòng", "Lịch công tác cán bộ xã", "Lịch công tác phòng"]],
-      ["Chiến dịch điều tra", ["Quản lý chiến dịch", "Tạo chiến dịch*"]],
+      ["Chiến dịch điều tra", ["Quản lý chiến dịch", "Tạo chiến dịch"]],
     ]);
-    expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ*", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);
+    // W11.45: Báo cáo định kỳ BM-11 có màn.
+    expect(g["Báo cáo"]).toEqual(["Báo cáo định kỳ", "KSGM tuần, tháng", "Thủy sản (Phụ lục 2)", "Báo cáo dịch bệnh", KHTC]);
     expect(g["Dữ liệu"]).toEqual([
-      ["Số liệu cấp xã", ["Nhập liệu tuần*", "Khai thác thủy sản*", "Nhật ký sản xuất*", "Lịch tiêm (thực tế)"]],
+      ["Số liệu cấp xã", ["Nhập liệu tuần", "Khai thác thủy sản", "Nhật ký sản xuất", "Lịch tiêm (thực tế)", "Danh sách hộ chăn nuôi"]], // BF-CN-CATCH #112, BF-CN-XA-DATA #175: đủ màn; #251 FN-10 v4.0
       "Bản đồ vùng dịch",
-      ["Dự án KNQG", ["Dự án, điểm trình diễn", "Mẫu biểu dự án*"]],
+      ["Dự án KNQG", ["Dự án, điểm trình diễn", "Mẫu biểu dự án"]], // W11.53: Mẫu 01–07 có màn
       "Quy trình, văn bản",
     ]);
     // Số đếm lịch chờ duyệt giữ ở "Lịch công tác cán bộ xã".
@@ -170,22 +188,24 @@ describe("kn.menu/v7 (BF-MENU #98, R-A6; v7 MENU-V7 #146 sau chồng gói W): me
     expect(leaves("kn_tinh/thong_tin_truyen_thong")).toEqual(
       expect.arrayContaining(["dieu_hanh:tinh.bao_gia.tien_do", "dieu_hanh:tinh.bao_gia.kiem_duyet", "dieu_hanh:tinh.bao_gia.cau_hinh", "bao_cao:tinh.bao_gia.bang_gia",
         "bao_cao:tinh.bao_gia.bien_dong", "bao_cao:tinh.bao_gia.gia_thanh" /* W11.78 */, "bao_cao:tinh.bao_gia.dashboard", "bao_cao:tinh.bao_gia.thong_ke",
-        "du_lieu:tinh.bao_gia.dieu_tra" /* W11.78 */]),
+        "du_lieu:tinh.bao_gia.dieu_tra" /* W11.78 */, "dieu_hanh:tinh.bao_gia.de_xuat_mat_hang"]),
     );
     expect(leaves("kn_xa/thong_tin_truyen_thong")).toEqual(
-      expect.arrayContaining(["dieu_hanh:xa.bao_gia.nhap", "dieu_hanh:xa.bao_gia.xac_minh", "bao_cao:xa.bao_gia.bang_gia", "du_lieu:xa.bao_gia.lich_su"]),
+      expect.arrayContaining(["dieu_hanh:xa.bao_gia.nhap", "dieu_hanh:xa.bao_gia.xac_minh", "bao_cao:xa.bao_gia.bang_gia", "du_lieu:xa.bao_gia.lich_su", "dieu_hanh:xa.bao_gia.de_xuat_mat_hang"]),
     );
+    expect(leaves("kn_tw/ke_hoach_tai_chinh")).toContain("bao_cao:tw.khtc.bao_cao_tinh");
     expect(leaves("kn_tw/thong_tin_truyen_thong")).toContain("bao_cao:tw.bao_gia.gia_thanh"); // W11.78: Giá thành sản xuất (TW) có màn
     expect(leaves("kn_tinh/hanh_chinh_tong_hop")).toEqual(
       expect.arrayContaining(["dieu_hanh:tinh.hcth.dashboard", "dieu_hanh:tinh.hcth.nang_bac", "dieu_hanh:tinh.hcth.quyet_dinh_nang_bac", "dieu_hanh:tinh.hcth.ke_hoach" /* W11.27 */, "bao_cao:tinh.hcth.bao_cao_so",
         "du_lieu:tinh.hcth.ho_so", "du_lieu:tinh.hcth.kho_tai_lieu", "du_lieu:tinh.hcth.danh_muc"]),
     );
-    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài*", "Quy trình, văn bản"]);
-    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành", "Mặt hàng*", "Quy trình, văn bản"]); // W11.78: Điều tra giá thành có màn
-    expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual(["Dự án KNQG"]);
+    expect(groupsOf("kn_tinh/ke_hoach_tai_chinh")["Dữ liệu"]).toEqual(["Số liệu nguồn ngoài" /* W11.67 có màn */, "Quy trình, văn bản"]);
+    expect(groupsOf("kn_tinh/thong_tin_truyen_thong")["Dữ liệu"]).toEqual(["Điều tra giá thành", "Mặt hàng", "Quy trình, văn bản"]); // BG-ITEM-PROPOSAL: danh mục đã có màn; đề xuất ở Điều hành
+    // W11.53 (UR-QG-01): TW xem dự án KNQG và mẫu biểu, xác nhận/trả lại Mẫu 07.
+    expect(groupsOf("kn_tw/chan_nuoi_thuy_san")["Dữ liệu"]).toEqual([["Dự án KNQG", ["Dự án tại An Giang", "Mẫu biểu, nghiệm thu năm (07)"]]]);
     // W11.54: Trang chủ phòng đầu Điều hành Cấp Tỉnh mọi phòng; Quy trình, văn bản (/kn/van-ban) cuối Dữ liệu; Cấp Xã/TW không có Trang chủ phòng.
     for (const code of ["trong_trot", "chan_nuoi_thuy_san", "ke_hoach_tai_chinh", "thong_tin_truyen_thong", "hanh_chinh_tong_hop"]) {
-      expect(leaves(`kn_tinh/${code}`)[0]).toBe("dieu_hanh:tinh.trang_chu");
+      expect(leaves(`kn_tinh/${code}`)[0]).toBe(code === "ke_hoach_tai_chinh" ? "dieu_hanh:tinh.khtc.trang_chu" : "dieu_hanh:tinh.trang_chu");
       expect(leaves(`kn_xa/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
       expect(leaves(`kn_tw/${code}`)).not.toContain("dieu_hanh:tinh.trang_chu");
     }

@@ -9,11 +9,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
+	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
@@ -67,23 +71,28 @@ func sameFields(raw json.RawMessage, fs []domain.CNTSField) bool {
 	return string(a) == string(b)
 }
 
-// InstallCNTSForms cài (phiên bản mới) các biểu chưa có hoặc khác định nghĩa chuẩn của gói — Admin KN /
-// reports_admin (define_by của profile kn_cnts). Biểu đã cài đúng định nghĩa giữ nguyên.
+// InstallCNTSForms cài các biểu chưa có — Admin KN (chính sách định nghĩa kn_cnts, #192). Mẫu KNQG (BR-02) đã cài khác
+// cấu trúc chuẩn thì cài lại đúng chuẩn; biểu Cấp Tỉnh được sửa (BM-17) đã cài thì giữ phiên bản Cấp Tỉnh đã lưu (FN-07),
+// không ghi đè bằng cấu trúc mã nguồn. Biểu đã cài đúng định nghĩa giữ nguyên.
 func (s *Service) InstallCNTSForms(ctx context.Context, idem string) ([]CNTSFormView, error) {
 	views, err := s.CNTSForms(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for i, v := range views {
-		if v.Current {
+		if v.Current || (v.Installed != nil && !domain.CNTSLocked(v.Form.Code)) {
 			continue
 		}
 		raw, err := json.Marshal(v.Form.Fields)
 		if err != nil {
 			return nil, err
 		}
+		var base int64
+		if v.Installed != nil {
+			base = v.Installed.Version
+		}
 		ref, err := s.FormsNative.DefineTemplate(ctx, formsport.TemplateDef{Profile: domain.ProfileCNTS, Code: v.Form.Code,
-			Title: v.Form.BM + " — " + v.Form.Title, Fields: raw}, idemOr(idem, v.Form.Code))
+			Title: v.Form.BM + " — " + v.Form.Title, Fields: raw, BaseVersion: &base}, idemOr(idem, v.Form.Code))
 		if err != nil {
 			return nil, err
 		}
@@ -96,9 +105,17 @@ func (s *Service) InstallCNTSForms(ctx context.Context, idem string) ([]CNTSForm
 type CNTSSeriesInput struct {
 	Code     string
 	From, To string // YYYY-MM-DD
-	Units    []string
+	// Units: mã xã (Target communes) hoặc facility_ref cơ sở giết mổ (BM-01). Với nhóm xã (Target province/regions/
+	// aquaculture/model) máy chủ tự giải danh sách xã — Units bỏ qua.
+	Units []string
 	// Deadline: hạn khác mặc định của biểu (người phát hành chọn — W11.03). nil = mặc định.
 	Deadline *domain.Deadline
+	// BF-CN-PUBLISH (CN-07): đối tượng (rỗng = communes), khu vực (Target regions), cán bộ tỉnh phụ trách, giờ chốt =
+	// hạn nộp + CloseAfterHours giờ (nil = Cấp Tỉnh tự chốt, không đặt giờ).
+	Target          string
+	Regions         []string
+	OwnerRef        *uuid.UUID
+	CloseAfterHours *int
 }
 
 // CNTSSeries là kết quả chia kỳ (xem trước hoặc đã phát hành).
@@ -109,6 +126,13 @@ type CNTSSeries struct {
 	Tasks     int                         // số công việc sẽ sinh = kỳ × đơn vị
 	Calendar  *domain.Calendar            // lịch tuần của phòng (D8); nil với tuần làm việc BM-05 (không theo lịch tuần)
 	Published []formsport.PublishedPeriod // sau khi phát hành
+	// BF-CN-PUBLISH: đối tượng đã giải, người phụ trách, giờ chốt, xã của tỉnh (kèm khu vực — để chọn), lần phát hành.
+	Target          string
+	Regions         []string
+	OwnerRef        *uuid.UUID
+	CloseAfterHours *int
+	Communes        []partyport.CommuneRegion
+	PublicationID   *uuid.UUID
 }
 
 // cntsCalendar: lịch tuần của lô CNTS (D8 — Thứ Ba–Thứ Hai, domain.CNTSRule nạp sẵn, hiệu lực ngay; tham số
@@ -150,10 +174,14 @@ func (s *Service) PreviewCNTSSeries(ctx context.Context, in CNTSSeriesInput) (CN
 		}
 		return CNTSSeries{}, err
 	}
-	if len(in.Units) == 0 {
-		return CNTSSeries{}, problem.Validation.WithField("units", "chọn ít nhất một đơn vị nhận")
+	sr := CNTSSeries{Form: f, Periods: ps, OwnerRef: in.OwnerRef, CloseAfterHours: in.CloseAfterHours}
+	if err := s.cntsTarget(ctx, in, &sr); err != nil {
+		return sr, err
 	}
-	sr := CNTSSeries{Form: f, Periods: ps, Units: in.Units, Tasks: len(ps) * len(in.Units)}
+	if len(sr.Units) == 0 {
+		return sr, problem.Validation.WithField("units", "chọn ít nhất một đơn vị nhận")
+	}
+	sr.Tasks = len(ps) * len(sr.Units)
 	if !f.IsWorkWeek() {
 		sr.Calendar = &cal
 	}
@@ -179,6 +207,9 @@ func (s *Service) PublishCNTSSeries(ctx context.Context, in CNTSSeriesInput, ide
 		bi.Periods = append(bi.Periods, formsport.PeriodDef{Label: p.Label, DueAt: p.DueAt, Kind: p.Kind, Key: p.Key, From: p.From, To: p.To, Rule: p.Rule})
 	}
 	if sr.Published, err = s.FormsNative.PublishBatch(ctx, bi, idem); err != nil {
+		return sr, err
+	}
+	if err := s.recordCNTSPublication(ctx, in, &sr, idem); err != nil {
 		return sr, err
 	}
 	return sr, nil

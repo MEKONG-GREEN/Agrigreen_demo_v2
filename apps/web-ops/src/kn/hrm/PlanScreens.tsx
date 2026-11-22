@@ -3,7 +3,8 @@
 // FN-11 Kế hoạch nhân lực năm (BRD HCTH v3.0; W11.27, dom/hrm — kỳ native cap/forms profile hrm_plan). Bố cục theo
 // prototype HCTH (Khuyen_nong_so_HCTH.html, SC.kh / SC['kh.d']):
 //   - Phòng HCTH/Admin: bảng tổng hợp đơn vị × chỉ tiêu (Hiện có, Dự kiến nghỉ hưu, Dự kiến nghỉ/chuyển khác, Cần bổ sung,
-//     Nhu cầu theo kế hoạch, Trạng thái) + dòng "Toàn Trung tâm"; mở kỳ năm, Xuất Excel, Chốt kế hoạch; bấm đơn vị xem chi tiết.
+//     Nhu cầu theo kế hoạch, Trạng thái) + dòng "Toàn Trung tâm"; mở kỳ năm, Nhắc phòng chưa lập (#50), Xuất Excel, Chốt kế
+//     hoạch; bấm đơn vị xem chi tiết.
 //   - Chi tiết đơn vị: "Số liệu hiện có (tự động)", "Kế hoạch của phòng" (nhập), "Nhu cầu theo vị trí" (thêm/xóa dòng),
 //     Lưu nháp / Gửi Phòng HCTH / Sao chép năm trước; HCTH: Xác nhận, Yêu cầu điều chỉnh, Điều chỉnh sau chốt (có lý do);
 //     khung lịch sử bên phải.
@@ -31,6 +32,7 @@ import {
   type PlanApi,
 } from "./plan-api";
 import { vnDate } from "./staff-api";
+import { adjustmentHref } from "./plan-adjustments/routes";
 
 const BASE = "/kn/nhan-su/ke-hoach";
 
@@ -212,6 +214,22 @@ function PlanSummaryView({ year, onChanged }: { year: number; onChanged: () => v
               >
                 Xuất Excel
               </button>
+              {s.can_manage ? (
+                <button
+                  type="button"
+                  className="btn btn-o btn-sm"
+                  disabled={chot || act.busy || pending.length === 0}
+                  onClick={() =>
+                    void act.run(
+                      () => pa.remind(year),
+                      (r) =>
+                        `Đã nhắc ${r.units.length} đơn vị chưa gửi kế hoạch (${r.units.map((u) => u.unit_name).join(", ")}).`,
+                    )
+                  }
+                >
+                  Nhắc phòng chưa lập
+                </button>
+              ) : null}
               {s.can_manage ? (
                 <button type="button" className="btn btn-p btn-sm" disabled={chot || act.busy} onClick={() => setConfirm(true)}>
                   Chốt kế hoạch
@@ -402,7 +420,6 @@ function PlanUnitBody({ d, back, reload, api: pa }: { d: HrmPlanUnit; back?: boo
   const [form, setForm] = useState<HrmPlanInput>(start);
   const [addPos, setAddPos] = useState(false);
   const [review, setReview] = useState(false);
-  const [adjust, setAdjust] = useState(false);
   const act = useAction();
   const edit = d.can_edit;
   const cur = d.row.source === "auto" ? d.figures.current : d.row.values.current;
@@ -433,7 +450,7 @@ function PlanUnitBody({ d, back, reload, api: pa }: { d: HrmPlanUnit; back?: boo
     ...(d.draft ? [{ event: "Lưu nháp kế hoạch", actor_display: d.row.unit_name, at: d.draft.recorded_at }] : []),
     ...d.adjustments.map((a) => ({
       event: `Điều chỉnh sau chốt (lần ${a.seq})`,
-      actor_display: "Phòng HCTH",
+      actor_display: a.actor_ref || "Chưa có thông tin người thực hiện",
       at: a.recorded_at,
       reason: a.reason,
       changes: [{ field: "Nhu cầu theo kế hoạch", old: null, new: String(a.values.demand) }],
@@ -643,9 +660,9 @@ function PlanUnitBody({ d, back, reload, api: pa }: { d: HrmPlanUnit; back?: boo
           </>
         ) : null}
         {d.can_adjust ? (
-          <button type="button" className="btn btn-o btn-sm" onClick={() => setAdjust(true)}>
+          <Link className="btn btn-o btn-sm" href={adjustmentHref(year, unit)}>
             Điều chỉnh (có lý do)
-          </button>
+          </Link>
         ) : null}
         {!edit && d.row.status === "closed" && !d.can_adjust ? (
           <span className="mute small">Kế hoạch đã chốt, chỉ điều chỉnh có lý do.</span>
@@ -679,35 +696,7 @@ function PlanUnitBody({ d, back, reload, api: pa }: { d: HrmPlanUnit; back?: boo
           }
         />
       ) : null}
-      {adjust ? (
-        <ReasonDialog
-          title="Điều chỉnh kế hoạch đã chốt"
-          label="Lý do điều chỉnh (10–500 ký tự)"
-          min={10}
-          ok="Ghi điều chỉnh"
-          onClose={() => setAdjust(false)}
-          extra={
-            <div className="grid2">
-              <div className="field">
-                <label htmlFor="adj-nk">Dự kiến nghỉ, chuyển công tác khác</label>
-                <input id="adj-nk" type="number" min={0} value={form.leaving} onChange={(e) => setNum("leaving", e.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="adj-bs">Số cần bổ sung</label>
-                <input id="adj-bs" type="number" min={0} value={form.additional} onChange={(e) => setNum("additional", e.target.value)} />
-              </div>
-            </div>
-          }
-          onOk={(reason) =>
-            act.run(async () => {
-              const r = await pa.adjust(year, unit, { ...form, reason });
-              setAdjust(false);
-              reload();
-              return r;
-            }, "Đã ghi điều chỉnh kế hoạch (lưu lịch sử).")
-          }
-        />
-      ) : null}
+
     </>
   );
 }

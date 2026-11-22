@@ -34,4 +34,6 @@ var (
 	ErrPlanNotClosed  = problem.New(http.StatusConflict, "hrm.plan_not_closed", "Kế hoạch chưa chốt — sửa bằng cách gửi lại, không điều chỉnh")
 	ErrPlanDisabled   = problem.New(http.StatusServiceUnavailable, "hrm.plan_disabled", "Kế hoạch nhân lực chưa nối cap/forms")
 	ErrPlanNoPrevious = problem.New(http.StatusNotFound, "hrm.plan_no_previous", "Năm trước chưa có kế hoạch của đơn vị để sao chép")
+	// ErrPlanAllSubmitted: "Nhắc phòng chưa lập" khi mọi đơn vị của kỳ đã gửi (NOTIFY-HCTH-KN #50).
+	ErrPlanAllSubmitted = problem.New(http.StatusConflict, "hrm.plan_all_submitted", "Mọi đơn vị đã gửi kế hoạch — không còn đơn vị cần nhắc")
 )

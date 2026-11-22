@@ -6,6 +6,7 @@ package handler_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"slices"
@@ -17,10 +18,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ledger"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 )
 
@@ -70,10 +73,6 @@ func (f fakeNames) DisplayNames(context.Context, []uuid.UUID) (map[uuid.UUID]str
 // ---------------------------------------------------------------------------
 // Tiện ích
 // ---------------------------------------------------------------------------
-
-func deptBody(org uuid.UUID, code string) map[string]any {
-	return map[string]any{"org_ref": org.String(), "code": code, "name": "Phòng " + code, "description": "Phòng ban thử", "sort_order": 10}
-}
 
 func (c caller) adminWithKey(method, path, idem string, body any) resp {
 	c.f.t.Helper()
@@ -155,16 +154,115 @@ func changeOf(entry map[string]any, field string) (old, nw any, ok bool) {
 	return nil, nil, false
 }
 
-func (f *fixture) deptID(admin caller, unit uuid.UUID, code string) string {
+// ctx là context của người gọi như sau chuỗi xác thực của gốc lắp ráp (principal + tenant). Từ KNSPLIT-2 #118 binding
+// HTTP /v1/departments* thuộc chủ KN (internal/kn/extension/departments, kiểm HTTP ở tests/kndepartments); kiểm thử của
+// pf/party gọi thẳng cổng port.DepartmentAdmin mà gốc lắp ráp nối cho chủ đó.
+func (c caller) ctx() context.Context {
+	c.f.t.Helper()
+	p, err := c.f.iss.Verifier().Verify(context.Background(), c.token)
+	if err != nil {
+		c.f.t.Fatal(err)
+	}
+	return tenant.WithID(authz.WithPrincipal(context.Background(), p), p.TenantID)
+}
+
+// wantErr kiểm lỗi RFC 9457 của use case: mã HTTP và mã lỗi (code rỗng = chỉ kiểm mã HTTP).
+func wantErr(t *testing.T, err error, status int, code, what string) {
+	t.Helper()
+	var p *problem.Problem
+	if !errors.As(err, &p) || p.Status != status || (code != "" && p.Code != code) {
+		t.Fatalf("%s: muốn %d %s, nhận %v", what, status, code, err)
+	}
+}
+
+type result[T any] struct {
+	v   T
+	err error
+}
+
+func r2[T any](v T, err error) result[T]         { return result[T]{v, err} }
+func r3[T any](v T, _ bool, err error) result[T] { return result[T]{v, err} }
+
+func (r result[T]) must(t *testing.T) T {
+	t.Helper()
+	if r.err != nil {
+		t.Fatal(r.err)
+	}
+	return r.v
+}
+
+func deptInput(org uuid.UUID, code string) port.DepartmentInput {
+	return port.DepartmentInput{OrgRef: org, Code: code, Name: "Phòng " + code, Description: "Phòng ban thử", SortOrder: 10}
+}
+
+func (f *fixture) deptID(admin caller, unit uuid.UUID, code string) uuid.UUID {
 	f.t.Helper()
-	r := admin.adminDo(http.MethodGet, "/v1/departments?org_ref="+unit.String(), nil)
-	for _, it := range items(r) {
-		if it["code"] == code {
-			return it["id"].(string)
+	vs, _, err := f.mod.DepartmentAdmin().ListDepartments(admin.ctx(), unit, false, true)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	for _, v := range vs {
+		if v.Code == code {
+			return v.ID
 		}
 	}
-	f.t.Fatalf("không có phòng ban %s: %v", code, r.body)
-	return ""
+	f.t.Fatalf("không có phòng ban %s: %v", code, vs)
+	return uuid.Nil
+}
+
+func (f *fixture) setDeptStatus(admin caller, id uuid.UUID, status, reason string) {
+	f.t.Helper()
+	if _, err := f.mod.DepartmentAdmin().ChangeDepartmentStatus(admin.ctx(), id, status, reason, key()); err != nil {
+		f.t.Fatalf("đổi trạng thái phòng ban %s → %s: %v", id, status, err)
+	}
+}
+
+func changeVal(s *string) any {
+	if s == nil {
+		return nil
+	}
+	return *s
+}
+
+// menuResp đổi kết quả cổng menu thành resp như binding HTTP của chủ KN (#222): 200 + thân KNMenu
+// (port.NewMenuDocument), lỗi → mã HTTP và mã lỗi RFC 9457. Binding (tham số, ?role=, Cache-Control) kiểm ở
+// internal/kn/extension/departments và tests/kndepartments.
+func menuResp(t *testing.T, v port.MenuView, err error) resp {
+	t.Helper()
+	if err != nil {
+		p := problem.From(err)
+		return resp{status: p.Status, body: map[string]any{"code": p.Code}}
+	}
+	raw, err := json.Marshal(port.NewMenuDocument(v))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	return resp{status: http.StatusOK, body: m}
+}
+
+func (c caller) menu(q port.MenuQuery) resp {
+	c.f.t.Helper()
+	v, err := c.f.mod.DepartmentAdmin().Menu(c.ctx(), q)
+	return menuResp(c.f.t, v, err)
+}
+
+func (c caller) modules(code string, q port.MenuQuery) resp {
+	c.f.t.Helper()
+	v, err := c.f.mod.DepartmentAdmin().DepartmentModules(c.ctx(), code, q)
+	return menuResp(c.f.t, v, err)
+}
+
+func changeOfEntry(e port.ChangeLogEntry, field string) (old, nw any, ok bool) {
+	for _, c := range e.Changes {
+		if c.Field == field {
+			return changeVal(c.Old), changeVal(c.New), true
+		}
+	}
+	return nil, nil, false
 }
 
 // ---------------------------------------------------------------------------
@@ -180,111 +278,117 @@ func TestFN_AD_04_03_DepartmentLifecycleAuditLog(t *testing.T) {
 	root := f.root()
 	tr := f.seedTree(root)
 	f.mod.UseActorNames(fakeNames{root.actor: "Quản trị Mekong"})
+	svc := f.mod.DepartmentAdmin()
+	rc := root.ctx()
 
-	wantCode(t, root.adminDo(http.MethodPost, "/v1/departments", deptBody(tr.t30001, "trong_trot")), http.StatusUnprocessableEntity,
-		"party.department_unit_invalid", "phòng ban của Nút xã")
-	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments", deptBody(tr.p89, "Trong Trot")), http.StatusUnprocessableEntity, "mã sai dạng")
-	bad := deptBody(tr.p89, "trong_trot")
-	bad["menu_profile"] = "khong_co"
-	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments", bad), http.StatusUnprocessableEntity, "bộ menu không có")
-	wantStatus(t, f.as(f.tenant, tr.p89, port.RoleKNProvinceAdmin).adminDo(http.MethodPost, "/v1/departments", deptBody(tr.p89, "trong_trot")),
-		http.StatusForbidden, "Cấp Tỉnh không quản trị phòng ban")
+	_, _, err := svc.CreateDepartment(rc, deptInput(tr.t30001, "trong_trot"), key())
+	wantErr(t, err, http.StatusUnprocessableEntity, "party.department_unit_invalid", "phòng ban của Nút xã")
+	_, _, err = svc.CreateDepartment(rc, deptInput(tr.p89, "Trong Trot"), key())
+	wantErr(t, err, http.StatusUnprocessableEntity, "", "mã sai dạng")
+	bad := deptInput(tr.p89, "trong_trot")
+	bad.MenuProfile = "khong_co"
+	_, _, err = svc.CreateDepartment(rc, bad, key())
+	wantErr(t, err, http.StatusUnprocessableEntity, "", "bộ menu không có")
+	_, _, err = svc.CreateDepartment(f.as(f.tenant, tr.p89, port.RoleKNProvinceAdmin).ctx(), deptInput(tr.p89, "trong_trot"), key())
+	wantErr(t, err, http.StatusForbidden, "", "Cấp Tỉnh không quản trị phòng ban")
 
 	// Gọi lặp cùng Idempotency-Key → cùng phòng ban, một dòng sổ.
-	body := deptBody(tr.p89, "trong_trot")
-	body["status"], body["menu_profile"] = port.DeptActive, port.MenuProfileTrongTrot
+	in := deptInput(tr.p89, "trong_trot")
+	in.Status, in.MenuProfile = port.DeptActive, port.MenuProfileTrongTrot
 	idem := key()
-	r1 := root.adminWithKey(http.MethodPost, "/v1/departments", idem, body)
-	r2 := root.adminWithKey(http.MethodPost, "/v1/departments", idem, body)
-	wantStatus(t, r1, http.StatusCreated, "tạo phòng ban")
-	if str(r2.body, "id") != str(r1.body, "id") || r2.hdr.Get("Idempotent-Replayed") == "" {
-		t.Fatalf("gọi lặp: %v / %v %v", r1.body, r2.body, r2.hdr)
+	d1, replayed1, err := svc.CreateDepartment(rc, in, idem)
+	if err != nil || replayed1 {
+		t.Fatalf("tạo phòng ban: %v replayed=%v", err, replayed1)
 	}
-	id := str(r1.body, "id")
+	d2, replayed2, err := svc.CreateDepartment(rc, in, idem)
+	if err != nil || d2.ID != d1.ID || !replayed2 {
+		t.Fatalf("gọi lặp: %v / %v replayed=%v %v", d1, d2, replayed2, err)
+	}
+	id := d1.ID
 	if n := f.countIn(f.tenant, "pf_party.department_event"); n != 1 {
 		t.Fatalf("sổ phòng ban sau gọi lặp: %d", n)
 	}
-	if r1.body["selectable"] != true || str(r1.body, "status_label") != "Đang áp dụng" {
-		t.Fatalf("phòng ban: %v", r1.body)
+	if !d1.Selectable() || port.DepartmentStatusLabel(d1.Status) != "Đang áp dụng" {
+		t.Fatalf("phòng ban: %+v", d1)
 	}
-	wantCode(t, root.adminDo(http.MethodPost, "/v1/departments", deptBody(tr.p89, "trong_trot")), http.StatusConflict,
-		"party.department_code_taken", "trùng mã trong đơn vị")
+	_, _, err = svc.CreateDepartment(rc, deptInput(tr.p89, "trong_trot"), key())
+	wantErr(t, err, http.StatusConflict, "party.department_code_taken", "trùng mã trong đơn vị")
 	// Cùng mã ở đơn vị khác được phép (theo từng đơn vị).
-	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments", deptBody(tr.p92, "trong_trot")), http.StatusCreated, "đơn vị khác")
+	r3(svc.CreateDepartment(rc, deptInput(tr.p92, "trong_trot"), key())).must(t)
 
-	// Sửa (PUT) → một dòng Log cũ → mới; PUT không đổi gì → không ghi sổ.
-	upd := map[string]any{"name": "Phòng Trồng trọt", "description": "Báo cáo cây trồng", "sort_order": 5}
-	r := root.adminDo(http.MethodPut, "/v1/departments/"+id, upd)
-	wantStatus(t, r, http.StatusOK, "sửa")
-	wantStatus(t, root.adminDo(http.MethodPut, "/v1/departments/"+id, upd), http.StatusOK, "sửa lặp")
+	// Sửa → một dòng Log cũ → mới; sửa không đổi gì → không ghi sổ.
+	upd := port.DepartmentInput{Name: "Phòng Trồng trọt", Description: "Báo cáo cây trồng", SortOrder: 5}
+	r2(svc.UpdateDepartment(rc, id, upd)).must(t)
+	r2(svc.UpdateDepartment(rc, id, upd)).must(t)
 
 	// Ngưng: lý do bắt buộc; cảnh báo khi chưa nối nguồn đếm.
-	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+id+"/status", map[string]any{"status": "suspended"}),
-		http.StatusUnprocessableEntity, "ngưng thiếu lý do")
-	r = root.adminDo(http.MethodPost, "/v1/departments/"+id+"/status", map[string]any{"status": "suspended", "reason": "Tạm ngưng chờ sắp xếp tổ chức"})
-	wantStatus(t, r, http.StatusCreated, "ngưng")
-	if ws, _ := r.body["warnings"].([]any); len(ws) == 0 || str(r.body, "department", "status") != port.DeptSuspended {
-		t.Fatalf("ngưng: %v", r.body)
+	_, err = svc.ChangeDepartmentStatus(rc, id, port.DeptSuspended, "", key())
+	wantErr(t, err, http.StatusUnprocessableEntity, "", "ngưng thiếu lý do")
+	res := r2(svc.ChangeDepartmentStatus(rc, id, port.DeptSuspended, "Tạm ngưng chờ sắp xếp tổ chức", key())).must(t)
+	if len(res.Warnings) == 0 || res.Department.Status != port.DeptSuspended {
+		t.Fatalf("ngưng: %+v", res)
 	}
-	wantCode(t, root.adminDo(http.MethodPost, "/v1/departments/"+id+"/status", map[string]any{"status": "suspended", "reason": "Ngưng lần hai cho chắc"}),
-		http.StatusConflict, "party.department_state", "đã ở trạng thái")
-	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+id+"/status", map[string]any{"status": "active"}), http.StatusCreated, "mở lại")
+	_, err = svc.ChangeDepartmentStatus(rc, id, port.DeptSuspended, "Ngưng lần hai cho chắc", key())
+	wantErr(t, err, http.StatusConflict, "party.department_state", "đã ở trạng thái")
+	r2(svc.ChangeDepartmentStatus(rc, id, port.DeptActive, "", key())).must(t)
 
 	// "Xóa": chưa nối nguồn đếm → mặc định chặn; có tài khoản → chặn; không còn gì → được, ẩn khỏi danh sách.
-	wantCode(t, root.adminDo(http.MethodPost, "/v1/departments/"+id+"/retire", map[string]any{"reason": "Khai báo nhầm phòng ban"}),
-		http.StatusServiceUnavailable, "party.dependency_unavailable", "xóa khi chưa nối nguồn đếm")
+	_, _, err = svc.RetireDepartment(rc, id, "Khai báo nhầm phòng ban", key())
+	wantErr(t, err, http.StatusServiceUnavailable, "party.dependency_unavailable", "xóa khi chưa nối nguồn đếm")
 	usage := &fakeUsage{}
 	f.mod.UseDepartmentUsage(usage)
 	usage.set(2, 0)
-	r = root.adminDo(http.MethodPost, "/v1/departments/"+id+"/retire", map[string]any{"reason": "Khai báo nhầm phòng ban"})
-	wantCode(t, r, http.StatusConflict, "party.department_in_use", "xóa khi có tài khoản")
-	r = root.adminDo(http.MethodGet, "/v1/departments/"+id, nil)
-	if r.body["account_count"] != float64(2) {
-		t.Fatalf("số tài khoản: %v", r.body)
+	_, _, err = svc.RetireDepartment(rc, id, "Khai báo nhầm phòng ban", key())
+	wantErr(t, err, http.StatusConflict, "party.department_in_use", "xóa khi có tài khoản")
+	if v := r2(svc.GetDepartment(rc, id)).must(t); v.Usage == nil || v.Usage.Accounts != 2 {
+		t.Fatalf("số tài khoản: %+v", v)
 	}
 	usage.set(0, 0)
-	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+id+"/retire", map[string]any{"reason": "Khai báo nhầm phòng ban"}), http.StatusCreated, "xóa")
-	if list := items(root.adminDo(http.MethodGet, "/v1/departments?org_ref="+tr.p89.String(), nil)); len(list) != 0 {
-		t.Fatalf("phòng ban đã xóa còn trong danh sách: %v", list)
+	if _, _, err := svc.RetireDepartment(rc, id, "Khai báo nhầm phòng ban", key()); err != nil {
+		t.Fatalf("xóa: %v", err)
 	}
-	if list := items(root.adminDo(http.MethodGet, "/v1/departments?include_retired=true&org_ref="+tr.p89.String(), nil)); len(list) != 1 || list[0]["retired"] != true {
-		t.Fatalf("include_retired: %v", list)
+	if list, _, err := svc.ListDepartments(rc, tr.p89, false, true); err != nil || len(list) != 0 {
+		t.Fatalf("phòng ban đã xóa còn trong danh sách: %v %v", list, err)
 	}
-	wantCode(t, root.adminDo(http.MethodPost, "/v1/departments", deptBody(tr.p89, "trong_trot")), http.StatusConflict,
-		"party.department_code_taken", "mã đã xóa không tái sử dụng")
+	if list, _, err := svc.ListDepartments(rc, tr.p89, true, true); err != nil || len(list) != 1 || !list[0].Retired {
+		t.Fatalf("include_retired: %v %v", list, err)
+	}
+	_, _, err = svc.CreateDepartment(rc, deptInput(tr.p89, "trong_trot"), key())
+	wantErr(t, err, http.StatusConflict, "party.department_code_taken", "mã đã xóa không tái sử dụng")
 
 	// Log: tạo, sửa, ngưng (lý do), mở lại, xóa — người, tên hiển thị, cũ → mới.
-	es := logItems(t, root.adminDo(http.MethodGet, "/v1/departments/"+id+"/log", nil))
+	es := r2(svc.DepartmentLog(rc, id, 0, 0)).must(t)
 	var events []string
 	for _, e := range es {
-		events = append(events, e["event"].(string))
-		if e["actor_ref"] != root.actor.String() || e["actor_display"] != "Quản trị Mekong" || e["at"] == "" {
-			t.Fatalf("dòng log thiếu người/thời điểm: %v", e)
+		events = append(events, e.Event)
+		if e.ActorRef != root.actor || e.ActorDisplay != "Quản trị Mekong" || e.At.IsZero() {
+			t.Fatalf("dòng log thiếu người/thời điểm: %+v", e)
 		}
 	}
 	if !slices.Equal(events, []string{"created", "updated", "status_changed", "status_changed", "retired"}) {
 		t.Fatalf("log: %v", events)
 	}
-	if o, n, ok := changeOf(es[1], "name"); !ok || o != "Phòng trong_trot" || n != "Phòng Trồng trọt" {
-		t.Fatalf("log sửa tên cũ → mới: %v", es[1])
+	if o, n, ok := changeOfEntry(es[1], "name"); !ok || o != "Phòng trong_trot" || n != "Phòng Trồng trọt" {
+		t.Fatalf("log sửa tên cũ → mới: %+v", es[1])
 	}
-	if o, n, ok := changeOf(es[2], "status"); !ok || o != "active" || n != "suspended" || es[2]["reason"] != "Tạm ngưng chờ sắp xếp tổ chức" {
-		t.Fatalf("log ngưng: %v", es[2])
+	if o, n, ok := changeOfEntry(es[2], "status"); !ok || o != "active" || n != "suspended" || es[2].Reason == nil ||
+		*es[2].Reason != "Tạm ngưng chờ sắp xếp tổ chức" {
+		t.Fatalf("log ngưng: %+v", es[2])
 	}
-	if _, n, ok := changeOf(es[4], "retired"); !ok || n != "true" {
-		t.Fatalf("log xóa: %v", es[4])
+	if _, n, ok := changeOfEntry(es[4], "retired"); !ok || n != "true" {
+		t.Fatalf("log xóa: %+v", es[4])
 	}
 
 	// RB-1: sổ chỉ ghi thêm; chuỗi băm liền.
-	err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
-		_, e := tx.Exec(context.Background(), "UPDATE pf_party.department_event SET reason = 'sửa lén' WHERE department_id = $1", uuid.MustParse(id))
+	err = tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
+		_, e := tx.Exec(context.Background(), "UPDATE pf_party.department_event SET reason = 'sửa lén' WHERE department_id = $1", id)
 		return e
 	})
 	if err == nil {
 		t.Fatal("UPDATE sổ phòng ban phải bị chặn (RB-1)")
 	}
 	if err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
-		v, e := ledger.Verify(context.Background(), tx, "pf_party.department_event", f.tenant, "dept:"+id)
+		v, e := ledger.Verify(context.Background(), tx, "pf_party.department_event", f.tenant, "dept:"+id.String())
 		if e == nil && (!v.OK || v.RowsChecked != 5) {
 			t.Fatalf("chuỗi băm: %+v", v)
 		}
@@ -294,11 +398,13 @@ func TestFN_AD_04_03_DepartmentLifecycleAuditLog(t *testing.T) {
 	}
 
 	// Cách ly tenant: quản trị tenant khác không thấy, không sửa được.
-	other := f.as(ids.New(), uuid.Nil, authz.RolePlatformAdmin)
-	wantCode(t, other.adminDo(http.MethodGet, "/v1/departments/"+id, nil), http.StatusNotFound, "party.department_not_found", "tenant khác đọc")
-	wantStatus(t, other.adminDo(http.MethodPost, "/v1/departments/"+id+"/status", map[string]any{"status": "active"}), http.StatusNotFound, "tenant khác sửa")
-	if list := items(other.adminDo(http.MethodGet, "/v1/departments?org_ref="+tr.p92.String(), nil)); len(list) != 0 {
-		t.Fatalf("tenant khác thấy phòng ban: %v", list)
+	oc := f.as(ids.New(), uuid.Nil, authz.RolePlatformAdmin).ctx()
+	_, err = svc.GetDepartment(oc, id)
+	wantErr(t, err, http.StatusNotFound, "party.department_not_found", "tenant khác đọc")
+	_, err = svc.ChangeDepartmentStatus(oc, id, port.DeptActive, "", key())
+	wantErr(t, err, http.StatusNotFound, "", "tenant khác sửa")
+	if list, _, err := svc.ListDepartments(oc, tr.p92, false, true); err != nil || len(list) != 0 {
+		t.Fatalf("tenant khác thấy phòng ban: %v %v", list, err)
 	}
 }
 
@@ -316,14 +422,14 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	root := f.root()
 	tr := f.seedTree(root)
 
-	// Dữ liệu nền 5 phòng ban An Giang (W11.06, chờ khách Q-051), chạy lặp an toàn.
-	r := root.adminDo(http.MethodPost, "/v1/orgs/"+tr.p89.String()+"/departments/seed", nil)
-	if created, _ := r.body["created"].([]any); r.status != http.StatusOK || len(created) != 5 {
-		t.Fatalf("seed phòng ban: %d %v", r.status, r.body)
+	// Dữ liệu nền 5 phòng ban An Giang (W11.06, chờ khách Q-051), chạy lặp an toàn (HTTP POST
+	// /v1/orgs/{ref}/departments/seed của chủ KN: tests/kndepartments, #222).
+	if res, err := f.mod.DepartmentAdmin().SeedDepartments(root.ctx(), tr.p89, key()); err != nil || len(res.Created) != 5 {
+		t.Fatalf("seed phòng ban: %v %v", res, err)
 	}
-	r = root.adminDo(http.MethodPost, "/v1/orgs/"+tr.p89.String()+"/departments/seed", nil)
-	if created, _ := r.body["created"].([]any); len(created) != 0 || r.body["existing"] != float64(5) || len(r.body["legacy_retired"].([]any)) != 0 {
-		t.Fatalf("seed lặp: %v", r.body)
+	if res, err := f.mod.DepartmentAdmin().SeedDepartments(root.ctx(), tr.p89, key()); err != nil || len(res.Created) != 0 || res.Existing != 5 ||
+		len(res.LegacyRetired) != 0 {
+		t.Fatalf("seed lặp: %v %v", res, err)
 	}
 
 	xa := f.as(f.tenant, tr.t30001, port.RoleKNOfficer)
@@ -331,19 +437,19 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	tw := f.as(f.tenant, tr.national, port.RoleKNNationalAdmin)
 
 	// Bước 2 đăng nhập: danh sách phòng ban của đơn vị người gọi (Nút xã → TTKN tỉnh).
-	r = xa.appDo(http.MethodGet, "/v1/departments", nil)
-	if list := items(r); r.status != http.StatusOK || len(list) != 5 || str(r.body, "org_ref") != tr.p89.String() ||
-		list[0]["code"] != "trong_trot" || list[0]["selectable"] != true || list[1]["selectable"] != false || list[1]["account_count"] != nil {
-		t.Fatalf("phòng ban (app): %d %v", r.status, r.body)
+	// (HTTP GET /v1/departments của chủ KN: tests/kndepartments.)
+	if list, unit, err := f.mod.DepartmentAdmin().ListDepartments(xa.ctx(), uuid.Nil, true, false); err != nil || len(list) != 5 || unit != tr.p89 ||
+		list[0].Code != "trong_trot" || !list[0].Selectable() || list[1].Selectable() || list[1].Usage != nil || list[0].Retired {
+		t.Fatalf("phòng ban (app): %v %v %v", unit, list, err)
 	}
 
 	// Cấp Xã: menu Trồng trọt mặc định (chỉ một phòng ban Đang áp dụng), trang mặc định Công việc cần làm.
-	r = xa.appDo(http.MethodGet, "/v1/menu", nil)
+	r := xa.menu(port.MenuQuery{})
 	wantStatus(t, r, http.StatusOK, "menu Cấp Xã")
 	if str(r.body, "audience") != port.AudienceXa || str(r.body, "department", "code") != "trong_trot" ||
-		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || str(r.body, "menu_version") != "kn.menu/v7" ||
-		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu", "dung_chung"}) || r.hdr.Get("Cache-Control") != "no-store" {
-		t.Fatalf("menu Cấp Xã: %v %v", r.body, r.hdr)
+		str(r.body, "default_route") != "/kn/nhiem-vu/cong-viec" || str(r.body, "menu_version") != domain.MenuVersion ||
+		!slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "du_lieu", "dung_chung"}) {
+		t.Fatalf("menu Cấp Xã: %v", r.body)
 	}
 	keys := menuKeys(r)
 	for _, k := range []string{"xa.nhiem_vu.cong_viec", "xa.bao_cao.cua_xa", "xa.thu_thap.thua", "xa.thu_thap.vat_tu"} {
@@ -359,33 +465,32 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 		t.Fatalf("thiếu khóa số đếm Công việc cần làm: %s", raw)
 	}
 	// Không lấy được menu của vai khác.
-	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?audience=kn_tinh", nil), http.StatusForbidden, "party.menu_audience_forbidden", "Cấp Xã xin menu Tỉnh")
-	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?audience=admin", nil), http.StatusForbidden, "party.menu_audience_forbidden", "Cấp Xã xin menu Admin")
-	// Tên tham số cũ ?role= (hợp đồng tạm P6) vẫn nhận một đợt.
-	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?role=kn_tinh", nil), http.StatusForbidden, "party.menu_audience_forbidden", "Cấp Xã xin menu Tỉnh (?role=)")
-	if r := xa.appDo(http.MethodGet, "/v1/departments/trong_trot/modules?role=kn_xa", nil); r.status != http.StatusOK || str(r.body, "audience") != port.AudienceXa {
-		t.Fatalf("?role= (tên cũ): %d %v", r.status, r.body)
+	wantCode(t, xa.menu(port.MenuQuery{Audience: port.AudienceTinh}), http.StatusForbidden, "party.menu_audience_forbidden", "Cấp Xã xin menu Tỉnh")
+	wantCode(t, xa.menu(port.MenuQuery{Audience: port.AudienceAdmin}), http.StatusForbidden, "party.menu_audience_forbidden", "Cấp Xã xin menu Admin")
+	// Tên tham số cũ ?role= (hợp đồng tạm P6) là việc của binding HTTP ở chủ KN (#222: departments.TestMenuBinding, tests/kndepartments).
+	if r := xa.modules("trong_trot", port.MenuQuery{Audience: port.AudienceXa}); r.status != http.StatusOK || str(r.body, "audience") != port.AudienceXa {
+		t.Fatalf("modules Cấp Xã: %d %v", r.status, r.body)
 	}
 	// Hợp đồng đường dẫn KN-fix: trang web-ops, không chứa mã phòng ban (phòng ban ở ngữ cảnh phiên).
 	if !strings.Contains(string(raw), `"route":"/kn/nhiem-vu/lich-cong-tac"`) || strings.Contains(string(raw), "/kn/trong_trot/") {
 		t.Fatalf("đường dẫn menu Cấp Xã: %s", raw)
 	}
 	// Phòng ban chưa mở → không vào được.
-	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil), http.StatusConflict, "party.department_not_open", "chưa mở")
+	wantCode(t, xa.menu(port.MenuQuery{Department: "chan_nuoi_thuy_san"}), http.StatusConflict, "party.department_not_open", "chưa mở")
 
 	// Cấp Tỉnh, Cấp Quốc gia (chỉ xem: không có Nhiệm vụ).
-	r = tinh.appDo(http.MethodGet, "/v1/menu", nil)
+	r = tinh.menu(port.MenuQuery{})
 	if keys := menuKeys(r); r.status != http.StatusOK || !slices.Contains(keys, "tinh.nhiem_vu.lich_cong_tac") || !slices.Contains(keys, "tinh.bao_cao.chi_cuc") ||
 		slices.Contains(keys, "tinh.bao_cao.dot_xuat") || str(r.body, "default_route") != "/kn/dashboard" {
 		t.Fatalf("menu Cấp Tỉnh: %v", r.body)
 	}
-	r = tw.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil)
+	r = tw.menu(port.MenuQuery{UnitRef: tr.p89})
 	if keys := menuKeys(r); r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "bao_cao", "dung_chung"}) || !slices.Contains(keys, "tw.bao_cao.nam") {
 		t.Fatalf("menu Cấp Quốc gia: %v", r.body)
 	}
 
 	// Admin: Tổng quan hệ thống; Phòng ban (Trồng trọt mở, 4 phòng khác "Chưa mở" mờ); Quản trị hệ thống; Dùng chung.
-	r = root.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil)
+	r = root.menu(port.MenuQuery{UnitRef: tr.p89})
 	if r.status != http.StatusOK || !slices.Equal(groupKeys(r), []string{"dieu_hanh", "phong_ban", "quan_tri", "dung_chung"}) || str(r.body, "default_route") != "/kn/tong-quan" {
 		t.Fatalf("menu Admin: %v", r.body)
 	}
@@ -393,6 +498,16 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	if keys, raw := menuKeys(r), mustJSON(t, r.body); slices.Contains(keys, "admin.qt.cong_cu.tai_khoan") ||
 		strings.Contains(raw, `"/quan-tri/tai-khoan`) || !slices.Contains(keys, "admin.qt.nguoi_dung") || !strings.Contains(raw, `"/kn/quan-tri/nguoi-dung"`) {
 		t.Fatalf("menu Admin KN còn /quan-tri/tai-khoan hoặc mất /kn/quan-tri/nguoi-dung: %v", keys)
+	}
+	// KN-STANDALONE-1-ADMIN-TOOLS (#264): GET /v1/menu Admin không còn 10 công cụ nền tảng ngoài BRD 2.0; giữ Cơ cấu 3 cấp.
+	if raw := mustJSON(t, r.body); strings.Contains(raw, "admin.qt.cong_cu") || strings.Contains(raw, `"/dong-bo"`) ||
+		!strings.Contains(raw, `"/kn/quan-tri/co-cau-to-chuc"`) {
+		t.Fatalf("menu Admin KN còn công cụ nền tảng: %v", raw)
+	}
+	for _, gone := range []string{"tham-so", "to-chuc", "mau-bao-cao", "xung-dot", "giam-sat-dong-bo", "khach-hang-api", "su-dung-api", "bang-ke", "nhat-ky-xuat"} {
+		if raw := mustJSON(t, r.body); strings.Contains(raw, `"/quan-tri/`+gone+`"`) {
+			t.Fatalf("menu Admin KN còn /quan-tri/%s", gone)
+		}
 	}
 	if it := adminDeptItem(t, r, "trong_trot"); it["enabled"] != true ||
 		!hasMenuChildren(it, []string{"admin.pb.theo_doi_nop", "admin.pb.tong_hop", "admin.pb.du_lieu_bao_cao", "admin.pb.thu_thap", "admin.pb.lich_cong_tac", "admin.pb.danh_muc", "admin.pb.mau_bao_cao", "admin.pb.bao_cao_khtc"}) ||
@@ -406,8 +521,8 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 
 	// Bật Phòng Chăn nuôi - Thủy sản: menu đổi NGAY ở request kế tiếp, không triển khai lại.
 	cn := f.deptID(root, tr.p89, "chan_nuoi_thuy_san")
-	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+cn+"/status", map[string]any{"status": "active"}), http.StatusCreated, "bật phòng ban")
-	r = xa.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil)
+	f.setDeptStatus(root, cn, port.DeptActive, "")
+	r = xa.menu(port.MenuQuery{Department: "chan_nuoi_thuy_san"})
 	if r.status != http.StatusOK || str(r.body, "department", "menu_profile") != port.MenuProfileChanNuoiThuySan ||
 		// Bộ dựng thử không nối NavigationPolicy → trang mặc định thô của đối tượng; khi chạy thật (assembly) chính sách
 		// contextDefaultRoutes đưa CNTS Cấp Xã về /kn/cnts/bao-cao-ky (builder_test, kn-menu.json).
@@ -420,7 +535,7 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	if raw, _ := json.Marshal(r.body); strings.Contains(string(raw), `"status":"coming_soon"`) {
 		t.Fatalf("CNTS Cấp Xã còn mục Sắp có: %s", raw)
 	}
-	if rt := tinh.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil); rt.status != http.StatusOK {
+	if rt := tinh.menu(port.MenuQuery{Department: "chan_nuoi_thuy_san"}); rt.status != http.StatusOK {
 		t.Fatalf("menu CNTS Cấp Tỉnh: %d %v", rt.status, rt.body)
 	} else if raw, _ := json.Marshal(rt.body); !strings.Contains(string(raw), `"status":"coming_soon","status_label":"Sắp có"`) {
 		t.Fatalf("mục Sắp có: %s", raw)
@@ -429,26 +544,26 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 	if keys := menuKeys(r); !slices.Contains(keys, "xa.cnts.viec_can_lam") {
 		t.Fatalf("Cấp Xã CNTS có Việc cần làm: %v", keys)
 	}
-	wantStatus(t, xa.appDo(http.MethodGet, "/v1/menu", nil), http.StatusUnprocessableEntity, "hai phòng ban đang áp dụng → phải chọn")
-	if it := adminDeptItem(t, root.appDo(http.MethodGet, "/v1/menu?org_ref="+tr.p89.String(), nil), "chan_nuoi_thuy_san"); it["enabled"] != true {
+	wantStatus(t, xa.menu(port.MenuQuery{}), http.StatusUnprocessableEntity, "hai phòng ban đang áp dụng → phải chọn")
+	if it := adminDeptItem(t, root.menu(port.MenuQuery{UnitRef: tr.p89}), "chan_nuoi_thuy_san"); it["enabled"] != true {
 		t.Fatalf("Admin thấy phòng ban vừa bật: %v", it)
 	}
 
 	// Báo cáo đột xuất: chỉ khi phòng ban có mẫu loại dot_xuat ở cấp tương ứng (P3).
 	f.mod.UseFormAvailability(fakeForms{"trong_trot|commune|dot_xuat": true})
-	if keys := menuKeys(xa.appDo(http.MethodGet, "/v1/menu?department=trong_trot", nil)); !slices.Contains(keys, "xa.bao_cao.dot_xuat") {
+	if keys := menuKeys(xa.menu(port.MenuQuery{Department: "trong_trot"})); !slices.Contains(keys, "xa.bao_cao.dot_xuat") {
 		t.Fatalf("Cấp Xã có mẫu đột xuất: %v", keys)
 	}
-	if keys := menuKeys(tinh.appDo(http.MethodGet, "/v1/menu?department=trong_trot", nil)); slices.Contains(keys, "tinh.bao_cao.dot_xuat") {
+	if keys := menuKeys(tinh.menu(port.MenuQuery{Department: "trong_trot"})); slices.Contains(keys, "tinh.bao_cao.dot_xuat") {
 		t.Fatalf("Cấp Tỉnh chưa có mẫu đột xuất cấp tỉnh: %v", keys)
 	}
 
 	// /v1/departments/{code}/modules: cây module của một phòng ban.
-	r = tinh.appDo(http.MethodGet, "/v1/departments/trong_trot/modules", nil)
+	r = tinh.modules("trong_trot", port.MenuQuery{})
 	if keys := menuKeys(r); r.status != http.StatusOK || !slices.Contains(keys, "tinh.nhiem_vu.ra_soat") {
 		t.Fatalf("modules Cấp Tỉnh: %v", r.body)
 	}
-	r = root.appDo(http.MethodGet, "/v1/departments/thong_tin_truyen_thong/modules?audience=admin&org_ref="+tr.p89.String(), nil)
+	r = root.modules("thong_tin_truyen_thong", port.MenuQuery{Audience: port.AudienceAdmin, UnitRef: tr.p89})
 	// W11.72: 5 mục chung + "Báo cáo cho KHTC" (W11.11) + "Xã báo giá", "Kỳ báo giá & giờ khóa" (đã mở) + "Mặt hàng" (Sắp có).
 	if gs, _ := r.body["groups"].([]any); r.status != http.StatusOK || len(gs) != 1 ||
 		!slices.Contains(menuKeys(r), "admin.pb.bao_cao_khtc") ||
@@ -457,15 +572,14 @@ func TestUR_KT_02_MenuByConfigDepartmentToggle(t *testing.T) {
 		t.Fatalf("modules Admin (phòng ban chưa mở, khuôn Thông tin Tuyên truyền: 5 mục chung + Báo cáo cho KHTC + Xã báo giá, Kỳ báo giá & giờ khóa + 1 Sắp có): %v", r.body)
 	}
 	// Admin vào menu mọi cấp (FN-AD-04.07).
-	if r := root.appDo(http.MethodGet, "/v1/menu?audience=kn_xa&department=trong_trot&org_ref="+tr.p89.String(), nil); r.status != http.StatusOK {
+	if r := root.menu(port.MenuQuery{Audience: port.AudienceXa, Department: "trong_trot", UnitRef: tr.p89}); r.status != http.StatusOK {
 		t.Fatalf("Admin xem menu Cấp Xã: %v", r.body)
 	}
 
 	// Ngưng → menu đóng lại ngay.
-	wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments/"+cn+"/status", map[string]any{"status": "suspended", "reason": "Chưa có cán bộ phụ trách"}),
-		http.StatusCreated, "ngưng phòng ban")
-	wantCode(t, xa.appDo(http.MethodGet, "/v1/menu?department=chan_nuoi_thuy_san", nil), http.StatusConflict, "party.department_not_open", "sau khi ngưng")
-	if r := xa.appDo(http.MethodGet, "/v1/menu", nil); str(r.body, "department", "code") != "trong_trot" {
+	f.setDeptStatus(root, cn, port.DeptSuspended, "Chưa có cán bộ phụ trách")
+	wantCode(t, xa.menu(port.MenuQuery{Department: "chan_nuoi_thuy_san"}), http.StatusConflict, "party.department_not_open", "sau khi ngưng")
+	if r := xa.menu(port.MenuQuery{}); str(r.body, "department", "code") != "trong_trot" {
 		t.Fatalf("sau khi ngưng, mặc định lại Trồng trọt: %v", r.body)
 	}
 }
@@ -478,31 +592,29 @@ func TestW1106_SeedReplacesLegacyTempCodes(t *testing.T) {
 	root := f.root()
 	tr := f.seedTree(root)
 	for _, code := range []string{"phong_ban_5", "phong_ban_6"} {
-		wantStatus(t, root.adminDo(http.MethodPost, "/v1/departments", deptBody(tr.p89, code)), http.StatusCreated, "phòng ban tạm v7.7 "+code)
+		r3(f.mod.DepartmentAdmin().CreateDepartment(root.ctx(), deptInput(tr.p89, code), key())).must(t)
 	}
 	usage := &fakeUsage{}
 	f.mod.UseDepartmentUsage(usage)
 	usage.set(1, 0)
-	seed := "/v1/orgs/" + tr.p89.String() + "/departments/seed"
-	r := root.adminDo(http.MethodPost, seed, nil)
-	if created, _ := r.body["created"].([]any); r.status != http.StatusOK || len(created) != 5 ||
-		len(r.body["legacy_retired"].([]any)) != 0 || len(r.body["legacy_kept"].([]any)) != 2 {
-		t.Fatalf("seed khi mã tạm còn tài khoản: %d %v", r.status, r.body)
+	seed := func() (port.DepartmentSeedResult, error) {
+		return f.mod.DepartmentAdmin().SeedDepartments(root.ctx(), tr.p89, key()) // HTTP của chủ KN: tests/kndepartments (#222)
+	}
+	if res, err := seed(); err != nil || len(res.Created) != 5 || len(res.LegacyRetired) != 0 || len(res.LegacyKept) != 2 {
+		t.Fatalf("seed khi mã tạm còn tài khoản: %v %v", res, err)
 	}
 	usage.set(0, 0)
-	r = root.adminDo(http.MethodPost, seed, nil)
-	if retired, _ := r.body["legacy_retired"].([]any); r.status != http.StatusOK || len(retired) != 2 || len(r.body["legacy_kept"].([]any)) != 0 {
-		t.Fatalf("seed khi mã tạm hết dùng: %d %v", r.status, r.body)
+	if res, err := seed(); err != nil || len(res.LegacyRetired) != 2 || len(res.LegacyKept) != 0 {
+		t.Fatalf("seed khi mã tạm hết dùng: %v %v", res, err)
 	}
-	if list := items(root.adminDo(http.MethodGet, "/v1/departments?org_ref="+tr.p89.String(), nil)); len(list) != 5 {
-		t.Fatalf("còn 5 phòng ban: %v", list)
+	if list, _, err := f.mod.DepartmentAdmin().ListDepartments(root.ctx(), tr.p89, false, true); err != nil || len(list) != 5 {
+		t.Fatalf("còn 5 phòng ban: %v %v", list, err)
 	}
-	r = root.appDo(http.MethodGet, "/v1/departments/phong_ban_5/modules?audience=admin&org_ref="+tr.p89.String(), nil)
+	r := root.modules("phong_ban_5", port.MenuQuery{Audience: port.AudienceAdmin, UnitRef: tr.p89})
 	if r.status != http.StatusOK || str(r.body, "department", "code") != "hanh_chinh_tong_hop" {
 		t.Fatalf("mã cũ phong_ban_5 → hanh_chinh_tong_hop: %d %v", r.status, r.body)
 	}
-	wantStatus(t, root.appDo(http.MethodGet, "/v1/departments/phong_ban_6/modules?audience=admin&org_ref="+tr.p89.String(), nil),
-		http.StatusNotFound, "phong_ban_6 bỏ")
+	wantStatus(t, root.modules("phong_ban_6", port.MenuQuery{Audience: port.AudienceAdmin, UnitRef: tr.p89}), http.StatusNotFound, "phong_ban_6 bỏ")
 }
 
 // ---------------------------------------------------------------------------

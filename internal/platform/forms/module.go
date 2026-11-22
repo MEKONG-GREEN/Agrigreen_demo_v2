@@ -48,6 +48,10 @@ type Deps struct {
 	// theo profile (vd kn_cnts: số liều tiêm ≤ tổng đàn).
 	Facilities port.FacilityDirectory
 	Validators map[string]port.Validator
+	// ReviewGuards: kiểm quyền rà soát thêm theo profile (BF-CN-XA-DATA #175 — kn_cnts: chỉ người phụ trách biểu).
+	ReviewGuards map[string]port.ReviewGuard
+	// DefinitionPolicies are application-owned write rules, registered before serving.
+	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
 }
 
 // Module là pf/forms đã nối.
@@ -64,8 +68,51 @@ func New(b tenant.Beginner, clk clock.Clock, d Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc.Facilities, svc.Validators = d.Facilities, d.Validators
-	return &Module{svc: svc}, nil
+	svc.Facilities, svc.Validators, svc.ReviewGuards = d.Facilities, d.Validators, d.ReviewGuards
+	m := &Module{svc: svc}
+	for profile, policy := range d.DefinitionPolicies {
+		if err := m.UseDefinitionPolicy(profile, policy); err != nil {
+			return nil, err
+		}
+	}
+	return m, nil
+}
+
+// UseDefinitionPolicy registers an owner rule before requests are served.
+// A registered nil rule denies writes, including legacy DefineBy administrators.
+func (m *Module) UseDefinitionPolicy(profile string, policy port.TemplateDefinitionPolicy) error {
+	known := false
+	for _, p := range m.svc.Profiles() {
+		if p.Name == profile {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return port.ErrProfileNotFound
+	}
+	if m.svc.DefinitionPolicies == nil {
+		m.svc.DefinitionPolicies = map[string]port.TemplateDefinitionPolicy{}
+	}
+	m.svc.DefinitionPolicies[profile] = policy
+	return nil
+}
+
+// TemplateCatalog is the scoped read capability, including immutable versions.
+func (m *Module) TemplateCatalog() port.TemplateCatalog { return app.Publisher{Svc: m.svc} }
+
+// Middleware rechecks definition permission after session resolution and before
+// HTTP idempotency replay. It preserves upstream account/session scope bindings.
+func (m *Module) Middleware() gin.HandlerFunc {
+	return handler.Handler{Svc: m.svc}.TemplateDefinitionAuthorization()
+}
+
+// UseReviewGuard nối kiểm quyền rà soát của bên dùng cho profile (gốc lắp ráp).
+func (m *Module) UseReviewGuard(profile string, g port.ReviewGuard) {
+	if m.svc.ReviewGuards == nil {
+		m.svc.ReviewGuards = map[string]port.ReviewGuard{}
+	}
+	m.svc.ReviewGuards[profile] = g
 }
 
 // UseValidator nối quy tắc nghiệp vụ của bên dùng cho profile (gốc lắp ráp — bên cài quy tắc có thể dựng sau module).
@@ -87,6 +134,9 @@ func (m *Module) SyncSink() syncport.Sink { return app.SyncSink{Svc: m.svc} }
 
 // Control là cổng điều khiển kỳ native (tiến độ, chốt, hủy) cho module nghiệp vụ (W11.62 — KN Kỳ KHTC).
 func (m *Module) Control() port.PeriodControl { return app.Control{Svc: m.svc} }
+
+// ConditionalControl adds native compare-and-swap without changing legacy callers.
+func (m *Module) ConditionalControl() port.ConditionalPeriodControl { return app.Control{Svc: m.svc} }
 
 // SystemProgress provides a read-only server-side reader for trusted tenant jobs.
 // User requests continue to use Control and its existing authorization checks.

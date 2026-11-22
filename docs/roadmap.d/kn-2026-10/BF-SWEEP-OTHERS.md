@@ -1,0 +1,1 @@
+- [ ] BF-SWEEP-OTHERS (#117, phần đầu): FN-08 HCTH sửa thông tin làm việc trên route riêng, UI-KIT DetailPage/LogPanel, lỗi từng trường, kiểm quyền màn và hồ sơ. Codex viết; chờ Claude review đúng SHA và gộp. Không đổi API/migration. Phần còn lại: #163 HCTH, #164 KHTC, #165 Báo giá. [Phạm vi](../../kn/gia-dinh/BF-SWEEP-OTHERS.md).

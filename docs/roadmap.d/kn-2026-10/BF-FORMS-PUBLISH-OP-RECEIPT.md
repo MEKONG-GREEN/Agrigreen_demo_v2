@@ -1,0 +1,1 @@
+- [x] BF-FORMS-PUBLISH-OP-RECEIPT (05/11/2026, pf 20261105022736): supplier additive cho receipt phát hành batch atomic, exact native creation revision, explicit resource kind, permanent identity/current-authority replay và unknown fail closed; không chuyển caller/lifecycle. [Hợp đồng và giới hạn](../../kn/gia-dinh/BF-FORMS-PUBLISH-OP-RECEIPT.md).

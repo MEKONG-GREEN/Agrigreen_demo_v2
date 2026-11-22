@@ -105,7 +105,7 @@ func New(db tenant.Beginner, clk clock.Clock, deps Deps) *Module {
 		Households: memberships{m.member}, Markers: markers{m.member}, AdminGeom: deps.AdminGeom}
 	m.plot.Vault = deps.Farmers
 	m.season = &seasonapp.Service{DB: db, Clock: clk, Scope: deps.Scope, Orgs: deps.Orgs, Plots: m.plot, Params: deps.Params,
-		Catalogs: deps.Catalogs, GpsLog: deps.GpsLog}
+		Catalogs: deps.Catalogs, GpsLog: deps.GpsLog, Members: memberships{m.member}, Units: deps.AdminUnits}
 	m.bilateral = &bilateralapp.Service{DB: db, Clock: clk}
 	m.ledger = bilateralapp.Ledger{DB: db, Clock: clk}
 	m.anchor = &anchorapp.Service{DB: db, Clock: clk, Creator: deps.CooperativeRegistrar}
@@ -248,17 +248,20 @@ func (m *Module) MapLayers() geoport.MapLayers { return plothttp.MapLayers{Svc: 
 // ReportData cho pf/reports (qua gốc lắp ráp): báo cáo sản lượng HTX (HTX US-DASH-02, US-DASH-03).
 func (m *Module) ReportData() cropcyclesrc.ReportData { return seasonapp.ReportData{Svc: m.season} }
 
-// SyncSources là chiều xuống của module cho pf/sync: sop_version, season, farm_log, plot.
+// SyncSources là chiều xuống của module cho pf/sync: sop_version, season, farm_log, plot, support_request (#313).
 func (m *Module) SyncSources() []syncport.Source {
-	return []syncport.Source{seasonapp.SyncSource{Svc: m.season}, plotapp.SyncSource{Svc: m.plot}}
+	return []syncport.Source{seasonapp.SyncSource{Svc: m.season}, plotapp.SyncSource{Svc: m.plot},
+		seasonapp.SupportSyncSource{Svc: m.season}}
 }
 
-// SyncSinks là chiều lên của module cho pf/sync: season_open, farm_log, farm_log_batch, harvest, plot_boundary.
+// SyncSinks là chiều lên của module cho pf/sync: season_open, farm_log, farm_log_batch, harvest, plot_boundary,
+// support_request (#313).
 func (m *Module) SyncSinks() []syncport.Sink {
-	return []syncport.Sink{seasonapp.SyncSink{Svc: m.season}, plotapp.SyncSink{Svc: m.plot}}
+	return []syncport.Sink{seasonapp.SyncSink{Svc: m.season}, plotapp.SyncSink{Svc: m.plot}, seasonapp.SupportSyncSink{Svc: m.season}}
 }
 
-// GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (tên consumer giữ "pf.cropcycle.gps_log").
+// GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (tên consumer giữ "pf.cropcycle.gps_log"): vụ, nhật
+// ký, khai sản lượng và yêu cầu hỗ trợ (#313, thay consumer pf.extension.gps_log).
 func (m *Module) GpsLogHandler() inbox.Handler { return m.season.HandleGpsLog }
 
 // ---- bộ ghép nội bộ ----

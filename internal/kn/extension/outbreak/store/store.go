@@ -120,25 +120,55 @@ type OutbreakRow struct {
 	Ref uuid.UUID
 	domain.Outbreak
 	Meta
+	// RuleVersion: domain.RuleVersionV1 (dữ liệu cũ một hộ) hoặc domain.RuleVersion (v2). Rỗng khi ghi → v2.
+	RuleVersion string
+	// Households là DB-04 của phiên bản v2 (bảng con, theo position); rỗng ở v1. Đọc qua OutbreakHouseholds.
+	Households []HouseholdLine
+}
+
+// HouseholdLine là một hộ của phiên bản ổ dịch (bảng con cnts_outbreak_household): phiên bản hộ và loại chăn nuôi DB-14
+// chụp lúc ghi.
+type HouseholdLine struct {
+	HouseholdRef  uuid.UUID
+	HouseholdSeq  int64
+	LivestockType string
+	Position      int
+	// Đọc kèm (không ghi): mã hộ HCN-01, ấp và chủ thể kho định danh của phiên bản hộ đã chụp, trạng thái hiện hành của hộ.
+	Code      string
+	Hamlet    string
+	PersonRef uuid.UUID
+	Status    string
 }
 
 const obCols = `id, seq, outbreak_ref, event, commune_code, disease_code, species_code, received_at, source, suspect_ref,
   household_ref, locality, ST_Y(location)::numeric(12,7)::text, ST_X(location)::numeric(12,7)::text, location_source,
   gps_accuracy_m::text, herd_size, herd_age_days, dead, symptoms, sample_date, lab_name, lab_result, culled_head,
   culled_kg::text, chemical_liters::text, buffer_note, prevention_note, attachment_refs::text[], as_of, progress_note, status_reason,
-  captured_at, event_time, recorded_at, actor_ref, on_behalf_of, support_reason, idem_key`
+  captured_at, event_time, recorded_at, actor_ref, on_behalf_of, support_reason, idem_key, affected_households,
+  aqua_farmed_ha::text, aqua_wild_ha::text, rule_version`
 
 func scanOutbreak(row pgx.Row) (OutbreakRow, error) {
 	var r OutbreakRow
-	var locality, labName, labResult, buffer, prevention, progress, lat, lon, acc, kg, liters *string
+	var locality, labName, labResult, buffer, prevention, progress, lat, lon, acc, kg, liters, farmed, wild *string
 	var refs []string
-	var herdAge, culled *int32
+	var herdAge, culled, affected *int32
 	var herd, dead int32
 	err := row.Scan(&r.ID, &r.Seq, &r.Ref, &r.Event, &r.CommuneCode, &r.DiseaseCode, &r.SpeciesCode, &r.ReceivedAt, &r.Source,
 		&r.SuspectRef, &r.HouseholdRef, &locality, &lat, &lon, &r.LocationSource, &acc, &herd, &herdAge, &dead, &r.Symptoms,
 		&r.SampleDate, &labName, &labResult, &culled, &kg, &liters, &buffer, &prevention, &refs, &r.AsOf, &progress,
-		&r.StatusReason, &r.CapturedAt, &r.EventTime, &r.RecordedAt, &r.ActorRef, &r.OnBehalfOf, &r.SupportReason, &r.IdemKey)
+		&r.StatusReason, &r.CapturedAt, &r.EventTime, &r.RecordedAt, &r.ActorRef, &r.OnBehalfOf, &r.SupportReason, &r.IdemKey,
+		&affected, &farmed, &wild, &r.RuleVersion)
 	if err != nil {
+		return r, err
+	}
+	if affected != nil {
+		v := int64(*affected)
+		r.AffectedHouseholds = &v
+	}
+	if r.AquaFarmedHa, err = decPtr(farmed); err != nil {
+		return r, err
+	}
+	if r.AquaWildHa, err = decPtr(wild); err != nil {
 		return r, err
 	}
 	r.Locality, r.LabName, r.LabResult = str(locality), str(labName), str(labResult)
@@ -186,27 +216,92 @@ func collectOutbreaks(rows pgx.Rows, err error) ([]OutbreakRow, error) {
 	return out, rows.Err()
 }
 
-// InsertOutbreak ghi một phiên bản ổ dịch (stream 'outbreak:<ref>').
+// InsertOutbreak ghi một phiên bản ổ dịch (stream 'outbreak:<ref>') và — với v2 — các dòng bảng con DB-04 của phiên bản
+// đó trong cùng giao dịch. DB-15 = số dòng bảng con (dịch vụ không nhận từ API — AC-04).
 func InsertOutbreak(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r *OutbreakRow) error {
+	if r.RuleVersion == "" {
+		r.RuleVersion = domain.RuleVersion
+	}
+	if r.RuleVersion == domain.RuleVersion {
+		n := int64(len(r.Households))
+		r.AffectedHouseholds = &n
+	}
 	lat, lon := latLon(r.Location)
 	refs := refStrings(r.AttachmentRefs)
-	return tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_outbreak (id, tenant_id, stream_key, outbreak_ref, event, commune_code,
+	if err := tx.QueryRow(ctx, `INSERT INTO pf_extension.cnts_outbreak (id, tenant_id, stream_key, outbreak_ref, event, commune_code,
 	    disease_code, species_code, received_at, source, suspect_ref, household_ref, locality, location, location_source,
 	    gps_accuracy_m, herd_size, herd_age_days, dead, symptoms, sample_date, lab_name, lab_result, culled_head, culled_kg,
 	    chemical_liters, buffer_note, prevention_note, attachment_refs, as_of, progress_note, status_reason, captured_at,
-	    event_time, actor_ref, on_behalf_of, support_reason, idem_key, rule_version)
+	    event_time, actor_ref, on_behalf_of, support_reason, idem_key, rule_version, affected_households, aqua_farmed_ha,
+	    aqua_wild_ha)
 	  VALUES ($1::uuid, $2::uuid, $3::text, $4::uuid, $5::text, $6::text, $7::text, $8::text, $9::timestamptz, $10::text,
 	    $11::uuid, $12::uuid, $13::text, ST_SetSRID(ST_MakePoint($15::text::float8, $14::text::float8), 4326), $16::text,
 	    $17::numeric, $18::int, $19::int, $20::int, $21::text, $22::date, $23::text, $24::text, $25::int, $26::numeric,
 	    $27::numeric, $28::text, $29::text, $30::text[]::uuid[], $31::date, $32::text, $33::text, $34::timestamptz, $35::timestamptz,
-	    $36::uuid, $37::uuid, $38::text, $39::text, $40::text)
+	    $36::uuid, $37::uuid, $38::text, $39::text, $40::text, $41::int, $42::numeric, $43::numeric)
 	  RETURNING seq, recorded_at`,
 		r.ID, tid, "outbreak:"+r.Ref.String(), r.Ref, r.Event, r.CommuneCode, r.DiseaseCode, r.SpeciesCode, r.ReceivedAt.UTC(),
 		r.Source, r.SuspectRef, r.HouseholdRef, optText(r.Locality), lat, lon, r.LocationSource, decText(r.GPSAccuracyM),
 		r.HerdSize, r.HerdAgeDays, r.Dead, r.Symptoms, r.SampleDate, optText(r.LabName), optText(r.LabResult), r.CulledHead,
 		decText(r.CulledKg), decText(r.ChemicalLiters), optText(r.BufferNote), optText(r.PreventionNote), refs, r.AsOf,
 		optText(r.ProgressNote), r.StatusReason, r.CapturedAt, r.EventTime.UTC(), r.ActorRef, r.OnBehalfOf, r.SupportReason,
-		r.IdemKey, domain.RuleVersion).Scan(&r.Seq, &r.RecordedAt)
+		r.IdemKey, r.RuleVersion, r.AffectedHouseholds, decText(r.AquaFarmedHa), decText(r.AquaWildHa)).Scan(&r.Seq, &r.RecordedAt); err != nil {
+		return err
+	}
+	for i := range r.Households {
+		h := &r.Households[i]
+		h.Position = i + 1
+		if _, err := tx.Exec(ctx, `INSERT INTO pf_extension.cnts_outbreak_household (tenant_id, outbreak_ref, outbreak_seq,
+		    household_ref, household_seq, livestock_type, position) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			tid, r.Ref, r.Seq, h.HouseholdRef, h.HouseholdSeq, h.LivestockType, h.Position); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// VersionKey là (ổ dịch, phiên bản).
+type VersionKey struct {
+	Ref uuid.UUID
+	Seq int64
+}
+
+// OutbreakHouseholds đọc hộ DB-04 của các phiên bản (theo position), kèm mã hộ, ấp, chủ thể của phiên bản hộ đã chụp và
+// trạng thái hiện hành của hộ (hộ vô hiệu hóa sau đó vẫn hiện ở dữ liệu cũ — FN-10 BR-07).
+func OutbreakHouseholds(ctx context.Context, tx pgx.Tx, keys []VersionKey) (map[VersionKey][]HouseholdLine, error) {
+	out := map[VersionKey][]HouseholdLine{}
+	if len(keys) == 0 {
+		return out, nil
+	}
+	refs, seqs := make([]string, len(keys)), make([]int64, len(keys))
+	for i, k := range keys {
+		refs[i], seqs[i] = k.Ref.String(), k.Seq
+	}
+	rows, err := tx.Query(ctx, `SELECT oh.outbreak_ref, oh.outbreak_seq, oh.household_ref, oh.household_seq, oh.livestock_type,
+	    oh.position, k.code, coalesce(h.hamlet, ''), h.person_ref, cur.status
+	  FROM pf_extension.cnts_outbreak_household oh
+	  JOIN (SELECT unnest($1::text[])::uuid AS ref, unnest($2::bigint[]) AS seq) w ON w.ref = oh.outbreak_ref AND w.seq = oh.outbreak_seq
+	  JOIN pf_extension.cnts_livestock_household_key k ON k.household_ref = oh.household_ref
+	  JOIN pf_extension.cnts_livestock_household h ON h.household_ref = oh.household_ref AND h.seq = oh.household_seq
+	  JOIN LATERAL (SELECT x.status FROM pf_extension.cnts_livestock_household x WHERE x.household_ref = oh.household_ref
+	    ORDER BY x.seq DESC LIMIT 1) cur ON true
+	  ORDER BY oh.outbreak_ref, oh.outbreak_seq, oh.position`, refs, seqs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var k VersionKey
+		var l HouseholdLine
+		var pos int16
+		if err := rows.Scan(&k.Ref, &k.Seq, &l.HouseholdRef, &l.HouseholdSeq, &l.LivestockType, &pos, &l.Code, &l.Hamlet,
+			&l.PersonRef, &l.Status); err != nil {
+			return nil, err
+		}
+		l.Position = int(pos)
+		out[k] = append(out[k], l)
+	}
+	return out, rows.Err()
 }
 
 // OutbreakFilter lọc danh sách ổ dịch (bản hiện hành).
@@ -328,7 +423,7 @@ func InsertSuspect(ctx context.Context, tx pgx.Tx, tid uuid.UUID, r *SuspectRow)
 		r.ID, tid, "suspect:"+r.Ref.String(), r.Ref, r.Event, r.CommuneCode, r.ReporterKind, r.ObservedAt.UTC(),
 		optText(r.SpeciesCode), optText(r.DiseaseCode), r.HouseholdRef, optText(r.Locality), lat, lon, decText(r.GPSAccuracyM),
 		r.Affected, r.Dead, r.Description, refs, r.OutbreakRef, r.StatusReason, r.CapturedAt, r.EventTime.UTC(), r.ActorRef,
-		r.OnBehalfOf, r.SupportReason, r.IdemKey, domain.RuleVersion).Scan(&r.Seq, &r.RecordedAt)
+		r.OnBehalfOf, r.SupportReason, r.IdemKey, domain.RuleVersionV1).Scan(&r.Seq, &r.RecordedAt)
 }
 
 // SuspectFilter lọc danh sách tin báo (bản hiện hành).

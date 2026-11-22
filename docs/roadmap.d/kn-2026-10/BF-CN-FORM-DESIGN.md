@@ -1,0 +1,1 @@
+- [ ] BF-CN-FORM-DESIGN (#174): Phần đầu FN-07 xem cấu trúc/phiên bản năm biểu kỳ native, xem trước và kiểm XLSX/CSV theo dòng, không ghi; menu thật. Còn sửa/copy/lưu/phát hành phiên bản/nhật ký/KNQG/AC-03 ở child #191/#192; không ghi nhận FN-07 đủ. Xem docs/kn/gia-dinh/BF-CN-FORM-DESIGN.md.

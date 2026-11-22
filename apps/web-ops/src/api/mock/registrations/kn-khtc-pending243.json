@@ -1,0 +1,11 @@
+{
+  "id": "kn-khtc-pending243",
+  "source": "./kn-khtc-pending243",
+  "app": [
+    {
+      "export": "khtcPendingRoutes243",
+      "order": 10243
+    }
+  ],
+  "admin": []
+}

@@ -11,6 +11,10 @@
     },
     {
       "Reader": "r_extension",
+      "View": "pf_cooperative_pub.v1_plot_export"
+    },
+    {
+      "Reader": "r_extension",
       "View": "pf_cooperative_pub.v1_plots"
     },
     {

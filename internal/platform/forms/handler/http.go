@@ -33,6 +33,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.POST("/forms/templates", h.define)
 	rg.POST("/forms/templates/fixtures", h.fixtures)
 	rg.GET("/forms/templates/:id", h.template)
+	rg.GET("/forms/template-versions", h.templateVersions)
+	rg.GET("/forms/template-versions/:version", h.templateVersion)
 	rg.GET("/forms/periods", h.periods)
 	rg.POST("/forms/periods", h.publish)
 	rg.GET("/forms/periods/:id", h.period)
@@ -316,11 +318,12 @@ func (h Handler) templates(c *gin.Context) {
 }
 
 type defineReq struct {
-	Profile string         `json:"profile"`
-	Code    string         `json:"code"`
-	Title   string         `json:"title"`
-	Fields  []domain.Field `json:"fields"`
-	Fixture bool           `json:"fixture"`
+	Profile     string         `json:"profile"`
+	Code        string         `json:"code"`
+	Title       string         `json:"title"`
+	Fields      []domain.Field `json:"fields"`
+	Fixture     bool           `json:"fixture"`
+	BaseVersion *int64         `json:"base_version"`
 }
 
 func (h Handler) define(c *gin.Context) {
@@ -329,7 +332,7 @@ func (h Handler) define(c *gin.Context) {
 		return
 	}
 	t, err := h.Svc.DefineTemplate(c.Request.Context(), app.TemplateInput{Profile: req.Profile, Code: req.Code, Title: req.Title,
-		Fields: req.Fields, Fixture: req.Fixture}, idemKey(c))
+		Fields: req.Fields, Fixture: req.Fixture, BaseVersion: req.BaseVersion}, idemKey(c))
 	if err != nil {
 		httpx.Fail(c, err)
 		return
@@ -505,7 +508,8 @@ func (h Handler) submissions(c *gin.Context) {
 	}
 	out := make([]submissionDTO, 0, len(ss))
 	for _, s := range ss {
-		out = append(out, submissionOf(s.Submission, s.Status, s.Review))
+		// #175: lịch sử trả thông tin đã lưu của TỪNG phiên bản (nộp trễ, lý do, ghi chú); bản cũ không có sổ phụ → mặc định.
+		out = append(out, submissionOf(s.Submission, s.Status, s.Review, s.Meta))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": out})
 }
@@ -619,7 +623,7 @@ func (h Handler) snapshot(c *gin.Context) {
 }
 
 func (h Handler) tasks(c *gin.Context) {
-	f := app.TaskFilter{Code: c.Query("code")}
+	f := app.TaskFilter{Code: c.Query("code"), Cursor: c.Query("cursor")}
 	f.Limit, _ = strconv.Atoi(c.Query("limit"))
 	for _, x := range []struct {
 		field string
@@ -636,16 +640,20 @@ func (h Handler) tasks(c *gin.Context) {
 		}
 		*x.dst = &d
 	}
-	ts, err := h.Svc.Tasks(c.Request.Context(), c.Query("profile"), f)
+	pg, err := h.Svc.TasksPage(c.Request.Context(), c.Query("profile"), f)
 	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	out := make([]app.TaskData, 0, len(ts))
-	for _, t := range ts {
+	out := make([]app.TaskData, 0, len(pg.Items))
+	for _, t := range pg.Items {
 		out = append(out, app.TaskDataOf(t, t.Template))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": out})
+	var next *string
+	if pg.NextCursor != "" {
+		next = &pg.NextCursor
+	}
+	c.JSON(http.StatusOK, gin.H{"items": out, "next_cursor": next})
 }
 
 type previousDTO struct {

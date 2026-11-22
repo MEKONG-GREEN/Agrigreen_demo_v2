@@ -109,6 +109,22 @@ func TestLegacyPublishedReaderAccessContract(t *testing.T) {
 	if len(flags) != len(readers) || len(allowed) == 0 || len(members) == 0 {
 		t.Fatal("missing actual ACL snapshot")
 	}
+	// The new dormant guest role has no owner-data published-view capability,
+	// including transitive membership that would permit a later SET ROLE.
+	for _, a := range allowed {
+		if a.Reader == "r_guestlink" {
+			t.Fatalf("guestlink must not read published view %s", a.View)
+		}
+	}
+	var guestPublishedRoles []string
+	if err := pool.QueryRow(ctx, `SELECT coalesce(array_agg(rolname::text ORDER BY rolname), ARRAY[]::text[])
+		FROM pg_roles WHERE right(rolname,4)='_pub'
+		AND pg_has_role('r_guestlink'::regrole, oid, 'MEMBER')`).Scan(&guestPublishedRoles); err != nil {
+		t.Fatal(err)
+	}
+	if len(guestPublishedRoles) != 0 {
+		t.Fatalf("guestlink must not inherit or assume published-reader roles: %v", guestPublishedRoles)
+	}
 	type snapshot struct {
 		Roles       []roleFlags
 		Access      []access
@@ -172,6 +188,28 @@ func TestLegacyPublishedReaderAccessContract(t *testing.T) {
 	}
 	additions.Access = append(additions.Access, platformKN.Access...)
 	additions.Memberships = append(additions.Memberships, platformKN.Memberships...)
+	// PA1-HTX-SUPPORT-GPSLOG (#313): view chỉ-để-chép pf_extension_pub.v1_support_request_export — đọc qua membership
+	// r_extension_pub sẵn có (không thêm membership, không mã ứng dụng nào đọc).
+	supportRaw, err := os.ReadFile("../tests/golden/pa1-support-export-access-additions.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var support snapshot
+	if err := json.Unmarshal(supportRaw, &support); err != nil {
+		t.Fatal(err)
+	}
+	if len(support.Roles) != 0 || len(support.Memberships) != 0 {
+		t.Fatal("#313 support export adds view access only")
+	}
+	additions.Access = append(additions.Access, support.Access...)
+	// #184 adds a new dormant capability role, not a change to any frozen OLD role.
+	// Keep its flags exact and leave Access/Memberships empty: any inherited or
+	// direct published-view grant to r_guestlink must still fail this snapshot.
+	if slices.ContainsFunc(want.Roles, func(r roleFlags) bool { return r.Role == "r_guestlink" }) {
+		t.Fatal("new guestlink role must not be added to the frozen OLD snapshot")
+	}
+	want.Roles = append(want.Roles, roleFlags{Role: "r_guestlink", Inherit: true, BypassRLS: false, Login: false})
+	slices.SortFunc(want.Roles, func(a, b roleFlags) int { return strings.Compare(a.Role, b.Role) })
 	want.Access = append(want.Access, additions.Access...)
 	want.Memberships = append(want.Memberships, additions.Memberships...)
 	slices.SortFunc(want.Access, func(a, b access) int {

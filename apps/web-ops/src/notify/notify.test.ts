@@ -23,4 +23,11 @@ describe("KIND_LABEL — Báo giá nông sản", () => {
     expect(KIND_LABEL.price_verify_request).toBe("Yêu cầu xác minh giá");
     expect(KIND_LABEL.price_lock_summary).toBe("Tổng hợp khóa nhập giá");
   });
+
+  it("W11.53b: có nhãn tiếng Việt cho ba loại thông báo biểu dự án KNQG (enum hợp đồng)", () => {
+    for (const k of ["cnts_knqg_sent", "cnts_knqg_reviewed", "cnts_knqg_submitted"] as const) {
+      expect(KIND_LABEL[k]).toBeTruthy();
+      expect(KIND_LABEL[k]).not.toBe(k);
+    }
+  });
 });

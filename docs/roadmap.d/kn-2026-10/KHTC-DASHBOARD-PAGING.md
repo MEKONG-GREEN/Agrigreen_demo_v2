@@ -1,0 +1,1 @@
+- [x] KHTC-DASHBOARD-PAGING (W11.69-DASHBOARD-FULL #189): dashboard bỏ cap100 bằng keyset/batch, lọc projection và thống nhất adhoc theo quyền. Chỉ lát phân trang; live/leadership/badge/reminder/field còn ở #202. Bằng chứng và giới hạn: docs/kn/gia-dinh/KHTC-DASHBOARD-PAGING.md.

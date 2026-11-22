@@ -366,3 +366,47 @@ func TestFN_XA_03_06_ScopeRolesDepartmentTenantSummary(t *testing.T) {
 	}
 	want(t, stranger.get("/v1/kn/materials/"+id1+"/log"), http.StatusNotFound, "extension.material_record_not_found", "tenant khác đọc")
 }
+
+// BF-TT-MAT (#105, TT-12) "Nạp Excel": đọc tệp thành dòng của bảng nhập, không ghi sổ; Cấp Tỉnh/TW không được nạp.
+func TestBF_TT_MAT_ImportPreviewDoesNotWrite(t *testing.T) {
+	f := newFix(t)
+	xa := f.user(f.tenant, authz.KNXa, dept, "30001")
+	upload := func(u user, body string) resp {
+		t.Helper()
+		r, _ := http.NewRequest(http.MethodPost, f.srv.URL+"/v1/kn/materials/import", strings.NewReader(body))
+		r.Header.Set("Authorization", "Bearer "+u.token)
+		r.Header.Set("Content-Type", "text/csv; charset=utf-8")
+		r.Header.Set(authz.ContextHeader, u.ctxID.String())
+		r.Header.Set("Idempotency-Key", key())
+		res, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = res.Body.Close() }()
+		raw, _ := io.ReadAll(res.Body)
+		var m map[string]any
+		_ = json.Unmarshal(raw, &m)
+		return resp{status: res.StatusCode, raw: raw, body: m}
+	}
+	r := upload(xa, "Vật tư,Số lượng,Thời điểm,Ghi chú\nphan_ure,12.5,30/09/2026,Đợt 1\nGiống lúa (bao),2.5,,\ncu,1,,\n")
+	want(t, r, http.StatusOK, "", "nạp tệp")
+	ls := objs(r.body["lines"])
+	if len(ls) != 3 || r.body["accepted"] != float64(1) || r.body["rejected"] != float64(2) {
+		t.Fatalf("kết quả nạp: %s", r.raw)
+	}
+	if str(ls[0], "material_code") != "phan_ure" || str(ls[0], "unit") != "kg" || str(ls[0], "quantity") != "12.5" ||
+		str(ls[0], "recorded_on") != "2026-09-30" || str(ls[0], "status") != "accepted" || ls[0]["reason"] != nil {
+		t.Fatalf("dòng 1: %s", r.raw)
+	}
+	if str(ls[1], "material_code") != "giong_bao" || str(ls[1], "status") != "rejected" || ls[1]["quantity"] != nil {
+		t.Fatalf("dòng 2 (bao → số nguyên): %s", r.raw)
+	}
+	if l := xa.get("/v1/kn/materials?commune=30001"); len(items(l)) != 0 {
+		t.Fatalf("nạp tệp không được ghi sổ: %s", l.raw)
+	}
+	want(t, upload(xa, "Ghi chú\nx\n"), http.StatusUnprocessableEntity, "extension.material_import_invalid", "thiếu cột")
+	tinh := f.user(f.tenant, authz.KNTinh, dept, "30001")
+	want(t, upload(tinh, "Vật tư,Số lượng\nphan_ure,1\n"), http.StatusForbidden, "forbidden", "Cấp Tỉnh nạp")
+	tw := f.user(f.tenant, authz.KNTW, dept)
+	want(t, upload(tw, "Vật tư,Số lượng\nphan_ure,1\n"), http.StatusForbidden, "extension.read_only", "TW nạp")
+}

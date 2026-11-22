@@ -19,13 +19,18 @@ export interface NumberRule {
   max?: string | number;
   /** Số chữ số thập phân tối đa. */
   maxDecimals?: number;
+  /** Giới hạn chuỗi thô trước khi chuẩn hóa/so sánh số (vd 32 cho danh mục nhân sự). */
+  maxInputLength?: number;
 }
 
 export type ParsedNumber = { ok: true; value: string } | { ok: false; error: string };
 
 /** Kiểm một ô số người gõ (kiểu vi-VN "1.234,5" hoặc "1234.5"). Rỗng mà không bắt buộc → value "". */
 export function parseNumberInput(raw: string, rule: NumberRule = {}): ParsedNumber {
+  if (rule.maxInputLength !== undefined && raw.length > rule.maxInputLength) return { ok: false, error: `Tối đa ${rule.maxInputLength} ký tự số.` };
   if (raw.trim() === "") return rule.required ? { ok: false, error: "Bắt buộc nhập." } : { ok: true, value: "" };
+  // normalizeNumberInput gọi Decimal.parse: chặn số mũ trước để không dựng lũy thừa rồi mới từ chối.
+  if (/[eE]/.test(raw)) return { ok: false, error: "Không phải số hợp lệ." };
   const v = normalizeNumberInput(raw);
   if (!/^-?\d+(\.\d+)?$/.test(v)) return { ok: false, error: "Không phải số hợp lệ." };
   if (rule.integer && v.includes(".")) return { ok: false, error: "Chỉ nhập số nguyên." };

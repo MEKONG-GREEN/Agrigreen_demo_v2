@@ -1,5 +1,6 @@
 /// Yêu cầu hỗ trợ của nông dân (HTX US-SUPPORT-01) — payload `SupportPayload`
-/// của pf/extension (docs/dev/sync-contract.md, entity `support_request`).
+/// của pf/cooperative (#313, trước đó pf/extension; docs/dev/sync-contract.md,
+/// entity `support_request`). `task_status` chỉ có ở yêu cầu chép từ pf/extension.
 library;
 
 /// Loại sự cố (`category`).

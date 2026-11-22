@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
+	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -78,4 +79,47 @@ func bindCapabilityTestPrincipal(t *testing.T, p authz.Principal) authz.Principa
 	}
 	p.SelectedSession = &selected
 	return p
+}
+
+// #71: biểu CNTS dùng phạm vi quyền FN-14 tường minh của payload chủ; profile khác và phiên chưa từng được cấp giữ nguyên.
+func TestCNTSFormActorUsesOwnerGrantScope(t *testing.T) {
+	profiles := FormProfiles()
+	general, livestock := profiles[0], profiles[1]
+	f1, f2, legacy := ids.New(), ids.New(), ids.New()
+	bind := func(g *extport.CNTSGrantScope) authz.Principal {
+		k := extport.SessionContext{ID: ids.New(), Role: extport.SessionRoleCommune, Department: partyport.DeptChanNuoiThuySan,
+			Communes: []string{"30001", "30002"}, Scope: authz.Scope{Units: []string{"30001", "30002"}}, Facilities: []uuid.UUID{legacy},
+			CNTSGrant: g}
+		s, err := extport.NewSessionContext(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return authz.Principal{ActorRef: ids.New(), TenantID: ids.New(), SelectedSession: &s}
+	}
+
+	p := bind(nil)
+	subject, used, err := livestock.ResolveActor(context.Background(), p, livestock)
+	if err != nil || !used || subject.AllowsTemplate != nil || !subject.AllowsTarget(port.UnitFacility, legacy) || len(subject.Scope.Units) != 2 {
+		t.Fatalf("chưa từng được cấp quyền phải giữ hành vi cũ: %v", err)
+	}
+
+	p = bind(&extport.CNTSGrantScope{})
+	subject, _, err = livestock.ResolveActor(context.Background(), p, livestock)
+	if err != nil || subject.AllowsTemplate == nil || subject.AllowsTemplate("CNTS-BM01") || subject.AllowsTarget(port.UnitFacility, legacy) ||
+		!subject.Scope.Empty() {
+		t.Fatalf("phạm vi tường minh rỗng phải chặn: %v", err)
+	}
+
+	p = bind(&extport.CNTSGrantScope{Grants: []extport.CNTSGrant{{Ref: ids.New(), Seq: 1, Role: "ksgm", Communes: []string{"30001"},
+		Facilities: []uuid.UUID{f1}, Forms: []string{"BM-01"}}}})
+	subject, _, err = livestock.ResolveActor(context.Background(), p, livestock)
+	if err != nil || !subject.AllowsTemplate("CNTS-BM01") || subject.AllowsTemplate("CNTS-BM04") || !subject.AllowsTarget(port.UnitFacility, f1) ||
+		subject.AllowsTarget(port.UnitFacility, f2) || subject.AllowsTarget(port.UnitFacility, legacy) ||
+		!subject.Scope.Allows("30001") || subject.Scope.Allows("30002") {
+		t.Fatalf("AC-03/BR-02: biểu, cơ sở, xã theo quyền FN-14: %v", err)
+	}
+	subject, _, err = general.ResolveActor(context.Background(), p, general)
+	if err != nil || subject.AllowsTemplate != nil || !subject.Scope.Allows("30002") {
+		t.Fatalf("profile kn không dùng quyền CNTS: %v", err)
+	}
 }

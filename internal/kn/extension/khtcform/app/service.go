@@ -14,7 +14,9 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -106,6 +108,7 @@ func (s *Service) caller(ctx context.Context, dept string) (caller, error) {
 
 // Submission là một lần gửi (lịch sử gửi).
 type Submission struct {
+	NativeLate  *bool
 	ID          uuid.UUID
 	Attempt     int64
 	SubmittedAt time.Time
@@ -118,6 +121,7 @@ type Submission struct {
 
 // Form là phiếu của một phòng trong một kỳ KHTC (màn nhập FN-PN-03.02 và màn rà soát FN-TI-02.04).
 type Form struct {
+	Supplement     *AdhocRequestView
 	Period         pstore.Period
 	DueAt          time.Time
 	Terminal       string // "" | closed | cancelled
@@ -209,8 +213,22 @@ func (s *Service) load(ctx context.Context, c caller, id uuid.UUID, dept string)
 	if err != nil {
 		return Form{}, err
 	}
+	if p.Type == pdomain.TypeAdhoc {
+		if c.k.Role == extport.SessionRoleAdmin && !c.p.MFA {
+			return Form{}, problem.MFARequired
+		}
+		if c.k.Role == extport.SessionRoleNational || c.k.ReadOnly() {
+			return Form{}, errNotDept
+		}
+		if c.k.Role == extport.SessionRoleAdmin {
+			c.review = true
+		}
+	}
 	f := Form{Period: p, DueAt: dueOf(p, evs), Terminal: terminalOf(evs), Department: dept, DepartmentName: DeptName(dept),
 		Template: domain.TemplateFor(dept), Grid: p.Type == pdomain.TypeWeek}
+	if err := s.attachAdhocRequest(ctx, c, &f); err != nil {
+		return Form{}, err
+	}
 	now := s.now()
 	f.Overdue = now.After(f.DueAt)
 	if f.Terminal == pdomain.PeriodCancelled && c.member {
@@ -263,6 +281,13 @@ func (s *Service) load(ctx context.Context, c caller, id uuid.UUID, dept string)
 		f.View.State == pdomain.FormSupplement
 	f.Editable = c.writer && editableState
 	f.CanReview = c.review && (f.View.CanConfirm || f.View.CanRequestSupplement)
+	if f.Supplement != nil {
+		f.RequestNote = f.Supplement.Instruction
+		if f.Supplement.State == "intent" {
+			f.Editable = false
+			f.CanReview = false
+		}
+	}
 	switch {
 	case draft != nil && (c.member || last == nil):
 		f.Content, f.ContentSource, f.DraftAt = draft.Content.Normalize(), "draft", &draft.EventTime
@@ -274,11 +299,17 @@ func (s *Service) load(ctx context.Context, c caller, id uuid.UUID, dept string)
 	if err := s.fillGrid(ctx, c, &f); err != nil {
 		return Form{}, err
 	}
+	if err := s.attachAdhocSubmissionDeadlines(ctx, c, &f); err != nil {
+		return Form{}, err
+	}
 	f.Result = s.evaluate(f, f.Content, true)
 	return f, nil
 }
 
 func (s *Service) evaluate(f Form, sh domain.Sheet, submit bool) domain.Result {
+	if f.Supplement != nil {
+		return domain.Result{Rows: map[uuid.UUID]domain.RowResult{}, Issues: domain.ValidateAdhocAnswer(sh, f.Supplement.Indicators, submit)}
+	}
 	adj := map[uuid.UUID]domain.AdjPeriod{}
 	for _, a := range f.AdjPeriods {
 		adj[a.ID] = a
@@ -479,6 +510,9 @@ func (s *Service) editable(ctx context.Context, id uuid.UUID, dept string) (call
 	if err != nil {
 		return c, Form{}, err
 	}
+	if c.k.Role == extport.SessionRoleAdmin && f.Period.Type != pdomain.TypeAdhoc {
+		return c, Form{}, errNotWriter
+	}
 	if !f.Editable {
 		msg := "phiếu \"" + pdomain.FormLabels[f.View.State] + "\""
 		switch f.View.State {
@@ -515,9 +549,23 @@ func (s *Service) record(ctx context.Context, c caller, f Form, sh domain.Sheet,
 	var out *store.Sheet
 	err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		prev, err := store.ByIdem(ctx, tx, idem)
-		if err != nil || prev != nil {
-			out = prev
+		if err != nil {
 			return err
+		}
+		if prev != nil {
+			_, hash, e := sh.Hash()
+			if e != nil {
+				return e
+			}
+			_, oldHash, e := prev.Content.Hash()
+			if e != nil {
+				return e
+			}
+			if prev.ActorRef != c.p.ActorRef || prev.PeriodID != f.Period.ID || prev.Department != f.Department || prev.Kind != kind || prev.BaseAttempt != int(f.View.Attempt) || string(hash) != string(oldHash) {
+				return ErrAdhocRequestConflict
+			}
+			out = prev
+			return nil
 		}
 		if err := store.Insert(ctx, tx, c.p.TenantID, &row, idem); err != nil {
 			return err
@@ -525,7 +573,7 @@ func (s *Service) record(ctx context.Context, c caller, f Form, sh domain.Sheet,
 		out = &row
 		return nil
 	})
-	return out, err
+	return out, adhocError(err)
 }
 
 func idemOr(idem string) string {
@@ -537,6 +585,9 @@ func idemOr(idem string) string {
 
 // SaveDraft "Lưu nháp" (không giới hạn, không kiểm bắt buộc — vẫn trả kết quả kiểm tra để báo tại ô).
 func (s *Service) SaveDraft(ctx context.Context, id uuid.UUID, dept string, in SaveInput, idem string) (Form, error) {
+	if err := boundsAdhocInput(in.Sheet); err != nil {
+		return Form{}, err
+	}
 	c, f, err := s.editable(ctx, id, dept)
 	if err != nil {
 		return Form{}, err
@@ -545,6 +596,9 @@ func (s *Service) SaveDraft(ctx context.Context, id uuid.UUID, dept string, in S
 		return Form{}, formsport.ErrVersionConflict.WithDetail("phiếu đã được gửi ở nơi khác — tải lại phiếu")
 	}
 	sh := withPeriodNames(in.Sheet.Normalize(), f.AdjPeriods)
+	if err := s.validateRequestToken(ctx, c, f, sh, false); err != nil {
+		return Form{}, err
+	}
 	if len(sh.Cells) > domain.MaxCells || len(sh.Adjustments) > domain.MaxAdjustments {
 		return Form{}, problem.Validation.WithDetail("bảng quá lớn")
 	}
@@ -564,6 +618,8 @@ func invalid(res domain.Result) error {
 		list = append(list, i)
 		field := "sheet"
 		switch {
+		case strings.HasPrefix(i.Section, "adhoc_"):
+			field = i.Section
 		case i.Section != "":
 			field = "texts." + i.Section
 		case i.Adjustment >= 0:
@@ -582,6 +638,12 @@ func (s *Service) Submit(ctx context.Context, id uuid.UUID, dept string, in Save
 	if idem == "" {
 		return Form{}, problem.IdempotencyRequired
 	}
+	if err := boundsAdhocInput(in.Sheet); err != nil {
+		return Form{}, err
+	}
+	if f, ok, err := s.replayAdhocSubmit(ctx, id, dept, in, idem); err != nil || ok {
+		return f, err
+	}
 	c, f, err := s.editable(ctx, id, dept)
 	if err != nil {
 		return Form{}, err
@@ -590,6 +652,9 @@ func (s *Service) Submit(ctx context.Context, id uuid.UUID, dept string, in Save
 		return Form{}, formsport.ErrVersionConflict.WithDetail("phiếu đã được gửi ở nơi khác — tải lại phiếu")
 	}
 	sh := withPeriodNames(in.Sheet.Normalize(), f.AdjPeriods)
+	if err := s.validateRequestToken(ctx, c, f, sh, true); err != nil {
+		return Form{}, err
+	}
 	if res := s.evaluate(f, sh, true); !res.Valid() {
 		return Form{}, invalid(res)
 	}
@@ -602,12 +667,18 @@ func (s *Service) Submit(ctx context.Context, id uuid.UUID, dept string, in Save
 	var pb *problem.Problem
 	if errors.As(err, &pb) && pb.Code == formsport.ErrInvalidValues.Code {
 		for _, fe := range pb.Errors {
+			if fe.Field == "adhoc_request_id" {
+				return Form{}, ErrAdhocRequestChanged.WithCause(err)
+			}
 			if fe.Field == domain.FieldSheet {
 				return Form{}, ErrOldTemplate.WithCause(err)
 			}
 		}
 	}
 	if err != nil {
+		return Form{}, err
+	}
+	if err := s.completeAdhocRequest(ctx, c, f, sealed.ID, sealed.Content); err != nil {
 		return Form{}, err
 	}
 	return s.load(ctx, c, id, dept)
@@ -623,39 +694,86 @@ const (
 	DecisionAccepted = "accepted" // Xác nhận phiếu
 )
 
-// Review "Yêu cầu bổ sung" / "Xác nhận phiếu" — Cấp Tỉnh Phòng KHTC; dùng rà soát bốn mắt của cap/forms (người rà soát ≠
-// người gửi). Gửi lần cuối cho phép (3/3) chỉ còn Xác nhận; kỳ đã đóng thì không rà soát.
-func (s *Service) Review(ctx context.Context, id uuid.UUID, dept, decision, note, idem string) (Form, error) {
+// ReviewInput giữ đúng lần gửi mà người rà soát đã đọc; không tự chuyển sang lần mới hơn.
+type ReviewInput struct {
+	ExpectedSubmissionID uuid.UUID `json:"expected_submission_id"`
+	BaseAttempt          int64     `json:"base_attempt"`
+	Decision             string    `json:"decision"`
+	Note                 string    `json:"note"`
+}
+
+// ReviewResult tách xác nhận native của thao tác khỏi phiếu hiện hành đọc sau đó.
+type ReviewResult struct {
+	Form                 Form
+	ReviewedSubmissionID uuid.UUID
+	ReviewedAttempt      int64
+	ReviewDecision       string
+}
+
+func validateReview(in ReviewInput) error {
+	if in.ExpectedSubmissionID == uuid.Nil {
+		return problem.Validation.WithField("expected_submission_id", "bắt buộc mã lần gửi đã đọc")
+	}
+	if in.BaseAttempt < 1 {
+		return problem.Validation.WithField("base_attempt", "phải là số nguyên dương của lần gửi đã đọc")
+	}
+	if in.Decision != DecisionAccepted && in.Decision != DecisionReturned {
+		return problem.Validation.WithField("decision", "returned | accepted")
+	}
+	if len(in.Note) > 4000 || utf8.RuneCountInString(in.Note) > 1000 {
+		return problem.Validation.WithField("note", "tối đa 1000 ký tự")
+	}
+	if in.Decision == DecisionReturned && in.Note == "" {
+		return problem.Validation.WithField("note", "bắt buộc khi yêu cầu bổ sung")
+	}
+	return nil
+}
+
+// Review rà soát bốn mắt đúng phiên bản đã đọc. Native Forms kiểm lại phiên bản cuối
+// dưới khóa của kỳ, kể cả khi có lần gửi mới giữa s.load và Entry.Review.
+func (s *Service) Review(ctx context.Context, id uuid.UUID, dept string, in ReviewInput, idem string) (ReviewResult, error) {
+	in.Note = strings.TrimSpace(in.Note)
+	if err := validateReview(in); err != nil {
+		return ReviewResult{}, err
+	}
 	c, err := s.caller(ctx, dept)
 	if err != nil {
-		return Form{}, err
-	}
-	if !c.review {
-		return Form{}, errNotKHTC
+		return ReviewResult{}, err
 	}
 	f, err := s.load(ctx, c, id, dept)
 	if err != nil {
-		return Form{}, err
+		return ReviewResult{}, err
 	}
-	switch decision {
-	case DecisionReturned:
-		if !f.View.CanRequestSupplement {
-			return Form{}, ErrNotReviewable.WithDetail("\"Yêu cầu bổ sung\" chỉ khi phiếu Đã gửi (chưa đủ số lần gửi tối đa) và kỳ chưa đóng")
-		}
-	case DecisionAccepted:
-		if !f.View.CanConfirm {
-			return Form{}, ErrNotReviewable.WithDetail("\"Xác nhận\" chỉ khi phiếu Đã gửi và kỳ chưa đóng")
-		}
-	default:
-		return Form{}, problem.Validation.WithField("decision", "returned | accepted")
+	if !c.review && (c.k.Role != extport.SessionRoleAdmin || c.k.ReadOnly() || f.Period.Type != pdomain.TypeAdhoc) {
+		return ReviewResult{}, errNotKHTC
 	}
-	if len(f.Submissions) == 0 {
-		return Form{}, ErrNotReviewable
+	if len(f.Submissions) == 0 || f.Submissions[0].ID != in.ExpectedSubmissionID || f.Submissions[0].Attempt != in.BaseAttempt {
+		return ReviewResult{}, ErrNotReviewable.WithDetail("Lần gửi đã thay đổi — tải lại phiếu trước khi rà soát")
 	}
-	if _, err := s.Entry.Review(ctx, pdomain.ProfileKHTC, f.Submissions[0].ID, decision, note, "khtc:form:review:"+idemOr(idem)); err != nil {
-		return Form{}, err
+	if in.Decision == DecisionReturned && !f.View.CanRequestSupplement {
+		return ReviewResult{}, ErrNotReviewable.WithDetail("\"Yêu cầu bổ sung\" chỉ khi phiếu Đã gửi (chưa đủ số lần gửi tối đa) và kỳ chưa đóng")
 	}
-	return s.load(ctx, c, id, dept)
+	if in.Decision == DecisionAccepted && !f.View.CanConfirm {
+		return ReviewResult{}, ErrNotReviewable.WithDetail("\"Xác nhận\" chỉ khi phiếu Đã gửi và kỳ chưa đóng")
+	}
+	if c.k.Role == extport.SessionRoleAdmin && !c.p.MFA {
+		return ReviewResult{}, problem.MFARequired
+	}
+	nativeKey := "khtc:form:review:" + idemOr(idem)
+	nativeCtx := s.adhocReviewContext(ctx, c, f.Period, in.ExpectedSubmissionID, in.Decision, in.Note, nativeKey)
+	ack, err := s.Entry.Review(nativeCtx, pdomain.ProfileKHTC, in.ExpectedSubmissionID, in.Decision, in.Note, nativeKey)
+	if err != nil {
+		return ReviewResult{}, err
+	}
+	if ack.ID != in.ExpectedSubmissionID || ack.Version != in.BaseAttempt || ack.Unit != dept ||
+		ack.Decision != in.Decision || ack.ReviewNote != in.Note || ack.ReviewedAt == nil {
+		return ReviewResult{}, ErrDependency.WithDetail("Chưa đối chiếu được kết quả rà soát của lần gửi")
+	}
+	current, err := s.load(ctx, c, id, dept)
+	if err != nil {
+		return ReviewResult{}, err
+	}
+	return ReviewResult{Form: current, ReviewedSubmissionID: ack.ID, ReviewedAttempt: ack.Version, ReviewDecision: ack.Decision}, nil
 }
 
 // ---------------------------------------------------------------------------

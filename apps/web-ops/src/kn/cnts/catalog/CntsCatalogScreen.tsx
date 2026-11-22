@@ -10,7 +10,7 @@ import { useParams, usePathname, useRouter, useSearchParams } from "next/navigat
 import { useState, type ChangeEvent } from "react";
 import { unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
-import { fieldErrorMap } from "@/api/problem";
+import { ApiProblem, fieldErrorMap } from "@/api/problem";
 import type { CatalogItem, CatalogName } from "@/api/types";
 import { useAuth } from "@/auth/AuthProvider";
 import { hasRole, ROLES } from "@/auth/principal";
@@ -22,17 +22,23 @@ import { toCsv } from "@/htx/rules";
 import { LoadState, ReadOnlyNotice, useAction, useLoad } from "@/kn/cycle/common";
 import { readUpload, saveBlob } from "@/lib/files";
 import { ReasonDialog } from "../ReasonDialog";
+import { CommuneField, useUnitNames } from "./CommuneField";
 import {
   CNTS_TABS,
   CNTS_THRESHOLDS,
   INT_RULE,
+  THRESHOLD_RULE,
   cleanAttrs,
   codes,
+  effectiveThreshold,
+  exportRows,
+  indicatorParamKey,
   formatDoses,
   normalizeAttrs,
   parseDoses,
   tabOf,
   templateRows,
+  unitText,
   validateAttrs,
   type CatalogTab,
   type CntsCatalog,
@@ -43,6 +49,12 @@ import {
 const PAGE = 20;
 type TabId = CntsCatalog | "thresholds";
 type Item = CatalogItem & { valid_from?: string };
+
+/** Nội dung tệp của nút "Xuất danh mục": CSV UTF-8 có BOM, CRLF, dấu nháy trước ô bắt đầu bằng = + - @ (chống công thức
+ * Excel). Bộ nạp danh mục coi ô có dấu nháy đó là cùng nội dung với mục đã có, nên tệp nạp lại được (#170). */
+export function exportCatalogCsv(tab: CatalogTab, items: Parameters<typeof exportRows>[1]): string {
+  return toCsv(exportRows(tab, items));
+}
 
 function vnToday(): string {
   return new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
@@ -126,7 +138,7 @@ function summary(tab: CatalogTab, it: Item, names: Record<string, string>): stri
     case "cnts_vaccination_schedule":
       return `${names[a.model_type ?? ""] ?? a.model_type ?? names[a.breed ?? ""] ?? a.breed ?? ""} · ${parseDoses(a.doses).length} mũi`;
     case "cnts_slaughter_facility":
-      return `Xã ${a.commune_code ?? "—"} · ${opt("facility_kind") ?? ""} · GS: ${a.stamp_codes_gs || "—"} · GC: ${a.stamp_codes_gc || "—"}`;
+      return `Xã ${unitText(a.commune_code, names) || "—"} · ${opt("facility_kind") ?? ""} · GS: ${a.stamp_codes_gs || "—"} · GC: ${a.stamp_codes_gc || "—"}`;
     case "cnts_aquaculture_object":
       return opt("scale_unit") ?? "—";
     case "cnts_indicator":
@@ -156,9 +168,26 @@ function fieldText(f: Field, value: string | undefined, names: Record<string, st
       return parseDoses(value)
         .map((d) => `${names[d.vaccine] ?? d.vaccine} lần ${d.shot} @ ${d.age_days} ngày tuổi`)
         .join("; ");
+    case "commune":
+      return unitText(value, names);
     default:
       return value;
   }
+}
+
+/** Cột danh sách: mặc định một cột tóm tắt; danh mục có `columns` thì mỗi thuộc tính một cột (CN-10: đủ trường CSGM). */
+function attrColumns(tab: CatalogTab, names: Record<string, string>): Column<Item>[] {
+  if (!tab.columns) return [{ key: "attrs", header: tab.summary, cell: (i) => <span className="small">{summary(tab, i, names)}</span> }];
+  return tab.columns.flatMap(({ key, header }): Column<Item>[] => {
+    const f = tab.fields.find((x) => x.key === key);
+    if (!f) return [];
+    if (f.kind === "commune")
+      return [
+        { key: `${key}.name`, header, cell: (i) => names[i.attrs[key] ?? ""] ?? "—" },
+        { key, header: `Mã ${header.toLowerCase()}`, cell: (i) => (i.attrs[key] ? <code>{i.attrs[key]}</code> : "—") },
+      ];
+    return [{ key, header, cell: (i) => <span className="small">{fieldText(f, i.attrs[key], names) || "—"}</span> }];
+  });
 }
 
 export function CntsCatalogScreen() {
@@ -179,9 +208,12 @@ export function CntsCatalogScreen() {
   const catalog = tab === "thresholds" ? null : tab;
   const rows = useLoad(catalog ? () => ca.list(catalog, at) : null, [catalog, at, nonce]);
   const refNames = useRefNames(at, nonce);
-  const names = refNames.data ?? {};
-  const reload = () => setNonce((n) => n + 1);
   const current = catalog ? tabOf(catalog) : null;
+  const communeKey = current?.fields.find((f) => f.kind === "commune")?.key;
+  const [commune, setCommune] = useState("");
+  const unitNames = useUnitNames(communeKey ? (rows.data ?? []).map((i) => i.attrs[communeKey] ?? "") : []);
+  const names = { ...(refNames.data ?? {}), ...unitNames };
+  const reload = () => setNonce((n) => n + 1);
 
   const setActive = (it: Item, active: boolean, reason?: string) =>
     act
@@ -204,7 +236,7 @@ export function CntsCatalogScreen() {
     ? [
         { key: "code", header: "Mã", cell: (i) => <code>{i.code}</code> },
         { key: "name", header: "Tên", cell: (i) => (i.active ? <b>{i.name}</b> : <span className="mute">{i.name}</span>) },
-        { key: "attrs", header: current.summary, cell: (i) => <span className="small">{summary(current, i, names)}</span> },
+        ...attrColumns(current, names),
         { key: "from", header: "Hiệu lực từ", cell: (i) => dmy(i.valid_from) },
         { key: "st", header: "Trạng thái", cell: (i) => (i.active ? <StatusPill tone="ok">Đang dùng</StatusPill> : <StatusPill>Ngừng dùng</StatusPill>) },
         {
@@ -239,15 +271,31 @@ export function CntsCatalogScreen() {
       <PageHeader
         title="Danh mục Chăn nuôi – Thủy sản"
         actions={
-          ca.canEdit && current ? (
+          current ? (
             <span className="row">
-              <button type="button" className="btn btn-o btn-sm" aria-expanded={showImport} onClick={() => setShowImport((v) => !v)}>
-                <Icon name="upload" size={15} />
-                Nạp Excel
+              <button
+                type="button"
+                className="btn btn-o btn-sm"
+                disabled={!rows.data}
+                onClick={() =>
+                  rows.data &&
+                  saveBlob(new Blob([exportCatalogCsv(current, rows.data)], { type: "text/csv;charset=utf-8" }), `danh-muc-${current.id}-${at}.csv`)
+                }
+              >
+                <Icon name="download" size={15} />
+                Xuất danh mục
               </button>
-              <Link className="btn btn-p btn-sm" href={withAt(`${base}/${current.id}/them-moi`, at)}>
-                Thêm {current.label.toLowerCase()}
-              </Link>
+              {ca.canEdit ? (
+                <>
+                  <button type="button" className="btn btn-o btn-sm" aria-expanded={showImport} onClick={() => setShowImport((v) => !v)}>
+                    <Icon name="upload" size={15} />
+                    Nạp Excel
+                  </button>
+                  <Link className="btn btn-p btn-sm" href={withAt(`${base}/${current.id}/them-moi`, at)}>
+                    Thêm {current.label.toLowerCase()}
+                  </Link>
+                </>
+              ) : null}
             </span>
           ) : null
         }
@@ -260,7 +308,7 @@ export function CntsCatalogScreen() {
       {act.view}
       <div className="dtabs" role="tablist" aria-label="Danh mục CNTS">
         {[...CNTS_TABS.map((t) => ({ id: t.id as TabId, label: t.label })), { id: "thresholds" as TabId, label: "Ngưỡng mặc định" }].map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={t.id === tab} onClick={() => (setTab(t.id), setPage(1), setShowImport(false))}>
+          <button key={t.id} type="button" role="tab" aria-selected={t.id === tab} onClick={() => (setTab(t.id), setPage(1), setShowImport(false), setCommune(""))}>
             {t.label}
           </button>
         ))}
@@ -271,12 +319,29 @@ export function CntsCatalogScreen() {
           <input type="date" aria-label="Xem tại ngày" value={at} onChange={(e) => (setAt(e.target.value || vnToday()), setPage(1))} />
         </label>
         {current ? <SearchBox value={q} onChange={(v) => (setQ(v), setPage(1))} placeholder="Tìm mã, tên" /> : null}
+        {communeKey ? (
+          <label className="row small">
+            Lọc theo xã
+            <select className="select" aria-label="Lọc theo xã" value={commune} onChange={(e) => (setCommune(e.target.value), setPage(1))}>
+              <option value="">Tất cả xã</option>
+              {[...new Set((rows.data ?? []).map((i) => i.attrs[communeKey] ?? "").filter(Boolean))]
+                .sort((a, b) => (names[a] ?? a).localeCompare(names[b] ?? b, "vi"))
+                .map((c) => (
+                  <option key={c} value={c}>
+                    {unitText(c, names)}
+                  </option>
+                ))}
+            </select>
+          </label>
+        ) : null}
       </div>
       {showImport && current ? <ImportPanel tab={current} onDone={reload} /> : null}
       {current ? (
         <LoadState s={rows}>
           {(d) => {
-            const list = d.filter((i) => !q || `${i.code} ${i.name}`.toLowerCase().includes(q.toLowerCase()));
+            const list = d.filter(
+              (i) => (!q || `${i.code} ${i.name}`.toLowerCase().includes(q.toLowerCase())) && (!communeKey || !commune || i.attrs[communeKey] === commune),
+            );
             return (
               <DataTable
                 caption={current.label}
@@ -423,6 +488,7 @@ function ItemForm({ tab, item, base, at }: { tab: CatalogTab; item: Item | null;
               <FieldInput
                 key={f.key}
                 f={f}
+                at={validFrom}
                 value={attrs[f.key] ?? ""}
                 options={o}
                 error={err(f.key)}
@@ -464,12 +530,14 @@ function ItemForm({ tab, item, base, at }: { tab: CatalogTab; item: Item | null;
 export function CntsCatalogItemScreen() {
   const { tab, code, base, at, ca, item } = useRouteItem();
   const names = useRefNames(at);
+  const communeKey = tab?.fields.find((f) => f.kind === "commune")?.key;
+  const unitNames = useUnitNames(communeKey && item.data?.item ? [item.data.item.attrs[communeKey] ?? ""] : []);
   if (!tab || !code) return <NotFound base={base} what="Danh mục không tồn tại" />;
   return (
     <LoadState s={item}>
       {(d) =>
         d.item ? (
-          <ItemDetail tab={tab} item={d.item} base={base} at={at} canEdit={ca.canEdit} names={names.data ?? {}} />
+          <ItemDetail tab={tab} item={d.item} base={base} at={at} canEdit={ca.canEdit} names={{ ...(names.data ?? {}), ...unitNames }} />
         ) : (
           <NotFound base={withAt(`${base}?tab=${tab.id}`, at)} what={`Không có mục ${code}`} />
         )
@@ -547,6 +615,7 @@ function ItemDetail({ tab, item, base, at, canEdit, names }: { tab: CatalogTab; 
 
 function FieldInput({
   f,
+  at,
   value,
   onChange,
   onBlurError,
@@ -555,6 +624,8 @@ function FieldInput({
   error,
 }: {
   f: Field;
+  /** Ngày áp dụng đang chọn ở form. */
+  at: string;
   value: string;
   onChange: (v: string) => void;
   onBlurError: (error: string | undefined) => void;
@@ -625,6 +696,10 @@ function FieldInput({
       return <DosesEditor value={value} onChange={onChange} onInputError={onDosesInput} vaccines={(options.cnts_vaccine ?? []).filter((v) => v.active)} error={error} />;
     case "codes":
       return <TextField label={f.label} value={value} onChange={onChange} error={error} hint={f.hint} />;
+    case "commune":
+      return <CommuneField label={f.label} required={required} value={value} at={at || vnToday()} onChange={onChange} error={error} />;
+    case "decimal":
+      return <NumberField label={f.label} value={value} onChange={onChange} onBlurError={onBlurError} error={error} rule={THRESHOLD_RULE} hint={f.hint} />;
     default:
       return <TextField label={f.label} required={required} value={value} onChange={onChange} error={error} maxLength={f.max} />;
   }
@@ -745,9 +820,58 @@ function DosesEditor({
   );
 }
 
-/** Ngưỡng mặc định (tham số có phiên bản, sửa qua quy trình đặt → duyệt ở "Tham số"). */
+interface IndicatorThresholdRow {
+  key: string;
+  code: string;
+  name: string;
+  bound: "min" | "max";
+  unit: string;
+  value: string;
+  source: "param" | "catalog" | "none";
+  from: string;
+  doc: string;
+}
+
+/** Ngưỡng theo chỉ tiêu (BF-CN-CATALOG #170): SINH TỪ danh mục chỉ tiêu theo dõi tại ngày đang xem — mỗi chỉ tiêu một dòng tối
+ * thiểu, một dòng tối đa. Giá trị hiệu lực: tham số đã duyệt cnts.indicator_min/max:<mã> nếu có, không thì ngưỡng mặc định của
+ * danh mục (Admin sửa ở form chỉ tiêu). Chỉ tiêu mới có ngưỡng hiện ngay.
+ * Review #170 (11e2171d): chỉ coi là "chưa có tham số" khi API xác nhận 404 masterdata.param_not_found; lỗi khác (403, 503
+ * extension.dependency_unavailable, mạng…) ném ra để cả bảng hiện lỗi tải + Thử lại — không trình bày ngưỡng danh mục như
+ * ngưỡng hiệu lực khi có thể đang có tham số đã duyệt ghi đè. */
+function useIndicatorThresholds(at: string) {
+  const { api } = useAuth();
+  const ca = useCatalogApi();
+  return useLoad(async () => {
+    const indicators = (await ca.list("cnts_indicator", at)).filter((i) => i.active);
+    const param = (key: string) =>
+      unwrap(api.GET("/v1/masterdata/params/value", { params: { query: { key, at } } }))
+        .then((v) => ({ value: v.value ?? v.text ?? "", from: v.effective_from ?? "", doc: v.source_doc ?? "" }))
+        .catch((e: unknown) => {
+          if (e instanceof ApiProblem && e.status === 404 && e.code === "masterdata.param_not_found") return null;
+          throw e;
+        });
+    const rows = await Promise.all(
+      indicators.flatMap((i) =>
+        (["min", "max"] as const).map(async (bound): Promise<IndicatorThresholdRow> => {
+          const key = indicatorParamKey(bound, i.code);
+          const p = await param(key);
+          const eff = effectiveThreshold(p?.value, i.attrs[bound === "min" ? "threshold_min" : "threshold_max"]);
+          return {
+            key, code: i.code, name: i.name, bound, unit: i.attrs.unit ?? "", value: eff.value, source: eff.source,
+            from: eff.source === "param" ? (p?.from ?? "") : eff.source === "catalog" ? (i.valid_from ?? "") : "",
+            doc: eff.source === "param" ? (p?.doc ?? "") : eff.source === "catalog" ? "Danh mục chỉ tiêu theo dõi" : "Chưa đặt",
+          };
+        }),
+      ),
+    );
+    return rows;
+  }, [at]);
+}
+
+/** Ngưỡng mặc định: theo chỉ tiêu (sinh từ danh mục) + tham số cảnh báo khác (tham số có phiên bản, giá trị BRD nạp sẵn — Q5). */
 function Thresholds({ at }: { at: string }) {
-  const { api, principal } = useAuth();
+  const { api } = useAuth();
+  const ind = useIndicatorThresholds(at);
   const s = useLoad(
     () =>
       Promise.all(
@@ -759,25 +883,51 @@ function Thresholds({ at }: { at: string }) {
       ),
     [at],
   );
-  const setter = hasRole(principal, ROLES.paramSetter);
+  const SOURCE = { param: "Tham số đã duyệt", catalog: "Ngưỡng mặc định của danh mục", none: "—" } as const;
   return (
     <>
       <div className="alert alert-info" style={{ marginBottom: 12 }}>
         <Icon name="info" />
         <span>
-          Ngưỡng là tham số có phiên bản (người đặt ≠ người duyệt); ngưỡng mới áp dụng cho số liệu có ngày từ ngày hiệu lực.
-          {setter ? (
-            <>
-              {" "}
-              <a href="/quan-tri/tham-so?prefix=cnts.">Đề xuất giá trị mới</a>
-            </>
-          ) : null}
+          Ngưỡng theo chỉ tiêu lấy từ danh mục &quot;Chỉ tiêu theo dõi&quot; (Admin đặt ngưỡng tối thiểu/tối đa ở form chỉ tiêu, có hiệu lực từ
+          ngày áp dụng). Tham số có phiên bản cnts.indicator_min/max:&lt;mã&gt; đã duyệt (nếu có) được ưu tiên.
         </span>
       </div>
+      <section aria-label="Ngưỡng theo chỉ tiêu theo dõi">
+        {ind.problem ? (
+          <p className="small" style={{ marginBottom: 8 }}>
+            <b>Không xác định được ngưỡng hiệu lực theo chỉ tiêu.</b> Chưa tra được tham số đã duyệt nên không lấy ngưỡng trong danh mục thay thế.
+          </p>
+        ) : null}
+        <LoadState s={ind}>
+          {(rows) => (
+            <DataTable
+              caption="Ngưỡng theo chỉ tiêu theo dõi"
+              columns={[
+                { key: "name", header: "Chỉ tiêu", cell: (r) => `${r.name} (${r.code})` },
+                { key: "bound", header: "Ngưỡng", cell: (r) => (r.bound === "min" ? "Tối thiểu" : "Tối đa") },
+                { key: "value", header: "Giá trị", cell: (r) => (r.value ? <b>{`${r.value} ${r.unit}`.trim()}</b> : <span className="mute">Chưa đặt</span>) },
+                { key: "source", header: "Nguồn", cell: (r) => <span className="small">{SOURCE[r.source]}</span> },
+                { key: "key", header: "Khóa tham số", cell: (r) => <code className="small">{r.key}</code> },
+                { key: "from", header: "Hiệu lực từ", cell: (r) => dmy(r.from) },
+                { key: "doc", header: "Căn cứ", cell: (r) => <span className="small">{r.doc}</span> },
+              ]}
+              rows={rows}
+              rowKey={(r) => r.key}
+              page={1}
+              pageSize={rows.length || 1}
+              total={rows.length}
+              onPage={() => undefined}
+              empty="Danh mục chưa có chỉ tiêu theo dõi đang dùng."
+            />
+          )}
+        </LoadState>
+      </section>
+      <h3 style={{ marginTop: 16 }}>Tham số cảnh báo khác</h3>
       <LoadState s={s}>
         {(rows) => (
           <DataTable
-            caption="Ngưỡng mặc định CNTS"
+            caption="Tham số cảnh báo CNTS khác"
             columns={[
               { key: "label", header: "Ngưỡng", cell: (r) => r.label },
               { key: "value", header: "Giá trị", cell: (r) => <b>{`${r.value} ${r.unit}`.trim()}</b> },

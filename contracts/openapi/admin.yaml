@@ -3605,6 +3605,38 @@ paths:
                   ended_at: {type: [string, "null"], format: date-time}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {description: accounts.support_session_ended, $ref: "#/components/responses/Problem"}
+  /v1/accounts/audit:
+    get:
+      summary: "Nhật ký hệ thống (#70 cổng truy vấn, #73 KN): chỉ phiên Admin KN có MFA; mỗi trang (kể cả rỗng) ghi bền một lượt xem trước khi trả"
+      description: |
+        Đọc các sổ có chủ đã đăng ký (account_event của pf/accounts và các sổ KN: lượt xem nhật ký, hồ sơ KN, kỳ/duyệt báo cáo,
+        kỳ KHTC, cấp quyền CNTS) theo recorded_at trong [from, to), tối đa 93 ngày, mới nhất trước. Mọi trang phải gửi lại cùng
+        bộ lọc và limit; cursor ràng buộc băm bộ lọc, người đọc, tenant. Không nhận tenant. Kết quả chỉ có UUID, mã, thời điểm và
+        trường mã/ref/boolean trong danh sách cho phép của nguồn — không lý do, nội dung, payload hay tên người.
+        Lỗi: 401/403 (không phải Admin KN, đang hỗ trợ, thiếu MFA, tenant lệch — lần bị chủ KN từ chối cũng được ghi sổ),
+        422 bộ lọc/cursor sai, 503 accounts.dependency_unavailable khi chưa cấu hình nguồn/bộ ghi hoặc ghi lượt xem lỗi.
+      operationId: accountsAudit
+      tags: [accounts]
+      parameters:
+        - {name: from, in: query, required: true, schema: {type: string, format: date-time}, description: "RFC3339, gồm"}
+        - {name: to, in: query, required: true, schema: {type: string, format: date-time}, description: "RFC3339, không gồm; to - from ≤ 93 ngày"}
+        - {name: actor_ref, in: query, schema: {type: string, format: uuid}, description: "Người thao tác"}
+        - {name: department, in: query, schema: {type: string}, description: "Mã phòng ban (nguồn không lưu phòng ban không khớp)"}
+        - {name: module, in: query, schema: {type: string}, description: "Mã module nguồn: accounts, kn.audit, kn.records, kn.report, kn.khtc, kn.cnts"}
+        - {name: action, in: query, schema: {type: string}, description: "Mã sự việc đầy đủ, ví dụ account.locked, period.reopened"}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {name: cursor, in: query, schema: {type: string, maxLength: 2048}}
+      responses:
+        "200":
+          description: Một trang
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/AuditPage"}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "428": {description: "accounts.context_required — chưa chọn ngữ cảnh phiên KN", $ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+        "503": {$ref: "#/components/responses/Problem"}
   /v1/accounts/support-log:
     get:
       summary: "Nhật ký hỗ trợ (không xóa): thời điểm, Admin, thay cho ai, chức năng, nội dung, lý do — mới nhất trước"
@@ -5174,7 +5206,7 @@ paths:
     get:
       summary: "FN-AD-04.03: phòng ban (module) của một đơn vị kèm số tài khoản/bản ghi (null khi chưa nối nguồn đếm)"
       operationId: knAdminListDepartments
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: org_ref, in: query, schema: {type: string, format: uuid}, description: "Đơn vị (Nút cấp 1/2); vắng = đơn vị của Nút người gọi"}
         - {name: include_retired, in: query, schema: {type: boolean, default: false}}
@@ -5190,7 +5222,7 @@ paths:
       summary: "FN-AD-04.03: khai báo phòng ban cho Nút cấp 1 (TTKNQG) hoặc cấp 2 (TTKN tỉnh); trùng mã trong đơn vị → 409"
       description: Chỉ Admin (platform_admin, registry_admin). Ghi sổ pf_party.department_event (created, ảnh chụp sau).
       operationId: knCreateDepartment
-      tags: [party]
+      tags: [extension]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -5213,7 +5245,7 @@ paths:
     get:
       summary: Một phòng ban kèm số tài khoản/bản ghi
       operationId: knGetDepartment
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
@@ -5227,7 +5259,7 @@ paths:
     put:
       summary: Sửa tên, mô tả, thứ tự, bộ menu (không đổi gì → không ghi sổ; đổi → một dòng Log cũ → mới)
       operationId: knUpdateDepartment
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
       requestBody:
@@ -5257,7 +5289,7 @@ paths:
       summary: "Đổi trạng thái Đang áp dụng / Chưa mở / Ngưng hoạt động — hiệu lực ngay ở bước 2 đăng nhập và menu (UR-KT-02)"
       description: Ngưng (suspended) bắt buộc lý do ≥ 10 ký tự. Ngưng/đóng phòng ban còn tài khoản/dữ liệu → cảnh báo, dữ liệu cũ giữ nguyên.
       operationId: knDepartmentStatus
-      tags: [party]
+      tags: [extension]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -5290,7 +5322,7 @@ paths:
     post:
       summary: "Xóa phòng ban (sự kiện retired, không xóa cứng) — chặn khi có tài khoản/dữ liệu (409) hoặc chưa nối nguồn đếm (503)"
       operationId: knRetireDepartment
-      tags: [party]
+      tags: [extension]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -5317,7 +5349,7 @@ paths:
     get:
       summary: Khung Log của phòng ban — người, thời điểm, cũ → mới, lý do (AC-CHUNG)
       operationId: knDepartmentLog
-      tags: [party]
+      tags: [extension]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: cursor, in: query, schema: {type: integer, minimum: 0}, description: "seq của dòng cuối trang trước"}
@@ -5407,7 +5439,7 @@ paths:
     post:
       summary: "Nạp 5 phòng ban mặc định (TTKN An Giang; Phòng Trồng trọt Đang áp dụng; W11.06, chờ khách Q-051); xóa mã tạm phong_ban_5/6 chưa dùng; chạy lặp an toàn"
       operationId: knSeedDepartments
-      tags: [party]
+      tags: [extension]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - {name: ref, in: path, required: true, schema: {type: string, format: uuid}}
@@ -7784,6 +7816,44 @@ components:
         recorded_at: {type: string, format: date-time}
         changes: {type: array, items: {$ref: "#/components/schemas/KNFieldChange"}, description: "profile_updated: chỉ tên trường, old/new = null (RB-3)"}
         reason: {type: [string, "null"]}
+    AuditChange:
+      type: object
+      required: [field]
+      properties:
+        field: {type: string}
+        before: {$ref: "#/components/schemas/AuditValue"}
+        after: {$ref: "#/components/schemas/AuditValue"}
+    AuditItem:
+      type: object
+      required: [source, module, event_ref, entity_ref, actor_ref, occurred_at, recorded_at, action, outcome, changes]
+      properties:
+        source: {type: string}
+        module: {type: string}
+        event_ref: {type: string, format: uuid}
+        entity_ref: {type: string, format: uuid}
+        actor_ref: {type: string, format: uuid}
+        occurred_at: {type: string, format: date-time}
+        recorded_at: {type: string, format: date-time}
+        department: {type: string}
+        action: {type: string}
+        outcome: {type: string, enum: [unknown, succeeded, denied, failed]}
+        changes: {type: array, items: {$ref: "#/components/schemas/AuditChange"}}
+    AuditPage:
+      type: object
+      required: [items, sources, as_of, next_cursor]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/AuditItem"}}
+        sources: {type: array, items: {type: string}, description: "Các nguồn thực sự tham gia trang (độ phủ — không phải toàn hệ thống)"}
+        as_of: {type: string, format: date-time, description: "Mốc thời gian cố định qua các trang"}
+        next_cursor: {type: [string, "null"]}
+    AuditValue:
+      type: object
+      required: [kind]
+      properties:
+        kind: {type: string, enum: [boolean, ref, codes]}
+        boolean: {type: boolean}
+        ref: {type: string, format: uuid}
+        codes: {type: array, items: {type: string}}
     KNSupportLogEntry:
       type: object
       required: [id, support_session_id, context_id, request_id, phase, actor_ref, actor_display, on_behalf_of, on_behalf_of_display, acted_role,

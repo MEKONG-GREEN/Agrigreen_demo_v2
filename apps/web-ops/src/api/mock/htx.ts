@@ -1,13 +1,14 @@
 // ============================================================================
 // BACKEND GIẢ LẬP cho App HTX ngoài pf/cropcycle:
 //  - pf/accounts: tài khoản nông dân (tạo, nhập hàng loạt, phát lại liên kết/QR kích hoạt);
-//  - pf/extension: nhiệm vụ tự sinh từ yêu cầu hỗ trợ của nông dân (source = htx_app);
+//  - pf/cooperative (#313): yêu cầu hỗ trợ của nông dân (dòng chép từ pf/extension kèm trạng thái nhiệm vụ KN lúc chép;
+//    nhiệm vụ source = htx_app vẫn nạp vào TASKS cho màn nhiệm vụ KN);
 //  - Admin: nhập danh mục hàng loạt (HTX US-CAT-02), vô hiệu hoá HTX.
 // SĐT chủ hộ là SỐ TỔNG HỢP dạng 09990xxxxx (seed-synthetic), không phải số thật.
 // Liên kết kích hoạt là chuỗi ngẫu nhiên — không đăng nhập được vào đâu.
 // ============================================================================
 import { uuidv7 } from "../idempotency";
-import type { CatalogItem, CatalogName, ExtTask, FarmerAccount, FarmerActivation, FarmerGrant, HouseholdListItem, Org, SupportCategory, SupportRequestStaff } from "../types";
+import type { CatalogItem, CatalogName, ExtTask, FarmerAccount, FarmerActivation, FarmerGrant, HouseholdListItem, CoopSupportRequest, Org, SupportCategory } from "../types";
 import { CATALOGS, COOPERATIVES, syntheticPhone, findCoop, hexId, householdsOf, htxCoop, ORG_EVENTS, orgEvents, ORGS, OFFICER_NAMES, OFFICER_REFS, TASKS, type MockCooperative } from "./data";
 import { headerKey, parseCsv } from "./admin-ops";
 import { hasRole, inScope, isZip, json, nowIso, paginate, problem, reasonOf, validation, type Route } from "./http";
@@ -158,9 +159,8 @@ const SUPPORT_TEXT: { category: SupportCategory; text: string; urgent?: boolean 
   { category: "may_moc", text: "Cần hỗ trợ đặt lịch máy gặt cho 3 lô liền kề." },
 ];
 
-/** Yêu cầu hỗ trợ đã nhận (không có `task` — ghép với nhiệm vụ hiện hành trong TASKS khi đọc). */
-type MockSupport = Omit<SupportRequestStaff, "task"> & { task_id: string };
-const SUPPORT_REQUESTS: MockSupport[] = [];
+/** Yêu cầu hỗ trợ ở pf_coop (chép từ pf/extension, #313): trạng thái nhiệm vụ KN lúc chép ở legacy_task_status. */
+const SUPPORT_REQUESTS: CoopSupportRequest[] = [];
 
 // HTX khác (ngoài HTX của persona Quản lý HTX) — minh hoạ cách ly HTX.
 const OTHER_SUPPORT: { category: SupportCategory; text: string }[] = [
@@ -172,7 +172,6 @@ function pushSupport(coop: MockCooperative, n: number, t: { category: SupportCat
   const received = Date.parse(task.created_at);
   SUPPORT_REQUESTS.push({
     id: hexId(n, "5a9e"),
-    task_id: task.task_id,
     household_ref: task.household_ref ?? hexId(n, "40ee"),
     plot_ref: null,
     cooperative_ref: coop.api.ref,
@@ -189,7 +188,7 @@ function pushSupport(coop: MockCooperative, n: number, t: { category: SupportCat
     // Gửi ngoại tuyến (HTX US-SUPPORT-01 AC-2): bấm Gửi trước khi máy chủ nhận.
     event_time: new Date(received - 60_000).toISOString(),
     received_at: new Date(received).toISOString(),
-    assignment_rule: task.assignee_ref ? "commune_on_duty" : "admin_queue",
+    legacy_task_status: task.status,
   });
 }
 
@@ -251,38 +250,29 @@ seedSupportTasks();
 // --------------------------------------------------------------------------
 export const htxAppRoutes: Route[] = [
   {
-    // pf/extension: danh sách yêu cầu hỗ trợ cho cán bộ (HTX US-SUPPORT-01, KN US-TASK-01/03).
+    // pf/cooperative (#313): danh sách yêu cầu hỗ trợ cho quản lý HTX (HTX mình) và quản trị (toàn tenant).
     method: "GET",
-    pattern: /^\/v1\/extension\/support-requests$/,
+    pattern: /^\/v1\/cropcycle\/support-requests$/,
     handler: ({ url, persona }) => {
-      if (!hasRole(persona, "coop_manager", "kn_officer", "kn_province_admin", "kn_national_admin", "platform_admin")) return problem(403, "forbidden", "Forbidden");
+      if (!hasRole(persona, "coop_manager", "platform_admin")) return problem(403, "forbidden", "Forbidden");
       const q = (k: string) => url.searchParams.get(k) ?? "";
       const bad: { field: string; reason: string }[] = [];
-      if (q("task_status") && !["new", "assigned", "accepted", "in_progress", "resolved"].includes(q("task_status"))) bad.push({ field: "task_status", reason: "không hợp lệ" });
+      if (q("category") && !["dich_hai", "benh_lua", "thoi_tiet", "ky_thuat", "may_moc", "khac"].includes(q("category"))) bad.push({ field: "category", reason: "không hợp lệ" });
       if (q("urgency") && !["binh_thuong", "khan"].includes(q("urgency"))) bad.push({ field: "urgency", reason: "phải là binh_thuong hoặc khan" });
       if (q("gps_missing") && !["true", "false"].includes(q("gps_missing"))) bad.push({ field: "gps_missing", reason: "phải là true hoặc false" });
       if (bad.length) return validation(bad);
-      const coopOnly = hasRole(persona, "coop_manager") && !hasRole(persona, "kn_officer", "kn_province_admin", "kn_national_admin", "platform_admin");
+      const coopOnly = !hasRole(persona, "platform_admin");
       const own = persona.me.org?.ref ?? "";
-      if (coopOnly && q("cooperative_ref") && q("cooperative_ref") !== own) return problem(403, "extension.out_of_scope", "Out of scope");
-      const list = SUPPORT_REQUESTS.map((s): SupportRequestStaff | null => {
-        const { task_id, ...rest } = s;
-        const task = TASKS.find((t) => t.task_id === task_id);
-        return task ? { ...rest, task } : null;
-      })
-        .filter((s): s is SupportRequestStaff => !!s)
-        .filter(
-          (s) =>
-            (inScope(persona, s.province_code, s.commune_code) || (!coopOnly && s.task.assignee_ref === persona.me.actor_ref)) &&
-            (!coopOnly || s.cooperative_ref === own) &&
-            (!q("cooperative_ref") || s.cooperative_ref === q("cooperative_ref")) &&
-            (!q("task_status") || s.task.status === q("task_status")) &&
-            (!q("category") || s.category === q("category")) &&
-            (!q("urgency") || s.urgency === q("urgency")) &&
-            (!q("commune_code") || s.commune_code === q("commune_code")) &&
-            (!q("gps_missing") || String(s.gps_missing) === q("gps_missing")),
-        )
-        .sort((a, b) => Date.parse(b.received_at) - Date.parse(a.received_at));
+      if (coopOnly && q("cooperative_ref") && q("cooperative_ref") !== own) return problem(403, "cropcycle.out_of_scope", "Out of scope");
+      const list = SUPPORT_REQUESTS.filter(
+        (s) =>
+          (!coopOnly || s.cooperative_ref === own) &&
+          (!q("cooperative_ref") || s.cooperative_ref === q("cooperative_ref")) &&
+          (!q("category") || s.category === q("category")) &&
+          (!q("urgency") || s.urgency === q("urgency")) &&
+          (!q("commune_code") || s.commune_code === q("commune_code")) &&
+          (!q("gps_missing") || String(s.gps_missing) === q("gps_missing")),
+      ).sort((a, b) => Date.parse(b.received_at) - Date.parse(a.received_at));
       return json(paginate(list, url));
     },
   },
@@ -373,6 +363,25 @@ export const htxAppRoutes: Route[] = [
 // Admin API
 // --------------------------------------------------------------------------
 const CATALOG_CODE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/;
+/** Cột không phải thuộc tính mục — như catalogImportAliases của máy chủ (masterdata/app/catalog_import.go): ngày áp dụng
+ * (valid_from) và cột trạng thái chỉ để đọc của tệp "Xuất danh mục" (#170) không so với attrs, nên tệp xuất nạp lại được. */
+const IMPORT_META = new Set(["catalog", "danh_muc", "code", "ma", "ma_muc", "name", "ten", "ten_muc", "valid_from", "hieu_luc_tu", "ngay_hieu_luc", "trang_thai", "status"]);
+/** Ô của tệp nạp có cùng nội dung với giá trị đã lưu — như csvUnescapeAs của máy chủ: tệp "Xuất danh mục" (toCsv) thêm
+ * dấu nháy trước ô bắt đầu bằng = + - @ tab CR để Excel không chạy công thức, nên "'" + giá trị đó vẫn là cùng nội dung;
+ * bộ đọc CSV đổi CRLF trong ô ngoặc kép thành LF, nên giá trị đã lưu có CRLF được so ở dạng LF (review Codex 7058). */
+function sameCell(cell: string, stored: string | undefined): boolean {
+  if (stored === undefined) return false;
+  const forms = [stored, stored.replace(/\r\n/g, "\n")];
+  return forms.some((s) => cell === s || (/^[=+\-@\t\r]/.test(s) && cell === `'${s}`));
+}
+
+/** Kiểm thuộc tính theo danh mục cho "Nạp Excel", do module danh mục đăng ký — như CatalogDefinition (Normalize/ValidateAttrs)
+ * mà module KN đăng ký vào masterdata của máy chủ: nạp hàng loạt dùng cùng ràng buộc với thêm/sửa từng mục. */
+type ImportAttrCheck = (attrs: Record<string, string>) => { field: string; reason: string } | null;
+const IMPORT_ATTR_CHECKS = new Map<string, ImportAttrCheck>();
+export function registerCatalogImportCheck(catalog: string, check: ImportAttrCheck): void {
+  IMPORT_ATTR_CHECKS.set(catalog, check);
+}
 
 export const htxAdminRoutes: Route[] = [
   {
@@ -409,16 +418,19 @@ export const htxAdminRoutes: Route[] = [
         const name = (r[iName] ?? "").trim();
         const attrs: Record<string, string> = {};
         header.forEach((h, j) => {
-          if (j !== iCat && j !== iCode && j !== iName && (r[j] ?? "").trim()) attrs[h] = (r[j] ?? "").trim();
+          if (j !== iCat && j !== iCode && j !== iName && !IMPORT_META.has(h) && (r[j] ?? "").trim()) attrs[h] = (r[j] ?? "").trim();
         });
         const list = CATALOGS[catalog as CatalogName];
         if (!list) return { row, status: "rejected" as const, catalog, code, reason: `Danh mục "${catalog}" không tồn tại` };
         if (!CATALOG_CODE.test(code)) return { row, status: "rejected" as const, catalog, code, reason: "Mã không hợp lệ (chữ, số, _ . -; tối đa 40 ký tự)" };
         if (!name) return { row, status: "rejected" as const, catalog, code, reason: "Thiếu tên" };
         if (attrs.growth_days !== undefined && !(Number(attrs.growth_days) > 0)) return { row, status: "rejected" as const, catalog, code, reason: "Thời gian sinh trưởng phải lớn hơn 0." };
+        // Ràng buộc thuộc tính do danh mục đăng ký (vd ngưỡng chỉ tiêu CNTS, review Codex 7058 #170): kiểm trước khi so/tạo như máy chủ.
+        const bad = IMPORT_ATTR_CHECKS.get(catalog)?.(attrs);
+        if (bad) return { row, status: "rejected" as const, catalog, code, reason: `${bad.field}: ${bad.reason}` };
         const existing = list.find((x) => x.code === code);
         if (existing) {
-          const same = existing.name === name && Object.entries(attrs).every(([k, v]) => existing.attrs[k] === v);
+          const same = sameCell(name, existing.name) && Object.entries(attrs).every(([k, v]) => sameCell(v, existing.attrs[k]));
           return same
             ? { row, status: "skipped" as const, catalog, code, reason: "Đã có mục cùng nội dung" }
             : { row, status: "rejected" as const, catalog, code, reason: "Mã đã có với nội dung khác — sửa từng mục trên màn hình danh mục" };

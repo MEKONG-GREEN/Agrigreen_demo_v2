@@ -3,8 +3,13 @@
 // Cơ sở giết mổ: facility_ref do máy chủ cấp, mã mộc dấu không trùng giữa cơ sở. Dữ liệu tổng hợp, không phải thật.
 import { uuidv7 } from "../idempotency";
 import type { CatalogItem, CatalogName } from "../types";
-import { CATALOGS, PARAM_VERSIONS } from "./data";
+import { ADMIN_UNITS, CATALOGS, PARAM_VERSIONS } from "./data";
 import { hasRole, json, nowIso, problem, reasonOf, validation, type Ctx, type Route } from "./http";
+import { registerCatalogImportCheck } from "./htx";
+
+/** Mã xã của mục mẫu cũ CS_BINH_DUC (mã ĐVHC thật, không có trong danh sách xã giả lập) vẫn hợp lệ. */
+const LEGACY_COMMUNES = new Set(["30292"]);
+const COMMUNE_OK = (code: string) => LEGACY_COMMUNES.has(code) || ADMIN_UNITS.some((u) => u.code === code && u.level === "commune");
 
 interface MockVersion {
   id: string;
@@ -64,6 +69,11 @@ function check(c: string, code: string, body: Record<string, unknown>): Response
   if (typeof body.name !== "string" || !body.name.trim()) return validation([{ field: "name", reason: "bắt buộc" }]);
   if (c === "cnts_slaughter_facility") {
     if (!attrs.commune_code) return validation([{ field: "attrs.commune_code", reason: "bắt buộc" }]);
+    // FN-01 AC-02 (BF-CN-SLAUGHTER #169): xã phải có trong danh mục ĐVHC như máy chủ (pf/masterdata AdminUnit constraint).
+    if (!COMMUNE_OK(attrs.commune_code))
+      return problem(422, "masterdata.cnts_commune_invalid", "Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng", {
+        errors: [{ field: "attrs.commune_code", reason: "Không có xã/phường/đặc khu này trong danh mục ĐVHC." }],
+      });
     const mine = [...(attrs.stamp_codes_gs ?? "").split(","), ...(attrs.stamp_codes_gc ?? "").split(",")].map((s) => s.trim()).filter(Boolean);
     for (const o of items(c)) {
       if (o.code === code) continue;
@@ -73,8 +83,26 @@ function check(c: string, code: string, body: Record<string, unknown>): Response
     }
   }
   if (c === "cnts_vaccine" && !(attrs.species ?? "").trim()) return validation([{ field: "attrs.species", reason: "bắt buộc ít nhất một mã" }]);
+  if (c === "cnts_indicator") {
+    const bad = indicatorThresholdError(attrs);
+    if (bad) return validation([bad]);
+  }
   return null;
 }
+
+/** Ngưỡng của chỉ tiêu (BF-CN-CATALOG #170), như catalogThreshold + catalogNormalizeCNTS của máy chủ: số thập phân thường
+ * không âm, ≤ 7 chữ số nguyên, ≤ 4 chữ số thập phân (kiểm cú pháp trước khi đổi sang số), tối thiểu ≤ tối đa. Dùng cho cả
+ * thêm/sửa từng mục lẫn "Nạp Excel" (htx.ts catalog-imports — review Codex 7058). */
+export function indicatorThresholdError(attrs: Record<string, string | undefined>): { field: string; reason: string } | null {
+  const v = (k: string) => (attrs[k] ?? "").trim();
+  for (const k of ["threshold_min", "threshold_max"]) {
+    if (v(k) && !/^\d{1,7}(\.\d{1,4})?$/.test(v(k))) return { field: `attrs.${k}`, reason: "số thập phân không âm, tối đa 7 chữ số phần nguyên và 4 chữ số thập phân" };
+  }
+  if (v("threshold_min") && v("threshold_max") && Number(v("threshold_min")) > Number(v("threshold_max")))
+    return { field: "attrs.threshold_max", reason: "ngưỡng tối đa phải lớn hơn hoặc bằng ngưỡng tối thiểu" };
+  return null;
+}
+registerCatalogImportCheck("cnts_indicator", indicatorThresholdError);
 
 function clean(attrs: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};

@@ -126,3 +126,45 @@ cd apps/web-ops; npx vitest run src/kn/price
 | Mã | Yêu cầu | Gói | Phạm vi G1 | Tiêu chí chấp nhận | Kiểm thử | Trạng thái |
 |---|---|---|---|---|---|---|
 | BG-KHTC | Bảng giá đã duyệt theo ngày (min/max toàn tỉnh) và số phiếu theo tuần báo cáo cho KHTC Mẫu 1 A.III, đọc qua view `_pub`, không nhập lại (KHTC v2.2 §3.4, Q-084) | W11.10 (hợp đồng), W11.76 (view) | trong G1 | Theo ca golden G02B ([khtc-week-mapping.md](khtc-week-mapping.md)): ngày chưa duyệt không có dòng; hai cột Mẫu 1 là hai ngày đã duyệt gần nhất không sau ngày chốt; số phiếu tuần chỉ đếm bảng đã duyệt; tuần "đã chốt" khi mọi ngày báo giá theo lịch đã duyệt. Khóa tuần theo lịch kỳ W11.03 (`TestDefaultWeekOf_W1176`: 04/11/2026 → 2026-W45). | `TestPriceBoardsHTTP_W1176` (view `_pub` đúng số), `TestDefaultWeekOf_W1176`; `TestKHTCQA_GoldenDatasetConsistent` (G02B) | **một phần** (**mã**: bên đọc KHTC W11.64; view đã có) |
+
+## BF-SWEEP-PRICE (#165) — bằng chứng kỹ thuật bổ sung, 30/10/2026
+
+Lát #165 chỉ gồm CalendarConfig/FN-AD-04.04–06, theo BRD v1.3 ngày07/10/2026. Không suy rộng sang toàn Báo giá;
+items/points/tickets/reports/surveys tiếp ở #182. Đây là đối chiếu/kiểm kỹ thuật, không thay biên bản UAT của PO.
+
+| Chức năng | Bổ sung của lát UI-KIT | Bằng chứng cần đọc cùng marker READY |
+|---|---|---|
+| BG-FN-AD-04.04 | Route xem/sửa kỳ, thêm/xem ngoại lệ; lỗi từng ô; DataTable/STT; log lịch từ history. API ngoại lệ chưa trả actor/time/history nên Log nói rõ giới hạn | `calendar-config.test.tsx`, `calendar-form.test.ts`, `price-config.spec.ts`, `TestPriceCalendarHTTP_W1174` |
+| BG-FN-AD-04.05 | Route xem/sửa nhắc, giữ thứ tự giờ/biến mẫu/ngày hiệu lực; gửi thử cấu hình đã lưu; lịch sử gửi dùng DataTable | Các test UI/E2E trên và test nhắc hiện hành |
+| BG-FN-AD-04.06 | Route mặc định/nhóm/mặt hàng; định danh bất biến khi sửa; NumberField/validateForm và guard trước Decimal; Log actor/thời điểm/cũ→mới; xóa có xác nhận, không xóa mặc định | `TestConfigDecimalBounds`, hostile HTTP trong `TestPriceCalendarHTTP_W1174`, UI/E2E trên |
+
+## BG-ITEM-PROPOSAL (#37) — chứng cứ đường vào đề xuất, 31/10/2026
+
+Lát này bổ sung chứng cứ cho BG-UR-XA-06 và BG-FN-AD-04.03 AC-05 trên lõi W11.73/W11.74 hiện hành. Không thay trạng thái của các AC khác hay biên bản UAT của PO. Giả định, checkpoint ngày 30/10 và giới hạn: [BG-ITEM-PROPOSAL](../kn/gia-dinh/BG-ITEM-PROPOSAL.md).
+
+- `TestPriceProposalFlowHTTP` đạt hai subcase HTTP/PostgreSQL/race, không SKIP: chỉ QTNV/Admin quyết định, đúng tenant/điểm/người đề xuất, duyệt lặp không thêm mặt hàng, từ chối phải có lý do; mặt hàng gán cho xã đề xuất từ ngày báo giá kế tiếp qua cuối tuần/ngày lễ/ngày bổ sung, danh mục trước hiệu lực giữ nguyên.
+- Affected-race đầu có một assertion menu Price cũ còn đòi Mặt hàng Admin Sắp có. Chỉ sửa block Price viết tay, giữ prefix Admin và các phòng khác; kiểm lại toàn Party domain 14 test cấp đầu/4 subtest đạt. Kết quả mới nhất theo package đạt 197 test cấp đầu/154 subtest, không cộng lặp lượt kiểm lại; 0 lỗi/0 SKIP test.
+- `proposal-route.test.tsx` 3/3, `items.test.tsx` 6/6, `kn-menu.contract.test.ts` 34/34 là các tập con của full Vitest một worker 137 file/1.060 test đạt. `price-proposal-menus.test.mjs` đạt 2/2; mutation có kiểm soát làm đỏ rồi khôi phục nguyên byte thành xanh. Menu v12 lớn hơn v11 của dev; đề xuất ở Điều hành Tỉnh/Xã, danh mục ở Dữ liệu; golden sinh lại chính thức.
+- `price-item-proposals.spec.ts` focused đạt 1/1 riêng; full production-mock Playwright đạt 53 file/160 test, 0 skip/flaky/unexpected, một worker, retry 0, timeout/expect gốc 60/10 giây. Tạo assignment Tỉnh chỉ có Báo giá qua UI Admin, đăng nhập thật, đi menu Tỉnh/Xã, gửi hai đề xuất, Admin duyệt/từ chối rồi Xã chỉ xem lịch sử riêng. Date được khóa và timezone VN; browser chứng minh đường bấm/consumer, QTNV và ngày hiệu lực lấy từ native test.
+- Migration gate thật theo bộ lọc chính thức đạt 8 test; gói có 0 SQL thay đổi. Các cổng Go/web đã chạy và lịch sử docscheck định dạng được ghi trong giả định và handoff của SHA gửi review. Mọi cụm PostgreSQL và server browser riêng đã dọn.
+
+Nguồn đã gộp origin/dev 033f356c542e0db152df4e36523a3ef9fc9f1293; chứng cứ local chờ điều phối kiểm SHA/hash/source guard rồi gửi Claude review. Refactor Dialog/DetailPage của ItemsScreen thuộc #182; thông báo kết quả đề xuất chưa được bổ sung.
+
+## BF-SWEEP-PRICE-FORMS (#182) — lát Xã báo giá, nhóm vùng và phân công
+
+Bổ sung kỹ thuật cho BG-FN-AD-04.01/02, BRD v1.3; không đổi trạng thái nghiệm thu nghiệp vụ hoặc kết luận UAT toàn phòng từ các hàng lịch sử bên trên.
+
+| Phạm vi lát | Bằng chứng và giới hạn |
+|---|---|
+| Xã báo giá | DataTable/STT, route Thêm/Sửa/Chi tiết, DetailPage/validateForm, lỗi tại ô và required; Log đọc versions có event_time/actor_ref/cũ→mới/lý do, giữ ĐVHC/ngày hiệu lực và API hiện hành |
+| Phân công | Route riêng, chọn cán bộ theo danh bạ được cấp/vai/ngày, giữ lịch sử từ officers; quyền Admin và replay do API kiểm lại; không đổi vị trí chức năng hay diễn giải BRD khác đã ghi |
+| Nhóm vùng | List/route thêm/sửa/chi tiết, lỗi trường và không có form popup; hợp đồng chưa cấp history/actor/time nên hiển thị rõ giới hạn nhật ký, không tạo dữ liệu giả |
+| Quyền/phiên/thử lại | URL sửa/thêm của Tỉnh chỉ xem; mất response sau commit thử lại không tạo xã lần hai; response của phiên Admin cũ không điều hướng sang phiên mới |
+
+Các test `point-detail.test.tsx`, `point-routes.test.ts`, `points.test.tsx`, browser `price-points182.spec.ts` và PG `TestPricePointsHTTP_W1172` được đọc cùng kết quả cụ thể ở markerREADY đúngSHA. Browser dùng API giả lập, không thay kiểm backend/realm/kho triển khai. Không có ô số mới; các trường số ở items/tickets/surveys còn thuộc #198, chưa được suy rộng kết luận. Nhập Excel xã và nhật ký nhóm vùng đầy đủ còn gap; phần items/tickets/reports/surveys theo #198.
+
+## BF-SWEEP-PRICE-REST (#198) — lát danh mục, 03/11/2026
+
+Chỉ chuyển item thêm/sửa/xem/ngưng/thay thế và nhóm hàng thêm/sửa/xem sang route riêng; dùng validateForm/required, giữ hiệu lực/thứ tự/khóa trường và idempotency. Log ItemVersion lấy actor/event_time/cũ→mới thật, hiển thị Tỉnh/Admin; không hiển thị actor Log mới cho TW. Nhóm hàng chỉ có snapshot/version/valid_from nên nói rõ thiếu lịch sử, không dựng Log giả. Bằng chứng UI/quyền/context/mấtACK/HTTP-PG/CI đúngSHA nằm ở issue198 khi hoàn tất; không thay UAT của PO.
+
+Child #204 giữ Gán xã/Bộ vụ/Đề xuất và ticket/report/survey/Log nhóm/nhóm vùng/Excel gap còn lại. Metadata history trong payload ItemDetail là hợp đồng backend có trước; chưa chứng nhận hạn chế backend/PII chỉ vì ẩn UI. Không đổi các trạng thái toàn AC ở bảng trên thành đạt vì lát này; đọc docs/kn/gia-dinh/BF-SWEEP-PRICE-REST.md và issue204 cho giới hạn.

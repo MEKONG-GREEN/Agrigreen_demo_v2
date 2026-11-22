@@ -1,0 +1,39 @@
+{
+  "id": "extension-khtc-open-badge230",
+  "order": 20230,
+  "tables": {},
+  "replacements": [
+    {
+      "path": [
+        "deptMenus",
+        "ke_hoach_tai_chinh",
+        "kn_tinh",
+        0,
+        "Items",
+        3
+      ],
+      "before": {
+        "Key": "tinh.khtc.ky_bao_cao",
+        "Label": "Kỳ báo cáo & phiếu các phòng",
+        "Route": "/kn/khtc/ky-bao-cao",
+        "Icon": "task",
+        "BadgeSource": "",
+        "Requires": null,
+        "ComingSoon": false,
+        "Needs": "",
+        "Children": null
+      },
+      "after": {
+        "Key": "tinh.khtc.ky_bao_cao",
+        "Label": "Kỳ báo cáo & phiếu các phòng",
+        "Route": "/kn/khtc/ky-bao-cao",
+        "Icon": "task",
+        "BadgeSource": "extension.khtc_periods.open",
+        "Requires": null,
+        "ComingSoon": false,
+        "Needs": "",
+        "Children": null
+      }
+    }
+  ]
+}

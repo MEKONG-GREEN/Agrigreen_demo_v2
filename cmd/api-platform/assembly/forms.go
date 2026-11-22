@@ -35,7 +35,10 @@ var (
 func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extension.Module, facilities formsport.FacilityDirectory) (*forms.Module, error) {
 	fm, err := forms.New(p, clk, forms.Deps{Approvals: wf.Approvals(), Profiles: append(append([]formsport.Profile{}, KNProfiles...), KNHRMProfiles...),
 		Facilities: facilities, Validators: map[string]formsport.Validator{KNCNTSProfile.Name: kn.CNTSValidator(),
-			KNKHTCProfile.Name: kn.KHTCFormValidator(), hrmport.PlanProfile: hrm.PlanValidator()}})
+			KNKHTCProfile.Name: kn.KHTCFormValidator(), hrmport.PlanProfile: hrm.PlanValidator()},
+		ReviewGuards: map[string]formsport.ReviewGuard{KNCNTSProfile.Name: kn.CNTSReviewGuard()},
+		// #192: chính sách định nghĩa biểu kn_cnts (khóa KNQG, quyền thiết kế FN-07) — profile bắt buộc policy.
+		DefinitionPolicies: map[string]formsport.TemplateDefinitionPolicy{KNCNTSProfile.Name: kn.CNTSDefinitionPolicy()}})
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +49,13 @@ func wireForms(p *pgxpool.Pool, clk clock.Clock, wf *workflow.Module, kn *extens
 	// extension.khtc_max_submissions ghi đè). Kế hoạch năm (W11.61) nối trong pf/extension; bộ quy đổi kỳ nguồn (PFPUB) nối
 	// ngay dưới. W11.63: phiếu Báo cáo cho KHTC — nhập/rà soát qua cổng Entry; bài nộp kn_khtc phải mang bảng số liệu đã
 	// niêm phong (KHTCFormValidator ở trên).
-	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), Entry: fm.Entry(),
+	kn.UseKHTCPeriods(extension.KHTCDeps{Forms: fm.Publisher(), Control: fm.Control(), ConditionalControl: fm.ConditionalControl(), Entry: fm.Entry(),
 		MaxSubmissions: KNKHTCProfile.MaxSubmissions})
 	// PFPUB (ADR-0053 §7): kỳ KHTC mở kèm kỳ nguồn quy đổi theo lịch D8; "Đủ dữ liệu" theo cờ chốt của nguồn.
 	kn.UseKHTCSourceCrosswalk(kn.KHTCSourceCrosswalk())
 	// W11.50: chiến dịch điều tra CNTS — đợt là kỳ native kn_cnts loại `adhoc` (không vào lũy kế, không vào tổng KHTC).
-	kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Figures: fm.Figures()})
+	// #201: mọi thao tác ghi kỳ native của đợt đi qua cổng CAS (#159), revision ghi bền trong ý định của đợt.
+	kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(),
+		Conditional: fm.ConditionalControl(), Figures: fm.Figures()})
 	return fm, nil
 }

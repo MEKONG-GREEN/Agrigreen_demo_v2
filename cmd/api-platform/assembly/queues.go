@@ -38,6 +38,7 @@ func Queues() []Queue {
 		{Name: AuditConsentConsumer, Events: []string{partyport.EventConsentRecorded}},
 		{Name: mrvport.ExportConsumer, Events: []string{mrvport.EventExportRequested}},
 		{Name: accport.OrgStatusConsumer, Events: accounts.OrgStatusEvents},
+		{Name: accport.PasswordResetConsumer, Events: []string{accport.EventPasswordResetRequested}}, // #255 ADR-0057
 		{Name: wwport.BuildConsumer, Events: []string{wwport.EventBuildRequested}},
 		{Name: repport.ExportConsumer, Events: []string{repport.EventExportRequested}},
 		{Name: repport.DeliveryConsumer, Events: []string{repport.EventExportCompleted}},
@@ -45,7 +46,7 @@ func Queues() []Queue {
 		{Name: simport.OptimizerConsumer, Events: []string{simport.EventJobRequested}},
 		{Name: krefport.Consumer, Events: krefport.Events}, // W2.5: bản chiếu k_ref
 	}
-	for _, c := range notify.New(nil, clock.System{}, notify.Deps{Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Kinds: NotificationKinds(), Digests: NotificationDigests(), Builders: NotificationBuilders(nil, nil, nil)}).Consumers() {
+	for _, c := range notify.New(nil, clock.System{}, notify.Deps{Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Kinds: NotificationKinds(), Digests: NotificationDigests(), Builders: NotificationBuilders(nil, nil, nil, nil)}).Consumers() {
 		out = append(out, Queue{Name: c.Name, Events: c.Events})
 	}
 	for _, c := range Consumers {

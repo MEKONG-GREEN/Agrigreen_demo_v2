@@ -3,6 +3,10 @@ import 'dart:convert';
 /// Thực thể chiều lên (hợp đồng đồng bộ): G1 và G2 (App HTX).
 abstract final class PushEntity {
   static const plotBoundary = 'plot_boundary';
+
+  /// Thửa ruộng của KN ở kho KN (pf_extension, KN-STANDALONE-5-TT-DATA #271):
+  /// ranh giới vẽ ngoại tuyến của app hiện trường KN.
+  static const knPlotBoundary = 'kn_plot_boundary';
   static const fieldReport = 'field_report';
   static const taskUpdate = 'task_update';
   static const consent = 'consent';
@@ -41,7 +45,7 @@ abstract final class PushEntity {
   static const formsSubmission = 'forms_submission';
 
   static const g1 = {plotBoundary, fieldReport, taskUpdate, consent, evidence};
-  static const kn = {reportSubmission, formsSubmission};
+  static const kn = {reportSubmission, formsSubmission, knPlotBoundary};
   static const g3 = {htxCollectionResponse};
   static const g2 = {
     seasonOpen,

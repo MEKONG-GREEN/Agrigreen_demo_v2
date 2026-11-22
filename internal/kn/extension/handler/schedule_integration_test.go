@@ -728,3 +728,44 @@ func (d *denyCP) Pass(_ context.Context, e meter.Egress) (meter.Decision, error)
 	d.got = append(d.got, e)
 	return meter.Decision{Allowed: false, Reason: "quota_exceeded", Mode: meter.ModeEnforce}, nil
 }
+
+// KN-STANDALONE-5-TT-DATA (#271): ô "Địa điểm: HTX" của Lịch công tác (FN-XA-03.08, FN-TI-02.07) nhận hồ sơ KN loại HTX
+// (pf_extension.kn_producer, FN-XA-03.03) đang hoạt động của đúng xã; mã không phải hồ sơ KN (vd HTX nền tảng) → 422.
+func TestFN_XA_03_08_ScheduleHTXFromKNRecords(t *testing.T) {
+	f := newFixture(t)
+	p := f.seedPeople()
+	record := func(commune, event string) uuid.UUID {
+		ref := ids.New()
+		err := tenant.WithTenantTx(context.Background(), f.pool, f.tenant, func(tx pgx.Tx) error {
+			_, err := tx.Exec(context.Background(), `INSERT INTO pf_extension.kn_producer (id, tenant_id, stream_key, producer_ref, kind, event,
+			    commune_code, name, person_ref, status_reason, event_time, actor_ref, idem_key, rule_version)
+			  VALUES ($1, $2, $3, $4, 'cooperative', $5, $6, $7, $8, $9, now(), $8, $10, 'test')`,
+				ids.New(), f.tenant, "kn_producer:"+ref.String(), ref, event, commune, "HTX "+ref.String()[30:], ids.New(),
+				map[bool]any{true: "Ngừng hoạt động theo đề nghị", false: nil}[event == "deactivated"], "seed:"+ref.String())
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ref
+	}
+	item := func(day string, coop uuid.UUID) map[string]any {
+		it := sItem(day, "morning", "", "", "Làm việc với HTX")
+		it["commune_code"], it["cooperative_ref"] = "30001", coop.String()
+		return it
+	}
+	ok := record("30001", "created")
+	d := p.off30001a.must(p.off30001a.saveSched(nextWeek, "draft", nil, item("2026-09-22", ok)), http.StatusCreated, "HTX là hồ sơ KN của xã")
+	if got := items(d, "items"); len(got) != 1 || got[0]["cooperative_ref"] != ok.String() {
+		t.Fatalf("mục công tác giữ mã hồ sơ KN: %v", got)
+	}
+	for what, ref := range map[string]uuid.UUID{
+		"không phải hồ sơ KN (HTX nền tảng)": ids.New(),
+		"hồ sơ HTX xã khác":                  record("30002", "created"),
+		"hồ sơ HTX đã ngừng hoạt động":       record("30001", "deactivated"),
+	} {
+		if r := p.off30001a.saveSched("2026-09-28", "draft", nil, item("2026-09-29", ref)); r.status != http.StatusUnprocessableEntity || code(r) != "extension.cooperative_invalid" {
+			t.Fatalf("%s → 422 extension.cooperative_invalid: %d %v", what, r.status, r.body)
+		}
+	}
+}

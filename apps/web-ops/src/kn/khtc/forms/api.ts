@@ -3,10 +3,13 @@
 // khối "Điều chỉnh kỳ trước", mục lời văn), lưu nháp ở máy chủ, gửi KHTC, rà soát (/v1/extension/khtc/*).
 import { unwrap, type ApiClient } from "@/api/client";
 import type { components } from "@/api/generated/application";
+import {createRetryingMutation} from "../adhoc/retry";
 import { newIdempotencyKey } from "@/api/idempotency";
 
 type S = components["schemas"];
 export type KhtcFormSheet = S["KHTCFormSheet"];
+export type KhtcFormReviewInput = S["KHTCFormReviewInput"];
+export type KhtcFormReviewResult = S["KHTCFormReviewResult"];
 export type KhtcFormTask = S["KHTCFormTask"];
 export type KhtcFormContent = S["KHTCFormContent"];
 export type KhtcFormCell = S["KHTCFormCell"];
@@ -61,6 +64,7 @@ export function cloneContent(
 ): KhtcFormContent {
   const src = c ?? emptyContent();
   return {
+    ...(src.adhoc_request_id ? {adhoc_request_id:src.adhoc_request_id,adhoc_values:{...src.adhoc_values},adhoc_text:src.adhoc_text??""}:{}),
     cells: Object.fromEntries(
       Object.entries(src.cells ?? {}).map(([k, v]) => [k, { ...v }]),
     ),
@@ -126,7 +130,9 @@ export function normalizeForSend(c: KhtcFormContent): KhtcFormContent {
     };
     if (Object.values(n).some((x) => x !== "")) cells[k] = n;
   }
+  if(Object.keys(c.adhoc_values??{}).length>20 || Object.values(c.adhoc_values??{}).some(v=>v.length>23) || (c.adhoc_text?.length??0)>32000)throw new Error("Câu trả lời bổ sung quá lớn.");
   return {
+    ...(c.adhoc_request_id ? {adhoc_request_id:c.adhoc_request_id,adhoc_values:Object.fromEntries(Object.entries(c.adhoc_values??{}).map(([k,v])=>[k,fix(v)])),adhoc_text:c.adhoc_text?.trim()??""}:{}),
     cells,
     adjustments: c.adjustments.map((a) => ({
       ...a,
@@ -139,9 +145,8 @@ export function normalizeForSend(c: KhtcFormContent): KhtcFormContent {
   };
 }
 
-const idem = () => ({ header: { "Idempotency-Key": newIdempotencyKey() } });
-
 export function createKhtcFormApi(api: ApiClient) {
+  const mutate=createRetryingMutation();
   const path = (id: string, dept: string) => ({ path: { id, dept } });
   return {
     tasks: async (department: string): Promise<KhtcFormTask[]> =>
@@ -163,10 +168,11 @@ export function createKhtcFormApi(api: ApiClient) {
       dept: string,
       sheet: KhtcFormContent,
       base_attempt: number,
+      key?: string,
     ): Promise<KhtcFormSheet> =>
       unwrap(
         api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/draft", {
-          params: { ...path(id, dept), ...idem() },
+          params: { ...path(id, dept), header: { "Idempotency-Key": key ?? newIdempotencyKey() } },
           body: { sheet: normalizeForSend(sheet), base_attempt },
         }),
       ),
@@ -175,23 +181,24 @@ export function createKhtcFormApi(api: ApiClient) {
       dept: string,
       sheet: KhtcFormContent,
       base_attempt: number,
-    ): Promise<KhtcFormSheet> =>
-      unwrap(
-        api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/submit", {
-          params: { ...path(id, dept), ...idem() },
-          body: { sheet: normalizeForSend(sheet), base_attempt },
-        }),
-      ),
+      key?: string,
+    ): Promise<KhtcFormSheet> => {
+      const body={sheet:normalizeForSend(sheet),base_attempt};
+      if (key) return unwrap(api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/submit", { params: { ...path(id, dept), header: { "Idempotency-Key": key } }, body }));
+      return mutate("submit:"+id+":"+dept+":"+base_attempt,body,key=>unwrap(api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/submit",{
+        params:{...path(id,dept),header:{"Idempotency-Key":key}},body
+      })));
+    },
     review: (
       id: string,
       dept: string,
-      decision: "returned" | "accepted",
-      note?: string,
-    ): Promise<KhtcFormSheet> =>
+      input: KhtcFormReviewInput,
+      key: string,
+    ): Promise<KhtcFormReviewResult> =>
       unwrap(
         api.POST("/v1/extension/khtc/periods/{id}/forms/{dept}/review", {
-          params: { ...path(id, dept), ...idem() },
-          body: { decision, note },
+          params: { ...path(id, dept), header: { "Idempotency-Key": key } },
+          body: input,
         }),
       ),
   };

@@ -167,7 +167,7 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.28 | Báo cáo Sở NS01–06 + Dashboard | As-of tại ngày chốt, quy tắc kiểm chéo, nhấn ô xem người, lưu tệp + lịch sử xuất, nhật ký trường nhạy cảm; dashboard < 5 s | D3 H8 (trừ .docx → W10.17) | W11.21, W11.22 | L | pf 000151 | Mã được | 2 | |
 | W11.29 | web-ops HCTH | ~30 màn + Contact cho mọi vai; giả lập `src/api/mock/hrm*`; Playwright `hc-*.spec.ts` | D3 H9 | OpenAPI của W11.22–W11.28 | L | — | Mã được (theo hợp đồng) | 2–3 | |
 | W11.30 | Chuyển đổi dữ liệu HCTH | Công cụ một lần đọc Excel qua `shared/tabular`, chuẩn hóa, báo cáo dòng lỗi | D3 H10 | W11.21, W11.22 | M | — | Mã được (`cmd/hrmimport`, ánh xạ cột cấu hình được); nạp thật chờ tệp nguồn Q-069 | 3 | |
-| W11.31 | Nghiệm thu HCTH | `docs/uat/hc-v3.0-acceptance.md`, E2E `tests/hc30`, tải 500 lượt nộp/ngày | D3 H11 | tất cả | M | — | Mã được | 3 | |
+| W11.31 | Nghiệm thu HCTH | `docs/uat/hcth-v3.0-acceptance.md`, HTTP+DB `tests/hc30`: cohort470/24,500người nộp/ngày; tải đồng thời/NLTX/UAT tiếp ở#188 | D3 H11 | tất cả | M | — | Phần đầu; còn#188 | 3 | |
 
 **Chăn nuôi – Thủy sản** (CN11 → W11.11)
 
@@ -177,14 +177,14 @@ Ký hiệu nguồn: `D1 §2.1#4` = bản D1, mục 2.1, dòng 4. `v4.3 §21.1`, 
 | W11.42 | Biểu kỳ Cấp Xã BM-01/04/05/17 | Kỳ ngày + tuần mới, hạn riêng, đơn vị = cơ sở GM, sao chép kỳ trước, không phát sinh, khóa lạc quan; Mobile 3 màn + offline | D4 CN2 | W11.03, W11.05, W11.07, W11.41 | XL | pf 000160 | Chặn Q-045 | 2 | |
 | W11.43 | Quy tắc liên biểu + 12 cảnh báo | Vòng đời cảnh báo trên nhiệm vụ SLA (`cap/task` cài ở extension), nhắc cấu hình theo biểu | D4 CN3 | W11.42 | L | pf 000161 | Mã được | 2 | |
 | W11.44 | Tổng hợp BM-02, BM-18, lũy kế | Dòng điều chỉnh, file Chi cục có phiên bản, Phụ lục 2 | D4 CN4 | W11.42, W11.10 | L | pf 000162 | Chờ Q-078, Q-079 | 2 | |
-| W11.45 | Báo cáo phòng BM-11 | Soạn tự động + phần viết, LĐ duyệt, gửi theo nơi nhận, phiên bản | D4 CN5 | W11.44, W10.17 | L | pf 000166 | Chặn Q-046 | 3 | |
+| W11.45 | Báo cáo phòng BM-11 | Soạn tự động + phần viết, LĐ duyệt, gửi theo nơi nhận, phiên bản | D4 CN5 | W11.44, W10.17 | L | pf 20261028034853 | **Đã làm 28/10/2026** (#24): giả định Q-046 theo đề xuất — BM-11 gửi hộp "Báo cáo đến" để lưu ([giả định](gia-dinh/W11.45.md)) | 3 | |
 | W11.46 | Lịch trực, lịch tiêm, lịch công tác + check-in GPS | BM-03, BM-07, BM-05/06 | D4 CN6 | W11.41, W11.07 | L | pf 000163 | Chờ Q-057 | 2 | |
 | W11.47 | Hộ mô hình, điểm, CT/DA, cấp quyền | ~~`pf_coop` site/batch~~ → bản ghi KN `pf_extension` (CT/DA, điểm, hộ mô hình, quyền CNTS; ADR-0055, Q-KNS-04: không ghi HTX) | D4 CN7 | W10.13, W11.61 | L | pf 20261020161323 | Đã làm 20/10/2026 — giả định tạm Q-023, Q-076, Q-061 ([gia-dinh/W11.47](gia-dinh/W11.47.md)) | 3 | |
 | W11.48 | Nhật ký BM-08/09/19 | Lứa, lần ghi có chỉ số, GPS bất biến + 200 m + phát hiện giả lập, ảnh, offline, xác thực, hạch toán NC-15 | D4 CN8 | W11.47, W11.43 | XL | pf 20261024090937 | Đã làm 21/10/2026 — giả định tạm Q-005, Q-077 ([gia-dinh/W11.48](gia-dinh/W11.48.md)); App xã ngoại tuyến chưa | 3 | |
 | W11.49 | Dịch bệnh BM-10 | Ổ dịch có phiên bản diễn biến + báo nghi dịch | D4 CN9 | W11.41, W11.07 | M | pf 000164 | Mã được | 2 | |
 | W11.50 | Chiến dịch điều tra | Đợt trên kỳ `adhoc`, tách khỏi lũy kế | D4 CN10 | W11.42 | M | pf 20261024091058 | Đã làm (giả định tạm Q-058 — [W11.50](gia-dinh/W11.50.md)) | 2 | |
 | W11.52 | Bản đồ vùng nuôi/dịch (GĐ2) | Vẽ vùng, bán kính, hướng di chuyển, theo ngày | D4 CN12 | W11.49, W11.47 | L | pf 20261024090947 | Đã làm 21/10/2026 (kéo vào G1) — giả định bán kính 500 m/3 km/10 km ([gia-dinh/W11.52](gia-dinh/W11.52.md)) | 4 | |
-| W11.53 | Dự án KNQG Mẫu 01–07 (GĐ2) | Ký scan, TW xác nhận | D4 CN13 | W11.47, W11.48, W10.17 | L | pf 000178 | GĐ2; chờ Q-055, Q-027 | 4 | |
+| W11.53 | Dự án KNQG Mẫu 01–07 (GĐ2) | Ký scan, TW xác nhận | D4 CN13 | W11.47, W11.48, W10.17 | L | pf 20261028094147 | **Đã làm 28/10/2026** (nhánh `w1153-cnts-knqg`, kéo vào G1): Mẫu 01/03/04/05/07, vòng đời duyệt/ký scan/gửi QG — TW xác nhận, Word qua pf/export; Q-055, Q-027 giả định tạm ([gia-dinh](gia-dinh/W11.53.md)) | 4 | |
 | W11.54 | Trang chủ phòng + kho văn bản (GĐ2) | `pf/content`, `_pub` | D4 CN14 | W11.44, W11.10 | M | `_pub` | GĐ2 | 4 | Kéo vào G1: làm trong `pf/extension` (`extension/depthome`), pf 20261024091009 — [giả định](gia-dinh/W11.54.md) |
 | W11.55 | Nông hộ Mobile (GĐ2) | OTP SMS, nhật ký hộ, lịch tiêm + nhắc, báo nghi dịch | D4 CN15 | W11.48, W11.49, W10.06 | L | pf 000179 | GĐ2; Chặn Q-020, Q-080 | 4 | |
 

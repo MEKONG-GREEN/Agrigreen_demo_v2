@@ -43,6 +43,10 @@ func EpidemicKind(k string) bool {
 	return k == KindOutbreak || k == KindThreatened || k == KindBuffer || k == KindDirection
 }
 
+// ImpactKind: loại vùng hiện số hộ bị ảnh hưởng, diện tích thủy sản bị ảnh hưởng (CNTS v4.0 FN-18 BR-02) — vùng dịch,
+// vùng bị uy hiếp, vùng đệm (hình đa giác); hướng di chuyển là đường, không chứa ổ dịch.
+func ImpactKind(k string) bool { return k == KindOutbreak || k == KindThreatened || k == KindBuffer }
+
 // Cách vẽ.
 const (
 	ModePolygon = "polygon" // vẽ tay

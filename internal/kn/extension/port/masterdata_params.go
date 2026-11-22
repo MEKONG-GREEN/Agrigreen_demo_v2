@@ -23,6 +23,11 @@ const (
 	ParamCNTSLogOverdueDays = "cnts.log_overdue_grace_days"
 	// ParamCNTSMortalityPctPrefix + ":<mã loại mô hình>" — tỷ lệ chết vượt % → cảnh báo Khẩn (Cấp Tỉnh cấu hình).
 	ParamCNTSMortalityPctPrefix = "cnts.mortality_max_pct"
+	// ParamCNTSDiaryEditWindowDays: lần ghi nhật ký nuôi (W11.48) đã gửi chưa xác thực sửa được n ngày tính từ ngày ghi (7,
+	// BRD CNTS v3.7 Mục III.5). ParamCNTSDiaryGPSRetentionDays: hạn lưu tọa độ GPS lúc ghi (365, giả định tạm Q-005 chờ
+	// DPIA). Đăng ký riêng ở extension.CNTSDiaryMasterdataParams (KN-PARAMS-CNTS-DIARY-OWNER #85).
+	ParamCNTSDiaryEditWindowDays   = "cnts.diary.edit_window_days"
+	ParamCNTSDiaryGPSRetentionDays = "cnts.diary.gps_retention_days"
 )
 
 // IndicatorKey dựng khóa ngưỡng chỉ tiêu: prefix + ":<chỉ tiêu>"[":<loại mô hình>"].

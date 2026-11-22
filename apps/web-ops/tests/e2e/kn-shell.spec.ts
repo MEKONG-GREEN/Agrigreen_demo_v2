@@ -122,9 +122,11 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(menuNav(page).getByRole("link", { name: /Chăn nuôi/ })).toHaveCount(0);
     await menuNav(page).getByRole("button", { name: /Phòng Trồng trọt/ }).click();
     await expect(menuNav(page).getByRole("link", { name: "Mẫu báo cáo" })).toBeVisible();
-    // BF-ACC-KN-MENU (#120, TT-13): Công cụ nền tảng không còn liên kết màn tài khoản native cũ.
-    await menuNav(page).getByRole("button", { name: /Công cụ nền tảng/ }).click();
-    await expect(menuNav(page).getByRole("link", { name: "Tham số & phê duyệt" })).toBeVisible();
+    // KN-STANDALONE-1-ADMIN-TOOLS (#264): không còn nhóm "Công cụ nền tảng (tạm)" (BRD 2.0 không có FN); BF-ACC-KN-MENU (#120):
+    // không liên kết màn tài khoản native cũ.
+    await expect(menuNav(page).getByRole("button", { name: /Công cụ nền tảng/ })).toHaveCount(0);
+    await expect(menuNav(page).getByRole("link", { name: "Tham số & phê duyệt" })).toHaveCount(0);
+    await expect(menuNav(page).locator('a[href^="/quan-tri/"], a[href="/dong-bo"]')).toHaveCount(0);
     await expect(menuNav(page).getByRole("link", { name: /Tài khoản cán bộ/ })).toHaveCount(0);
     await expect(menuNav(page).locator('a[href="/quan-tri/tai-khoan"]')).toHaveCount(0);
     await menuNav(page).getByRole("link", { name: "Người dùng" }).click();
@@ -132,6 +134,11 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page.getByRole("heading", { level: 1, name: "Người dùng" })).toBeVisible();
     await expect(menuNav(page).getByRole("link", { name: "Người dùng" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText("Hệ thống gặp lỗi")).toHaveCount(0);
+    // Gõ thẳng URL công cụ đã gỡ trong phiên Admin KN → không có quyền (dù tài khoản có vai realm quản trị).
+    for (const path of ["/quan-tri/tham-so", "/quan-tri/to-chuc", "/dong-bo"]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
+    }
   });
 
   test("thu gọn sidebar: chỉ icon, flyout trắng chứa menu con; trạng thái giữ khi tải lại", async ({ page }) => {
@@ -164,8 +171,19 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page).toHaveURL(/\/kn\/nhiem-vu\/cong-viec$/);
     await menuNav(page).getByRole("button", { name: /Thu thập dữ liệu/ }).click();
     await menuNav(page).getByRole("link", { name: "Danh sách HTX" }).click();
-    // P6s: danh sách đọc API thật (GET /v1/cooperatives theo xã phụ trách).
-    await expect(page.getByText("Hiển thị 1–3 trên 3")).toBeVisible();
+    // Hồ sơ KN (#67, #102): GET /v1/kn/producer-records theo xã phụ trách, phân trang máy chủ theo con trỏ — không có tổng số.
+    // Kiểm thêm STT, nhãn "Hiển thị 1–3" và nút Trang trước/sau (10 dòng/trang).
+    const table = page.getByRole("table", { name: "Danh sách HTX" });
+    const rows = table.getByRole("row").filter({ has: page.getByRole("cell") });
+    await expect(rows).toHaveCount(3);
+    await expect(rows.nth(0).getByRole("cell").first()).toHaveText("1");
+    await expect(rows.nth(2).getByRole("cell").first()).toHaveText("3");
+    await expect(rows.first().getByText("Hoạt động", { exact: true })).toBeVisible();
+    const pager = page.getByRole("navigation", { name: "Phân trang" });
+    await expect(page.locator(".pager [aria-live=polite]")).toHaveText("Hiển thị 1–3");
+    await expect(pager.getByRole("button", { name: "Trang 1" })).toHaveAttribute("aria-current", "page");
+    await expect(pager.getByRole("button", { name: "Trang trước" })).toBeDisabled();
+    await expect(pager.getByRole("button", { name: "Trang sau" })).toBeDisabled();
     await page.getByRole("button", { name: "Đặt lại" }).click();
     await page.getByRole("link", { name: /^Xem HTX/ }).first().click();
     await expect(page).toHaveURL(/\/kn\/du-lieu\/htx\/[0-9a-f-]{36}$/);
@@ -181,7 +199,7 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(page.locator(".choose-msg[role=alert]")).toContainText("liên hệ quản trị viên");
   });
 
-  test("sai 5 lần → khóa tạm 15 phút; Quên mật khẩu dẫn tới liên hệ quản trị viên", async ({ page }) => {
+  test("sai 5 lần → khóa tạm 15 phút; Quên mật khẩu dẫn tới tự đặt lại qua email", async ({ page }) => {
     await page.goto("/login");
     for (let i = 0; i < 5; i++) await submitLogin(page, "quan.lm@ttknqg.gov.vn", `sai-${i}`);
     await expect(loginAlert(page)).toContainText("tạm khóa 15 phút");
@@ -189,5 +207,8 @@ test.describe("khung KN v7.7: đăng nhập, chọn vai trò & phòng ban, menu 
     await expect(loginAlert(page)).toContainText("tạm khóa 15 phút");
     await page.getByRole("link", { name: "Quên mật khẩu?" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Quên mật khẩu" })).toBeVisible();
+    await page.getByLabel("Email", { exact: true }).fill("quan.lm@ttknqg.gov.vn");
+    await page.getByRole("button", { name: "Gửi liên kết đặt lại" }).click();
+    await expect(page.getByRole("status")).toContainText("30 phút");
   });
 });

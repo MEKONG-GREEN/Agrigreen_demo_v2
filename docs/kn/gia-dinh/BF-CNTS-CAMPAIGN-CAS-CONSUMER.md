@@ -1,0 +1,27 @@
+## BF-CNTS-CAMPAIGN-CAS-CONSUMER — nối CAS kỳ native (#159) vào ý định đợt điều tra CNTS
+
+Issue #201, làn KN, nối tiếp #156 BF-CNTS-CAMPAIGN-POOL (ý định thao tác + đối soát sau ghi) và #159 BF-FORMS-PERIOD-CAS (port
+`formsport.ConditionalPeriodControl`). Claude viết, Codex review chéo và gộp. Không sửa `internal/platform/forms`.
+
+| Điểm | Giả định / quyết định | Mã | Hỏi PO |
+|---|---|---|---|
+| Nối port | `CNTSCampaignDeps.Conditional` (gốc lắp ráp truyền `fm.ConditionalControl()`), `Service.Cond`. Thiếu port → phát hành, gia hạn, đóng, mở lại trả 503 TRƯỚC khi nhận ý định; không bao giờ quay về `PeriodControl.ChangeDue/ClosePeriod/CancelPeriod/ReopenPeriod` vô điều kiện. Nhắc nộp và đọc tiến độ giữ `PeriodControl.Progress` (chỉ đọc) | `module_cntscampaign.go`, `cmd/api-platform/assembly/forms.go`, `app.change` | — |
+| Revision bền trong ý định | Migration pf `20261103152426` (chỉ thêm cột, không sửa migration cũ): `rev_period_id/rev_profile/rev_event_seq/rev_due_seq` trên `cnts_campaign_intent`, ràng buộc chỉ có revision khi có token giữ; `Claim`/`Release` luôn xóa revision. Luồng: giao dịch 1 nhận ý định → `ControlSnapshot` NGOÀI giao dịch pf_extension → giao dịch ngắn (khóa đợt) `BindRevision` chỉ khi token còn giữ ý định còn hạn (giờ DB), trả giá trị đọc lại từ dòng ý định → lời gọi CAS dùng đúng giá trị đó. Mất ý định khi ghi revision → 409 interrupted, không gọi cap/forms | `app.begin`, `native.bind`, `store.BindRevision` | — |
+| Định danh revision | Revision phải đúng tenant của người gọi, kỳ native của đợt, profile `kn_cnts`, `event_seq ≥ 1`, `due_seq ≥ 0`; sai → 503, không ghi. Revision chỉ là điều kiện cập nhật, không cấp quyền: `writer()`/`Can(mo_lai_ky)` và kiểm quyền của cap/forms giữ nguyên | `native.bind` | — |
+| Mọi đường ghi | Gia hạn (`ChangeDueCAS`), đóng (`ClosePeriodCAS`), mở lại (`ReopenPeriodCAS` → ghi revision áp dụng vào ý định → `ChangeDueCAS`), đối soát `reconcile` (đóng / mở lại → đổi hạn), hủy bù phát hành (`CancelPeriodCAS` sau khi chụp + ghi revision dưới quyền giữ) | `Extend`, `Close`, `Reopen`, `reconcile`, `Publish.undo` | — |
+| Chuỗi Reopen → ChangeDue | Bước sau dùng revision ÁP DỤNG do chính `ReopenPeriodCAS` trả (heads đọc trong TX commit của cap/forms), ghi lại vào ý định qua `BindRevision` (xác minh còn giữ) rồi mới gọi. Không tự cộng seq, không đọc snapshot mới. Mất ý định giữa hai bước → không gọi bước sau, đánh dấu lệch | `native.next` | — |
+| Khóa idempotent ở cap/forms | Theo token ý định (`cnts_campaign:extend:<token>` …), không theo Idempotency-Key của client: mỗi lần thử là một ý định mới với revision riêng; CAS chặn ghi lặp/ghi muộn. Gọi lặp cùng Idempotency-Key sau 503 (mất ACK) → ý định mới, chụp mới dưới quyền giữ, ghi xong; sổ đợt vẫn đúng một sự kiện (khóa idempotent pf_extension theo Idempotency-Key) | `Extend`, `Close`, `Reopen` | — |
+| Hội tụ khi lần thử trước không rõ kết quả | Ảnh chụp (dưới quyền giữ) cho thấy kỳ native đã chốt → Đóng đợt chỉ ghi sự kiện; kỳ native đã nhận bài → Mở lại chỉ đổi hạn | `Close`, `Reopen` | — |
+| Lỗi | `forms.period_conflict` → 409 `extension.cnts_campaign_interrupted`, KHÔNG thử lại với revision mới. Lỗi nghiệp vụ 4xx của cap/forms = chắc chắn chưa ghi. Lỗi không phải `problem` (mạng, hạn lời gọi, commit mất ACK, ctx hủy) = không rõ kết quả → 503; không mặc nhận rollback/thành công | `definite`, `callErr` | — |
+| Đối soát / phòng thủ | `stale_gen` tăng khi: có bước CAS đã ghi mà sổ đợt chưa ghi (chuỗi dở dang), lời ghi cuối lỗi không rõ kết quả, hoặc bị CAS từ chối (kỳ native đổi ngoài ý định — ví dụ người ghi legacy). Đối soát chỉ chạy khi token GIỮ ý định, đọc sổ đợt cam kết mới nhất, chụp + ghi revision dưới quyền giữ đó, ghi CAS; mất ý định giữa chừng → lời gọi bị từ chối/không gọi | `native.suspect`, `settle`, `reconcile` | — |
+| Pool / giao dịch | Không lời gọi cap/forms nào trong giao dịch pf_extension; `BindRevision` là giao dịch ngắn riêng trên pool pf_extension, tuần tự với lời gọi cap/forms (không giữ hai kết nối cùng lúc). KN không ghi dữ liệu HTX; không đổi quyền/PII; không đổi baseline knboundary | `change` | — |
+
+### Kiểm chứng
+
+- `tests/kn77/cnts_campaign_pool_integration_test.go` (mở rộng): yêu cầu cũ bị giữ trước lời ghi native, mất ý định; người kế tiếp ghi native + sổ đợt xong; lời ghi của yêu cầu cũ bị cap/forms từ chối NGAY (`forms.period_conflict`) — kiểm trạng thái kỳ native ngay khi lời gọi trả về, trước mọi bước đánh dấu/đối soát của yêu cầu cũ (gia hạn, gia hạn dài hơn, đóng — không ảnh chụp/outbox chốt, mở lại — không gọi bước đổi hạn). Pool 1 kết nối trống, pool chung cỡ 2 chạy qua đường CAS.
+- `tests/kn77/cnts_campaign_cas_integration_test.go` (mới): due ABA (legacy đưa hạn về giá trị cũ), close/reopen ABA, chuỗi Reopen → Due có người chen giữa, mất ý định giữa chuỗi, mất ACK sau commit + gọi lặp cùng Idempotency-Key (đúng một sự kiện), context cancel sau ghi, đối soát cũ bị từ chối, hủy bù cũ bị từ chối, revision sai tenant/kỳ/profile/seq → 503 không ghi, vai không ghi → 403 không gọi cap/forms, thiếu port → 503 không nhận ý định.
+- Phân biệt: test PG của #159 (`internal/platform/forms/app/control_cas_integration_test.go`) là primitive native; các test trên là consumer end-to-end qua HTTP pf/extension + pf/forms thật. Không suy G1 đạt từ port test.
+
+### Câu hỏi PO
+
+Không đổi nghiệp vụ. Thông báo 409 `extension.cnts_campaign_interrupted` mới cũng dùng khi kỳ native bị đổi bởi thao tác khác — người dùng tải lại đợt rồi thao tác lại.

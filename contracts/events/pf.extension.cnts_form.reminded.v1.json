@@ -18,6 +18,7 @@
     "due_at":         { "type": "string", "format": "date-time" },
     "message":        { "type": "string", "maxLength": 500 },
     "channels":       { "type": "array", "items": { "type": "string", "enum": ["in_app", "push", "email"] } },
+    "channels_explicit": { "type": "boolean", "description": "BF-NOTIFY-KN-ADAPTER (#121): true = channels là lựa chọn kênh tường minh của cấu hình nhắc theo biểu (pf/notify gửi đúng các kênh đó, hộp thư luôn có); thiếu/false = hành vi cũ (hộp thư + push, email khi channels có email)" },
     "recipient_refs": { "type": "array", "items": { "type": "string", "format": "uuid" } },
     "department":     { "type": "string", "enum": ["chan_nuoi_thuy_san"] },
     "event_time":     { "type": "string", "format": "date-time" }

@@ -18,6 +18,8 @@ export type WsWarning = S["ExtWorkScheduleWarning"];
 export type WsVersion = S["ExtWorkScheduleVersion"];
 export type WsSave = S["ExtWorkScheduleSave"];
 export type WsSettings = S["ExtWorkScheduleSettings"];
+export type WsCheckin = S["ExtWorkScheduleCheckin"];
+export type WsCheckout = S["ExtWorkScheduleCheckout"];
 export type KnLogEntry = S["KNLogEntry"];
 export type KnLogPage = S["KNLogPage"];
 export type WsSession = WsItemInput["session"];
@@ -243,4 +245,13 @@ export function placeError(lat: string, lon: string): string | null {
   const x = Number(a), y = Number(b);
   if (!Number.isFinite(x) || !Number.isFinite(y) || x < 8 || x > 24 || y < 102 || y > 118) return "Tọa độ phải trong Việt Nam (vĩ độ 8–24, kinh độ 102–118).";
   return null;
+}
+
+/** Thời gian ở địa điểm (CNTS v4.0 FN-12 BR-07, AC-12): 210 phút → "3 giờ 30 phút". */
+export function stayLabel(minutes: number): string {
+  const m = Math.max(0, Math.floor(minutes));
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h === 0) return `${r} phút`;
+  return r === 0 ? `${h} giờ` : `${h} giờ ${r} phút`;
 }

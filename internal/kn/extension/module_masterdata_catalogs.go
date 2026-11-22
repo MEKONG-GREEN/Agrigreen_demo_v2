@@ -8,6 +8,7 @@ import (
 	knport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"regexp"
 	"slices"
 	"sort"
@@ -73,9 +74,13 @@ func MasterdataCatalogs() mdport.CatalogRegistration {
 			"description": desc,
 		},
 		knport.CatalogCNTSIndicator: {
-			"unit":        {Required: false, Normalize: catalogText(20)},
-			"value_type":  {Required: true, Normalize: catalogOneOf("decimal", "integer", "percent")},
-			"description": desc,
+			"unit":       {Required: false, Normalize: catalogText(20)},
+			"value_type": {Required: true, Normalize: catalogOneOf("decimal", "integer", "percent")},
+			// BF-CN-CATALOG #170 (FN-06 "chỉ tiêu theo dõi kèm ngưỡng mặc định", BR-03 theo ngày hiệu lực).
+			knport.AttrThresholdMin: {Required: false, Normalize: catalogThreshold},
+			knport.AttrThresholdMax: {Required: false, Normalize: catalogThreshold},
+			knport.AttrDiaryMetric:  {Required: false, Normalize: catalogOneOf(knport.DiaryWaterMetrics...)},
+			"description":           desc,
 		},
 		knport.CatalogCNTSModelType: {
 			"sector":           {Required: true, Normalize: catalogOneOf("chan_nuoi", "thuy_san")},
@@ -251,6 +256,23 @@ func catalogCommuneCode(s string) (string, error) {
 	return s, nil
 }
 
+var errCatalogThreshold = errors.New("số thập phân không âm, tối đa 7 chữ số phần nguyên và 4 chữ số thập phân")
+
+// catalogThreshold chuẩn hóa ngưỡng: bỏ khoảng trắng, nhận dấu phẩy thập phân kiểu vi-VN, trả dạng ngắn nhất (7.50 → 7.5).
+// Cú pháp (số thập phân thường, độ dài có giới hạn, không số mũ) kiểm TRƯỚC khi dựng decimal — bài học #107/#109/#29.
+func catalogThreshold(s string) (string, error) {
+	d := knport.ParseThreshold(strings.ReplaceAll(strings.TrimSpace(s), ",", "."))
+	if d == nil {
+		return "", errCatalogThreshold
+	}
+	return d.String(), nil
+}
+
+// CatalogThresholdRange đọc ngưỡng tối thiểu/tối đa của một chỉ tiêu (nil = chưa đặt hoặc giá trị hỏng).
+func CatalogThresholdRange(attrs map[string]string) (lo, hi *decimal.Decimal) {
+	return knport.ParseThreshold(attrs[knport.AttrThresholdMin]), knport.ParseThreshold(attrs[knport.AttrThresholdMax])
+}
+
 func catalogDosesAttr(s string) (string, error) {
 	ds, err := catalogParseDoses(s)
 	if err != nil {
@@ -323,6 +345,10 @@ func catalogNormalizeCNTS(it mdport.CatalogItem) error {
 	case knport.CatalogCNTSVaccinationSchedule:
 		if it.Attrs["model_type"] == "" && it.Attrs["breed"] == "" {
 			return mdport.FieldError{Field: "attrs.model_type", Err: errors.New("quy trình tiêm gắn loại mô hình hoặc giống")}
+		}
+	case knport.CatalogCNTSIndicator:
+		if lo, hi := CatalogThresholdRange(it.Attrs); lo != nil && hi != nil && lo.GreaterThan(*hi) {
+			return mdport.FieldError{Field: "attrs." + knport.AttrThresholdMax, Err: errors.New("ngưỡng tối đa phải lớn hơn hoặc bằng ngưỡng tối thiểu")}
 		}
 	case knport.CatalogCNTSSlaughterFacility:
 		gs, gc := catalogCodes(it.Attrs[knport.AttrStampsGS]), catalogCodes(it.Attrs[knport.AttrStampsGC])

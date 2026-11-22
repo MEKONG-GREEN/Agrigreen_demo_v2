@@ -22,14 +22,21 @@ import (
 	calhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscal/handler"
 	diaryapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/app"
 	diaryhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsdiary/handler"
+	lhapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntslivestock/app"
+	lhhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntslivestock/handler"
 	zmapapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/app"
 	zmaphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/handler"
 	modelapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/app"
 	modelhandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmodel/handler"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/departments"
 	dhapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/depthome/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/handler"
 	khtcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/app"
 	khtchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/handler"
+	kaapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knattrs/app"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knaudit"
+	kpapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knplot/app"
+	krapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/knrecords/app"
 	matapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/app"
 	mathandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/material/handler"
 	obapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/app"
@@ -38,15 +45,14 @@ import (
 	rcapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/app"
 	rchandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/handler"
 	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
-	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 	metricsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/metrics/port"
 	notifyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	syncport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/sync/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/inbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/schedule"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -73,6 +79,8 @@ type Deps struct {
 	// Plots, Coops (tùy chọn): cổng thống kê hẹp do KN sở hữu; gốc lắp ráp nối bộ đọc publication v1.
 	Plots port.PlotStatistics
 	Coops port.CooperativeStatistics
+	// Store (tùy chọn): kho đối tượng cho tệp minh chứng số liệu nguồn ngoài KHTC (W11.67); thiếu → tải tệp trả 503.
+	Store objstore.Store
 }
 
 // Module là pf/extension đã nối.
@@ -91,14 +99,19 @@ type Module struct {
 	// W11.64: bộ đọc nguồn module của Kỳ KHTC (extension/khtcsource, module_khtcsource.go).
 	khtcSrc *khtcSourceService
 	// W11.63: phiếu Báo cáo cho KHTC (extension/khtcform, module_khtc.go).
-	khtcForms   *khtcFormService
-	khtcReports *khtcReportService
+	khtcForms     *khtcFormService
+	khtcReports   *khtcReportService
+	khtcTemplates *khtcTemplateService // W11.65: five fixed report authoring/publication ledgers.
+	khtcExt       *khtcExternalService // W11.67: số liệu nguồn ngoài (extension/khtcext, module_khtcext.go)
+	objects       objstore.Store
 	// W11.43 (D4 CN3): quy tắc liên biểu + 12 cảnh báo CNTS, vòng đời cảnh báo, nhắc nộp theo biểu (module_cntsalert.go).
 	alert *alertapp.Service
 	// W11.46 (D4 CN6): lịch trực KSGM BM-03, lịch tiêm phòng BM-07 (extension/cntscal).
 	cal *calapp.Service
 	// W11.47 (D4 CN7): CT/DA, điểm trình diễn, hộ mô hình, cấp quyền CNTS (extension/cntsmodel, module_cntsmodel.go).
 	model *modelapp.Service
+	// CNTS-V4-HOUSEHOLD-LIST (#251, ADR-0056): danh sách hộ chăn nuôi (extension/cntslivestock).
+	livestock *lhapp.Service
 	// W11.48 (D4 CN8): nhật ký nuôi BM-08/09/19 (extension/cntsdiary, module_cntsdiary.go).
 	diary *diaryapp.Service
 	// W11.52 (D4 CN12): bản đồ vùng nuôi, vùng dịch (extension/cntsmap, module_cntsmap.go).
@@ -107,15 +120,28 @@ type Module struct {
 	home *dhapp.Service
 	// W11.50 (D4 CN10): chiến dịch điều tra mở rộng (extension/cntscampaign, module_cntscampaign.go).
 	campaigns *campaignService
+	// BF-SRV-KN-ATTRS (#119): hồ sơ KN riêng — năm sản xuất máy (TT-10), cây trồng thửa (TT-11) (module_knattrs.go).
+	attrs *kaapp.Service
+	// W11.53 (D4 CN13): mẫu biểu dự án KNQG Mẫu 01–07 (extension/cntsknqg, module_cntsknqg.go).
+	knqg *knqgService
+	// KNSPLIT-2-KN-RECORDS (#67): hồ sơ KN riêng HTX / Nông hộ / Tổ hợp tác (module_knrecords.go).
+	records *krapp.Service
+	// KN-STANDALONE-5-TT-DATA (#271): thửa ruộng KN ở pf_extension (module_knplot.go).
+	plots *kpapp.Service
+	// AUDIT-LOG-KN (#73): nguồn nhật ký KN, quyền xem, sổ lượt xem bền (module_knaudit.go).
+	audit *knaudit.Service
+	// KNSPLIT-2-PARTY-KN-ROUTES (#118): danh mục phòng ban của pf/party, binding HTTP do KN sở hữu (extension/departments).
+	departments partyport.DepartmentAdmin
 }
 
 // New tạo module với pool của vai extension_app.
 func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
+	pool := db
 	db = forModule(db)
 	m := &Module{svc: &app.Service{
 		DB: db, Clock: clk, Scope: d.Scope, Orgs: d.Orgs, Units: d.Units, Params: d.Params, Catalogs: d.Catalogs,
-		Plots: d.Plots, Coops: d.Coops,
-	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}}
+		Plots: d.Plots, Coops: d.Coops, Objects: d.Store,
+	}, rc: &rcapp.Service{DB: db, Clock: clk, Orgs: d.Orgs, Units: d.Units, Params: d.Params}, objects: d.Store}
 	// Tên người thao tác của sổ vật tư dùng chung danh bạ của vòng đời báo cáo (UseReportCycle nối sau).
 	m.mat = &matapp.Service{DB: db, Clock: clk, Catalogs: d.Catalogs, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.khtc = &khtcapp.Service{DB: db, Clock: clk, Names: func() partyport.ActorNames { return m.rc.Names }}
@@ -124,22 +150,24 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	m.cal = &calapp.Service{DB: db, Clock: clk, Units: d.Units, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.model = &modelapp.Service{DB: db, Clock: clk, Units: d.Units, Programs: khtcapp.Ports{Svc: m.khtc},
 		Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.livestock = &lhapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Names: func() partyport.ActorNames { return m.rc.Names }}
 	m.diary = &diaryapp.Service{DB: db, Clock: clk, Units: d.Units, Params: d.Params, Alerts: m.alert,
-		Names: func() partyport.ActorNames { return m.rc.Names }}
+		Vaccinations: m.cal, // BF-CN-VACC: NC-11 → ngày tiêm thực tế của lịch BM-07 (quy tắc liên biểu số 7)
+		Names:        func() partyport.ActorNames { return m.rc.Names }}
 	m.zmap = &zmapapp.Service{DB: db, Clock: clk, Units: d.Units, Plots: d.Plots, Names: func() partyport.ActorNames { return m.rc.Names }}
+	m.rc.BM11Programs = m.bm11Programs // W11.45: kết quả CT/DA cho Báo cáo phòng BM-11
+	m.rc.BM11Herds = m.bm11Herds       // #253: hộ, trang trại theo loại chăn nuôi cho Báo cáo phòng BM-11
 	m.home = m.newDeptHome()
+	m.plots = m.newKNPlots(db, clk, d.Params)
+	m.attrs = newKNAttrs(pool, db, clk, d.Catalogs, m.plots)
+	m.records = m.newKNRecords(pool, db, clk, d.Units)
+	m.audit = newKNAudit(db, clk)
 	return m
 }
 
-// UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng.
-func (m *Module) UseContacts(c accport.StaffContacts) { m.svc.Contacts = c }
-
-// UseFarmers nối cổng liên kết tài khoản nông dân ↔ nông hộ (pf/accounts) — yêu cầu
-// hỗ trợ từ App HTX (HTX US-SUPPORT-01 → KN US-TASK-01). Gốc lắp ráp gọi sau khi dựng pf/accounts.
-func (m *Module) UseFarmers(f accport.FarmerHouseholds) { m.svc.Farmers = f }
-
-// UseGpsLog nối log GPS của pf/geo (consumer port.GpsLogConsumer, HTX US-GPS-03).
-func (m *Module) UseGpsLog(g geoport.GpsLog) { m.svc.GpsLog = g }
+// UseContacts nối cổng số điện thoại cán bộ (pf/accounts) sau khi module đó được dựng: danh bạ trực (US-DIR-02) và cột
+// "ĐT viên chức" của lịch trực KSGM BM-03 (BF-CN-DUTY).
+func (m *Module) UseContacts(c accport.StaffContacts) { m.svc.Contacts, m.cal.Contacts = c, c }
 
 // UseKNContext nối ngữ cảnh phiên KN và danh bạ gán vai trò của P1 (pf/accounts) cho lịch công tác (KN v7.7 P5).
 // Chưa nối → suy từ vai realm + phạm vi đơn vị, danh bạ trực pf_extension.staff.
@@ -155,6 +183,7 @@ func (m *Module) UseRoleHolders(h accport.RoleHolders) { m.svc.Holders = h }
 // xuất nội bộ: ghi egress_event, không bao giờ bị chặn kể cả AG_EGRESS_MODE=enforce.
 func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logger) {
 	m.svc.Egress, m.svc.EgressMode, m.svc.Log = cp, mode, log
+	m.plots.Egress, m.plots.EgressMode, m.plots.Log = cp, mode, log // FN-XA-03.05: tải tệp thửa
 	if m.khtcReports != nil {
 		m.khtcReports.Egress, m.khtcReports.EgressMode = cp, mode
 	}
@@ -165,6 +194,8 @@ func (m *Module) UseEgress(cp meter.Checkpoint, mode meter.Mode, log *slog.Logge
 // vật nuôi). Chưa nối → lập/cập nhật ổ dịch, báo nghi dịch trả 503 extension.dependency_unavailable.
 func (m *Module) UseCNTSCatalogs(c port.CNTSCatalogs) {
 	m.ob.Catalogs, m.cal.Catalogs, m.model.Catalogs, m.zmap.Catalogs = c, c, c, c
+	m.livestock.Catalogs = c // #251: vật nuôi HCN-05
+	m.diary.Catalogs = c     // BF-CN-CATALOG #170: ngưỡng mặc định theo danh mục chỉ tiêu theo dõi
 }
 
 // UseXaScopes (W11.46) nối danh sách cán bộ Cấp Xã CNTS kèm phạm vi (pf/accounts) cho lưới lịch trực KSGM BM-03.
@@ -173,9 +204,6 @@ func (m *Module) UseXaScopes(x accport.XaScopes) { m.cal.Officers, m.model.Offic
 
 // UseTablePDF nối bộ dựng PDF bảng (pf/reports) cho "Xuất PDF" lịch công tác.
 func (m *Module) UseTablePDF(p port.TablePDF) { m.svc.TablePDF = p }
-
-// GpsLogHandler là inbox.Handler của consumer port.GpsLogConsumer (vai extension_app).
-func (m *Module) GpsLogHandler() inbox.Handler { return m.svc.HandleGpsLog }
 
 // UseContactNames (W11.23, Q-072 — đề xuất của dev: Contact thay danh bạ trực): tên cán bộ đọc từ Contact dùng chung
 // (hồ sơ nhân sự + kho định danh) TRƯỚC; cột display_name dạng rõ của pf_extension.staff chỉ còn là nguồn dự phòng cho
@@ -194,15 +222,33 @@ func (m *Module) RegisterApp(rg *gin.RouterGroup) {
 	m.registerKHTCPeriods(rg) // W11.62
 	obhandler.Handler{Svc: m.ob}.RegisterApp(rg)
 	m.registerKHTCReports(rg)                          // W11.66
+	m.registerKHTCTemplates(rg)                        // W11.65
 	m.registerKHTCSources(rg)                          // W11.64
+	m.registerKHTCExternal(rg)                         // W11.67
 	alerthandler.Handler{Svc: m.alert}.RegisterApp(rg) // W11.43
 	calhandler.Handler{Svc: m.cal}.RegisterApp(rg)
-	modelhandler.Handler{Svc: m.model}.RegisterApp(rg) // W11.47
-	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg) // W11.48
-	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)   // W11.52
-	m.registerDeptHome(rg)                             // W11.54
-	m.registerCNTSCampaigns(rg)                        // W11.50
+	modelhandler.Handler{Svc: m.model}.RegisterApp(rg)      // W11.47
+	lhhandler.Handler{Svc: m.livestock}.RegisterApp(rg)     // #251
+	diaryhandler.Handler{Svc: m.diary}.RegisterApp(rg)      // W11.48
+	zmaphandler.Handler{Svc: m.zmap}.RegisterApp(rg)        // W11.52
+	m.registerDeptHome(rg)                                  // W11.54
+	m.registerCNTSCampaigns(rg)                             // W11.50
+	m.registerKNAttrs(rg)                                   // BF-SRV-KN-ATTRS
+	m.registerCNTSKNQG(rg)                                  // W11.53
+	m.registerKNRecords(rg)                                 // KNSPLIT-2-KN-RECORDS
+	m.registerKNPlots(rg)                                   // KN-STANDALONE-5-TT-DATA (#271)
+	departments.Handler{Svc: m.departments}.RegisterApp(rg) // KNSPLIT-2 #118, #222: GET /v1/departments, /v1/menu, /v1/departments/{code}/modules
 }
+
+// GateExemptRoutes (KNSPLIT-2 #222): menu và cây module phòng ban phục vụ cả khi pf/extension tắt cho tenant — menu
+// tự lọc mục của module đã tắt (R-MOD-08), như khi còn ở pf/party (luôn bật). Gốc lắp ráp đọc qua assembly.Gated.
+func (m *Module) GateExemptRoutes() []string {
+	return []string{"/v1/menu", "/v1/departments/:code/modules"}
+}
+
+// UseDepartmentAdmin (KNSPLIT-2 #118, #222) nối cổng phòng ban của pf/party cho /v1/departments*, /v1/menu và nạp phòng
+// ban mặc định. Chưa nối → các route đó trả 503 extension.dependency_unavailable (đóng).
+func (m *Module) UseDepartmentAdmin(d partyport.DepartmentAdmin) { m.departments = d }
 
 // KHTCPrograms là cổng đọc danh sách CT/DA chủ của KHTC (quyết định D20): CNTS (W11.47) gắn điểm/hộ, thu – chi tham
 // chiếu program_ref qua cổng này.
@@ -211,8 +257,10 @@ func (m *Module) KHTCPrograms() port.KHTCPrograms { return khtcapp.Ports{Svc: m.
 // KHTCPlans là cổng đọc Kế hoạch năm theo ngày hiệu lực (W11.62 kỳ KHTC, W11.63 phiếu, W11.65 mẫu).
 func (m *Module) KHTCPlans() port.KHTCPlans { return khtcapp.Ports{Svc: m.khtc} }
 
-// RegisterAdmin: module chưa có route quản trị (tham số SLA đặt qua pf/masterdata).
-func (m *Module) RegisterAdmin(*gin.RouterGroup) {}
+// RegisterAdmin gắn route Admin API: danh mục phòng ban (#118), nạp phòng ban mặc định (#222). Tham số SLA đặt qua pf/masterdata.
+func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
+	departments.Handler{Svc: m.departments}.RegisterAdmin(rg)
+}
 
 // SyncSource cho pf/sync: chiều xuống "task", "directive".
 func (m *Module) SyncSource() syncport.Source { return app.SyncSource{Svc: m.svc} }

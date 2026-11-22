@@ -1438,7 +1438,7 @@ export function HrmPermissionScreen() {
                         </th>
                         {m.perms.map((p) => (
                           <td key={p}>
-                            <select
+                            {p === "assessment" && it.grantee_kind === "role" && ["xa", "tinh", "tw"].includes(it.grantee) ? <span>Không (HCTH v4.0)</span> : <select
                               aria-label={`${it.grantee} — ${PERM_LABEL[p] ?? p}`}
                               disabled={it.locked}
                               value={(cur as Record<string, string>)[p] ?? ""}
@@ -1460,7 +1460,7 @@ export function HrmPermissionScreen() {
                                   {SCOPE_LABEL[sc]}
                                 </option>
                               ))}
-                            </select>
+                            </select>}
                           </td>
                         ))}
                         <td>

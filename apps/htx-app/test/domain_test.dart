@@ -198,6 +198,11 @@ void main() {
         isNull,
       );
     });
+    test('#313: nhãn trạng thái — yêu cầu mới (module HTX) không có task_status; yêu cầu chép giữ trạng thái cũ', () {
+      expect(supportStatusLabel(null), 'Đã gửi');
+      expect(supportStatusLabel('resolved'), 'Đã xử lý xong');
+      expect(supportStatusLabel('in_progress'), 'Đang xử lý');
+    });
   });
 
   group('HTX US-GPS-02: nguồn xác thực vị trí', () {

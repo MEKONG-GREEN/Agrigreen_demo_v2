@@ -1,0 +1,3 @@
+## KNSPLIT-2-ACCOUNTS-REGISTRY — Rollout owner attributes và assignment rules (phần đầu)
+
+API assembly nối extension.AttributeCatalog + AssignmentRules tường minh; lỗi catalog dừng startup. Không registry/fallback mới, không đổi Roles/MFA/native lifecycle hoặc xóa bridge trước consumer. Khôi phục từ dev85793441 theo claim Codex thiếu nhánh máy cũ, provenance issue #52. [Kiểm kê](../../dev/accounts-registry-inventory.md). Child #193 giữ role-order rollout và units/delegation/read-only còn lại; chưa đạt toàn acceptance #52/#57/G1/4b. Kết quả PG/static/mutation/CI đúng SHA ghi issue khi runner xong.

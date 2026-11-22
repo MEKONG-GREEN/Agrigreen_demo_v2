@@ -23,10 +23,29 @@ type gated struct {
 	gate  gin.HandlerFunc
 }
 
-// Gated trả m với route App/Admin đi qua gate; gate nil → m nguyên vẹn.
+// gateExempt là module có route đã xác thực phải phục vụ cả khi module tắt cho tenant (KNSPLIT-2 #222: menu theo cấu
+// hình tự lọc mục của module đã tắt, R-MOD-08 — trước khi chuyển sang chủ KN, menu ở pf/party luôn bật). Mẫu đường dẫn
+// theo gin (FullPath, gồm tiền tố /v1).
+type gateExempt interface{ GateExemptRoutes() []string }
+
+// Gated trả m với route App/Admin đi qua gate (trừ route m khai miễn cổng); gate nil → m nguyên vẹn.
 func Gated(m httpx.Module, gate gin.HandlerFunc) httpx.Module {
 	if gate == nil {
 		return m
+	}
+	if e, ok := m.(gateExempt); ok {
+		exempt := map[string]bool{}
+		for _, p := range e.GateExemptRoutes() {
+			exempt[p] = true
+		}
+		inner := gate
+		gate = func(c *gin.Context) {
+			if exempt[c.FullPath()] {
+				c.Next()
+				return
+			}
+			inner(c)
+		}
 	}
 	return gated{inner: m, gate: gate}
 }

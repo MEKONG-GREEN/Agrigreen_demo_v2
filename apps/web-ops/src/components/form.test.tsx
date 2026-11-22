@@ -1,10 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { Decimal } from "@/lib/exactDecimal";
 import { NumberField, parseNumberInput, SelectField, TextField, validateForm } from "./form";
 
 describe("parseNumberInput (R-A1)", () => {
+  it("chặn số mũ và chuỗi vượt giới hạn trước bộ đọc decimal (BF-SWEEP-HCTH-REST)", () => {
+    const parse = vi.spyOn(Decimal, "parse");
+    try {
+      for (const value of ["1e100000", "1e-100000", "1e1000", "9".repeat(100000)]) {
+        expect(parseNumberInput(value, { maxInputLength: 32 }).ok).toBe(false);
+      }
+      expect(parse).not.toHaveBeenCalled();
+    } finally { parse.mockRestore(); }
+  });
   it("không nhận số âm theo mặc định, kể cả dạng vi-VN", () => {
     expect(parseNumberInput("-1")).toEqual({ ok: false, error: "Không được nhập số âm." });
     expect(parseNumberInput("-0,5")).toEqual({ ok: false, error: "Không được nhập số âm." });

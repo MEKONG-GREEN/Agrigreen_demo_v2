@@ -52,10 +52,10 @@ class HomeScreen extends ConsumerWidget {
             onTap: () => open(const NotificationsScreen()),
           ),
           IconButton(
-            tooltip: 'Khóa',
+            tooltip: 'Đăng xuất',
             iconSize: 28,
-            icon: const Icon(Icons.lock),
-            onPressed: () => ref.read(appControllerProvider.notifier).lock(),
+            icon: const Icon(Icons.logout),
+            onPressed: () => ref.read(appControllerProvider.notifier).signOut(),
           ),
         ],
       ),

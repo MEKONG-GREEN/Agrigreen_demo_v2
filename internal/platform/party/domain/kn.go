@@ -70,18 +70,8 @@ func ValidStatus(s string) bool {
 	return s == port.DeptActive || s == port.DeptNotOpen || s == port.DeptSuspended
 }
 
-// StatusLabel là nhãn tiếng Việt của trạng thái phòng ban.
-func StatusLabel(s string) string {
-	switch s {
-	case port.DeptActive:
-		return "Đang áp dụng"
-	case port.DeptNotOpen:
-		return "Chưa mở"
-	case port.DeptSuspended:
-		return "Ngưng hoạt động"
-	}
-	return s
-}
+// StatusLabel là nhãn tiếng Việt của trạng thái phòng ban (port.DepartmentStatusLabel).
+func StatusLabel(s string) string { return port.DepartmentStatusLabel(s) }
 
 // ValidateReason kiểm lý do (MinKNReason–500 ký tự) của trường field.
 func ValidateReason(field, r string) error {
@@ -167,12 +157,8 @@ func NormalizeRegion(r port.Region) (port.Region, error) {
 	return r, nil
 }
 
-// FieldChange là một dòng "giá trị cũ → mới" của Log (kn-v7.7-plan §1.5).
-type FieldChange struct {
-	Field string  `json:"field"`
-	Old   *string `json:"old"`
-	New   *string `json:"new"`
-}
+// FieldChange là một dòng "giá trị cũ → mới" của Log (kn-v7.7-plan §1.5), chung với cổng quản trị phòng ban.
+type FieldChange = port.FieldChange
 
 // Diff so hai ảnh chụp JSON (object phẳng) và trả các trường đổi, sắp theo tên. before nil (tạo
 // mới) → mọi trường của after là mới.

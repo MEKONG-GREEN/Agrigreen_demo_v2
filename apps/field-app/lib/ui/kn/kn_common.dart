@@ -36,56 +36,71 @@ Future<KnCommandResult?> knRunCommand(
   }
 }
 
-/// Hộp thoại nhập lý do (≥ [min] ký tự).
+/// Hộp thoại nhập lý do (≥ [min] ký tự). Bộ điều khiển ô nhập thuộc về
+/// hộp thoại (hủy cùng nó, sau hiệu ứng đóng — không hủy sớm khi còn vẽ).
 Future<String?> knAskReason(
   BuildContext context, {
   required String title,
   String? body,
   int min = 10,
-}) async {
-  final ctl = TextEditingController();
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, set) => AlertDialog(
-        title: Text(title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (body != null) Text(body),
-            TextField(
-              key: const ValueKey('kn-reason'),
-              controller: ctl,
-              maxLines: 2,
-              onChanged: (_) => set(() {}),
-              decoration: InputDecoration(
-                labelText: 'Lý do (ít nhất $min ký tự)',
-                helperText: piiWarning(ctl.text), // X-02
-                helperMaxLines: 3,
-              ),
-            ),
-          ],
+}) => showDialog<String>(
+  context: context,
+  builder: (_) => _KnReasonDialog(title: title, body: body, min: min),
+);
+
+class _KnReasonDialog extends StatefulWidget {
+  const _KnReasonDialog({required this.title, this.body, required this.min});
+  final String title;
+  final String? body;
+  final int min;
+  @override
+  State<_KnReasonDialog> createState() => _KnReasonDialogState();
+}
+
+class _KnReasonDialogState extends State<_KnReasonDialog> {
+  final _ctl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.body != null) Text(widget.body!),
+        TextField(
+          key: const ValueKey('kn-reason'),
+          controller: _ctl,
+          maxLines: 2,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: 'Lý do (ít nhất ${widget.min} ký tự)',
+            helperText: piiWarning(_ctl.text), // X-02
+            helperMaxLines: 3,
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            key: const ValueKey('kn-reason-ok'),
-            onPressed: ctl.text.trim().length >= min
-                ? () => Navigator.pop(ctx, true)
-                : null,
-            child: const Text('Xác nhận'),
-          ),
-        ],
-      ),
+      ],
     ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Hủy'),
+      ),
+      FilledButton(
+        key: const ValueKey('kn-reason-ok'),
+        onPressed: _ctl.text.trim().length >= widget.min
+            ? () => Navigator.pop(context, _ctl.text.trim())
+            : null,
+        child: const Text('Xác nhận'),
+      ),
+    ],
   );
-  final v = ctl.text.trim();
-  ctl.dispose();
-  return ok == true ? v : null;
 }
 
 /// Danh sách phân trang (cursor) tải dần — ListView.builder, nút "Tải thêm".

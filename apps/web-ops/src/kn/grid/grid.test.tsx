@@ -249,3 +249,20 @@ describe("KN P3b soạn lô thao tác của trình thiết kế", () => {
     expect(shiftRefsText("IF(D#=0,0,AA#/D#*100)", 20, 4)).toBe("IF(D#=0,0,AE#/D#*100)");
   });
 });
+
+// BF-TT-FORMS (#107, UP-04): khung "Yêu cầu biểu mẫu" luôn hiện; nhiều dòng yêu cầu → mỗi dòng một gạch đầu dòng.
+describe("FormEntry — khung Yêu cầu biểu mẫu (UP-04)", () => {
+  it("có yêu cầu → hiện từng dòng; chưa có → nói rõ mẫu chưa ghi yêu cầu", () => {
+    const d = def("T01");
+    d.requirements = "Nhập theo tuần\n- Không nhập số âm";
+    const { unmount } = render(<FormEntry definition={d} versionKey="v1" communes={COMMUNES} values={{}} evaluate={server(d)} openSlots={[3]} readOnly />);
+    const box = screen.getByRole("note", { name: "Yêu cầu biểu mẫu" });
+    expect(within(box).getByText("- Nhập theo tuần")).toBeInTheDocument();
+    expect(within(box).getByText("- Không nhập số âm")).toBeInTheDocument();
+    unmount();
+    const e = def("T01");
+    delete (e as { requirements?: string }).requirements;
+    render(<FormEntry definition={e} versionKey="v1" communes={COMMUNES} values={{}} evaluate={server(e)} openSlots={[3]} readOnly />);
+    expect(within(screen.getByRole("note", { name: "Yêu cầu biểu mẫu" })).getByText("- Mẫu chưa ghi yêu cầu riêng.")).toBeInTheDocument();
+  });
+});

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,57 +21,577 @@ import (
 
 func newID() uuid.UUID { return ids.New() }
 
-// change chạy một thao tác chuyển trạng thái: giữ khóa tư vấn của đợt trong giao dịch pf_extension, kiểm trạng thái, gọi
-// cap/forms (giao dịch riêng của pf/forms) rồi ghi sự kiện trong cùng giao dịch pf_extension. Gọi lặp cùng khóa
-// idempotent → không làm lại (trả đợt hiện tại). Ghi sự kiện lỗi sau khi cap/forms đã đổi → bù (undo) nếu có.
+// DefaultLease là hạn ý định thao tác của đợt: đủ cho các lời gọi cap/forms của một yêu cầu HTTP; tiến trình chết giữa
+// chừng → hết hạn thì thao tác khác (và sửa nháp) chạy được.
+const DefaultLease = 2 * time.Minute
+
+// maxLeaseMargin: biên an toàn tối đa giữa hạn lời gọi cap/forms và hạn ý định.
+const maxLeaseMargin = 15 * time.Second
+
+// cleanupTimeout: hạn của bù ở cap/forms và bỏ ý định sau lỗi (chạy cả khi yêu cầu đã hủy).
+const cleanupTimeout = 30 * time.Second
+
+func (s *Service) lease() time.Duration {
+	if s.Lease >= time.Second {
+		return s.Lease.Truncate(time.Second) // hạn DB tính bằng giây nguyên
+	}
+	return DefaultLease
+}
+
+// step là kết quả lời gọi cap/forms (chạy NGOÀI giao dịch) của một thao tác.
+type step struct {
+	ev store.Event
+	// undo bù ở cap/forms khi ghi sự kiện đợt lỗi (phát hành: hủy kỳ native vừa tạo). nil → không bù.
+	undo func(context.Context)
+	// emit ghi thêm trong giao dịch ghi sự kiện (outbox nhắc nộp). nil → không.
+	emit func(ctx context.Context, tx pgx.Tx, at time.Time) error
+}
+
+// op là ngữ cảnh lời gọi cap/forms của một thao tác: token đang giữ ý định và phiên ghi kỳ native có điều kiện (nil khi đợt
+// chưa có kỳ native — phát hành — hoặc thao tác không ghi kỳ native — nhắc nộp).
+type op struct {
+	c          caller
+	id, token  uuid.UUID
+	n          *native
+	publishing bool // phát hành đã gọi PublishBatch (lỗi không rõ kết quả → kỳ native có thể đã tạo)
+}
+
+// suspect: lời gọi cap/forms lỗi err có thể đã làm kỳ native lệch sổ đợt → đánh dấu lệch (stale_gen) để người giữ ý định đối
+// soát.
+func (o *op) suspect(err error) bool {
+	if o.n != nil {
+		return o.n.suspect(err)
+	}
+	return o.publishing && !definite(err)
+}
+
+// ---------------------------------------------------------------------------
+// Ghi kỳ native có điều kiện (BF-CNTS-CAMPAIGN-CAS-CONSUMER, #201 — nối port #159 formsport.ConditionalPeriodControl).
+//
+// ControlSnapshot đọc tiến độ + revision kỳ native NGOÀI giao dịch pf_extension; giao dịch ngắn (khóa đợt) xác minh token còn
+// giữ ý định còn hạn (giờ DB) và ghi revision vào dòng ý định (store.BindRevision) — mất ý định → dừng, KHÔNG gọi cap/forms.
+// Giá trị truyền vào lời gọi CAS là giá trị đọc lại từ dòng ý định. Chuỗi Reopen → ChangeDue: revision áp dụng do chính lời
+// gọi trước trả về (heads đọc trong TX commit của cap/forms) được ghi lại vào ý định (xác minh quyền giữ) rồi mới gọi bước
+// sau — không tự cộng seq, không đọc snapshot mới của người khác. forms.period_conflict → không thử lại bằng revision mới.
+// ---------------------------------------------------------------------------
+
+// native là phiên ghi kỳ native có điều kiện của token đang giữ ý định của đợt.
+type native struct {
+	s         *Service
+	c         caller
+	id, token uuid.UUID
+	pid       uuid.UUID                // kỳ native của đợt
+	rev       formsport.PeriodRevision // revision kỳ vọng của lời gọi CAS kế tiếp
+	snap      formsport.PeriodProgress // tiến độ đọc cùng revision ban đầu
+	wrote     bool                     // đã có lời gọi CAS thành công (kỳ native đã đổi)
+	inflight  bool                     // lời gọi CAS cuối cùng lỗi (chưa biết đã ghi hay chưa nếu lỗi không rõ kết quả)
+}
+
+var (
+	errNoCAS = ErrDependency.WithDetail("cap/forms chưa nối cổng điều khiển kỳ có điều kiện (CAS) — không ghi kỳ native của đợt")
+	// errRevision: revision cap/forms trả không thuộc kỳ native của đợt trong tenant của người gọi — fail closed.
+	errRevision = ErrDependency.WithDetail("cap/forms trả revision không khớp kỳ native của đợt — không ghi kỳ native")
+	errLostBind = ErrInterrupted.WithDetail("mất quyền giữ đợt trước khi ghi kỳ native — chưa ghi kỳ native; tải lại đợt rồi thử lại")
+)
+
+// begin chụp kỳ native pid (ngoài giao dịch) rồi ghi revision vào ý định của token. Token phải đang giữ ý định.
+func (s *Service) begin(ctx context.Context, c caller, id, token, pid uuid.UUID) (*native, error) {
+	if s.Cond == nil {
+		return nil, errNoCAS
+	}
+	sn, err := s.Cond.ControlSnapshot(ctx, domain.Profile, pid)
+	if err != nil {
+		return nil, err
+	}
+	if sn.Progress.ID != pid {
+		return nil, errRevision
+	}
+	n := &native{s: s, c: c, id: id, token: token, pid: pid, snap: sn.Progress}
+	if err := n.bind(ctx, sn.Revision); err != nil {
+		return nil, err
+	}
+	return n, nil
+}
+
+// bind ghi revision r vào ý định của token (giao dịch ngắn giữ khóa đợt) và lấy giá trị ghi bền làm revision kỳ vọng.
+func (n *native) bind(ctx context.Context, r formsport.PeriodRevision) error {
+	if r.TenantID != n.c.p.TenantID || r.PeriodID != n.pid || r.Profile != domain.Profile || r.EventSeq < 1 || r.DueSeq < 0 {
+		return errRevision
+	}
+	var got store.Revision
+	ok := false
+	err := n.s.tx(ctx, n.c.p.TenantID, func(tx pgx.Tx) error {
+		ok = false
+		if err := store.Lock(ctx, tx, n.c.p.TenantID, n.id); err != nil {
+			return err
+		}
+		var err error
+		got, ok, err = store.BindRevision(ctx, tx, n.c.p.TenantID, n.id, n.token,
+			store.Revision{PeriodID: r.PeriodID, Profile: r.Profile, EventSeq: r.EventSeq, DueSeq: r.DueSeq})
+		return err
+	})
+	if err != nil {
+		return classify(err)
+	}
+	if !ok {
+		return errLostBind
+	}
+	n.rev = formsport.PeriodRevision{TenantID: n.c.p.TenantID, PeriodID: got.PeriodID, Profile: got.Profile, EventSeq: got.EventSeq,
+		DueSeq: got.DueSeq}
+	return nil
+}
+
+// next: bước kế tiếp của chuỗi — ghi revision áp dụng của lời gọi vừa xong vào ý định (còn giữ) trước lời gọi sau.
+func (n *native) next(ctx context.Context) error { return n.bind(ctx, n.rev) }
+
+func (n *native) apply(f func(formsport.PeriodRevision) (formsport.PeriodRevision, error)) error {
+	n.inflight = true
+	r, err := f(n.rev)
+	if err != nil {
+		return err
+	}
+	n.inflight, n.wrote, n.rev = false, true, r
+	return nil
+}
+
+func (n *native) changeDue(ctx context.Context, due time.Time, reason, key string) error {
+	return n.apply(func(r formsport.PeriodRevision) (formsport.PeriodRevision, error) {
+		return n.s.Cond.ChangeDueCAS(ctx, domain.Profile, n.pid, r, due, reason, key)
+	})
+}
+
+func (n *native) close(ctx context.Context, key string) error {
+	return n.apply(func(r formsport.PeriodRevision) (formsport.PeriodRevision, error) {
+		return n.s.Cond.ClosePeriodCAS(ctx, domain.Profile, n.pid, r, key)
+	})
+}
+
+func (n *native) reopen(ctx context.Context, reason, key string) error {
+	return n.apply(func(r formsport.PeriodRevision) (formsport.PeriodRevision, error) {
+		return n.s.Cond.ReopenPeriodCAS(ctx, domain.Profile, n.pid, r, reason, key)
+	})
+}
+
+func (n *native) cancel(ctx context.Context, reason, key string) error {
+	return n.apply(func(r formsport.PeriodRevision) (formsport.PeriodRevision, error) {
+		return n.s.Cond.CancelPeriodCAS(ctx, domain.Profile, n.pid, r, reason, key)
+	})
+}
+
+// suspect: kỳ native có thể lệch sổ đợt sau lỗi err — đã có bước ghi thành công (chuỗi dở dang), hoặc lời gọi ghi cuối lỗi
+// không rõ kết quả (không mặc nhận rollback), hoặc bị từ chối vì kỳ native đã đổi ngoài ý định (người giữ phải đối soát).
+func (n *native) suspect(err error) bool {
+	return n.wrote || (n.inflight && (isConflict(err) || !definite(err)))
+}
+
+// definite: lỗi nghiệp vụ cap/forms trả TRƯỚC khi ghi (4xx) — chắc chắn chưa ghi. Lỗi khác (mạng, hạn lời gọi, commit mất ACK,
+// 5xx) là không rõ kết quả.
+func definite(err error) bool {
+	var p *problem.Problem
+	return errors.As(err, &p) && p.Status < http.StatusInternalServerError
+}
+
+func isConflict(err error) bool {
+	var p *problem.Problem
+	return errors.As(err, &p) && p.Code == formsport.ErrPeriodConflict.Code
+}
+
+// callErr là lỗi trả người gọi khi lời gọi cap/forms của thao tác lỗi.
+func callErr(err error, expired bool) error {
+	switch {
+	case expired:
+		return ErrDependency.WithDetail("cap/forms không phản hồi kịp hạn thao tác — thử lại").WithCause(err)
+	case isConflict(err):
+		return ErrInterrupted.WithDetail("kỳ native của đợt đã đổi bởi thao tác khác — chưa ghi kết quả; tải lại đợt rồi thử lại").WithCause(err)
+	case !isProblem(err):
+		return ErrDependency.WithDetail("cap/forms lỗi không rõ kết quả — kỳ native đối soát theo sổ đợt; tải lại đợt rồi thử lại").WithCause(err)
+	}
+	return err
+}
+
+func isProblem(err error) bool {
+	var p *problem.Problem
+	return errors.As(err, &p)
+}
+
+// current đọc trạng thái hiện tại của đợt trong giao dịch (ErrNotFound nếu không có / người gọi không thấy).
+func (s *Service) current(ctx context.Context, tx pgx.Tx, c caller, id uuid.UUID) (Campaign, error) {
+	v, err := store.Latest(ctx, tx, id)
+	if err != nil {
+		return Campaign{}, err
+	}
+	if v == nil || !c.sees(*v) {
+		return Campaign{}, ErrNotFound
+	}
+	es, err := store.Events(ctx, tx, []uuid.UUID{id})
+	if err != nil {
+		return Campaign{}, err
+	}
+	// Đợt đã phát hành: phiên bản mới nhất là phiên bản đã phát hành (trigger chặn phiên bản sau phát hành).
+	return build(*v, es[id]), nil
+}
+
+// change chạy một thao tác chuyển trạng thái (BF-CNTS-CAMPAIGN-POOL, #156) KHÔNG giữ giao dịch DB quanh lời gọi cap/forms
+// (cap/forms mở giao dịch riêng trên CÙNG pool — giữ kết nối trong khi chờ kết nối thứ hai làm cạn pool):
+//  1. giao dịch ngắn giữ khóa tư vấn của đợt: gọi lặp cùng khóa idempotent → trả đợt hiện tại; kiểm thấy đợt, trạng thái;
+//     ghi ý định thao tác (cnts_campaign_intent, hạn giờ DB) — ý định khác còn hạn → 409 ErrBusy; commit;
+//  2. call: cap/forms NGOÀI giao dịch, hạn lời gọi = thời điểm TRƯỚC giao dịch 1 + hạn ý định − biên;
+//  3. giao dịch ngắn giữ khóa: bỏ ý định của token (hết hạn → nhận lại nếu không ai giữ; người khác giữ → ErrInterrupted,
+//     không ghi gì), kiểm lại trạng thái, phiên bản, số sự kiện; ghi sự kiện đợt (+ emit) cùng giao dịch.
+//
+// Lỗi ở 2 → bỏ ý định. Lỗi ở 3 → wrapUp (bù/đối soát) rồi bỏ ý định. Trong lúc ý định còn hạn, trigger chặn sửa nháp và
+// mọi sự kiện đợt khác — thay khóa giữ suốt của bản cũ.
+//
+// Đối soát kỳ native (review Codex #156 [P2]): forms chưa có ghi có điều kiện (CAS/fence), nên lời gọi cap/forms của yêu cầu
+// đã MẤT ý định có thể đè kỳ native sau khi yêu cầu kế tiếp đã ghi xong. Yêu cầu nào biết mình mất ý định (hoặc lời gọi lỗi
+// không rõ kết quả, hoặc ghi sự kiện lỗi sau khi cap/forms đã đổi) đánh dấu lệch (stale_gen) SAU khi lời gọi của nó đã trả về;
+// người giữ ý định — chính nó nếu nhận lại được, không thì người đang giữ khi ghi xong, hoặc thao tác kế tiếp — đưa kỳ native
+// về đúng sổ đợt đã cam kết mới nhất (settle). Không bao giờ ghi lại giá trị của yêu cầu cũ: luôn ghi theo sổ đợt.
+//
+// #201: mọi lời gọi ghi kỳ native đi qua cổng CAS với revision ghi bền trong ý định (begin/bind) — yêu cầu đã mất ý định bị
+// cap/forms từ chối ngay (forms.period_conflict → 409 interrupted) thay vì đè rồi chờ đối soát. Thiếu cổng CAS → 503 trước
+// khi nhận ý định. stale_gen/settle giữ làm lớp phòng thủ (lỗi không rõ kết quả, chuỗi dở dang, ghi ngoài đường ý định).
 func (s *Service) change(ctx context.Context, c caller, id uuid.UUID, act, idem string,
-	forms func(cur Campaign) (store.Event, func(), error)) (Campaign, error) {
+	call func(ctx context.Context, cur Campaign, o *op) (step, error)) (Campaign, error) {
 	if idem == "" {
 		return Campaign{}, problem.IdempotencyRequired
 	}
 	key := "cnts_campaign:" + act + ":" + id.String() + ":" + idem
+	lease := s.lease()
+	native := writesNative(act)
+	if native && s.Cond == nil {
+		return Campaign{}, errNoCAS
+	}
+	start := time.Now()
+	token := newID()
+	var cur Campaign
+	done := false
 	err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		if err := store.Lock(ctx, tx, c.p.TenantID, id); err != nil {
 			return err
 		}
 		if prev, err := store.EventByIdem(ctx, tx, key); err != nil || prev != nil {
+			done = prev != nil
 			return err
 		}
-		v, err := store.Latest(ctx, tx, id)
-		if err != nil {
+		var err error
+		if cur, err = s.current(ctx, tx, c, id); err != nil {
 			return err
 		}
-		if v == nil || !c.sees(*v) {
-			return ErrNotFound
+		// Ma trận FN-21: mở lại là quyền của Lãnh đạo phòng (kiểm ở Reopen); thao tác khác chỉ cán bộ tổng hợp hoặc người
+		// phụ trách đợt.
+		if act != domain.ActReopened && !c.manages(cur.Version) {
+			return errNotOwner
 		}
-		es, err := store.Events(ctx, tx, []uuid.UUID{id})
-		if err != nil {
-			return err
-		}
-		cur := build(*v, es[id])
 		if !domain.CanApply(cur.State, act) {
 			return ErrState.WithDetail("đợt đang ở trạng thái " + stateLabel(cur.State))
 		}
-		ev, undo, err := forms(cur)
+		claimed, err := store.Claim(ctx, tx, c.p.TenantID, id, token, act, lease)
 		if err != nil {
 			return err
 		}
-		ev.ID, ev.CampaignID, ev.Action, ev.ActorRef, ev.EventTime = newID(), id, act, c.p.ActorRef, s.now()
-		if err := store.InsertEvent(ctx, tx, c.p.TenantID, &ev, key); err != nil {
-			if undo != nil {
-				undo()
-			}
-			return err
-		}
-		if act == domain.ActReminded && ev.Reminded != nil && *ev.Reminded > 0 {
-			return s.emitReminders(ctx, tx, c, cur, ev.EventTime)
+		if !claimed {
+			return ErrBusy
 		}
 		return nil
 	})
 	if err != nil {
 		return Campaign{}, classify(err)
 	}
+	if done {
+		return s.get(ctx, c, id)
+	}
+
+	callCtx, cancel := context.WithDeadline(ctx, start.Add(lease-min(lease/4, maxLeaseMargin)))
+	o := &op{c: c, id: id, token: token}
+	var st step
+	if native && cur.Period != nil && cur.Period.FormsPeriodRef != nil {
+		o.n, err = s.begin(callCtx, c, id, token, *cur.Period.FormsPeriodRef)
+	}
+	if err == nil {
+		st, err = call(callCtx, cur, o)
+	}
+	expired := errors.Is(callCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil
+	cancel()
+	if err != nil {
+		s.wrapUp(ctx, c, id, token, act, native && o.suspect(err), nil)
+		return Campaign{}, callErr(err, expired)
+	}
+
+	settle := false
+	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+		settle = false
+		if err := store.Lock(ctx, tx, c.p.TenantID, id); err != nil {
+			return err
+		}
+		released, err := store.Release(ctx, tx, c.p.TenantID, id, token, true)
+		if err != nil {
+			return err
+		}
+		if !released {
+			// Ý định của token đã hết hạn trước khi ghi (giao dịch này chờ lâu): nhận lại nếu không ai đang giữ — kiểm đợt
+			// không đổi ngay dưới đây (ai đó đã chen vào thì trạng thái/phiên bản/sự kiện đã khác → ErrState, bù).
+			// Người khác đang giữ ý định còn hạn → ErrInterrupted, không ghi gì.
+			reclaimed, err := store.Claim(ctx, tx, c.p.TenantID, id, token, act, lease)
+			if err != nil {
+				return err
+			}
+			if !reclaimed {
+				return ErrInterrupted
+			}
+			if _, err := store.Release(ctx, tx, c.p.TenantID, id, token, true); err != nil {
+				return err
+			}
+			// Lời gọi cap/forms của mình chạy khi KHÔNG giữ ý định: có thể đã ghi đè kỳ native sau một thao tác khác — đánh
+			// dấu lệch (review #156 [P2]); đối soát ngay dưới đây sau khi ghi sự kiện.
+			if native {
+				if err := store.MarkStale(ctx, tx, c.p.TenantID, id); err != nil {
+					return err
+				}
+			}
+		}
+		now, err := s.current(ctx, tx, c, id)
+		if err != nil {
+			return err
+		}
+		// Phòng thủ: ý định giữ suốt nên không ai đổi được đợt; vẫn kiểm trước khi ghi.
+		if !domain.CanApply(now.State, act) || now.Version.Seq != cur.Version.Seq || len(now.Events) != len(cur.Events) {
+			return ErrState.WithDetail("đợt vừa đổi trong lúc thao tác — tải lại rồi thử lại")
+		}
+		ev := st.ev
+		ev.ID, ev.CampaignID, ev.Action, ev.ActorRef, ev.EventTime = newID(), id, act, c.p.ActorRef, s.now()
+		if err := store.InsertEvent(ctx, tx, c.p.TenantID, &ev, key); err != nil {
+			return err
+		}
+		if st.emit != nil {
+			if err := st.emit(ctx, tx, ev.EventTime); err != nil {
+				return err
+			}
+		}
+		// Còn lần lệch kỳ native chưa đối soát (của mình hoặc yêu cầu khác đã mất ý định) → giữ lại ý định để đối soát.
+		_, dirty, err := store.StaleGen(ctx, tx, c.p.TenantID, id)
+		if err != nil || !dirty {
+			return err
+		}
+		settle, err = store.Claim(ctx, tx, c.p.TenantID, id, token, act, lease)
+		return err
+	})
+	if err != nil {
+		s.wrapUp(ctx, c, id, token, act, native, st.undo)
+		return Campaign{}, classify(err)
+	}
+	if settle {
+		s.settle(ctx, c, id, token)
+	}
 	return s.get(ctx, c, id)
+}
+
+// writesNative: thao tác ghi kỳ native ở cap/forms (nhắc nộp chỉ đọc tiến độ).
+func writesNative(act string) bool { return act != domain.ActReminded }
+
+// wrapUp kết thúc thao tác lỗi sau khi đã gọi cap/forms (chạy cả khi yêu cầu đã hủy). stale: lời gọi cap/forms có thể đã ghi
+// kỳ native mà thao tác không ghi được sự kiện (mất ý định, ghi lỗi, không rõ kết quả) → đánh dấu lệch. Rồi giữ lại ý định
+// (của mình còn hạn, hoặc nhận lại nếu không ai giữ): đợt còn Nháp → bù (phát hành: hủy kỳ native vừa tạo); còn lệch → đối
+// soát; không thì bỏ ý định. Người khác đang giữ ý định → không bù, không đối soát: người giữ đối soát khi ghi xong (thấy dấu
+// lệch), hoặc thao tác kế tiếp.
+func (s *Service) wrapUp(ctx context.Context, c caller, id, token uuid.UUID, act string, stale bool, undo func(context.Context)) {
+	ctx = context.WithoutCancel(ctx)
+	own, dirty, draft := false, false, false
+	tctx, cancel := context.WithTimeout(ctx, cleanupTimeout)
+	err := s.tx(tctx, c.p.TenantID, func(tx pgx.Tx) error {
+		own, dirty, draft = false, false, false
+		if err := store.Lock(tctx, tx, c.p.TenantID, id); err != nil {
+			return err
+		}
+		if stale {
+			if err := store.MarkStale(tctx, tx, c.p.TenantID, id); err != nil {
+				return err
+			}
+		}
+		var err error
+		if own, err = store.Renew(tctx, tx, c.p.TenantID, id, token, s.lease()); err != nil {
+			return err
+		}
+		if !own {
+			if own, err = store.Claim(tctx, tx, c.p.TenantID, id, token, act, s.lease()); err != nil || !own {
+				return err
+			}
+		}
+		if _, dirty, err = store.StaleGen(tctx, tx, c.p.TenantID, id); err != nil {
+			return err
+		}
+		now, err := s.current(tctx, tx, c, id)
+		if err != nil {
+			return err
+		}
+		draft = now.State == domain.StateDraft
+		return nil
+	})
+	cancel()
+	if err != nil || !own {
+		if own {
+			s.release(ctx, c, id, token)
+		}
+		return
+	}
+	if undo != nil && draft {
+		// Đợt vẫn Nháp và mình giữ ý định: kỳ native vừa tạo (khóa PublishBatch cố định theo đợt) không thuộc sự kiện nào.
+		uctx, ucancel := context.WithTimeout(ctx, cleanupTimeout)
+		undo(uctx)
+		ucancel()
+	}
+	if dirty {
+		s.settle(ctx, c, id, token)
+		return
+	}
+	s.release(ctx, c, id, token)
+}
+
+// settleRounds: số vòng đối soát tối đa của một yêu cầu (mỗi vòng: đọc sổ đợt, đưa kỳ native về đúng sổ, kiểm không có lần
+// lệch mới). Hết vòng mà còn lệch → bỏ ý định, dấu lệch còn — thao tác kế tiếp đối soát.
+const settleRounds = 3
+
+// actSync: thao tác ghi ở ý định khi đối soát nhận lại đợt.
+const actSync = "sync"
+
+// settle đưa kỳ native về đúng trạng thái đã cam kết ở sổ đợt (review #156 [P2]). Gọi khi token ĐANG giữ ý định; luôn bỏ ý
+// định trước khi trả về. Vì mọi sự kiện đợt bị chặn khi ý định còn hạn, sổ đợt đọc ở đầu vòng là kết quả cam kết mới nhất
+// trong suốt vòng; lần lệch đánh dấu trong vòng (stale_gen tăng) → vòng sau. Mất ý định giữa vòng → lời gọi đối soát của mình
+// cũng có thể lệch: đánh dấu, nhận lại nếu được, không thì để người giữ đối soát.
+func (s *Service) settle(ctx context.Context, c caller, id, token uuid.UUID) {
+	lease := s.lease()
+	ctx, stop := context.WithTimeout(context.WithoutCancel(ctx), settleRounds*(lease+cleanupTimeout))
+	defer stop()
+	for range settleRounds {
+		start := time.Now()
+		var cur Campaign
+		var gen int64
+		own := false
+		err := s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+			if err := store.Lock(ctx, tx, c.p.TenantID, id); err != nil {
+				return err
+			}
+			var err error
+			if own, err = store.Renew(ctx, tx, c.p.TenantID, id, token, lease); err != nil || !own {
+				return err
+			}
+			if gen, _, err = store.StaleGen(ctx, tx, c.p.TenantID, id); err != nil {
+				return err
+			}
+			cur, err = s.current(ctx, tx, c, id)
+			return err
+		})
+		if err != nil || !own {
+			if own {
+				s.release(ctx, c, id, token)
+			}
+			return
+		}
+		rctx, cancel := context.WithDeadline(ctx, start.Add(lease-min(lease/4, maxLeaseMargin)))
+		rerr := s.reconcile(rctx, c, cur, token)
+		cancel()
+		again := false
+		err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
+			again = false
+			if err := store.Lock(ctx, tx, c.p.TenantID, id); err != nil {
+				return err
+			}
+			held, err := store.Renew(ctx, tx, c.p.TenantID, id, token, lease)
+			if err != nil {
+				return err
+			}
+			if !held {
+				if err := store.MarkStale(ctx, tx, c.p.TenantID, id); err != nil {
+					return err
+				}
+				again, err = store.Claim(ctx, tx, c.p.TenantID, id, token, actSync, lease)
+				return err
+			}
+			g, _, err := store.StaleGen(ctx, tx, c.p.TenantID, id)
+			if err != nil {
+				return err
+			}
+			if rerr == nil && g == gen {
+				if err := store.MarkSynced(ctx, tx, c.p.TenantID, id, gen); err != nil {
+					return err
+				}
+			}
+			again = rerr == nil && g != gen
+			if !again {
+				_, err = store.Release(ctx, tx, c.p.TenantID, id, token, false)
+			}
+			return err
+		})
+		if err != nil {
+			s.release(ctx, c, id, token)
+			return
+		}
+		if !again {
+			return
+		}
+	}
+	s.release(ctx, c, id, token)
+}
+
+// syncReason: lý do ghi ở cap/forms khi đối soát kỳ native theo sổ đợt.
+const syncReason = "Đồng bộ kỳ điều tra theo sổ đợt (thao tác chồng lấn)"
+
+// reconcile đưa kỳ native của đợt đã phát hành về đúng sổ đợt cur: Đang thu thập → kỳ nhận bài (mở lại nếu đang chốt) với
+// hạn = hạn hiện hành của đợt; Đã đóng → kỳ chốt. Đợt Nháp → không có kỳ native để đối soát. Token ĐANG giữ ý định (settle
+// vừa gia hạn): ảnh kỳ native chụp và revision ghi vào ý định dưới quyền giữ đó, mọi lời gọi ghi là CAS (#201) — kỳ native đổi
+// giữa chừng → forms.period_conflict, không ghi đè; mất ý định giữa chuỗi → dừng trước bước sau.
+func (s *Service) reconcile(ctx context.Context, c caller, cur Campaign, token uuid.UUID) error {
+	if cur.Period == nil || cur.Period.FormsPeriodRef == nil {
+		return nil
+	}
+	n, err := s.begin(ctx, c, cur.Version.CampaignID, token, *cur.Period.FormsPeriodRef)
+	if err != nil {
+		return err
+	}
+	p := n.snap
+	key := "cnts_campaign:sync:" + token.String() + ":" + newID().String()
+	switch cur.State {
+	case domain.StateClosed:
+		if p.Status == periodOpen || p.Status == periodReopened {
+			return n.close(ctx, key+":close")
+		}
+	case domain.StateCollecting:
+		switch p.Status {
+		case periodCancelled:
+			return ErrState.WithDetail("kỳ native của đợt đã bị hủy — không đối soát được")
+		case periodClosed:
+			if err := n.reopen(ctx, syncReason, key+":reopen"); err != nil {
+				return err
+			}
+			if err := n.next(ctx); err != nil {
+				return err
+			}
+			p.DueAt = time.Time{}
+		}
+		if !p.DueAt.Equal(cur.DueAt) {
+			return n.changeDue(ctx, cur.DueAt, syncReason, key+":due")
+		}
+	}
+	return nil
+}
+
+// Trạng thái kỳ native (formsport.PeriodProgress.Status).
+const (
+	periodOpen      = "open"
+	periodClosed    = "closed"
+	periodReopened  = "reopened"
+	periodCancelled = "cancelled"
+)
+
+// release bỏ ý định của token sau lỗi (giao dịch riêng, chạy cả khi yêu cầu đã hủy). Token không còn giữ ý định → không có
+// gì để bỏ. Lỗi bỏ qua: ý định tự hết hạn.
+func (s *Service) release(ctx context.Context, c caller, id, token uuid.UUID) {
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+	defer cancel()
+	_ = s.tx(rctx, c.p.TenantID, func(tx pgx.Tx) error {
+		_, err := store.Release(rctx, tx, c.p.TenantID, id, token, false)
+		return err
+	})
 }
 
 func stateLabel(st string) string {
@@ -89,38 +610,60 @@ func (s *Service) Publish(ctx context.Context, id uuid.UUID, idem string) (Campa
 	if err != nil {
 		return Campaign{}, err
 	}
-	return s.change(ctx, c, id, domain.ActPublished, idem, func(cur Campaign) (store.Event, func(), error) {
+	return s.change(ctx, c, id, domain.ActPublished, idem, func(ctx context.Context, cur Campaign, o *op) (step, error) {
 		v := cur.Version
 		if !v.DueAt.After(s.now()) {
-			return store.Event{}, nil, problem.Validation.WithField("due_at", "hạn nộp đã qua — sửa nháp trước khi phát hành")
+			return step{}, problem.Validation.WithField("due_at", "hạn nộp đã qua — sửa nháp trước khi phát hành")
 		}
-		ref, err := s.Forms.LatestTemplate(ctx, domain.Profile, v.TemplateCode)
+		// #192: đúng phiên bản đã chọn trong Nháp (FN-21 B1), không tự thay bằng phiên bản mới nhất.
+		ref, err := s.template(ctx, v.TemplateCode, v.TemplateVersion)
 		if err != nil {
 			if isNotFound(err) {
-				return store.Event{}, nil, ErrTemplate.WithField("template_code", v.TemplateCode)
+				return step{}, ErrTemplate.WithField("template_code", v.TemplateCode)
 			}
-			return store.Event{}, nil, err
+			return step{}, err
 		}
 		key := domain.PeriodKey(v.CampaignID, v.From)
 		zone := clock.Zone()
 		from := time.Date(v.From.Year(), v.From.Month(), v.From.Day(), 0, 0, 0, 0, zone)
 		to := time.Date(v.To.Year(), v.To.Month(), v.To.Day(), 0, 0, 0, 0, zone)
-		pub, err := s.Forms.PublishBatch(ctx, formsport.BatchInput{Profile: domain.Profile, TemplateID: ref.ID, UnitKind: formsport.UnitCommune,
-			Units: v.Units, Periods: []formsport.PeriodDef{{Label: v.Name, DueAt: v.DueAt, Kind: domain.PeriodKind, Key: key, From: from, To: to,
+		in := formsport.BatchInput{Profile: domain.Profile, TemplateID: ref.ID, UnitKind: formsport.UnitCommune, Units: v.Units}
+		if v.ScopeMode == domain.ScopeHouseholds {
+			// #236: mỗi hộ một việc của cán bộ xã chứa hộ; hộ phải còn Đang dùng lúc phát hành (bị vô hiệu hóa sau khi lưu
+			// nháp → sửa nháp bỏ hộ đó).
+			parents, err := s.activeHouseholds(ctx, c, v.Households)
+			if err != nil {
+				return step{}, err
+			}
+			in.UnitKind, in.Units, in.UnitParents = formsport.UnitHousehold, make([]string, 0, len(v.Households)), parents
+			for _, h := range v.Households {
+				in.Units = append(in.Units, h.String())
+			}
+		}
+		o.publishing = true
+		pub, err := s.Forms.PublishBatch(ctx, formsport.BatchInput{Profile: in.Profile, TemplateID: in.TemplateID, UnitKind: in.UnitKind,
+			Units: in.Units, UnitParents: in.UnitParents, Periods: []formsport.PeriodDef{{Label: v.Name, DueAt: v.DueAt, Kind: domain.PeriodKind, Key: key, From: from, To: to,
 				Rule: domain.PeriodRule}}}, "cnts_campaign:"+v.CampaignID.String())
 		if err != nil {
-			return store.Event{}, nil, err
+			return step{}, err
 		}
 		if len(pub) != 1 {
-			return store.Event{}, nil, problem.Internal.WithDetail("cap/forms trả số kỳ khác 1")
+			return step{}, problem.Internal.WithDetail("cap/forms trả số kỳ khác 1")
 		}
 		pid := pub[0].ID
 		seq, tv, due := v.Seq, ref.Version, v.DueAt
-		undo := func() {
-			_ = s.Control.CancelPeriod(ctx, domain.Profile, pid, "Hủy tự động: ghi phát hành đợt điều tra không thành công",
-				"cnts_campaign:"+v.CampaignID.String()+":compensate")
+		// Bù (wrapUp): chỉ khi mình giữ ý định và đợt vẫn Nháp — khóa idempotent của PublishBatch cố định theo đợt, nên khi
+		// người khác đang giữ đợt (cũng đang phát hành) kỳ native này cũng là của họ: không hủy. #201: hủy bù là CAS — chụp kỳ
+		// native và ghi revision vào ý định (còn giữ) rồi CancelPeriodCAS; kỳ native đổi giữa chừng → không hủy.
+		undo := func(ctx context.Context) {
+			n, err := s.begin(ctx, c, v.CampaignID, o.token, pid)
+			if err != nil {
+				return
+			}
+			_ = n.cancel(ctx, "Hủy tự động: ghi phát hành đợt điều tra không thành công",
+				"cnts_campaign:"+v.CampaignID.String()+":compensate:"+o.token.String())
 		}
-		return store.Event{Version: &seq, FormsPeriodRef: &pid, PeriodKey: &key, TemplateVersion: &tv, DueAt: &due}, undo, nil
+		return step{ev: store.Event{Version: &seq, FormsPeriodRef: &pid, PeriodKey: &key, TemplateVersion: &tv, DueAt: &due}, undo: undo}, nil
 	})
 }
 
@@ -139,14 +682,18 @@ func (s *Service) Extend(ctx context.Context, id uuid.UUID, due time.Time, reaso
 	if !ok {
 		return Campaign{}, problem.Validation.WithField("reason", "bắt buộc, 10–500 ký tự")
 	}
-	return s.change(ctx, c, id, domain.ActExtended, idem, func(cur Campaign) (store.Event, func(), error) {
+	return s.change(ctx, c, id, domain.ActExtended, idem, func(ctx context.Context, cur Campaign, o *op) (step, error) {
 		if !due.After(cur.DueAt) {
-			return store.Event{}, nil, problem.Validation.WithField("due_at", "hạn mới phải sau hạn hiện hành")
+			return step{}, problem.Validation.WithField("due_at", "hạn mới phải sau hạn hiện hành")
 		}
-		if err := s.Control.ChangeDue(ctx, domain.Profile, *cur.Period.FormsPeriodRef, due, why, "cnts_campaign:extend:"+idem); err != nil {
-			return store.Event{}, nil, err
+		if o.n == nil {
+			return step{}, errNoCAS
 		}
-		return store.Event{DueAt: &due, Reason: &why}, nil, nil
+		// Khóa idempotent ở cap/forms theo token ý định: mỗi lần thử là một ý định mới với revision riêng (CAS chặn ghi lặp).
+		if err := o.n.changeDue(ctx, due, why, "cnts_campaign:extend:"+o.token.String()); err != nil {
+			return step{}, err
+		}
+		return step{ev: store.Event{DueAt: &due, Reason: &why}}, nil
 	})
 }
 
@@ -156,11 +703,18 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, idem string) (Campaig
 	if err != nil {
 		return Campaign{}, err
 	}
-	return s.change(ctx, c, id, domain.ActClosed, idem, func(cur Campaign) (store.Event, func(), error) {
-		if err := s.Control.ClosePeriod(ctx, domain.Profile, *cur.Period.FormsPeriodRef, "cnts_campaign:close:"+idem); err != nil {
-			return store.Event{}, nil, err
+	return s.change(ctx, c, id, domain.ActClosed, idem, func(ctx context.Context, cur Campaign, o *op) (step, error) {
+		if o.n == nil {
+			return step{}, errNoCAS
 		}
-		return store.Event{}, nil, nil
+		// Kỳ native đã chốt (ảnh chụp dưới quyền giữ ý định — lần thử trước không rõ kết quả đã chốt): đúng kết quả cần ghi.
+		if o.n.snap.Status == periodClosed {
+			return step{}, nil
+		}
+		if err := o.n.close(ctx, "cnts_campaign:close:"+o.token.String()); err != nil {
+			return step{}, err
+		}
+		return step{}, nil
 	})
 }
 
@@ -173,10 +727,6 @@ func (s *Service) Reopen(ctx context.Context, id uuid.UUID, until time.Time, rea
 	if !c.k.Can(extport.SessionPowerReopenPeriod) {
 		return Campaign{}, errNotLeader
 	}
-	ro, ok := s.Control.(Reopener)
-	if !ok {
-		return Campaign{}, ErrDependency.WithDetail("cap/forms chưa có thao tác mở lại kỳ cho module nghiệp vụ")
-	}
 	why, ok := domain.Reason(reason)
 	if !ok {
 		return Campaign{}, problem.Validation.WithField("reason", "bắt buộc, 10–500 ký tự")
@@ -184,30 +734,44 @@ func (s *Service) Reopen(ctx context.Context, id uuid.UUID, until time.Time, rea
 	if !until.After(s.now()) {
 		return Campaign{}, problem.Validation.WithField("due_at", "thời hạn mở lại phải sau hiện tại")
 	}
-	return s.change(ctx, c, id, domain.ActReopened, idem, func(cur Campaign) (store.Event, func(), error) {
-		pid := *cur.Period.FormsPeriodRef
-		if err := ro.ReopenPeriod(ctx, domain.Profile, pid, why, "cnts_campaign:reopen:"+idem); err != nil {
-			return store.Event{}, nil, err
+	return s.change(ctx, c, id, domain.ActReopened, idem, func(ctx context.Context, cur Campaign, o *op) (step, error) {
+		n := o.n
+		if n == nil {
+			return step{}, errNoCAS
 		}
-		if err := s.Control.ChangeDue(ctx, domain.Profile, pid, until, why, "cnts_campaign:reopen-due:"+idem); err != nil {
-			return store.Event{}, nil, err
+		switch n.snap.Status {
+		case periodCancelled:
+			return step{}, ErrState.WithDetail("kỳ native của đợt đã bị hủy — không mở lại được")
+		case periodClosed:
+			if err := n.reopen(ctx, why, "cnts_campaign:reopen:"+o.token.String()); err != nil {
+				return step{}, err
+			}
+			// Chuỗi Reopen → ChangeDue: ghi revision áp dụng của bước mở lại vào ý định (còn giữ) trước khi đổi hạn.
+			if err := n.next(ctx); err != nil {
+				return step{}, err
+			}
 		}
-		return store.Event{DueAt: &until, Reason: &why}, nil, nil
+		// Kỳ native đang nhận bài (lần thử trước không rõ kết quả đã mở lại): chỉ đổi hạn.
+		if err := n.changeDue(ctx, until, why, "cnts_campaign:reopen-due:"+o.token.String()); err != nil {
+			return step{}, err
+		}
+		return step{ev: store.Event{DueAt: &until, Reason: &why}}, nil
 	})
 }
 
 // Remind "Nhắc xã chưa nộp" (B4): một thông báo cho cán bộ xã của mỗi xã chưa gửi (sự kiện nhắc nộp biểu CNTS — pf/notify
-// gửi tới cán bộ xã của xã khi không có người nhận cụ thể).
+// gửi tới cán bộ xã của xã khi không có người nhận cụ thể). Tiến độ đọc MỘT lần ngoài giao dịch; sự kiện "reminded" và các
+// sự kiện nhắc (outbox) ghi cùng giao dịch theo đúng ảnh tiến độ đó.
 func (s *Service) Remind(ctx context.Context, id uuid.UUID, idem string) (Campaign, int, error) {
 	c, err := s.writer(ctx)
 	if err != nil {
 		return Campaign{}, 0, err
 	}
 	n := 0
-	out, err := s.change(ctx, c, id, domain.ActReminded, idem, func(cur Campaign) (store.Event, func(), error) {
+	out, err := s.change(ctx, c, id, domain.ActReminded, idem, func(ctx context.Context, cur Campaign, _ *op) (step, error) {
 		p, err := s.Control.Progress(ctx, domain.Profile, *cur.Period.FormsPeriodRef)
 		if err != nil {
-			return store.Event{}, nil, err
+			return step{}, err
 		}
 		for _, u := range p.Units {
 			if pending(u) {
@@ -215,9 +779,12 @@ func (s *Service) Remind(ctx context.Context, id uuid.UUID, idem string) (Campai
 			}
 		}
 		if n == 0 {
-			return store.Event{}, nil, problem.Validation.WithDetail("mọi xã đã gửi — không có xã cần nhắc")
+			return step{}, problem.Validation.WithDetail("mọi xã đã gửi — không có xã cần nhắc")
 		}
-		return store.Event{Reminded: &n}, nil, nil
+		emit := func(ctx context.Context, tx pgx.Tx, at time.Time) error {
+			return s.emitReminders(ctx, tx, c, cur, p, at)
+		}
+		return step{ev: store.Event{Reminded: &n}, emit: emit}, nil
 	})
 	return out, n, err
 }
@@ -226,12 +793,8 @@ func pending(u formsport.UnitProgress) bool {
 	return u.Versions == 0 && (u.Status == "not_submitted" || u.Status == "overdue")
 }
 
-// emitReminders ghi sự kiện nhắc nộp (outbox, cùng giao dịch với sự kiện reminded của đợt).
-func (s *Service) emitReminders(ctx context.Context, tx pgx.Tx, c caller, cur Campaign, now time.Time) error {
-	p, err := s.Control.Progress(ctx, domain.Profile, *cur.Period.FormsPeriodRef)
-	if err != nil {
-		return err
-	}
+// emitReminders ghi sự kiện nhắc nộp (outbox, cùng giao dịch với sự kiện reminded của đợt) theo tiến độ p đã đọc.
+func (s *Service) emitReminders(ctx context.Context, tx pgx.Tx, c caller, cur Campaign, p formsport.PeriodProgress, now time.Time) error {
 	slot := extport.CNTSReminderBefore
 	if !now.Before(cur.DueAt) {
 		slot = extport.CNTSReminderOverdue

@@ -5,6 +5,7 @@
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { ADMIN_UNITS, CATALOGS } from "./data";
+import { xlsxOf } from "./kn-cnts-cal-xlsx";
 import { json, problem, validation, type Ctx, type Route } from "./http";
 
 // Như máy chủ (cntsmodel/domain): kinh phí số nguyên không âm; quy mô số dương (BF-SWEEP-CNTS: web chặn trước, mock chặn lại).
@@ -145,6 +146,34 @@ function seed() {
     status_reason: null, ...sys }]);
 }
 
+/** Hộ mô hình cho lịch tiêm BM-07 (BF-CN-VACC): điểm, dự án, cán bộ theo dõi điểm, nhãn chủ hộ che bớt. */
+export function modelHouseholdInfo(ref: string): (S["CNTSVaccinationModel"] & { commune_code: string; model_type_code: string }) | null {
+  seed();
+  const h = last(HOUSEHOLDS, ref);
+  const s = h ? last(SITES, h.site_ref) : undefined;
+  const p = s ? last(PROJECTS, s.project_ref) : undefined;
+  if (!h || !s || !p) return null;
+  return {
+    household_ref: h.ref, owner_label: OWNERS.get(h.person_ref)?.label ?? null, site_ref: s.ref, site_name: s.name, project_ref: p.ref, project_code: p.code,
+    project_name: p.name, officer_ref: s.officer_ref, officer_display: s.officer_ref ? NAMES[s.officer_ref] ?? null : null,
+    active: h.event !== "withdrawn" && s.event !== "closed" && p.event !== "closed", commune_code: h.commune_code, model_type_code: s.model_type_code,
+  };
+}
+
+/** Dự án (bản hiện hành), điểm và số hộ đang tham gia — cho giả lập mẫu biểu KNQG (W11.53). null = không có dự án. */
+export function cntsMockProjectInfo(ref: string) {
+  seed();
+  const p = last(PROJECTS, ref);
+  if (!p) return null;
+  const sites = [...SITES.values()].map((v) => v.at(-1)!).filter((s) => s.project_ref === ref).map((s) => ({
+    ref: s.ref, name: s.name, commune_code: s.commune_code, closed: s.event === "closed",
+    scale: s.scale ? `${s.scale} ${s.scale_unit}` : "",
+    households: [...HOUSEHOLDS.values()].map((v) => v.at(-1)!).filter((h) => h.site_ref === s.ref && h.event !== "withdrawn")
+      .map((h) => ({ label: OWNERS.get(h.person_ref)?.label ?? "", scale: h.scale ? `${h.scale} ${h.scale_unit}` : "" })),
+  }));
+  return { project: p, manager: NAMES[p.manager_ref] ?? "", sites };
+}
+
 function parsePoint(b: { location?: S["CNTSPoint"] | null }) {
   const l = b.location;
   if (!l) return null;
@@ -152,6 +181,36 @@ function parsePoint(b: { location?: S["CNTSPoint"] | null }) {
 }
 
 export const cntsModelRoutes: Route[] = [
+  // W11.53c: nạp Excel điểm, hộ. Giả lập chỉ trả tệp mẫu tối giản (sheet điểm); đọc tệp Excel thật (nén deflate) cần máy
+  // chủ thật — xem trước/ghi trả 422 như tệp không đọc được.
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/projects\/([^/]+)\/import-template$/,
+    handler: (ctx) => {
+      seed();
+      const p = last(PROJECTS, ctx.params[0]!);
+      if (!p) return problem(404, "extension.cnts_project_not_found", "Không có chương trình, dự án");
+      if (!editProject(who(ctx), p)) return problem(403, "forbidden", "chỉ chủ nhiệm của dự án, lãnh đạo phòng hoặc Admin nạp điểm, hộ");
+      const head = ["Mã điểm (*)", "Tên điểm (*)", "Mã xã (*)", "Mã loại mô hình (*)", "Quy mô", "Đơn vị quy mô", "Mẫu nhật ký", "Cán bộ theo dõi", "Ghi chú"];
+      const bytes = xlsxOf("Điểm trình diễn", [head], []);
+      return new Response(new Blob([bytes as BlobPart]), { status: 200, headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } });
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/projects\/([^/]+)\/import(?:\/preview)?$/,
+    handler: (ctx) => {
+      seed();
+      const p = last(PROJECTS, ctx.params[0]!);
+      if (!p) return problem(404, "extension.cnts_project_not_found", "Không có chương trình, dự án");
+      if (!editProject(who(ctx), p)) return problem(403, "forbidden", "chỉ chủ nhiệm của dự án, lãnh đạo phòng hoặc Admin nạp điểm, hộ");
+      if (p.event === "closed") return problem(409, "extension.cnts_project_closed", "Dự án đã kết thúc — mở lại trước khi sửa");
+      return problem(422, "extension.cnts_import_invalid", "Tệp nạp điểm trình diễn, hộ tham gia không hợp lệ", {
+        detail: "Bản giả lập không đọc tệp Excel — dùng máy chủ thật",
+        issues: [],
+      });
+    },
+  },
   {
     method: "GET",
     pattern: /^\/v1\/extension\/cnts\/projects$/,
@@ -439,5 +498,6 @@ export function cntsMockHousehold(ctx: Ctx, ref: string) {
     keeper: !w.readOnly && (w.role === "admin" || w.role === "kn_xa") && h.event !== "withdrawn",
     reviewer: !w.readOnly && (w.role === "admin" || (w.role === "kn_tinh" && ["", "chu_nhiem", "lanh_dao_phong"].includes(w.group))),
     point: POINTS.get(h.ref) ?? POINTS.get(site.ref) ?? null,
+    officer_display: site.officer_ref ? NAMES[site.officer_ref] ?? null : null,
   };
 }

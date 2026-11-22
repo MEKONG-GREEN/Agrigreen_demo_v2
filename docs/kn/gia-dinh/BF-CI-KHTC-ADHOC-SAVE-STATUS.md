@@ -1,0 +1,9 @@
+## BF-CI-KHTC-ADHOC-SAVE-STATUS — Xác nhận lưu theo vòng đời báo cáo
+
+Phạm vi #232: giữ phản hồi **Đã lưu bản soạn** sau khi POST thành công và GET tải lại phiên bản. Không thay API, quyền phía server, dữ liệu nguồn, công thức, Word hoặc trình soạn toàn văn. BRD KHTC v2.3 ngày08/10/2026 (SHA25615859351f90574bf667190b1a12160465ba03f8ca9e408b94c90d285a3502e25), P318/P336 là ngữ cảnh bảo toàn nội dung đã soạn; gói này không tuyên bố hoàn tất BR-DL-19 hay UAT.
+
+`useAction` thuộc resource của kỳ đã chọn, nằm ngoài LoadState và editor key theo version/final. Vì vậy xác nhận POST vẫn hiện sau version reload; nếu POST đã được nhận nhưng GET sau đó lỗi, UI giữ xác nhận cùng lỗi đọc, không giả GET thành công. LoadState hiện giữ children khi đang loading; không coi loading-only là nguyên nhân unmount. Key version/final vẫn giữ nguyên để reset dirty/admin/text đúng khi có dữ liệu canonical mới.
+
+Workspace danh sách, lựa chọn, adapters và detail có vòng đời theo API object và dữ kiện quyền hiện có: trạng thái, subject/tenant/org/MFA/roles/scope, context/assignment/vai/phòng/phạm vi và support binding. Đổi vòng đời hủy owner cũ; ACK muộn của A→B→A chỉ chạm component đã unmount, không xóa nháp hoặc hiện success ở owner mới. Nhãn hiển thị/menu/badge/lý do hỗ trợ không phải identity. API WeakMap chỉ giữ weak keys; không serialize methods/tokens hoặc ghi identity ra log. Đây là ranh giới dữ liệu client, không cấp quyền và không thay kiểm tra server.
+
+409/422 giữ nhập liệu và trạng thái chưa lưu, không hiện success giả. Không thêm ô số: hostile numeric probes không áp dụng. Không đổi shared common/Auth/mock/E2E assertion, timeout/retry, Forms/HTX, migration hoặc baseline. Bằng chứng unit/business RED/mutation/control, native PG, full web/E2E và exact CI giữ trong packet review; không suy PASS từ compile hoặc job cũ. Việc triển khai vẫn cần Claude review và ticket merge.

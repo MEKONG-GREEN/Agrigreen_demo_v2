@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	extport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
+	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
@@ -57,8 +58,10 @@ type reportFx struct {
 	src *goldenReader
 }
 
-func newReportFx(t *testing.T) *reportFx {
-	f := newKHTCFormFx(t)
+func newReportFx(t *testing.T) *reportFx { return newReportFxWith(t, nil) }
+
+func newReportFxWith(t *testing.T, wrapControl func(formsport.PeriodControl) formsport.PeriodControl) *reportFx {
+	f := newKHTCFormFxWith(t, wrapControl)
 	f.planBody["base_version"] = 1
 	f.planBody["decision_no"] = "02/QD-KH"
 	f.planBody["decision_date"] = "2026-01-01"

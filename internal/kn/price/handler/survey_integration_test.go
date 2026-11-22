@@ -21,6 +21,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/db"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/dbadmin"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
@@ -40,7 +41,7 @@ type surveyEnv struct {
 	items map[string]string // tên hiển thị → mã
 }
 
-func newSurveyEnv(t *testing.T) *surveyEnv {
+func newSurveyEnv(t *testing.T, replay ...bool) *surveyEnv {
 	t.Helper()
 	env := pgtest.Get(t)
 	clk := clock.NewFixed(time.Date(2026, 7, 20, 1, 0, 0, 0, time.UTC)) // Thứ Hai 20/07/2026 08:00 giờ VN
@@ -64,7 +65,7 @@ func newSurveyEnv(t *testing.T) *surveyEnv {
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(func(c *gin.Context) {
+	authenticate := func(c *gin.Context) {
 		if p, ok := who[c.GetHeader("X-Test-As")]; ok {
 			c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), bindTestSession(t, p)))
 		}
@@ -72,7 +73,8 @@ func newSurveyEnv(t *testing.T) *surveyEnv {
 		for _, err := range c.Errors {
 			t.Logf("lỗi 5xx %s: %v", c.Request.URL.Path, err.Err)
 		}
-	})
+	}
+	r.Use(authenticate)
 	g := r.Group("/v1")
 	Handler{Svc: svc}.RegisterApp(g)
 	PointHandler{Svc: svc}.RegisterApp(g)
@@ -100,6 +102,17 @@ func newSurveyEnv(t *testing.T) *surveyEnv {
 	} {
 		w := e.call("tinh", http.MethodPost, "/v1/price/items", it, http.StatusCreated)
 		e.items[fmt.Sprint(it["name"], " ", it["variety"])] = fmt.Sprint(w["code"])
+	}
+	if len(replay) > 0 && replay[0] {
+		// Seed xong mới bật middleware thật, tránh thay hợp đồng các fixture cũ.
+		r = gin.New()
+		r.Use(authenticate, idempotency.Middleware(env.Pool(t, migrations.PF, "platform_api")))
+		g = r.Group("/v1")
+		Handler{Svc: svc}.RegisterApp(g)
+		PointHandler{Svc: svc}.RegisterApp(g)
+		ItemHandler{Svc: items}.RegisterApp(g)
+		SurveyHandler{Svc: survey}.RegisterApp(g)
+		e.r = r
 	}
 	return e
 }

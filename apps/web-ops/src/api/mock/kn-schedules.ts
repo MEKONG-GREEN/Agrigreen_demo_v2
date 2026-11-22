@@ -97,6 +97,10 @@ const KN_COOP_NAMES: readonly [string, string][] = [
   ["91306", "HTX Núi Sam"],
 ];
 
+/** Mã hồ sơ KN loại HTX (mock /v1/kn/producer-records) liên kết HTX thứ i của KN_COOPS — Lịch công tác chọn HTX từ hồ sơ KN (#271). */
+export const knCoopRecordRef = (i: number): string => `01927b3e-0000-7000-8000-0000000e${String(i + 1).padStart(4, "0")}`;
+const knCoopRecordName = (ref: string | null | undefined): string | undefined => KN_COOP_NAMES.find((_, i) => knCoopRecordRef(i) === ref)?.[1];
+
 export const KN_COOPS: readonly Cooperative[] = KN_COOP_NAMES.map(([code, name], i) => {
   const base = COOPERATIVES[0]!.api;
   return {
@@ -790,7 +794,7 @@ export class WorkScheduleStore {
         SESSION_LABEL[it.session],
         [it.start_time, it.end_time].filter(Boolean).join("–"),
         it.content,
-        [communeName(it.commune_code), KN_COOPS.find((x) => x.ref === it.cooperative_ref)?.name, it.location].filter(Boolean).join(" · "),
+        [communeName(it.commune_code), knCoopRecordName(it.cooperative_ref), it.location].filter(Boolean).join(" · "),
         it.participants ?? "",
         it.conflict ? "Trùng giờ" : "",
       ]),
@@ -877,7 +881,7 @@ export function seedWorkSchedules(store: WorkScheduleStore): void {
   const thu = roster("thu");
   const binh = roster("binh");
   const mai = roster("mai");
-  const coop = (name: string) => KN_COOPS.find((c) => c.name === name)!.ref;
+  const coop = (name: string) => knCoopRecordRef(KN_COOP_NAMES.findIndex(([, n]) => n === name));
   const daysSinceMonday = (now - vnMidnight(cur)) / 3_600_000;
   const before = (h: number) => daysSinceMonday + h; // giờ trước 00:00 Thứ Hai tuần này
 

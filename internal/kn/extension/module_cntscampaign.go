@@ -5,20 +5,25 @@ package extension
 // cap/forms → 503 extension.dependency_unavailable. Gốc lắp ráp gọi UseCNTSCampaigns sau khi dựng pf/forms.
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 
 	campapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscampaign/app"
 	camphandler "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntscampaign/handler"
+	accport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/accounts/port"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 )
 
 // CNTSCampaignDeps là port của module khác cho chiến dịch điều tra. Forms, Control bắt buộc; Figures cho bảng kết quả.
-// Control cài thêm cntscampaign/app.Reopener (pf/forms app.Control) thì "Mở lại đợt" dùng được.
+// Conditional (#159 pf/forms Module.ConditionalControl) bắt buộc cho mọi thao tác ghi kỳ native (phát hành, gia hạn, đóng,
+// mở lại, đối soát — #201): thiếu → các thao tác đó trả 503, không quay về lời gọi vô điều kiện của Control.
 type CNTSCampaignDeps struct {
-	Forms   formsport.Publisher
-	Control formsport.PeriodControl
-	Figures formsport.FiguresReader
+	Forms       formsport.Publisher
+	Control     formsport.PeriodControl
+	Conditional formsport.ConditionalPeriodControl
+	Figures     formsport.FiguresReader
 }
 
 // campaignService là use case chiến dịch điều tra (trường Module.campaigns).
@@ -28,8 +33,9 @@ type campaignService = campapp.Service
 func (m *Module) campaignSvc() *campapp.Service {
 	if m.campaigns == nil {
 		m.campaigns = &campapp.Service{DB: m.svc.DB, Clock: m.svc.Clock, Orgs: m.rc.Orgs, Units: m.rc.Units,
-			Regions: func() partyport.Regions { return m.rc.Regions },
-			Names:   func() partyport.ActorNames { return m.rc.Names }}
+			Regions:  func() partyport.Regions { return m.rc.Regions },
+			Names:    func() partyport.ActorNames { return m.rc.Names },
+			Officers: func() accport.KNDirectory { return m.svc.KNDirectory }}
 	}
 	return m.campaigns
 }
@@ -42,8 +48,15 @@ func (m *Module) registerCNTSCampaigns(rg *gin.RouterGroup) {
 // UseCNTSCampaigns nối cap/forms cho chiến dịch điều tra.
 func (m *Module) UseCNTSCampaigns(d CNTSCampaignDeps) {
 	s := m.campaignSvc()
-	s.Forms, s.Control = d.Forms, d.Control
+	s.Forms, s.Control, s.Cond = d.Forms, d.Control, d.Conditional
+	// BF-CN-PUBLISH (#108): cùng cổng tiến độ kỳ native cho nháp của biểu kỳ CNTS và nút Nhắc của màn theo dõi (gốc lắp
+	// ráp chỉ gọi UseCNTSCampaigns — không thêm lời gọi nối mới ngoài làn KN).
+	m.rc.FormsControl = d.Control
+	m.alert.Control = d.Control
 	if d.Figures != nil {
 		s.Figures = d.Figures
 	}
 }
+
+// UseCNTSCampaignLease đặt hạn ý định thao tác của đợt (BF-CNTS-CAMPAIGN-POOL, #156; 0 → mặc định 2 phút) — cho kiểm thử.
+func (m *Module) UseCNTSCampaignLease(d time.Duration) { m.campaignSvc().Lease = d }

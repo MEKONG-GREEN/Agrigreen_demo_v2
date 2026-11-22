@@ -71,6 +71,10 @@ type SessionContext struct {
 	// ViewOnly: ngữ cảnh chỉ xem — Lãnh đạo đơn vị xem phòng ban ngoài lần gán (BR-04 HCTH, Q-059), nhóm
 	// "Ban Giám đốc". Middleware pf/accounts chặn mọi thao tác ghi; module dùng ReadOnly().
 	ViewOnly bool
+	// CNTSGrant (#71, FN-14): phạm vi quyền CNTS hiện hành (sổ cnts_grant) của người được cấp trong phiên Cấp Xã phòng
+	// CNTS, do chủ KN chiếu ở server mỗi request. nil = người này chưa từng có quyền chạm xã của phiên → giữ hành vi
+	// W11.07; khác nil là phạm vi TƯỜNG MINH (rỗng = chặn). Chỉ thu hẹp, không mở rộng Scope/vai/nhiệm vụ.
+	CNTSGrant *CNTSGrantScope `json:",omitempty"`
 }
 
 // AllowsDepartment cho biết dữ liệu của phòng ban code thuộc ngữ cảnh: Admin (không ở chế độ hỗ trợ)

@@ -100,6 +100,9 @@ type Service struct {
 	Catalogs mdport.Catalogs         // tùy chọn: giống lúa, vụ, máy (thiếu → chỉ kiểm dạng mã)
 	Farmers  port.FarmerHouseholds   // liên kết tài khoản ↔ nông hộ; thiếu → vai farmer nhận 503
 	GpsLog   geoport.GpsLog          // log GPS của pf/geo (consumer port.GpsLogConsumer); thiếu → consumer lỗi, giao lại
+	// Members, Units: HTX/xã hiện tại của nông hộ và tỉnh của xã cho yêu cầu hỗ trợ (#313); thiếu → gửi yêu cầu nhận 503.
+	Members HouseholdMemberships
+	Units   partyport.AdminUnits
 	// Sharing (ADR-0020): cấp quyền chia sẻ + sổ đọc của bề mặt đối tác (pf/party); thiếu → 403.
 	Sharing partyport.PartnerAccess
 	Log     *slog.Logger

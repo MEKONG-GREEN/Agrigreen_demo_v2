@@ -1,0 +1,17 @@
+## KHTC-DASHBOARD-PENDING-INBOX — hộp phiếu thường niên chờ rà soát
+
+### Phạm vi và nguồn
+
+BRD KHTC v2.3, DOCX SHA25615859351F90574BF667190B1A12160465BA03F8CA9E408B94C90D285A3502E25, P742–774 và886–920. Lát #243 thêm danh sách phiếu thường niên đã gửi chờ rà soát, menu và mở màn rà soát hiện hữu. Mỗi trang đọc25 kỳ KHTC chưa đóng/hủy bằng keyset, không giới hạn năm; trang rỗng vẫn giữ con trỏ nếu còn kỳ. Đây là một phần FN-TI-02.01/FN-TI-02.04; chưa UAT/G1.
+
+### Quyền và dữ liệu
+
+Giữ reader KHTC/Admin hiện hữu và quyền native hiện tại; TW không được cấp quyền đọc phiếu qua route này. Không giả vai hoặc đổi context để đọc. Native Progress bằng public port ngoài TX KN; kiểm ID/profile/status, latest submission UUID/version/time, decision và unit trong phòng được giao. Lỗi đọc/quyền hoặc dữ kiện không nhất quán trả lỗi, không trả số0 hoặc trang rỗng giả. Không đọc nháp, bảng niêm phong, Plan hoặc ý định mutation241 để suy đã gửi; không sửa dữ liệu hay gọi API ghi trong GET. Phiếu chấp nhận/trả lại hoặc kỳ đóng/hủy không thuộc hàng chờ; lần gửi lại dùng đúng native identity mới. Hiện giữ nguyên cách chiếu lần gửi cuối/Q-081 của dev, không tự sửa policy khi thêm danh sách.
+
+### Giao diện
+
+Trang riêng dùng PageHeader/DataTable có STT, menu chính thức và liên kết tới reviewer hiện hữu theo kỳ/phòng. Hiển thị lần gửi/thời điểm đã ghi; quyền và phiên bản được đọc lại khi mở chi tiết. Đổi tenant/actor/context/role/MFA/assignment/support/scope/client hoặc route loại dữ liệu cũ; hết phiên xóa kết quả; lỗi không giả thành không có phiếu. Nút Làm mới đọc lại; chưa tuyên bố live push/refresh tức thì. Mock dùng chung metadata submission với reader hiện hữu; dữ liệu demo không phải chứng cứ ghi DB sản xuất.
+
+### Phần còn lại
+
+Child chính thức [#245](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/245): badge toàn cục và public batch/count theo quyền hiện tại; hộp phiếu phát sinh; bộ lọc kỳ/phòng/cảnh báo; quyền lãnh đạo/BGĐ từ context gốc; nhắc phòng/audit/outbox; live TW; lĩnh vực/bảng/thẻ/trạng thái còn thiếu. Không dùng kích thước trang làm badge, poll toàn lịch sử bằng N Progress hoặc tăng budget. Không thay #211 control/receipt, #225 workspace, #242/#244 history/report hoặc #240 quyết định PO. Không thêm số nhập hay migration.

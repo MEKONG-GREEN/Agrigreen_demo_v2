@@ -4,6 +4,7 @@ package htxread
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -131,4 +132,32 @@ func (r *Reader) confirmations(ctx context.Context, refs []uuid.UUID, cutoff *ti
 		return nil, err
 	}
 	return out, nil
+}
+
+var _ port.PlotDirectory = (*Reader)(nil)
+
+// PlotLocation đọc xã/HTX/trạng thái của một thửa từ publication; RLS của người gọi ẩn thửa ngoài phạm vi.
+func (r *Reader) PlotLocation(ctx context.Context, plotRef uuid.UUID) (port.PlotLocation, bool, error) {
+	var out port.PlotLocation
+	found := false
+	err := r.read(ctx, func(tx pgx.Tx) error {
+		var coop *uuid.UUID
+		e := tx.QueryRow(ctx, `SELECT plot_ref,commune_code,cooperative_ref,status
+    FROM pf_cooperative_pub.v1_plots WHERE plot_ref=$1::uuid`, plotRef).Scan(&out.PlotRef, &out.CommuneCode, &coop, &out.Status)
+		if errors.Is(e, pgx.ErrNoRows) {
+			return nil
+		}
+		if e != nil {
+			return e
+		}
+		if coop != nil {
+			out.CooperativeRef = *coop
+		}
+		found = true
+		return nil
+	})
+	if err != nil {
+		return port.PlotLocation{}, false, err
+	}
+	return out, found, nil
 }

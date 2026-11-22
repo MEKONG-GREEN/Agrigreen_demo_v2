@@ -1,0 +1,1 @@
+- [x] BF-SWEEP-PRICE-FORMS (lát Xã báo giá): points/region/officer list-route-detail, UI-KIT/validateForm/Log xã từ ledger versions, URL filters và current-session guards; API/quyền/idempotency giữ nguyên. Items/tickets/reports/surveys và Log nhóm vùng/Excel xã chưa hoàn tất, tiếp #198. Chưa coi toàn Báo giá/UAT đạt; bằng chứng đúngSHA tại #182, Claude review trước merge.

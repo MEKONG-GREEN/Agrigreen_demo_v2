@@ -259,14 +259,15 @@ func snapshot(a port.Assignment) []byte {
 // writeAsg ghi sổ + bảng chiếu + outbox trong một giao dịch. mutate nhận trạng thái hiện hành (nil khi
 // gán mới) và trả trạng thái mới. Trùng idem_key → trả bản đã ghi.
 func (s *Service) writeAsg(ctx context.Context, tid, actorRef uuid.UUID, key, action string, reason *string, id uuid.UUID,
-	mutate func(tx pgx.Tx, cur *port.Assignment) (port.Assignment, error)) (AssignmentResult, error) {
+	same func(*store.AsgEvent) bool, mutate func(tx pgx.Tx, cur *port.Assignment) (port.Assignment, error)) (AssignmentResult, error) {
 	var res AssignmentResult
 	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
 		if prev, err := store.AsgEventByIdem(ctx, tx, key); err != nil || prev != nil {
 			if err != nil {
 				return err
 			}
-			if id != uuid.Nil && prev.A.ID != id {
+			// #154: bản đã ghi (request song song) chỉ được trả lại khi cùng thao tác, người gọi, lần gán và nội dung.
+			if prev.Action != action || prev.ActorRef != actorRef || (id != uuid.Nil && prev.A.ID != id) || (same != nil && !same(prev)) {
 				return problem.IdempotencyConflict
 			}
 			cur, err := store.AssignmentByID(ctx, tx, prev.A.ID, false)
@@ -319,7 +320,7 @@ func (s *Service) writeAsg(ctx context.Context, tid, actorRef uuid.UUID, key, ac
 		return nil
 	})
 	if errors.Is(err, ledger.ErrDuplicate) {
-		return s.writeAsg(ctx, tid, actorRef, key, action, reason, id, mutate) // bên thua của hai request song song đọc lại
+		return s.writeAsg(ctx, tid, actorRef, key, action, reason, id, same, mutate) // bên thua của hai request song song đọc lại
 	}
 	return res, err
 }
@@ -373,7 +374,7 @@ func (s *Service) GrantAssignment(ctx context.Context, user uuid.UUID, in domain
 		return AssignmentResult{}, err
 	}
 	key := "asg:grant:" + idem
-	if prev, err := s.asgReplay(ctx, a.p.TenantID, key); err != nil || prev != nil {
+	if prev, err := s.asgReplay(ctx, a, key, domain.AsgGranted, user, uuid.Nil, s.sameAsgInput(in, reason)); err != nil || prev != nil {
 		return derefAsg(prev), err
 	}
 	t, err := s.knTarget(ctx, a, user)
@@ -395,7 +396,7 @@ func (s *Service) GrantAssignment(ctx context.Context, user uuid.UUID, in domain
 		}
 		vaultGranted = !had
 	}
-	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgGranted, optStr(reason), uuid.Nil,
+	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgGranted, optStr(reason), uuid.Nil, s.sameAsgInput(in, reason),
 		func(tx pgx.Tx, _ *port.Assignment) (port.Assignment, error) {
 			if err := noDuplicate(ctx, tx, user, c.in, uuid.Nil); err != nil {
 				return port.Assignment{}, err
@@ -427,12 +428,20 @@ func optStr(s string) *string {
 	return &s
 }
 
-func (s *Service) asgReplay(ctx context.Context, tid uuid.UUID, key string) (*AssignmentResult, error) {
+// asgReplay phát lại theo sổ gán vai trò. Như replayFor (#154): khóa phải cùng thao tác, người gọi, tài khoản
+// (và lần gán khi id khác Nil) và cùng nội dung yêu cầu (same, xem sameAsgInput/sameReason) — khác thì 422;
+// tài khoản phải còn trong phạm vi hiện hành của người gọi.
+func (s *Service) asgReplay(ctx context.Context, a *actor, key, action string, user, id uuid.UUID,
+	same func(*store.AsgEvent) bool) (*AssignmentResult, error) {
 	var out *AssignmentResult
-	err := tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error {
+	err := tenant.WithTenantTx(ctx, s.DB, a.p.TenantID, func(tx pgx.Tx) error {
 		prev, err := store.AsgEventByIdem(ctx, tx, key)
 		if err != nil || prev == nil {
 			return err
+		}
+		if prev.Action != action || prev.ActorRef != a.p.ActorRef || prev.A.UserRef != user || (id != uuid.Nil && prev.A.ID != id) ||
+			!same(prev) {
+			return problem.IdempotencyConflict
 		}
 		cur, err := store.AssignmentByID(ctx, tx, prev.A.ID, false)
 		if err != nil || cur == nil {
@@ -441,7 +450,41 @@ func (s *Service) asgReplay(ctx context.Context, tid uuid.UUID, key string) (*As
 		out = &AssignmentResult{Assignment: *cur, Seq: prev.Seq, Replayed: true}
 		return nil
 	})
-	return out, err
+	if err != nil || out == nil {
+		return nil, err
+	}
+	if _, err := s.target(ctx, a, user); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// sameAsgInput: yêu cầu gán/sửa vai trò (chuẩn hóa như lúc ghi) trùng trạng thái SAU của dòng sổ prev, cùng lý do.
+// valid_from vắng → lấy theo bản đã ghi (lúc ghi nó là thời điểm gọi, hoặc giữ hiệu lực cũ khi sửa). Không chuẩn
+// hóa được → coi là khác (đóng khi lỗi).
+func (s *Service) sameAsgInput(in domain.AssignmentInput, reason string) func(*store.AsgEvent) bool {
+	return func(prev *store.AsgEvent) bool {
+		n, err := s.normalizeAssignment(in, prev.A.ValidFrom)
+		if err != nil || !sameReason(prev.Reason, reason) {
+			return false
+		}
+		p := prev.A
+		return n.Role == p.Role && n.OrgRef == p.OrgRef && n.MgmtLevel == p.MgmtLevel && sameSet(n.Departments, p.Departments) &&
+			sameSet(n.Communes, p.Communes) && n.ValidFrom.Equal(p.ValidFrom) &&
+			((n.ValidTo == nil && p.ValidTo == nil) || (n.ValidTo != nil && p.ValidTo != nil && n.ValidTo.Equal(*p.ValidTo)))
+	}
+}
+
+// sameRevoke: thu hồi chỉ mang lý do.
+func sameRevoke(reason string) func(*store.AsgEvent) bool {
+	return func(prev *store.AsgEvent) bool { return sameReason(prev.Reason, reason) }
+}
+
+func sameSet(a, b []string) bool {
+	x, y := slices.Clone(a), slices.Clone(b)
+	slices.Sort(x)
+	slices.Sort(y)
+	return slices.Equal(slices.Compact(x), slices.Compact(y))
 }
 
 func derefAsg(r *AssignmentResult) AssignmentResult {
@@ -461,7 +504,7 @@ func (s *Service) ChangeAssignment(ctx context.Context, user, id uuid.UUID, in d
 		return AssignmentResult{}, err
 	}
 	key := "asg:change:" + idem
-	if prev, err := s.asgReplay(ctx, a.p.TenantID, key); err != nil || prev != nil {
+	if prev, err := s.asgReplay(ctx, a, key, domain.AsgChanged, user, id, s.sameAsgInput(in, reason)); err != nil || prev != nil {
 		return derefAsg(prev), err
 	}
 	t, err := s.knTarget(ctx, a, user)
@@ -473,7 +516,7 @@ func (s *Service) ChangeAssignment(ctx context.Context, user, id uuid.UUID, in d
 	if err != nil {
 		return AssignmentResult{}, err
 	}
-	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgChanged, optStr(reason), id,
+	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgChanged, optStr(reason), id, s.sameAsgInput(in, reason),
 		func(tx pgx.Tx, cur *port.Assignment) (port.Assignment, error) {
 			if cur.UserRef != user {
 				return port.Assignment{}, ErrAssignmentNotFound
@@ -514,7 +557,7 @@ func (s *Service) RevokeAssignment(ctx context.Context, user, id uuid.UUID, reas
 		return AssignmentResult{}, err
 	}
 	key := "asg:revoke:" + idem
-	if prev, err := s.asgReplay(ctx, a.p.TenantID, key); err != nil || prev != nil {
+	if prev, err := s.asgReplay(ctx, a, key, domain.AsgRevoked, user, id, sameRevoke(reason)); err != nil || prev != nil {
 		if err == nil && prev.Assignment.Role == port.KNXa {
 			err = s.releaseKNXaVault(ctx, a, user, key+":vault") // lần trước lỗi giữa chừng → làm tiếp
 		}
@@ -523,7 +566,7 @@ func (s *Service) RevokeAssignment(ctx context.Context, user, id uuid.UUID, reas
 	if _, err := s.knTarget(ctx, a, user); err != nil {
 		return AssignmentResult{}, err
 	}
-	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgRevoked, optStr(reason), id,
+	res, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, key, domain.AsgRevoked, optStr(reason), id, sameRevoke(reason),
 		func(_ pgx.Tx, cur *port.Assignment) (port.Assignment, error) {
 			if cur.UserRef != user {
 				return port.Assignment{}, ErrAssignmentNotFound
@@ -637,7 +680,7 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 	if len(in.Assignments) == 0 {
 		return KNCreateResult{}, problem.Validation.WithField("assignments", "bắt buộc ít nhất một vai trò")
 	}
-	if prev, err := s.replay(ctx, a.p.TenantID, in.IdemKey); err != nil {
+	if prev, err := s.replayFor(ctx, a, in.IdemKey, domain.ActionCreated, uuid.Nil); err != nil {
 		return KNCreateResult{}, err
 	} else if prev != nil {
 		return s.knReplayed(ctx, a, *prev)
@@ -700,7 +743,7 @@ func (s *Service) CreateKNUser(ctx context.Context, in KNCreateInput) (KNCreateR
 	}
 	res := KNCreateResult{Warnings: warnings}
 	for i, c := range checked {
-		r, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, in.IdemKey+":asg:"+strconv.Itoa(i), domain.AsgGranted, nil, uuid.Nil,
+		r, err := s.writeAsg(ctx, a.p.TenantID, a.p.ActorRef, in.IdemKey+":asg:"+strconv.Itoa(i), domain.AsgGranted, nil, uuid.Nil, nil,
 			func(pgx.Tx, *port.Assignment) (port.Assignment, error) { return assignmentFrom(ids.New(), id, c), nil })
 		if err != nil {
 			// Tài khoản đã ghi sổ: không xóa, Admin thêm vai trò còn thiếu ở màn Detail. Nhưng vai kho định danh vừa tự
@@ -744,6 +787,44 @@ type ProfilePatch struct {
 	IdemKey  string
 }
 
+// profileNext áp thay đổi in lên hồ sơ hiện tại u, chuẩn hóa, và trả các trường thực sự đổi.
+func profileNext(u port.User, in ProfilePatch) (domain.Profile, []string, error) {
+	cur := domain.Profile{Username: u.Username, Email: u.Email, FirstName: u.FirstName, LastName: u.LastName, Phone: u.Phone}
+	next := cur
+	if in.FullName != nil {
+		next.FirstName, next.LastName = domain.SplitFullName(*in.FullName)
+	}
+	if in.Email != nil {
+		next.Email = *in.Email
+	}
+	if in.Phone != nil {
+		next.Phone = *in.Phone
+	}
+	next.Phone = domain.NormalizePhone(next.Phone)
+	if (cur.Phone != "" && cur.Username == cur.Phone) || cur.Username == cur.Email {
+		// Tên đăng nhập theo SĐT/email: đi theo giá trị mới.
+		next.Username = loginName(domain.Profile{Email: strings.ToLower(strings.TrimSpace(next.Email)), Phone: next.Phone})
+	}
+	next, err := next.Normalize()
+	if err != nil {
+		return next, nil, err
+	}
+	var fields []string
+	if next.FirstName != cur.FirstName || next.LastName != cur.LastName {
+		fields = append(fields, "full_name")
+	}
+	if next.Email != strings.ToLower(cur.Email) {
+		fields = append(fields, "email")
+	}
+	if next.Phone != cur.Phone {
+		fields = append(fields, "phone")
+	}
+	if next.Username != strings.ToLower(cur.Username) {
+		fields = append(fields, "username")
+	}
+	return next, fields, nil
+}
+
 // UpdateProfile sửa thông tin tài khoản ở Keycloak và ghi một dòng sổ chỉnh sửa. Đổi SĐT của tài khoản
 // đăng nhập bằng SĐT → đổi luôn tên đăng nhập (FN-CH-00.01).
 func (s *Service) UpdateProfile(ctx context.Context, user uuid.UUID, in ProfilePatch) (store.ProfileChange, bool, error) {
@@ -768,6 +849,19 @@ func (s *Service) UpdateProfile(ctx context.Context, user uuid.UUID, in ProfileP
 		return store.ProfileChange{}, false, err
 	}
 	if prev != nil {
+		// #154: PATCH không qua middleware cache HTTP (chỉ POST) và sổ chỉ lưu tên trường (RB-3, không lưu giá trị),
+		// nên phát lại đòi cùng người gọi, cùng tài khoản, cùng lý do, tài khoản còn trong phạm vi HIỆN HÀNH, và nội
+		// dung yêu cầu đã đúng với hồ sơ hiện tại (áp lại không đổi gì). Khác → 422 idempotency_key_reused.
+		if prev.ActorRef != a.p.ActorRef || prev.UserRef != user || !sameReason(prev.Reason, in.Reason) {
+			return store.ProfileChange{}, false, problem.IdempotencyConflict
+		}
+		t, err := s.target(ctx, a, user)
+		if err != nil {
+			return store.ProfileChange{}, false, err
+		}
+		if _, fields, err := profileNext(t.user, in); err != nil || len(fields) > 0 {
+			return store.ProfileChange{}, false, problem.IdempotencyConflict
+		}
 		return *prev, true, nil
 	}
 	if user == a.p.ActorRef {
@@ -777,37 +871,9 @@ func (s *Service) UpdateProfile(ctx context.Context, user uuid.UUID, in ProfileP
 	if err != nil {
 		return store.ProfileChange{}, false, err
 	}
-	cur := domain.Profile{Username: t.user.Username, Email: t.user.Email, FirstName: t.user.FirstName, LastName: t.user.LastName, Phone: t.user.Phone}
-	next := cur
-	if in.FullName != nil {
-		next.FirstName, next.LastName = domain.SplitFullName(*in.FullName)
-	}
-	if in.Email != nil {
-		next.Email = *in.Email
-	}
-	if in.Phone != nil {
-		next.Phone = *in.Phone
-	}
-	next.Phone = domain.NormalizePhone(next.Phone)
-	if (cur.Phone != "" && cur.Username == cur.Phone) || cur.Username == cur.Email {
-		// Tên đăng nhập theo SĐT/email: đi theo giá trị mới.
-		next.Username = loginName(domain.Profile{Email: strings.ToLower(strings.TrimSpace(next.Email)), Phone: next.Phone})
-	}
-	if next, err = next.Normalize(); err != nil {
+	next, fields, err := profileNext(t.user, in)
+	if err != nil {
 		return store.ProfileChange{}, false, fieldProblem(err)
-	}
-	var fields []string
-	if next.FirstName != cur.FirstName || next.LastName != cur.LastName {
-		fields = append(fields, "full_name")
-	}
-	if next.Email != strings.ToLower(cur.Email) {
-		fields = append(fields, "email")
-	}
-	if next.Phone != cur.Phone {
-		fields = append(fields, "phone")
-	}
-	if next.Username != strings.ToLower(cur.Username) {
-		fields = append(fields, "username")
 	}
 	if len(fields) == 0 {
 		return store.ProfileChange{}, false, ErrState.WithDetail("Không có thay đổi.")

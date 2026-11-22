@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/patterns/list";
 import { LoadState, useAction, useCommuneNames, useLoad } from "@/kn/cycle/common";
 import { ReasonBox } from "@/kn/cnts/model/parts";
 import { createCntsDiaryApi, dmy, FORM_LABEL, KIND_LABEL, type CntsDiaryApi, type EntryStatus } from "./api";
-import { Checks, flagged, LocationInfo, MetricsTable, Photos, StatusBadge, WeightChart } from "./parts";
+import { Checks, flagged, LocationInfo, MetricsTable, Photos, StatusBadge, TablesView, WeightChart } from "./parts";
 
 export function ReviewScreen() {
   const { api } = useAuth();
@@ -121,6 +121,7 @@ function EntryReview({ dapi, entryRef, onChanged }: { dapi: CntsDiaryApi; entryR
           {act.view}
           <h4>Số liệu</h4>
           <MetricsTable form={e.form} entry={e} previous={e.previous?.metrics} />
+          <TablesView form={e.form} tables={e.tables} />
           <h4>Kiểm tra tự động</h4>
           <Checks checks={e.checks} />
           <h4>Vị trí</h4>

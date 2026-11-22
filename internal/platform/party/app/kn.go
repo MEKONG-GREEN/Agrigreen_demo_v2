@@ -28,7 +28,7 @@ import (
 
 // Mã lỗi KN (docs/errors.md, mục pf/party).
 var (
-	ErrDepartmentNotFound  = problem.New(http.StatusNotFound, "party.department_not_found", "Không tìm thấy phòng ban")
+	ErrDepartmentNotFound  = port.ErrDepartmentMissing
 	ErrDepartmentCodeTaken = problem.New(http.StatusConflict, "party.department_code_taken", "Mã phòng ban đã có trong đơn vị (mã không tái sử dụng)")
 	ErrDepartmentState     = problem.New(http.StatusConflict, "party.department_state", "Trạng thái phòng ban không cho phép thao tác này")
 	ErrDepartmentInUse     = problem.New(http.StatusConflict, "party.department_in_use",
@@ -67,8 +67,9 @@ type KN struct {
 }
 
 var (
-	_ port.Departments = (*KN)(nil)
-	_ port.Regions     = (*KN)(nil)
+	_ port.Departments     = (*KN)(nil)
+	_ port.Regions         = (*KN)(nil)
+	_ port.DepartmentAdmin = (*KN)(nil)
 )
 
 func (k *KN) now() time.Time { return k.Clock.Now().UTC() }
@@ -90,16 +91,7 @@ func snapshotJSON(v any) []byte {
 }
 
 // LogEntry là một dòng khung Log của màn Detail (kn-v7.7-plan §1.5).
-type LogEntry struct {
-	Seq          int64
-	Event        string
-	ActorRef     uuid.UUID
-	ActorDisplay string
-	At           time.Time // event_time
-	RecordedAt   time.Time
-	Changes      []domain.FieldChange
-	Reason       *string
-}
+type LogEntry = port.ChangeLogEntry
 
 func (k *KN) toLog(ctx context.Context, evs []store.KNEvent, changes func(store.KNEvent) []domain.FieldChange) []LogEntry {
 	out := make([]LogEntry, 0, len(evs))
@@ -226,21 +218,10 @@ func departmentByCodeTx(ctx context.Context, tx pgx.Tx, unitRef uuid.UUID, code 
 // ---------------------------------------------------------------------------
 
 // DepartmentInput là dữ liệu tạo/sửa phòng ban.
-type DepartmentInput struct {
-	OrgRef      uuid.UUID
-	Code        string
-	Name        string
-	Description string
-	SortOrder   int
-	Status      string // tạo: rỗng = not_open
-	MenuProfile string
-}
+type DepartmentInput = port.DepartmentInput
 
 // DepartmentView là phòng ban kèm số tài khoản/bản ghi (nil khi chưa nối nguồn đếm).
-type DepartmentView struct {
-	port.Department
-	Usage *port.Usage
-}
+type DepartmentView = port.DepartmentView
 
 // usage cộng số tài khoản/bản ghi từ mọi nguồn; known = false khi chưa nối nguồn nào.
 func (k *KN) usage(ctx context.Context, unit uuid.UUID, code string) (port.Usage, bool, error) {
@@ -405,12 +386,7 @@ func (k *KN) UpdateDepartment(ctx context.Context, id uuid.UUID, in DepartmentIn
 
 // StatusResult là kết quả đổi trạng thái kèm cảnh báo (FN-AD-04.03: ngưng phòng ban có tài
 // khoản/dữ liệu → cảnh báo, dữ liệu cũ giữ nguyên).
-type StatusResult struct {
-	Department port.Department
-	Replayed   bool
-	Usage      *port.Usage
-	Warnings   []string
-}
+type StatusResult = port.DepartmentStatusResult
 
 // ChangeDepartmentStatus đổi Đang áp dụng / Chưa mở / Ngưng hoạt động. Có hiệu lực ngay ở bước 2
 // đăng nhập và menu (đọc trực tiếp bảng hiện hành).

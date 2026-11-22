@@ -1,0 +1,1 @@
+- [ ] BF-SWEEP-HCTH-FORMS-REST (#197): tham số FN19 chi tiết/Log/thêm phiên bản qua route, NumberField/validateForm và guard raw ba tỷ lệ native; chờ Claude review đúng SHA. Sáu màn còn lại theo #203. [Phạm vi](../../kn/gia-dinh/BF-SWEEP-HCTH-FORMS-REST.md).

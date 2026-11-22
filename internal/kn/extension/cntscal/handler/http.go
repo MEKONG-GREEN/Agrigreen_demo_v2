@@ -5,7 +5,9 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -28,12 +30,17 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g := rg.Group("/extension/cnts")
 	g.GET("/duty-rosters/:month", h.getRoster)
 	g.POST("/duty-rosters/:month", h.saveRoster)
+	httpx.AllowBody(g, http.MethodPost, "/duty-rosters/:month/import", app.MaxRosterImportBytes+1024)
+	g.POST("/duty-rosters/:month/import", h.importRoster)
+	g.GET("/duty-rosters/:month/export.xlsx", h.exportRoster)
 	g.GET("/my-duties", h.myDuties)
 	g.GET("/vaccination-batches", h.listBatches)
 	g.POST("/vaccination-batches", h.createBatch)
 	g.GET("/vaccination-batches/:ref", h.getBatch)
 	g.POST("/vaccination-batches/:ref/doses", h.updateDoses)
 	g.POST("/vaccination-batches/:ref/cancel", h.cancelBatch)
+	g.GET("/vaccination-matrix", h.matrix)          // BF-CN-VACC: bảng BM-07
+	g.GET("/vaccination-matrix/xlsx", h.matrixXLSX) // BF-CN-VACC: xuất Excel đúng mẫu BM-07
 }
 
 func idem(c *gin.Context) string { return idempotency.KeyFromContext(c.Request.Context()) }
@@ -93,7 +100,7 @@ func cellsOut(cs []domain.Cell) []gin.H {
 func rosterOut(v app.RosterView) gin.H {
 	facs := make([]gin.H, 0, len(v.Facilities))
 	for _, f := range v.Facilities {
-		facs = append(facs, gin.H{"ref": f.Ref, "code": f.Code, "name": f.Name, "commune_code": f.CommuneCode, "kind": optStr(f.Kind)})
+		facs = append(facs, gin.H{"ref": f.Ref, "code": f.Code, "name": f.Name, "commune_code": f.CommuneCode, "kind": optStr(f.Kind), "address": optStr(f.Address)})
 	}
 	offs := make([]gin.H, 0, len(v.Officers))
 	for _, o := range v.Officers {
@@ -101,23 +108,9 @@ func rosterOut(v app.RosterView) gin.H {
 		for _, f := range o.Scope.Facilities {
 			fr = append(fr, f.String())
 		}
-		offs = append(offs, gin.H{"ref": o.Ref, "display": nameOf(v.Names, o.Ref), "commune_codes": o.Communes, "facility_refs": fr})
+		offs = append(offs, gin.H{"ref": o.Ref, "display": nameOf(v.Names, o.Ref), "commune_codes": o.Communes, "facility_refs": fr, "phone_masked": optStr(o.PhoneMasked)})
 	}
-	warns := make([]gin.H, 0, len(v.Warnings))
-	for _, w := range v.Warnings {
-		var f, o any
-		if w.Facility != uuid.Nil {
-			f = w.Facility
-		}
-		if w.Officer != uuid.Nil {
-			o = w.Officer
-		}
-		days := w.Days
-		if days == nil {
-			days = []int{}
-		}
-		warns = append(warns, gin.H{"code": w.Code, "message": w.Message, "facility_ref": f, "officer_ref": o, "days": days})
-	}
+	warns := warningsOut(v.Warnings)
 	vers := make([]gin.H, 0, len(v.Versions))
 	for _, x := range v.Versions {
 		vers = append(vers, gin.H{"version": x.Version, "source": x.Source, "cell_count": x.CellCount, "note": optStr(x.Note),
@@ -134,7 +127,57 @@ func rosterOut(v app.RosterView) gin.H {
 	return gin.H{"month": domain.MonthKey(v.Month), "province_code": optStr(v.Province), "legacy": v.Legacy, "days_in_month": domain.DaysIn(v.Month), "version": v.Version,
 		"source": optStr(v.Source), "note": optStr(v.Note), "cells": cellsOut(v.Cells), "facilities": facs, "officers": offs,
 		"warnings": warns, "updated_at": optTS(v.UpdatedAt), "updated_by": by, "versions": vers, "can_edit": v.CanEdit,
-		"notified_officer_refs": notified}
+		"notified_officer_refs": notified, "can_view_phone": v.CanViewPhone}
+}
+
+func warningsOut(ws []domain.Warning) []gin.H {
+	out := make([]gin.H, 0, len(ws))
+	for _, w := range ws {
+		var f, o any
+		if w.Facility != uuid.Nil {
+			f = w.Facility
+		}
+		if w.Officer != uuid.Nil {
+			o = w.Officer
+		}
+		days := w.Days
+		if days == nil {
+			days = []int{}
+		}
+		out = append(out, gin.H{"code": w.Code, "message": w.Message, "facility_ref": f, "officer_ref": o, "days": days})
+	}
+	return out
+}
+
+// importRoster: thân request là tệp .xlsx (không multipart), tối đa 4 MB. Chỉ đọc, không ghi.
+func (h Handler) importRoster(c *gin.Context) {
+	r, err := h.Svc.ImportRoster(c.Request.Context(), c.Param("month"), c.Query("province_code"), io.LimitReader(c.Request.Body, app.MaxRosterImportBytes+1))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	issues := make([]gin.H, 0, len(r.Issues))
+	for _, x := range r.Issues {
+		var line any
+		if x.Line > 0 {
+			line = x.Line
+		}
+		issues = append(issues, gin.H{"line": line, "field": x.Field, "message": x.Message})
+	}
+	c.JSON(http.StatusOK, gin.H{"month": domain.MonthKey(r.Month), "province_code": optStr(r.Province), "sheet": r.Sheet, "basis": optStr(r.Basis),
+		"row_count": r.RowCount, "cells": cellsOut(r.Cells), "issues": issues, "warnings": warningsOut(r.Warnings)})
+}
+
+// exportRoster: bản đã lưu của tháng thành .xlsx đúng mẫu BM-03.
+func (h Handler) exportRoster(c *gin.Context) {
+	data, name, err := h.Svc.ExportRoster(c.Request.Context(), c.Param("month"), c.Query("province_code"), c.Query("basis"))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="`+name+`"`)
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 
 func (h Handler) getRoster(c *gin.Context) {
@@ -254,7 +297,94 @@ func batchOut(v app.BatchView, today time.Time, labels map[string]string) gin.H 
 	if v.Next != nil {
 		m["next_dose"] = doseOut(*v.Next, today, labels)
 	}
+	m["model"] = modelOut(v.Model, v.Names)
 	return m
+}
+
+// modelOut là hộ mô hình của lứa (BF-CN-VACC): điểm, dự án, CB theo dõi MH, nhãn chủ hộ đã che bớt.
+func modelOut(x *app.ModelInfo, names map[uuid.UUID]string) any {
+	if x == nil {
+		return nil
+	}
+	var officer any
+	if x.OfficerRef != nil {
+		officer = nameOf(names, *x.OfficerRef)
+	}
+	return gin.H{"household_ref": x.HouseholdRef, "owner_label": optStr(x.OwnerLabel), "site_ref": x.SiteRef, "site_name": x.SiteName,
+		"project_ref": x.ProjectRef, "project_code": x.ProjectCode, "project_name": x.ProjectName, "officer_ref": optRef(x.OfficerRef),
+		"officer_display": officer, "active": x.Open}
+}
+
+func optUUID(v *problem.Problem, bad *bool, field, s string) *uuid.UUID {
+	if s == "" {
+		return nil
+	}
+	r, err := uuid.Parse(s)
+	if err != nil {
+		*v, *bad = *v.WithField(field, "phải là UUID"), true
+		return nil
+	}
+	return &r
+}
+
+func (h Handler) matrixQuery(c *gin.Context) (app.MatrixQuery, bool) {
+	v, bad := *problem.Validation, false
+	q := app.MatrixQuery{ModelType: c.Query("model_type_code"), Commune: c.Query("commune_code"),
+		Project: optUUID(&v, &bad, "project_ref", c.Query("project_ref")), Site: optUUID(&v, &bad, "site_ref", c.Query("site_ref")),
+		From: parseDay(&v, &bad, "received_from", c.Query("received_from")), To: parseDay(&v, &bad, "received_to", c.Query("received_to"))}
+	if bad {
+		httpx.Fail(c, &v)
+		return q, false
+	}
+	return q, true
+}
+
+func (h Handler) matrix(c *gin.Context) {
+	q, ok := h.matrixQuery(c)
+	if !ok {
+		return
+	}
+	m, err := h.Svc.VaccinationMatrix(c.Request.Context(), q)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	cols := make([]gin.H, 0, len(m.Columns))
+	for _, x := range m.Columns {
+		cols = append(cols, gin.H{"vaccine_code": x.Vaccine, "vaccine_name": optStr(m.Labels["cnts_vaccine:"+x.Vaccine]), "shot": x.Shot, "age_days": x.AgeDays})
+	}
+	rows := make([]gin.H, 0, len(m.Rows))
+	for _, r := range m.Rows {
+		cells := make([]any, 0, len(r.Cells))
+		for _, d := range r.Cells {
+			if d == nil {
+				cells = append(cells, nil)
+				continue
+			}
+			cells = append(cells, doseOut(*d, m.Today, m.Labels))
+		}
+		v := r.BatchView
+		v.Names = m.Names
+		x := batchOut(v, m.Today, m.Labels)
+		x["cells"], x["household_text"], x["commune_name"] = cells, optStr(r.HouseholdText()), optStr(m.CommuneNames[r.CommuneCode])
+		rows = append(rows, x)
+	}
+	c.JSON(http.StatusOK, gin.H{"model_type_code": m.ModelType, "model_type_name": optStr(m.Labels["cnts_model_type:"+m.ModelType]),
+		"columns": cols, "rows": rows, "truncated": m.Truncated, "max_rows": domain.MaxMatrixRows})
+}
+
+func (h Handler) matrixXLSX(c *gin.Context) {
+	q, ok := h.matrixQuery(c)
+	if !ok {
+		return
+	}
+	b, name, err := h.Svc.VaccinationMatrixXLSX(c.Request.Context(), q)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename=\""+name+"\"; filename*=UTF-8''"+url.PathEscape(name))
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", b)
 }
 
 func parseDay(v *problem.Problem, bad *bool, field, s string) *time.Time {
@@ -271,7 +401,8 @@ func parseDay(v *problem.Problem, bad *bool, field, s string) *time.Time {
 
 func (h Handler) listBatches(c *gin.Context) {
 	v, bad := *problem.Validation, false
-	q := app.BatchQuery{Commune: c.Query("commune_code"), Status: c.Query("status"),
+	q := app.BatchQuery{Commune: c.Query("commune_code"), Status: c.Query("status"), ModelType: c.Query("model_type_code"),
+		Project: optUUID(&v, &bad, "project_ref", c.Query("project_ref")), Site: optUUID(&v, &bad, "site_ref", c.Query("site_ref")),
 		From: parseDay(&v, &bad, "received_from", c.Query("received_from")), To: parseDay(&v, &bad, "received_to", c.Query("received_to"))}
 	if s := c.Query("household_ref"); s != "" {
 		r, err := uuid.Parse(s)

@@ -68,6 +68,9 @@ var catalogImportAliases = map[string]string{
 	"name": "name", "ten": "name", "ten_muc": "name",
 	// W11.41: ngày áp dụng của danh mục CNTS (YYYY-MM-DD; trống = hôm nay).
 	"valid_from": "valid_from", "hieu_luc_tu": "valid_from", "ngay_hieu_luc": "valid_from",
+	// BF-CN-CATALOG #170: cột trạng thái của tệp "Xuất danh mục" chỉ để đọc — nạp lại tệp xuất thì bỏ qua cột này (không
+	// coi là thuộc tính, không đổi trạng thái; ngừng/dùng lại qua thao tác riêng có lý do).
+	"trang_thai": "status", "status": "status",
 }
 
 // ImportCatalogs nạp nhiều mục danh mục từ CSV/XLSX (HTX US-CAT-02). Tệp sai mẫu →
@@ -141,6 +144,12 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 				}
 				it.ValidFrom = d
 			}
+			// Ô bị tệp xuất thêm dấu nháy chống công thức được so với mục đã có trước khi chuẩn hóa (độ dài tên/thuộc tính).
+			if prev, err := store.Item(ctx, tx, it.Catalog, it.Code, false); err != nil {
+				return err
+			} else if prev != nil {
+				it = csvFormulaEscapedAs(it, *prev)
+			}
 			norm, err := s.normalizeCatalogItem(s.prepareCatalogIdentity(it))
 			if err != nil {
 				row.Reason = importReason(err)
@@ -201,6 +210,37 @@ func (s *Service) ImportCatalogs(ctx context.Context, body io.Reader, key string
 		return CatalogImportResult{}, err
 	}
 	return res, nil
+}
+
+// csvFormulaEscapedAs: tệp "Xuất danh mục" thêm dấu nháy đơn trước ô bắt đầu bằng = + - @ tab CR để Excel không chạy
+// công thức (#170). Khi so với mục đã có, ô đúng bằng "'" + giá trị đã lưu (giá trị đó bắt đầu bằng ký tự công thức)
+// được coi là chính giá trị đã lưu, nên tệp vừa xuất nạp lại được. Chỉ áp khi mã đã có; dòng tạo mới giữ nguyên ô.
+func csvFormulaEscapedAs(in, cur domain.Item) domain.Item {
+	in.Name = csvUnescapeAs(in.Name, cur.Name)
+	if len(in.Attrs) == 0 {
+		return in
+	}
+	attrs := make(map[string]string, len(in.Attrs))
+	for k, v := range in.Attrs {
+		attrs[k] = csvUnescapeAs(v, cur.Attrs[k])
+	}
+	in.Attrs = attrs
+	return in
+}
+
+// csvUnescapeAs cũng coi ô bằng giá trị đã lưu ở dạng CRLF → LF là giá trị đã lưu: encoding/csv đổi CRLF trong ô ngoặc
+// kép thành LF, nên mô tả nhiều dòng (lưu qua API với CRLF) của tệp xuất vẫn nạp lại được (review Codex 7058).
+func csvUnescapeAs(cell, stored string) string {
+	c := strings.TrimSpace(cell)
+	for _, s := range []string{stored, strings.ReplaceAll(stored, "\r\n", "\n")} {
+		if s == "" {
+			continue
+		}
+		if (s != stored && c == s) || (strings.ContainsRune("=+-@\t\r", rune(s[0])) && c == "'"+s) {
+			return stored
+		}
+	}
+	return cell
 }
 
 func (r *CatalogImportResult) add(row CatalogImportRow) {

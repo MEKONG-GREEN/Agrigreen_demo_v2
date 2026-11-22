@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +31,9 @@ type FormRow struct {
 	ReviewedAt      *time.Time
 	ReviewNote      string
 	Late            bool
+	NativeLate      *bool
+	RequestDueAt    *time.Time
+	RequestState    string
 }
 
 // SourceRow là một dòng bảng "Nguồn module".
@@ -84,7 +89,7 @@ func deadlinesOf(p store.Period, evs []store.Event) (time.Time, time.Time) {
 }
 
 // project dựng Detail từ sổ + tiến độ kỳ native + trạng thái nguồn.
-func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []store.Event, srcs []store.Source, names map[string]string) Detail {
+func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []store.Event, srcs []store.Source, names map[string]string, requests map[string]*store.AdhocRequest) Detail {
 	now := s.now()
 	d := Detail{Period: p, Events: evs}
 	d.DueAt, d.ExportDueAt = deadlinesOf(p, evs)
@@ -111,10 +116,15 @@ func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []s
 			row.View = domain.FormView{State: domain.FormUnknown}
 		default:
 			n, hasDraft := drafts[dept]
-			row.View = domain.FormStateOf(domain.FormFacts{Versions: u.Versions, Decision: u.Decision, Overdue: d.Overdue, Terminal: term,
+			overdue := d.Overdue
+			if request := requests[dept]; request != nil {
+				overdue = now.After(request.DueAt)
+			}
+			row.View = domain.FormStateOf(domain.FormFacts{Versions: u.Versions, Decision: u.Decision, Overdue: overdue, Terminal: term,
 				Max: p.MaxSubmissions, Draft: hasDraft && n == u.Versions})
 			row.LastSubmittedAt, row.ReviewedAt, row.ReviewNote, row.Late = u.LastSubmittedAt, u.ReviewedAt, u.ReviewNote, u.Late
 		}
+		projectAdhocRequest(&row, requests[dept], u, term)
 		if u.Versions > 0 {
 			f.AnySent = true
 		}
@@ -123,23 +133,7 @@ func (s *Service) project(ctx context.Context, c caller, p store.Period, evs []s
 		}
 		d.Forms = append(d.Forms, row)
 	}
-	refs := make([]extport.KHTCSourceRef, 0, len(srcs))
-	for _, sr := range srcs {
-		ref := extport.KHTCSourceRef{Department: sr.Department, Source: sr.Source, CalendarID: sr.CalendarID, CalendarVersion: sr.CalendarVersion,
-			NativeKey: sr.NativeKey}
-		if sr.Label != nil {
-			ref.Label = *sr.Label
-		}
-		refs = append(refs, ref)
-		d.Sources = append(d.Sources, SourceRow{Ref: ref})
-	}
-	if s.Crosswalk != nil && len(refs) > 0 {
-		if states, err := s.Crosswalk.States(ctx, refs); err == nil && len(states) == len(refs) {
-			for i, st := range states {
-				d.Sources[i].Known, d.Sources[i].Closed, d.Sources[i].At = true, st.Closed, st.ClosedAt
-			}
-		}
-	}
+	d.Sources = s.sourceRows(ctx, srcs)
 	f.Sources = len(d.Sources)
 	for _, sr := range d.Sources {
 		if sr.Closed {
@@ -197,8 +191,15 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 	if err != nil {
 		return Detail{}, err
 	}
+	if p.Type == domain.TypeAdhoc && !adhocReader(c) {
+		return Detail{}, problem.Forbidden
+	}
+	requests, err := s.activeRequests(ctx, c, p)
+	if err != nil {
+		return Detail{}, err
+	}
 	names, _, _ := s.unitDepartments(ctx, c.k)
-	return s.project(ctx, c, p, evs, srcs, names), nil
+	return s.project(ctx, c, p, evs, srcs, names, requests), nil
 }
 
 // List liệt kê kỳ (năm kế hoạch year, 0 = mọi năm), mới trước, kèm trạng thái và tiến độ nộp.
@@ -214,7 +215,7 @@ func (s *Service) List(ctx context.Context, year, limit int) ([]Detail, error) {
 	var evs map[uuid.UUID][]store.Event
 	err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 		var e error
-		if ps, e = store.Periods(ctx, tx, year, limit); e != nil {
+		if ps, e = store.PeriodsForReader(ctx, tx, year, limit, adhocReader(c)); e != nil {
 			return e
 		}
 		idl := make([]uuid.UUID, 0, len(ps))
@@ -230,7 +231,11 @@ func (s *Service) List(ctx context.Context, year, limit int) ([]Detail, error) {
 	names, _, _ := s.unitDepartments(ctx, c.k)
 	out := make([]Detail, 0, len(ps))
 	for _, p := range ps {
-		d := s.project(ctx, c, p, evs[p.ID], nil, names)
+		requests, err := s.activeRequests(ctx, c, p)
+		if err != nil {
+			return nil, err
+		}
+		d := s.project(ctx, c, p, evs[p.ID], nil, names, requests)
 		d.Sources = nil
 		out = append(out, d)
 	}
@@ -256,51 +261,11 @@ func eventIdem(idem, action string, id uuid.UUID) string {
 	return "khtc:" + action + ":" + id.String() + ":" + idem
 }
 
-// ChangeDeadline "Sửa hạn nộp" — chỉ kỳ chưa đóng/hủy. Đổi hạn của kỳ native cap/forms trước (sổ phụ period_due: cờ
-// "Nộp trễ" của lần gửi, Trễ hạn, hạn trên thiết bị theo hạn mới), rồi ghi sự kiện ở sổ KHTC; ghi sổ KHTC lỗi → trả hạn
-// native về hạn cũ (bù như "Mở kỳ").
+// ChangeDeadline đổi hạn bằng intent bền và native CAS ngoài TX. Undo chỉ dùng
+// applied revision của chính mutation đã được xác nhận; kết quả không rõ giữ
+// unresolved để đối soát, không mặc nhận đã trả hạn cũ.
 func (s *Service) ChangeDeadline(ctx context.Context, id uuid.UUID, in DeadlineInput, idem string) (Detail, error) {
-	c, err := s.writer(ctx)
-	if err != nil {
-		return Detail{}, err
-	}
-	d, err := s.Get(ctx, id)
-	if err != nil {
-		return Detail{}, err
-	}
-	if domain.CanChangeDeadline(d.State) != nil {
-		return Detail{}, ErrTerminal
-	}
-	if in.DueAt.IsZero() {
-		return Detail{}, problem.Validation.WithField("due_at", "bắt buộc")
-	}
-	if in.ExportDueAt.IsZero() {
-		in.ExportDueAt = d.ExportDueAt
-		if in.ExportDueAt.Before(in.DueAt) {
-			in.ExportDueAt = in.DueAt
-		}
-	}
-	if err := domain.ValidateDeadlines(d.Period.Cutoff, in.DueAt, in.ExportDueAt, zone()); err != nil {
-		return Detail{}, inputErr(err)
-	}
-	e := store.Event{PeriodID: id, Action: store.ActionDeadline, DueAt: ptrTime(in.DueAt.UTC()), ExportDueAt: ptrTime(in.ExportDueAt.UTC())}
-	if why, ok := domain.ValidReason(in.Reason); ok {
-		e.Reason = &why
-	}
-	reason := ""
-	if e.Reason != nil {
-		reason = *e.Reason
-	}
-	if err := s.Control.ChangeDue(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, in.DueAt, reason, eventIdem(idem, "forms-due", id)); err != nil {
-		return Detail{}, err
-	}
-	if err := s.appendEvent(ctx, c, e, eventIdem(idem, "deadline", id)); err != nil {
-		// Bù: trả hạn kỳ native về hạn hiệu lực cũ (best effort — lỗi bù không che lỗi gốc).
-		_ = s.Control.ChangeDue(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, d.DueAt, "Hoàn tác: ghi sổ KHTC không thành công",
-			eventIdem(idem, "forms-due-undo", id))
-		return Detail{}, err
-	}
-	return s.Get(ctx, id)
+	return s.changeDeadlineCAS209(ctx, id, in, idem)
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }
@@ -308,7 +273,7 @@ func ptrTime(t time.Time) *time.Time { return &t }
 // Close "Đóng kỳ" (BR-DL-15): chốt kỳ native (phiếu chưa gửi → Không gửi, đã gửi/yêu cầu bổ sung → Đã khóa, ảnh chụp đóng
 // băng) rồi ghi sự kiện đóng. Gọi lại sau lỗi giữa chừng: kỳ native đã chốt → chỉ ghi sự kiện.
 func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) (Detail, error) {
-	c, err := s.writer(ctx)
+	c, err := s.periodWriter(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
@@ -325,7 +290,23 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) 
 	case err != nil:
 		return Detail{}, ErrNotClosable.WithDetail("kỳ đang " + domain.PeriodLabels[d.State] + ": " + err.Error())
 	}
-	if err := s.Control.ClosePeriod(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, eventIdem(idem, "forms-close", id)); err != nil &&
+	if s.CancelGuard != nil {
+		// Đang hủy kỳ (ý định còn hạn): không chốt kỳ native ở cap/forms — trigger cũng chặn sự kiện 'closed', kiểm trước để
+		// không để lại kỳ native đã chốt mà sổ KHTC chưa đóng (review #143 N6).
+		pending, err := s.CancelGuard.CancelPending(ctx, id)
+		if err != nil {
+			return Detail{}, ErrDependency.WithDetail("trạng thái hủy kỳ lỗi").WithCause(err)
+		}
+		if pending {
+			return Detail{}, ErrCancelling
+		}
+	}
+	nativeKey := eventIdem(idem, "forms-close", id)
+	nativeCtx := ctx
+	if d.Period.Type == domain.TypeAdhoc {
+		nativeCtx = BindAdhocOperation(ctx, s.DB, c.k, id, formsport.Operation{Action: formsport.OperationClose, Profile: domain.ProfileKHTC, PeriodID: d.Period.FormsPeriodRef, IdemKey: nativeKey})
+	}
+	if err := s.Control.ClosePeriod(nativeCtx, domain.ProfileKHTC, d.Period.FormsPeriodRef, nativeKey); err != nil &&
 		!errors.Is(err, formsport.ErrPeriodClosed) {
 		return Detail{}, err
 	}
@@ -344,19 +325,13 @@ func (s *Service) Close(ctx context.Context, id uuid.UUID, reason, idem string) 
 // Cancel "Hủy kỳ" (BR-DL-18): kỳ Đã mở/Đang thu thập/Trễ hạn/Đủ dữ liệu, báo cáo chưa có Bản cuối, lý do bắt buộc. Hủy kỳ
 // native (phiếu gỡ khỏi module các phòng, số liệu không vào ảnh chụp) rồi ghi sự kiện hủy. Kỳ đã hủy không tính khi
 // kiểm mở trùng — mở lại đúng kỳ đó được.
+//
+// P0-POOL-SHARED-2 (#143, bàn giao từ #139): KHÔNG giữ giao dịch quanh lời gọi module khác. Đọc kỳ, Bản cuối và kiểm điều
+// kiện ngoài giao dịch; CancelGuard (khtcreport) ghi Ý ĐỊNH HỦY bền trong giao dịch ngắn giữ khóa khtc_snapshot (trigger chặn
+// Bản cuối/đóng kỳ trong lúc còn hạn), hủy kỳ native ở cap/forms NGOÀI giao dịch, rồi ghi sự kiện hủy + bỏ ý định trong
+// giao dịch ngắn thứ hai. cap/forms lỗi → bỏ ý định, không ghi gì ở sổ KHTC.
 func (s *Service) Cancel(ctx context.Context, id uuid.UUID, reason, idem string) (Detail, error) {
-	if s.GuardCancel != nil {
-		err := s.GuardCancel(ctx, id, func(tx pgx.Tx) error { _, e := s.cancel(ctx, id, reason, idem, tx); return e })
-		if err != nil {
-			return Detail{}, err
-		}
-		return s.Get(ctx, id)
-	}
-	return s.cancel(ctx, id, reason, idem, nil)
-}
-
-func (s *Service) cancel(ctx context.Context, id uuid.UUID, reason, idem string, protected pgx.Tx) (Detail, error) {
-	c, err := s.writer(ctx)
+	c, err := s.periodWriter(ctx, id)
 	if err != nil {
 		return Detail{}, err
 	}
@@ -379,21 +354,94 @@ func (s *Service) cancel(ctx context.Context, id uuid.UUID, reason, idem string,
 	case err != nil:
 		return Detail{}, ErrNotCancellable.WithDetail(err.Error())
 	}
-	if err := s.Control.CancelPeriod(ctx, domain.ProfileKHTC, d.Period.FormsPeriodRef, why, eventIdem(idem, "forms-cancel", id)); err != nil &&
+	var token uuid.UUID
+	cctx := ctx // lời gọi cap/forms: có hạn trước khi ý định hủy hết hạn (review #143 C1)
+	if s.CancelGuard != nil {
+		var deadline time.Time
+		token, deadline, err = s.CancelGuard.BeginCancel(ctx, id)
+		if err == nil {
+			var cancel context.CancelFunc
+			cctx, cancel = context.WithDeadline(ctx, deadline)
+			defer cancel()
+		}
+		switch {
+		case errors.Is(err, domain.ErrHasFinal):
+			return Detail{}, ErrNotCancellable.WithDetail(err.Error())
+		case errors.Is(err, domain.ErrCancelling):
+			return Detail{}, ErrCancelling
+		case err != nil:
+			return Detail{}, err
+		}
+	}
+	abort := func(cause error) error {
+		if s.CancelGuard == nil {
+			return cause
+		}
+		actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if aerr := s.CancelGuard.AbortCancel(actx, id, token); aerr != nil {
+			return errors.Join(cause, aerr)
+		}
+		return cause
+	}
+	if err := s.Control.CancelPeriod(cancelNativeContext(cctx, s.DB, c.k, d.Period, why, eventIdem(idem, "forms-cancel", id)), domain.ProfileKHTC, d.Period.FormsPeriodRef, why, eventIdem(idem, "forms-cancel", id)); err != nil &&
 		!errors.Is(err, formsport.ErrPeriodCancelled) {
-		return Detail{}, err
+		if ctx.Err() == nil && cctx.Err() != nil {
+			err = ErrDependency.WithDetail("hủy kỳ ở cap/forms chậm quá hạn giữ kỳ — thử lại").WithCause(err)
+		}
+		return Detail{}, abort(err)
 	}
 	st := d.State
 	event := store.Event{PeriodID: id, Action: store.ActionCancelled, Reason: &why, State: &st}
-	if protected != nil {
+	if s.CancelGuard != nil {
 		event.ID, event.ActorRef, event.EventTime = ids.New(), c.p.ActorRef, s.now()
-		err := store.InsertEvent(ctx, protected, c.p.TenantID, &event, eventIdem(idem, "cancel", id))
-		return Detail{}, classify(err)
+		write := func(tx pgx.Tx) error {
+			return store.InsertEvent(ctx, tx, c.p.TenantID, &event, eventIdem(idem, "cancel", id))
+		}
+		err := s.CancelGuard.FinishCancel(ctx, id, token, write)
+		if errors.Is(err, domain.ErrCancelLost) {
+			return s.recoverLostCancel(ctx, id, d.Period.FormsPeriodRef, write)
+		}
+		if err != nil {
+			return Detail{}, abort(classify(err))
+		}
+		return s.Get(ctx, id)
 	}
 	if err := s.appendEvent(ctx, c, event, eventIdem(idem, "cancel", id)); err != nil {
 		return Detail{}, err
 	}
 	return s.Get(ctx, id)
+}
+
+// recoverLostCancel (review #143 C1): cap/forms ĐÃ hủy kỳ native nhưng ý định hủy đã hết hạn trước khi ghi sự kiện hủy
+// (lời gọi/giao dịch chậm quá hạn). Bù: nhận ý định MỚI (BeginCancel kiểm Bản cuối dưới khóa khtc_snapshot) rồi ghi sự
+// kiện hủy — nhất quán khi trong lúc đó chưa ai đánh dấu Bản cuối. Đã có Bản cuối (cap/forms hủy, KHTC có Bản cuối — không
+// tự hoàn tác được vì hủy ở cap/forms là trạng thái cuối) → log lỗi extension.khtc.cancel_intent_lost để đối soát, trả
+// 409 extension.khtc_period_cancel_interrupted. Lần hủy khác đang giữ ý định → 409 cancelling (lần đó sẽ ghi sự kiện).
+func (s *Service) recoverLostCancel(ctx context.Context, id, formsRef uuid.UUID, write func(pgx.Tx) error) (Detail, error) {
+	lg := slog.Default().With("event", "extension.khtc.cancel_intent_lost", "period_id", id, "forms_period_ref", formsRef)
+	token, _, err := s.CancelGuard.BeginCancel(ctx, id)
+	if err == nil {
+		if err = s.CancelGuard.FinishCancel(ctx, id, token, write); err != nil {
+			actx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+			defer cancel()
+			err = errors.Join(err, s.CancelGuard.AbortCancel(actx, id, token))
+		}
+	}
+	switch {
+	case err == nil:
+		lg.WarnContext(ctx, "hủy kỳ KHTC: ý định hủy hết hạn sau khi cap/forms đã hủy — đã nhận lại ý định và ghi sự kiện hủy", "outcome", "recovered")
+		return s.Get(ctx, id)
+	case errors.Is(err, domain.ErrCancelling):
+		lg.WarnContext(ctx, "hủy kỳ KHTC: ý định hủy hết hạn, lần hủy khác đang giữ ý định", "outcome", "deferred")
+		return Detail{}, ErrCancelling
+	case errors.Is(err, domain.ErrHasFinal):
+		lg.ErrorContext(ctx, "hủy kỳ KHTC: cap/forms đã hủy kỳ native nhưng báo cáo đã có Bản cuối — cần đối soát", "outcome", "alert")
+		return Detail{}, ErrCancelInterrupted.WithCause(err)
+	default:
+		lg.ErrorContext(ctx, "hủy kỳ KHTC: cap/forms đã hủy kỳ native nhưng chưa ghi được sự kiện hủy — thử Hủy kỳ lại", "outcome", "alert", "error", err.Error())
+		return Detail{}, classify(err)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -463,4 +511,27 @@ func (s *Service) InstallTemplate(ctx context.Context, idem string) (TemplateSta
 		return TemplateState{}, err
 	}
 	return TemplateState{Code: ref.Code, Version: ref.Version, Title: ref.Title}, nil
+}
+
+func (s *Service) sourceRows(ctx context.Context, srcs []store.Source) []SourceRow {
+	var out []SourceRow
+	refs := make([]extport.KHTCSourceRef, 0, len(srcs))
+	for _, sr := range srcs {
+		ref := extport.KHTCSourceRef{Department: sr.Department, Source: sr.Source, CalendarID: sr.CalendarID, CalendarVersion: sr.CalendarVersion,
+			NativeKey: sr.NativeKey}
+		if sr.Label != nil {
+			ref.Label = *sr.Label
+		}
+		refs = append(refs, ref)
+		out = append(out, SourceRow{Ref: ref})
+	}
+	if s.Crosswalk != nil && len(refs) > 0 {
+		if states, err := s.Crosswalk.States(ctx, refs); err == nil && len(states) == len(refs) {
+			for i, st := range states {
+				out[i].Known, out[i].Closed, out[i].At = true, st.Closed, st.ClosedAt
+			}
+		}
+	}
+
+	return out
 }

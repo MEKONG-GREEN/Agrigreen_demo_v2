@@ -164,12 +164,31 @@ func PeriodsByIDs(ctx context.Context, tx pgx.Tx, ids []uuid.UUID) (map[uuid.UUI
 // PeriodsFiltered liệt kê kỳ native của profile (mới trước) lọc tùy chọn theo mã biểu và khoảng ngày của đặc tả
 // (kỳ có period_to ≥ from và period_from ≤ to; kỳ không gắn lịch luôn qua).
 func PeriodsFiltered(ctx context.Context, tx pgx.Tx, profile, code string, from, to *time.Time, limit int) ([]Period, error) {
+	return PeriodsFilteredAfter(ctx, tx, profile, code, from, to, nil, limit)
+}
+
+// PeriodKey là khóa thứ tự của kỳ trong PeriodsFiltered (ORDER BY period_from DESC NULLS LAST, id DESC).
+type PeriodKey struct {
+	From *time.Time // ngày đầu của đặc tả (nil = kỳ không gắn lịch)
+	ID   uuid.UUID
+}
+
+// PeriodsFilteredAfter như PeriodsFiltered, chỉ lấy các kỳ đứng SAU khóa after (nil = từ đầu) — đọc theo lô/trang.
+func PeriodsFilteredAfter(ctx context.Context, tx pgx.Tx, profile, code string, from, to *time.Time, after *PeriodKey, limit int) ([]Period, error) {
+	var afterFrom *string
+	var afterID *uuid.UUID
+	if after != nil {
+		afterFrom, afterID = dateOrNil(after.From), &after.ID
+	}
 	rows, err := tx.Query(ctx, `SELECT `+periodSelect("p.")+` FROM pf_forms.period p
 	    LEFT JOIN pf_forms.period_spec s ON s.tenant_id = p.tenant_id AND s.period_id = p.id
 	   WHERE p.profile = $1 AND ($2 = '' OR p.template_code = $2)
 	     AND ($3::date IS NULL OR s.period_to IS NULL OR s.period_to >= $3::date)
 	     AND ($4::date IS NULL OR s.period_from IS NULL OR s.period_from <= $4::date)
-	   ORDER BY s.period_from DESC NULLS LAST, p.id DESC LIMIT $5`, profile, code, dateOrNil(from), dateOrNil(to), limit)
+	     AND ($7::uuid IS NULL
+	       OR ($6::date IS NOT NULL AND (s.period_from IS NULL OR s.period_from < $6::date OR (s.period_from = $6::date AND p.id < $7::uuid)))
+	       OR ($6::date IS NULL AND s.period_from IS NULL AND p.id < $7::uuid))
+	   ORDER BY s.period_from DESC NULLS LAST, p.id DESC LIMIT $5`, profile, code, dateOrNil(from), dateOrNil(to), limit, afterFrom, afterID)
 	if err != nil {
 		return nil, err
 	}

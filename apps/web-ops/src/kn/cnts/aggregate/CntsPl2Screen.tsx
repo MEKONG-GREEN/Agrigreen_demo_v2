@@ -77,6 +77,8 @@ function Pl2Body({ v, writer, act, capi, reload }: {
   );
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [reopening, setReopening] = useState(false);
+  // BF-CN-CATCH #112 (UP-09): xem khai thác theo xã từng sheet của biểu ĐÁNH BẮT (cá, tôm, mực, khác) hoặc tổng.
+  const [sheet, setSheet] = useState("tong");
   const st = AGG_STATE[v.aggregate.state];
   const groupLabel = Object.fromEntries(v.aqua_groups.map((g) => [g.key, g.label]));
   const saveAqua = async () => {
@@ -199,7 +201,14 @@ function Pl2Body({ v, writer, act, capi, reload }: {
       </section>
 
       <section className="card sec">
-        <h2>Khai thác theo xã (tổng sản lượng, tấn)</h2>
+        <h2>Khai thác theo xã ({sheet === "tong" ? "tổng sản lượng" : (v.groups.find((g) => g.key === sheet)?.label ?? sheet)}, tấn)</h2>
+        <div className="tabs" role="tablist" aria-label="Sheet khai thác">
+          {[...v.groups.filter((g) => g.key === "tong"), ...v.groups.filter((g) => g.key !== "tong")].map((g) => (
+            <button key={g.key} role="tab" aria-selected={sheet === g.key} className={sheet === g.key ? "tab active" : "tab"} onClick={() => setSheet(g.key)}>
+              {g.key === "tong" ? "Tổng khai thác" : g.label}
+            </button>
+          ))}
+        </div>
         <table className="dt" aria-label="Khai thác theo xã">
           <thead>
             <tr><th>Khu vực</th><th>Xã/phường</th>{COLS_HEAD}<th>Ghi chú</th></tr>
@@ -212,14 +221,14 @@ function Pl2Body({ v, writer, act, capi, reload }: {
                 regionHead && reg ? (
                   <tr key={"r:" + c.region_code} className="row-sub">
                     <td colSpan={2}><strong>{reg.region_name}</strong></td>
-                    <ColsCells c={reg.cells.tong!} />
+                    <ColsCells c={reg.cells[sheet] ?? reg.cells.tong!} />
                     <td />
                   </tr>
                 ) : null,
                 <tr key={c.commune_code}>
                   <td />
                   <td>{c.commune_name}</td>
-                  <ColsCells c={c.cells.tong!} />
+                  <ColsCells c={c.cells[sheet] ?? c.cells.tong!} />
                   <td>
                     {c.expected && !c.reported ? <StatusPill tone="bad">Chưa nộp</StatusPill> : null}
                     {c.nil_report ? <StatusPill tone="neutral">Không phát sinh</StatusPill> : null}

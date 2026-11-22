@@ -1,0 +1,4 @@
+- [x] BF-SWEEP-KHTC-AFTER-EDITOR: #241 lát reviewer FN-TI-02.04: bắt buộc target/version đã đọc, ACK từ public native Forms, chặn ý định cũ tác động lần gửi mới; giữ nguyên native atomic guard và editor #229.
+- [x] BF-SWEEP-KHTC-AFTER-EDITOR: DetailPage, nút bên phải, nguồn chỉ đọc, ghi chú Unicode/lỗi liên kết, xác nhận đúng lần gửi, quyền/resource lifetime, late GET/ACK/ABA và cùng payload/key khi pending/unknown.
+- [ ] BF-SWEEP-KHTC-AFTER-EDITOR: Claude review chéo đúng SHA sau toàn bộ cổng, native/full web/browser/scanner và CI xanh; chưa coi tích hợp hoàn tất.
+- [ ] BF-SWEEP-KHTC-AFTER-EDITOR: Phần còn lại chính thức #242: public immutable history/compare/actor/audit/receipt; report/snapshot/Bản cuối/Excel/cảnh báo nguồn; kỳ nhúng/Adhoc/navigation còn lại và chốt khác biệt last-send policy với BRD v2.3 qua #217/#239. Không coi lát này là full FN/UAT/G1.

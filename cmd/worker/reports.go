@@ -94,7 +94,11 @@ func buildReportsModule(ctx context.Context, log *slog.Logger, pool *pgxpool.Poo
 	if err != nil {
 		return nil, err
 	}
-	dir := accounts.New(nil, clk, accounts.Deps{Directory: kc}).MailDirectory()
+	acc, err := workerAccounts(nil, clk, accounts.Deps{Directory: kc})
+	if err != nil {
+		return nil, err
+	}
+	dir := acc.MailDirectory()
 	if dir == nil {
 		log.Warn("chưa cấu hình AG_KC_* — lịch gửi báo cáo không tra được email người nhận", "event", "startup", "outcome", "skipped")
 	}

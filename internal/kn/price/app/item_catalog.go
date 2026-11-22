@@ -626,7 +626,7 @@ func (s *ItemService) ApproveProposal(ctx context.Context, profile string, id uu
 			in.Points = append(in.Points, p.PointCode)
 		}
 		in.ValidTo = time.Time{}
-		res, err = s.createItemTx(ctx, tx, c, in, &id, idem)
+		res, err = s.createItemTx(ctx, tx, c, in, replacementPermission{caller: c, verified: true}, &id, idem)
 		if err != nil {
 			return err
 		}

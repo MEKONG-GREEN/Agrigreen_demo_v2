@@ -1,0 +1,293 @@
+paths:
+# @ag-order: 20100
+  /v1/extension/khtc/exported-reports:
+    get:
+      summary: "Kho metadata báo cáo KHTC đã xuất, chỉ đọc trong tenant phiên hiện tại"
+      operationId: extensionKhtcExportedReports
+      tags: [extension]
+      parameters:
+        - {name: field, in: query, schema: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}}
+        - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: kind, in: query, schema: {type: string, enum: ['', week, month, quarter, year, program, adhoc]}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: q, in: query, schema: {type: string, maxLength: 200}}
+        - {name: versions, in: query, schema: {type: boolean, default: false}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        "200":
+          description: Bản cuối của mỗi kỳ, hoặc bản xuất mới nhất nếu chưa có Bản cuối; versions=true hiện mọi phiên bản. Không có bản soạn.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchive'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/exported-reports/periods:
+    get:
+      summary: Chọn kỳ có báo cáo đã xuất trong tenant phiên, có tìm kiếm và phân trang
+      operationId: extensionKhtcArchivePeriods
+      tags: [extension]
+      parameters:
+        - {name: field, in: query, schema: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}}
+        - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: kind, in: query, schema: {type: string, enum: ['', week, month, quarter, year, program, adhoc]}}
+        - {name: q, in: query, description: Tìm tên kỳ (giữ tương thích API190), schema: {type: string, maxLength: 200}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+        - {name: versions, in: query, schema: {type: boolean, default: false}}
+        - {name: document_q, in: query, description: Tên kỳ hoặc số văn bản tương ứng bộ lọc kho, schema: {type: string, maxLength: 200}}
+      responses:
+        "200":
+          description: Kỳ có ít nhất một bản xuất, loại kỳ hủy và kỳ chỉ có bản soạn
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchivePeriods'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/exported-reports/fields:
+    get:
+      summary: Mã lĩnh vực từ các hàng đã xuất trong snapshot đóng băng, phân trang đầy đủ
+      operationId: extensionKhtcArchiveFields
+      tags: [extension]
+      parameters:
+        - {name: field, in: query, schema: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}}
+        - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
+        - {name: year, in: query, required: true, schema: {type: integer, minimum: 2000, maximum: 2100}}
+        - {name: kind, in: query, schema: {type: string, enum: ['', week, month, quarter, year, program, adhoc]}}
+        - {name: q, in: query, schema: {type: string, maxLength: 200}}
+        - {name: after, in: query, schema: {type: string, maxLength: 40}}
+        - {name: period_id, in: query, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+        - {name: versions, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: Mã lĩnh vực đã xác định trong mọi bản xuất khớp bộ lọc; metadata unknown không tạo mã giả
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchiveFields'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/periods/{id}/report/exports/{exportID}/preview:
+    get:
+      summary: Xem nội dung từ bản xuất bất biến, không đọc bản soạn
+      operationId: extensionKhtcArchivePreview
+      tags: [extension]
+      parameters:
+        - {name: field, in: query, schema: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}}
+        - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: Nội dung và mẫu đã ghim của đúng bản xuất
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchivePreview'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/periods/{id}/report/exports/{exportID}/words:
+    get:
+      summary: Danh sách Word đã lưu, đã xác minh liên kết với đúng bản xuất Excel
+      operationId: extensionKhtcArchiveWords
+      tags: [extension]
+      parameters:
+        - {name: field, in: query, schema: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}}
+        - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 100000, default: 0}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+      responses:
+        "200":
+          description: Metadata Word đã lưu; không suy liên kết Word cũ chưa được xác minh
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCArchiveWords'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/periods/{id}/report/exports/{exportID}/words/{runID}/download:
+    get:
+      summary: Tải nguyên byte Word đã lưu của đúng bản xuất; không dựng lại hoặc cấp số
+      operationId: extensionKhtcArchiveWordDownload
+      tags: [extension]
+      parameters:
+        - {name: field, in: query, schema: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}}
+        - {name: field_status, in: query, schema: {type: string, enum: [complete, partial, unknown]}}
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: exportID, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: runID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: DOCX đã lưu sau kiểm quyền, liên kết, băm và ghi nhận lần truy cập
+          headers:
+            X-Content-SHA256: {schema: {type: string, pattern: '^[a-f0-9]{64}$'}}
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: {type: string, format: binary}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+  /v1/extension/khtc/exported-reports/zip:
+    post:
+      summary: Tải tối đa 10 tệp Word và Excel đã lưu, ZIP và tổng byte gốc tối đa 20 MiB
+      operationId: extensionKhtcArchiveZIP
+      tags: [extension]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [items]
+              properties:
+                field: {type: string, maxLength: 40, pattern: '^[a-z0-9][a-z0-9._-]{0,39}$'}
+                field_status: {type: string, enum: [complete, partial, unknown]}
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [period_id, export_id]
+                    properties:
+                      period_id: {type: string, format: uuid}
+                      export_id: {type: string, format: uuid}
+                      format: {type: string, enum: [excel, word], default: excel}
+                      run_id: {type: string, format: uuid, description: Bắt buộc khi format là word; Excel không nhận run_id}
+      responses:
+        "200":
+          description: ZIP chứa nguyên byte Word và Excel đã lưu, đóng khi bất kỳ tệp nào không hợp lệ
+          content:
+            application/zip:
+              schema: {type: string, format: binary}
+        "400": {$ref: '#/components/responses/Problem'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "404": {$ref: '#/components/responses/Problem'}
+        "413": {$ref: '#/components/responses/Problem'}
+        "422": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+components:
+  schemas:
+# @ag-order: 20100
+    KHTCArchiveRow:
+      type: object
+      required: [id, period_id, period_name, report_type, document_no, version, final, provisional, actor_ref, at]
+      properties:
+        id: {type: string, format: uuid}
+        period_id: {type: string, format: uuid}
+        field_codes: {type: array, items: {type: string}}
+        field_status: {type: string, enum: [complete, partial, unknown]}
+        period_name: {type: string}
+        report_type: {type: string, enum: [week, month, quarter, year, program, adhoc]}
+        document_no: {type: string}
+        version: {type: integer, format: int64}
+        final: {type: boolean}
+        provisional: {type: boolean}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+# @ag-order: 20101
+    KHTCArchive:
+      type: object
+      required: [items, has_more, offset]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/KHTCArchiveRow'}}
+        has_more: {type: boolean}
+        offset: {type: integer}
+
+# @ag-order: 20102
+    KHTCArchivePreview:
+      type: object
+      additionalProperties: false
+      required: [export_id, version, content]
+      properties:
+        export_id: {type: string, format: uuid}
+        version: {type: integer, format: int64}
+        content: {$ref: '#/components/schemas/KHTCReportContent'}
+        template_document: {$ref: '#/components/schemas/KHTCTemplateRendered'}
+
+# @ag-order: 20103
+    KHTCArchivePeriod:
+      type: object
+      required: [id, name, report_type]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        report_type: {type: string, enum: [week, month, quarter, year, program, adhoc]}
+# @ag-order: 20104
+    KHTCArchivePeriods:
+      type: object
+      required: [items, has_more, offset]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/KHTCArchivePeriod'}}
+        has_more: {type: boolean}
+        offset: {type: integer}
+
+# @ag-order: 20105
+    KHTCArchiveWord:
+      type: object
+      required: [period_id, export_id, run_id, version, template, template_version, template_hash, input_hash, body_hash, size, file_name, content_type, doc_number, doc_number_auto, actor_ref, at]
+      properties:
+        period_id: {type: string, format: uuid}
+        export_id: {type: string, format: uuid}
+        run_id: {type: string, format: uuid}
+        version: {type: integer, format: int64}
+        template: {type: string}
+        template_version: {type: integer}
+        template_hash: {type: string}
+        input_hash: {type: string}
+        body_hash: {type: string}
+        size: {type: integer, format: int64}
+        file_name: {type: string}
+        content_type: {type: string}
+        doc_number: {type: string}
+        doc_number_auto: {type: boolean}
+        actor_ref: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+# @ag-order: 20106
+    KHTCArchiveWords:
+      type: object
+      required: [period_id, export_id, export_version, export_name, items, has_more, offset]
+      properties:
+        period_id: {type: string, format: uuid}
+        export_id: {type: string, format: uuid}
+        export_version: {type: integer, format: int64}
+        field_codes: {type: array, items: {type: string}}
+        field_status: {type: string, enum: [complete, partial, unknown]}
+        export_name: {type: string}
+        items: {type: array, items: {$ref: '#/components/schemas/KHTCArchiveWord'}}
+        has_more: {type: boolean}
+        offset: {type: integer}
+
+# @ag-order: 20107
+    KHTCArchiveFields:
+      type: object
+      required: [items, has_more, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [code]
+            properties:
+              code: {type: string}
+        has_more: {type: boolean}
+        next_cursor: {type: string}

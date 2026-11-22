@@ -5,6 +5,9 @@ package handler
 
 import (
 	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -383,10 +386,29 @@ type thresholdIn struct {
 	SurveyPct    *string `json:"survey_pct"`
 }
 
+var calendarPercent = regexp.MustCompile(`^[0-9]{1,3}(?:\.[0-9]{1,2})?$`)
+
 func calDecimal(s, name string) (decimal.Decimal, error) {
+	invalid := func() (decimal.Decimal, error) {
+		return decimal.Zero, problem.Validation.WithField(name, "nhập số thập phân thường trong (0; 100], tối đa 2 số lẻ")
+	}
+	// AUTO-REVIEW §4: độ dài, cú pháp và biên được kiểm TRƯỚC NewFromString hay tính toán decimal.
+	if len(s) > 32 {
+		return invalid()
+	}
+	s = strings.TrimSpace(s)
+	if !calendarPercent.MatchString(s) {
+		return invalid()
+	}
+	integer, fraction, _ := strings.Cut(s, ".")
+	whole, _ := strconv.Atoi(integer) // tối đa 3 chữ số đã kiểm cú pháp
+	decimalPart := strings.Trim(fraction, "0")
+	if whole > 100 || (whole == 100 && decimalPart != "") || (whole == 0 && decimalPart == "") {
+		return invalid()
+	}
 	d, err := decimal.NewFromString(s)
 	if err != nil {
-		return d, problem.Validation.WithDetail(name + " phải là số thập phân dạng chuỗi")
+		return invalid()
 	}
 	return d, nil
 }

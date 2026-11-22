@@ -464,8 +464,8 @@ func TestCNTSAlerts_W1143(t *testing.T) {
 
 	// Cấu hình nhắc nhở: mặc định BRD; Tỉnh lưu phiên bản mới; Xã không sửa; giá trị sai → 422.
 	cfg := want(t, xa1.get("/v1/extension/cnts/alert-config"), 200, "", "Xã đọc cấu hình")
-	if len(list(cfg, "forms")) != 5 || len(list(cfg, "kinds")) != 13 {
-		t.Fatalf("5 biểu, 13 loại: %v", cfg)
+	if len(list(cfg, "forms")) != 5 || len(list(cfg, "kinds")) != 14 { // CNTS v4.0: thêm dòng 13 Chưa check-out (#250)
+		t.Fatalf("5 biểu, 14 loại: %v", cfg)
 	}
 	want(t, xa1.put("/v1/extension/cnts/alert-config/forms/CNTS-BM04", map[string]any{"before_due_hours": 24}), 403, "", "Xã sửa")
 	want(t, tinh.put("/v1/extension/cnts/alert-config/forms/CNTS-BM04", map[string]any{"before_due_hours": 24, "repeat_daily": true,

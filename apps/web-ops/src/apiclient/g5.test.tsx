@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminApiClient, unwrap } from "@/api/client";
 import { newIdempotencyKey } from "@/api/idempotency";
-import { CLIENT_IDS, g5MockSnapshot, resetG5Mock, statementCsv } from "@/api/mock/g5";
+import { CLIENT_IDS, g5MockSnapshot, periodBack, resetG5Mock, statementCsv } from "@/api/mock/g5";
 import { mockAdminFetchNoDelay } from "@/api/mock/handler";
 import { MOCK_PERSONAS, mockToken } from "@/api/mock/personas";
 import { ApiProblem, PROBLEM_MESSAGES, problemMessage } from "@/api/problem";
@@ -69,9 +69,19 @@ vi.mock("@/auth/AuthProvider", async () => {
   };
 });
 
-beforeEach(() => {
+function resetG5At(now: string): void {
+  vi.setSystemTime(new Date(now));
   resetG5Mock();
   auth.persona = "api-admin";
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  resetG5At("2026-10-02T03:00:00.000Z");
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("tiền VND dạng chuỗi thập phân — không float (ADR-0023, R-10)", () => {
@@ -250,31 +260,70 @@ describe("backend giả lập G5 — quy tắc như app/", () => {
     expect(viewer.code).toBe("forbidden");
   });
 
-  it("khóa API: bí mật chỉ ở phản hồi 201 đầu, gọi lặp cùng Idempotency-Key không có bí mật, mock không giữ bí mật", async () => {
-    const key = newIdempotencyKey();
-    const first = await unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: { "Idempotency-Key": key } } }));
-    expect(first.api_key).toMatch(/^agk_[a-z2-7]{12}_[A-Za-z0-9_-]{43}$/);
-    expect(first.api_key?.startsWith(`agk_${first.key_prefix}_`)).toBe(true);
-    const replay = await unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: { "Idempotency-Key": key } } }));
-    expect(replay.key_id).toBe(first.key_id);
-    expect(replay.api_key).toBeUndefined();
-    const secretPart = first.api_key!.split("_").pop()!;
-    expect(g5MockSnapshot()).not.toContain(secretPart);
-    expect(JSON.stringify(window.sessionStorage)).not.toContain(secretPart);
-    const list = await unwrap(admin("api-admin").GET("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory } } }));
-    expect(JSON.stringify(list)).not.toContain(secretPart);
-    // Đã có 2 khóa hiệu lực → 409 apiclient.too_many_keys.
-    const tooMany = await problemOf(unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: hdr() } })));
-    expect(tooMany.code).toBe("apiclient.too_many_keys");
-  });
+  it.each(["giữa", "gần cuối"] as const)(
+    "khóa API: bí mật chỉ ở phản hồi 201 đầu, replay không có bí mật, không lưu payload đầy đủ có _ ở %s",
+    async (position) => {
+      const originalRandom = crypto.getRandomValues.bind(crypto);
+      let secretDraws = 0;
+      const fixedRandom = (array: Parameters<typeof crypto.getRandomValues>[0]): ReturnType<typeof crypto.getRandomValues> => {
+        if (array instanceof Uint8Array && array.byteLength === 32) {
+          secretDraws++;
+          array.fill(0);
+          if (position === "giữa") array.set([255, 255, 255], 15);
+          else {
+            array[30] = 3;
+            array[31] = 249;
+          }
+          return array;
+        }
+        return originalRandom(array);
+      };
+      const random = vi.spyOn(crypto, "getRandomValues").mockImplementation(fixedRandom);
+      try {
+        const key = newIdempotencyKey();
+        const first = await unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: { "Idempotency-Key": key } } }));
+        expect(/^agk_[a-z2-7]{12}_[A-Za-z0-9_-]{43}$/.test(first.api_key ?? "")).toBe(true);
+        expect(first.api_key?.startsWith(`agk_${first.key_prefix}_`)).toBe(true);
+        const replay = await unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: { "Idempotency-Key": key } } }));
+        expect(replay.key_id).toBe(first.key_id);
+        expect(replay.api_key).toBeUndefined();
+        const secretPart = first.api_key!.slice(`agk_${first.key_prefix}_`.length);
+        expect(g5MockSnapshot().includes(secretPart)).toBe(false);
+        expect(JSON.stringify(window.sessionStorage).includes(secretPart)).toBe(false);
+        const list = await unwrap(admin("api-admin").GET("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory } } }));
+        expect(JSON.stringify(list).includes(secretPart)).toBe(false);
+        expect(secretPart.length).toBe(43);
+        expect(secretPart.includes("_")).toBe(true);
+        // Đã có 2 khóa hiệu lực → 409 apiclient.too_many_keys.
+        const tooMany = await problemOf(unwrap(admin("api-admin").POST("/v1/api-clients/{id}/keys", { params: { path: { id: CLIENT_IDS.factory }, header: hdr() } })));
+        expect(tooMany.code).toBe("apiclient.too_many_keys");
+        expect(secretDraws).toBe(1);
+      } finally {
+        random.mockRestore();
+      }
+    },
+  );
 
-  it("bảng kê: kỳ chưa kết thúc → 409; 202 + job → hoàn tất; người yêu cầu không tự duyệt; CSV tất định như domain.StatementCSV", async () => {
-    const today = new Date();
-    const thisMonth = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`;
+  it.each([
+    ["trước ranh giới tháng VN", "2026-10-31T16:59:59.999Z", "2026-10", "2026-09"],
+    ["đúng ranh giới tháng VN", "2026-10-31T17:00:00.000Z", "2026-11", "2026-10"],
+    ["tháng UTC khác tháng VN", "2026-10-31T18:15:39.606Z", "2026-11", "2026-10"],
+    ["sau ranh giới tháng UTC", "2026-11-01T00:00:00.001Z", "2026-11", "2026-10"],
+    ["trước ranh giới năm VN", "2026-12-31T16:59:59.999Z", "2026-12", "2026-11"],
+    ["đúng ranh giới năm VN", "2026-12-31T17:00:00.000Z", "2027-01", "2026-12"],
+    ["năm UTC khác năm VN", "2026-12-31T23:59:59.999Z", "2027-01", "2026-12"],
+    ["sau ranh giới năm UTC", "2027-01-01T00:00:00.001Z", "2027-01", "2026-12"],
+  ])("bảng kê (%s): kỳ chưa kết thúc → 409; 202 + job → hoàn tất; người yêu cầu không tự duyệt; CSV tất định như domain.StatementCSV", async (_case, now, openPeriod, endedPeriod) => {
+    resetG5At(now);
+    const thisMonth = periodBack(0);
     const notEnded = await problemOf(unwrap(admin("api-admin").POST("/v1/metering/statements", { params: { header: hdr() }, body: { period: thisMonth } })));
-    expect(notEnded.code).toBe("metering.period_not_ended");
+    expect([notEnded.status, notEnded.code]).toEqual([409, "metering.period_not_ended"]);
+    expect(thisMonth).toBe(openPeriod);
     const period = lastEndedPeriod();
-    const job = await unwrap(admin("api-admin").POST("/v1/metering/statements", { params: { header: hdr() }, body: { period, client_id: CLIENT_IDS.verifier } }));
+    expect(period).toBe(endedPeriod);
+    const queued = await admin("api-admin").POST("/v1/metering/statements", { params: { header: hdr() }, body: { period, client_id: CLIENT_IDS.verifier } });
+    expect(queued.response.status).toBe(202);
+    const job = await unwrap(Promise.resolve(queued));
     expect(job.status).toBe("queued");
     let j = job;
     for (let i = 0; i < 3 && j.status === "queued"; i++) j = await unwrap(admin("api-admin").GET("/v1/metering/statement-jobs/{id}", { params: { path: { id: job.id } } }));

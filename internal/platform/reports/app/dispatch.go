@@ -35,6 +35,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // EgressDispatch là đường xuất "Báo cáo Chi cục" qua điểm kiểm soát.
@@ -650,8 +651,11 @@ func (s *Service) SendDispatch(ctx context.Context, id uuid.UUID, in SendInput, 
 //  3. Kết quả sent/failed ghi có điều kiện còn giữ đúng token rồi nhả việc (giao dịch riêng): giao dịch inbox hủy sau đó
 //     → giao lại thấy "sent" → không gửi lại.
 //
-// Giao dịch inbox (tx) chỉ dùng để ĐỌC; không khóa dòng dispatch (khóa sẽ chặn câu nhận việc ở giao dịch riêng).
-func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env outbox.Envelope) error {
+// P0-POOL-SHARED-2 (#143): toàn bộ lượt gửi (đọc, nhận việc, đọc kho, SMTP, ghi dấu, ghi kết quả — mỗi bước một giao
+// dịch ngắn riêng) chạy NGOÀI giao dịch inbox qua txdeps.Get: inbox.Process hủy giao dịch inbox, chạy lượt gửi khi KHÔNG
+// giữ kết nối nào, rồi chạy lại handler — lần này chỉ trả kết quả đã nhớ và commit dòng inbox. Trước đây giao dịch inbox
+// mở suốt lượt gửi (giữ một kết nối trong khi chờ kết nối thứ hai cho giao dịch riêng, và trong lúc SMTP/kho chạy).
+func (s *Service) HandleDispatchRequested(ctx context.Context, _ pgx.Tx, env outbox.Envelope) error {
 	var p port.DispatchRequestedV1
 	if err := json.Unmarshal(env.Payload, &p); err != nil {
 		return err
@@ -663,9 +667,21 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if s.DB == nil {
 		return ErrDependency.WithDetail("chưa nối pool DB của pf/reports (worker)")
 	}
+	_, err = txdeps.Get(ctx, "reports.dispatch:"+env.EventID.String(), func(ctx context.Context) (struct{}, error) {
+		return struct{}{}, s.sendDispatch(ctx, env, p, id)
+	})
+	return err
+}
+
+// sendDispatch là một lượt gửi email Chi cục (ngoài giao dịch inbox; mỗi bước DB là giao dịch ngắn riêng).
+func (s *Service) sendDispatch(ctx context.Context, env outbox.Envelope, p port.DispatchRequestedV1, id uuid.UUID) error {
 	tid := env.TenantID
-	d, err := store.DispatchByID(ctx, tx, id, false)
-	if err != nil || d == nil {
+	var d *store.Dispatch
+	if err := s.tx(ctx, tid, func(tx pgx.Tx) error {
+		var err error
+		d, err = store.DispatchByID(ctx, tx, id, false)
+		return err
+	}); err != nil || d == nil {
 		return err
 	}
 	if d.Status != dispatch.StatusSending || d.Attempts != p.Attempt {
@@ -680,6 +696,8 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	token := ids.New()
 	var claimed bool
 	round, sentAttempt := 0, 0
+	var all []store.DispatchRecipient
+	var files []store.DispatchFile
 	if err := s.tx(ctx, tid, func(claimTx pgx.Tx) error {
 		var err error
 		claimed, err = store.ClaimDispatch(ctx, claimTx, d.ID, d.Attempts, token, now.Add(lease), now)
@@ -699,7 +717,14 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 			return err
 		}
 		// Lượt của vòng gần nhất đã "sent": dấu dạng cũ chỉ có giá trị cho các lượt SAU đó (vòng chưa hoàn tất).
-		sentAttempt, err = store.LastSentAttempt(ctx, claimTx, d.ID)
+		if sentAttempt, err = store.LastSentAttempt(ctx, claimTx, d.ID); err != nil {
+			return err
+		}
+		// Danh bạ và tệp đã xuất đọc cùng giao dịch nhận việc (trước đây đọc ở giao dịch inbox).
+		if all, err = store.Recipients(ctx, claimTx, d.Province, d.Department, false); err != nil {
+			return err
+		}
+		files, err = store.DispatchFiles(ctx, claimTx, d.ID)
 		return err
 	}); err != nil {
 		return err
@@ -733,10 +758,6 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 	if s.Mailer == nil {
 		return fail("chưa cấu hình SMTP công vụ (AG_SMTP_*)")
 	}
-	all, err := store.Recipients(ctx, tx, d.Province, d.Department, false)
-	if err != nil {
-		return err
-	}
 	addr := map[uuid.UUID]string{}
 	for _, r := range all {
 		if r.Address != nil && r.Active {
@@ -748,10 +769,6 @@ func (s *Service) HandleDispatchRequested(ctx context.Context, tx pgx.Tx, env ou
 		if a, ok := addr[x]; ok {
 			cc = append(cc, a)
 		}
-	}
-	files, err := store.DispatchFiles(ctx, tx, d.ID)
-	if err != nil {
-		return err
 	}
 	limitMB, err := s.attachmentLimit(ctx, now)
 	if err != nil {

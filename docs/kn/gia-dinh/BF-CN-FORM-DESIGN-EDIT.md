@@ -1,0 +1,14 @@
+## BF-CN-FORM-DESIGN-EDIT — FN-07 lưu phiên bản, sao chép, khóa KNQG, chọn biểu điều tra (#192)
+
+Căn cứ duy nhất: BRD CNTS v4.0 — FN-07 (B1–B4, luồng phụ "Sao chép biểu; nạp cấu trúc từ Excel", BR-01, BR-02, AC-03), UR-TINH-07, ma trận quyền FN-07 mục VI, FN-21 B1 / UR-TINH-26 "biểu điều tra (thiết kế tại FN-07, phiên bản)". Nối tiếp #174 (xem/kiểm tệp) và cổng chung #191.
+
+- Chính sách định nghĩa biểu profile `kn_cnts` (`Profile.RequireDefinitionPolicy`, `Module.CNTSDefinitionPolicy`, đăng ký ở gốc lắp ráp): áp cho mọi đường ghi phiên bản (API KN, REST `/v1/forms/templates`, `Publisher.DefineTemplate`, cài biểu chuẩn). Mặc định từ chối.
+- Quyền ghi theo ma trận FN-07: Admin; Cấp Tỉnh Phòng CNTS nhóm "Cán bộ tổng hợp" (nhóm chưa khai coi như Cấp Tỉnh, giống các màn lập kế hoạch khác của phòng). Viên chức, lãnh đạo phòng, Ban Giám đốc, chỉ xem, TW, Xã chỉ đọc hoặc 403. Cấp Tỉnh chỉ ghi BM-17 và biểu điều tra `CNTS-DT-*`.
+- Mẫu KNQG (BR-02; UR-TINH-07 "Mẫu 01, 03, 04, 05, 07 cố định"): trong biểu cap/forms của phòng là BM-01, BM-04, BM-05 I/II. Chỉ chấp nhận đúng cấu trúc chuẩn (cài/cập nhật biểu chuẩn), mọi thay đổi khác bị từ chối kể cả Admin. BM-03 (lịch trực) và BM-07 (mẫu Word KNQG) không phải biểu cap/forms. Sao chép mẫu KNQG thành biểu điều tra mới được phép.
+- "Mẫu đang có dữ liệu chỉ thêm cột, không xóa" (UR-TINH-07): áp cho mọi mẫu đã có phiên bản (không xóa, không đổi kiểu chỉ tiêu; được đổi tên, đơn vị, nhóm, bắt buộc, lựa chọn, thêm chỉ tiêu). Cổng chung không có phép đọc "mẫu đã có dữ liệu" theo mã, nên quy tắc chặt hơn câu chữ BRD — chọn an toàn cho BR-01.
+- Lưu phiên bản dùng `base_version` (phiên bản đã đọc); lưu chồng → 409. Kỳ/bài đã phát hành giữ `template_id` cũ (BR-01, AC-03); kỳ phát hành sau dùng phiên bản mới nhất (UR-TINH-07 "mỗi lần phát hành tạo phiên bản mới; kỳ đã nộp giữ phiên bản cũ"). "Cài biểu kỳ" của Admin không ghi đè phiên bản BM-17 Cấp Tỉnh đã lưu.
+- Biểu mới/sao chép: mã máy chủ ghép `CNTS-DT-<hậu tố>` (chữ in hoa, số, gạch ngang, ≤ 40 ký tự), phiên bản 1, loại "biểu điều tra" dùng cho Chiến dịch điều tra (FN-21). Kết quả kiểm Excel hợp lệ chỉ lưu khi người dùng bấm lưu (tạo biểu điều tra hoặc dùng cho biểu đang chọn); tệp sai không ghi gì.
+- Đợt điều tra ghi phiên bản biểu đã chọn (`pf_extension.cnts_campaign.template_version`, migration mới, chỉ thêm cột; Nháp cũ NULL = mới nhất lúc phát hành). Phát hành và bảng kết quả dùng đúng phiên bản đã chọn/đã phát hành.
+- KN không ghi dữ liệu HTX; không sửa schema shared; danh mục phiên bản đọc qua `formsport.TemplateCatalog` (capability tùy chọn của Publisher).
+
+Khác biệt với nội dung issue #192: issue yêu cầu cả mẫu nhật ký động (GPS/ảnh/tần suất, chủ nhiệm chương trình) và runtime nhật ký thực thi cấu trúc động; BRD 2.0 UR-TINH-07 cũng có loại "lịch" và biểu báo cáo mã mới. Phần này tách gói con BF-CN-FORM-DESIGN-EDIT-DIARY vì runtime nhật ký (`cntsdiary`, BM-08/09/19) hiện là trường cố định, cần thay đổi lớn riêng.

@@ -1,0 +1,4 @@
+- [x] BF-SWEEP-KHTC-NONPLAN-UI-AFTER-INBOX: #229 lát editor phiếu thường: giới hạn/lỗi từng ô, DetailPage, dirty/authority/resource lifetime, khóa nội dung lúc pending/unknown, retry payload/key, xác nhận đúng lần gửi trên API hiện hữu.
+- [x] BF-SWEEP-KHTC-NONPLAN-UI-AFTER-INBOX: RED nghiệp vụ trên producer cũ và test control, cực trị số, late ACK/GET/ABA, quyền/context và HTTP retry.
+- [ ] BF-SWEEP-KHTC-NONPLAN-UI-AFTER-INBOX: Claude review chéo đúng SHA và ticket merge sau mọi cổng/CI xanh; chưa coi tích hợp hoàn tất.
+- [ ] BF-SWEEP-KHTC-NONPLAN-UI-AFTER-INBOX: Phần còn lại chính thức #241: rà soát, report/snapshot/Bản cuối, kỳ nhúng/Adhoc/confirmation/navigation và public history/audit contract. Không coi lát này là full FN/UAT/G1.

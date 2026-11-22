@@ -1,9 +1,11 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/outbreak/domain"
@@ -43,7 +45,7 @@ func TestUR_XA_10_Rules(t *testing.T) {
 		"culled_kg":       func(o *domain.Outbreak) { o.CulledKg = &kg },
 		"symptoms":        func(o *domain.Outbreak) { o.Symptoms = "gọi 0912 345 678" },
 		"as_of":           func(o *domain.Outbreak) { o.AsOf = today.AddDate(0, 0, 1) },
-		"locality":        func(o *domain.Outbreak) { o.Locality = "" },
+		"household_ref":   func(o *domain.Outbreak) { r := uuid.New(); o.HouseholdRef = &r }, // v1 không ghi được nữa
 		"source":          func(o *domain.Outbreak) { o.Source = "khac" },
 		"location_source": func(o *domain.Outbreak) { o.LocationSource = "" },
 	}
@@ -58,6 +60,68 @@ func TestUR_XA_10_Rules(t *testing.T) {
 	o.Location = &domain.Point{Lat: decimal.Zero, Lon: decimal.Zero}
 	if es := domain.NormalizeOutbreak(&o, now, today); !fields(es)["location"] {
 		t.Errorf("tọa độ 0,0 phải bị chặn: %v", es)
+	}
+}
+
+// CNTS v4.0 (#252): địa bàn chỉ là ghi chú tùy chọn — DB-04 là hộ chọn trong danh sách.
+func TestLocalityOptional(t *testing.T) {
+	o := valid()
+	o.Locality = ""
+	if es := domain.NormalizeOutbreak(&o, now, today); len(es) != 0 {
+		t.Fatalf("thiếu địa bàn vẫn hợp lệ: %v", es)
+	}
+}
+
+// UR-XA-10 DB-16: số ha ≥ 0, tối đa 2 chữ số thập phân; kiểm cú pháp trước khi parse.
+func TestParseHectares(t *testing.T) {
+	for _, ok := range []string{"0", "12.5", "1234567890.99", " 3.10 "} {
+		if d, good := domain.ParseHectares(ok); !good || d == nil {
+			t.Errorf("%q phải hợp lệ", ok)
+		}
+	}
+	if d, good := domain.ParseHectares(""); !good || d != nil {
+		t.Errorf("rỗng → nil")
+	}
+	for _, bad := range []string{"-1", "1.234", "1e100000", "1e-100000", "12345678901", "1,5", "abc", ".5", strings.Repeat("9", 5000)} {
+		if _, good := domain.ParseHectares(bad); good {
+			t.Errorf("%q phải bị chặn", bad)
+		}
+	}
+}
+
+// FN-11 AC-05: bệnh nhóm thủy sản để trống DB-16 thì không gửi được; bệnh khác không ghi DB-16.
+func TestCheckAqua(t *testing.T) {
+	o := valid()
+	if es := domain.CheckAqua(&o, true); !fields(es)["aqua_farmed_ha"] || !fields(es)["aqua_wild_ha"] {
+		t.Fatalf("thiếu DB-16: %v", es)
+	}
+	z := decimal.Zero
+	o.AquaFarmedHa, o.AquaWildHa = &z, &z
+	if es := domain.CheckAqua(&o, true); len(es) != 0 {
+		t.Fatalf("DB-16 = 0 hợp lệ: %v", es)
+	}
+	if es := domain.CheckAqua(&o, false); !fields(es)["aqua_farmed_ha"] {
+		t.Fatalf("bệnh không thủy sản không ghi DB-16: %v", es)
+	}
+}
+
+// UR-XA-10: DB-04 phải có ít nhất 1 hộ (DB-15 ≥ 1), không lặp, tối đa 200.
+func TestCheckHouseholds(t *testing.T) {
+	a := uuid.New()
+	if es := domain.CheckHouseholds(nil, 0); !fields(es)["households"] {
+		t.Fatal("không hộ nào phải bị chặn")
+	}
+	if es := domain.CheckHouseholds([]uuid.UUID{a}, 0); len(es) != 0 {
+		t.Fatalf("một hộ hợp lệ: %v", es)
+	}
+	if es := domain.CheckHouseholds(nil, 1); len(es) != 0 {
+		t.Fatalf("một hộ mới hợp lệ: %v", es)
+	}
+	if es := domain.CheckHouseholds([]uuid.UUID{a, a}, 0); !fields(es)["households"] {
+		t.Fatal("hộ lặp phải bị chặn")
+	}
+	if es := domain.CheckHouseholds([]uuid.UUID{a}, domain.MaxHouseholds); !fields(es)["households"] {
+		t.Fatal("quá 200 hộ phải bị chặn")
 	}
 }
 

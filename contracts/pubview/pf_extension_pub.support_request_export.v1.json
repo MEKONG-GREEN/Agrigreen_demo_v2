@@ -1,0 +1,147 @@
+{
+  "view": "pf_extension_pub.v1_support_request_export",
+  "directive": "pf_extension_pub.support_request_export/v1",
+  "owner": "pf/extension",
+  "status": "published",
+  "package": "PA1-HTX-SUPPORT-GPSLOG (#313)",
+  "migration": "pf 20261116020729",
+  "consumers": [
+    "pf/cooperative one-time copy migration pf 20261116020731 (runs as ag_migrator per tenant); r_metrics, r_agg through existing published-schema policy; no application code reads this view"
+  ],
+  "purpose": "One-time export of HTX App support requests (HTX US-SUPPORT-01) from the KN module to the HTX owner module pf/cooperative (PA1 step 2, Q7). The KN table becomes read-only.",
+  "grain": "tenant x support request",
+  "key": [
+    "tenant_id",
+    "id"
+  ],
+  "closed_rule": "Append-only source (no updates); task columns are the current KN task projection. The copy is idempotent (skips ids already copied).",
+  "personal_data": false,
+  "columns": [
+    {
+      "name": "tenant_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "tenant id"
+    },
+    {
+      "name": "id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "support request id (UUIDv7)"
+    },
+    {
+      "name": "household_ref",
+      "type": "uuid",
+      "nullable": false,
+      "description": "household ref"
+    },
+    {
+      "name": "cooperative_ref",
+      "type": "uuid",
+      "nullable": false,
+      "description": "cooperative org ref"
+    },
+    {
+      "name": "commune_code",
+      "type": "text",
+      "nullable": false,
+      "description": "commune code"
+    },
+    {
+      "name": "province_code",
+      "type": "text",
+      "nullable": false,
+      "description": "province code"
+    },
+    {
+      "name": "plot_ref",
+      "type": "uuid",
+      "nullable": true,
+      "description": "plot ref"
+    },
+    {
+      "name": "category",
+      "type": "text",
+      "nullable": false,
+      "description": "incident category"
+    },
+    {
+      "name": "urgency",
+      "type": "text",
+      "nullable": false,
+      "description": "binh_thuong | khan"
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "nullable": false,
+      "description": "free text (phone/national id blocked on intake)"
+    },
+    {
+      "name": "photo_refs",
+      "type": "uuid[]",
+      "nullable": false,
+      "description": "file refs (<= 5)"
+    },
+    {
+      "name": "location",
+      "type": "geometry(Point,4326)",
+      "nullable": true,
+      "description": "GPS point; NULL = GPS missing"
+    },
+    {
+      "name": "gps_accuracy_m",
+      "type": "numeric(14,4)",
+      "nullable": true,
+      "description": "GPS accuracy (m)"
+    },
+    {
+      "name": "event_time",
+      "type": "timestamp with time zone",
+      "nullable": false,
+      "description": "device submit time"
+    },
+    {
+      "name": "received_at",
+      "type": "timestamp with time zone",
+      "nullable": false,
+      "description": "server receive time"
+    },
+    {
+      "name": "submitted_by",
+      "type": "uuid",
+      "nullable": false,
+      "description": "farmer actor ref"
+    },
+    {
+      "name": "device_id",
+      "type": "text",
+      "nullable": true,
+      "description": "device id"
+    },
+    {
+      "name": "idem_key",
+      "type": "text",
+      "nullable": false,
+      "description": "idempotency key"
+    },
+    {
+      "name": "task_id",
+      "type": "uuid",
+      "nullable": false,
+      "description": "KN task created with the request"
+    },
+    {
+      "name": "task_status",
+      "type": "text",
+      "nullable": true,
+      "description": "KN task status at read time"
+    },
+    {
+      "name": "task_sync_seq",
+      "type": "bigint",
+      "nullable": true,
+      "description": "KN task sync_seq at read time (farmer device cursor)"
+    }
+  ]
+}

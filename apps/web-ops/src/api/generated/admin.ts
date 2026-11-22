@@ -2463,6 +2463,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/accounts/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Nhật ký hệ thống (#70 cổng truy vấn, #73 KN): chỉ phiên Admin KN có MFA; mỗi trang (kể cả rỗng) ghi bền một lượt xem trước khi trả
+         * @description Đọc các sổ có chủ đã đăng ký (account_event của pf/accounts và các sổ KN: lượt xem nhật ký, hồ sơ KN, kỳ/duyệt báo cáo,
+         *     kỳ KHTC, cấp quyền CNTS) theo recorded_at trong [from, to), tối đa 93 ngày, mới nhất trước. Mọi trang phải gửi lại cùng
+         *     bộ lọc và limit; cursor ràng buộc băm bộ lọc, người đọc, tenant. Không nhận tenant. Kết quả chỉ có UUID, mã, thời điểm và
+         *     trường mã/ref/boolean trong danh sách cho phép của nguồn — không lý do, nội dung, payload hay tên người.
+         *     Lỗi: 401/403 (không phải Admin KN, đang hỗ trợ, thiếu MFA, tenant lệch — lần bị chủ KN từ chối cũng được ghi sổ),
+         *     422 bộ lọc/cursor sai, 503 accounts.dependency_unavailable khi chưa cấu hình nguồn/bộ ghi hoặc ghi lượt xem lỗi.
+         */
+        get: operations["accountsAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/accounts/support-log": {
         parameters: {
             query?: never;
@@ -5764,6 +5789,49 @@ export interface components {
             /** @description profile_updated: chỉ tên trường, old/new = null (RB-3) */
             changes: components["schemas"]["KNFieldChange"][];
             reason: string | null;
+        };
+        AuditChange: {
+            field: string;
+            before?: components["schemas"]["AuditValue"];
+            after?: components["schemas"]["AuditValue"];
+        };
+        AuditItem: {
+            source: string;
+            module: string;
+            /** Format: uuid */
+            event_ref: string;
+            /** Format: uuid */
+            entity_ref: string;
+            /** Format: uuid */
+            actor_ref: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: date-time */
+            recorded_at: string;
+            department?: string;
+            action: string;
+            /** @enum {string} */
+            outcome: "unknown" | "succeeded" | "denied" | "failed";
+            changes: components["schemas"]["AuditChange"][];
+        };
+        AuditPage: {
+            items: components["schemas"]["AuditItem"][];
+            /** @description Các nguồn thực sự tham gia trang (độ phủ — không phải toàn hệ thống) */
+            sources: string[];
+            /**
+             * Format: date-time
+             * @description Mốc thời gian cố định qua các trang
+             */
+            as_of: string;
+            next_cursor: string | null;
+        };
+        AuditValue: {
+            /** @enum {string} */
+            kind: "boolean" | "ref" | "codes";
+            boolean?: boolean;
+            /** Format: uuid */
+            ref?: string;
+            codes?: string[];
         };
         KNSupportLogEntry: {
             /** Format: uuid */
@@ -11757,6 +11825,47 @@ export interface operations {
             404: components["responses"]["Problem"];
             /** @description accounts.support_session_ended */
             409: components["responses"]["Problem"];
+        };
+    };
+    accountsAudit: {
+        parameters: {
+            query: {
+                /** @description RFC3339, gồm */
+                from: string;
+                /** @description RFC3339, không gồm; to - from ≤ 93 ngày */
+                to: string;
+                /** @description Người thao tác */
+                actor_ref?: string;
+                /** @description Mã phòng ban (nguồn không lưu phòng ban không khớp) */
+                department?: string;
+                /** @description Mã module nguồn: accounts, kn.audit, kn.records, kn.report, kn.khtc, kn.cnts */
+                module?: string;
+                /** @description Mã sự việc đầy đủ, ví dụ account.locked, period.reopened */
+                action?: string;
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Một trang */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            /** @description accounts.context_required — chưa chọn ngữ cảnh phiên KN */
+            428: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
         };
     };
     accountsSupportLog: {

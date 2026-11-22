@@ -1,10 +1,12 @@
 // Client có kiểu cho Nâng bậc lương (W11.25, dom/hrm — /v1/hrm/promotion*, /v1/hrm/staff/{id}/ratings): danh sách
 // nâng bậc NL01–NL04 (FN-09), xuất Mẫu số 1/2/4, sổ quyết định (FN-10). Họ tên chỉ đi qua bộ nhớ của màn.
 import { unwrap, type ApiClient } from "@/api/client";
-import { newIdempotencyKey } from "@/api/idempotency";
+import { currentIdempotentRun, newIdempotencyKey, withIdempotentOperation } from "@/api/idempotency";
+import { stableMultipart } from "@/api/multipart";
 import { parseProblemResponse } from "@/api/problem";
 import { filenameFromDisposition } from "@/lib/files";
 import type { components } from "@/api/generated/application";
+import { prepareHrmFile } from "./upload-file";
 
 type S = components["schemas"];
 export type PromoKind = S["HrmPromoKind"];
@@ -210,18 +212,19 @@ export function createPromotionApi(api: ApiClient) {
           body: { reason },
         }),
       ),
-    attachFile: (id: string, file: File): Promise<{ doc_id: string }> =>
-      unwrap(
+    attachFile: async (id: string, file: File): Promise<{ doc_id: string }> => {
+      const run = currentIdempotentRun();
+      const mp = stableMultipart([["file", await prepareHrmFile(file)]]);
+      const send = () => unwrap(
         api.POST("/v1/hrm/promotion/decisions/{id}/file", {
           params: { header: header(), path: { id } },
+          headers: { "Content-Type": mp.contentType },
           body: { file: file as unknown as string },
-          bodySerializer: (b: { file: string }) => {
-            const fd = new FormData();
-            fd.append("file", b.file as unknown as Blob, file.name);
-            return fd;
-          },
+          bodySerializer: () => mp.body,
         }),
-      ),
+      );
+      return run ? withIdempotentOperation(run, send) : send();
+    },
     async decisionBook(year?: number): Promise<{ blob: Blob; name: string }> {
       const res = await api.GET("/v1/hrm/promotion/decision-book", {
         params: { query: year ? { year } : {} },

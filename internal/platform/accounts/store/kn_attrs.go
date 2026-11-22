@@ -69,14 +69,28 @@ func InsertAttrEvent(ctx context.Context, tx pgx.Tx, e *AttrEvent) error {
 		string(e.After), e.Reason, e.EventTime.UTC(), e.ActorRef, e.IdemKey, domain.AttrRuleVersion).Scan(&e.Seq)
 }
 
-// AttrEventByIdem trả assignment_id và seq của dòng sổ đã ghi với idem_key (ok = false nếu chưa có).
-func AttrEventByIdem(ctx context.Context, tx pgx.Tx, key string) (uuid.UUID, bool, error) {
-	var id uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT assignment_id FROM pf_accounts.assignment_attr_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key).Scan(&id)
+// AttrIdem là phần dòng sổ thuộc tính vai cần để phát lại theo idem_key (#154): lần gán, tài khoản, người ghi,
+// ảnh chụp SAU (after, AttrsSnapshot) và lý do — đủ để so thao tác + actor + đích + nội dung yêu cầu.
+type AttrIdem struct {
+	AssignmentID uuid.UUID
+	UserRef      uuid.UUID
+	ActorRef     uuid.UUID
+	After        []byte
+	Reason       *string
+}
+
+// AttrEventByIdem trả dòng sổ đã ghi với idem_key (nil nếu chưa có).
+func AttrEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*AttrIdem, error) {
+	var p AttrIdem
+	err := tx.QueryRow(ctx, "SELECT assignment_id, user_ref, actor_ref, after, reason FROM pf_accounts.assignment_attr_event WHERE idem_key = $1"+
+		ledger.NewestByIdem(""), key).Scan(&p.AssignmentID, &p.UserRef, &p.ActorRef, &p.After, &p.Reason)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, false, nil
+		return nil, nil
 	}
-	return id, err == nil, err
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
 }
 
 // PutAttrs ghi bảng chiếu thuộc tính vai theo dòng sổ vừa ghi (R-21).
@@ -194,14 +208,25 @@ func InsertDelegEvent(ctx context.Context, tx pgx.Tx, e *DelegEvent) error {
 		d.ValidFrom, d.ValidTo, e.Reason, e.EventTime.UTC(), e.ActorRef, e.IdemKey, domain.AttrRuleVersion).Scan(&e.Seq)
 }
 
-// DelegEventByIdem trả delegation_id của dòng sổ đã ghi với idem_key.
-func DelegEventByIdem(ctx context.Context, tx pgx.Tx, key string) (uuid.UUID, bool, error) {
-	var id uuid.UUID
-	err := tx.QueryRow(ctx, "SELECT delegation_id FROM pf_accounts.delegation_event WHERE idem_key = $1"+ledger.NewestByIdem(""), key).Scan(&id)
+// DelegIdem là phần dòng sổ ủy quyền cần để phát lại theo idem_key (#154): ủy quyền, người ghi, lý do.
+type DelegIdem struct {
+	DelegationID uuid.UUID
+	ActorRef     uuid.UUID
+	Reason       string
+}
+
+// DelegEventByIdem trả dòng sổ ủy quyền đã ghi với idem_key (nil nếu chưa có).
+func DelegEventByIdem(ctx context.Context, tx pgx.Tx, key string) (*DelegIdem, error) {
+	var p DelegIdem
+	err := tx.QueryRow(ctx, "SELECT delegation_id, actor_ref, reason FROM pf_accounts.delegation_event WHERE idem_key = $1"+
+		ledger.NewestByIdem(""), key).Scan(&p.DelegationID, &p.ActorRef, &p.Reason)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, false, nil
+		return nil, nil
 	}
-	return id, err == nil, err
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
 }
 
 // PutDelegation ghi bảng chiếu ủy quyền.

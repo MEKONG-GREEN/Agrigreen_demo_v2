@@ -22,6 +22,7 @@ func (h Handler) registerPlans(rg *gin.RouterGroup) {
 	rg.GET("/hrm/plans/:year", h.planSummary)
 	rg.GET("/hrm/plans/:year/export", h.exportPlan)
 	rg.POST("/hrm/plans/:year/close", h.closePlan)
+	rg.POST("/hrm/plans/:year/remind", h.remindPlan)
 	rg.GET("/hrm/plans/:year/units/:unit", h.planUnit)
 	rg.GET("/hrm/plans/:year/units/:unit/previous", h.previousPlan)
 	rg.PUT("/hrm/plans/:year/units/:unit/draft", h.savePlanDraft)
@@ -181,6 +182,25 @@ func (h Handler) closePlan(c *gin.Context) {
 		return
 	}
 	h.planSummary(c)
+}
+
+// remindPlan: "Nhắc phòng chưa lập" (NOTIFY-HCTH-KN #50) — nhắc các đơn vị chưa gửi; pf/notify gửi lãnh đạo đơn vị.
+func (h Handler) remindPlan(c *gin.Context) {
+	y, ok := yearParam(c)
+	if !ok {
+		return
+	}
+	r, err := h.Svc.RemindPlan(c.Request.Context(), y, idem(c))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	units := make([]gin.H, 0, len(r.Units))
+	for _, u := range r.Units {
+		units = append(units, gin.H{"unit": u.Unit, "unit_name": u.UnitName})
+	}
+	c.JSON(http.StatusCreated, gin.H{"id": r.ID, "year": r.Year, "period_ref": r.PeriodRef, "units": units,
+		"due_at": r.DueAt.UTC().Format(time.RFC3339), "reminded_at": r.RemindedAt.UTC().Format(time.RFC3339)})
 }
 
 func (h Handler) planUnit(c *gin.Context) {

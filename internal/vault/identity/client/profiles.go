@@ -67,9 +67,10 @@ type SectionResponse struct {
 	Fields  map[string]string `json:"fields" pii:"true"`
 }
 
-// WriteResponse là phản hồi của amend và ghi ngăn — không chứa định danh.
+// WriteResponse là phản hồi của amend và ghi ngăn — không chứa định danh. RevisionRef: mã bản sửa của amend (#251).
 type WriteResponse struct {
-	Ref string `json:"ref"`
+	Ref         string `json:"ref"`
+	RevisionRef string `json:"revision_ref,omitempty"`
 }
 
 var _ Profiles = (*httpClient)(nil)

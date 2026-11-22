@@ -93,6 +93,11 @@ func SendLeaseFromEnv(getenv func(string) string) (time.Duration, error) {
 	return dispatch.SendLeaseFromEnv(getenv)
 }
 
+// SendMargin là biên an toàn giữa hạn lời gọi SMTP và hạn nhận việc (¼ hạn, tối đa 30 giây) — xem dispatch.SendMargin.
+func SendMargin(lease time.Duration) time.Duration {
+	return dispatch.SendMargin(lease)
+}
+
 // Module là pf/reports đã nối.
 type Module struct{ svc *app.Service }
 
@@ -164,6 +169,9 @@ func (m *Module) UseMailer(ml port.Mailer) { m.svc.Mailer = ml }
 // UseDispatchLease đặt hạn nhận việc gửi Chi cục sau khi dựng (kiểm thử hạn ngắn; vận hành dùng Deps.DispatchLease đã qua
 // SendLeaseFromEnv/ValidateSendLease).
 func (m *Module) UseDispatchLease(d time.Duration) { m.svc.DispatchLease = d }
+
+// UseDeliveryLease đặt hạn nhận việc gửi email lịch báo cáo (kiểm thử hạn ngắn; vận hành dùng mặc định 1 phút).
+func (m *Module) UseDeliveryLease(d time.Duration) { m.svc.DeliveryLease = d }
 
 // DispatchHandler là inbox.Handler cho pf.reports.dispatch.requested (consumer port.DispatchConsumer).
 func (m *Module) DispatchHandler() inbox.Handler { return m.svc.HandleDispatchRequested }

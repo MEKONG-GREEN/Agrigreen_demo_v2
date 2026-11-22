@@ -66,3 +66,7 @@ b3e05bd1a6928689875bcff44f887e687ae3d419:internal/platform/party/domain/menu_dep
 # bí mật — quy tắc trúng vì chữ "keyed" đứng trước một chuỗi dài.
 e6b50acee68dbfc3b0640fe1e95ec9a8d76bf149:docs/REGRESSION.md:generic-api-key:541
 e6b50acee68dbfc3b0640fe1e95ec9a8d76bf149:docs/kn/gia-dinh/KNSPLIT-2-MDCATALOG-A.md:generic-api-key:14
+
+# Nonce Idempotency-Key của fixture mock, không phải thông tin xác thực; Claude review #213.
+266ef5b0574f2f505cff11bf4be392dfbb574dc3:apps/web-ops/src/kn/hrm/plan-adjustments/numeric-boundary.test.tsx:generic-api-key:20
+266ef5b0574f2f505cff11bf4be392dfbb574dc3:apps/web-ops/src/kn/hrm/plan-adjustments/routes.test.tsx:generic-api-key:33

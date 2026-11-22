@@ -239,8 +239,9 @@ describe("HTTP giả lập: ngữ cảnh KN (X-AG-Context), Idempotency-Key, s�
     const mine = await xa.ws.mine();
     expect(mine.week_start).toBe(NEXT);
     // Tên xã và HTX của tài khoản KN giả lập (địa điểm mục công tác).
-    const coops = await xa.api.GET("/v1/cooperatives", { params: { query: { admin_unit: "91302" } } });
-    expect(coops.data?.items.map((c) => c.name)).toEqual(["HTX Bình Đức"]);
+    // #271: HTX của Lịch công tác là hồ sơ KN riêng (FN-XA-03.03), không phải HTX nền tảng.
+    const coops = await xa.api.GET("/v1/kn/producer-records", { params: { header: {} as { "X-AG-Context": string }, query: { kind: "cooperative", commune: "91302", status: "active" } } });
+    expect(coops.data?.items.map((c) => c.display_name)).toEqual(["HTX Bình Đức"]);
     const unit = await xa.api.GET("/v1/masterdata/admin-units/{code}", { params: { path: { code: "91301" } } });
     expect(unit.data?.name).toBe("Mỹ Hòa Hưng");
   });

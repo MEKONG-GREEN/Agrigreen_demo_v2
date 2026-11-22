@@ -1,0 +1,1 @@
+- [ ] KHTC-DASHBOARD W11.69-DASHBOARD (#166): Trang chủ KHTC chỉ đọc từ capture Mẫu 5, 5 KPI, bộ lọc và trạng thái phiếu/nguồn live; phần còn lại #189. Chờ review chéo Claude.

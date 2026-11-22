@@ -69,6 +69,7 @@ type SourceTrace struct {
 }
 
 type SourceMetric struct {
+	Text       string        `json:"text,omitempty"`
 	Trace      []SourceTrace `json:"trace,omitempty"`
 	Unit       string        `json:"unit"`
 	Key        string        `json:"key"`
@@ -121,7 +122,42 @@ type Section struct {
 	Editable bool   `json:"editable"`
 }
 
+// ExternalEvidence là tệp minh chứng của một số liệu nguồn ngoài (chỉ siêu dữ liệu).
+type ExternalEvidence struct {
+	ID       uuid.UUID `json:"id"`
+	FileName string    `json:"file_name"`
+}
+
+// ExternalFigure là một ô "Nhập ngoài" (W11.67, BR-DL-19): giá trị hiệu lực của chỉ tiêu nguồn ngoài trong kỳ, khóa như ô
+// số trên bản soạn; "Nguồn dữ liệu" hiện cơ quan, văn bản/kênh, ngày, tệp minh chứng. Chỉ sửa tại Số liệu nguồn ngoài.
+type ExternalFigure struct {
+	EntryID     uuid.UUID          `json:"entry_id"`
+	Version     int64              `json:"version"`
+	IndicatorID uuid.UUID          `json:"indicator_id"`
+	Code        string             `json:"code"`
+	Name        string             `json:"name"`
+	Group       string             `json:"group"`
+	Value       string             `json:"value"`
+	Unit        string             `json:"unit"`
+	Agency      string             `json:"agency"`
+	Document    string             `json:"document"`
+	SourceDate  string             `json:"source_date"`
+	Evidence    []ExternalEvidence `json:"evidence"`
+	At          time.Time          `json:"at"`
+}
+
+// Supplement pins the request lifecycle in the immutable report input.
+type Supplement struct {
+	ID                  uuid.UUID  `json:"id"`
+	Department          string     `json:"department"`
+	Instruction         string     `json:"instruction"`
+	State               string     `json:"state"`
+	DueAt               time.Time  `json:"due_at"`
+	NativeSubmissionRef *uuid.UUID `json:"native_submission_ref"`
+	ReturnApplied       *bool      `json:"return_applied"`
+}
 type Data struct {
+	Supplements []Supplement                 `json:"supplements,omitempty"`
 	Period      Period                       `json:"period"`
 	Template    string                       `json:"template"`
 	Plan        port.KHTCPlan                `json:"plan"`
@@ -133,10 +169,37 @@ type Data struct {
 	Provisional []string                     `json:"provisional"`
 	InputHash   string                       `json:"input_hash"`
 	CapturedAt  time.Time                    `json:"captured_at"`
+	// External: ô Nhập ngoài của kỳ (W11.67). Rỗng thì bỏ khỏi JSON và khỏi băm — bản soạn cũ không đổi băm.
+	External []ExternalFigure `json:"external,omitempty"`
+}
+
+// WithExternal gắn số liệu nguồn ngoài của kỳ vào dữ liệu đã dựng và đưa chúng vào băm đầu vào: đổi giá trị, nguồn hay
+// minh chứng sau khi xuất → "Nguồn đã thay đổi" (BR-DL-04). Không có số liệu → giữ nguyên băm của Compose.
+func WithExternal(data Data, figures []ExternalFigure) (Data, error) {
+	if len(figures) == 0 {
+		data.External = nil
+		return data, nil
+	}
+	data.External = append([]ExternalFigure{}, figures...)
+	sort.SliceStable(data.External, func(i, j int) bool {
+		a, b := data.External[i], data.External[j]
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return a.Code < b.Code
+	})
+	var err error
+	data.InputHash, err = Hash(struct {
+		Base     string
+		External []ExternalFigure
+	}{data.InputHash, data.External})
+	return data, err
 }
 
 func Template(kind string) string {
 	switch kind {
+	case "adhoc":
+		return "adhoc"
 	case "week":
 		return "mau_1"
 	case "month":
@@ -153,6 +216,8 @@ func Template(kind string) string {
 
 func Sections(template string) []Section {
 	switch template {
+	case "adhoc":
+		return []Section{{"noi_dung", "Nội dung báo cáo", true}, {"chi_tieu", "Chỉ tiêu được chọn", false}}
 	case "mau_1":
 		return []Section{
 			{"A", "KẾT QUẢ ĐẠT ĐƯỢC", false},
@@ -184,11 +249,20 @@ var AdminKeys = []string{"document_no", "place", "report_date", "recipient", "ba
 
 // Edits contains only fields explicitly editable in G1. Numeric/system values have no write representation.
 type Edits struct {
+	Adhoc *AdhocSelection    `json:"adhoc,omitempty"`
 	Admin map[string]*string `json:"admin"`
 	Texts map[string]string  `json:"texts"`
 }
 
 func (e Edits) Validate(template string) error {
+	if e.Adhoc != nil {
+		if template != "adhoc" {
+			return ErrInput
+		}
+		if err := e.Adhoc.Validate(); err != nil {
+			return err
+		}
+	}
 	for key, value := range e.Admin {
 		if !slices.Contains(AdminKeys, key) {
 			return fmt.Errorf("%w: ô hành chính %s", ErrInput, key)
@@ -230,9 +304,13 @@ func (f AdminField) Value() string {
 }
 
 type Draft struct {
+	Adhoc *AdhocSelection       `json:"adhoc,omitempty"`
 	Data  Data                  `json:"data"`
 	Admin map[string]AdminField `json:"admin"`
 	Texts map[string]string     `json:"texts"`
+	// Optional for historical payloads: nil retains the original fixed renderer.
+	TemplateSnapshot *port.KHTCTemplateSnapshot `json:"template_snapshot,omitempty"`
+	TemplateTerminal *string                    `json:"template_terminal,omitempty"`
 }
 
 func Edit(d Draft, in Edits, actor uuid.UUID, at time.Time) (Draft, error) {
@@ -254,6 +332,12 @@ func Edit(d Draft, in Edits, actor uuid.UUID, at time.Time) (Draft, error) {
 	if out.Texts == nil {
 		out.Texts = map[string]string{}
 	}
+	if in.Adhoc != nil {
+		if err := in.Adhoc.ValidateData(out.Data); err != nil {
+			return Draft{}, err
+		}
+		out.Adhoc = in.Adhoc.Clone()
+	}
 	for key, value := range in.Admin {
 		field := out.Admin[key]
 		field.Override, field.Changed = nil, false
@@ -272,11 +356,27 @@ func Edit(d Draft, in Edits, actor uuid.UUID, at time.Time) (Draft, error) {
 	for key, value := range in.Texts {
 		out.Texts[key] = strings.TrimSpace(value)
 	}
+	if out.Data.Template == "adhoc" {
+		out.Data.Provisional = AdhocData(out).Provisional
+	}
 	return out, nil
 }
 
 func Refresh(d Draft, data Data, defaults map[string]string) Draft {
-	out := Draft{Data: data, Admin: map[string]AdminField{}, Texts: map[string]string{}}
+	out := Draft{Data: data, Adhoc: d.Adhoc.Clone(), Admin: map[string]AdminField{}, Texts: map[string]string{}}
+	if d.TemplateSnapshot != nil {
+		copy := *d.TemplateSnapshot
+		copy.Definition = append(json.RawMessage(nil), copy.Definition...)
+		if copy.LegacyUntil != nil {
+			until := *copy.LegacyUntil
+			copy.LegacyUntil = &until
+		}
+		out.TemplateSnapshot = &copy
+	}
+	if d.TemplateTerminal != nil {
+		term := *d.TemplateTerminal
+		out.TemplateTerminal = &term
+	}
 	for key, value := range d.Texts {
 		out.Texts[key] = value
 	}
@@ -336,6 +436,9 @@ func Refresh(d Draft, data Data, defaults map[string]string) Draft {
 		next.Changed = previous.Override != nil && (previous.Changed || previous.System != next.System)
 		out.Admin[key] = next
 	}
+	if out.Data.Template == "adhoc" {
+		out.Data.Provisional = AdhocData(out).Provisional
+	}
 	return out
 }
 
@@ -390,6 +493,28 @@ func Hash(value any) (string, error) {
 func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot *SourceRef, metrics []SourceMetric, at time.Time) (Data, error) {
 	data := Data{Period: period, Template: Template(period.Type), Plan: plan, Sources: snapshot, Metrics: metrics, Rows: []ProgramRow{},
 		Submissions: []Submitted{}, FormTexts: map[string]map[string]string{}, Provisional: []string{}, CapturedAt: at}
+	return composeCalculation(data, calculationWindow{year: period.Year, from: period.From,
+		to: perioddomain.QuantityEnd(period.Type, period.To, period.Cutoff), kind: period.Type,
+		currentID: &period.ID, departments: period.Departments}, submitted)
+}
+
+// calculationWindow is a pure calculation envelope, never a reporting-period
+// entity. Only Compose supplies a real current period identity.
+type calculationWindow struct {
+	year        int
+	from, to    time.Time
+	kind        string
+	currentID   *uuid.UUID
+	departments []string
+	live        bool
+}
+
+func (w calculationWindow) current(id uuid.UUID) bool {
+	return w.currentID != nil && *w.currentID == id
+}
+
+func composeCalculation(data Data, window calculationWindow, submitted []Submitted) (Data, error) {
+	plan, snapshot, metrics := data.Plan, data.Sources, data.Metrics
 	if data.Template == "" {
 		return Data{}, ErrInput
 	}
@@ -424,14 +549,14 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 	}
 	current := map[string]Submitted{}
 	for _, sheet := range latest {
-		isCurrentProgram := period.Type == perioddomain.TypeProgram && sheet.PeriodID == period.ID
-		if sheet.Year != period.Year || (sheet.To.After(perioddomain.QuantityEnd(period.Type, period.To, period.Cutoff)) && !isCurrentProgram) {
+		isCurrentProgram := window.kind == perioddomain.TypeProgram && window.current(sheet.PeriodID)
+		if sheet.Year != window.year || (sheet.To.After(window.to) && !isCurrentProgram) || (window.live && sheet.Decision == "returned") {
 			continue
 		}
-		if sheet.Type == "week" || sheet.PeriodID == period.ID {
+		if sheet.Type == "week" || window.current(sheet.PeriodID) {
 			data.Submissions = append(data.Submissions, sheet)
 		}
-		if sheet.PeriodID == period.ID {
+		if window.current(sheet.PeriodID) {
 			current[sheet.Department] = sheet
 			data.FormTexts[sheet.Department] = sheet.Sheet.Texts
 		}
@@ -451,8 +576,8 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 			missing("Phòng " + department + " đang được yêu cầu bổ sung")
 		}
 	}
-	for _, department := range period.Departments {
-		if _, ok := current[department]; !ok {
+	for _, department := range window.departments {
+		if _, ok := current[department]; !ok && window.kind != "adhoc" {
 			missing("Phòng " + department + " chưa gửi số liệu")
 		}
 	}
@@ -464,9 +589,13 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 	for _, entry := range plan.Entries {
 		entries[entry.Ref] = entry
 	}
+	trackedAt := window.from
+	if window.kind == "adhoc" && trackedAt.Year() < plan.Year {
+		trackedAt = time.Date(plan.Year, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
 	tracked := func(entry port.KHTCPlanEntry) bool {
 		for depth := 0; depth < 16; depth++ {
-			if !form.TrackedIn(entry, period.From) {
+			if !form.TrackedIn(entry, trackedAt) {
 				return false
 			}
 			if entry.ParentRef == nil {
@@ -496,6 +625,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 			continue
 		}
 		done, adjustment, total, people, budget := decimal.Zero, decimal.Zero, decimal.Zero, decimal.Zero, decimal.Zero
+		hasRangeSheet := false
 		for _, sheet := range data.Submissions {
 			if sheet.Department != entry.Department || sheet.Type != "week" {
 				continue
@@ -508,8 +638,8 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				if strings.TrimSpace(raw) == "" {
 					return decimal.Zero, nil
 				}
-				n, err := decimal.NewFromString(raw)
-				if err != nil {
+				n, ok := form.ParseNumber(raw)
+				if !ok {
 					return decimal.Zero, fmt.Errorf("%w: số liệu phiếu", ErrInput)
 				}
 				return n, nil
@@ -519,7 +649,10 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				return Data{}, err
 			}
 			total = total.Add(n)
-			if !sheet.To.Before(period.From) {
+			if !sheet.To.Before(window.from) {
+				if _, exists := sheet.Sheet.Cells[entry.Ref.String()]; exists {
+					hasRangeSheet = true
+				}
 				done = done.Add(n)
 				p, err := parse(cell.People)
 				if err != nil {
@@ -533,7 +666,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				budget = budget.Add(b)
 			}
 			for _, adj := range sheet.Sheet.Adjustments {
-				if adj.EntryRef != entry.Ref.String() || adj.PeriodYear != period.Year {
+				if adj.EntryRef != entry.Ref.String() || adj.PeriodYear != window.year {
 					continue
 				}
 				amount, err := parse(adj.Amount)
@@ -541,18 +674,18 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 					return Data{}, err
 				}
 				total = total.Add(amount)
-				if !sheet.To.Before(period.From) {
+				if !sheet.To.Before(window.from) {
 					adjustment = adjustment.Add(amount)
 				}
 			}
 		}
 		if entry.DataSource == "module" {
 			metric, ok := byKey[entry.SourceKey]
-			if !ok || metric.Value.Provisional() {
+			if !ok || metric.Value.Provisional() || (window.live && metric.Value.NoSource) {
 				row.Missing = true
 				missing("Hạng mục chưa có nguồn đã chốt: " + entry.Name)
 			}
-			if ok {
+			if ok && (!window.live || (!metric.Value.Provisional() && !metric.Value.NoSource)) {
 				v := metric.Value
 				if v.Increment != nil {
 					done = *v.Increment
@@ -566,7 +699,7 @@ func Compose(period Period, plan port.KHTCPlan, submitted []Submitted, snapshot 
 				}
 				adjustment = decimal.Zero
 			}
-		} else if _, ok := current[entry.Department]; !ok {
+		} else if _, ok := current[entry.Department]; !ok && ((!window.live && window.kind != "adhoc") || !hasRangeSheet) {
 			row.Missing = true
 			missing("Phòng " + entry.Department + " chưa gửi số liệu")
 		}

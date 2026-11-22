@@ -168,6 +168,50 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "403": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/Problem" }
+  /v1/subjects/revisions:
+    post:
+      summary: >-
+        #251 (ADR-0056) — nhãn che bớt họ tên (vd "Nguyễn V. A.") và SĐT che một phần (vd "0912•••123") trước/sau của các bản sửa,
+        tối đa 200 mã. Không bao giờ trả họ tên/SĐT đầy đủ. Mã lạ, của tenant khác hoặc của chủ thể đã xóa định danh bị bỏ qua.
+        Mục đích extension.contact; vai vault_registrar, vault_display hoặc vault_evidence_viewer. Mỗi chủ thể ghi một dòng sổ op
+        revision_read. Phản hồi no-store.
+      operationId: subjectRevisions
+      parameters:
+        - $ref: "#/components/parameters/Purpose"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refs]
+              properties:
+                purpose: { type: string }
+                refs: { type: array, maxItems: 200, items: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Nhãn bản sửa có trong tenant
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [ref, subject_ref, prev_label, next_label]
+                      properties:
+                        ref: { type: string, format: uuid }
+                        subject_ref: { type: string, format: uuid }
+                        prev_label: { type: string }
+                        next_label: { type: string }
+                        prev_masked_phone: { type: string }
+                        next_masked_phone: { type: string }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
   /v1/subjects/{ref}/unwrap:
     post:
       summary: Mở DEK đã seal bằng khóa công khai của chủ thể — vai vault_evidence_viewer
@@ -231,7 +275,9 @@ paths:
         "422": { $ref: "#/components/responses/Problem" }
   /v1/subjects/{ref}/amend:
     post:
-      summary: Sửa họ tên, SĐT, địa chỉ (W11.22 — chỉ mục đích hrm.profile; CCCD giữ nguyên; SĐT trùng chủ thể khác → 409) — vai vault_registrar
+      summary: >-
+        Sửa họ tên, SĐT, địa chỉ (W11.22; mục đích hrm.profile, contact.directory, extension.contact — #251; CCCD giữ nguyên; SĐT trùng
+        chủ thể khác → 409) — vai vault_registrar. Mỗi lần sửa ghi một bản sửa (bản mã họ tên/SĐT trước và sau), trả revision_ref.
       operationId: amendSubject
       parameters:
         - $ref: "#/components/parameters/Ref"
@@ -454,6 +500,10 @@ components:
             required: [ref]
             properties:
               ref: { type: string, format: uuid }
+              revision_ref:
+                type: string
+                format: uuid
+                description: "#251 — mã bản sửa họ tên/SĐT của amend (vault.identity_revision); không có ở ghi ngăn"
     Problem:
       description: RFC 9457
       content:

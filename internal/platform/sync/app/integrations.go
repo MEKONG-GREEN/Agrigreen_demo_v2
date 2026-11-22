@@ -37,8 +37,8 @@ type IntegrationDeps struct {
 var sourceLabels = map[string]string{
 	"pf.mechanization.area_sync": "App HTX → Bản đồ CGH (diện tích vụ)",
 	"pf.geo.hub_valve":           "ERP/MKG → GIS (van công bố kho/Hub)",
-	"pf.cropcycle.gps_log":       "App HTX → GIS (log GPS mùa vụ)",
-	"pf.extension.gps_log":       "App HTX → GIS (log GPS yêu cầu hỗ trợ)",
+	"pf.cropcycle.gps_log":       "App HTX → GIS (log GPS mùa vụ, yêu cầu hỗ trợ)",
+	"pf.extension.gps_log":       "App HTX → GIS (log GPS yêu cầu hỗ trợ — luồng cũ, gộp vào pf.cropcycle.gps_log từ #313)",
 	"pf.simulation.snapshot":     "Mô phỏng (ảnh chụp đầu vào)",
 	"pf.simulation.optimizer":    "Bộ tối ưu mô phỏng",
 	"pf.accounts.org_status":     "Tổ chức → tài khoản",

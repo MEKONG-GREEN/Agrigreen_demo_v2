@@ -371,6 +371,22 @@ func ListHouseholds(ctx context.Context, tx pgx.Tx, f HouseholdFilter) ([]Househ
 	return collect(rows, err, scanHousehold)
 }
 
+// CoveredHouseholds trả bản hiện hành của các hộ có mã trong refs HOẶC thuộc điểm trong sites (phạm vi quyền theo dõi
+// mô hình của phiên — #71). Hai danh sách rỗng → không truy vấn.
+func CoveredHouseholds(ctx context.Context, tx pgx.Tx, refs, sites []uuid.UUID) ([]Household, error) {
+	if len(refs) == 0 && len(sites) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx, "SELECT "+householdCols+` FROM (
+	    SELECT DISTINCT ON (household_ref) * FROM pf_extension.cnts_model_household
+	    WHERE household_ref IN (SELECT household_ref FROM pf_extension.cnts_model_household
+	      WHERE household_ref = ANY ($1::text[]::uuid[]) OR site_ref = ANY ($2::text[]::uuid[]))
+	    ORDER BY household_ref, seq DESC) h
+	  WHERE h.household_ref = ANY ($1::text[]::uuid[]) OR h.site_ref = ANY ($2::text[]::uuid[])
+	  ORDER BY household_ref`, refStrings(refs), refStrings(sites))
+	return collect(rows, err, scanHousehold)
+}
+
 // ---------------------------------------------------------------------------
 // Cấp quyền
 // ---------------------------------------------------------------------------
@@ -441,6 +457,15 @@ func GrantVersions(ctx context.Context, tx pgx.Tx, ref uuid.UUID) ([]Grant, erro
 	return collect(rows, err, scanGrant)
 }
 
+// GranteeEverGranted cho biết grantee đã TỪNG có quyền CNTS (vai khác nông hộ) ở BẤT KỲ phiên bản nào trong tenant — kể
+// cả quyền đã sửa thu hẹp, thu hồi, hết hạn (#71: quyết định phạm vi tường minh của phiên, chỉ đọc).
+func GranteeEverGranted(ctx context.Context, tx pgx.Tx, grantee uuid.UUID) (bool, error) {
+	var ok bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_extension.cnts_grant WHERE grantee_ref = $1 AND role <> $2)`,
+		grantee, domain.RoleFarmer).Scan(&ok)
+	return ok, err
+}
+
 // ListGrants trả bản hiện hành của mọi quyền; grantee khác nil → chỉ của người đó.
 func ListGrants(ctx context.Context, tx pgx.Tx, grantee *uuid.UUID) ([]Grant, error) {
 	rows, err := tx.Query(ctx, "SELECT "+grantCols+` FROM (
@@ -504,4 +529,27 @@ func CooperativeExists(ctx context.Context, tx pgx.Tx, ref uuid.UUID) (bool, err
 	var ok bool
 	err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pf_cooperative_pub.v1_cooperatives WHERE org_ref = $1)`, ref).Scan(&ok)
 	return ok, err
+}
+
+// ImportRow là một dòng sổ (điểm hoặc hộ) đã ghi bởi một lần nạp Excel (W11.53c), tìm theo tiền tố khóa idem.
+type ImportRow struct {
+	Kind       string // "site" | "household"
+	Ref        uuid.UUID
+	ProjectRef uuid.UUID
+	IdemKey    string
+}
+
+// ImportRows trả các dòng sổ có khóa idem bắt đầu bằng sitePrefix (điểm) hoặc hhPrefix (hộ): điểm trước, theo dòng Excel.
+func ImportRows(ctx context.Context, tx pgx.Tx, sitePrefix, hhPrefix string) ([]ImportRow, error) {
+	// Cùng tiền tố, đuôi là số dòng Excel → sắp theo độ dài rồi chữ = theo số dòng.
+	rows, err := tx.Query(ctx, `SELECT kind, ref, project_ref, idem_key FROM (
+	    SELECT 'site' AS kind, site_ref AS ref, project_ref, idem_key FROM pf_extension.cnts_demo_site WHERE starts_with(idem_key, $1)
+	    UNION ALL
+	    SELECT 'household', household_ref, project_ref, idem_key FROM pf_extension.cnts_model_household WHERE starts_with(idem_key, $2)) r
+	  ORDER BY kind DESC, char_length(idem_key), idem_key`, sitePrefix, hhPrefix)
+	return collect(rows, err, func(r pgx.Row) (ImportRow, error) {
+		var x ImportRow
+		err := r.Scan(&x.Kind, &x.Ref, &x.ProjectRef, &x.IdemKey)
+		return x, err
+	})
 }

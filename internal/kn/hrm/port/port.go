@@ -173,12 +173,6 @@ var (
 		"Có quyết định nâng bậc sau cho cùng người — hủy quyết định sau trước")
 )
 
-// PromotionNotifier nhận kết quả job tính mốc hằng ngày (FN-09 bước 1: "thông báo cho Phòng HCTH"). Gốc lắp ráp nối
-// pf/notify khi có loại thông báo; nil → chỉ ghi sổ promotion_scan (dashboard đọc lần chạy gần nhất).
-type PromotionNotifier interface {
-	PromotionDue(ctx context.Context, tenant uuid.UUID, day time.Time, counts map[string]int) error
-}
-
 // PromotionWriter là cổng ghi Word cho Mẫu số 1/2/4 (W10.17 `cap/export` nối sau). nil → chỉ xuất Excel.
 type PromotionWriter interface {
 	// RenderDocx dựng .docx của mẫu form từ bảng đã dựng (cột, dòng là chuỗi); trả tên tệp và nội dung.

@@ -37,6 +37,9 @@ type ActorResolver func(context.Context, authz.Principal, Profile) (ResolvedActo
 
 // Profile là cấu hình của MỘT bên dùng (ứng dụng) — tương đương mục cap/forms của app.yaml.
 type Profile struct {
+	// AuthorizeOperation is an optional application-owned exception for one verified
+	// invocation. Nil preserves the ordinary level policy. Never serialized.
+	AuthorizeOperation OperationAuthorizer `json:"-"`
 	// ResolveActor lets an application own session and target restrictions. Never serialized.
 	ResolveActor ActorResolver `json:"-"`
 
@@ -71,6 +74,8 @@ type Profile struct {
 	// NoReopen: kỳ đã chốt KHÔNG mở lại được (W11.27 HCTH BR-02 — sau chốt chỉ điều chỉnh qua sổ riêng của bên dùng, ảnh
 	// chụp đóng băng là bản chính thức). Mặc định false giữ hành vi mở lại của các profile khác.
 	NoReopen bool
+	// RequireDefinitionPolicy prevents missing owner registration from granting DefineBy.
+	RequireDefinitionPolicy bool `json:"-"`
 }
 
 // Loại đơn vị lá (W11.05). Đơn vị = người và luồng nhiều bước (HCTH, D3 §2.5) CHỪA CHỖ: hằng số có, cấu hình và
@@ -218,6 +223,7 @@ var (
 	ErrInvalidValues    = problem.New(http.StatusUnprocessableEntity, "forms.values_invalid", "Số liệu không khớp định nghĩa biểu")
 	ErrInvalidTemplate  = problem.New(http.StatusUnprocessableEntity, "forms.template_invalid", "Định nghĩa biểu không hợp lệ")
 	ErrPeriodCancelled  = problem.New(http.StatusConflict, "forms.period_cancelled", "Kỳ đã hủy — không nộp, chốt hay mở lại được")
+	ErrPeriodConflict   = problem.New(http.StatusConflict, "forms.period_conflict", "Kỳ đã thay đổi — đối soát ý định trước khi thử lại")
 	ErrSubmissionLimit  = problem.New(http.StatusConflict, "forms.submission_limit", "Đơn vị đã gửi đủ số lần tối đa của kỳ")
 	// W11.42 (pf 000149).
 	ErrVersionConflict = problem.New(http.StatusConflict, "forms.submission_conflict",
@@ -249,10 +255,19 @@ type Validator interface {
 	Validate(ctx context.Context, templateCode string, values map[string]string) []Issue
 }
 
+// ReviewGuard kiểm thêm quyền rà soát bài nộp theo quy tắc của bên dùng (vd CNTS FN-09: kỳ đã chỉ định người phụ trách
+// biểu thì chỉ người đó xác thực / yêu cầu điều chỉnh). cap/forms gọi SAU khi đã kiểm cấp, phạm vi, biểu của người gọi và
+// NGOÀI giao dịch của module (bên dùng tự đọc sổ của mình); trả lỗi = chặn. Gốc lắp ráp nối theo profile.
+type ReviewGuard interface {
+	AllowReview(ctx context.Context, periodID uuid.UUID, templateCode string) error
+}
+
 // TemplateDef là định nghĩa biểu do module nghiệp vụ cài (Fields là JSON mảng trường — khớp domain.Field).
 type TemplateDef struct {
 	Profile, Code, Title string
 	Fields               json.RawMessage
+	// BaseVersion is mandatory with a definition policy; 0 creates a new code.
+	BaseVersion *int64
 }
 
 // TemplateRef là phiên bản biểu đã có.

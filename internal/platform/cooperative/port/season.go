@@ -40,8 +40,8 @@ const (
 // pf/cropcycle để sự kiện đã xử lý không bị giao lại sau W3.3.
 const GpsLogConsumer = "pf.cropcycle.gps_log"
 
-// GpsLogEvents là các sự kiện consumer GpsLogConsumer đăng ký.
-var GpsLogEvents = []string{EventSeasonOpened, EventFarmLogRecorded, EventHarvestDeclared}
+// GpsLogEvents là các sự kiện consumer GpsLogConsumer đăng ký (#313: + yêu cầu hỗ trợ, thay consumer pf.extension.gps_log).
+var GpsLogEvents = []string{EventSeasonOpened, EventFarmLogRecorded, EventHarvestDeclared, EventSupportRequestSubmitted}
 
 // Sự kiện vụ/nhật ký/SOP (schema trong contracts/events/, tên chốt ở g2-conventions §4).
 const (

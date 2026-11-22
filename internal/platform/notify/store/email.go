@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,13 +48,43 @@ func OpenEmailDeliveries(ctx context.Context, tx pgx.Tx, batch uuid.UUID) ([]dom
 	return out, rows.Err()
 }
 
-// FinishEmailDelivery ghi kết quả một lần thử (finished_at = now, cùng UPDATE với status — mốc của delivery-health).
-// lastErr chỉ là mã lỗi, không địa chỉ.
-func FinishEmailDelivery(ctx context.Context, tx pgx.Tx, id uuid.UUID, status string, lastErr *string, now time.Time) error {
-	_, err := tx.Exec(ctx, `UPDATE pf_notify.email_delivery SET status = $2, attempts = attempts + 1, last_error = $3,
-	    finished_at = $4::timestamptz, sent_at = CASE WHEN $2 = 'sent' THEN $4::timestamptz ELSE sent_at END
-	  WHERE id = $1`, id, status, lastErr, now.UTC())
+// ClaimEmailDelivery nhận một lần gửi email còn mở chưa ai giữ hoặc đã hết hạn giữ (BF-NOTIFY-POOL #155, như
+// ClaimDelivery). Trả số lần đã thử hiện hành; ok=false: đã xong hoặc worker khác đang giữ.
+func ClaimEmailDelivery(ctx context.Context, tx pgx.Tx, id, token uuid.UUID, now, until time.Time) (attempts int, ok bool, err error) {
+	err = tx.QueryRow(ctx, `UPDATE pf_notify.email_delivery SET claim_id = $2, claim_until = $4
+	  WHERE id = $1 AND status IN ('pending', 'failed') AND attempts < $5 AND (claim_id IS NULL OR claim_until <= $3)
+	  RETURNING attempts`, id, token, now.UTC(), until.UTC(), domain.MaxDeliveryAttempts).Scan(&attempts)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, nil
+	}
+	return attempts, err == nil, err
+}
+
+// ReleaseEmailDelivery trả nhận (không tính lần thử) khi lượt gửi bị hủy trước khi có kết quả.
+func ReleaseEmailDelivery(ctx context.Context, tx pgx.Tx, id, token uuid.UUID) error {
+	_, err := tx.Exec(ctx, `UPDATE pf_notify.email_delivery SET claim_id = NULL, claim_until = NULL WHERE id = $1 AND claim_id = $2`, id, token)
 	return err
+}
+
+// EmailDeliveryOpen: lần gửi email còn mở (pending/failed còn lượt) — đọc lại sau khi mất nhận (review #155 P1).
+func EmailDeliveryOpen(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bool, error) {
+	var open bool
+	err := tx.QueryRow(ctx, `SELECT status IN ('pending', 'failed') AND attempts < $2 FROM pf_notify.email_delivery WHERE id = $1`,
+		id, domain.MaxDeliveryAttempts).Scan(&open)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return open, err
+}
+
+// FinishEmailDelivery ghi kết quả một lần thử (finished_at = now, cùng UPDATE với status — mốc của delivery-health) và
+// xóa nhận — CHỈ khi nhận còn là của token (mất nhận → không ghi đè, trả false). lastErr chỉ là mã lỗi, không địa chỉ.
+func FinishEmailDelivery(ctx context.Context, tx pgx.Tx, id, token uuid.UUID, status string, lastErr *string, now time.Time) (bool, error) {
+	tag, err := tx.Exec(ctx, `UPDATE pf_notify.email_delivery SET status = $2, attempts = attempts + 1, last_error = $3,
+	    finished_at = $4::timestamptz, sent_at = CASE WHEN $2 = 'sent' THEN $4::timestamptz ELSE sent_at END,
+	    claim_id = NULL, claim_until = NULL
+	  WHERE id = $1 AND claim_id = $5`, id, status, lastErr, now.UTC(), token)
+	return tag.RowsAffected() == 1, err
 }
 
 // EmailDeliveries liệt kê lần gửi email của thông báo kind (kiểm thử, vận hành): người nhận → trạng thái, số lần thử.

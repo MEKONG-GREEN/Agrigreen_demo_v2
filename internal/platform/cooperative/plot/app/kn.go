@@ -187,11 +187,11 @@ func (c knCaller) input(attrs store.KNAttrs) *KNInput {
 	return in
 }
 
-// farmerRef ghi tên nông dân vào kho định danh (chủ thể "người") và trả mã tham chiếu; tên rỗng → Nil.
+// farmerRef kiểm tên chủ hộ bắt buộc (TT-11), rồi ghi vào kho định danh và trả mã tham chiếu.
 func (s *Service) farmerRef(ctx context.Context, name, commune string) (uuid.UUID, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return uuid.Nil, nil
+		return uuid.Nil, problem.Validation.WithField("farmer_name", "bắt buộc")
 	}
 	if utf8.RuneCountInString(name) > domain.MaxFarmerName {
 		return uuid.Nil, problem.Validation.WithField("farmer_name", "tối đa 200 ký tự")
@@ -395,6 +395,10 @@ func (s *Service) knCreateAttrs(ctx context.Context, c knCaller, in KNCreateInpu
 	shape, err := knShape(in.Shape)
 	if err != nil {
 		return nil, err
+	}
+	// R-A1 (#113): kiểm số khai báo trước khi ghi tên chủ hộ vào kho định danh (lỗi không để lại bản ghi định danh).
+	if in.DeclaredAreaHa != nil && !in.DeclaredAreaHa.IsPositive() {
+		return nil, problem.Validation.WithField("declared_area_ha", "phải dương")
 	}
 	dept, err := c.writeDept(in.Department)
 	if err != nil {

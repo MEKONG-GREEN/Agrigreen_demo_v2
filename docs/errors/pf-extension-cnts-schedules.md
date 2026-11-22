@@ -6,6 +6,7 @@ Dùng lại mã đã có của module: `extension.read_only`, `extension.out_of_
 | HTTP | code | Khi nào |
 |---|---|---|
 | 422 | `extension.cnts_roster_invalid` | Lịch trực sai: ngày ngoài tháng, ca không phải N/Đ/NĐ, trùng ô (cơ sở, viên chức, ngày), cơ sở giết mổ không hoạt động trong tháng, ghi chú có số điện thoại/CCCD |
+| 422 | `extension.cnts_roster_import_invalid` | Nạp lịch trực (BF-CN-DUTY): tệp không phải .xlsx (kể cả .xls cũ), không mở được, vượt 4 MB hoặc 2000 dòng viên chức, không có dòng tiêu đề cột BM-03 (STT, Tên cơ sở giết mổ, Viên chức trực KSGM…), không có sheet đúng tháng. Lỗi từng dòng (không khớp cơ sở/viên chức, ký hiệu ca lạ) KHÔNG trả lỗi này mà nằm trong `issues` của kết quả 200 |
 | 409 | `extension.cnts_roster_version_conflict` | `base_version` khác phiên bản hiện hành của lịch tháng (khóa lạc quan); `current_version` trong phần mở rộng |
 | 404 | `extension.cnts_vaccination_not_found` | Lứa không có hoặc ngoài phạm vi người gọi |
 | 422 | `extension.cnts_vaccination_invalid` | Lịch tiêm sai: thiếu hộ/địa bàn, tuổi lúc nhận, xã không hợp lệ, loại mô hình/giống không dùng tại ngày nhận giống, Cấp Xã sửa ngày dự kiến, ngày tiêm thực tế ở tương lai hoặc trước ngày nhận giống, không có thay đổi, thiếu lý do hủy |
@@ -17,3 +18,9 @@ Dùng lại mã đã có của module: `extension.read_only`, `extension.out_of_
 | 409 | `extension.checkin_not_registered` | Lịch còn Nháp — gửi lịch trước khi check-in |
 | 409 | `extension.checkin_not_approved` | Lịch đã gửi nhưng chưa có bản nào được duyệt — chỉ check-in theo lịch đã duyệt (log bug TT-07/CN-06, 23/10/2026). Đang có điều chỉnh chờ duyệt lại thì check-in theo bản đã duyệt trước đó |
 | 404 | `extension.schedule_item_not_found` | Không có mục trong phiên bản hiện hành của lịch |
+| 409 | `extension.checkout_no_checkin` | Check-out mục chưa check-in — check-out chỉ sau khi đã check-in (CNTS v4.0 FN-12 B4b) |
+| 409 | `extension.checkout_exists` | Mục công tác đã check-out — check-out không sửa được (BR-06); `checkout_id` trong phần mở rộng |
+| 404 | `extension.visit_photo_not_found` | Không có ảnh check-in/check-out của mục (chưa check-in/check-out, hoặc check-in cũ trước v4.0 không ảnh) |
+
+Check-in/check-out (CNTS v4.0 FN-12, #249) thiếu ảnh, ảnh không phải base64, quá 500 KB hoặc không phải JPEG/PNG/WebP →
+`validation_failed` trường `photo` (AC-09); chưa nối kho tệp ảnh → `extension.dependency_unavailable`.

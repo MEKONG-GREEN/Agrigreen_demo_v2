@@ -22,7 +22,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/notify/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // ErrEmailRetry: còn lần gửi email lỗi tạm thời — trả cho inbox để hàng đợi giao lại (tối đa MaxDeliveryAttempts lần).
@@ -71,9 +71,10 @@ func (s *Service) flushEmail(ctx context.Context, tx pgx.Tx, tid uuid.UUID, b em
 		Payload: port.EmailRequestedV1{BatchID: b.id, Kind: b.kind, Deliveries: b.count}})
 }
 
-// HandleEmail là inbox.Handler của pf.notify.email.requested: gửi từng email của lô. Kết quả mỗi lần gửi ghi bằng giao
-// dịch RIÊNG (như HandlePush) để khi hàng đợi giao lại, email đã gửi không gửi lặp. Không có email → dropped (no_email),
-// không thử lại; lỗi tra cứu / máy chủ thư → failed, thử lại tới MaxDeliveryAttempts.
+// HandleEmail là inbox.Handler của pf.notify.email.requested: gửi từng email của lô. Như HandlePush (BF-NOTIFY-POOL
+// #155): đọc lô, tra địa chỉ (pf/accounts), gửi SMTP và ghi kết quả chạy NGOÀI giao dịch inbox, mỗi lần gửi nhận → gửi →
+// kết bằng giao dịch ngắn riêng, nên khi hàng đợi giao lại, email đã gửi không gửi lặp. Không có email → dropped
+// (no_email), không thử lại; lỗi tra cứu / máy chủ thư → failed, thử lại tới MaxDeliveryAttempts.
 func (s *Service) HandleEmail(ctx context.Context, _ pgx.Tx, env outbox.Envelope) error {
 	if env.EventType != port.EventEmailRequested {
 		return nil
@@ -85,27 +86,27 @@ func (s *Service) HandleEmail(ctx context.Context, _ pgx.Tx, env outbox.Envelope
 	if !s.emailEnabled() {
 		return fmt.Errorf("notify: %w: chưa cấu hình kênh email / danh bạ thư", ErrDependency)
 	}
-	var jobs []domain.EmailJob
-	if err := tenant.WithTenantTx(ctx, s.DB, env.TenantID, func(tx pgx.Tx) error {
-		var e error
-		jobs, e = store.OpenEmailDeliveries(ctx, tx, p.BatchID)
-		return e
-	}); err != nil {
+	tid, batch := env.TenantID, p.BatchID
+	res, err := txdeps.Get(ctx, "notify.email:"+env.EventID.String(), func(ctx context.Context) (deliveryOutcome, error) {
+		return runDeliveries(ctx, s, tid, sendLoop[domain.EmailJob]{
+			name: "email",
+			list: func(ctx context.Context, tx pgx.Tx) ([]domain.EmailJob, error) {
+				return store.OpenEmailDeliveries(ctx, tx, batch)
+			},
+			id:    func(j domain.EmailJob) uuid.UUID { return j.ID },
+			claim: store.ClaimEmailDelivery,
+			send:  func(ctx context.Context, j domain.EmailJob) (string, *string) { return s.sendEmail(ctx, tid, j) },
+			finish: func(ctx context.Context, tx pgx.Tx, j domain.EmailJob, token uuid.UUID, status string, code *string, now time.Time) (bool, error) {
+				return store.FinishEmailDelivery(ctx, tx, j.ID, token, status, code, now)
+			},
+			release: store.ReleaseEmailDelivery,
+			open:    store.EmailDeliveryOpen,
+		})
+	})
+	if err != nil {
 		return err
 	}
-	retry := false
-	for _, j := range jobs {
-		status, code := s.sendEmail(ctx, env.TenantID, j)
-		if status == domain.DeliveryFailed && j.Attempts+1 < domain.MaxDeliveryAttempts {
-			retry = true
-		}
-		if err := tenant.WithTenantTx(ctx, s.DB, env.TenantID, func(tx pgx.Tx) error {
-			return store.FinishEmailDelivery(ctx, tx, j.ID, status, code, s.now())
-		}); err != nil {
-			return err
-		}
-	}
-	if retry {
+	if res.retry {
 		return ErrEmailRetry
 	}
 	return nil

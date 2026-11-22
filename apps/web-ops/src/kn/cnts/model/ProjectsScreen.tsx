@@ -2,9 +2,9 @@
 
 // Chương trình, dự án, điểm trình diễn (W11.47 — BRD CNTS v3.7 UR-TINH-19, FN-19 phần CT/DA; bố cục prototype A
 // "r-projects"): danh sách dự án, tạo/sửa (chủ nhiệm sửa dự án mình — FN-19 BR-01), chi tiết dự án với điểm trình diễn và
-// hộ tham gia, kết thúc/mở lại. Mẫu biểu dự án BM-12…BM-16 là gói W11.53 (GĐ2).
+// hộ tham gia, kết thúc/mở lại. Mẫu biểu dự án BM-12…BM-16 (Mẫu 01/03/04/05/07): màn /kn/cnts/du-an-mau-bieu (W11.53).
 // BF-SWEEP-CNTS (#101): kinh phí dùng NumberField (số nguyên, không âm), trường bắt buộc báo lỗi theo trường khi bấm Lưu,
-// bảng có STT. Mẫu KNQG 01/03/04/05/07 và bước xác nhận của TW — TODO(#29).
+// bảng có STT.
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { fieldErrorMap } from "@/api/problem";
@@ -24,6 +24,7 @@ import {
   type ProjectDetail,
   type ProjectSave,
 } from "./api";
+import { ImportPanel } from "./ImportPanel";
 import { ReasonBox, SiteForm, SitePanel } from "./parts";
 
 export function ProjectsScreen() {
@@ -188,7 +189,7 @@ function ProjectPanel({ mapi, projectRef, officers, onChanged }: { mapi: CntsMod
 }
 
 function ProjectBody({ mapi, p, officers, reload }: { mapi: CntsModelApi; p: ProjectDetail; officers: Candidate[]; reload: () => void }) {
-  const [mode, setMode] = useState<"edit" | "close" | "reopen" | "site" | null>(null);
+  const [mode, setMode] = useState<"edit" | "close" | "reopen" | "site" | "import" | null>(null);
   const [site, setSite] = useState<string | null>(null);
   const [editSite, setEditSite] = useState<string | null>(null);
   const act = useAction();
@@ -220,6 +221,9 @@ function ProjectBody({ mapi, p, officers, reload }: { mapi: CntsModelApi; p: Pro
               <button className="btn" onClick={() => setMode("site")}>
                 Thêm điểm trình diễn
               </button>
+              <button className="btn" onClick={() => setMode("import")}>
+                Nạp Excel điểm, hộ
+              </button>
               <button className="btn" onClick={() => setMode("close")}>
                 Kết thúc dự án
               </button>
@@ -246,6 +250,7 @@ function ProjectBody({ mapi, p, officers, reload }: { mapi: CntsModelApi; p: Pro
           }}
         />
       ) : null}
+      {mode === "import" ? <ImportPanel mapi={mapi} projectRef={p.ref} projectCode={p.code} onDone={(committed) => (committed ? reload() : setMode(null))} /> : null}
       {mode === "site" ? <SiteForm mapi={mapi} projectRef={p.ref} officers={officers} communes={communes} onDone={(ref) => (setMode(null), ref && (reload(), setSite(ref)))} /> : null}
       {editing ? <SiteForm key={editing.ref} mapi={mapi} projectRef={p.ref} site={editing} officers={officers} communes={communes} onDone={(ref) => (setEditSite(null), ref && reload())} /> : null}
       <h3>Điểm trình diễn</h3>

@@ -27,7 +27,6 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	partyport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
@@ -37,6 +36,7 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/params"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // Mã lỗi (docs/errors/pf-extension-cnts-alert.md).
@@ -86,8 +86,13 @@ type Service struct {
 	Feed formsport.SubmissionFeed
 	// Dir: người nhận (nil → thông báo theo chủ đề vai × đơn vị, không email).
 	Dir Directory
+	// Control (BF-CN-PUBLISH): tiến độ kỳ native trong phạm vi người gọi — nút Nhắc của màn theo dõi biểu kỳ. nil → 503.
+	Control formsport.PeriodControl
 	// Names (tùy chọn): tên cán bộ cho lịch sử, người xử lý.
 	Names func() partyport.ActorNames
+	// Followers (CNTS v4.0 Mục III.5 dòng 13): người theo dõi lịch cán bộ xã nhận cảnh báo "Chưa check-out". nil → cảnh
+	// báo vẫn sinh, không có người nhận đích danh.
+	Followers FollowersFunc
 }
 
 func (s *Service) now() time.Time { return s.Clock.Now().UTC() }

@@ -3,7 +3,26 @@ import { createApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { resetCntsDiary } from "@/api/mock/kn-cnts-diary";
 import { resetCntsModel } from "@/api/mock/kn-cnts-model";
-import { accounting, createCntsDiaryApi, expectedAlive, kindsOf, metricErrors, money, soldOn, tablesOf, waterWarnings } from "./api";
+import {
+  accounting,
+  ageWeek,
+  cost6Label,
+  createCntsDiaryApi,
+  expectedAlive,
+  growthTable,
+  kgPerHead,
+  kindsOf,
+  lineAmount,
+  MAX_GROWTH_WEEK,
+  metricErrors,
+  money,
+  soldOn,
+  SUPPLY_ITEMS,
+  TABLE_FIELDS,
+  tablesOf,
+  TECH_TARGETS,
+  waterWarnings,
+} from "./api";
 
 describe("nhật ký nuôi BM-08/09/19 — quy tắc biểu (W11.48)", () => {
   it("chỉ số theo mẫu và loại lần ghi", () => {
@@ -167,5 +186,99 @@ describe("nhật ký nuôi theo ngày VN", () => {
     const e = await dapi.createEntry({ cycle_ref: c.ref, entry_kind: "daily", metrics: { alive: "495", dead: "0", feed_kg: "12" } });
     expect(e.entry_date).toBe("2026-10-26");
     expect(e.editable_until).toBe("2026-11-02");
+  });
+});
+
+describe("BF-CN-DIARY #109 — đủ trường sổ gốc BM-08/BM-09 2026", () => {
+  it("mục 4 mua nguyên liệu thức ăn có ở sổ gà và sổ vịt, không có ở BM-19; khoản chi 6 theo sổ", () => {
+    expect(tablesOf("BM-08")).toContain("feed_materials");
+    expect(tablesOf("BM-09")).toEqual(["feed_purchases", "feed_materials", "vaccinations", "officer_notes"]);
+    expect(tablesOf("BM-19")).toEqual([]);
+    expect(cost6Label("BM-08")).toBe("Chế phẩm");
+    expect(cost6Label("BM-09")).toBe("Vaccine");
+    expect(SUPPLY_ITEMS["BM-09"]).toEqual(["Con giống", "Thức ăn vịt con", "Thức ăn vịt lớn", "Vaccine"]);
+    expect(TABLE_FIELDS.officer_notes.map((f) => f.key)).toEqual(["date", "officer", "content", "farmer_opinion"]);
+    expect(TABLE_FIELDS.vaccinations.map((f) => f.key)).toEqual(["date", "vaccine", "dosage", "method", "mfg_date", "shot", "note"]);
+    expect(TABLE_FIELDS.treatments.map((f) => f.key)).toEqual(["date", "condition", "symptoms", "drug", "dosage", "treater", "withdrawal_days", "result"]);
+  });
+
+  it("thành tiền và P (kg/con) tự tính", () => {
+    expect(lineAmount("10.5", "8000")).toBe(84000);
+    expect(lineAmount("", "8000")).toBeNull();
+    expect(kgPerHead("1650", 1000)).toBe(1.65);
+    expect(kgPerHead(null, 10)).toBeNull();
+  });
+
+  it("tuần tuổi: theo 'Tuần tuổi (khi cân)' nếu có, không thì từ ngày tuổi lúc nhận", () => {
+    const c = { received_date: "2027-01-01", age_days: 1 };
+    expect(ageWeek(c, { entry_date: "2027-01-01", metrics: {} })).toBe(1);
+    expect(ageWeek(c, { entry_date: "2027-01-07", metrics: {} })).toBe(1);
+    expect(ageWeek(c, { entry_date: "2027-01-08", metrics: {} })).toBe(2);
+    expect(ageWeek(c, { entry_date: "2027-01-08", metrics: { age_week: "5" } })).toBe(5);
+  });
+
+  it("chỉ tiêu sinh trưởng theo tuần (tuần 1, 2, 3, 4, 6, 8, 10, 12) và yêu cầu kỹ thuật", () => {
+    const c = { received_date: "2027-01-01", age_days: 1, initial_count: 100, initial_weight_g: "40" };
+    const e = (d: string, alive: string, dead: string, feed: string, extra: Record<string, string> = {}, status: "submitted" | "draft" = "submitted") => ({
+      entry_date: d,
+      status,
+      metrics: { alive, dead, feed_kg: feed, ...extra },
+    });
+    const g = growthTable(c, [
+      e("2027-01-02", "99", "1", "2", { death_cause: "yeu" }),
+      e("2027-01-07", "98", "1", "3", { death_cause: "benh", weight_avg_g: "120" }),
+      e("2027-01-29", "96", "2", "20", { death_cause: "yeu", weight_avg_g: "700" }), // ngày tuổi 29 → tuần 5 → dòng tuần 6
+      e("2027-01-30", "10", "0", "999", {}, "draft"), // nháp không tính
+    ]);
+    expect(g.rows.map((r) => r.week)).toEqual([1, 2, 3, 4, 6, 8, 10, 12]);
+    expect(g.rows[0]).toMatchObject({ alive: 98, survival: 98, dead: 2, causes: "Yếu, Bệnh", feedKg: 5, weightKg: 0.12 });
+    expect(g.rows[1]).toMatchObject({ alive: null, survival: null, dead: 0, feedKg: 0 });
+    expect(g.rows[4]).toMatchObject({ week: 6, alive: 96, survival: 96, dead: 2, weightKg: 0.7 });
+    // Tiêu tốn lũy kế = 25 kg / (96 × 0,7 − 100 × 0,04) = 25 / 63,2.
+    expect(g.rows[4]!.fcr).toBe(0.4);
+    expect(g.total).toMatchObject({ dead: 4, feedKg: 25, alive: 96, survival: 96, fcr: 0.4 });
+    expect(g.avg).toEqual({ weightKg: 0.41, feedPerHead: 0.25 });
+    const t = TECH_TARGETS["BM-08"]!;
+    expect(t.map((x) => x.target)).toEqual(["95", "90", "2,8", "1,6–1,8"]);
+    expect(t[0]!.actual(g)).toBeNull(); // tuần 4 chưa có lần ghi
+    expect(t[2]!.ok(t[2]!.actual(g)!)).toBe(true);
+    expect(TECH_TARGETS["BM-09"]!.map((x) => x.label)).toEqual([
+      "Tỉ lệ nuôi sống đến 70 ngày",
+      "Trọng lượng TB lúc 70 ngày",
+      "Tiêu tốn thức ăn (thức ăn hỗn hợp hoàn chỉnh)",
+    ]);
+    // Quá tuần 12 thêm dòng mỗi 2 tuần.
+    expect(growthTable(c, [e("2027-03-30", "90", "0", "1")]).rows.map((r) => r.week).slice(-2)).toEqual([12, 14]);
+  });
+
+  it("#109 (Codex P2): bảng sinh trưởng giới hạn tài nguyên với tuần tuổi bất thường", () => {
+    const c = { received_date: "2027-01-01", age_days: 1, initial_count: 100, initial_weight_g: "40" };
+    const e = (d: string, week: string, alive = "99", feed = "1") => ({ entry_date: d, status: "submitted" as const, metrics: { alive, dead: "0", feed_kg: feed, age_week: week } });
+    for (const huge of ["10000", "100000000", "9".repeat(400)]) {
+      const g = growthTable(c, [e("2027-01-02", "1"), e("2027-01-03", huge)]);
+      expect(g.rows.map((r) => r.week)).toEqual([1, 2, 3, 4, 6, 8, 10, 12]);
+      expect(g.outOfRange).toEqual([{ entry_date: "2027-01-03", week: Number(huge) }]);
+      expect(g.total.feedKg).toBe(1); // lần ghi bất thường không cộng vào bảng
+    }
+    // Nhiều lần ghi bất thường vẫn không vượt trần dòng.
+    const many = Array.from({ length: 500 }, (_, i) => e("2027-02-01", String(105 + i * 1000)));
+    expect(growthTable(c, many).rows.length).toBe(8);
+    // Ngày tuổi lúc nhận quá lớn (tuần tính ra > MAX_GROWTH_WEEK) cũng báo bất thường.
+    expect(growthTable({ ...c, age_days: 3650 }, [{ entry_date: "2027-01-02", status: "submitted", metrics: { alive: "1", dead: "0", feed_kg: "1" } }]).outOfRange).toHaveLength(1);
+    // Bình thường và quá tuần 12 vẫn đúng; trần là MAX_GROWTH_WEEK (8 + 46 = 54 dòng).
+    const g = growthTable(c, [e("2027-01-02", "3", "98", "2"), e("2027-03-20", "13", "95", "5"), e("2027-04-01", "16", "94", "4")]);
+    expect(g.outOfRange).toEqual([]);
+    expect(g.rows.map((r) => r.week)).toEqual([1, 2, 3, 4, 6, 8, 10, 12, 14, 16]);
+    expect(g.rows.find((r) => r.week === 3)).toMatchObject({ alive: 98, feedKg: 2 });
+    expect(g.rows.find((r) => r.week === 14)).toMatchObject({ alive: 95, feedKg: 5 });
+    expect(g.rows.find((r) => r.week === 16)).toMatchObject({ alive: 94, feedKg: 4 });
+    const top = growthTable(c, [e("2027-01-02", String(MAX_GROWTH_WEEK))]);
+    expect(top.rows).toHaveLength(54);
+    expect(top.rows.at(-1)!.week).toBe(MAX_GROWTH_WEEK);
+    expect(top.outOfRange).toEqual([]);
+    // Biểu ghi báo lỗi sớm như server (MaxAgeWeek).
+    const m = { alive: "1", dead: "0", feed_kg: "1" };
+    expect(metricErrors("BM-08", "daily", { ...m, age_week: "13" }).age_week).toBeUndefined();
+    expect(metricErrors("BM-08", "daily", { ...m, age_week: "10000" }).age_week).toBe("Tuần tuổi 0–104");
   });
 });

@@ -11,14 +11,20 @@ depends:
   pf/workflow: ">=1.0 <2"
 provides:
   ports:
+    - ConditionalPeriodControl
+    - DurablePublisher
     - Entry
     - FacilityDirectory
     - FiguresReader
     - Freezer
     - PeriodControl
+    - PeriodOperations
+    - PublishOperations
     - Publisher
+    - ReviewGuard
     - SubmissionFeed
     - SystemProgressReader
+    - TemplateCatalog
     - Validator
   events: [pf.forms.period.closed/v1, pf.forms.submission.recorded/v1]
   internal_events: []

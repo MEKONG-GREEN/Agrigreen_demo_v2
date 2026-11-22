@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:agrigreen_mobile/application/boundary_service.dart';
 import 'package:agrigreen_mobile/data/actions/action_queue.dart';
+import 'package:agrigreen_mobile/data/db/schema.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 import 'package:agrigreen_mobile/domain/geo/boundary.dart';
 import 'package:agrigreen_mobile/domain/outbox_record.dart';
@@ -63,9 +64,9 @@ void main() {
       await api.postAction(path: '/v1/x', idempotencyKey: 'act:1');
       await api.sendJson(
         method: 'PUT',
-        path: '/v1/kn/households/h1',
+        path: '/v1/kn/plots/p1',
         idempotencyKey: 'act:2',
-        body: const {'cultivated_area_ha': '1.5'},
+        body: const {'note': 'p1'},
       );
       await api.registerDevice(
         deviceId: 'dev1',
@@ -168,14 +169,14 @@ void main() {
     setUp(() async => h = await Harness.create());
     tearDown(() => h.dispose());
 
-    test('FN-XA-03.03 lệnh PUT xếp hàng được phát lại bằng sendJson', () async {
+    test('FN-XA-03.04 lệnh PUT xếp hàng được phát lại bằng sendJson', () async {
       final a = await h.actions.enqueue(
-        ApiActionKind.knCooperativeUpdate,
-        target: 'c1',
-        body: const {'name': 'HTX Mới'},
+        ApiActionKind.knPlotUpdate,
+        target: 'p1',
+        body: const {'name': 'Thửa 1'},
       );
       expect(a.method, 'PUT');
-      expect(a.path, '/v1/kn/cooperatives/c1');
+      expect(a.path, '/v1/kn/plots/p1');
       await h.sync.syncOnce(force: true);
       expect(h.fake.sendCalls.single.$1, 'PUT');
       expect(h.fake.sendCalls.single.$3, a.idempotencyKey);
@@ -184,6 +185,72 @@ void main() {
       expect(
         ApiActionKind.knMaterialCorrect.pathFor('m1'),
         '/v1/kn/materials/m1/correct',
+      );
+    });
+
+    test('#161 hồ sơ KN riêng: mọi lệnh là POST /v1/kn/producer-records…, không còn route ghi HTX nền tảng', () async {
+      expect(
+        ApiActionKind.knRecordCreate.pathFor(null),
+        '/v1/kn/producer-records',
+      );
+      expect(
+        ApiActionKind.knRecordUpdate.pathFor('r1'),
+        '/v1/kn/producer-records/r1',
+      );
+      expect(
+        ApiActionKind.knRecordDeactivate.pathFor('r1'),
+        '/v1/kn/producer-records/r1/deactivate',
+      );
+      expect(
+        ApiActionKind.knRecordReactivate.pathFor('r1'),
+        '/v1/kn/producer-records/r1/reactivate',
+      );
+      for (final k in ApiActionKind.values) {
+        final path = k.pathFor('x');
+        expect(path, isNot(contains('/v1/kn/cooperatives')), reason: k.code);
+        expect(path, isNot(contains('/v1/kn/households')), reason: k.code);
+        if (k.name.startsWith('knRecord')) expect(k.method, 'POST');
+      }
+      final a = await h.actions.enqueue(
+        ApiActionKind.knRecordUpdate,
+        target: 'r1',
+        body: const {'kind': 'cooperative', 'base_version': 2},
+      );
+      await h.sync.syncOnce(force: true);
+      expect(h.fake.actionCalls.single.$1, '/v1/kn/producer-records/r1');
+      expect(h.fake.actionCalls.single.$2, a.idempotencyKey);
+      expect(h.fake.sendCalls, isEmpty);
+    });
+
+    test('#161 lệnh ghi HTX cũ còn trong máy: không phát lại, migration v4 bỏ (retired), không xếp hàng mới', () async {
+      Future<void> legacy(String id, int seq, String kind) =>
+          h.db.db.insert('api_action', {
+            'id': id,
+            'seq': seq,
+            'kind': kind,
+            'target': 'c1',
+            'body': jsonEncode({'name': 'HTX'}),
+            'status': 'pending',
+            'created_at': h.clock.now().millisecondsSinceEpoch,
+          });
+      await legacy('old-1', 900, 'kn_cooperative_update');
+      await legacy('old-2', 901, 'kn_household_create');
+      // Dòng cũ đọc được (lớp phủ) nhưng không vào danh sách phát lại.
+      expect(await h.actions.active(), hasLength(2));
+      expect(await h.actions.pending(), isEmpty);
+      await h.sync.syncOnce(force: true);
+      expect(h.fake.actionCalls, isEmpty);
+      expect(h.fake.sendCalls, isEmpty);
+      // Máy nâng cấp từ lược đồ v3: lệnh cũ còn chờ → failed 'retired'.
+      await Schema.upgrade(h.db.db, 3, Schema.version);
+      expect(await h.actions.pendingCount(), 0);
+      final old = (await h.actions.byId('old-1'))!;
+      expect(old.status, ApiActionStatus.failed);
+      expect(old.lastError, RetiredActionKind.retiredCode);
+      expect(() => old.path, throwsStateError);
+      await expectLater(
+        h.actions.enqueue(RetiredActionKind.values.first, target: 'c1'),
+        throwsArgumentError,
       );
     });
 

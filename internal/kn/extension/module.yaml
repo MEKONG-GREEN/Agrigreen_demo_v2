@@ -32,7 +32,9 @@ provides:
     - HTXConfirmationHistory
     - HTXConfirmations
     - HTXData
+    - KHTCFixedTemplates
     - KHTCMetricNames
+    - KHTCOperationSource
     - KHTCPlanDepartments
     - KHTCPlanVersions
     - KHTCPlans
@@ -40,7 +42,9 @@ provides:
     - KHTCReportStates
     - KHTCSourceCrosswalk
     - KHTCSources
+    - KHTCTemplateContextReader
     - OrganizationData
+    - PlotDirectory
     - PlotStatistics
     - ReportData
     - TablePDF
@@ -48,6 +52,7 @@ provides:
     - pf.extension.cnts_alert.changed/v1
     - pf.extension.cnts_duty.changed/v1
     - pf.extension.cnts_form.reminded/v1
+    - pf.extension.cnts_knqg.changed/v1
     - pf.extension.consolidation.completed/v1
     - pf.extension.directive.issued/v1
     - pf.extension.outbreak.reported/v1
@@ -57,7 +62,6 @@ provides:
     - pf.extension.report_task.reminded/v1
     - pf.extension.submission.adjustment_requested/v1
     - pf.extension.submission.submitted/v1
-    - pf.extension.support_request.submitted/v1
     - pf.extension.task.created/v1
     - pf.extension.task.escalated/v1
     - pf.extension.work_schedule.reminded/v1
@@ -69,6 +73,7 @@ provides:
     - pf_extension_pub.consolidation_closed/v1
     - pf_extension_pub.directive_target_ack/v1
     - pf_extension_pub.field_report/v1
+    - pf_extension_pub.support_request_export/v1
     - pf_extension_pub.task/v1
     - pf_extension_pub.task_event/v1
   data_products: []

@@ -13,9 +13,11 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	gosync "sync"
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -70,6 +72,7 @@ type opts struct {
 	slaHours *decimal.Decimal
 	extra    []port.Source            // Source thêm (vd FarmerSource)
 	farmers  accport.FarmerHouseholds // nối UseFarmers
+	bind     gin.HandlerFunc          // middleware ngữ cảnh phiên giả (chạy sau Authenticate)
 }
 
 func newFixture(t *testing.T, o ...opts) *fixture {
@@ -97,7 +100,11 @@ func newFixture(t *testing.T, o ...opts) *fixture {
 	}
 	log := telemetry.NewLogger("test", io.Discard)
 	appEng := httpx.NewEngine(log, 1<<20)
-	f.mod.RegisterApp(appEng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), idempotency.Middleware(ops)))
+	app := []gin.HandlerFunc{httpx.Authenticate(f.iss.Verifier())}
+	if op.bind != nil {
+		app = append(app, op.bind)
+	}
+	f.mod.RegisterApp(appEng.Group("/v1", append(app, idempotency.Middleware(ops))...))
 	adminEng := httpx.NewEngine(log, 1<<20)
 	f.mod.RegisterAdmin(adminEng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), httpx.RequireMFA(), idempotency.Middleware(ops)))
 	f.app, f.admin = httptest.NewServer(appEng), httptest.NewServer(adminEng)
@@ -487,6 +494,49 @@ func TestPullScopeChangeResets(t *testing.T) {
 	pg2, _ := c.pull(pg.NextCursor, 0)
 	if !pg2.Reset || len(pg2.Changes) != 2 || pg2.Changes[0].Entity != "plot" {
 		t.Fatalf("sau khi đổi phạm vi: %+v", pg2)
+	}
+}
+
+// #49 (FN-14 AC-02): quyền trong payload phiên chủ đổi (cấp/thu hồi/chuyển việc) mà vai, phòng ban, xã không đổi → dấu
+// quyền phiên đổi → con trỏ cũ reset: máy người nhận nạp lại công việc, máy người bị thu hồi thay toàn bộ dữ liệu tham
+// chiếu. Payload giữ nguyên → không reset. pf/sync không giải mã payload.
+func TestPullOwnerSessionChangeResets(t *testing.T) {
+	var mu gosync.Mutex
+	payload := []byte("grant-v1")
+	sessionID, node := ids.New(), ids.New()
+	bind := func(c *gin.Context) {
+		p, _ := authz.FromContext(c.Request.Context())
+		p.KN = &authz.KNContext{ID: sessionID, OrgRef: node, Role: authz.KNXa, Department: "chan_nuoi_thuy_san", Communes: []string{unitA},
+			Scope: authz.Scope{Units: []string{unitA}}}
+		s, err := authz.NewSession("kn", sessionID, authz.SessionScope{NodeID: node, Department: "chan_nuoi_thuy_san", UnitCodes: []string{unitA}, RequiresNode: true})
+		if err != nil {
+			t.Error(err)
+		}
+		mu.Lock()
+		s = s.WithPayload(payload)
+		mu.Unlock()
+		p.SelectedSession = &s
+		c.Request = c.Request.WithContext(authz.WithPrincipal(c.Request.Context(), p))
+		c.Next()
+	}
+	f := newFixture(t, opts{bind: bind})
+	c := f.officer()
+	c.register()
+	f.source.add("plot", unitA, 2)
+	pg, r := c.pull("", 0)
+	if r.status != http.StatusOK || pg.Reset || len(pg.Changes) != 3 {
+		t.Fatalf("lần đầu: %d %+v", r.status, pg)
+	}
+	same, _ := c.pull(pg.NextCursor, 0)
+	if same.Reset || len(same.Changes) != 0 {
+		t.Fatalf("payload không đổi mà reset: %+v", same)
+	}
+	mu.Lock()
+	payload = []byte("grant-v2")
+	mu.Unlock()
+	pg2, _ := c.pull(same.NextCursor, 0)
+	if !pg2.Reset || len(pg2.Changes) != 3 {
+		t.Fatalf("quyền phiên đổi phải reset và nạp lại: %+v", pg2)
 	}
 }
 

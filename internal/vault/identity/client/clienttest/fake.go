@@ -44,6 +44,11 @@ type subject struct {
 	sections map[string]client.Fields
 }
 
+type revision struct {
+	tenant, subject                          uuid.UUID
+	prevName, prevPhone, nextName, nextPhone string
+}
+
 type blindKey struct {
 	tenant uuid.UUID
 	kind   string
@@ -56,18 +61,21 @@ type Fake struct {
 	subjects map[uuid.UUID]*subject
 	blind    map[blindKey]uuid.UUID
 	log      []Access
+	// revisions: bản sửa họ tên/SĐT (#251) — giá trị đã chuẩn hóa trước/sau, chỉ trả nhãn che bớt.
+	revisions map[uuid.UUID]revision
 	// Fail, nếu khác nil, được gọi đầu mỗi thao tác; trả lỗi khác nil → thao tác trả lỗi đó.
 	Fail func(op string) error
 }
 
 var (
-	_ client.Client   = (*Fake)(nil)
-	_ client.Profiles = (*Fake)(nil)
+	_ client.Client    = (*Fake)(nil)
+	_ client.Profiles  = (*Fake)(nil)
+	_ client.Revisions = (*Fake)(nil)
 )
 
 // New tạo kho giả rỗng.
 func New() *Fake {
-	return &Fake{subjects: map[uuid.UUID]*subject{}, blind: map[blindKey]uuid.UUID{}}
+	return &Fake{subjects: map[uuid.UUID]*subject{}, blind: map[blindKey]uuid.UUID{}, revisions: map[uuid.UUID]revision{}}
 }
 
 // Accesses trả bản sao nhật ký truy cập.
@@ -262,6 +270,11 @@ func (f *Fake) Erase(ctx context.Context, ref uuid.UUID, reason string) error {
 			delete(f.blind, k)
 		}
 	}
+	for k, r := range f.revisions {
+		if r.subject == ref {
+			delete(f.revisions, k)
+		}
+	}
 	clear(s.priv[:])
 	s.id, s.priv, s.erased, s.sections = client.Identity{Kind: s.id.Kind, AreaCode: s.id.AreaCode}, nil, true, nil
 	return nil
@@ -319,20 +332,26 @@ func (f *Fake) PubKeys(ctx context.Context, areaCodes []string) ([]client.PubKey
 
 // Amend thực hiện client.Profiles (W11.22): kiểm mục đích thuộc danh mục của thao tác như kho thật.
 func (f *Fake) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UUID, id client.Identity) error {
+	_, err := f.AmendRevision(ctx, purpose, ref, id)
+	return err
+}
+
+// AmendRevision thực hiện client.Revisions (#251): như Amend, giữ bản sửa trước/sau và trả mã bản sửa.
+func (f *Fake) AmendRevision(ctx context.Context, purpose client.Purpose, ref uuid.UUID, id client.Identity) (uuid.UUID, error) {
 	tid, actor, err := f.start(ctx, domain.OpAmend, purpose, true)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	if !domain.AllowedPurpose(domain.OpAmend, string(purpose)) {
-		return problem.Validation.WithField("purpose", "không thuộc danh mục của thao tác amend")
+		return uuid.Nil, problem.Validation.WithField("purpose", "không thuộc danh mục của thao tác amend")
 	}
 	if id.FullName == "" {
-		return problem.Validation.WithField("full_name", "bắt buộc")
+		return uuid.Nil, problem.Validation.WithField("full_name", "bắt buộc")
 	}
 	var phone string
 	if id.Phone != "" {
 		if phone, err = domain.NormalizePhone(id.Phone); err != nil {
-			return problem.Validation.WithField("phone", err.Error())
+			return uuid.Nil, problem.Validation.WithField("phone", err.Error())
 		}
 	}
 	f.mu.Lock()
@@ -340,12 +359,12 @@ func (f *Fake) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UUID,
 	s, err := f.get(tid, ref)
 	f.record(domain.OpAmend, purpose, ref, actor)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	k := blindKey{tid, domain.BlindPhone, phone}
 	if phone != "" {
 		if other, ok := f.blind[k]; ok && other != ref {
-			return client.ProblemDuplicate
+			return uuid.Nil, client.ProblemDuplicate
 		}
 	}
 	if s.id.Phone != "" {
@@ -354,8 +373,38 @@ func (f *Fake) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UUID,
 	if phone != "" {
 		f.blind[k] = ref
 	}
-	s.id.FullName, s.id.Phone, s.id.Address = domain.NormalizeName(id.FullName), phone, id.Address
-	return nil
+	rev := ids.New()
+	name := domain.NormalizeName(id.FullName)
+	f.revisions[rev] = revision{tenant: tid, subject: ref, prevName: s.id.FullName, prevPhone: s.id.Phone, nextName: name, nextPhone: phone}
+	s.id.FullName, s.id.Phone, s.id.Address = name, phone, id.Address
+	return rev, nil
+}
+
+// Revisions thực hiện client.Revisions (#251): chỉ nhãn che bớt; mã lạ/tenant khác/chủ thể đã xóa → bỏ qua.
+func (f *Fake) Revisions(ctx context.Context, purpose client.Purpose, refs []uuid.UUID) ([]client.Revision, error) {
+	tid, actor, err := f.start(ctx, domain.OpRevisionRead, purpose, true)
+	if err != nil {
+		return nil, err
+	}
+	if !domain.AllowedPurpose(domain.OpRevisionRead, string(purpose)) {
+		return nil, problem.Validation.WithField("purpose", "không thuộc danh mục của thao tác revision_read")
+	}
+	if len(refs) > client.MaxRevisionRefs {
+		return nil, problem.Validation.WithField("refs", "tối đa 200 bản sửa mỗi lần")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := []client.Revision{}
+	for _, ref := range refs {
+		r, ok := f.revisions[ref]
+		if !ok || r.tenant != tid {
+			continue
+		}
+		f.record(domain.OpRevisionRead, purpose, r.subject, actor)
+		out = append(out, client.Revision{Ref: ref, SubjectRef: r.subject, PrevLabel: domain.Label(r.prevName),
+			NextLabel: domain.Label(r.nextName), PrevPhone: domain.MaskPhone(r.prevPhone), NextPhone: domain.MaskPhone(r.nextPhone)})
+	}
+	return out, nil
 }
 
 // sectionCheck: mục đích thuộc danh mục của op VÀ là mục đích của ngăn (như kho thật).

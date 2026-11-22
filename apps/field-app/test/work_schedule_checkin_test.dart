@@ -1,14 +1,37 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:agrigreen_field/application/visit_photo.dart';
 import 'package:agrigreen_field/application/work_schedule_service.dart';
 import 'package:agrigreen_field/domain/work_schedule.dart';
 import 'package:agrigreen_mobile/data/actions/action_queue.dart';
 import 'package:agrigreen_mobile/data/crypto/envelope.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 
 import 'support/harness.dart';
 
 // W11.46 (BRD CNTS FN-12, CV-07): check-in GPS tại địa điểm công tác trên App hiện trường — xếp lệnh idempotent khi
 // mất mạng, chỉ mục ngoài cơ quan của hôm nay, sau khi đã gửi lịch.
+// CNTS-V4-CHECKOUT-PHOTO (#249, BRD CNTS v4.0 FN-12 CV-07/CV-08): check-in, check-out bắt buộc ảnh (nén ≤ 500 KB),
+// check-out chỉ sau check-in, lệnh chờ ngoại tuyến giữ thời điểm lúc bấm.
+
+/// Camera giả: ảnh JPEG nhỏ, hoặc null (người dùng hủy chụp).
+class _Camera implements CameraSource {
+  _Camera();
+  bool cancel = false;
+  int shots = 0;
+  static final jpeg = Uint8List.fromList(
+    img.encodeJpg(img.Image(width: 32, height: 24), quality: 80),
+  );
+  @override
+  Future<CapturedImage?> capture() async {
+    shots++;
+    return cancel ? null : CapturedImage(jpeg, 'image/jpeg');
+  }
+}
 
 /// 09:00 Thứ Tư 14/10/2026 giờ Việt Nam.
 final _now = DateTime.utc(2026, 10, 14, 2, 0);
@@ -79,6 +102,7 @@ void main() {
   late Harness h;
   late ActionQueue actions;
   late WorkScheduleService svc;
+  late _Camera camera;
   var status = 'approved';
   var checkins = <Object?>[];
   int? approvedVersion;
@@ -103,6 +127,7 @@ void main() {
       ids: h.ids,
       extraKinds: CntsActionKind.values,
     );
+    camera = _Camera();
     svc = WorkScheduleService(
       db: h.db,
       api: h.server,
@@ -116,6 +141,7 @@ void main() {
           GpsFix(lat: 10.001, lon: 105.0, accuracyM: 8),
         ),
       ),
+      camera: camera,
     );
     status = 'approved';
     checkins = [];
@@ -232,6 +258,11 @@ void main() {
     expect(acts.single.body?['accuracy_m'], 8);
     expect(acts.single.body?['captured_at'], _now.toIso8601String());
     expect(
+      base64Decode(acts.single.body!['photo']! as String),
+      _Camera.jpeg,
+      reason: 'CNTS v4.0: check-in kèm ảnh chụp tại chỗ',
+    );
+    expect(
       v.items.firstWhere((i) => i.id == 'i-today').checkin?.pending,
       isTrue,
     );
@@ -256,6 +287,7 @@ void main() {
     final ck = v.items.firstWhere((i) => i.id == 'i-today').checkin!;
     expect(ck.far, isTrue);
     expect(ck.label, contains('612 m'));
+    expect(ck.label, isNot(contains('Chưa check-out')));
 
     status = 'draft';
     checkins = [];
@@ -266,10 +298,146 @@ void main() {
     );
   });
 
+  test('CNTS v4.0 BR-07 (#250): máy chủ gắn nhãn Chưa check-out lúc 23:59 → hiện ở màn cán bộ xã; check-out gỡ nhãn', () {
+    final ck = WsCheckin.fromJson({
+      'captured_at': '2026-10-14T01:00:00Z',
+      'no_checkout': true,
+      'checkout': null,
+    })!;
+    expect(ck.noCheckout, isTrue);
+    expect(ck.label, endsWith('Chưa check-out'));
+    final out = ck.withCheckout(
+      WsCheckout(capturedAt: DateTime.utc(2026, 10, 14, 9, 30), pending: true),
+    );
+    expect(out.noCheckout, isFalse);
+    expect(out.label, isNot(contains('Chưa check-out')));
+  });
+
   test('sửa mục trên app giữ địa điểm bản đồ trong thân lệnh', () {
     final i = WsItem.fromJson(
       _item('x', '2026-10-14', place: {'lat': 10.5, 'lon': 106.0}),
     )!;
     expect(i.toInput()['place'], {'lat': 10.5, 'lon': 106.0, 'source': 'map'});
+  });
+
+  test(
+    'CNTS v4.0 FN-12: hủy chụp ảnh → không check-in, không xếp lệnh',
+    () async {
+      camera.cancel = true;
+      final v = await svc.load(_week);
+      await expectLater(
+        svc.checkin(_week, v.items.firstWhere((i) => i.id == 'i-today')),
+        throwsA(
+          isA<WorkScheduleError>().having((e) => e.field, 'field', 'photo'),
+        ),
+      );
+      expect(await actions.ofKind(CntsActionKind.workScheduleCheckin), isEmpty);
+    },
+  );
+
+  test('CV-08: nút Check-out chỉ sau check-in; check-out ngoại tuyến kèm ảnh, giữ thời điểm lúc bấm (AC-11)', () async {
+    var v = await svc.load(_week);
+    final today = v.items.firstWhere((i) => i.id == 'i-today');
+    expect(v.canCheckout(today, _now), isFalse, reason: 'chưa check-in');
+    await expectLater(
+      svc.checkout(_week, today),
+      throwsA(isA<WorkScheduleError>()),
+    );
+    v = await svc.checkin(_week, today);
+    expect(
+      v.canCheckout(v.items.firstWhere((i) => i.id == 'i-today'), _now),
+      isTrue,
+      reason: 'check-in đang chờ đồng bộ vẫn check-out được',
+    );
+    h.clock.advance(const Duration(hours: 2, minutes: 30));
+    v = await svc.checkout(_week, today);
+    final acts = await actions.ofKind(CntsActionKind.workScheduleCheckout);
+    expect(acts, hasLength(1));
+    expect(
+      acts.single.path,
+      '/v1/extension/work-schedules/$_sid/items/i-today/checkout',
+    );
+    expect(
+      acts.single.body?['captured_at'],
+      _now.add(const Duration(hours: 2, minutes: 30)).toIso8601String(),
+    );
+    expect(base64Decode(acts.single.body!['photo']! as String), _Camera.jpeg);
+    final ck = v.items.firstWhere((i) => i.id == 'i-today').checkin!;
+    expect(ck.checkout?.pending, isTrue);
+    expect(ck.label, contains('Đã check-out (chờ đồng bộ)'));
+    expect(
+      v.canCheckout(
+        v.items.firstWhere((i) => i.id == 'i-today'),
+        h.clock.now(),
+      ),
+      isFalse,
+      reason: 'một mục một check-out',
+    );
+    expect(camera.shots, 2);
+  });
+
+  test('máy chủ trả check-out: thời gian ở địa điểm, Đồng bộ trễ (AC-12, AC-13); check-in cũ không ảnh', () async {
+    checkins = [
+      {
+        'id': 'c1',
+        'item_id': 'i-today',
+        'captured_at': '2026-10-14T01:00:00Z',
+        'distance_m': 20,
+        'far': false,
+        'legacy_no_photo': false,
+        'checkout': {
+          'captured_at': '2026-10-14T04:30:00Z',
+          'far': true,
+          'stay_minutes': 210,
+          'synced_late': true,
+        },
+      },
+      {
+        'id': 'c2',
+        'item_id': 'i-tomorrow',
+        'captured_at': '2026-10-15T01:00:00Z',
+        'legacy_no_photo': true,
+        'checkout': null,
+      },
+    ];
+    final v = await svc.load(_week);
+    final ck = v.items.firstWhere((i) => i.id == 'i-today').checkin!;
+    expect(ck.checkout?.stayMinutes, 210);
+    expect(
+      ck.label,
+      contains('Check-out xa địa điểm · ở 3 giờ 30 phút · Đồng bộ trễ'),
+    );
+    expect(
+      v.canCheckout(v.items.firstWhere((i) => i.id == 'i-today'), _now),
+      isFalse,
+    );
+    expect(
+      v.items.firstWhere((i) => i.id == 'i-tomorrow').checkin!.label,
+      contains('dữ liệu cũ, không ảnh'),
+    );
+    expect(stayLabel(120), '2 giờ');
+    expect(stayLabel(45), '45 phút');
+  });
+
+  test('ảnh lớn được nén về JPEG ≤ 500 KB; dữ liệu không phải ảnh → null', () {
+    final noisy = img.Image(width: 2400, height: 1800);
+    var seed = 7;
+    for (final p in noisy) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      p
+        ..r = seed & 0xff
+        ..g = (seed >> 8) & 0xff
+        ..b = (seed >> 16) & 0xff;
+    }
+    final big = Uint8List.fromList(img.encodePng(noisy));
+    expect(big.length, greaterThan(maxVisitPhotoBytes));
+    final out = compressVisitPhotoSync(big)!;
+    expect(out.length, lessThanOrEqualTo(maxVisitPhotoBytes));
+    expect(out.sublist(0, 3), [0xFF, 0xD8, 0xFF]);
+    expect(compressVisitPhotoSync(_Camera.jpeg), same(_Camera.jpeg));
+    expect(
+      compressVisitPhotoSync(Uint8List.fromList(utf8.encode('không phải ảnh'))),
+      isNull,
+    );
   });
 }

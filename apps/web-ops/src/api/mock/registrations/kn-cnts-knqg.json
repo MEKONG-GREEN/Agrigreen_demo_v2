@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-knqg",
+  "source": "./kn-cnts-knqg",
+  "app": [
+    {
+      "export": "cntsKnqgRoutes",
+      "order": 1153
+    }
+  ],
+  "admin": []
+}

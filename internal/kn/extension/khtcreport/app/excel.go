@@ -295,7 +295,31 @@ func writeFormTexts(w *workbook, data domain.Data, hcth bool) {
 	}
 }
 
+// writeExternal ghi các ô Nhập ngoài (W11.67, BR-DL-19) kèm nguồn: cơ quan, văn bản/kênh, ngày, tệp minh chứng.
+func writeExternal(w *workbook, figures []domain.ExternalFigure) {
+	if len(figures) == 0 {
+		return
+	}
+	w.line("Số liệu nguồn ngoài (Nhập ngoài) — chỉ sửa tại Số liệu nguồn ngoài")
+	w.line("Chỉ tiêu", "Giá trị", "ĐVT", "Cơ quan cung cấp", "Văn bản / kênh", "Ngày", "Minh chứng")
+	for _, x := range figures {
+		files := make([]string, 0, len(x.Evidence))
+		for _, ev := range x.Evidence {
+			files = append(files, ev.FileName)
+		}
+		w.numericLine([]string{x.Name, x.Value, x.Unit, x.Agency, x.Document, x.SourceDate, strings.Join(files, "; ")}, 1)
+	}
+}
+
 func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, error) {
+	if d.Data.Template == "adhoc" {
+		if d.Adhoc == nil {
+			return nil, ErrInvalid.WithDetail("Chọn ít nhất một chỉ tiêu trước khi xuất")
+		}
+		if err := d.Adhoc.ValidateData(d.Data); err != nil {
+			return nil, ErrInvalid.WithCause(err)
+		}
+	}
 	file := excelize.NewFile()
 	defer func() { _ = file.Close() }()
 	heading, err := file.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Family: "Times New Roman"}, Fill: excelize.Fill{Type: "pattern", Color: []string{"E7EFEC"}, Pattern: 1}, Alignment: &excelize.Alignment{WrapText: true}})
@@ -316,12 +340,19 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 	w.check(tabular.SetColumnWidth(file, w.sheet, "A", "N", 18))
 	w.check(tabular.SetColumnWidth(file, w.sheet, "B", "B", 42))
 	data := d.Data
+	if data.Template == "adhoc" {
+		data = domain.AdhocData(d)
+		d.Data = data
+	}
 	rows := domain.SelectRows(data.Rows, filter)
 	w.title("TRUNG TÂM KHUYẾN NÔNG")
 	w.title("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM — Độc lập - Tự do - Hạnh phúc")
 	w.line("Số: "+admin(d, "document_no")+"/BC-TTKN", admin(d, "place")+", ngày "+admin(d, "report_date"))
 	w.title("BÁO CÁO")
 	title := "Kết quả thực hiện nhiệm vụ công tác khuyến nông"
+	if data.Template == "adhoc" {
+		title = "Báo cáo phát sinh"
+	}
 	if data.Template == "mau_5" {
 		title = fmt.Sprintf("Kết quả tiến độ thực hiện Chương trình khuyến nông địa phương năm %d", data.Period.Year)
 	}
@@ -336,7 +367,7 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 	if filter.Department != "" || filter.Program != "" || filter.Commune != "" || filter.Level != "" {
 		w.line("Xuất theo bộ lọc", departmentName(filter.Department), filter.Program, filter.Commune, filter.Level)
 	}
-	if data.Template == "mau_5" {
+	if data.Template == "mau_5" || data.Template == "adhoc" {
 		w.line("Kính gửi", admin(d, "recipient"))
 		w.line("Căn cứ", admin(d, "basis"))
 	}
@@ -349,7 +380,12 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 			title += " — " + nextPeriod(data.Period)
 		}
 		w.title(section.Key + ". " + title)
+		if section.Key == "A" && data.Template == "mau_1" || section.Key == "I" {
+			writeExternal(w, data.External)
+		}
 		switch section.Key {
+		case "chi_tieu":
+			writeAdhocFigures(w, data)
 		case "A.I.1", "A.I.2", "A.I.3", "A.III":
 			writeMetrics(w, data.Metrics, section.Key)
 		case "A.II.1", "I.1":
@@ -426,6 +462,12 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 		w.line("Băm số", data.Sources.FiguresHash)
 		w.line("Băm trạng thái HTX", data.Sources.StatusHash)
 	}
+	if len(data.External) > 0 {
+		w.line("Số liệu nguồn ngoài", "Mã chỉ tiêu", "Bản ghi", "Phiên bản", "Lúc ghi")
+		for _, x := range data.External {
+			w.line(x.Name, x.Code, x.EntryID.String(), strconv.FormatInt(x.Version, 10), x.At.Format(time.RFC3339))
+		}
+	}
 	w.line("Kỳ phiếu", "Phòng", "Bài nộp", "Lần gửi", "Bảng niêm phong", "Băm bảng")
 	for _, ref := range data.Submissions {
 		w.line(ref.PeriodID.String(), departmentName(ref.Department), ref.SubmissionID.String(), strconv.FormatInt(ref.Attempt, 10), ref.SheetID.String(), ref.Hash)
@@ -449,5 +491,5 @@ func RenderXLSX(d domain.Draft, filter domain.Filter, version int64) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	return buffer.Bytes(), nil
+	return fixedWorkbook(buffer.Bytes(), d.TemplateSnapshot, d, templateTerminal(d), filter, version)
 }

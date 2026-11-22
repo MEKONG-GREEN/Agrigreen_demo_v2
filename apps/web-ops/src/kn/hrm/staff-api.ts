@@ -68,6 +68,7 @@ export const PERM_LABEL: Record<string, string> = {
   "audit.view": "Xem nhật ký xem/xuất",
   "docs.view": "Xem tài liệu", // W11.24 kho tài liệu (FN-14)
   "docs.manage": "Quản lý tài liệu",
+  assessment: "Đánh giá viên chức",
 };
 export const SCOPE_LABEL: Record<HrmScope, string> = {
   none: "Không",

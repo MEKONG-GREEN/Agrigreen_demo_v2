@@ -141,6 +141,15 @@ func Periods(ctx context.Context, tx pgx.Tx, profile string, limit int) ([]Perio
 
 // InsertEvent ghi sự kiện kỳ native (máy trạng thái kiểm ở trigger trg_transition — sai → AGF01).
 func InsertEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, periodRef uuid.UUID, profile string, e *domain.Event, idem string) error {
+	_, err := insertEvent(ctx, tx, tid, periodRef, profile, e, idem)
+	return err
+}
+
+// InsertEventProof224 returns the exact partitioned identity from the native INSERT.
+func InsertEventProof224(ctx context.Context, tx pgx.Tx, tid, periodRef uuid.UUID, profile string, e *domain.Event, idem string) (time.Time, error) {
+	return insertEvent(ctx, tx, tid, periodRef, profile, e, idem)
+}
+func insertEvent(ctx context.Context, tx pgx.Tx, tid, periodRef uuid.UUID, profile string, e *domain.Event, idem string) (time.Time, error) {
 	var reason *string
 	if e.Reason != "" {
 		reason = &e.Reason
@@ -149,10 +158,12 @@ func InsertEvent(ctx context.Context, tx pgx.Tx, tid uuid.UUID, periodRef uuid.U
 	if units == nil {
 		units = []string{}
 	}
-	return tx.QueryRow(ctx, `INSERT INTO pf_forms.period_event (id, tenant_id, stream_key, period_ref, profile, origin, action, mode, units, reason,
+	var recordedAt time.Time
+	err := tx.QueryRow(ctx, `INSERT INTO pf_forms.period_event (id, tenant_id, stream_key, period_ref, profile, origin, action, mode, units, reason,
 	    event_time, actor_ref, idem_key, rule_version)
-	  VALUES ($1, $2, 'period:' || $3::uuid::text, $3::uuid, $4, 'native', $5, $6, $7, $8, $9, $10, $11, $12) RETURNING seq`,
-		e.ID, tid, periodRef, profile, e.Action, e.Mode, units, reason, e.At.UTC(), e.Actor, idem, domain.RuleVersion).Scan(&e.Seq)
+	  VALUES ($1, $2, 'period:' || $3::uuid::text, $3::uuid, $4, 'native', $5, $6, $7, $8, $9, $10, $11, $12) RETURNING seq,recorded_at`,
+		e.ID, tid, periodRef, profile, e.Action, e.Mode, units, reason, e.At.UTC(), e.Actor, idem, domain.RuleVersion).Scan(&e.Seq, &recordedAt)
+	return recordedAt.UTC(), err
 }
 
 // Events đọc sự kiện của kỳ theo seq.
@@ -501,4 +512,22 @@ func InsertDue(ctx context.Context, tx pgx.Tx, tid, periodID uuid.UUID, due time
 	  VALUES ($1, $2, 'due:' || $3::uuid::text, $3::uuid, '', $4, $5, $6, $7, $8, $9)`,
 		ids.New(), tid, periodID, due.UTC(), nilIfEmpty(reason), at.UTC(), actor, idem, domain.RuleVersion)
 	return err
+}
+
+// PeriodByIdem reads the durable receipt even after the shared30-day dedupe TTL.
+func PeriodByIdem(ctx context.Context, tx pgx.Tx, key string) (*Period, error) {
+	p, err := scanPeriod(tx.QueryRow(ctx, `SELECT `+"id, profile, template_id, template_code, template_version, label, due_at, units, owner_ref, publisher_level, actor_ref, event_time"+` FROM pf_forms.period WHERE idem_key=$1 ORDER BY recorded_at DESC LIMIT 1`, key))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &p, err
+}
+
+// No receipt from another batch/profile may be mistaken for an empty batch.
+// The caller holds the tenant+batch advisory lock; RLS still isolates tenants.
+func PublishReceiptCount(ctx context.Context, tx pgx.Tx, key string) (int, error) {
+	var n int
+	err := tx.QueryRow(ctx, `SELECT count(*) FROM(SELECT 1 FROM pf_forms.period
+ WHERE starts_with(idem_key,$1||':period:') LIMIT 367) bounded`, key).Scan(&n)
+	return n, err
 }

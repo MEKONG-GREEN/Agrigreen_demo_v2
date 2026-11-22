@@ -1,0 +1,1342 @@
+{
+  "doc_checklist": [
+    "Kế hoạch thực hiện dự án",
+    "Thông báo triển khai dự án tại địa phương",
+    "Quyết định phê duyệt quy chuẩn, tiêu chuẩn hàng hóa",
+    "Quyết định phân công viên chức chỉ đạo, phụ trách dự án",
+    "Kế hoạch mua sắm hàng hóa thực hiện dự án",
+    "Quyết định, hợp đồng mua sắm giống, thức ăn, vật tư",
+    "Hồ sơ nông dân (đơn tham gia, cam kết đối ứng, biên bản chọn hộ, hợp đồng)",
+    "Biên bản bàn giao giống, vật tư",
+    "Danh sách hỗ trợ giống, thiết bị, vật tư; danh sách đối ứng"
+  ],
+  "indicator_rows": {
+    "05": [
+      {
+        "chi_tieu": "1. Qui mô",
+        "ma": "quy_mo"
+      },
+      {
+        "chi_tieu": "2. Số hộ tham gia",
+        "dvt": "hộ",
+        "ma": "so_ho"
+      },
+      {
+        "chi_tieu": "3. Thời gian triển khai",
+        "ma": "thoi_gian"
+      },
+      {
+        "chi_tieu": "4. Giống (tên giống, phẩm cấp, số lượng)",
+        "ma": "giong"
+      },
+      {
+        "chi_tieu": "5. Các loại vật tư hỗ trợ",
+        "ma": "vat_tu"
+      },
+      {
+        "chi_tieu": "6. Tập huấn (số lớp, số lượt người)",
+        "ma": "tap_huan"
+      },
+      {
+        "chi_tieu": "7. Tham quan (số ngày, số lượt người)",
+        "ma": "tham_quan"
+      },
+      {
+        "chi_tieu": "8. Tổng kết (số ngày, số lượt người)",
+        "ma": "tong_ket"
+      },
+      {
+        "chi_tieu": "9. Năng suất (sản lượng)",
+        "dvt": "kg",
+        "ma": "nang_suat"
+      },
+      {
+        "chi_tieu": "Hiệu quả kinh tế (lợi nhuận)",
+        "dvt": "đồng",
+        "ma": "hieu_qua"
+      },
+      {
+        "chi_tieu": "10. Nhân rộng mô hình",
+        "ma": "nhan_rong"
+      }
+    ],
+    "07": [
+      {
+        "chi_tieu": "1. Qui mô",
+        "ma": "quy_mo"
+      },
+      {
+        "chi_tieu": "2. Số hộ tham gia",
+        "dvt": "hộ",
+        "ma": "so_ho"
+      },
+      {
+        "chi_tieu": "3. Thời gian triển khai",
+        "ma": "thoi_gian"
+      },
+      {
+        "chi_tieu": "4. Giống (tên giống, phẩm cấp, số lượng)",
+        "ma": "giong"
+      },
+      {
+        "chi_tieu": "5. Các loại vật tư hỗ trợ",
+        "ma": "vat_tu"
+      },
+      {
+        "chi_tieu": "6. Tập huấn (số lớp, số lượt người)",
+        "ma": "tap_huan"
+      },
+      {
+        "chi_tieu": "7. Đào tạo (số lớp ngoài MH, số ngày, số lượt người)",
+        "ma": "dao_tao"
+      },
+      {
+        "chi_tieu": "8. Tham quan (số ngày, số lượt người)",
+        "ma": "tham_quan"
+      },
+      {
+        "chi_tieu": "9. Tổng kết (số ngày, số lượt người)",
+        "ma": "tong_ket"
+      },
+      {
+        "chi_tieu": "10. Năng suất",
+        "ma": "nang_suat"
+      },
+      {
+        "chi_tieu": "Chất lượng sản phẩm (nếu có)",
+        "ma": "chat_luong"
+      },
+      {
+        "chi_tieu": "Hiệu quả kinh tế",
+        "dvt": "đồng",
+        "ma": "hieu_qua"
+      }
+    ]
+  },
+  "specs": [
+    {
+      "form": "01",
+      "code": "Mẫu 01/TĐ-DA",
+      "bm": "BM-12",
+      "title": "Báo cáo tiến độ thực hiện dự án theo tháng",
+      "lifecycle": "approve",
+      "per_site": false,
+      "period": "month",
+      "unique": true,
+      "fields": [
+        {
+          "key": "ten_du_an",
+          "label": "Tên dự án",
+          "kind": "text",
+          "auto": true
+        },
+        {
+          "key": "ma_du_an",
+          "label": "Mã dự án",
+          "kind": "text",
+          "auto": true
+        },
+        {
+          "key": "chu_nhiem",
+          "label": "Chủ nhiệm dự án",
+          "kind": "text",
+          "auto": true
+        },
+        {
+          "key": "to_chuc_chu_tri",
+          "label": "Tổ chức chủ trì",
+          "kind": "text"
+        },
+        {
+          "key": "thoi_gian_du_an",
+          "label": "Thời gian thực hiện",
+          "kind": "text",
+          "auto": true
+        },
+        {
+          "key": "kinh_phi",
+          "label": "Kinh phí (đồng)",
+          "kind": "text",
+          "auto": true
+        },
+        {
+          "key": "can_cu",
+          "label": "Căn cứ (hợp đồng, thuyết minh)",
+          "kind": "long"
+        },
+        {
+          "key": "tuyen_truyen",
+          "label": "4. Thông tin tuyên truyền",
+          "kind": "long"
+        },
+        {
+          "key": "danh_gia",
+          "label": "5. Đánh giá chung",
+          "kind": "long",
+          "required": true
+        },
+        {
+          "key": "kien_nghi",
+          "label": "6. Kiến nghị, đề xuất",
+          "kind": "long"
+        }
+      ],
+      "tables": [
+        {
+          "key": "mo_hinh",
+          "label": "1. Xây dựng mô hình",
+          "columns": [
+            {
+              "key": "dia_diem",
+              "label": "Điểm trình diễn, địa điểm",
+              "kind": "text"
+            },
+            {
+              "key": "quy_mo_ke_hoach",
+              "label": "Quy mô kế hoạch",
+              "kind": "text"
+            },
+            {
+              "key": "quy_mo_thuc_hien",
+              "label": "Quy mô thực hiện",
+              "kind": "text"
+            },
+            {
+              "key": "so_ho_ke_hoach",
+              "label": "Số hộ kế hoạch",
+              "kind": "int"
+            },
+            {
+              "key": "so_ho_thuc_hien",
+              "label": "Số hộ thực hiện",
+              "kind": "int"
+            },
+            {
+              "key": "ket_qua",
+              "label": "Kết quả đến kỳ báo cáo",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 100,
+          "hint": "Một dòng mỗi điểm trình diễn"
+        },
+        {
+          "key": "vat_tu",
+          "label": "2. Cung ứng giống, thiết bị, vật tư",
+          "columns": [
+            {
+              "key": "ten",
+              "label": "Giống, thiết bị, vật tư",
+              "kind": "text"
+            },
+            {
+              "key": "dvt",
+              "label": "ĐVT",
+              "kind": "text"
+            },
+            {
+              "key": "ke_hoach",
+              "label": "Kế hoạch",
+              "kind": "number"
+            },
+            {
+              "key": "da_cap",
+              "label": "Đã cấp",
+              "kind": "number"
+            },
+            {
+              "key": "thoi_gian",
+              "label": "Thời gian cấp",
+              "kind": "text"
+            },
+            {
+              "key": "ghi_chu",
+              "label": "Ghi chú",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 100,
+          "hint": "Đã cấp vượt kế hoạch → cảnh báo"
+        },
+        {
+          "key": "tap_huan",
+          "label": "3. Tập huấn hộ tham gia và nhân rộng",
+          "columns": [
+            {
+              "key": "noi_dung",
+              "label": "Nội dung",
+              "kind": "text"
+            },
+            {
+              "key": "lop_ke_hoach",
+              "label": "Số lớp kế hoạch",
+              "kind": "int"
+            },
+            {
+              "key": "lop_thuc_hien",
+              "label": "Số lớp thực hiện",
+              "kind": "int"
+            },
+            {
+              "key": "luot_ke_hoach",
+              "label": "Lượt người kế hoạch",
+              "kind": "int"
+            },
+            {
+              "key": "luot_thuc_hien",
+              "label": "Lượt người thực hiện",
+              "kind": "int"
+            },
+            {
+              "key": "ghi_chu",
+              "label": "Ghi chú",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 30
+        }
+      ],
+      "sections": [
+        {
+          "title": "Thông tin chung",
+          "fields": [
+            "ten_du_an",
+            "ma_du_an",
+            "chu_nhiem",
+            "to_chuc_chu_tri",
+            "thoi_gian_du_an",
+            "kinh_phi",
+            "can_cu"
+          ]
+        },
+        {
+          "title": "1. Xây dựng mô hình",
+          "tables": [
+            "mo_hinh"
+          ]
+        },
+        {
+          "title": "2. Cung ứng giống, thiết bị, vật tư",
+          "tables": [
+            "vat_tu"
+          ]
+        },
+        {
+          "title": "3. Tập huấn",
+          "tables": [
+            "tap_huan"
+          ]
+        },
+        {
+          "title": "4–6. Tuyên truyền, đánh giá, kiến nghị",
+          "fields": [
+            "tuyen_truyen",
+            "danh_gia",
+            "kien_nghi"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "03",
+      "code": "Mẫu 03",
+      "bm": "BM-13",
+      "title": "Báo cáo kết quả kiểm tra, đánh giá dự án khuyến nông trung ương",
+      "lifecycle": "sign",
+      "per_site": false,
+      "unique": false,
+      "numbered": true,
+      "fields": [
+        {
+          "key": "can_cu",
+          "label": "Căn cứ",
+          "kind": "long",
+          "required": true
+        },
+        {
+          "key": "quyet_dinh_doan",
+          "label": "Quyết định thành lập đoàn kiểm tra",
+          "kind": "text"
+        },
+        {
+          "key": "ngay_kiem_tra",
+          "label": "Ngày kiểm tra",
+          "kind": "date"
+        },
+        {
+          "key": "thuc_dia",
+          "label": "2. Kiểm tra thực địa (công việc đã triển khai, kết quả đến thời điểm kiểm tra)",
+          "kind": "long",
+          "required": true
+        },
+        {
+          "key": "nx_ho_so",
+          "label": "Về hồ sơ, tài liệu",
+          "kind": "long"
+        },
+        {
+          "key": "nx_to_chuc",
+          "label": "Về công tác tổ chức thực hiện",
+          "kind": "long"
+        },
+        {
+          "key": "nx_tien_do",
+          "label": "Về tiến độ và kết quả đến thời điểm kiểm tra",
+          "kind": "long"
+        },
+        {
+          "key": "ton_tai",
+          "label": "Những hạn chế, tồn tại cần khắc phục",
+          "kind": "long"
+        },
+        {
+          "key": "kien_nghi",
+          "label": "III. Kiến nghị, đề xuất",
+          "kind": "long"
+        },
+        {
+          "key": "noi_nhan",
+          "label": "Nơi nhận",
+          "kind": "long"
+        }
+      ],
+      "tables": [
+        {
+          "key": "doan",
+          "label": "1. Thành phần đoàn kiểm tra",
+          "columns": [
+            {
+              "key": "ho_ten",
+              "label": "Họ và tên",
+              "kind": "text"
+            },
+            {
+              "key": "chuc_vu",
+              "label": "Chức vụ, đơn vị công tác",
+              "kind": "text"
+            },
+            {
+              "key": "chuc_danh",
+              "label": "Chức danh trong đoàn",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 30
+        },
+        {
+          "key": "doi_tuong",
+          "label": "2. Thời gian, địa điểm, đối tượng kiểm tra",
+          "columns": [
+            {
+              "key": "ten",
+              "label": "Tên dự án/mô hình",
+              "kind": "text"
+            },
+            {
+              "key": "chu_tri",
+              "label": "Tổ chức chủ trì, chủ nhiệm dự án",
+              "kind": "text"
+            },
+            {
+              "key": "don_vi",
+              "label": "Đơn vị thực hiện",
+              "kind": "text"
+            },
+            {
+              "key": "dia_diem",
+              "label": "Địa điểm kiểm tra",
+              "kind": "text"
+            },
+            {
+              "key": "quy_mo",
+              "label": "Quy mô thực hiện",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 30
+        },
+        {
+          "key": "ho_so",
+          "label": "II.1. Kiểm tra hồ sơ, tài liệu",
+          "columns": [
+            {
+              "key": "ten",
+              "label": "Hồ sơ, tài liệu",
+              "kind": "text"
+            },
+            {
+              "key": "tinh_trang",
+              "label": "Tình trạng",
+              "kind": "choice",
+              "options": [
+                {
+                  "value": "co",
+                  "label": "Có"
+                },
+                {
+                  "value": "chua_du",
+                  "label": "Chưa đủ"
+                },
+                {
+                  "value": "chua_co",
+                  "label": "Chưa có"
+                }
+              ]
+            },
+            {
+              "key": "ghi_chu",
+              "label": "Ghi chú",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 60,
+          "hint": "Danh mục theo mẫu, thêm được dòng"
+        }
+      ],
+      "sections": [
+        {
+          "title": "Căn cứ",
+          "fields": [
+            "can_cu"
+          ]
+        },
+        {
+          "title": "I. Thông tin chung",
+          "fields": [
+            "quyet_dinh_doan",
+            "ngay_kiem_tra"
+          ],
+          "tables": [
+            "doan",
+            "doi_tuong"
+          ]
+        },
+        {
+          "title": "II. Kết quả kiểm tra",
+          "fields": [
+            "thuc_dia"
+          ],
+          "tables": [
+            "ho_so"
+          ]
+        },
+        {
+          "title": "3. Nhận xét, đánh giá",
+          "fields": [
+            "nx_ho_so",
+            "nx_to_chuc",
+            "nx_tien_do",
+            "ton_tai"
+          ]
+        },
+        {
+          "title": "III. Kiến nghị, đề xuất",
+          "fields": [
+            "kien_nghi",
+            "noi_nhan"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "04",
+      "code": "Mẫu 04/DA-NTTH",
+      "bm": "BM-14",
+      "title": "Bản nghiệm thu hiện trường lớp tập huấn nhân rộng mô hình",
+      "lifecycle": "sign",
+      "per_site": false,
+      "unique": false,
+      "fields": [
+        {
+          "key": "hop_dong",
+          "label": "Căn cứ Hợp đồng số",
+          "kind": "text",
+          "hint": "Số, ngày hợp đồng giữa TTKN Quốc gia với tổ chức chủ trì"
+        },
+        {
+          "key": "ke_hoach",
+          "label": "Kế hoạch tổ chức lớp được phê duyệt ngày",
+          "kind": "text"
+        },
+        {
+          "key": "ngay",
+          "label": "Hôm nay, ngày",
+          "kind": "date"
+        },
+        {
+          "key": "tai",
+          "label": "Tại",
+          "kind": "text"
+        },
+        {
+          "key": "ten_lop",
+          "label": "1. Tên lớp tập huấn",
+          "kind": "text",
+          "required": true
+        },
+        {
+          "key": "dia_diem",
+          "label": "2. Địa điểm tổ chức",
+          "kind": "text"
+        },
+        {
+          "key": "so_hoc_vien",
+          "label": "3. Số học viên tham gia",
+          "kind": "int",
+          "required": true
+        },
+        {
+          "key": "tu_ngay",
+          "label": "4. Tập huấn từ ngày",
+          "kind": "date"
+        },
+        {
+          "key": "den_ngay",
+          "label": "đến ngày",
+          "kind": "date"
+        },
+        {
+          "key": "tham_quan",
+          "label": "5. Thời gian tham quan",
+          "kind": "text"
+        },
+        {
+          "key": "dia_diem_tham_quan",
+          "label": "6. Địa điểm tham quan",
+          "kind": "text"
+        },
+        {
+          "key": "noi_dung",
+          "label": "1. Nội dung chương trình",
+          "kind": "long"
+        },
+        {
+          "key": "tai_lieu",
+          "label": "2. Chất lượng giảng dạy — Tài liệu",
+          "kind": "long"
+        },
+        {
+          "key": "giang_vien",
+          "label": "2. Chất lượng giảng dạy — Giảng viên",
+          "kind": "long"
+        },
+        {
+          "key": "to_chuc",
+          "label": "3. Công tác tổ chức lớp học",
+          "kind": "long"
+        },
+        {
+          "key": "nhan_xet",
+          "label": "4. Nhận xét chung",
+          "kind": "long",
+          "required": true
+        },
+        {
+          "key": "so_ban",
+          "label": "Số bản lập",
+          "kind": "int"
+        }
+      ],
+      "tables": [
+        {
+          "key": "tp_to_chuc",
+          "label": "I. Đại diện đơn vị tổ chức lớp tập huấn",
+          "columns": [
+            {
+              "key": "ho_ten",
+              "label": "Ông/bà",
+              "kind": "text"
+            },
+            {
+              "key": "chuc_vu",
+              "label": "Chức vụ",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 10
+        },
+        {
+          "key": "tp_quan_ly",
+          "label": "II. Đại diện cơ quan quản lý, khuyến nông địa phương",
+          "columns": [
+            {
+              "key": "ho_ten",
+              "label": "Ông/bà",
+              "kind": "text"
+            },
+            {
+              "key": "chuc_vu",
+              "label": "Chức vụ",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 10
+        },
+        {
+          "key": "tp_hoc_vien",
+          "label": "III. Đại diện học viên",
+          "columns": [
+            {
+              "key": "ho_ten",
+              "label": "Ông/bà",
+              "kind": "text"
+            },
+            {
+              "key": "chuc_vu",
+              "label": "Đơn vị",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 10
+        }
+      ],
+      "sections": [
+        {
+          "title": "Căn cứ",
+          "fields": [
+            "hop_dong",
+            "ke_hoach",
+            "ngay",
+            "tai"
+          ]
+        },
+        {
+          "title": "Thành phần nghiệm thu",
+          "tables": [
+            "tp_to_chuc",
+            "tp_quan_ly",
+            "tp_hoc_vien"
+          ]
+        },
+        {
+          "title": "IV. Kết quả nghiệm thu",
+          "fields": [
+            "ten_lop",
+            "dia_diem",
+            "so_hoc_vien",
+            "tu_ngay",
+            "den_ngay",
+            "tham_quan",
+            "dia_diem_tham_quan"
+          ]
+        },
+        {
+          "title": "Đánh giá nhận xét",
+          "fields": [
+            "noi_dung",
+            "tai_lieu",
+            "giang_vien",
+            "to_chuc",
+            "nhan_xet",
+            "so_ban"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "05",
+      "code": "Mẫu 05/DA-NTMH",
+      "bm": "BM-15",
+      "title": "Bản nghiệm thu kết quả thực hiện mô hình khuyến nông",
+      "lifecycle": "sign",
+      "per_site": true,
+      "unique": true,
+      "fields": [
+        {
+          "key": "hop_dong",
+          "label": "Căn cứ Hợp đồng số",
+          "kind": "text"
+        },
+        {
+          "key": "ngay",
+          "label": "Hôm nay, ngày",
+          "kind": "date"
+        },
+        {
+          "key": "tai",
+          "label": "Tại",
+          "kind": "text"
+        },
+        {
+          "key": "ten_mo_hinh",
+          "label": "1. Tên mô hình trình diễn (dự án)",
+          "kind": "text",
+          "required": true
+        },
+        {
+          "key": "dia_diem",
+          "label": "2. Địa điểm xây dựng mô hình",
+          "kind": "text",
+          "required": true
+        },
+        {
+          "key": "don_vi_thuc_hien",
+          "label": "3. Đơn vị thực hiện",
+          "kind": "text",
+          "required": true
+        },
+        {
+          "key": "chon_diem",
+          "label": "Chọn điểm, chọn hộ",
+          "kind": "long"
+        },
+        {
+          "key": "giong_vat_tu",
+          "label": "Kết quả mua và hỗ trợ giống, vật tư (chất lượng, tiến độ, hình thức cấp phát)",
+          "kind": "long"
+        },
+        {
+          "key": "chi_dao_kt",
+          "label": "Chỉ đạo kỹ thuật xây dựng mô hình",
+          "kind": "long"
+        },
+        {
+          "key": "nhan_rong",
+          "label": "2. Nhân rộng mô hình (tập huấn, tham quan, tổng kết)",
+          "kind": "long"
+        },
+        {
+          "key": "hieu_qua",
+          "label": "3. Hiệu quả, tác động của dự án",
+          "kind": "long"
+        },
+        {
+          "key": "kinh_phi_hd",
+          "label": "1. Tổng kinh phí theo hợp đồng (đồng)",
+          "kind": "number"
+        },
+        {
+          "key": "kinh_phi_qt",
+          "label": "2. Kinh phí đã thực hiện, đề nghị quyết toán (đồng)",
+          "kind": "number"
+        },
+        {
+          "key": "danh_gia",
+          "label": "IV.1. Đánh giá đạt/không đạt yêu cầu, đề nghị quyết toán",
+          "kind": "long",
+          "required": true
+        },
+        {
+          "key": "tiep_tuc",
+          "label": "IV.2. Nội dung tiếp tục triển khai",
+          "kind": "long"
+        },
+        {
+          "key": "ton_tai",
+          "label": "IV.3. Tồn tại, lý do, kiến nghị",
+          "kind": "long"
+        }
+      ],
+      "tables": [
+        {
+          "key": "thanh_phan",
+          "label": "Chúng tôi gồm",
+          "columns": [
+            {
+              "key": "nhom",
+              "label": "Đại diện",
+              "kind": "choice",
+              "options": [
+                {
+                  "value": "don_vi_hd",
+                  "label": "Đơn vị ký hợp đồng / tổ chức chủ trì"
+                },
+                {
+                  "value": "co_so",
+                  "label": "Đơn vị cơ sở thực hiện mô hình"
+                },
+                {
+                  "value": "quan_ly",
+                  "label": "Cơ quan quản lý ngành NN và MT, Khuyến nông"
+                },
+                {
+                  "value": "chinh_quyen",
+                  "label": "Chính quyền xã, phường"
+                },
+                {
+                  "value": "ho",
+                  "label": "Hộ tham gia"
+                },
+                {
+                  "value": "can_bo",
+                  "label": "Cán bộ phụ trách xây dựng mô hình"
+                },
+                {
+                  "value": "khac",
+                  "label": "Cơ quan, đơn vị khác"
+                }
+              ]
+            },
+            {
+              "key": "ho_ten",
+              "label": "Ông/bà",
+              "kind": "text"
+            },
+            {
+              "key": "chuc_vu",
+              "label": "Chức vụ / đơn vị",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 40,
+          "hint": "Đơn vị ký HĐ, đơn vị cơ sở, cơ quan quản lý/Khuyến nông tỉnh, chính quyền xã, hộ tham gia, cán bộ phụ trách"
+        },
+        {
+          "key": "chi_tieu",
+          "label": "4. Kết quả thực hiện",
+          "columns": [
+            {
+              "key": "ma",
+              "label": "Mã",
+              "kind": "text"
+            },
+            {
+              "key": "chi_tieu",
+              "label": "Chỉ tiêu mô hình",
+              "kind": "text"
+            },
+            {
+              "key": "dvt",
+              "label": "Đơn vị tính",
+              "kind": "text"
+            },
+            {
+              "key": "yeu_cau",
+              "label": "Yêu cầu HĐ",
+              "kind": "text"
+            },
+            {
+              "key": "thuc_te_nhat_ky",
+              "label": "Thực tế từ nhật ký",
+              "kind": "text",
+              "auto": true
+            },
+            {
+              "key": "thuc_te",
+              "label": "Thực hiện/thực tế đạt được",
+              "kind": "text"
+            },
+            {
+              "key": "dat",
+              "label": "Đánh giá",
+              "kind": "choice",
+              "options": [
+                {
+                  "value": "co",
+                  "label": "Đạt"
+                },
+                {
+                  "value": "khong",
+                  "label": "Không đạt"
+                }
+              ]
+            },
+            {
+              "key": "ghi_chu",
+              "label": "Ghi chú",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 60
+        },
+        {
+          "key": "ho_tro",
+          "label": "5. Giá trị giống, vật tư đã hỗ trợ cho nông dân",
+          "columns": [
+            {
+              "key": "ten",
+              "label": "Tên giống, vật tư",
+              "kind": "text"
+            },
+            {
+              "key": "so_luong",
+              "label": "Số lượng",
+              "kind": "text"
+            },
+            {
+              "key": "gia_tri",
+              "label": "Giá trị (đồng)",
+              "kind": "number"
+            },
+            {
+              "key": "ghi_chu",
+              "label": "Ghi chú",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 60
+        },
+        {
+          "key": "phu_luc_1",
+          "label": "Phụ lục I — Kết quả của các hộ tham gia",
+          "columns": [
+            {
+              "key": "chu_ho",
+              "label": "Chủ hộ tham gia",
+              "kind": "text"
+            },
+            {
+              "key": "quy_mo",
+              "label": "Quy mô",
+              "kind": "text"
+            },
+            {
+              "key": "ket_qua",
+              "label": "Kết quả chính đạt được",
+              "kind": "text"
+            },
+            {
+              "key": "ghi_chu",
+              "label": "Ghi chú",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 200
+        },
+        {
+          "key": "phu_luc_2",
+          "label": "Phụ lục II — Kết quả nhân rộng mô hình",
+          "columns": [
+            {
+              "key": "chu_ho",
+              "label": "Chủ hộ thực hiện nhân rộng",
+              "kind": "text"
+            },
+            {
+              "key": "dia_chi",
+              "label": "Địa chỉ",
+              "kind": "text"
+            },
+            {
+              "key": "quy_mo",
+              "label": "Quy mô",
+              "kind": "text"
+            },
+            {
+              "key": "ghi_chu",
+              "label": "Ghi chú",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 200
+        }
+      ],
+      "sections": [
+        {
+          "title": "Căn cứ, thành phần",
+          "fields": [
+            "hop_dong",
+            "ngay",
+            "tai"
+          ],
+          "tables": [
+            "thanh_phan"
+          ]
+        },
+        {
+          "title": "I. Kết quả về khối lượng thực hiện mô hình",
+          "fields": [
+            "ten_mo_hinh",
+            "dia_diem",
+            "don_vi_thuc_hien"
+          ],
+          "tables": [
+            "chi_tieu",
+            "ho_tro"
+          ]
+        },
+        {
+          "title": "II. Đánh giá về chất lượng mô hình",
+          "fields": [
+            "chon_diem",
+            "giong_vat_tu",
+            "chi_dao_kt",
+            "nhan_rong",
+            "hieu_qua"
+          ]
+        },
+        {
+          "title": "III. Kinh phí mô hình",
+          "fields": [
+            "kinh_phi_hd",
+            "kinh_phi_qt"
+          ]
+        },
+        {
+          "title": "IV. Nhận xét",
+          "fields": [
+            "danh_gia",
+            "tiep_tuc",
+            "ton_tai"
+          ]
+        },
+        {
+          "title": "Phụ lục",
+          "tables": [
+            "phu_luc_1",
+            "phu_luc_2"
+          ]
+        }
+      ]
+    },
+    {
+      "form": "07",
+      "code": "Mẫu 07/NTKQ-DA",
+      "bm": "BM-16",
+      "title": "Bản nghiệm thu kết quả thực hiện dự án khuyến nông hàng năm",
+      "lifecycle": "national",
+      "per_site": false,
+      "period": "year",
+      "unique": true,
+      "fields": [
+        {
+          "key": "hop_dong",
+          "label": "Căn cứ hợp đồng số (HĐ-KN), ngày",
+          "kind": "text",
+          "required": true
+        },
+        {
+          "key": "ben_b_ten",
+          "label": "Tổ chức chủ trì (bên B)",
+          "kind": "text"
+        },
+        {
+          "key": "quyet_dinh",
+          "label": "Quyết định phê duyệt điều chỉnh (nếu có)",
+          "kind": "text"
+        },
+        {
+          "key": "ngay",
+          "label": "Hôm nay, ngày",
+          "kind": "date"
+        },
+        {
+          "key": "tai",
+          "label": "Tại",
+          "kind": "text"
+        },
+        {
+          "key": "ten_mo_hinh",
+          "label": "1. Tên mô hình/dự án",
+          "kind": "text",
+          "required": true
+        },
+        {
+          "key": "giong_vat_tu",
+          "label": "Kết quả hỗ trợ giống, vật tư (chất lượng, đơn vị cung cấp, hình thức mua, cấp phát)",
+          "kind": "long"
+        },
+        {
+          "key": "chi_dao_kt",
+          "label": "Chỉ đạo kỹ thuật xây dựng mô hình",
+          "kind": "long"
+        },
+        {
+          "key": "tap_huan",
+          "label": "2. Công tác tập huấn, tham quan, hội thảo tổng kết",
+          "kind": "long"
+        },
+        {
+          "key": "hieu_qua",
+          "label": "3. Hiệu quả, tác động của dự án",
+          "kind": "long"
+        },
+        {
+          "key": "gia_tri_hd",
+          "label": "Giá trị hợp đồng (đồng)",
+          "kind": "number"
+        },
+        {
+          "key": "da_nhan",
+          "label": "Số tiền bên B đã nhận (đồng)",
+          "kind": "number"
+        },
+        {
+          "key": "nhan_xet",
+          "label": "IV. Nhận xét chung (kết quả, đạt/không đạt, đề nghị quyết toán)",
+          "kind": "long",
+          "required": true
+        },
+        {
+          "key": "che_do_bao_cao",
+          "label": "Chấp hành quy chế, chế độ báo cáo",
+          "kind": "long"
+        },
+        {
+          "key": "tiep_tuc",
+          "label": "Nội dung tiếp tục triển khai",
+          "kind": "long"
+        },
+        {
+          "key": "ton_tai",
+          "label": "Tồn tại, lý do, kiến nghị",
+          "kind": "long"
+        },
+        {
+          "key": "so_ban",
+          "label": "Số bản lập",
+          "kind": "int"
+        }
+      ],
+      "tables": [
+        {
+          "key": "ben_a",
+          "label": "Đại diện Trung tâm Khuyến nông Quốc gia (Bên A)",
+          "columns": [
+            {
+              "key": "ho_ten",
+              "label": "Ông/bà",
+              "kind": "text"
+            },
+            {
+              "key": "chuc_vu",
+              "label": "Chức vụ",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 10
+        },
+        {
+          "key": "ben_b",
+          "label": "Đại diện Tổ chức chủ trì dự án (Bên B)",
+          "columns": [
+            {
+              "key": "ho_ten",
+              "label": "Ông/bà",
+              "kind": "text"
+            },
+            {
+              "key": "chuc_vu",
+              "label": "Chức vụ",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 10
+        },
+        {
+          "key": "diem",
+          "label": "2. Kết quả thực hiện tại các điểm trình diễn",
+          "columns": [
+            {
+              "key": "dia_diem",
+              "label": "Địa điểm trình diễn",
+              "kind": "text"
+            },
+            {
+              "key": "quy_mo",
+              "label": "Qui mô thực hiện",
+              "kind": "text"
+            },
+            {
+              "key": "so_ho",
+              "label": "Số hộ tham gia",
+              "kind": "text"
+            },
+            {
+              "key": "thoi_gian",
+              "label": "Thời gian triển khai",
+              "kind": "text"
+            },
+            {
+              "key": "ket_qua",
+              "label": "Kết quả đạt được (chỉ tiêu chính)",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 200,
+          "auto": true,
+          "hint": "Tổng hợp từ các Mẫu 05 đã ký của dự án"
+        },
+        {
+          "key": "chi_tieu",
+          "label": "3. Kết quả chung mô hình (theo phụ lục HĐ đã ký)",
+          "columns": [
+            {
+              "key": "ma",
+              "label": "Mã",
+              "kind": "text"
+            },
+            {
+              "key": "chi_tieu",
+              "label": "Chỉ tiêu mô hình",
+              "kind": "text"
+            },
+            {
+              "key": "dvt",
+              "label": "Đơn vị tính",
+              "kind": "text"
+            },
+            {
+              "key": "yeu_cau",
+              "label": "Theo HĐ",
+              "kind": "text"
+            },
+            {
+              "key": "thuc_te",
+              "label": "Thực hiện/thực tế đạt được",
+              "kind": "text"
+            },
+            {
+              "key": "ghi_chu",
+              "label": "Ghi chú",
+              "kind": "text"
+            }
+          ],
+          "max_rows": 60
+        }
+      ],
+      "sections": [
+        {
+          "title": "Căn cứ, thành phần",
+          "fields": [
+            "hop_dong",
+            "ben_b_ten",
+            "quyet_dinh",
+            "ngay",
+            "tai"
+          ],
+          "tables": [
+            "ben_a",
+            "ben_b"
+          ]
+        },
+        {
+          "title": "I. Kết quả về khối lượng thực hiện",
+          "fields": [
+            "ten_mo_hinh"
+          ],
+          "tables": [
+            "diem",
+            "chi_tieu"
+          ]
+        },
+        {
+          "title": "II. Kết quả về chất lượng mô hình",
+          "fields": [
+            "giong_vat_tu",
+            "chi_dao_kt",
+            "tap_huan",
+            "hieu_qua"
+          ]
+        },
+        {
+          "title": "III. Kinh phí trong năm",
+          "fields": [
+            "gia_tri_hd",
+            "da_nhan"
+          ]
+        },
+        {
+          "title": "IV. Nhận xét chung",
+          "fields": [
+            "nhan_xet",
+            "che_do_bao_cao",
+            "tiep_tuc",
+            "ton_tai",
+            "so_ban"
+          ]
+        }
+      ]
+    }
+  ]
+}

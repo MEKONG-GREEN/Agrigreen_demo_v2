@@ -126,7 +126,10 @@ class _RecordCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final r = record;
     final s = ref.read(appControllerProvider).services;
-    final boundary = r.entity == PushEntity.plotBoundary && s != null
+    final isBoundary =
+        r.entity == PushEntity.plotBoundary ||
+        r.entity == PushEntity.knPlotBoundary;
+    final boundary = isBoundary && s != null
         ? s.boundaries.statusOfRecord(r)
         : null;
     final needsConfirm =
@@ -134,7 +137,7 @@ class _RecordCard extends ConsumerWidget {
     final canCorrect =
         r.replacedBy == null &&
         r.entity != PushEntity.consent &&
-        r.entity != PushEntity.plotBoundary &&
+        !isBoundary &&
         (r.status == OutboxStatus.rejected ||
             r.status == OutboxStatus.sent ||
             r.status == OutboxStatus.conflict);

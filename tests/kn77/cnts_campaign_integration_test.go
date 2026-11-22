@@ -78,7 +78,7 @@ func (f *aggFx) campaignCall(method, path, role string, manager bool, body any) 
 
 func TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150(t *testing.T) {
 	f := newAggFx(t, facilityDir{}, func(fm *forms.Module, kn *extension.Module) {
-		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Figures: fm.Figures()})
+		kn.UseCNTSCampaigns(extension.CNTSCampaignDeps{Forms: fm.Publisher(), Control: fm.Control(), Conditional: fm.ConditionalControl(), Figures: fm.Figures()})
 	})
 	// k_ref.org: Nút TTKN tỉnh 89 của phiên Cấp Tỉnh (view pf_forms_pub lấy tỉnh của kỳ native từ Nút phát hành).
 	ctx := context.Background()
@@ -109,7 +109,7 @@ func TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150(t *testing.T) {
 		t.Fatalf("lũy kế trước đợt: %+v", before)
 	}
 
-	input := map[string]any{"name": "Điều tra sản lượng khai thác 01/10/2026", "goal": "Khảo sát nhanh sau lũ", "field": "thuy_san",
+	input := map[string]any{"owner_ref": ids.New().String(), "name": "Điều tra sản lượng khai thác 01/10/2026", "goal": "Khảo sát nhanh sau lũ", "field": "thuy_san",
 		"template_code": "CNTS-BM17", "scope_mode": "communes", "communes": []string{"X1", "X2"}, "from_date": "2026-10-01",
 		"to_date": "2026-10-05", "due_at": "2026-10-09T03:00:00Z"}
 	var cv campaignView

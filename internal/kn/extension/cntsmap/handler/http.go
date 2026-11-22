@@ -10,7 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
+	lhdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntslivestock/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsmap/store"
@@ -147,9 +149,40 @@ func outbreakOut(o app.OutbreakView, names map[string]string) gin.H {
 	m := gin.H{"ref": o.Ref.String(), "version": o.Version, "status": o.Status, "commune_code": o.Commune,
 		"disease_code": o.Disease, "disease_name": optStr(names[knport.CatalogCNTSDisease+":"+o.Disease]),
 		"species_code": o.Species, "species_name": optStr(names[knport.CatalogCNTSSpecies+":"+o.Species]),
-		"lat": o.Location.Lat, "lng": o.Location.Lng, "as_of": o.AsOf.Format(time.DateOnly), "herd_size": o.HerdSize, "dead": o.Dead}
+		"lat": o.Location.Lat, "lng": o.Location.Lng, "as_of": o.AsOf.Format(time.DateOnly), "herd_size": o.HerdSize, "dead": o.Dead,
+		"affected_households": o.Households(), "aqua_farmed_ha": optDec(o.AquaFarmedHa), "aqua_wild_ha": optDec(o.AquaWildHa),
+		"legacy": o.Legacy()}
 	if o.DistanceM != nil {
 		m["distance_m"] = *o.DistanceM
+	}
+	return m
+}
+
+func optDec(d *decimal.Decimal) any {
+	if d == nil {
+		return nil
+	}
+	return d.StringFixed(2)
+}
+
+// impactOut: số hộ bị ảnh hưởng, diện tích thủy sản bị ảnh hưởng (ha, 2 chữ số lẻ) của vùng (FN-18 BR-02).
+func impactOut(im app.Impact) gin.H {
+	return gin.H{"outbreak_count": im.Outbreaks, "affected_households": im.Households,
+		"aqua_farmed_ha": im.AquaFarmedHa.StringFixed(2), "aqua_wild_ha": im.AquaWildHa.StringFixed(2)}
+}
+
+// farmOut: trang trại trên bản đồ (khóa household_ref — ADR-0056 mục 9); không có họ tên, SĐT chủ hộ.
+func farmOut(f store.Farm, names map[string]string) gin.H {
+	animals := make([]gin.H, 0, len(f.Species))
+	for i, sp := range f.Species {
+		animals = append(animals, gin.H{"species_code": sp, "species_name": optStr(names[knport.CatalogCNTSSpecies+":"+sp]),
+			"head_count": f.HeadCounts[i]}) // cùng độ dài (CHECK cnts_livestock_household_counts)
+	}
+	m := gin.H{"household_ref": f.Ref.String(), "code": f.Code, "commune_code": f.Commune, "hamlet": optStr(f.Hamlet),
+		"livestock_type": f.LivestockType, "livestock_type_label": lhdomain.TypeLabels[f.LivestockType], "animals": animals,
+		"lat": f.Location.Lat, "lng": f.Location.Lng}
+	if f.DistanceM != nil {
+		m["distance_m"] = *f.DistanceM
 	}
 	return m
 }
@@ -187,12 +220,22 @@ func (h Handler) layers(c *gin.Context) {
 	for _, p := range l.Places {
 		places = append(places, placeOut(p, l.Catalog))
 	}
+	farms := make([]gin.H, 0, len(l.Farms))
+	for _, f := range l.Farms {
+		farms = append(farms, farmOut(f, l.Catalog))
+	}
+	impacts := make([]gin.H, 0, len(l.Impacts))
+	for _, z := range l.Impacts {
+		m := impactOut(z.Impact)
+		m["zone_ref"] = z.ZoneRef.String()
+		impacts = append(impacts, m)
+	}
 	plots := make([]gin.H, 0, len(l.PlotStats))
 	for _, p := range l.PlotStats {
 		plots = append(plots, gin.H{"commune_code": p.CommuneCode, "plots": p.Plots, "area_ha": p.AreaHa.String()})
 	}
 	c.JSON(http.StatusOK, gin.H{"date": l.Day.Format(time.DateOnly), "can_draw": l.CanDraw, "zones": zones, "outbreaks": obs,
-		"places": places, "plot_stats": plots, "plots_ready": l.PlotsReady})
+		"places": places, "farms": farms, "zone_impacts": impacts, "plot_stats": plots, "plots_ready": l.PlotsReady})
 }
 
 func (h Handler) listZones(c *gin.Context) {
@@ -419,6 +462,15 @@ func (h Handler) contents(c *gin.Context) {
 	for _, o := range z.Outbreaks {
 		obs = append(obs, outbreakOut(o, z.Catalog))
 	}
-	c.JSON(http.StatusOK, gin.H{"date": z.Day.Format(time.DateOnly), "zone": zoneOut(z.Zone), "places": places, "outbreaks": obs,
-		"site_count": sites, "household_count": households, "outbreak_count": len(obs)})
+	farms := make([]gin.H, 0, len(z.Farms))
+	for _, f := range z.Farms {
+		farms = append(farms, farmOut(f, z.Catalog))
+	}
+	var impact any
+	if z.Impact != nil {
+		impact = impactOut(*z.Impact)
+	}
+	c.JSON(http.StatusOK, gin.H{"date": z.Day.Format(time.DateOnly), "zone": zoneOut(z.Zone), "places": places, "farms": farms,
+		"outbreaks": obs, "site_count": sites, "household_count": households, "farm_count": len(farms), "outbreak_count": len(obs),
+		"impact": impact})
 }

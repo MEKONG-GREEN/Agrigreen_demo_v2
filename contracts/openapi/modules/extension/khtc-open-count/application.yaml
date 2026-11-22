@@ -1,0 +1,26 @@
+paths:
+# @ag-order: 20230
+  /v1/extension/khtc/open-period-count:
+    get:
+      summary: Đếm toàn bộ kỳ KHTC chưa đóng/hủy theo tenant và quyền đọc hiện hữu
+      operationId: extensionKhtcOpenPeriodCount
+      tags: [extension]
+      responses:
+        "200":
+          description: Số đếm metadata cùng nguồn với thẻ Kỳ đang mở; không là receipt thao tác native
+          headers:
+            Cache-Control: {schema: {type: string, enum: [no-store]}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KHTCOpenPeriodCount'}
+        "401": {$ref: '#/components/responses/Problem'}
+        "403": {$ref: '#/components/responses/Problem'}
+        "503": {$ref: '#/components/responses/Problem'}
+components:
+  schemas:
+# @ag-order: 20230
+    KHTCOpenPeriodCount:
+      type: object
+      required: [open_count]
+      properties:
+        open_count: {type: integer, format: int64, minimum: 0}

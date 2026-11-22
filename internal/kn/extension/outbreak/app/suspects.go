@@ -183,11 +183,14 @@ func latestSuspect(ctx context.Context, tx pgx.Tx, c caller, ref uuid.UUID, base
 	return cur, nil
 }
 
-// ConfirmInput là xác nhận tin báo thành ổ dịch: nội dung BM-10 đầy đủ (vị trí trống → lấy vị trí của tin báo).
+// ConfirmInput là xác nhận tin báo thành ổ dịch: nội dung BM-10 đầy đủ (vị trí trống → lấy vị trí của tin báo), cán bộ
+// chọn hộ DB-04 theo quy tắc v2 (ADR-0056 mục 8).
 type ConfirmInput struct {
-	BaseVersion *int64
-	Outbreak    domain.Outbreak
-	IdemKey     string
+	BaseVersion   *int64
+	Outbreak      domain.Outbreak
+	IdemKey       string
+	Households    []uuid.UUID
+	NewHouseholds []NewHousehold
 }
 
 // ConfirmSuspect: cán bộ xã xác nhận tin báo và tạo báo cáo dịch bệnh (FN-11 "cán bộ xã xác nhận và tạo báo cáo") —
@@ -229,11 +232,16 @@ func (s *Service) ConfirmSuspect(ctx context.Context, ref uuid.UUID, in ConfirmI
 		if o.CommuneCode != pre.CommuneCode {
 			return store.OutbreakRow{}, ErrOutbreakInvalid.WithField("commune_code", "khác xã của tin báo nghi dịch")
 		}
-		disease, err := s.prepare(ctx, c, &o)
+		ob := OutbreakInput{Households: in.Households, NewHouseholds: in.NewHouseholds}
+		disease, err := s.prepare(ctx, &o, &ob)
 		if err != nil {
 			return store.OutbreakRow{}, err
 		}
 		unit, err := s.checkCommune(ctx, ErrOutbreakInvalid, c, o.CommuneCode)
+		if err != nil {
+			return store.OutbreakRow{}, err
+		}
+		persons, err := s.registerNew(ctx, ob.NewHouseholds)
 		if err != nil {
 			return store.OutbreakRow{}, err
 		}
@@ -243,6 +251,9 @@ func (s *Service) ConfirmSuspect(ctx context.Context, ref uuid.UUID, in ConfirmI
 		err = s.tx(ctx, c.p.TenantID, func(tx pgx.Tx) error {
 			cur, err := latestSuspect(ctx, tx, c, ref, in.BaseVersion)
 			if err != nil {
+				return err
+			}
+			if row.Households, err = s.attach(ctx, tx, c, obRef, o.CommuneCode, ob.Households, ob.NewHouseholds, persons, in.IdemKey); err != nil {
 				return err
 			}
 			if err := store.InsertOutbreak(ctx, tx, c.p.TenantID, &row); err != nil {

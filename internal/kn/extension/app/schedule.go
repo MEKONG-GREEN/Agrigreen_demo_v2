@@ -595,7 +595,7 @@ func (s *Service) checkScheduleItems(ctx context.Context, items []domain.Schedul
 			if it.CommuneCode == "" {
 				return problem.Validation.WithField("items.commune_code", "chọn xã của HTX")
 			}
-			if err := s.checkCooperative(ctx, it.CooperativeRef, it.CommuneCode); err != nil {
+			if err := s.checkKNCooperative(ctx, it.CooperativeRef, it.CommuneCode); err != nil {
 				return err
 			}
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
@@ -31,10 +32,17 @@ func useSectionData(section string) string { return "section/" + section }
 var errAmendRace = errors.New("vault: tranh chấp chỉ mục mù khi sửa")
 
 // Amend thay họ tên, SĐT, địa chỉ (CCCD giữ nguyên). SĐT thuộc chủ thể khác → ProblemDuplicate (ghi sổ duplicate).
+// Mỗi lần sửa thành công ghi một bản sửa (vault.identity_revision, #251) — xem AmendRevision.
 func (s *Service) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UUID, in client.Identity) error {
+	_, err := s.AmendRevision(ctx, purpose, ref, in)
+	return err
+}
+
+// AmendRevision như Amend, trả mã bản sửa (revision_ref) giữ bản mã họ tên/SĐT trước và sau lần sửa (ADR-0056 mục 4).
+func (s *Service) AmendRevision(ctx context.Context, purpose client.Purpose, ref uuid.UUID, in client.Identity) (uuid.UUID, error) {
 	p, err := s.begin(ctx, domain.OpAmend, purpose, client.RoleRegistrar)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 	name := domain.NormalizeName(in.FullName)
 	v, bad := problem.Validation, false
@@ -54,24 +62,28 @@ func (s *Service) Amend(ctx context.Context, purpose client.Purpose, ref uuid.UU
 		}
 	}
 	if bad {
-		return v
+		return uuid.Nil, v
 	}
+	rev := ids.New()
 	var err2 error
 	for attempt := 1; attempt <= amendAttempts; attempt++ {
 		var result error
-		result, err2 = s.amendOnce(ctx, p, purpose, ref, name, phone, in.Address, blind)
+		result, err2 = s.amendOnce(ctx, p, purpose, ref, rev, name, phone, in.Address, blind)
 		if errors.Is(err2, errAmendKeyChanged) {
 			continue
 		}
 		if errors.Is(err2, errAmendRace) {
-			return client.ProblemDuplicate
+			return uuid.Nil, client.ProblemDuplicate
 		}
 		if err2 != nil {
-			return err2
+			return uuid.Nil, err2
 		}
-		return result
+		if result != nil {
+			return uuid.Nil, result
+		}
+		return rev, nil
 	}
-	return err2 // khóa đổi liên tục (errAmendKeyChanged)
+	return uuid.Nil, err2 // khóa đổi liên tục (errAmendKeyChanged)
 }
 
 // amendAttempts: số lần sửa tối đa khi khóa dữ liệu của chủ thể đổi giữa lúc mã hóa và lúc ghi.
@@ -82,7 +94,7 @@ var errAmendKeyChanged = errors.New("vault: khóa dữ liệu của chủ thể 
 
 // amendOnce: P0-POOL-SHARED (#126) — giao dịch 1 chỉ đọc khóa đã bọc; KMS mở khóa + mã hóa trường mới NGOÀI giao
 // dịch; giao dịch 2 khóa chủ thể (FOR UPDATE), kiểm lại trạng thái + khóa không đổi, ghi định danh + chỉ mục mù + sổ.
-func (s *Service) amendOnce(ctx context.Context, p authz.Principal, purpose client.Purpose, ref uuid.UUID, name, phone, address string,
+func (s *Service) amendOnce(ctx context.Context, p authz.Principal, purpose client.Purpose, ref, rev uuid.UUID, name, phone, address string,
 	blind *store.Blind) (error, error) {
 	tid := p.TenantID
 	var result error
@@ -142,6 +154,11 @@ func (s *Service) amendOnce(ctx context.Context, p authz.Principal, purpose clie
 		// CCCD giữ nguyên bản mã hiện hành (cùng khóa dữ liệu — đã kiểm ở trên).
 		row.NationalIDCT = now.row.NationalIDCT
 		if err := store.UpdateIdentity(ctx, tx, ref, row); err != nil {
+			return err
+		}
+		// #251: bản sửa giữ bản mã cũ/mới (cùng khóa dữ liệu, AAD theo chủ thể) — đọc lại chỉ ra nhãn che bớt (Revisions).
+		if err := store.InsertRevision(ctx, tx, tid, store.Revision{Ref: rev, SubjectRef: ref, PrevNameCT: now.row.FullNameCT,
+			PrevPhoneCT: now.row.PhoneCT, NextNameCT: row.FullNameCT, NextPhoneCT: row.PhoneCT}, p.ActorRef); err != nil {
 			return err
 		}
 		if err := store.DeleteBlind(ctx, tx, ref, domain.BlindPhone); err != nil {

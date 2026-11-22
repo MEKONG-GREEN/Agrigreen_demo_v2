@@ -4,7 +4,9 @@
 // (FN-TI-02.04, Hình 11): thanh tab chương trình; lưới theo mẫu với hàng chữ cái cột và dòng loại cột; ô nhập viền xanh,
 // ô cố định/Từ Kế hoạch năm nền xám, Lũy kế kỳ trước xám nhạt, ô tự tính xanh nhạt, vượt ngưỡng đỏ nhạt; khối "Điều chỉnh
 // kỳ trước"; mục lời văn; kết quả kiểm tra (3 quy tắc); lịch sử gửi.
-import { useMemo, useState } from "react";
+import { AdhocAnswer } from "../adhoc/AdhocAnswer";
+import { useId, useMemo, useState } from "react";
+import { NumberField, TextField } from "@/components/form";
 import { StatusPill } from "@/components/patterns/list";
 import { dt, num } from "@/kn/cycle/common";
 import {
@@ -35,21 +37,27 @@ export function KhtcFormView({
   form,
   content,
   onChange,
+  inputIssues,
 }: {
   form: KhtcFormSheet;
   content: KhtcFormContent;
   /** Có → ô nhập sửa được (phòng, phiếu đang mở cho phòng). */
   onChange?: (c: KhtcFormContent) => void;
+  /** Current editor validation; read-only callers keep the server result. */
+  inputIssues?: KhtcFormIssue[];
 }) {
   const editable = !!onChange;
+  const base = useId();
+  const allIssues = inputIssues ?? form.issues;
+  const adjustmentError = (index: number, field: string) => allIssues.filter(issue => issue.adjustment === index && (!issue.letter || issue.letter === field)).map(issue => issue.message).join("; ") || undefined;
   const [tab, setTab] = useState(0);
   const cols = form.template.columns;
   const issues = useMemo(() => {
     const m = new Map<string, KhtcFormIssue[]>();
-    for (const i of form.issues)
+    for (const i of allIssues)
       m.set(issueKey(i), [...(m.get(issueKey(i)) ?? []), i]);
     return m;
-  }, [form.issues]);
+  }, [allIssues]);
   const adjYears = useMemo(
     () => Object.fromEntries(form.adj_periods.map((p) => [p.id, p.year])),
     [form.adj_periods],
@@ -88,6 +96,7 @@ export function KhtcFormView({
     return c.dtype === "number" && v ? num(v, 6) : v;
   };
 
+  if(form.supplement) return <AdhocAnswer form={form} content={content} onChange={onChange}/>;
   return (
     <div className="khtc-form">
       {form.grid ? (
@@ -134,6 +143,7 @@ export function KhtcFormView({
                       <th key={c.letter} title={c.note}>
                         {c.title}
                         {c.unit ? ` (${c.unit})` : ""}
+                        {c.required && c.kind === "input" ? <span className="req"> *</span> : null}
                       </th>
                     ))}
                   </tr>
@@ -196,10 +206,18 @@ export function KhtcFormView({
                               content.cells[r.entry_ref]?.[c.input] ?? "";
                             return (
                               <td key={c.letter} style={style} title={title}>
-                                {editable ? (
+                                {editable && c.dtype !== "text" ? (
+                                  <NumberField label={`${c.letter} ${r.name}`} value={v} required={c.required}
+                                    rule={{ integer: c.dtype === "integer", allowNegative: !c.non_negative, maxDecimals: 6, maxInputLength: 24 }}
+                                    error={bad?.filter(issue => issue.severity === "error").map(issue => issue.message).join("; ") || undefined}
+                                    onChange={value => setCell(r.entry_ref, c.input as keyof KhtcFormCell, value)} />
+                                ) : editable ? (
                                   <input
                                     className="input"
                                     aria-label={`${c.letter} ${r.name}`}
+                                    aria-required={c.required || undefined}
+                                    aria-invalid={bad?.some(issue => issue.severity === "error") || undefined}
+                                    aria-describedby={bad?.length ? `${base}-${r.entry_ref}-${c.letter}-err` : undefined}
                                     inputMode={
                                       c.dtype === "text" ? "text" : "decimal"
                                     }
@@ -223,6 +241,7 @@ export function KhtcFormView({
                                 ) : (
                                   ""
                                 )}
+                                {editable && c.dtype === "text" && bad?.length ? <span className="err" role="alert" id={`${base}-${r.entry_ref}-${c.letter}-err`}>{bad.map(issue => issue.message).join("; ")}</span> : null}
                               </td>
                             );
                           }
@@ -256,7 +275,7 @@ export function KhtcFormView({
               </thead>
               <tbody>
                 {content.adjustments.map((a, i) => {
-                  const bad = form.issues.filter((x) => x.adjustment === i);
+                  const bad = allIssues.filter((x) => x.adjustment === i);
                   return (
                     <tr
                       key={i}
@@ -265,9 +284,13 @@ export function KhtcFormView({
                     >
                       <td>
                         {editable ? (
+                          <>
                           <select
                             className="input"
                             aria-label="Hạng mục điều chỉnh"
+                            aria-required="true"
+                            aria-invalid={!!adjustmentError(i, "entry_ref") || undefined}
+                            aria-describedby={adjustmentError(i, "entry_ref") ? `${base}-adj-${i}-entry_ref` : undefined}
                             value={a.entry_ref}
                             onChange={(e) =>
                               setAdj(i, { entry_ref: e.target.value })
@@ -282,6 +305,8 @@ export function KhtcFormView({
                                 </option>
                               ))}
                           </select>
+                          {adjustmentError(i, "entry_ref") ? <span className="err" role="alert" id={`${base}-adj-${i}-entry_ref`}>{adjustmentError(i, "entry_ref")}</span> : null}
+                          </>
                         ) : (
                           (rows.find((r) => r.entry_ref === a.entry_ref)
                             ?.name ?? a.entry_ref)
@@ -289,9 +314,13 @@ export function KhtcFormView({
                       </td>
                       <td>
                         {editable ? (
+                          <>
                           <select
                             className="input"
                             aria-label="Kỳ được điều chỉnh"
+                            aria-required="true"
+                            aria-invalid={!!adjustmentError(i, "period_id") || undefined}
+                            aria-describedby={adjustmentError(i, "period_id") ? `${base}-adj-${i}-period_id` : undefined}
                             value={a.period_id}
                             onChange={(e) =>
                               setAdj(i, { period_id: e.target.value })
@@ -304,6 +333,8 @@ export function KhtcFormView({
                               </option>
                             ))}
                           </select>
+                          {adjustmentError(i, "period_id") ? <span className="err" role="alert" id={`${base}-adj-${i}-period_id`}>{adjustmentError(i, "period_id")}</span> : null}
+                          </>
                         ) : (
                           (a.period_name ??
                           form.adj_periods.find((p) => p.id === a.period_id)
@@ -313,30 +344,17 @@ export function KhtcFormView({
                       </td>
                       <td>
                         {editable ? (
-                          <input
-                            className="input"
-                            aria-label="Số điều chỉnh"
-                            inputMode="decimal"
-                            value={a.amount}
-                            style={{ width: 90 }}
-                            onChange={(e) =>
-                              setAdj(i, { amount: e.target.value })
-                            }
-                          />
+                          <NumberField label="Số điều chỉnh" value={a.amount} required
+                            rule={{ allowNegative: true, maxDecimals: 6, maxInputLength: 24 }} error={adjustmentError(i, "amount")}
+                            onChange={value => setAdj(i, { amount: value })} />
                         ) : (
                           num(a.amount, 6)
                         )}
                       </td>
                       <td>
                         {editable ? (
-                          <input
-                            className="input"
-                            aria-label="Lý do điều chỉnh"
-                            value={a.reason}
-                            onChange={(e) =>
-                              setAdj(i, { reason: e.target.value })
-                            }
-                          />
+                          <TextField label="Lý do điều chỉnh" value={a.reason} required error={adjustmentError(i, "reason")}
+                            onChange={value => setAdj(i, { reason: value })} />
                         ) : (
                           a.reason
                         )}
@@ -405,7 +423,7 @@ export function KhtcFormView({
 
       <h3>Lời văn</h3>
       {form.template.sections.map((s) => {
-        const bad = form.issues.filter((i) => i.section === s.key);
+        const bad = allIssues.filter((i) => i.section === s.key);
         return (
           <label
             key={s.key}
@@ -422,6 +440,9 @@ export function KhtcFormView({
                 rows={3}
                 style={{ width: "100%" }}
                 aria-label={s.title}
+                aria-required={s.required || undefined}
+                aria-invalid={bad.some(issue => issue.severity === "error") || undefined}
+                aria-describedby={bad.length ? `${base}-section-${s.key}` : undefined}
                 value={content.texts[s.key] ?? ""}
                 onChange={(e) =>
                   onChange!({
@@ -436,7 +457,7 @@ export function KhtcFormView({
               </p>
             )}
             {bad.length ? (
-              <span className="bad">
+              <span className="err" role="alert" id={`${base}-section-${s.key}`}>
                 {bad.map((i) => i.message).join("; ")}
               </span>
             ) : null}
@@ -445,11 +466,11 @@ export function KhtcFormView({
       })}
 
       <h3>Kết quả kiểm tra</h3>
-      {form.issues.length === 0 ? (
-        <p className="mute">Đạt 3 quy tắc kiểm tra.</p>
+      {allIssues.length === 0 ? (
+        <p className="mute">{editable ? "Chưa phát hiện lỗi ở các ô nhập." : "Đạt 3 quy tắc kiểm tra."}</p>
       ) : (
         <ul aria-label="Kết quả kiểm tra">
-          {form.issues.map((i, k) => (
+          {allIssues.map((i, k) => (
             <li key={k}>
               <StatusPill tone={i.severity === "error" ? "bad" : "warn"}>
                 {RULE_LABEL[i.rule]}

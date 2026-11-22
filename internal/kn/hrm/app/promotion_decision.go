@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -583,16 +584,47 @@ type ScanResult struct {
 	Day    time.Time
 	Counts map[string]int
 	Fresh  bool // false = đã chạy trong ngày (khóa trùng)
+	// Notified: đã ghi sự kiện pf.hrm.promotion_due.detected (cùng giao dịch với dòng sổ) cho pf/notify.
+	Notified bool
+}
+
+// PromotionDueNotice dựng payload sự kiện pf.hrm.promotion_due.detected từ số đếm của lần tính cur; ok = false khi không có
+// gì cần Phòng HCTH xử lý, hoặc số đếm y hệt lần tính trước prev (hasPrev) — job chạy hằng ngày, thông báo chỉ khi tình hình
+// đổi (không làm tràn hộp thư bằng cùng một nội dung mỗi ngày). Chỉ số đếm — không mã nhân sự, không PII.
+func PromotionDueNotice(months []int, cur, prev map[string]int, hasPrev bool) (port.PromotionDueDetectedV1, bool) {
+	of := func(c map[string]int) port.PromotionDueDetectedV1 {
+		p := port.PromotionDueDetectedV1{Windows: []port.PromotionDueWindow{}, Overdue: c["overdue"], Fail: c["fail"], Review: c["review"],
+			Missing: c["missing"]}
+		for _, m := range months {
+			p.Windows = append(p.Windows, port.PromotionDueWindow{Months: m, Count: c["due_"+strconv.Itoa(m)]})
+		}
+		return p
+	}
+	p := of(cur)
+	act := p.Overdue + p.Fail + p.Review + p.Missing
+	for _, w := range p.Windows {
+		act += w.Count
+	}
+	if act == 0 {
+		return p, false
+	}
+	if hasPrev && reflect.DeepEqual(of(prev), p) {
+		return p, false
+	}
+	return p, true
 }
 
 // PromotionScan tính mốc NLTX/TNVK của mọi viên chức của tenant tid tại ngày now (giờ VN): số đến kỳ trong các mốc nhắc
-// (1, 3, 6 tháng — tham số), số "Chưa đủ"/"Cần xem xét", số chưa tính được; ghi sổ promotion_scan (mỗi ngày một dòng) và
-// báo Notifier (nếu nối). Không phụ thuộc cờ AG_HRM_RECORDS ở mức tính (không đọc kho định danh); tenant không có tham số
-// nâng bậc → bỏ qua.
-func (s *Service) PromotionScan(ctx context.Context, tid uuid.UUID, now time.Time, notifier port.PromotionNotifier) (ScanResult, error) {
+// (1, 3, 6 tháng — tham số), số "Chưa đủ"/"Cần xem xét", số chưa tính được; ghi sổ promotion_scan (mỗi ngày một dòng) và —
+// khi có việc cần xử lý và số đếm khác lần trước (PromotionDueNotice) — sự kiện pf.hrm.promotion_due.detected vào outbox
+// CÙNG giao dịch (#50: sổ và sự kiện cùng thành/bại; giao tới pf/notify do outbox/consumer thử lại, không mất khi lần gửi
+// lỗi sau khi sổ đã ghi). Khóa idem ngày chặn ghi đôi (một sự kiện mỗi tenant mỗi ngày). Không phụ thuộc cờ AG_HRM_RECORDS
+// ở mức tính (không đọc kho định danh); tenant không có tham số nâng bậc → bỏ qua.
+func (s *Service) PromotionScan(ctx context.Context, tid uuid.UUID, now time.Time) (ScanResult, error) {
 	day := domain.BusinessDay(now)
 	res := ScanResult{Day: day, Counts: map[string]int{}}
 	err := s.tx(ctx, tid, func(tx pgx.Tx) error {
+		res.Counts, res.Notified = map[string]int{}, false
 		w, err := loadPromo(ctx, tx, day, nil)
 		if err != nil {
 			return err
@@ -630,26 +662,41 @@ func (s *Service) PromotionScan(ctx context.Context, tid uuid.UUID, now time.Tim
 		}
 		res.Counts["missing"] = len(w.missing)
 		res.Counts["active_vien_chuc"] = w.activeVC
-		err = store.InsertScan(ctx, tx, ids.New(), tid, uuid.Nil, day, res.Counts, now, "hrm:promotion-scan:"+day.Format(time.DateOnly))
+		prev, hasPrev, err := store.LastScan(ctx, tx)
+		if err != nil {
+			return err
+		}
+		scanID := ids.New()
+		err = store.InsertScan(ctx, tx, scanID, tid, uuid.Nil, day, res.Counts, now, "hrm:promotion-scan:"+day.Format(time.DateOnly))
 		if isUnique(err) {
 			return errAlreadyScanned
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		notice, ok := PromotionDueNotice(w.rules.RemindMonths, res.Counts, prev.Counts, hasPrev)
+		if !ok {
+			return nil
+		}
+		notice.ScanID, notice.Day = scanID, day.Format(time.DateOnly)
+		if err := enqueueEvent(ctx, tx, tid, now, port.EventPromotionDueDetected, notice); err != nil {
+			return err
+		}
+		res.Notified = true
+		return nil
 	})
 	switch {
 	case errors.Is(err, errAlreadyScanned):
+		res.Notified = false
 		return res, nil
 	case errors.Is(err, port.ErrPromotionRules):
+		res.Notified = false
 		return res, nil
 	case err != nil:
+		res.Notified = false
 		return res, err
 	}
 	res.Fresh = true
-	if notifier != nil {
-		if err := notifier.PromotionDue(ctx, tid, day, res.Counts); err != nil {
-			return res, err
-		}
-	}
 	return res, nil
 }
 
@@ -659,7 +706,7 @@ var errAlreadyScanned = errors.New("hrm: đã tính mốc trong ngày")
 func (s *Service) PromotionScanAll(ctx context.Context, tenants []uuid.UUID, log *slog.Logger) (int, error) {
 	n := 0
 	for _, tid := range tenants {
-		r, err := s.PromotionScan(ctx, tid, s.Clock.Now(), s.Promo.Notifier)
+		r, err := s.PromotionScan(ctx, tid, s.Clock.Now())
 		if err != nil {
 			if log != nil {
 				log.Error("tính mốc nâng bậc lỗi", "event", "job."+JobPromotionScan, "tenant", tid, "error", err)

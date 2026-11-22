@@ -2,8 +2,9 @@
 // trên openapi-fetch sinh từ hợp đồng: đợt điều tra (FN-TI-02.10), nhập tệp hai bước (FN-TI-02.11), rà soát phiếu + chốt đợt
 // (FN-TI-02.12), báo cáo giá thành (FN-TW-01.04). Tiền, % là chuỗi decimal (R-10: không float).
 import { unwrap, type ApiClient } from "@/api/client";
-import { newIdempotencyKey } from "@/api/idempotency";
-import { parseProblemResponse } from "@/api/problem";
+import { currentIdempotentRun, newIdempotencyKey, withIdempotentOperation } from "@/api/idempotency";
+import { stableMultipart, type MultipartPart } from "@/api/multipart";
+import { ApiProblem, parseProblemResponse } from "@/api/problem";
 import type { components } from "@/api/generated/application";
 import { filenameFromDisposition } from "@/lib/files";
 
@@ -118,14 +119,25 @@ function clean<T extends Record<string, unknown>>(q: T): T {
 
 type Blob2 = { blob: Blob; name: string };
 
-function multipart(p: ImportParts): FormData {
-  const fd = new FormData();
-  fd.append("file", p.file, p.file.name);
-  if (p.mapping) fd.append("mapping", JSON.stringify(p.mapping));
-  if (p.names) fd.append("names", JSON.stringify(p.names));
-  if (p.sha256) fd.append("sha256", p.sha256);
-  if (p.saveSynonyms) fd.append("save_synonyms", "true");
-  return fd;
+async function multipart(p: ImportParts) {
+  const invalid = () => new ApiProblem({ type: "about:blank", title: "Tệp không hợp lệ", status: 422, code: "price.survey_import_invalid", detail: "Chỉ nhận CSV UTF-8 hoặc Excel .xlsx, tệp không rỗng và tối đa 5 MiB." });
+  // survey_import.go / tabular.ReadBytes nhận theo chữ ký, không tin MIME do trình duyệt báo.
+  if (p.file.size <= 0 || p.file.size > 5 * 1024 * 1024) throw invalid();
+  const parts: MultipartPart[] = [];
+  if (p.mapping) parts.push(["mapping", JSON.stringify(p.mapping)]);
+  if (p.names) parts.push(["names", JSON.stringify(p.names)]);
+  if (p.sha256) parts.push(["sha256", p.sha256]);
+  if (p.saveSynonyms) parts.push(["save_synonyms", "true"]);
+  let bytes: ArrayBuffer;
+  try { bytes = await p.file.arrayBuffer(); } catch { throw invalid(); }
+  if (bytes.byteLength !== p.file.size) throw invalid();
+  const head = new Uint8Array(bytes);
+  const zip = head[0] === 80 && head[1] === 75 && head[2] === 3 && head[3] === 4;
+  if (!zip) {
+    try { new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { throw invalid(); }
+  }
+  const file = new File([bytes], p.file.name, { type: zip ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv", lastModified: 0 });
+  return stableMultipart([["file", file], ...parts]);
 }
 
 export function createSurveyApi(api: ApiClient) {
@@ -173,22 +185,32 @@ export function createSurveyApi(api: ApiClient) {
           params: { header: header(), path: { id: r } },
         }),
       ),
-    preview: (r: string, p: ImportParts): Promise<SurveyImportPreview> =>
-      unwrap(
+    preview: async (r: string, p: ImportParts): Promise<SurveyImportPreview> => {
+      const run = currentIdempotentRun();
+      const mp = await multipart(p);
+      const send = () => unwrap(
         api.POST("/v1/price/surveys/{id}/imports/preview", {
           params: id(r),
+          headers: { "Content-Type": mp.contentType },
           body: { file: "" },
-          bodySerializer: () => multipart(p),
+          bodySerializer: () => mp.body,
         }),
-      ),
-    commit: (r: string, p: ImportParts): Promise<SurveyImportResult> =>
-      unwrap(
+      );
+      return run ? withIdempotentOperation(run, send) : send();
+    },
+    commit: async (r: string, p: ImportParts): Promise<SurveyImportResult> => {
+      const run = currentIdempotentRun();
+      const mp = await multipart(p);
+      const send = () => unwrap(
         api.POST("/v1/price/surveys/{id}/imports", {
           params: { header: header(), path: { id: r } },
+          headers: { "Content-Type": mp.contentType },
           body: { file: "" },
-          bodySerializer: () => multipart(p),
+          bodySerializer: () => mp.body,
         }),
-      ),
+      );
+      return run ? withIdempotentOperation(run, send) : send();
+    },
     imports: (r: string) =>
       unwrap(api.GET("/v1/price/surveys/{id}/imports", { params: id(r) })),
     issues: (r: string, imp: string) =>

@@ -122,7 +122,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       // HTX US-DASH-03: lịch trên Application API chỉ cho quản lý HTX (cán bộ/quản trị dùng /quan-tri/mau-bao-cao).
       { href: "/htx/lich-bao-cao", module: "pf/reports", label: "Lịch gửi báo cáo", icon: "report", roles: [ROLES.coopManager] },
       { href: "/htx/tai-khoan-nong-dan", label: "Tài khoản nông dân", icon: "qr", roles: HTX_READ },
-      { href: "/htx/yeu-cau-ho-tro", label: "Yêu cầu hỗ trợ", icon: "support", roles: HTX_READ },
+      { href: "/htx/yeu-cau-ho-tro", label: "Yêu cầu hỗ trợ", icon: "support", roles: HTX_WRITE }, // #313: module chủ HTX, quản lý HTX + quản trị
       { href: "/htx/thu-gom", module: "pf/cropcycle", label: "Thu gom rơm MKG", icon: "harvest", roles: HTX_WRITE },
     ],
   },

@@ -1,0 +1,55 @@
+name: optimizer-zlib-canary
+
+# workflow_dispatch requires this file on the default branch. This package-only
+# push trigger validates the first candidate before integration; it never runs on main/dev.
+on:
+  push:
+    branches: [codex/optimizer287zlib]
+    paths:
+      - optimizer/Dockerfile
+      - scripts/test-optimizer-zlib-canary.sh
+      - .github/workflows/optimizer-zlib-canary.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image-control:
+    if: github.repository == 'MEKONG-GREEN/Agrigreen_demo_v2' && github.ref == 'refs/heads/codex/optimizer287zlib'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Verify the same Trivy release used by CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/zlib-trivy"
+          cd "$RUNNER_TEMP/zlib-trivy"
+          url=https://github.com/aquasecurity/trivy/releases/download/v0.70.0
+          curl --fail --location --retry 2 "$url/trivy_0.70.0_Linux-64bit.tar.gz" -o trivy.tar.gz
+          curl --fail --location --retry 2 "$url/trivy_0.70.0_checksums.txt" -o checksums.txt
+          # Immutable upstream release asset digests, independently checked against its checksum file.
+          echo '8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9  trivy.tar.gz' | sha256sum -c -
+          echo 'c45281240bb9211ea9e830fc0bf5cf8acf7c0ca830feb64ac8a0aa932c5c92d9  checksums.txt' | sha256sum -c -
+          awk '$2 == "trivy_0.70.0_Linux-64bit.tar.gz" {print $1 "  trivy.tar.gz"}' checksums.txt | sha256sum -c -
+          tar -xzf trivy.tar.gz trivy
+          echo "$RUNNER_TEMP/zlib-trivy" >> "$GITHUB_PATH"
+      - name: Build and scan original, fixed, mutant, restored images
+        shell: bash
+        run: bash scripts/test-optimizer-zlib-canary.sh "$RUNNER_TEMP/optimizer-zlib-proof"
+      - name: Preserve input hashes, real binaries and scanner evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: optimizer-zlib-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/optimizer-zlib-proof/
+            !${{ runner.temp }}/optimizer-zlib-proof/trivy-cache/**
+          if-no-files-found: error
+          retention-days: 14

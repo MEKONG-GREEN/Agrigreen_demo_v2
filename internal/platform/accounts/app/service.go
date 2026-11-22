@@ -10,6 +10,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"slices"
 	"time"
@@ -72,7 +73,10 @@ type Service struct {
 	SessionPolicies port.SessionPolicies // instance configuration; no owner payload decoding here
 	// AssignmentRules is optional trusted owner policy; configured errors never fall back.
 	AssignmentRules port.AssignmentRules `json:"-"`
-	DB              tenant.Beginner      // pool vai accounts_app
+	// UnitDelegations owns selected-session decisions and unit/delegation definitions.
+	// Nil keeps compatibility; configured decisions and errors are final.
+	UnitDelegations port.UnitDelegationPolicy `json:"-"`
+	DB              tenant.Beginner           // pool vai accounts_app
 	Clock           clock.Clock
 	Dir             port.Directory          // nil → ErrDependency
 	Scope           partyport.ScopeResolver // nil → ErrDependency
@@ -97,6 +101,19 @@ type Service struct {
 	// DormantDryRun (D24): job accounts_dormant chỉ đếm tài khoản sẽ báo trước / khóa, không ghi gì (chạy thử lần đầu
 	// ở môi trường thật — docs/runbooks/keycloak-mfa-d24.md).
 	DormantDryRun bool
+	// ResetMailer, ResetURL (#255, ADR-0057): kênh email và URL trang đặt lại mật khẩu (AG_WEB_OPS_URL) của consumer
+	// port.PasswordResetConsumer (cmd/worker). Thiếu → consumer lỗi, sự kiện giao lại rồi vào DLQ.
+	ResetMailer ResetMailer
+	ResetURL    string
+	// Log: nhật ký vận hành (không PII, không mã/mật khẩu). Nil → slog.Default().
+	Log *slog.Logger
+}
+
+func (s *Service) log() *slog.Logger {
+	if s.Log != nil {
+		return s.Log
+	}
+	return slog.Default()
 }
 
 // FacilityCatalog là phần cổng danh mục CNTS pf/accounts cần (masterdata/port.CNTSCatalogs thỏa mãn): ref không
@@ -407,12 +424,44 @@ func (s *Service) replay(ctx context.Context, tid uuid.UUID, key string) (*domai
 	return ev, err
 }
 
-// write ghi một dòng sổ; trùng idem_key (gọi song song) → đọc lại bản đã ghi.
+// replayFor là phát lại bền theo sổ account_event cho thao tác Admin API (BF-ACC-REPLAY-SCOPE #154).
+// Dòng cache shared.idempotency_key (gắn actor/org/vai) có hạn và bị xóa khi hết hạn, còn sổ thì giữ
+// mãi — nên phát lại theo sổ không được tin kết quả đã lưu: khóa phải thuộc đúng thao tác, đúng người
+// gọi và đúng tài khoản đích (không thì 422 idempotency_key_reused), và tài khoản đích phải còn trong
+// phạm vi/quyền HIỆN HÀNH của người gọi (s.target, lỗi thì đóng). user = uuid.Nil khi chưa biết đích (tạo).
+func (s *Service) replayFor(ctx context.Context, a *actor, key string, action domain.Action, user uuid.UUID) (*domain.Event, error) {
+	prev, err := s.replay(ctx, a.p.TenantID, key)
+	if err != nil || prev == nil {
+		return nil, err
+	}
+	if !sameRequest(*prev, action, a.p.ActorRef, user) {
+		return nil, problem.IdempotencyConflict
+	}
+	if _, err := s.target(ctx, a, prev.Account.UserRef); err != nil {
+		return nil, err
+	}
+	return prev, nil
+}
+
+// sameRequest: dòng sổ prev do cùng người gọi ghi cho cùng thao tác trên cùng tài khoản (user Nil = không so).
+func sameRequest(prev domain.Event, action domain.Action, actorRef, user uuid.UUID) bool {
+	return prev.Action == action && prev.ActorRef == actorRef && (user == uuid.Nil || prev.Account.UserRef == user)
+}
+
+// write ghi một dòng sổ; trùng idem_key (gọi song song) → đọc lại bản đã ghi, chỉ khi bản đó cùng thao
+// tác/người gọi/tài khoản (tạo tài khoản: đích mới sinh nên không so) — khác thì 422 (#154).
 func (s *Service) write(ctx context.Context, tid uuid.UUID, e *domain.Event) (replayed bool, err error) {
 	err = tenant.WithTenantTx(ctx, s.DB, tid, func(tx pgx.Tx) error { return record(ctx, tx, e) })
 	if errors.Is(ledger.Classify(err), ledger.ErrDuplicate) {
 		prev, rerr := s.replay(ctx, tid, e.IdemKey)
 		if rerr == nil && prev != nil {
+			user := e.Account.UserRef
+			if e.Action == domain.ActionCreated {
+				user = uuid.Nil
+			}
+			if !sameRequest(*prev, e.Action, e.ActorRef, user) {
+				return false, problem.IdempotencyConflict
+			}
 			*e = *prev
 			return true, nil
 		}

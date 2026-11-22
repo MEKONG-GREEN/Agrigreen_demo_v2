@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ApiProblem } from "@/api/problem";
+import { currentIdempotentRun, withIdempotentOperation } from "@/api/idempotency";
 import { useAuth } from "@/auth/AuthProvider";
 import { Dialog } from "@/components/Dialog";
 import { BackLink } from "@/components/patterns/detail";
@@ -27,6 +28,7 @@ import {
   type PromotionApi,
 } from "./promotion-api";
 import { createStaffApi, vnDate } from "./staff-api";
+import { prepareHrmFile } from "./upload-file";
 
 export const DECISION_BASE = "/kn/nhan-su/quyet-dinh-nang-bac";
 const KIND_CODE: Record<PromoKind, string> = { nltx: "NLTX", nlth: "NLTH", tnvk: "TNVK" };
@@ -51,17 +53,21 @@ function bacText(p: Decision["people"][number], kind: string): [string, string] 
 }
 
 /** Lưu quyết định; số trùng → hỏi lại (hrm.decision_warnings) rồi gửi kèm acknowledge_warnings. */
-async function saveDecision(pa: PromotionApi, body: DecisionInput, file: File | null) {
+export async function saveDecision(pa: PromotionApi, body: DecisionInput, file: File | null) {
+  const run = currentIdempotentRun();
+  const scoped = <T,>(send: () => T): T => run ? withIdempotentOperation(run, send) : send();
+  // Không ghi quyết định nếu tệp đã biết không đọc được/sai định dạng.
+  const checkedFile = file ? await prepareHrmFile(file) : null;
   let r;
   try {
-    r = await pa.createDecision(body);
+    r = await scoped(() => pa.createDecision(body));
   } catch (e) {
     if (e instanceof ApiProblem && e.code === "hrm.decision_warnings") {
       if (!window.confirm(`${e.message}\nVẫn lưu quyết định?`)) throw e;
-      r = await pa.createDecision({ ...body, acknowledge_warnings: true });
+      r = await scoped(() => pa.createDecision({ ...body, acknowledge_warnings: true }));
     } else throw e;
   }
-  if (file) await pa.attachFile(r.id, file);
+  if (checkedFile) await scoped(() => pa.attachFile(r.id, checkedFile));
   return r;
 }
 

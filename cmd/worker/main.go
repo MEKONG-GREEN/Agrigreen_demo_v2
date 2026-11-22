@@ -48,8 +48,7 @@
 //	pf.mechanization.area_sync  pf.cropcycle.coop_season_area.changed → diện tích vụ CGH (CGH FN-07, QT-03)
 //	pf.geo.hub_valve            mkg.hub.facility.published / mkg.hub.capacity.published → mô hình đọc hub (kiểm hợp đồng van)
 //	pf.cropcycle.htx_collection_valve  mkg.fieldops.collection_schedule/htx_collection_statement.published → lịch gom, bảng kê HTX
-//	pf.cropcycle.gps_log        vụ / nhật ký / sản lượng → log GPS pf/geo sau commit (HTX US-GPS-03)
-//	pf.extension.gps_log        yêu cầu hỗ trợ → log GPS pf/geo sau commit (HTX US-GPS-03)
+//	pf.cropcycle.gps_log        vụ / nhật ký / sản lượng / yêu cầu hỗ trợ (#313) → log GPS pf/geo sau commit (HTX US-GPS-03)
 //	pf.simulation.snapshot      ảnh chụp đầu vào (SupplySource pf/cropcycle+party+geo, Router pf/waterway)
 //
 // Consumer pf.notify.cropcycle (r_notify): nhật ký chờ duyệt / kết quả duyệt / nông
@@ -179,7 +178,7 @@ func consumers(log *slog.Logger) []consumer {
 			log.Info("đồng ý đã ghi", "event", env.EventType, "event_id", env.EventID, "tenant_id", env.TenantID, "trace_id", env.TraceID, "outcome", "ok")
 			return nil
 		},
-	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), waterwayBuildConsumer(), krefConsumer()}, append(reportsConsumers(log), wiredConsumers(log)...)...)
+	}, mrvExportConsumer(log), accountsOrgStatusConsumer(log), accountsPasswordResetConsumer(log), waterwayBuildConsumer(), krefConsumer()}, append(reportsConsumers(log), wiredConsumers(log)...)...)
 }
 
 func allConsumers(log *slog.Logger) []consumer {
@@ -518,7 +517,11 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 				closeFn()
 				return nil, func() {}, err
 			}
-			acc := accounts.New(accPool, clk, accounts.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Departments: pty.Departments(), Units: md.AdminUnits()})
+			acc, err := workerAccounts(accPool, clk, accounts.Deps{Scope: pty.ScopeResolver(), Orgs: pty.Orgs(), Departments: pty.Departments(), Units: md.AdminUnits()})
+			if err != nil {
+				closeFn()
+				return nil, func() {}, err
+			}
 			kn.UseKNContext(acc.ExtensionKNContext(), acc.ExtensionKNDirectory())
 			kn.UseRoleHolders(acc.RoleHolders()) // W11.46
 			// KN v7.7 P5: khóa tuần đã kết thúc, nhắc hạn đăng ký / hạn duyệt lịch công tác.
@@ -742,7 +745,11 @@ func buildSchedule(ctx context.Context, log *slog.Logger, jobs string) (*opsSche
 		}
 		// AG_ACCOUNTS_DORMANT_DRY_RUN=true: chỉ đếm và ghi log (lần chạy đầu ở môi trường thật — runbook keycloak-mfa-d24).
 		dry := os.Getenv("AG_ACCOUNTS_DORMANT_DRY_RUN") == "true"
-		acc := accounts.New(pfPool, clk, accounts.Deps{Directory: dir, Params: masterdata.New(pfPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}}).Params(), DormantDryRun: dry})
+		acc, err := workerAccounts(pfPool, clk, accounts.Deps{Directory: dir, Params: masterdata.New(pfPool, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}}).Params(), DormantDryRun: dry})
+		if err != nil {
+			closeFn()
+			return nil, func() {}, err
+		}
 		js = append(js, acc.Jobs(accounts.DormantTenants(out.pools[migrations.PF]), log)...)
 	}
 	if len(js) == 0 {

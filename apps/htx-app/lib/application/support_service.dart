@@ -40,8 +40,8 @@ class SupportItem {
 }
 
 /// Gửi yêu cầu hỗ trợ (HTX US-SUPPORT-01): luôn qua hàng đợi đồng bộ (entity
-/// `support_request`) nên gửi được khi mất mạng; máy chủ tạo nhiệm vụ cho cán
-/// bộ khuyến nông khi nhận (KN US-TASK-01).
+/// `support_request`) nên gửi được khi mất mạng; máy chủ (module HTX
+/// pf/cooperative từ #313) ghi yêu cầu cho quản lý HTX theo dõi.
 class SupportService {
   SupportService({
     required OutboxRepository outbox,

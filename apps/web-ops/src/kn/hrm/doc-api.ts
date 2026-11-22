@@ -1,10 +1,12 @@
 // Client có kiểu cho Kho tài liệu nhân sự (W11.24, dom/hrm — /v1/hrm/docs*) trên openapi-fetch sinh từ hợp đồng. Nội dung
 // tệp chỉ đi qua bộ nhớ (máy chủ giải mã qua pf/evidence, phản hồi no-store) — không lưu vào localStorage/sessionStorage.
 import { unwrap, type ApiClient } from "@/api/client";
-import { newIdempotencyKey } from "@/api/idempotency";
+import { currentIdempotentRun, newIdempotencyKey, withIdempotentOperation } from "@/api/idempotency";
+import { stableMultipart } from "@/api/multipart";
 import { parseProblemResponse } from "@/api/problem";
 import { filenameFromDisposition } from "@/lib/files";
 import type { components } from "@/api/generated/application";
+import { prepareHrmFile } from "./upload-file";
 
 type S = components["schemas"];
 export type HrmDocTree = S["HrmDocTree"];
@@ -130,22 +132,23 @@ export function createDocApi(api: ApiClient) {
     get: (id: string): Promise<HrmDocDetail> =>
       unwrap(api.GET("/v1/hrm/docs/{id}", { params: { path: { id } } })),
     /** Tải lên: phần "meta" (JSON phân loại) + phần "file". */
-    upload: (
+    upload: async (
       meta: HrmDocInput,
       file: File,
-    ): Promise<{ doc_id: string; version: number }> =>
-      unwrap(
+    ): Promise<{ doc_id: string; version: number }> => {
+      const run = currentIdempotentRun(); // giữ lượt trước await đọc tệp
+      const m = JSON.stringify(meta);
+      const mp = stableMultipart([["meta", m], ["file", await prepareHrmFile(file)]]);
+      const send = () => unwrap(
         api.POST("/v1/hrm/docs", {
           params: { header: header() },
-          body: { meta: JSON.stringify(meta), file: file as unknown as string },
-          bodySerializer: (b: { meta: string; file: string }) => {
-            const fd = new FormData();
-            fd.append("meta", b.meta);
-            fd.append("file", b.file as unknown as Blob, file.name);
-            return fd;
-          },
+          headers: { "Content-Type": mp.contentType },
+          body: { meta: m, file: file as unknown as string },
+          bodySerializer: () => mp.body,
         }),
-      ),
+      );
+      return run ? withIdempotentOperation(run, send) : send();
+    },
     classify: (id: string, body: HrmDocInput) =>
       unwrap(
         api.POST("/v1/hrm/docs/{id}/classify", {

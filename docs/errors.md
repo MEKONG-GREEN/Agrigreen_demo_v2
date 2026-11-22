@@ -191,11 +191,8 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.unit_invalid` | pf/extension: mã đơn vị hành chính không còn hiệu lực hoặc sai cấp (nhiệm vụ/báo cáo gắn xã; chốt kỳ theo tỉnh) |
 | 404 | `extension.staff_not_found` | pf/extension: cán bộ chưa có (hoặc đã ngừng) trong danh bạ trực |
 | 404 | `extension.contact_unavailable` | pf/extension: cán bộ trong danh bạ chưa khai số điện thoại ở tài khoản (hoặc tài khoản đã khóa) — không gọi/nhắn 1 chạm được (US-DIR-02) |
-| 403 | `extension.farmer_household_required` | pf/extension: tài khoản nông dân chưa liên kết nông hộ nào (HTX US-SUPPORT-01) |
-| 422 | `extension.household_invalid` | pf/extension: `household_ref` của yêu cầu hỗ trợ không thuộc tài khoản, hoặc tài khoản có nhiều nông hộ mà không chọn |
-| 404 | `extension.support_request_not_found` | pf/extension: không có yêu cầu hỗ trợ |
 | 409 | `extension.id_reused` | pf/extension: `id` do máy sinh đã dùng cho bản ghi khác |
-| 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục); consumer `pf.extension.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại) |
+| 503 | `extension.dependency_unavailable` | pf/extension: chưa nối pf/party (phạm vi) hoặc pf/masterdata (đơn vị, danh mục); consumer `pf.extension.gps_log` (gỡ ở #313) chưa nối log GPS pf/geo |
 | 404 | `extension.program_report_not_found` | pf/extension: không có báo cáo tiến độ Đề án (FR-03), hoặc ngoài phạm vi đọc |
 | 409 | `extension.program_report_approved` | pf/extension: phiên bản tiến độ Đề án đã được duyệt |
 | 404 | `extension.schedule_not_found` | pf/extension (KN v7.7 P5): không có lịch công tác, hoặc ngoài phạm vi (Cấp Xã: không phải lịch của mình; Cấp Tỉnh: khác phòng ban/tỉnh) — không lộ sự tồn tại |
@@ -215,6 +212,7 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 422 | `extension.form_no_structure` | pf/extension: mẫu chưa có cột nhập liệu — chặn phát hành (FN-TI-02.02) |
 | 422 | `extension.period_slots_exceeded` | pf/extension: số kỳ của đợt vượt số khe kỳ trên một dòng của mẫu nhiều kỳ (PL 01, 01B, 02, 07; tạm theo seed, chờ khách Q-01) |
 | 422 | `extension.provincial_import_invalid` | pf/extension: tệp nạp Tỉnh giao (`POST /v1/extension/report-batches/provincial-import`, W11.02) không đọc được (không phải CSV UTF-8/.xlsx, ô công thức, quá 500 dòng/2 MB), thiếu cột "Mã xã", không nhận ra cột Tỉnh giao nào hoặc hai cột trùng một cột Tỉnh giao — từ chối cả tệp; dòng lỗi riêng lẻ trả trong `rows` |
+| 422 | `extension.grid_import_invalid` | pf/extension BF-TT-FORMS (UP-04) Nhập từ Excel trên màn nhập biểu Cấp Xã: tệp không đọc được (.xls cũ, zip hỏng, CSV không UTF-8, quá 4 MB/2000 dòng) hoặc không có hàng chữ cái cột (A, B, C…) của tệp "Tải mẫu Excel" |
 | 422 | `extension.no_communes` | pf/extension: chưa chọn xã nhận, hoặc mã xã không phải Nút xã đang hoạt động của tỉnh |
 | 409 | `extension.batch_has_submissions` | pf/extension: thu hồi đợt khi đã có xã gửi báo cáo |
 | 409 | `extension.batch_withdrawn` | pf/extension: đợt đã thu hồi |
@@ -230,7 +228,14 @@ Người duyệt xuất bản phiên bản do chính mình soạn trả mã chun
 | 404 | `extension.material_record_not_found` | pf/extension KN v7.7 (FN-XA-03.06): bản ghi vật tư không có, của tenant khác, ngoài phạm vi xã hoặc của phòng ban khác |
 | 422 | `extension.material_unknown` | pf/extension KN v7.7: vật tư không có / đã ngừng dùng trong danh mục masterdata `material`, hoặc mục danh mục thiếu `attrs.unit` (lỗi theo trường `lines.<i>.material_code`) |
 | 422 | `extension.material_quantity_invalid` | pf/extension KN v7.7: số lượng sai theo ĐVT — âm, > 1 000 000 000, ĐVT đếm được (`bao, cái, chai, gói, con, chiếc, cây, hộp`) mà không nguyên, hoặc > 4 chữ số lẻ (tạm, chờ khách); lỗi theo trường `lines.<i>.quantity` / `quantity` |
+| 422 | `extension.material_import_invalid` | pf/extension BF-TT-MAT (TT-12) Nạp Excel vật tư: tệp không đọc được (ô công thức, .xls cũ, quá 2 MB/200 dòng) hoặc thiếu cột bắt buộc "Vật tư", "Số lượng"; lỗi từng dòng trả trong `lines[].reason`, không chặn cả tệp |
 | 409 | `extension.material_superseded` | pf/extension KN v7.7: sửa (`POST /v1/kn/materials/{id}/correct`) một bản ghi đã bị bản bù khác thay — hãy sửa bản hiện hành |
+| 404 | `extension.kn_attrs_cooperative_not_found` | pf/extension BF-SRV-KN-ATTRS (TT-10): HTX không có, không phải HTX, của tenant khác hoặc ngoài xã phụ trách (`/v1/kn/machine-profiles/{cooperative_ref}`) |
+| 404 | `extension.kn_attrs_plot_not_found` | pf/extension BF-SRV-KN-ATTRS (TT-11): thửa không có, của tenant khác hoặc ngoài xã phụ trách (`/v1/kn/plot-profiles/{plot_ref}`) |
+| 409 | `extension.kn_attrs_plot_retired` | pf/extension BF-SRV-KN-ATTRS (TT-11): đặt cây trồng cho thửa đã ngừng dùng |
+| 422 | `extension.kn_attrs_year_invalid` | pf/extension BF-SRV-KN-ATTRS (TT-10): năm sản xuất không phải số nguyên hoặc ngoài 1900 – năm hiện tại (giờ Việt Nam); lỗi theo trường `lines.<loại máy>.year_made` |
+| 422 | `extension.kn_attrs_machine_type_unknown` | pf/extension BF-SRV-KN-ATTRS (TT-10): loại máy không có / đã ngừng dùng trong danh mục masterdata `machine_type` (trường `lines.<loại máy>.machine_type`) |
+| 422 | `extension.kn_attrs_crop_unknown` | pf/extension BF-SRV-KN-ATTRS (TT-11): cây trồng không có / đã ngừng dùng trong danh mục masterdata `crop` (trường `crop_code`) |
 | 403 | `self_approval_forbidden` | pf/extension (P4): người đã nhập thay bản nộp (on_behalf_of) tự rà soát/xác nhận/chốt kỳ có bản đó (gap §4.6) |
 
 Vật tư KN v7.7 dùng lại `extension.read_only` (Cấp Quốc gia ghi vật tư), `extension.out_of_scope`, `extension.support_reason_required`, `extension.dependency_unavailable` (chưa nối danh mục vật tư / đơn vị hành chính).
@@ -420,6 +425,9 @@ Cổng `geo.GpsLog.RecordFix` (module khác gọi, không qua HTTP) trả lỗi 
 | 409 | `cropcycle.collection_statement_stale` | pf/cropcycle (G3-2): phản hồi theo `revision` cũ — MKG đã gửi bản sửa; `current_revision` là bản hiện hành |
 | 403 | `cropcycle.collection_manager_only` | pf/cropcycle (G3-2): chỉ `coop_manager` của đúng HTX (`org_ref`) được xác nhận/tranh chấp bảng kê |
 | 503 | `cropcycle.dependency_unavailable` | pf/cropcycle: chưa nối hoặc không gọi được pf/geo, pf/party, pf/masterdata, liên kết tài khoản ↔ nông hộ (vai `farmer`); consumer `pf.cropcycle.gps_log` chưa nối log GPS pf/geo (sự kiện được giao lại). G5: nguồn sản phẩm `collection_volume` chưa nối `geoport.PlotFacts` / `AdminUnits` hoặc không đọc được |
+| 403 | `cropcycle.farmer_household_required` | pf/cooperative (#313, thay `extension.farmer_household_required`): tài khoản nông dân chưa liên kết nông hộ nào — gửi/xem yêu cầu hỗ trợ (HTX US-SUPPORT-01) |
+| 422 | `cropcycle.household_invalid` | pf/cooperative (#313, thay `extension.household_invalid`): `household_ref` của yêu cầu hỗ trợ không thuộc tài khoản, hoặc tài khoản có nhiều nông hộ mà không chọn |
+| 422 | `cropcycle.household_no_cooperative` | pf/cooperative (#313): nông hộ của yêu cầu hỗ trợ chưa là xã viên một HTX đang hoạt động |
 
 Nhãn vị trí (HTX US-GPS-01/02): `location_status` = `match` (≤ `cropcycle.gps_match_tolerance_m`, mặc định 50 m) | `mismatch` | `missing`; nguồn `gps_source` luôn có. Thiếu GPS hoặc không đo được **không** chặn lưu.
 
@@ -464,6 +472,8 @@ Tài khoản cán bộ quản lý trong Keycloak qua Admin REST (KN US-ADM-01..0
 | 422 | `validation_failed` | pf/accounts: lý do khóa/mở khóa dưới 20 ký tự; email/SĐT/tên đăng nhập sai dạng; thiếu vai; vai sai loại tổ chức (`coop_manager` → "Vui lòng chọn HTX liên kết.") |
 | 502 | `accounts.email_failed` | pf/accounts: Keycloak không gửi được email liên kết (SMTP lỗi) khi gửi lại; khi tạo tài khoản thì trả 201 với `activation_email_sent = false` |
 | 503 | `accounts.dependency_unavailable` | pf/accounts: chưa cấu hình `AG_KC_*`, Keycloak không phản hồi hoặc từ chối tài khoản dịch vụ, chưa nối pf/party |
+| 410 | `accounts.reset_link_invalid` | pf/accounts (#255, ADR-0057): `POST /v1/public/password-reset/confirm` — mã sai/bị sửa, đã dùng, hết hạn (30 phút), đang được xác nhận song song hoặc tài khoản đã bị khóa; một mã chung, không phân biệt lý do |
+| 422 | `accounts.password_policy` | pf/accounts (#255): mật khẩu mới không đạt chính sách realm (≥ 12 ký tự, khác tên đăng nhập, không trùng 5 mật khẩu gần nhất); liên kết đặt lại vẫn dùng lại được |
 
 KN v7.7 gói P1 — gán vai trò nhiều vai × Nút × phòng ban × xã (FN-AD-04.04), ngữ cảnh phiên `X-AG-Context` (FN-CH-00.01), chế độ hỗ trợ (FN-AD-04.07):
 

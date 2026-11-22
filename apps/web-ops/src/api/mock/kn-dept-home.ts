@@ -213,6 +213,8 @@ function kpis(w: Who, docs: Doc[]): S["DeptKPI"][] {
       { key: "alerts_open", label: "Cảnh báo cần xử lý", value: 5, tone: "warn" },
       { key: "alerts_overdue", label: "Cảnh báo quá hạn", value: 1, tone: "bad" },
       { key: "outbreaks_active", label: "Ổ dịch đang theo dõi", value: 2, tone: "bad" },
+      { key: "livestock_households", label: "Hộ chăn nuôi đang dùng", value: 41, tone: "info" },
+      { key: "livestock_farms", label: "Trang trại chăn nuôi", value: 7, tone: "info" },
     ],
     trong_trot: [
       { key: "tasks_open", label: "Nhiệm vụ đang mở", value: 9, tone: "info" },

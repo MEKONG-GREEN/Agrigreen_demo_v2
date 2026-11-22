@@ -1,6 +1,5 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiClient, type ApiClient } from "@/api/client";
 import { mockFetchNoDelay } from "@/api/mock/handler";
 import { addDay, resetPriceItems, vnToday } from "@/api/mock/kn-price-items";
@@ -10,6 +9,7 @@ import { ItemsScreen } from "./ItemsScreen";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/kn/bao-gia/mat-hang",
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 
@@ -54,6 +54,10 @@ async function problemCode(p: Promise<unknown>): Promise<string> {
   }
   return "ok";
 }
+
+const journeyNow = new Date();
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(journeyNow); });
+afterEach(() => vi.useRealTimers());
 
 describe("mặt hàng theo thời kỳ — backend giả lập theo hợp đồng /v1/price/*", () => {
   beforeEach(() => resetPriceItems());
@@ -211,32 +215,15 @@ describe("mặt hàng theo thời kỳ — backend giả lập theo hợp đồn
 describe("màn FN-AD-04.03", () => {
   beforeEach(() => resetPriceItems());
 
-  it("Cấp Tỉnh xem danh mục, thêm mặt hàng qua hộp thoại", async () => {
+  it("Cấp Tỉnh xem danh mục và liên kết thêm mặt hàng trên route riêng", async () => {
     const { api } = await clientFor("kn-binh", "asg-binh-tinh");
-    auth.api = api;
-    auth.role = "kn_tinh";
+    auth.api = api; auth.role = "kn_tinh";
     render(<ItemsScreen />);
-    const table = await screen.findByRole("table", {
-      name: "Danh mục mặt hàng",
-    });
+    const table = await screen.findByRole("table", { name: "Danh mục mặt hàng" });
     expect(within(table).getByText("MH00001")).toBeInTheDocument();
-    expect(
-      screen.getByRole("tab", { name: "Đề xuất từ xã (1)" }),
-    ).toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Thêm mặt hàng" }),
-    );
-    const dlg = screen.getByRole("dialog", { name: "Thêm mặt hàng" });
-    await userEvent.type(within(dlg).getByLabelText("Tên loại"), "Chanh");
-    await userEvent.type(
-      within(dlg).getByLabelText("Giống / phẩm cấp"),
-      "không hạt",
-    );
-    await userEvent.click(within(dlg).getByRole("button", { name: "Lưu" }));
-    await waitFor(() =>
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
-    );
-    expect(await screen.findByText("MH00009")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Đề xuất từ xã (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Thêm mặt hàng" })).toHaveAttribute("href", expect.stringContaining("/mat-hang/them-moi?"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("Cấp Xã chỉ có tab Đề xuất mặt hàng", async () => {

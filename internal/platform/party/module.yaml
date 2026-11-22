@@ -24,6 +24,7 @@ provides:
     - CoopMarkers
     - CoopProfiles
     - CooperativeRegistrar
+    - DepartmentAdmin
     - DepartmentUsage
     - Departments
     - FormAvailability

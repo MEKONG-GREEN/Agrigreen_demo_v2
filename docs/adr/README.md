@@ -41,13 +41,17 @@
 | 0037 | [Tách xác thực và phân quyền, không mạo danh](0037-tach-xac-thuc-va-phan-quyen-khong-mao-danh.md) | Đề xuất — chờ MKG ký (A7); ghi lại KN P1 (đã hiện thực, pf 000060–000061) làm `ResolveContext` ĐTK 1; phần còn lại W7.2 |
 | 0038 | [Bộ chạy migration theo module — sổ theo module, thứ tự topo, vai `own_<module>`](0038-bo-chay-migration-theo-module.md) | Đề xuất — hiện thực bước 1 ở W7.1 (sau cờ `AG_MIGRATE_RUNNER=v2`, mặc định v1 một bản phát hành) |
 | 0041 | [MFA theo nhóm cho cán bộ KN, phiên giữ theo D9, realm quản trị riêng, vô hiệu tài khoản 45 ngày](0041-mfa-theo-nhom-d24.md) | Chấp nhận — quyết định CEO D24, D25 (13/10/2026), ứng với v4.3 ADR-23/P-1…P-5; hiện thực gói MFA (pf 20261013134254, 20261013142347); sửa ADR-0010 |
+| 0048 | [Liên kết khách có OTP](0048-lien-ket-khach-co-otp.md) | Khung dormant #184; owner/transport/public flow ở #200 |
 | 0049 | [`cap/price` = module năng lực `pf/price`](0049-cap-price-pf-price.md) | Đề xuất — khung hiện thực ở W11.71 (pf 000138); số 0039–0048 dành cho ADR khác của đợt; bị thay thế một phần bởi ADR-0055 (Báo giá là của KN) |
 | 0050 | [`dom/hrm` = module nghiệp vụ `pf/hrm`; danh mục nhân sự ở module của chủ](0050-dom-hrm-pf-hrm.md) | Đề xuất — khung + danh mục nhân sự ở W11.21 (pf 000147); dữ liệu thật chờ Q-070 |
 | 0051 | [Tách `cap/export` thành module năng lực `pf/export` — mẫu văn bản có phiên bản, bộ ghi .docx tất định, sổ lần xuất có băm, số văn bản tự cấp](0051-cap-export-pf-export-docx.md) | Đề xuất — hiện thực ở W10.17 (pf 20261024090957); dùng thật chờ Q-062 |
 | 0052 | [Đồng sở hữu dữ liệu MKG + HTX, neo HTX theo mã số thuế, HTX tạm "Chưa xác nhận" và nhận quyền](0052-dong-so-huu-mkg-htx-neo-mst.md) | Chấp nhận — quyết định CEO D2 (13/10/2026), trả lời H-1/QĐ-2; hiện thực gói D2 (pf 20261013091454) |
 | 0053 | [Một hợp đồng `_pub` có phiên bản cho "số liệu đã chốt" — họ `closed_figures/v1`, port KHTC `KHTCSources`, bên đọc qua thành viên vai `_pub`](0053-hop-dong-so-lieu-da-chot-closed-figures.md) | Đề xuất — hiện thực ở PFPUB; D8, D17, D18, D2 đã chốt; Trồng trọt giữ vòng đời báo cáo |
 | 0054 | [`cap/directory` = module năng lực `pf/contact` — danh bạ dùng chung, một bản ghi/người ở kho định danh, lọc trường ở API](0054-cap-directory-pf-contact.md) | Đề xuất — hiện thực W11.23 (pf 20261013230912, vault 20261013165158); Q-071, Q-072 theo đề xuất của dev; bị thay thế một phần bởi ADR-0055 (Contact là của KN) |
-| 0055 | [Tách hệ thống Khuyến nông — hệ độc lập về logic (`internal/kn/*`, dữ liệu hệ khác chỉ qua `_pub`/data product/lớp tích hợp, client kn-web trong G1, frontend riêng sau G1); tách vật lý tùy chọn khi vận hành cần](0055-tach-he-thong-khuyen-nong.md) | Chốt ranh giới G1 theo PO; đề xuất đối chiếu D2 chờ PO |
+| 0055 | [Tách hệ thống Khuyến nông — hệ độc lập về logic (`internal/kn/*`, dữ liệu hệ khác chỉ qua `_pub`/data product/lớp tích hợp, client kn-web trong G1, frontend riêng sau G1); tách vật lý tùy chọn khi vận hành cần](0055-tach-he-thong-khuyen-nong.md) | Chốt ranh giới G1 theo PO; đề xuất đối chiếu D2 chờ PO; thay thế một phần bởi ADR-0060 (Q-KNS-02, bảng Binary/realm) |
+| 0056 | [Hộ chăn nuôi CNTS v4.0 — danh sách hộ là sổ của KN, họ tên/SĐT ở kho định danh, ổ dịch nhiều hộ qua bảng con chỉ ghi thêm](0056-ho-chan-nuoi-cnts-v4.md) | Chấp nhận — gói CNTS-V4-HOUSEHOLD-ADR (#248); hiện thực #251, #252, dùng ở #236 |
+| 0057 | [Tự đặt lại mật khẩu qua email (mã một lần chỉ lưu băm, 30 phút, 5 lần/giờ/tài khoản, gửi qua outbox, thu hồi phiên), bỏ PIN Mobile](0057-tu-dat-lai-mat-khau-qua-email.md) | Chấp nhận — gói #255 AUTH-V2-RESET-NOPIN (BRD 2.0 FN-CH-00.01, FN-05) |
+| 0060 | [App Khuyến nông là hệ vật lý riêng (APP_KN_v1.0: DB, Keycloak realm `kn`, Access, deploy riêng); nền tảng chuyển dữ liệu KN rồi gỡ phần KN, dữ liệu cũ chỉ đọc; giữ Q-KNS-01 và bốn feed cho pha kết nối](0060-kn-he-vat-ly-rieng-app-kn.md) | Chấp nhận — PO duyệt PA1 16/11/2026; gói #311 PA1-ADR-0058-KN-PHYSICAL (số 0058, 0059 đã có nhánh dùng); thay thế một phần ADR-0055 |
 
 ADR 0006, 0007, 0009, 0010, 0011 được chủ sản phẩm chấp nhận ngày 30/09/2026 trong phiên làm việc. Bảng đối chiếu cam kết → mã → kiểm thử ở [trien-khai-g1.md](trien-khai-g1.md).
 
@@ -67,4 +71,3 @@ Số của ADR **chưa viết** mà tài liệu khác đã nhắc tới. Viết 
 | 0045 | Phân loại dữ liệu 4 mức | như trên |
 | 0046 | Phụ thuộc OR-Tools | như trên |
 | 0047 | Dữ liệu vị trí người lái/người đếm | như trên, W12.19 |
-| 0048 | Liên kết khách có OTP | như trên |

@@ -15,6 +15,7 @@ import (
 	geoport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/geo/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // SeasonSupply thực hiện port.SupplyStats. Tenant lấy từ context.
@@ -50,7 +51,11 @@ func (s *Service) HandleGpsLog(ctx context.Context, tx pgx.Tx, env outbox.Envelo
 	if err != nil || !ok {
 		return err
 	}
-	_, err = s.GpsLog.RecordFix(tenant.WithID(ctx, env.TenantID), fix)
+	// P0-POOL-SHARED-2 (#143): ghi qua pf/geo (giao dịch riêng trên cùng pool) NGOÀI giao dịch inbox — như consumer cũ
+	// pf.extension.gps_log của yêu cầu hỗ trợ (#313); ngoài inbox (không có bộ nhớ txdeps) gọi thẳng.
+	_, err = txdeps.Get(ctx, "geo.gps_fix:"+fix.IdemKey, func(ctx context.Context) (geoport.GpsFixReceipt, error) {
+		return s.GpsLog.RecordFix(tenant.WithID(ctx, env.TenantID), fix)
+	})
 	if errors.Is(err, geoport.ErrGpsFixInvalid) {
 		return nil
 	}
@@ -62,6 +67,7 @@ func (s *Service) gpsFixOf(ctx context.Context, tx pgx.Tx, env outbox.Envelope) 
 		EventID   uuid.UUID `json:"event_id"`
 		LogID     uuid.UUID `json:"log_id"`
 		HarvestID uuid.UUID `json:"harvest_id"`
+		SupportID uuid.UUID `json:"support_request_id"`
 	}
 	if err := json.Unmarshal(env.Payload, &ids); err != nil {
 		return geoport.GpsFix{}, false, fmt.Errorf("cropcycle: payload %s hỏng: %w", env.EventType, err)
@@ -100,6 +106,8 @@ func (s *Service) gpsFixOf(ctx context.Context, tx pgx.Tx, env outbox.Envelope) 
 		fix = geoport.GpsFix{ActorRef: h.ActorRef, Purpose: geoport.GpsPurposeHarvest, TargetRef: h.ID, PlotRef: h.PlotRef,
 			CommuneCode: h.CommuneCode, CapturedAt: h.EventTime, IdemKey: "cropcycle:harvest:" + h.ID.String()}
 		g, device = h.GPS, h.DeviceID
+	case port.EventSupportRequestSubmitted:
+		return s.supportFix(ctx, tx, ids.SupportID)
 	default:
 		return fix, false, nil
 	}
@@ -117,6 +125,23 @@ func (s *Service) gpsFixOf(ctx context.Context, tx pgx.Tx, env outbox.Envelope) 
 	fix.Source = g.Source
 	if device != nil {
 		fix.DeviceID = *device
+	}
+	return fix, true, nil
+}
+
+// supportFix dựng bản ghi log GPS của yêu cầu hỗ trợ (#313, mục đích support): toạ độ thiết bị lúc gửi; yêu cầu thiếu vị
+// trí không có gì để ghi. Khóa chống trùng giữ tiền tố "extension:support_request:" của consumer cũ pf.extension.gps_log.
+func (s *Service) supportFix(ctx context.Context, tx pgx.Tx, id uuid.UUID) (geoport.GpsFix, bool, error) {
+	r, err := store.SupportByID(ctx, tx, id)
+	if err != nil || r == nil || r.Location == nil {
+		return geoport.GpsFix{}, false, err
+	}
+	lon, lat := r.Location.Lon, r.Location.Lat
+	fix := geoport.GpsFix{ActorRef: r.SubmittedBy, Purpose: geoport.GpsPurposeSupport, TargetRef: r.ID, PlotRef: r.PlotRef,
+		CommuneCode: r.CommuneCode, Lon: &lon, Lat: &lat, AccuracyM: r.GPSAccuracyM, Source: geoport.GpsSourceDevice,
+		CapturedAt: r.EventTime, IdemKey: "extension:support_request:" + r.ID.String()}
+	if r.DeviceID != nil {
+		fix.DeviceID = *r.DeviceID
 	}
 	return fix, true, nil
 }

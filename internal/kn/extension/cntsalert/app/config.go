@@ -18,11 +18,11 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	formsport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/outbox"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // FormConfigView là cấu hình nhắc của một biểu.
@@ -314,15 +314,22 @@ func reminderSlots(cfg domain.FormReminder, due, now time.Time, loc *time.Locati
 func emitReminded(ctx context.Context, tx pgx.Tx, tid uuid.UUID, p formsport.PeriodProgress, u formsport.UnitProgress, slot string,
 	cfg domain.FormReminder, recips []uuid.UUID, now time.Time, loc *time.Location) error {
 	kind := slot
-	if len(slot) > 7 && slot[:7] == "repeat:" {
+	switch {
+	case strings.HasPrefix(slot, "repeat:"):
 		kind = port.CNTSReminderRepeat
+	case strings.HasPrefix(slot, "manual:"):
+		// BF-CN-PUBLISH: Cấp Tỉnh bấm Nhắc — sự kiện giữ lượt before/overdue của hợp đồng v1 (như nhắc đợt điều tra W11.50).
+		kind = port.CNTSReminderBefore
+		if !now.Before(p.DueAt) {
+			kind = port.CNTSReminderOverdue
+		}
 	}
 	if recips == nil {
 		recips = []uuid.UUID{}
 	}
 	pl := port.CNTSFormRemindedV1{PeriodRef: p.ID, TemplateCode: p.TemplateCode, PeriodLabel: p.Label, Unit: u.Unit, CommuneCode: u.Parent,
 		Slot: kind, DueAt: p.DueAt.UTC().Format(time.RFC3339), Message: cfg.Render(domain.FormLabel(p.TemplateCode), p.Label, p.DueAt, loc),
-		Channels: cfg.Channels, RecipientRefs: recips, Department: domain.Department, EventTime: now.UTC().Format(time.RFC3339)}
+		Channels: cfg.Channels, ChannelsExplicit: true, RecipientRefs: recips, Department: domain.Department, EventTime: now.UTC().Format(time.RFC3339)}
 	return outbox.Enqueue(ctx, tx, outbox.Event{ID: ids.New(), TenantID: tid, Type: port.EventCNTSFormReminded, SchemaVersion: 1, OccurredAt: now,
 		Producer: port.EventProducerName, Payload: pl})
 }
@@ -368,6 +375,12 @@ func (s *Service) lateStreaks(ctx context.Context, tx pgx.Tx, tid uuid.UUID, ps 
 		first, last := xs[streak-1], xs[0]
 		province := s.provinceOf(ctx, last.u.Parent, now)
 		rs := &resolver{s: s, tid: tid, province: province}
+		// BF-CN-PUBLISH: kỳ phát hành có người phụ trách → báo đúng người đó (thay mọi người có cờ phụ trách biểu).
+		if owner, err := store.PublicationOwner(ctx, tx, last.p.ID); err != nil {
+			return n, err
+		} else if owner != nil {
+			rs.owner = *owner
+		}
 		kind, _ := domain.KindOf(domain.KindLateStreak)
 		subjKind := "commune"
 		if last.u.Parent != "" && last.u.Parent != last.u.Unit {

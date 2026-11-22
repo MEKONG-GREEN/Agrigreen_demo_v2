@@ -107,4 +107,27 @@ describe("kế hoạch nhân lực năm (W11.27, FN-11) — giả lập", () => 
     expect(screen.getByRole("heading", { name: "Nhu cầu theo vị trí" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Gửi Phòng HCTH" })).toBeNull();
   });
+
+  it("Nhắc phòng chưa lập (NOTIFY-HCTH-KN #50): nhắc đơn vị chưa gửi; sau chốt 409, nút tắt; Cấp Tỉnh thường bị từ chối", async () => {
+    const admin = await clientFor("kn-admin", "asg-admin");
+    const p = await admin.pa.open({ year: 2027, due_on: "2026-11-30", cutoff_on: "2026-10-12" });
+    const r = await admin.pa.remind(2027);
+    expect(r.units.map((x) => x.unit)).toEqual(p.units);
+    expect(r.units.every((x) => x.unit_name !== "")).toBe(true);
+    const tt = await clientFor("kn-binh", "asg-binh-tinh");
+    expect(await problemCode(tt.pa.remind(2027))).toBe("forbidden");
+
+    auth.api = admin.api;
+    const u = userEvent.setup();
+    const { unmount } = render(<HrmPlanCenterScreen />);
+    await u.click(await screen.findByRole("button", { name: "Nhắc phòng chưa lập" }));
+    expect(await screen.findByText(new RegExp(`Đã nhắc ${p.units.length} đơn vị chưa gửi kế hoạch`))).toBeTruthy();
+    unmount();
+
+    await admin.pa.close(2027);
+    expect(await problemCode(admin.pa.remind(2027))).toBe("hrm.plan_closed");
+    render(<HrmPlanCenterScreen />);
+    const btn = (await screen.findByRole("button", { name: "Nhắc phòng chưa lập" })) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
 });

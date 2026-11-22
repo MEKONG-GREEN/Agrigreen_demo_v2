@@ -1,0 +1,1 @@
+- [x] BF-CN-SLAUGHTER (28/10/2026, #169, CN-10): danh mục cơ sở giết mổ chọn xã từ ĐVHC (tên + mã, theo ngày áp dụng), danh sách có cột riêng từng trường và lọc theo xã, 4 CSGM mẫu trong dữ liệu nền ([giả định](../../kn/gia-dinh/BF-CN-SLAUGHTER.md)).

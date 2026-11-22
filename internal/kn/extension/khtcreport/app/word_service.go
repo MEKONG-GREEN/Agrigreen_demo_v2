@@ -53,8 +53,14 @@ func (s *Service) ExportWord(ctx context.Context, id, exportID uuid.UUID, idem s
 	if err != nil {
 		return exportport.Run{}, err
 	}
-	data := WordData(x.Content, x.Filter, x.Version)
-	req := exportport.Request{Template: WordTemplateKey(x.Content.Data.Template), Version: WordTemplateVersion, Subject: WordSubject(id),
+	if !archiveBodyMatches(x.Body, x.BodyHash) {
+		return exportport.Run{}, ErrDependency.WithDetail("Excel đã lưu không khớp băm")
+	}
+	key, version, data, err := fixedTemplateWord(x.Content.TemplateSnapshot, x.Content, templateTerminal(x.Content), x.Filter, x.Version)
+	if err != nil {
+		return exportport.Run{}, err
+	}
+	req := exportport.Request{Template: key, Version: version, Subject: WordSubject(id),
 		FileName: fmt.Sprintf("bao-cao-khtc-%s-%s-v%d.docx", x.Content.Data.Template, id.String(), x.Version), Data: data,
 		Date: &exportport.DateLine{Var: VarPlaceDate, Place: admin(x.Content, "place")}, IdemKey: idem}
 	if x.Provisional {
@@ -64,7 +70,14 @@ func (s *Service) ExportWord(ctx context.Context, id, exportID uuid.UUID, idem s
 	} else {
 		req.Number = &exportport.Numbering{Series: WordSeries, Var: VarNumber}
 	}
-	return s.Exporter.Export(ctx, req)
+	run, err := s.Exporter.Export(ctx, req)
+	if err != nil {
+		return exportport.Run{}, err
+	}
+	if err = s.bindWord(ctx, c, id, x, req, run); err != nil {
+		return exportport.Run{}, err
+	}
+	return run, nil
 }
 
 // WordHistory trả các lần xuất Word của báo cáo (mới nhất trước).

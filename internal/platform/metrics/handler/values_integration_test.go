@@ -24,18 +24,18 @@ var all = authz.Scope{All: true}
 
 func yesterday() clock.Date { return domain.AddDays(clock.BusinessDate(time.Now()), -1) }
 
-// KN US-DASH-01/02: giá trị kỳ đã chốt được ghi sổ; chạy lại cùng đầu vào không ghi
-// thêm (idempotent); đầu vào đổi (tính lại) → dòng mới supersedes dòng cũ kèm lý do,
-// dòng cũ vẫn còn (không sửa, RB-1); API trả dòng hiện hành, history=true trả cả hai.
-func TestKNDash02RecordIdempotentAndRecomputeSupersedes(t *testing.T) {
+// Giá trị kỳ đã chốt được ghi sổ; chạy lại cùng đầu vào không ghi thêm (idempotent); đầu
+// vào đổi (tính lại) → dòng mới supersedes dòng cũ kèm lý do, dòng cũ vẫn còn (không sửa,
+// RB-1); API trả dòng hiện hành, history=true trả cả hai.
+func TestRecordIdempotentAndRecomputeSupersedes(t *testing.T) {
 	f := newFixture(t, clock.NewFixed(time.Now()))
 	svc := f.mod.Service()
 	ctx := context.Background()
 	d := yesterday()
-	key := port.Key("kn.sown_area_ha")
+	key := port.Key("geo.plots_digitised")
 	f.src.scopes = []port.Scope{{}, {Units: []string{"80"}}}
-	f.src.set(key, "", "", "120.5")
-	f.src.set(key, "80", "", "70.25")
+	f.src.set(key, "", "", "120")
+	f.src.set(key, "80", "", "70")
 
 	r, err := svc.RecordDay(ctx, f.tenant, d, []port.Key{key})
 	if err != nil || r.Inserted != 2 {
@@ -52,14 +52,14 @@ func TestKNDash02RecordIdempotentAndRecomputeSupersedes(t *testing.T) {
 	}
 
 	national := f.as(f.tenant, all, port.RoleMetricsViewer)
-	res := national.get("/v1/metrics/kn.sown_area_ha/values?from=" + d.String() + "&to=" + d.String())
+	res := national.get("/v1/metrics/geo.plots_digitised/values?from=" + d.String() + "&to=" + d.String())
 	expect(t, res, 200, "")
 	it := res.items()
 	if len(it) != 1 || it[0]["value"] != "121" || it[0]["supersedes_id"] == nil || it[0]["correction_reason"] == nil || it[0]["definition_version"].(float64) != 1 {
 		t.Fatalf("hiện hành: %v", it)
 	}
-	res = national.get("/v1/metrics/kn.sown_area_ha/values?from=" + d.String() + "&to=" + d.String() + "&history=true")
-	if it := res.items(); len(it) != 2 || it[0]["value"] != "120.5" || it[0]["current"] != false || it[1]["current"] != true {
+	res = national.get("/v1/metrics/geo.plots_digitised/values?from=" + d.String() + "&to=" + d.String() + "&history=true")
+	if it := res.items(); len(it) != 2 || it[0]["value"] != "120" || it[0]["current"] != false || it[1]["current"] != true {
 		t.Fatalf("lịch sử: %v", it)
 	}
 
@@ -82,7 +82,7 @@ func TestRecordDayNotClosed(t *testing.T) {
 	if _, err := f.mod.Service().RecordDay(context.Background(), f.tenant, today, nil); err == nil || problem.From(err).Code != app.ErrNotClosed.Code {
 		t.Fatalf("mong not_closed, nhận %v", err)
 	}
-	if _, err := f.mod.Source().AsOf(context.Background(), "kn.open_tasks", today, port.Scope{TenantID: f.tenant}); !errors.Is(err, port.ErrNotClosed) {
+	if _, err := f.mod.Source().AsOf(context.Background(), "geo.plots_digitised", today, port.Scope{TenantID: f.tenant}); !errors.Is(err, port.ErrNotClosed) {
 		t.Fatalf("AsOf hôm nay: %v", err)
 	}
 	if _, err := f.mod.Source().AsOf(context.Background(), "x.unknown", yesterday(), port.Scope{TenantID: f.tenant}); !errors.Is(err, port.ErrUnknownMetric) {
@@ -92,11 +92,11 @@ func TestRecordDayNotClosed(t *testing.T) {
 
 // Phạm vi (ADR-0009) và cách ly tenant (RB-2): cán bộ tỉnh chỉ xem đơn vị trong phạm
 // vi, không xem toàn tenant; tenant khác không thấy dòng nào; vai không liên quan bị chặn;
-// vai KN xem chỉ số KN nhưng không xem chỉ số CGH.
+// vai có trong viewer_roles của chỉ số xem được chỉ số đó nhưng không xem chỉ số CGH.
 func TestMetricsScopeTenantIsolationAndRoles(t *testing.T) {
 	f := newFixture(t, clock.NewFixed(time.Now()))
 	d := yesterday()
-	key := port.Key("kn.open_tasks")
+	key := port.Key("geo.plots_digitised")
 	f.src.scopes = []port.Scope{{}, {Units: []string{"80"}}, {Units: []string{"86"}}}
 	f.src.set(key, "", "", "9")
 	f.src.set(key, "80", "", "4")
@@ -104,7 +104,7 @@ func TestMetricsScopeTenantIsolationAndRoles(t *testing.T) {
 	if _, err := f.mod.Service().RecordDay(context.Background(), f.tenant, d, []port.Key{key}); err != nil {
 		t.Fatal(err)
 	}
-	q := "/v1/metrics/kn.open_tasks/values?from=" + d.String() + "&to=" + d.String()
+	q := "/v1/metrics/geo.plots_digitised/values?from=" + d.String() + "&to=" + d.String()
 	prov := f.as(f.tenant, authz.Scope{Units: []string{"80", "80001"}}, "kn_province_admin")
 	expect(t, prov.get(q), 403, "metrics.out_of_scope")
 	expect(t, prov.get(q+"&unit=86"), 403, "metrics.out_of_scope")
@@ -124,7 +124,7 @@ func TestMetricsScopeTenantIsolationAndRoles(t *testing.T) {
 		t.Fatalf("tenant khác thấy dữ liệu: %v", res.items())
 	}
 
-	// Danh mục định nghĩa theo vai: KN thấy 4 KPI KN (+ chỉ số khác có vai KN), không thấy CGH.
+	// Danh mục định nghĩa theo vai: vai tỉnh thấy chỉ số có vai của mình, không thấy CGH.
 	res = prov.get("/v1/metrics/definitions")
 	expect(t, res, 200, "")
 	for _, it := range res.items() {
@@ -132,7 +132,7 @@ func TestMetricsScopeTenantIsolationAndRoles(t *testing.T) {
 			t.Fatal("vai KN không thấy định nghĩa CGH")
 		}
 	}
-	if n := len(f.as(f.tenant, all, port.RoleMetricsViewer).get("/v1/metrics/definitions").items()); n != 9 {
+	if n := len(f.as(f.tenant, all, port.RoleMetricsViewer).get("/v1/metrics/definitions").items()); n != 5 { // PA1 (#314): bỏ 4 chỉ số kn.*
 		t.Fatalf("metrics_viewer thấy %d định nghĩa", n)
 	}
 }
@@ -169,7 +169,7 @@ func TestDefinitionPinDetectsEditedFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, _ := c.Effective("kn.open_tasks", yesterday())
+	d, _ := c.Effective("geo.plots_digitised", yesterday())
 	pin := func(def domain.Def) error {
 		return tenant.WithTenantTx(ctx, f.pool, f.tenant, func(tx pgx.Tx) error { return store.PinDefinition(ctx, tx, f.tenant, def) })
 	}

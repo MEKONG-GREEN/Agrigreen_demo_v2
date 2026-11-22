@@ -1,0 +1,3 @@
+## KNSPLIT-2-REPORTS-OWNER — Kiểm kê lại nguồn và lịch báo cáo do owner đăng ký
+
+Khôi phục docs-only từ dev85793441 sau khi checkpoint máy cũ không được push. Kiểm kê hiện hành ở [reports-owner-inventory](../../dev/reports-owner-inventory.md): Builders/Catalog/Policies/FormSeeds/ResolveSession/Consolidations đã có, không thêm cơ chế production trùng hoặc fallback. Fixture #81 đã có SelectedSession và positive assertion; chạy lại PostgreSQL hiện tại trước ready. Không thay golden35, Params/snapshot, API/UI, migration hoặc D2/tenant. Bằng chứng lệnh/SHA cuối ghi issue #54; chưa coi toàn KNSPLIT/G1 hoàn tất.

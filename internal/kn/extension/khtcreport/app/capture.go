@@ -10,6 +10,7 @@ import (
 
 	kd "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/domain"
 	ks "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtc/store"
+	extapp "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcext/app"
 	form "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcform/domain"
 	fs "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcform/store"
 	pd "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcperiod/domain"
@@ -32,9 +33,17 @@ func (s *Service) submitted(ctx context.Context, c caller, p ps.Period) ([]domai
 	var events map[uuid.UUID][]ps.Event
 	if err := s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error {
 		var e error
-		periods, e = ps.Periods(ctx, tx, p.Year, 10000)
-		if e != nil {
-			return e
+		for year := p.From.Year(); year <= p.Year; year++ {
+			var rows []ps.Period
+			if p.Type == pd.TypeAdhoc {
+				rows, e = ps.AdhocReportPeriods(ctx, tx, year, p.ID, pd.QuantityEnd(p.Type, p.To, p.Cutoff))
+			} else {
+				rows, e = ps.ReportInputPeriods(ctx, tx, year, p.ID, pd.QuantityEnd(p.Type, p.To, p.Cutoff), p.Type == pd.TypeProgram)
+			}
+			if e != nil {
+				return e
+			}
+			periods = append(periods, rows...)
 		}
 		ids := make([]uuid.UUID, 0, len(periods))
 		for _, period := range periods {
@@ -45,12 +54,23 @@ func (s *Service) submitted(ctx context.Context, c caller, p ps.Period) ([]domai
 	}); err != nil {
 		return nil, err
 	}
-	out := []domain.Submitted{}
+	eligible := []ps.Period{}
 	for _, period := range periods {
 		isCurrentProgram := p.Type == pd.TypeProgram && period.ID == p.ID
 		if terminal(events[period.ID]) == pd.PeriodCancelled || (period.To.After(pd.QuantityEnd(p.Type, p.To, p.Cutoff)) && !isCurrentProgram) || (period.Type != pd.TypeWeek && period.ID != p.ID) {
 			continue
 		}
+		eligible = append(eligible, period)
+	}
+	return s.submittedPeriods(ctx, c, eligible)
+}
+
+// submittedPeriods consumes only real ledger periods selected by the caller.
+// Native submissions are read outside the module transaction; sealed content is
+// checked in a separate tenant-scoped read, as in the frozen-report path.
+func (s *Service) submittedPeriods(ctx context.Context, c caller, periods []ps.Period) ([]domain.Submitted, error) {
+	out := []domain.Submitted{}
+	for _, period := range periods {
 		for _, department := range period.Departments {
 			submissions, err := s.Forms.Submissions(ctx, pd.ProfileKHTC, period.FormsPeriodRef, department)
 			if err != nil {
@@ -200,10 +220,65 @@ func (s *Service) capture(ctx context.Context, c caller, p ps.Period) (domain.Da
 			}
 		}
 	}
+	if p.Type == pd.TypeAdhoc {
+		if err := boundedMetrics(metrics); err != nil {
+			return domain.Data{}, nil, err
+		}
+	}
+	if p.Type == pd.TypeAdhoc {
+		if err := boundedPlan(plan); err != nil {
+			return domain.Data{}, nil, err
+		}
+	}
 	metrics = domain.WithYields(metrics)
+	var requests []domain.Supplement
+	if p.Type == pd.TypeAdhoc {
+		var extra []domain.SourceMetric
+		requests, extra, err = s.supplementInputs(ctx, c, p, sheets)
+		if err != nil {
+			return domain.Data{}, nil, err
+		}
+		metrics = append(metrics, extra...)
+		prior, err := s.priorYearInputs(ctx, p, sheets)
+		if err != nil {
+			return domain.Data{}, nil, err
+		}
+		metrics = append(metrics, prior...)
+	}
 	sort.Slice(metrics, func(i, j int) bool { return metrics[i].Key < metrics[j].Key })
 	data, err := domain.Compose(domain.Period{ID: p.ID, No: p.No, Scope: p.Scope, Type: p.Type, Year: p.Year, Name: p.Name, From: p.From, To: p.To, Cutoff: p.Cutoff, Departments: append([]string{}, p.Departments...)}, plan, sheets, snapshot, metrics, s.now())
 	if err != nil {
+		return domain.Data{}, nil, err
+	}
+	if len(requests) > 0 {
+		data.Supplements = requests
+		data.InputHash, err = domain.Hash(struct {
+			Base     string
+			Requests []domain.Supplement
+		}{data.InputHash, requests})
+		if err != nil {
+			return domain.Data{}, nil, err
+		}
+	}
+	// W11.67: ô Nhập ngoài — giá trị hiệu lực của kỳ ở Số liệu nguồn ngoài (cùng module, cùng giao dịch tenant).
+	var external []extapp.ReportFigure
+	if err := s.tx(ctx, c.principal.TenantID, func(tx pgx.Tx) error { var e error; external, e = extapp.ReportFigures(ctx, tx, p.ID); return e }); err != nil {
+		return domain.Data{}, nil, err
+	}
+	figures := make([]domain.ExternalFigure, 0, len(external))
+	for _, f := range external {
+		x := domain.ExternalFigure{EntryID: f.Entry.ID, Version: f.Entry.Seq, IndicatorID: f.Indicator.ID, Code: f.Indicator.Code, Name: f.Indicator.Name,
+			Group: f.Indicator.Group, Value: f.Entry.Value.String(), Unit: f.Entry.Unit, Agency: f.Entry.Agency, Document: f.Entry.Document,
+			Evidence: []domain.ExternalEvidence{}, At: f.Entry.At.UTC()}
+		if f.Entry.SourceDate != nil {
+			x.SourceDate = f.Entry.SourceDate.Format("2006-01-02")
+		}
+		for _, ev := range f.Evidence {
+			x.Evidence = append(x.Evidence, domain.ExternalEvidence{ID: ev.ID, FileName: ev.FileName})
+		}
+		figures = append(figures, x)
+	}
+	if data, err = domain.WithExternal(data, figures); err != nil {
 		return domain.Data{}, nil, err
 	}
 	for _, sheet := range data.Submissions {

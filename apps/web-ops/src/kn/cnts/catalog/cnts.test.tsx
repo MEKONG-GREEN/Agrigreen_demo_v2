@@ -3,9 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminApiClient, createApiClient, unwrap } from "@/api/client";
 import { mockAdminFetchNoDelay, mockFetchNoDelay } from "@/api/mock/handler";
+import { parseCsv } from "@/api/mock/admin-ops";
+import { CATALOGS } from "@/api/mock/data";
 import { resetCntsVersions } from "@/api/mock/kn-cnts-catalogs";
-import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase } from "./CntsCatalogScreen";
-import { CNTS_TABS, cleanAttrs, expectedDate, formatDoses, parseDoses, tabOf, templateRows, validateAttrs } from "./schema";
+import { CntsCatalogItemFormScreen, CntsCatalogItemScreen, CntsCatalogScreen, catalogBase, exportCatalogCsv } from "./CntsCatalogScreen";
+import { CNTS_TABS, cleanAttrs, effectiveThreshold, expectedDate, exportRows, formatDoses, normalizeAttrs, parseDoses, tabOf, templateRows, validateAttrs } from "./schema";
 
 const nav = { path: "/kn/phong-ban/chan_nuoi_thuy_san/danh-muc-cnts", params: {} as Record<string, string>, search: "" };
 const push = vi.fn();
@@ -17,10 +19,14 @@ vi.mock("next/navigation", () => ({
 }));
 
 const auth = { roles: ["masterdata_admin"] as string[], persona: "setter" };
+// Review #170: thay phản hồi GET /v1/masterdata/params/value để kiểm 404 (chưa có tham số) vs 403/503/lỗi mạng.
+const paramValue: { respond: ((req: Request) => Promise<Response>) | null } = { respond: null };
+const apiFetch = (req: Request) =>
+  paramValue.respond && new URL(req.url).pathname === "/v1/masterdata/params/value" ? paramValue.respond(req) : mockFetchNoDelay(req);
 vi.mock("@/auth/AuthProvider", () => ({
   useAuth: () => ({
     principal: { roles: auth.roles },
-    api: createApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${auth.persona}`, fetch: mockFetchNoDelay }),
+    api: createApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${auth.persona}`, fetch: apiFetch }),
     adminApi: createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => `mock.${auth.persona}`, fetch: mockAdminFetchNoDelay }),
   }),
 }));
@@ -45,11 +51,164 @@ describe("danh mục CNTS — trường thuộc tính (W11.41)", () => {
     expect(validateAttrs(tabOf("cnts_vaccination_schedule"), { doses: "" })).toMatchObject({ model_type: expect.any(String), doses: expect.any(String) });
   });
 
+  it("chỉ tiêu theo dõi (#170): ngưỡng tối thiểu/tối đa là số thập phân không âm có giới hạn, tối thiểu ≤ tối đa", () => {
+    const tab = tabOf("cnts_indicator");
+    expect(tab.fields.map((f) => f.key)).toEqual(expect.arrayContaining(["threshold_min", "threshold_max", "diary_metric"]));
+    for (const bad of ["1e100000", "-1", "1.23456", "12345678", "abc", "9".repeat(5000)]) {
+      expect(validateAttrs(tab, { value_type: "decimal", threshold_min: bad }).threshold_min, bad).toBeTruthy();
+    }
+    expect(validateAttrs(tab, { value_type: "decimal", threshold_min: "33", threshold_max: "32" }).threshold_max).toMatch(/lớn hơn hoặc bằng/);
+    expect(validateAttrs(tab, { value_type: "decimal", threshold_min: "25,5", threshold_max: "32" })).toEqual({});
+    expect(normalizeAttrs(tab, { threshold_min: "25,5" }).threshold_min).toBe("25.5");
+  });
+
+  it("Xuất danh mục (#170): cùng cột với tệp mẫu (nạp lại được) + trạng thái", () => {
+    const tab = tabOf("cnts_indicator");
+    const rows = exportRows(tab, [
+      { code: "PH", name: "pH", attrs: { value_type: "decimal", threshold_min: "7.5", threshold_max: "8.5" }, active: true, valid_from: "2026-10-01" },
+      { code: "CU", name: "Chỉ tiêu cũ", attrs: { value_type: "integer" }, active: false },
+    ]);
+    expect(rows[0]).toEqual([...templateRows(tab)[0]!, "trang_thai"]);
+    expect(rows[1]).toEqual(["cnts_indicator", "PH", "pH", "2026-10-01", "", "decimal", "7.5", "8.5", "", "", "Đang dùng"]);
+    expect(rows[2]!.at(-1)).toBe("Ngừng dùng");
+    expect(effectiveThreshold("7", "7.5")).toEqual({ value: "7", source: "param" });
+    expect(effectiveThreshold(null, "7.5")).toEqual({ value: "7.5", source: "catalog" });
+  });
+
   it("cơ sở giết mổ: bắt buộc xã + loại, mã không trùng GS/GC, không gửi facility_ref", () => {
     const tab = tabOf("cnts_slaughter_facility");
     expect(validateAttrs(tab, {})).toMatchObject({ commune_code: "Bắt buộc nhập.", facility_kind: "Bắt buộc nhập." });
     expect(validateAttrs(tab, { commune_code: "30292", facility_kind: "tap_trung", stamp_codes_gs: "91.1, 91.2", stamp_codes_gc: "91.2" }).stamp_codes_gc).toMatch(/91.2/);
     expect(cleanAttrs({ facility_ref: "x", commune_code: " 30292 ", address: " " })).toEqual({ commune_code: "30292" });
+  });
+});
+
+describe("Xuất danh mục → Nạp lại (#170, review Codex #168)", () => {
+  it("tệp vừa xuất (có valid_from, trang_thai, chỉ tiêu ngưỡng 25–32) nạp lại nguyên vẹn: mọi dòng bỏ qua, không dòng lỗi", async () => {
+    resetCntsVersions();
+    const admin = createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", fetch: mockAdminFetchNoDelay });
+    const tab = tabOf("cnts_indicator");
+    const at = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    // Mô tả gạch đầu dòng và tên bắt đầu bằng @ + = - : nút Xuất (toCsv) thêm dấu nháy chống công thức Excel (review 7e29).
+    const created = [
+      { code: "NHIET_DO_RT", name: "Nhiệt độ ao (xuất-nạp)", description: "- Theo dõi nhiệt độ ao mỗi ngày" },
+      { code: "RT_AT", name: "@Chỉ tiêu nạp lại", description: "+ đo buổi sáng" },
+      { code: "RT_EQ", name: "= Chỉ tiêu bằng", description: "=1+1" },
+      { code: "RT_DASH", name: "- Chỉ tiêu gạch", description: "@ghi chú" },
+    ];
+    for (const c of created) {
+      await unwrap(
+        admin.POST("/v1/masterdata/catalogs/{catalog}/items", {
+          params: { path: { catalog: "cnts_indicator" } },
+          body: { code: c.code, name: c.name, valid_from: at, attrs: { value_type: "decimal", unit: "°C", diary_metric: "temp_c", threshold_min: "25", threshold_max: "32", description: c.description } },
+        } as never),
+      );
+    }
+    const page = await unwrap(
+      admin.GET("/v1/masterdata/catalogs/{catalog}/items", { params: { path: { catalog: "cnts_indicator" }, query: { at, include_inactive: true } } }),
+    );
+    const items = page.items as { code: string; name: string; attrs: Record<string, string>; active: boolean; valid_from?: string | null }[];
+    expect(items.find((i) => i.code === "NHIET_DO_RT")?.attrs.threshold_max).toBe("32");
+    const rows = exportRows(tab, items);
+    expect(rows[0]).toEqual(expect.arrayContaining(["valid_from", "trang_thai"]));
+    expect(rows.find((r) => r[1] === "NHIET_DO_RT")?.[3]).toBe(at);
+    // Đúng hàm nút "Xuất danh mục" dùng (exportCatalogCsv: BOM, CRLF, dấu nháy chống công thức).
+    const file = exportCatalogCsv(tab, items);
+    expect(file.charCodeAt(0)).toBe(0xfeff);
+    for (const cell of ["'- Theo dõi nhiệt độ ao mỗi ngày", "'@Chỉ tiêu nạp lại", "'+ đo buổi sáng", "'= Chỉ tiêu bằng", "'=1+1", "'- Chỉ tiêu gạch", "'@ghi chú"]) {
+      expect(file).toContain(cell);
+    }
+    const res = await unwrap(
+      admin.POST("/v1/masterdata/catalog-imports", {
+        params: { header: { "Idempotency-Key": "rt-170" } },
+        body: file,
+        bodySerializer: (b: unknown) => b as BodyInit,
+        headers: { "Content-Type": "text/csv" },
+      } as never),
+    );
+    expect(items.length).toBeGreaterThanOrEqual(7);
+    expect(res).toMatchObject({ total: items.length, skipped: items.length, created: 0, rejected: 0 });
+    // Dọn mục vừa tạo khỏi dữ liệu giả lập dùng chung để không ảnh hưởng các test màn hình bên dưới.
+    const list = CATALOGS.cnts_indicator;
+    for (const c of created) list.splice(list.findIndex((i) => i.code === c.code), 1);
+    resetCntsVersions();
+  });
+
+  const importCsv = (admin: ReturnType<typeof createAdminApiClient>, file: string, key: string) =>
+    unwrap(
+      admin.POST("/v1/masterdata/catalog-imports", {
+        params: { header: { "Idempotency-Key": key } },
+        body: file,
+        bodySerializer: (b: unknown) => b as BodyInit,
+        headers: { "Content-Type": "text/csv" },
+      } as never),
+    ) as Promise<{ total: number; created: number; skipped: number; rejected: number; rows: { code: string; status: string; reason?: string }[] }>;
+
+  it("bộ đọc CSV giả lập đọc bản ghi logic như máy chủ: ô ngoặc kép có xuống dòng, CRLF trong ô → LF, BOM, dòng trống (review Codex 7058)", () => {
+    expect(parseCsv('﻿a,b\r\n"x\ny","1, ""2"""\r\n\r\n  \r\n"p\r\nq",\n')).toEqual([
+      ["a", "b"],
+      ["x\ny", '1, "2"'],
+      ["p\nq", ""],
+    ]);
+  });
+
+  it("mô tả nhiều dòng (LF, CRLF, gạch đầu dòng) của tệp vừa xuất nạp lại nguyên vẹn; nội dung nhiều dòng khác vẫn bị từ chối (review Codex 7058)", async () => {
+    resetCntsVersions();
+    const admin = createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", fetch: mockAdminFetchNoDelay });
+    const tab = tabOf("cnts_indicator");
+    const at = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    const created = [
+      { code: "RT_ML_LF", description: "Dòng 1\nDòng 2" },
+      { code: "RT_ML_CRLF", description: 'Dòng 1\r\nDòng 2, "trích"' },
+      { code: "RT_ML_DASH", description: "- Dòng 1\nDòng 2" },
+    ];
+    try {
+      for (const c of created) {
+        await unwrap(
+          admin.POST("/v1/masterdata/catalogs/{catalog}/items", {
+            params: { path: { catalog: "cnts_indicator" } },
+            body: { code: c.code, name: `Nhiều dòng ${c.code}`, valid_from: at, attrs: { value_type: "decimal", description: c.description } },
+          } as never),
+        );
+      }
+      const page = await unwrap(
+        admin.GET("/v1/masterdata/catalogs/{catalog}/items", { params: { path: { catalog: "cnts_indicator" }, query: { at, include_inactive: true } } }),
+      );
+      const items = page.items as { code: string; name: string; attrs: Record<string, string>; active: boolean; valid_from?: string | null }[];
+      const file = exportCatalogCsv(tab, items);
+      expect(file).toContain('"Dòng 1\nDòng 2"');
+      expect(file).toContain('"Dòng 1\r\nDòng 2, ""trích"""');
+      expect(file).toContain("\"'- Dòng 1\nDòng 2\"");
+      const res = await importCsv(admin, file, "rt-170-multiline");
+      expect(res).toMatchObject({ total: items.length, skipped: items.length, created: 0, rejected: 0 });
+      const other = await importCsv(admin, 'catalog,code,name,value_type,description\r\ncnts_indicator,RT_ML_LF,Nhiều dòng RT_ML_LF,decimal,"Dòng 1\nDòng 3"\r\n', "rt-170-multiline-diff");
+      expect(other).toMatchObject({ total: 1, rejected: 1, skipped: 0 });
+    } finally {
+      const list = CATALOGS.cnts_indicator;
+      for (const c of created) {
+        const i = list.findIndex((x) => x.code === c.code);
+        if (i >= 0) list.splice(i, 1);
+      }
+      resetCntsVersions();
+    }
+  });
+
+  it("Nạp Excel áp cùng ràng buộc ngưỡng chỉ tiêu như thêm/sửa từng mục: số mũ, chuỗi rất dài, quá chữ số, tối thiểu > tối đa bị từ chối (review Codex 7058)", async () => {
+    const admin = createAdminApiClient({ baseUrl: "http://mock", getAccessToken: () => "mock.setter", fetch: mockAdminFetchNoDelay });
+    const huge = "9".repeat(100_000);
+    const bad: [string, string][] = [["1e100000", "32"], ["25", "1e-100000"], [huge, "32"], ["25", huge], ["32", "25"], ["12345678", ""], ["", "1.23456"], ["-1", "32"]];
+    const head = "catalog,code,name,value_type,unit,threshold_min,threshold_max,diary_metric\r\n";
+    const rows = bad.map(([lo, hi], i) => `cnts_indicator,NGUONG_SAI_${i},Ngưỡng sai ${i},decimal,°C,${lo},${hi},temp_c\r\n`).join("");
+    const ok = "cnts_indicator,NGUONG_DUNG,Ngưỡng đúng,decimal,°C,9999999.9999,9999999.9999,temp_c\r\n";
+    try {
+      const res = await importCsv(admin, head + rows + ok, "rt-170-thresholds");
+      expect(res).toMatchObject({ total: bad.length + 1, rejected: bad.length, created: 1 });
+      for (const r of res.rows.slice(0, bad.length)) expect(r).toMatchObject({ status: "rejected", reason: expect.stringMatching(/^attrs\.threshold_(min|max): /) });
+      expect(CATALOGS.cnts_indicator.some((x) => x.code.startsWith("NGUONG_SAI_"))).toBe(false);
+    } finally {
+      const list = CATALOGS.cnts_indicator;
+      for (let i = list.length - 1; i >= 0; i--) if (list[i]!.code.startsWith("NGUONG_")) list.splice(i, 1);
+    }
   });
 });
 
@@ -62,6 +221,7 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     nav.search = "";
     auth.roles = ["masterdata_admin"];
     auth.persona = "setter";
+    paramValue.respond = null;
   });
 
   it("danh sách không còn pop-up: Thêm, Xem, Sửa là liên kết tới trang riêng; mở đúng tab theo ?tab=", async () => {
@@ -93,13 +253,16 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     render(<CntsCatalogItemFormScreen />);
     expect(screen.getByRole("heading", { level: 1, name: /Thêm cơ sở giết mổ/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Hủy" })).toHaveAttribute("href", "/kn/cnts/danh-muc?tab=cnts_slaughter_facility");
-    await screen.findByLabelText(/Mã xã\/phường\/đặc khu/);
+    const xa = await screen.findByLabelText(/^Xã\/phường\/đặc khu/);
+    expect(xa.tagName).toBe("SELECT"); // chọn từ danh mục ĐVHC, không gõ mã (#169)
     await user.click(screen.getByRole("button", { name: "Lưu" }));
     expect(screen.getAllByRole("alert").filter((a) => a.textContent === "Bắt buộc nhập.").length).toBeGreaterThanOrEqual(4); // Mã, Tên, Xã, Loại cơ sở
     expect(push).not.toHaveBeenCalled();
     await user.type(screen.getByLabelText(/^Mã \*$/), "CS_MOI");
     await user.type(screen.getByLabelText(/^Tên \*$/), "Cơ sở mới");
-    await user.type(screen.getByLabelText(/Mã xã\/phường\/đặc khu/), "30292");
+    await user.selectOptions(await screen.findByLabelText(/Tỉnh\/thành phố của xã/), "91");
+    await waitFor(() => expect(within(screen.getByLabelText(/^Xã\/phường\/đặc khu/)).getByRole("option", { name: "Xã Bình Thạnh (91101)" })).toBeTruthy());
+    await user.selectOptions(screen.getByLabelText(/^Xã\/phường\/đặc khu/), "91101");
     await user.selectOptions(screen.getByLabelText(/Loại cơ sở/), "nho_le");
     await user.type(screen.getByLabelText(/Mã số khắc mộc dấu gia súc \(GS\)/), "91.589.05.1");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
@@ -108,6 +271,36 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     await user.type(screen.getByLabelText(/Mã số khắc mộc dấu gia súc \(GS\)/), "91.600.01");
     await user.click(screen.getByRole("button", { name: "Lưu" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/kn/cnts/danh-muc?tab=cnts_slaughter_facility"));
+  });
+
+  it("CSGM (#169): danh sách có cột riêng Xã (tên), Mã xã, Loại, mộc dấu GS/GC, Loài, Địa chỉ và lọc theo xã", async () => {
+    nav.search = "tab=cnts_slaughter_facility";
+    const user = userEvent.setup();
+    render(<CntsCatalogScreen />);
+    expect(await screen.findByText("Cơ sở giết mổ tập trung mẫu số 2 (giả lập)")).toBeTruthy();
+    for (const h of ["Xã", "Mã xã", "Loại", "Mộc dấu GS", "Mộc dấu GC", "Loài", "Địa chỉ", "Trạng thái"]) expect(screen.getByRole("columnheader", { name: h })).toBeTruthy();
+    const row = screen.getByText("Cơ sở giết mổ tập trung mẫu số 2 (giả lập)").closest("tr")!;
+    expect(await within(row).findByText("Xã Bình Thạnh")).toBeTruthy();
+    expect(within(row).getByText("91101")).toBeTruthy();
+    expect(within(row).getByText("91.900.21")).toBeTruthy();
+    expect(within(row).getByText("91.900.22")).toBeTruthy();
+    expect(within(row).getByText("Ấp Mẫu 2")).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText("Lọc theo xã"), "91102");
+    expect(screen.queryByText("Cơ sở giết mổ tập trung mẫu số 2 (giả lập)")).toBeNull();
+    expect(screen.getByText("Cơ sở giết mổ nhỏ lẻ mẫu số 3 (giả lập)")).toBeTruthy();
+  });
+
+  it("CSGM (#169): trang chi tiết hiện tên và mã xã; máy chủ (mock) từ chối mã xã không có trong ĐVHC", async () => {
+    nav.path = "/kn/cnts/danh-muc/cnts_slaughter_facility/CSGM_MAU_03";
+    nav.params = { type: "cnts_slaughter_facility", code: "CSGM_MAU_03" };
+    render(<CntsCatalogItemScreen />);
+    expect(await screen.findByText("Xã An Phước (91102)")).toBeTruthy();
+    const r = await admin().POST("/v1/masterdata/catalogs/{catalog}/items", {
+      params: { path: { catalog: "cnts_slaughter_facility" }, header: { "Idempotency-Key": "csgm-xa-la" } },
+      body: { code: "CS_XA_LA", name: "Cơ sở xã lạ", attrs: { commune_code: "99999", facility_kind: "nho_le" } },
+    });
+    expect(r.response.status).toBe(422);
+    expect((r.error as { code?: string }).code).toBe("masterdata.cnts_commune_invalid");
   });
 
   it("Vật nuôi: Thứ tự cột âm / thập phân / quá 999 bị chặn (R-A1), không gọi API", async () => {
@@ -215,6 +408,79 @@ describe("màn Danh mục CNTS (mock theo hợp đồng /v1/masterdata/catalogs/
     const h = await screen.findByRole("heading", { level: 1, name: new RegExp(cur.name) });
     expect(h).not.toHaveTextContent("2099");
     expect(screen.getByRole("link", { name: "Sửa" })).toHaveAttribute("href", "/kn/cnts/danh-muc/cnts_species/TRAU/sua");
+  });
+
+  it("#170: tab Ngưỡng mặc định sinh từ danh mục chỉ tiêu — chỉ tiêu mới có ngưỡng hiện ngay; nút Xuất danh mục", async () => {
+    await unwrap(
+      admin().POST("/v1/masterdata/catalogs/{catalog}/items", {
+        params: { path: { catalog: "cnts_indicator" }, header: { "Idempotency-Key": "ind-170" } },
+        body: { code: "NHIET_DO_AO", name: "Nhiệt độ nước ao", attrs: { value_type: "decimal", unit: "°C", threshold_min: "25", threshold_max: "32", diary_metric: "temp_c" } },
+      }),
+    );
+    const bad = await admin().POST("/v1/masterdata/catalogs/{catalog}/items", {
+      params: { path: { catalog: "cnts_indicator" }, header: { "Idempotency-Key": "ind-170-bad" } },
+      body: { code: "XAU", name: "Ngưỡng hỏng", attrs: { value_type: "decimal", threshold_min: "1e100000" } },
+    });
+    expect(bad.response.status).toBe(422);
+    const user = userEvent.setup();
+    nav.search = "tab=cnts_indicator";
+    render(<CntsCatalogScreen />);
+    expect(await screen.findByText("Nhiệt độ nước ao")).toBeTruthy();
+    for (const h of ["Ngưỡng tối thiểu", "Ngưỡng tối đa", "Chỉ số nhật ký"]) expect(screen.getByRole("columnheader", { name: h })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Xuất danh mục/ })).toBeEnabled();
+    await user.click(screen.getByRole("tab", { name: "Ngưỡng mặc định" }));
+    const table = await screen.findByRole("table", { name: "Ngưỡng theo chỉ tiêu theo dõi" });
+    expect(await within(table).findAllByText("Nhiệt độ nước ao (NHIET_DO_AO)")).toHaveLength(2);
+    expect(within(table).getByText("32 °C")).toBeTruthy();
+    expect(within(table).getByText("cnts.indicator_max:NHIET_DO_AO")).toBeTruthy();
+    expect(within(table).getAllByText("Ngưỡng mặc định của danh mục").length).toBeGreaterThanOrEqual(2);
+  });
+
+  describe("review #170 (11e2171d): ngưỡng danh mục chỉ thay thế khi API báo chưa có tham số", () => {
+    const problemResponse = (status: number, code: string) => () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ type: "about:blank", title: "", status, code, detail: "review #170" }), {
+          status,
+          headers: { "Content-Type": "application/problem+json" },
+        }),
+      );
+    const openThresholds = async () => {
+      const user = userEvent.setup();
+      render(<CntsCatalogScreen />);
+      expect(await screen.findByText("Heo")).toBeTruthy();
+      await user.click(screen.getByRole("tab", { name: "Ngưỡng mặc định" }));
+      return screen.getByRole("region", { name: "Ngưỡng theo chỉ tiêu theo dõi" });
+    };
+
+    it("404 masterdata.param_not_found: dùng ngưỡng mặc định của danh mục, ghi rõ nguồn", async () => {
+      paramValue.respond = problemResponse(404, "masterdata.param_not_found");
+      const region = await openThresholds();
+      const table = await within(region).findByRole("table", { name: "Ngưỡng theo chỉ tiêu theo dõi" });
+      expect(within(table).getAllByText("Ngưỡng mặc định của danh mục").length).toBeGreaterThan(0);
+      expect(within(region).queryByRole("alert")).toBeNull();
+      expect(within(region).queryByText(/Không xác định được ngưỡng/)).toBeNull();
+    });
+
+    it.each([
+      ["503 extension.dependency_unavailable", problemResponse(503, "extension.dependency_unavailable"), "extension.dependency_unavailable"],
+      ["403 forbidden", problemResponse(403, "forbidden"), "forbidden"],
+      ["404 không phải param_not_found", problemResponse(404, "not_found"), "not_found"],
+      ["lỗi mạng", () => Promise.reject(new TypeError("Failed to fetch")), "network_error"],
+    ] as const)("%s: không trình bày ngưỡng danh mục như ngưỡng hiệu lực, hiện lỗi + Thử lại", async (_name, respond, code) => {
+      paramValue.respond = respond;
+      const region = await openThresholds();
+      const alert = await within(region).findByRole("alert");
+      expect(within(alert).getByText(code)).toBeTruthy();
+      expect(within(region).getByText("Không xác định được ngưỡng hiệu lực theo chỉ tiêu.")).toBeTruthy();
+      expect(within(region).queryByRole("table")).toBeNull();
+      expect(within(region).queryByText("Ngưỡng mặc định của danh mục")).toBeNull();
+      // Thử lại khi API hồi phục (404 xác nhận chưa có tham số) → mới hiện ngưỡng danh mục.
+      paramValue.respond = problemResponse(404, "masterdata.param_not_found");
+      await userEvent.setup().click(within(alert).getByRole("button", { name: "Thử lại" }));
+      const table = await within(region).findByRole("table", { name: "Ngưỡng theo chỉ tiêu theo dõi" });
+      expect(within(table).getAllByText("Ngưỡng mặc định của danh mục").length).toBeGreaterThan(0);
+      expect(within(region).queryByText(/Không xác định được ngưỡng/)).toBeNull();
+    });
   });
 
   it("gốc route danh mục cho cả Phòng CNTS và Admin › Phòng ban", () => {

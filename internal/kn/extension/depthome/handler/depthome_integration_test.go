@@ -436,3 +436,56 @@ func TestFN17_DeptHome(t *testing.T) {
 		}
 	}
 }
+
+// insHousehold ghi một phiên bản hộ chăn nuôi thẳng vào sổ (pf 20261106164138, như dịch vụ #251 ghi) — dữ liệu cho thẻ trang chủ.
+func (f *fix) insHousehold(ref uuid.UUID, code, event, status, typ string) {
+	f.t.Helper()
+	var checkin *uuid.UUID
+	if status == "active" {
+		c := ids.New()
+		checkin = &c
+	}
+	var reason *string
+	if event == "deactivated" {
+		r := "Hộ ngừng chăn nuôi"
+		reason = &r
+	}
+	if _, err := f.pool.Exec(context.Background(), `INSERT INTO pf_extension.cnts_livestock_household (id, tenant_id, stream_key,
+	    household_ref, code, event, status, commune_code, person_ref, livestock_type, species_codes, head_counts, checkin_ref, reason,
+	    event_time, actor_ref, idem_key, rule_version)
+	  VALUES ($1, $2, 'lhh:' || $3::uuid::text, $3::uuid, $4, $5, $6, '30001', $7, $8, '{heo}', '{10}', $9, $10, now(), $7, $11, 'kn.cnts.livestock_household/v1')`,
+		ids.New(), f.tenant, ref, code, event, status, ids.New(), typ, checkin, reason, "t-"+ids.New().String()); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+// CNTS-V4-BM11-TYPES (#253): trang chủ Phòng CNTS có thẻ số hộ chăn nuôi, số trang trại — đếm hộ Đang dùng (bản hiện hành)
+// của danh sách hộ chăn nuôi; hộ Chờ bổ sung vị trí, Vô hiệu hóa không tính; hộ đổi loại tính theo loại hiện hành.
+func TestFN17_LivestockCounts_253(t *testing.T) {
+	f := newFix(t)
+	vc := f.user(tinh(cnts, false))
+	a, b, c, d, e := ids.New(), ids.New(), ids.New(), ids.New(), ids.New()
+	f.insHousehold(a, "HCN0000001", "created", "active", "nong_ho")
+	f.insHousehold(b, "HCN0000002", "created", "active", "trang_trai_nho")
+	f.insHousehold(c, "HCN0000003", "created", "active", "trang_trai_vua")
+	f.insHousehold(c, "HCN0000003", "deactivated", "deactivated", "trang_trai_vua")
+	f.insHousehold(d, "HCN0000004", "created_pending", "pending_location", "trang_trai_cong_nghiep")
+	f.insHousehold(e, "HCN0000005", "created", "active", "nong_ho")
+	f.insHousehold(e, "HCN0000005", "updated", "active", "trang_trai_cong_nghiep")
+
+	h := want(t, vc.get("/v1/extension/dept-home"), 200, "", "trang chủ CNTS")
+	got := map[string]string{}
+	for _, k := range list(h, "kpis") {
+		m := k.(map[string]any)
+		got[str(m, "key")] = num(m, "value")
+	}
+	if got["livestock_households"] != "3" || got["livestock_farms"] != "2" {
+		t.Fatalf("thẻ hộ chăn nuôi = 3 (A, B, E), trang trại = 2 (B, E): %v", got)
+	}
+	r := want(t, f.user(tinh(khtc, false)).get("/v1/extension/dept-home"), 200, "", "trang chủ KHTC")
+	for _, k := range list(r, "kpis") {
+		if strings.HasPrefix(str(k.(map[string]any), "key"), "livestock_") {
+			t.Fatalf("phòng khác không có thẻ hộ chăn nuôi: %v", r)
+		}
+	}
+}

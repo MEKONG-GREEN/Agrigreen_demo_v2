@@ -4,6 +4,7 @@ package handler
 import (
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -28,6 +29,8 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	rg.GET("/kn/materials", h.list)
 	rg.GET("/kn/materials/summary", h.summary)
 	rg.POST("/kn/materials", h.record)
+	httpx.AllowBody(rg, http.MethodPost, "/kn/materials/import", app.MaxImportBytes+1024)
+	rg.POST("/kn/materials/import", h.importFile)
 	rg.POST("/kn/materials/:id/correct", h.correct)
 	rg.GET("/kn/materials/:id/log", h.log)
 }
@@ -95,6 +98,27 @@ func (h Handler) record(c *gin.Context) {
 		status = http.StatusOK
 	}
 	c.JSON(status, gin.H{"items": dtos(items)})
+}
+
+// importFile: BF-TT-MAT "Nạp Excel" — đọc tệp CSV/.xlsx thành dòng của bảng nhập, không ghi sổ.
+func (h Handler) importFile(c *gin.Context) {
+	res, err := h.Svc.ParseImport(c.Request.Context(), io.LimitReader(c.Request.Body, app.MaxImportBytes+1))
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	opt := func(s string) any {
+		if s == "" {
+			return nil
+		}
+		return s
+	}
+	lines := make([]gin.H, 0, len(res.Lines))
+	for _, l := range res.Lines {
+		lines = append(lines, gin.H{"row": l.Row, "material_code": opt(l.MaterialCode), "material_name": opt(l.MaterialName), "unit": opt(l.Unit),
+			"quantity": opt(l.Quantity), "recorded_on": opt(l.RecordedOn), "note": opt(l.Note), "status": l.Status, "reason": opt(l.Reason)})
+	}
+	c.JSON(http.StatusOK, gin.H{"lines": lines, "accepted": res.Accepted, "rejected": res.Rejected})
 }
 
 type correctReq struct {

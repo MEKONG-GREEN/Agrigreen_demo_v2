@@ -36,6 +36,8 @@ func (h Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/subjects/lookup", h.lookup)
 	// W11.23: thẻ danh bạ theo lô (pf/contact) — POST vì thân mang danh sách ref; phản hồi no-store, không qua Idem.
 	rg.POST("/subjects/cards", h.cards)
+	// #251: nhãn che bớt của bản sửa họ tên/SĐT theo lô — phản hồi no-store, không qua Idem.
+	rg.POST("/subjects/revisions", h.revisions)
 	rg.GET("/subjects/:ref/display", h.display)
 	rg.POST("/subjects/:ref/resolve", h.resolve)
 	rg.POST("/subjects/:ref/unwrap", h.unwrap)
@@ -254,12 +256,13 @@ func (h Handler) amend(c *gin.Context) {
 	if !bind(c, &req) {
 		return
 	}
-	if err := h.Svc.Amend(c.Request.Context(), purposeOf(c, req.Purpose), ref,
-		client.Identity{FullName: req.FullName, Phone: req.Phone, Address: req.Address}); err != nil {
+	rev, err := h.Svc.AmendRevision(c.Request.Context(), purposeOf(c, req.Purpose), ref,
+		client.Identity{FullName: req.FullName, Phone: req.Phone, Address: req.Address})
+	if err != nil {
 		httpx.Fail(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, client.WriteResponse{Ref: ref.String()})
+	c.JSON(http.StatusOK, client.WriteResponse{Ref: ref.String(), RevisionRef: rev.String()})
 }
 
 func (h Handler) putSection(c *gin.Context) {
@@ -327,4 +330,36 @@ func (h Handler) cards(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, client.CardsResponse{Items: items})
+}
+
+func (h Handler) revisions(c *gin.Context) {
+	var req client.RevisionsRequest
+	if !bind(c, &req) {
+		return
+	}
+	if len(req.Refs) > client.MaxRevisionRefs {
+		httpx.Fail(c, problem.Validation.WithField("refs", "tối đa 200 bản sửa mỗi lần"))
+		return
+	}
+	refs := make([]uuid.UUID, 0, len(req.Refs))
+	for _, r := range req.Refs {
+		ref, err := uuid.Parse(r)
+		if err != nil {
+			httpx.Fail(c, problem.Validation.WithField("refs", "mã tham chiếu không hợp lệ"))
+			return
+		}
+		refs = append(refs, ref)
+	}
+	out, err := h.Svc.Revisions(c.Request.Context(), purposeOf(c, req.Purpose), refs)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	items := make([]client.RevisionItem, 0, len(out))
+	for _, x := range out {
+		items = append(items, client.RevisionItem{Ref: x.Ref.String(), SubjectRef: x.SubjectRef.String(), PrevLabel: x.PrevLabel,
+			NextLabel: x.NextLabel, PrevPhone: x.PrevPhone, NextPhone: x.NextPhone})
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, client.RevisionsResponse{Items: items})
 }

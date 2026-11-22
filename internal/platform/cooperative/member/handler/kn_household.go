@@ -1,31 +1,24 @@
 package handler
 
 // HTTP nông hộ của KN v7.7 FN-XA-03.03 (hợp đồng P7 §1). Application API, bắt buộc header X-AG-Context (ngữ cảnh
-// phiên P1): GET|POST /v1/kn/cooperatives/{ref}/households, PUT /v1/kn/households/{ref},
+// phiên P1): GET /v1/kn/cooperatives/{ref}/households,
 // GET /v1/kn/households/{ref}/log. Phần HTX của màn ở pf/party.
 
 import (
-	"bytes"
-	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/cooperative/member/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 )
 
 // registerKN gắn route nông hộ của FN-XA-03.03 vào nhóm Application API (bắt buộc header X-AG-Context).
 func (h Handler) registerKN(rg *gin.RouterGroup) {
 	g := rg.Group("/kn")
 	g.GET("/cooperatives/:ref/households", h.knListHouseholds)
-	g.POST("/cooperatives/:ref/households", h.knCreateHousehold)
-	g.PUT("/households/:ref", h.knUpdateHousehold)
 	g.GET("/households/:ref/log", h.knHouseholdLog)
 }
 
@@ -73,48 +66,6 @@ func toKNHouseholdDTO(h app.KNHousehold) knHouseholdDTO {
 // Tiện ích
 // ---------------------------------------------------------------------------
 
-// decimalText đọc trường số thập phân gửi dạng chuỗi hoặc số JSON. nil = không gửi; "" = null (xóa).
-func decimalText(f *fieldErrs, field string, raw json.RawMessage) *string {
-	if raw == nil {
-		return nil
-	}
-	t := bytes.TrimSpace(raw)
-	empty := ""
-	if bytes.Equal(t, []byte("null")) {
-		return &empty
-	}
-	var s string
-	if len(t) > 0 && t[0] == '"' {
-		if err := json.Unmarshal(t, &s); err != nil {
-			f.add(field, "phải là số thập phân")
-			return nil
-		}
-	} else {
-		s = string(t)
-	}
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return &empty
-	}
-	if _, err := decimal.NewFromString(s); err != nil {
-		f.add(field, "phải là số thập phân")
-		return nil
-	}
-	return &s
-}
-
-func decimalValue(f *fieldErrs, field string, raw json.RawMessage) *decimal.Decimal {
-	s := decimalText(f, field, raw)
-	if s == nil || *s == "" {
-		return nil
-	}
-	d, _ := decimal.NewFromString(*s)
-	return &d
-}
-
-// putKey là Idempotency-Key của PUT (middleware chỉ áp cho POST — app chống lặp bằng idem_key của sổ).
-func putKey(c *gin.Context) string { return strings.TrimSpace(c.GetHeader("Idempotency-Key")) }
-
 func writeKNLog(c *gin.Context, pg app.KNLogPage, err error) {
 	if err != nil {
 		httpx.Fail(c, err)
@@ -155,73 +106,6 @@ func (h Handler) knListHouseholds(c *gin.Context) {
 		items = append(items, toKNHouseholdDTO(it))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "next_cursor": encodeCursor(pg.Next)})
-}
-
-type knCreateHouseholdReq struct {
-	FullName         string          `json:"full_name" pii:"true"`
-	Phone            string          `json:"phone" pii:"true"`
-	CultivatedAreaHa json.RawMessage `json:"cultivated_area_ha"`
-}
-
-func (h Handler) knCreateHousehold(c *gin.Context) {
-	ref, ok := pathRef(c)
-	if !ok {
-		return
-	}
-	var req knCreateHouseholdReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	var fe fieldErrs
-	area := decimalValue(&fe, "cultivated_area_ha", req.CultivatedAreaHa)
-	if strings.TrimSpace(req.FullName) == "" {
-		fe.add("full_name", "bắt buộc")
-	}
-	if strings.TrimSpace(req.Phone) == "" {
-		fe.add("phone", "bắt buộc")
-	}
-	if fe.fail(c) {
-		return
-	}
-	out, err := h.Svc.CreateKNHousehold(c.Request.Context(), app.KNCreateHouseholdInput{
-		CooperativeRef: ref, FullName: req.FullName, Phone: req.Phone, CultivatedAreaHa: area,
-	})
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusCreated, toKNHouseholdDTO(out))
-}
-
-type knUpdateHouseholdReq struct {
-	CultivatedAreaHa json.RawMessage `json:"cultivated_area_ha"`
-	Reason           string          `json:"reason"`
-}
-
-func (h Handler) knUpdateHousehold(c *gin.Context) {
-	ref, ok := householdRef(c)
-	if !ok {
-		return
-	}
-	var req knUpdateHouseholdReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	var fe fieldErrs
-	area := decimalText(&fe, "cultivated_area_ha", req.CultivatedAreaHa)
-	if fe.fail(c) {
-		return
-	}
-	if area == nil {
-		httpx.Fail(c, problem.Validation.WithField("cultivated_area_ha", "bắt buộc (null = xóa giá trị)"))
-		return
-	}
-	out, err := h.Svc.UpdateKNHousehold(c.Request.Context(), ref, area, req.Reason, putKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toKNHouseholdDTO(out))
 }
 
 func (h Handler) knHouseholdLog(c *gin.Context) {

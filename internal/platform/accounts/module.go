@@ -46,6 +46,8 @@ type Deps struct {
 	SessionPolicies port.SessionPolicies // trusted application-owned request projections
 	// AssignmentRules validates normalized values without replacing native scope checks.
 	AssignmentRules port.AssignmentRules `json:"-"`
+	// UnitDelegations supplies trusted owner definitions and selected-session decisions.
+	UnitDelegations port.UnitDelegationPolicy `json:"-"`
 	// Sessions contains trusted application-owned projections for selected requests.
 	Sessions *authz.SessionRegistry
 	// Directory: Keycloak Admin REST. Nil → mọi route trả 503 accounts.dependency_unavailable.
@@ -90,10 +92,18 @@ func New(db tenant.Beginner, clk clock.Clock, d Deps) *Module {
 	if !d.Roles.Valid() {
 		panic("accounts: invalid role catalog configuration")
 	}
+	if d.UnitDelegations != nil {
+		if err := port.ValidateInternalUnitDefinition(d.UnitDelegations.InternalUnitDefinition()); err != nil {
+			panic(err)
+		}
+		if err := port.ValidateDelegationDefinition(d.UnitDelegations.DelegationDefinition()); err != nil {
+			panic(err)
+		}
+	}
 	db = forModule(db)
 	return &Module{svc: &app.Service{Attributes: catalog, DB: db, Clock: clk, Dir: d.Directory, Scope: d.Scope, Orgs: d.Orgs, Navigation: d.Navigation, Roles: d.Roles, AssignmentRules: d.AssignmentRules,
 		Households: d.Households, Vault: d.Vault, Params: d.Params, SessionPolicies: d.SessionPolicies, Departments: d.Departments, Units: d.Units, Names: d.Names,
-		Modules: d.Modules, DormantDryRun: d.DormantDryRun}, sessions: d.Sessions}
+		Modules: d.Modules, DormantDryRun: d.DormantDryRun, UnitDelegations: d.UnitDelegations}, sessions: d.Sessions}
 }
 
 // RegisterApp gắn route Application API của App HTX: tài khoản nông dân (quản lý
@@ -110,6 +120,18 @@ func (m *Module) FarmerHouseholds() port.FarmerHouseholds { return m.svc }
 
 // FarmerAccounts cho gốc lắp ráp: tài khoản nông dân của các nông hộ (cảnh báo khẩn theo địa bàn).
 func (m *Module) FarmerAccounts() port.FarmerAccounts { return m.svc }
+
+// RegisterPublic gắn route công khai (không đăng nhập) của Application API: tự đặt lại mật khẩu qua email (#255).
+func (m *Module) RegisterPublic(rg *gin.RouterGroup) { handler.Handler{Svc: m.svc}.RegisterPublic(rg) }
+
+// PasswordResetHandler gửi email liên kết đặt lại mật khẩu (consumer port.PasswordResetConsumer ở cmd/worker; bỏ giao
+// dịch của inbox — gửi SMTP ngoài giao dịch, ADR-0057).
+func (m *Module) PasswordResetHandler() inbox.Handler { return m.svc.HandlePasswordResetRequested }
+
+// UsePasswordReset nối kênh email, URL trang đặt lại (AG_WEB_OPS_URL) và nhật ký cho consumer đặt lại mật khẩu.
+func (m *Module) UsePasswordReset(mailer app.ResetMailer, resetURL string, log *slog.Logger) {
+	m.svc.ResetMailer, m.svc.ResetURL, m.svc.Log = mailer, resetURL, log
+}
 
 // RegisterAdmin gắn route Admin API (MFA bắt buộc ở router).
 func (m *Module) RegisterAdmin(rg *gin.RouterGroup) {
@@ -152,6 +174,9 @@ func (m *Module) RoleHolders() port.RoleHolders { return m.svc }
 
 // ScopedDutyHolders provides a read-only recipient query restricted to one issuer node.
 func (m *Module) ScopedDutyHolders() port.ScopedDutyHolders { return app.ScopedDutyReader{Svc: m.svc} }
+
+// UnitManagers provides a read-only leader query per internal unit at one owning node (NOTIFY-HCTH #48).
+func (m *Module) UnitManagers() port.UnitManagers { return app.UnitManagerReader{Svc: m.svc} }
 
 // XaScopes (W11.46) cho lịch trực KSGM BM-03 của pf/extension: cán bộ Cấp Xã của phòng ban kèm xã phụ trách, giới hạn
 // cơ sở/hộ (tenant tường minh).

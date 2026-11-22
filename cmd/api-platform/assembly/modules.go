@@ -162,13 +162,20 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		store = s
 	}
 
-	md := masterdata.New(unit, clk, masterdata.Deps{Params: []mdport.ParamRegistration{extension.MasterdataParams()}, Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
+	md := masterdata.New(unit, clk, masterdata.Deps{Params: masterdataParamRegistrations(), Catalogs: []mdport.CatalogRegistration{extension.MasterdataCatalogs()}})
 
-	navigationPolicy, err := extension.NavigationPolicy()
+	// KNSPLIT-2-MENU-PARITY (#122): cây menu KN do ứng dụng sở hữu (#76) thay bảng compatibility của pf/party.
+	// Mỗi module thành viên giữ nguồn của mình; NavigationPolicy của catalog giải alias bộ menu nên thay
+	// extension.NavigationPolicy() (chỉ dành cho đường compatibility). Parity: tests/kn77/menu_parity_integration_test.go.
+	menuCatalog, err := extension.MenuCatalog(hrm.MenuSource(), price.MenuSource(), contact.MenuSource())
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault, NavigationPolicy: navigationPolicy})
+	menus, err := menuCatalog.Registry()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	pty := party.New(unit, clk, party.Deps{AdminUnits: md.AdminUnits(), Vault: ext.Vault, Menus: menus, NavigationPolicy: menuCatalog.NavigationPolicy()})
 	wf := wireWorkflow(unit, clk, md, pty) // W6.1: cap/workflow cho duyệt tham số, cấp quyền (r_workflow, W2.6: cùng pool đơn vị)
 
 	g := geo.New(unit, clk, geo.Deps{Scope: pty.ScopeResolver(), Params: md.Params(), AdminUnits: md.AdminUnits()})
@@ -196,9 +203,10 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	knUnits := extension.NewPublishedAdminUnits(unit)
 	knOrgs := extension.NewPublishedOrganizations(unit)
 	kn := extension.New(unit, clk, extension.Deps{Scope: pty.ScopeResolver(), Orgs: knOrgs, Units: knUnits, Params: md.Params(), Catalogs: md.Catalogs(),
-		Plots: knHTXData, Coops: knHTXData})
-	md.UseStaffDirectory(kn.StaffNames()) // G-07: tên người đặt/duyệt tham số
-	pty.UseActorNames(kn.StaffNames())    // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
+		Plots: knHTXData, Coops: knHTXData, Store: store})
+	md.UseStaffDirectory(kn.StaffNames())        // G-07: tên người đặt/duyệt tham số
+	pty.UseActorNames(kn.StaffNames())           // KN v7.7 P2: tên người thao tác trong Log phòng ban/khu vực
+	kn.UseDepartmentAdmin(pty.DepartmentAdmin()) // KNSPLIT-2 #118: /v1/departments* do chủ KN đăng ký, dữ liệu ở pf/party
 
 	// PFPUB/D2 (ADR-0053 §8): nhãn "Chưa xác nhận" của dòng HTX trong số đã chốt cho KHTC.
 	kn.UseHTXConfirmations(knHTXData)
@@ -219,7 +227,6 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	coop.UseSharing(pty.PartnerAccess())
 	cc.UseSharing(pty.PartnerAccess(), pty.ValveGrants())
 	mrvMod.UseValveGrants(pty.ValveGrants())
-	kn.UseGpsLog(g.GpsLog()) // HTX US-GPS-03: log GPS yêu cầu hỗ trợ (pf.extension.gps_log)
 
 	cntsCatalogs := extension.NewCNTSCatalogs(md.EffectiveCatalogs(), clk)
 	kn.UseCNTSCatalogs(cntsCatalogs) // W11.49: bệnh, vật nuôi của Báo cáo dịch bệnh BM-10 (danh mục CNTS theo ngày)
@@ -228,7 +235,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	// dùng cổng thiết bị độc lập (syncmod.NewDevices) để không vòng phụ thuộc. API chỉ
 	// xếp lần gửi đẩy; gửi thật ở consumer pf.notify.push của worker.
 	nt := notify.New(unit, clk, notify.Deps{
-		Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Kinds: NotificationKinds(), Digests: NotificationDigests(), Builders: NotificationBuilders(nil, kn.Staff(), knUnits),
+		Consumers: NotificationConsumers(), Renderers: NotificationRenderers(), Kinds: NotificationKinds(), Digests: NotificationDigests(), Builders: NotificationBuilders(nil, kn.Staff(), knUnits, nil),
 		Scope: pty.ScopeResolver(), Devices: syncmod.NewDevices(unit), Staff: kn.Staff(), Units: md.AdminUnits(),
 	})
 
@@ -251,8 +258,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 		Scope: pty.ScopeResolver(), Params: md.Params(), Vault: ext.Vault,
 		Files: ev.Files(), CursorKey: cursorKey(ext),
 		Sources: append([]syncport.Source{md.SyncSource(), cnt.SyncSource(), kn.SyncSource(), nt.SyncSource(), mrvMod.SyncSource(), cc.SyncSource(),
-			kn.ReportSyncSource(), fm.SyncSource()}, coop.SyncSources()...), // KN v7.7 P7: report_task, form_layout, report_submission (Cấp Xã ngoại tuyến); W11.42 forms_task
-		Sinks: append([]syncport.Sink{kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink(), kn.ReportSyncSink(), fm.SyncSink()},
+			kn.ReportSyncSource(), fm.SyncSource(), kn.KNPlotSyncSource()}, coop.SyncSources()...), // KN v7.7 P7: report_task, form_layout, report_submission (Cấp Xã ngoại tuyến); W11.42 forms_task
+		Sinks: append([]syncport.Sink{kn.SyncSink(), mrvMod.SyncSink(), pty.SyncSink(), cc.SyncSink(), kn.ReportSyncSink(), fm.SyncSink(), kn.KNPlotSyncSink()},
 			coop.SyncSinks()...),
 	})
 	nt.UseSyncEntities(snc.PullEntities())               // KN US-SYNC-02: kiểm entities[] của nudge
@@ -264,17 +271,40 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 			return Modules{}, pools, err
 		}
 	}
-	sessionRegistry, err := authz.NewSessionRegistry(extension.SessionProjection())
+	// #49/#71: phiên chủ KN của module (kèm phạm vi quyền CNTS FN-14 hiện hành từ sổ cnts_grant) thay phép chiếu tĩnh.
+	sessionRegistry, err := authz.NewSessionRegistry(kn.SessionProjection())
 	if err != nil {
 		return Modules{}, pools, err
 	}
-	acc := accounts.New(unit, clk, accounts.Deps{Sessions: sessionRegistry, Navigation: pty.ContextNavigation(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+	// #52: owner snapshots are configured explicitly; invalid trusted declarations stop startup.
+	accountAttributes, err := extension.AttributeCatalog()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	accountRoles, err := AccountRoleCatalog()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	accountUnitDelegations, err := extension.UnitDelegationPolicy()
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	acc := accounts.New(unit, clk, accounts.Deps{Roles: accountRoles, Attributes: accountAttributes, AssignmentRules: extension.AssignmentRules(), UnitDelegations: accountUnitDelegations, Sessions: sessionRegistry, Navigation: pty.ContextNavigation(), Directory: dir, Scope: pty.ScopeResolver(), Orgs: pty.Orgs(),
+		SessionPolicies: extension.AccountSessionPolicies(pty.Departments()), // #60: nhật ký hỗ trợ + đơn vị mặc định do chủ KN chiếu
+
 		Households: coop.PartyHouseholds(), Vault: ext.Vault, Params: md.Params(),
 		Departments: pty.Departments(), Units: md.AdminUnits(), Names: kn.StaffNames(), // KN v7.7 P1
 		Modules: pty.ModuleEnablement()}) // W1.4: vai của module đã tắt không cấp được
 	// KN v7.7 P1 ↔ P2: menu theo ngữ cảnh phiên, số tài khoản theo phòng ban (mở khóa "xóa" phòng ban),
 	// dòng tài khoản của bảng Ảnh hưởng, tên người thao tác trong Log (Keycloak, dự phòng danh bạ cán bộ).
 	acc.UseFacilityCatalog(cntsCatalogs) // W11.41: phạm vi Cấp Xã theo cơ sở giết mổ của danh mục CNTS
+	// AUDIT-LOG-KN (#73): nhật ký hệ thống GET /v1/accounts/audit — nguồn gốc account_event + nguồn KN; chỉ phiên Admin KN
+	// xem, mỗi lượt xem/bị từ chối ghi bền vào sổ pf_extension.kn_audit_view trước khi trả dữ liệu.
+	auditRegistry, err := accport.NewAuditRegistry(append([]accport.AuditSource{acc.NativeAuditSource()}, kn.AuditSources()...)...)
+	if err != nil {
+		return Modules{}, pools, err
+	}
+	acc.UseAudit(auditRegistry, kn.AuditAccess())
 	pty.UseSessionContext(acc.SessionContext())
 	pty.UseDepartmentUsage(acc.DepartmentUsage())
 	pty.UseOrgImpact(acc.OrgImpact())
@@ -284,9 +314,8 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	if c := acc.StaffContacts(); c != nil {
 		kn.UseContacts(c) // US-DIR-02: số điện thoại cán bộ đọc từ Keycloak lúc bấm liên hệ
 	}
-	kn.UseFarmers(acc.FarmerHouseholds())                                                         // HTX US-SUPPORT-01: nông hộ của tài khoản nông dân
 	snc.UseFarmers(acc.FarmerHouseholds())                                                        // App HTX: pull của nông dân theo nông hộ liên kết
-	coop.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()})                            // HTX US-SEASON-01: thửa của nông hộ mình
+	coop.UseFarmerHouseholds(farmerHouseholds{acc.FarmerHouseholds()})                            // HTX US-SEASON-01, US-SUPPORT-01 (#313): nông hộ của nông dân
 	g.UseFarmers(farmerHouseholds{acc.FarmerHouseholds()})                                        // HTX US-GPS-03: nông dân đọc log GPS của mình
 	nt.UseAreaFarmers(AreaFarmers{Households: coop.Households(), Accounts: acc.FarmerAccounts()}) // HTX US-NEWS-03
 
@@ -337,7 +366,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	ct.UseStaff(KNContactStaff{Dir: hr.Directory()}, KNContactLabels{Units: acc.InternalUnits(), AdminUnits: knUnits})
 	kn.UseContactNames(ct.Names())
 	// W10.17: cap/export — Word KHTC Mẫu 1–5 (mẫu có phiên bản, lần xuất có băm, số văn bản {n}/BC-TTKN).
-	exp, err := wireExport(unit, clk, kn)
+	exp, err := wireExport(unit, clk, kn, hr)
 	if err != nil {
 		return Modules{}, pools, err
 	}
@@ -350,6 +379,7 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	pty.UseDepartmentUsage(mech.DepartmentUsage())
 	pty.UseDepartmentUsage(coop.DepartmentUsage())
 	pty.UseFormAvailability(rep.FormAvailability())
+	menuCatalog.UseFormAvailability(rep.FormAvailability()) // #122: cùng nguồn P3 cho mục "Báo cáo đột xuất" của cây KN
 	md.UseFormUsage(rep.FormUsage())
 	kn.UseTablePDF(rep.TablePDF()) // KN v7.7 P5: "Xuất PDF" lịch công tác
 	pr.UseTablePDF(rep.TablePDF()) // W11.75: "Tải PDF" phiếu báo giá (FN-XA-03.02)
@@ -361,8 +391,11 @@ func Build(ctx context.Context, open PoolOpener, clk clock.Clock, ext External) 
 	kn.UseRoleHolders(acc.RoleHolders())     // W11.46: người theo dõi lịch công tác
 	kn.UseXaScopes(acc.XaScopes())           // W11.46: viên chức Cấp Xã CNTS của lịch trực KSGM BM-03
 	kn.UseCNTSModelVault(ext.Vault)          // W11.47: chủ hộ mô hình CNTS ở kho định danh
+	kn.UseKNRecordsVault(ext.Vault)          // #67: người đại diện / chủ hộ của hồ sơ KN riêng HTX/Nông hộ/THT
+	kn.UseKNPlotVault(ext.Vault)             // #271: tên nông dân của thửa KN (FN-XA-03.05)
 	wireCNTSDiary(kn, ev, ext.Vault)         // W11.48: ảnh nhật ký nuôi CNTS qua pf/evidence
 	kn.UseCNTSMapGeometry(g.AdminGeometry()) // W11.52: cảnh báo vùng vẽ ngoài địa giới xã (bản đồ CNTS)
+	kn.UseKNPlotGeometry(g.AdminGeometry())  // #271: thửa KN nằm trong địa giới xã
 
 	// pf/waterway (G2): API ghi sổ đoạn/công trình, tạo job dựng và phát hành; worker dựng đồ thị (cmd/worker).
 	ww := waterway.New(unit, clk, waterway.Deps{Params: md.Params(), Catalogs: md.Catalogs()})

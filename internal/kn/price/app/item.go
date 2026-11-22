@@ -66,6 +66,16 @@ func (s *ItemService) steward(ctx context.Context, c caller) bool {
 
 func editor(c caller) bool { return c.manage || c.level == "TINH" }
 
+// replacementPermission chỉ được cấp sau khi kiểm quyền ngoài giao dịch. Giữ
+// cùng người gọi để mọi đường tạo mặt hàng đều bảo vệ việc tự ngưng mã cũ mà
+// không gọi hook Steward (có thể I/O) khi đang giữ kết nối giao dịch.
+type replacementPermission struct {
+	caller   caller
+	verified bool
+}
+
+func (p replacementPermission) permits(c caller) bool { return p.verified && p.caller == c }
+
 var (
 	errNotEditor  = problem.Forbidden.WithDetail("chỉ Cấp Tỉnh hoặc vai quản trị ghi được danh mục mặt hàng")
 	errNotSteward = problem.Forbidden.WithDetail("chỉ Quản trị nghiệp vụ báo giá (hoặc vai quản trị) làm được thao tác này")
@@ -404,16 +414,26 @@ func (s *ItemService) CreateItem(ctx context.Context, profile string, in ItemInp
 	if !editor(c) {
 		return WriteResult{}, errNotEditor
 	}
+	var replacement replacementPermission
+	if in.ReplacesCode != "" {
+		if !s.steward(ctx, c) {
+			return WriteResult{}, errNotSteward
+		}
+		replacement = replacementPermission{caller: c, verified: true}
+	}
 	var res WriteResult
 	err = s.tx(ctx, c.tenant, func(tx pgx.Tx) error {
 		var e error
-		res, e = s.createItemTx(ctx, tx, c, in, nil, idem)
+		res, e = s.createItemTx(ctx, tx, c, in, replacement, nil, idem)
 		return e
 	})
 	return res, err
 }
 
-func (s *ItemService) createItemTx(ctx context.Context, tx pgx.Tx, c caller, in ItemInput, proposal *uuid.UUID, idem string) (WriteResult, error) {
+func (s *ItemService) createItemTx(ctx context.Context, tx pgx.Tx, c caller, in ItemInput, replacement replacementPermission, proposal *uuid.UUID, idem string) (WriteResult, error) {
+	if in.ReplacesCode != "" && !replacement.permits(c) {
+		return WriteResult{}, errNotSteward
+	}
 	from, err := s.fromDay(ctx, tx, in.ValidFrom, "")
 	if err != nil {
 		return WriteResult{}, err

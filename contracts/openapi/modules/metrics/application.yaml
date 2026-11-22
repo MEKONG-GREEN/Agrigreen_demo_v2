@@ -33,7 +33,7 @@ paths:
       operationId: listMetricValues
       tags: [metrics]
       parameters:
-        - {name: key, in: path, required: true, schema: {type: string, example: kn.sown_area_ha}}
+        - {name: key, in: path, required: true, schema: {type: string, example: geo.plots_digitised}}
         - {name: from, in: query, schema: {type: string, format: date}}
         - {name: to, in: query, schema: {type: string, format: date}}
         - {name: unit, in: query, description: "Mã đơn vị hành chính; rỗng = toàn tenant", schema: {type: string}}

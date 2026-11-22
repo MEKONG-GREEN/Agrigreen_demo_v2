@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/app"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/reportcycle/domain"
@@ -19,6 +20,7 @@ func (h Handler) registerCNTS(g *gin.RouterGroup) {
 	g.POST("/cnts/period-forms/install", h.cntsInstall)
 	g.POST("/cnts/period-series/preview", h.cntsPreview)
 	g.POST("/cnts/period-series", h.cntsPublish)
+	h.registerCNTSPublish(g)
 }
 
 type cntsFormDTO struct {
@@ -83,10 +85,15 @@ type cntsSeriesReq struct {
 		OffsetDays int    `json:"offset_days"`
 		Time       string `json:"time"`
 	} `json:"deadline"`
+	Target          string     `json:"target"`
+	Regions         []string   `json:"regions"`
+	OwnerRef        *uuid.UUID `json:"owner_ref"`
+	CloseAfterHours *int       `json:"close_after_hours"`
 }
 
 func (r cntsSeriesReq) input() app.CNTSSeriesInput {
-	in := app.CNTSSeriesInput{Code: r.Code, From: r.From, To: r.To, Units: r.Units}
+	in := app.CNTSSeriesInput{Code: r.Code, From: r.From, To: r.To, Units: r.Units, Target: r.Target, Regions: r.Regions, OwnerRef: r.OwnerRef,
+		CloseAfterHours: r.CloseAfterHours}
 	if r.Deadline != nil {
 		in.Deadline = &domain.Deadline{OffsetDays: r.Deadline.OffsetDays, Time: r.Deadline.Time}
 	}
@@ -113,10 +120,41 @@ type cntsSeriesDTO struct {
 	Units           []string        `json:"units"`
 	Tasks           int             `json:"tasks"`
 	Periods         []cntsPeriodDTO `json:"periods"`
+	// BF-CN-PUBLISH (CN-07): đối tượng đã giải, người phụ trách, giờ chốt, xã của tỉnh (kèm khu vực), lần phát hành.
+	Target          string           `json:"target"`
+	Regions         []string         `json:"regions"`
+	OwnerRef        *string          `json:"owner_ref"`
+	CloseAfterHours *int             `json:"close_after_hours"`
+	Communes        []cntsCommuneDTO `json:"communes"`
+	PublicationID   *string          `json:"publication_id"`
+}
+
+type cntsCommuneDTO struct {
+	CommuneCode string `json:"commune_code"`
+	RegionCode  string `json:"region_code"`
+	RegionName  string `json:"region_name"`
 }
 
 func cntsSeriesOf(s app.CNTSSeries) cntsSeriesDTO {
-	d := cntsSeriesDTO{Code: s.Form.Code, UnitKind: s.Form.UnitKind, Units: s.Units, Tasks: s.Tasks, Periods: []cntsPeriodDTO{}}
+	d := cntsSeriesDTO{Code: s.Form.Code, UnitKind: s.Form.UnitKind, Units: s.Units, Tasks: s.Tasks, Periods: []cntsPeriodDTO{},
+		Target: s.Target, Regions: s.Regions, CloseAfterHours: s.CloseAfterHours, Communes: []cntsCommuneDTO{}}
+	if d.Units == nil {
+		d.Units = []string{}
+	}
+	if d.Regions == nil {
+		d.Regions = []string{}
+	}
+	if s.OwnerRef != nil {
+		o := s.OwnerRef.String()
+		d.OwnerRef = &o
+	}
+	if s.PublicationID != nil {
+		id := s.PublicationID.String()
+		d.PublicationID = &id
+	}
+	for _, c := range s.Communes {
+		d.Communes = append(d.Communes, cntsCommuneDTO{CommuneCode: c.CommuneCode, RegionCode: c.RegionCode, RegionName: c.RegionName})
+	}
 	if s.Calendar != nil {
 		id, v := s.Calendar.ID, s.Calendar.Version
 		d.CalendarID, d.CalendarVersion = &id, &v

@@ -48,7 +48,7 @@ class KnContextException implements Exception {
 
 /// Ngữ cảnh phiên KN v7.7 (P1) của app hiện trường.
 ///
-/// - Sau đăng nhập + PIN: `GET /v1/me/contexts`; một cặp → tự chọn, nhiều →
+/// - Sau đăng nhập (hoặc mở lại phiên ngoại tuyến): `GET /v1/me/contexts`; một cặp → tự chọn, nhiều →
 ///   màn chọn; `POST /v1/me/context` → lưu `KNSessionContext` và danh sách
 ///   cặp trong CSDL SQLCipher (bảng meta) để làm việc NGOẠI TUYẾN trong cửa sổ
 ///   72 giờ (ngữ cảnh cũ vẫn gửi kèm hàng đợi).
@@ -154,7 +154,7 @@ class KnContextService {
     return list;
   }
 
-  /// Xác định ngữ cảnh sau khi mở khóa (đăng nhập trực tuyến hoặc PIN).
+  /// Xác định ngữ cảnh sau khi mở phiên (đăng nhập trực tuyến hoặc phiên ngoại tuyến còn hạn).
   Future<KnContextState> resolve() async {
     await _load();
     final cur = _current;

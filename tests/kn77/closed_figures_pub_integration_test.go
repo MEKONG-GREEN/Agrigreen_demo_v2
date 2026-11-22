@@ -60,7 +60,8 @@ func setupCNTS(t *testing.T, f *fixture) *cntsFx {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	fm, err := forms.New(f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, forms.Deps{Profiles: platformasm.KNProfiles})
+	fm, err := forms.New(f.env.Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, forms.Deps{Profiles: platformasm.KNProfiles,
+		DefinitionPolicies: map[string]formsport.TemplateDefinitionPolicy{platformasm.KNCNTSProfile.Name: f.ext.CNTSDefinitionPolicy()}}) // #192
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func setupCNTS(t *testing.T, f *fixture) *cntsFx {
 		dst   *string
 	}{{"BM-T1", []string{c1, c2}, &x.periodA}, {"BM-T2", []string{c1}, &x.periodB}} {
 		ref, err := x.pub.DefineTemplate(adminCtx, formsport.TemplateDef{Profile: platformasm.KNCNTSProfile.Name, Code: p.code,
-			Title: "Biểu kiểm thử " + p.code, Fields: fields}, "")
+			Title: "Biểu kiểm thử " + p.code, Fields: fields, BaseVersion: new(int64)}, "")
 		if err != nil {
 			t.Fatalf("cài biểu %s: %v", p.code, err)
 		}

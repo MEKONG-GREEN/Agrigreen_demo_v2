@@ -56,12 +56,34 @@ Nguồn và giới hạn: [giả định W11.47](../kn/gia-dinh/W11.47.md) (Q-02
 | ★ Điểm trình diễn (xã, quy mô, tọa độ, cán bộ theo dõi, mẫu nhật ký): xã ngoài tỉnh bị chặn, loại mô hình theo danh mục, cán bộ phải phụ trách xã, HTX chỉ là mã có trong công bố HTX; Cấp Xã chỉ thấy điểm của xã mình | `TestCNTSModel_W1147` | G1 |
 | ★ UR-XA-04: cán bộ theo dõi điểm (hoặc được cấp quyền theo dõi mô hình) thêm, sửa, rút hộ; chủ hộ ở kho định danh (sổ chỉ giữ `person_ref`), nhãn và SĐT che một phần (BR-02); SĐT trong ghi chú bị chặn; rút hộ xóa tọa độ (QĐ-8) | `TestCNTSModel_W1147`, `TestHouseholdKeeper`; Vitest giả lập | G1 |
 | ★ UR-TINH-09, FN-14: cấp quyền theo vai, địa bàn (xã/cơ sở/điểm/hộ), biểu mẫu, hiệu lực; chỉ 4 vai Xã/Nông hộ (BR-01); địa bàn ngoài tỉnh bị chặn; chủ nhiệm chỉ cấp trong dự án mình (BR-03); người được cấp phải là tài khoản Cấp Xã có sẵn; mọi thay đổi có nhật ký | `TestCNTSModel_W1147`, `TestGrantRoles`, `TestGrantStatusAndCovers` | G1 |
-| ★ FN-14 AC-02: thu hồi quyền của A chuyển phạm vi cho người nhận (quyền mới cùng phạm vi); A mất quyền sửa hộ ngay, người nhận sửa được | `TestCNTSModel_W1147` | G1 (chuyển việc biểu chưa nộp trong `cap/forms`: chưa) |
+| ★ FN-14 AC-02: thu hồi quyền của A chuyển phạm vi cho người nhận (quyền mới cùng phạm vi); A mất quyền sửa hộ ngay, người nhận sửa được | `TestCNTSModel_W1147` | G1 (#71: chuyển điều kiện công việc biểu qua phiên chủ — `TestCNTSGrantOwnerSession_71`; #49: con trỏ đồng bộ reset) |
 | ADR-0055 / Q-KNS-04: KN không tạo dữ liệu HTX | `TestCNTSModel_W1147` (đếm qua `pf_cooperative_pub`), `go run ./tools/knboundary` | G1 |
 | Menu Tỉnh (Chương trình, dự án; Hộ mô hình; Cấp quyền xã, nông hộ), Xã (Điểm trình diễn, hộ mô hình; Quyền của tôi), TW (Dự án KNQG) | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
+| ★ FN-14 AC-01/AC-03, BR-02 (#71): quyền FN-14 vào phiên chủ KN ở request kế tiếp; BM-01 chỉ cơ sở được cấp; biểu được giao giới hạn biểu kỳ CNTS; tường minh rỗng/hết hạn/thu hồi/sửa thu hẹp xã = chặn (người đã từng có quyền không quay về W11.07); biên ngày tính cả ngày cuối; cùng người nhiều lần gán, phòng/tenant khác không nhận | `TestCNTSGrantOwnerSession_71`, `TestCNTSGrantNarrowingStaysExplicit_71`, `TestCNTSFormActorUsesOwnerGrantScope`, `TestCNTSGrant*` (port) | G1 |
 
-Chưa nghiệm thu: FN-14 AC-01/AC-03 (quyền KN vào phạm vi phiên `pf/accounts`, phạm vi KSGM BM-01 — ticket làn shared),
-mẫu biểu dự án BM-12…BM-16 (W11.53), nạp Excel điểm/hộ, chọn tọa độ trên bản đồ (W11.52), nông hộ tự nhập (GĐ2).
+Chưa nghiệm thu: chuyển nháp nhật ký khi thu hồi, Cấp Xã chưa từng được cấp quyền vẫn theo thuộc tính W11.07 (câu hỏi mở #71),
+nạp Excel điểm/hộ, chọn tọa độ trên bản đồ (W11.52), nông hộ tự nhập (GĐ2).
+
+## Mẫu biểu dự án KNQG Mẫu 01–07 W11.53 (BM-12…BM-16)
+
+Nguồn và giới hạn: [giả định W11.53](../kn/gia-dinh/W11.53.md) (Q-055, Q-027 là giả định tạm; Mẫu 01 theo BRD vì phòng chưa gửi mẫu gốc).
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| ★ UR-TINH-20, BR-03: Mẫu 01 lập từ dự án (điền sẵn tên, mã, kinh phí, điểm), mỗi dự án × tháng một bản; trình → lãnh đạo phòng duyệt / trả lại (thiếu ý kiến → chặn); đã duyệt không sửa, điều chỉnh tạo bản mới trình lại; vật tư đã cấp > kế hoạch → cảnh báo (quy tắc 11) | `TestCNTSKNQG_W1153`, `TestTransitions`, `TestNormalize`; Vitest `src/kn/cnts/knqg/knqg.test.tsx` | G1 |
+| ★ UR-TINH-21: Mẫu 03 căn cứ, đoàn kiểm tra, đối tượng, danh mục hồ sơ theo mẫu (thêm được dòng), thực địa, nhận xét, kiến nghị; Word có số `{n}/BC-TTKN` | `TestCNTSKNQG_W1153`, `TestWordTemplatesRender`; ảnh thực địa (JPG/PNG ≤ 5 MB, ≤ 20 ảnh, khóa khi trình ký): `TestCNTSKNQGNotifyPhotos_W1153b`; Vitest `knqg-api.test.ts` | G1 (ảnh chưa in vào Word) |
+| ★ UR-TINH-22: Mẫu 04 thành phần 3 bên, lớp, học viên, thời gian, tham quan, đánh giá; Đang lập → Chờ ký → Đã ký (scan) | `TestCNTSKNQG_W1153`, `TestWordTemplatesRender` | G1 |
+| ★ UR-TINH-23, quy tắc 9: Mẫu 05 mỗi điểm; thực tế lấy từ nhật ký đã xác thực, sửa phải ghi chú, không đạt phải ghi chú; ký có scan (PDF/JPG/PNG); đã ký không sửa, điều chỉnh phải ký lại; Cấp Xã xem/tải biên bản điểm xã mình, xã khác không thấy | `TestCNTSKNQG_W1153`, `TestPrefillAndComplete05`; Vitest `knqg-api.test.ts` | G1 |
+| ★ UR-TINH-24, AC-03, quy tắc 10: Mẫu 07 tổng hợp điểm từ Mẫu 05 đã ký; thiếu Mẫu 05 đã ký của một điểm (hoặc bản điều chỉnh chưa ký) → chặn gửi; trả lại không mở khóa Mẫu 05 | `TestCNTSKNQG_W1153`; Vitest `knqg-api.test.ts` | G1 |
+| ★ UR-QG-01, BR-02, AC-02: TW chỉ thấy dự án KNQG, thấy Mẫu 07 ngay khi gửi (không thấy bản chưa gửi), chỉ xem trừ xác nhận / trả lại (ý kiến); đã xác nhận khóa hẳn | `TestCNTSKNQG_W1153`; thông báo hộp thư TW khi gửi, chủ nhiệm khi xác nhận/trả lại, lãnh đạo phòng khi trình Mẫu 01: `TestCNTSKNQGNotifyPhotos_W1153b`, `TestRenderKNQGNotifications_W1153b`, `TestAssemblyAddsKNQGConsumer_W1153b` | G1 |
+| ★ FN-19 BR-01, AC-04: chủ nhiệm dự án khác, viên chức, Ban Giám đốc không lập/sửa/ký; chỉ dự án loại KNQG | `TestCNTSKNQG_W1153` | G1 |
+| ★ FN-19 B4, AC-01: Word 5 mẫu đủ mục, bảng của mẫu gốc (thành phần, chỉ tiêu, phụ lục, khối ký), bản điều chỉnh ghi rõ; lịch sử, tải lại có băm | `TestWordTemplatesRender`, `TestCNTSKNQG_W1153` (pf/export thật) | G1 |
+| Sổ chỉ ghi thêm, khóa lạc quan, phát lại theo Idempotency-Key | `TestCNTSKNQG_W1153` | G1 |
+| Menu Tỉnh "Mẫu biểu dự án", TW "Mẫu biểu, nghiệm thu năm (07)" | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
+
+Luồng trình duyệt (Mẫu 05 → ký → Mẫu 07 gửi → xác nhận; ảnh Mẫu 03): Playwright `tests/e2e/kn-cnts-knqg.spec.ts` (W11.53b).
+Nạp Excel điểm/hộ (FN-19 luồng phụ, [giả định W11.53c](../kn/gia-dinh/W11.53c.md)): tệp mẫu, xem trước không ghi, lỗi theo dòng/cột, số mũ/chuỗi dài bị chặn, xã ngoài tỉnh, trùng trong tệp và với dữ liệu đã có, ghi một giao dịch, chủ hộ ở kho định danh, phát lại theo Idempotency-Key — `TestCNTSModelImport_W1153c`, `TestParseScale`, `TestParseSites`, `TestParseHouseholds`, `TestParseLayout`; Vitest `src/kn/cnts/model/import.test.ts`.
+Chưa nghiệm thu: in ảnh thực địa vào Word Mẫu 03, đối chiếu mẫu gốc Mẫu 01.
 
 ## Nhật ký nuôi BM-08/09/19 W11.48
 
@@ -79,7 +101,7 @@ Nguồn và giới hạn: [giả định W11.48](../kn/gia-dinh/W11.48.md) (Q-07
 | Menu Tỉnh "Rà soát nhật ký", Xã "Nhật ký sản xuất" | `TestWebMenuFixture`; `kn-menu.contract.test.ts` | G1 |
 
 Chưa nghiệm thu: ghi ngoại tuyến trên App xã (entity `pf/sync`), nông hộ tự ghi (W11.55), cảnh báo quá hạn ghi (dòng 10),
-NC-11 cập nhật lịch tiêm BM-07, chuẩn kỹ thuật theo mẫu (UR-TINH-07), Mẫu 05 lấy thực tế (W11.53), bản đồ vị trí (W11.52).
+NC-11 cập nhật lịch tiêm BM-07, chuẩn kỹ thuật theo mẫu (UR-TINH-07), bản đồ vị trí (W11.52). Mẫu 05 lấy thực tế: W11.53.
 
 ## Bản đồ vùng nuôi, vùng dịch W11.52
 
@@ -134,3 +156,40 @@ Nguồn và giới hạn: [giả định W11.50](../kn/gia-dinh/W11.50.md) (ch�
 | BR-01: mở lại chỉ Lãnh đạo phòng, lý do + thời hạn; sổ chỉ ghi thêm | `TestCNTSCampaign_LifecycleSeparateFromCumulative_W1150`, `TestPeriodKeyAndState` | G1 |
 | Màn Cấp Tỉnh "Chiến dịch điều tra", menu `tinh.cnts.chien_dich.quan_ly` (mục "Tạo chiến dịch" còn Sắp có — tạo đợt ngay trên màn quản lý) | Vitest `campaign.test.ts`, `kn-menu.contract.test.ts`; `TestWebMenuFixture` | G1 |
 | AC-01 (102 xã thấy việc trong 1 phút), phạm vi theo hộ, nhắc tự động theo cấu hình đợt | — | Chưa nghiệm thu / chưa làm |
+
+## Báo cáo phòng BM-11 W11.45
+
+Nguồn và giới hạn: [giả định W11.45](../kn/gia-dinh/W11.45.md) (Q-046 giả định: BM-11 gửi để lưu; số liệu KHTC qua phiếu + nguồn đã chốt).
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| ★ UR-TINH-16, quy tắc 13: chỉ lập khi đã qua hạn nộp của tuần cuối và tỷ lệ xã đã nộp từng biểu nguồn ≥ mức Cấp Tỉnh đặt, hoặc mọi kỳ nguồn đã chốt (`extension.cnts_bm11_not_ready`) | `TestCNTSBM11_W1145` (quy tắc 13; tháng 9 sau chốt) | G1 |
+| ★ AC-01, BR-01: phần tự động = tổng số hợp lệ của kỳ (tổng đàn tuần cuối, tiêm phòng/hóa chất/KSGM cộng tuần, khai thác + nuôi trồng + lũy kế năm), không sửa tay | `TestCNTSBM11_W1145`, `TestBM11CoverageAndLivestock` | G1 |
+| ★ AC-03, BR-04: "Tổng hợp từ n/N xã" + danh sách xã thiếu, không ước tính | `TestCNTSBM11_W1145` ("Tổng hợp từ 1/2 xã", X2), `TestBM11CoverageAndLivestock`, `TestBM11WordTemplates` (99/102) | G1 |
+| ★ Vòng đời Đang soạn → Chờ duyệt → Trả lại → Đã gửi → Đã nhận; một báo cáo mỗi kỳ (kể cả tạo đồng thời); khóa lạc quan; sổ không UPDATE | `TestCNTSBM11_W1145`, `TestBM11Next` | G1 |
+| ★ AC-04: trả lại thiếu ý kiến không lưu được; chỉ Lãnh đạo phòng duyệt, BGĐ chỉ xem (BR-05) | `TestCNTSBM11_W1145`; Vitest `src/kn/cnts/bm11/bm11.test.tsx` | G1 |
+| ★ AC-02, BR-03: duyệt xong tự gửi; báo cáo có ngay trong hộp "Báo cáo đến" của HCTH (tuần), không lộ cho phòng không phải nơi nhận; "Đã nhận" một lần | `TestCNTSBM11_W1145` | G1 |
+| ★ BR-02: báo cáo đã gửi không sửa; số kỳ trước thay đổi sau khi gửi vào mục "Số liệu kỳ trước nộp bổ sung" | `TestCNTSBM11_W1145` (sửa sau gửi → 409), `TestBM11DiffAndText` | G1 |
+| ★ Xuất Word theo bố cục bản giấy (tuần A–D, tháng/quý/năm I–III), số `{n}/BC-CNTS` chỉ cho bản đã gửi, xuất lại dùng lại số | `TestCNTSBM11_W1145`, `TestBM11WordTemplates` | G1 |
+| Màn "Báo cáo định kỳ" (Cấp Tỉnh CNTS) và "Báo cáo đến" (HCTH, KHTC); menu | Vitest `bm11.test.tsx`, `kn-menu.contract.test.ts`; `TestWebMenuFixture` | G1 |
+| Email công vụ, thông báo cho phòng nhận, phụ lục kinh phí của báo cáo tháng, cấu hình nơi nhận theo loại trên màn riêng | — | Chưa làm |
+## FN-07 — Thiết kế & phát hành biểu mẫu (BRD CNTS v4.0; #174, #191, #192)
+
+Căn cứ: BRD CNTS v4.0 FN-07 (B1–B4, luồng phụ "Sao chép biểu; nạp cấu trúc từ Excel", BR-01, BR-02, AC-01…AC-03), UR-TINH-07,
+ma trận quyền FN-07 (Admin CRUD; Cấp Tỉnh "Cán bộ tổng hợp" CRU; viên chức, lãnh đạo phòng chỉ xem), FN-21 B1 "biểu và phiên bản".
+
+| Tiêu chí | Bằng chứng tự động | Phạm vi |
+|---|---|---|
+| Cấp Tỉnh CNTS/Admin xem cấu trúc đúng phiên bản đã cài (biểu kỳ và biểu điều tra, không có danh sách mã cố định); Xã/TW/phòng khác 403 | `TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN`, `TestCNTSDesignEdit_FN07_192` (PG thật), `design.test.ts`, `CntsDesignScreen.test.tsx` | G1 |
+| Kiểm XLSX/CSV theo dòng/header/type/cờ/giới hạn; có lỗi trả fields rỗng, công thức bị từ chối, kiểm tệp không ghi | Test PG trên + `TestParseCNTSDesign` (1e±100000, 100k chữ số, trùng mã/choice/500 dòng) | G1 |
+| ★ B1–B2: sửa cấu trúc và lưu thành phiên bản mới với `base_version`; lưu chồng trên bản đã cũ → 409, không ghi; lịch sử phiên bản | `TestCNTSDesignEdit_FN07_192` (AC-03, lịch sử), `CntsDesignScreen.test.tsx` | G1 |
+| ★ AC-03, BR-01: sửa cấu trúc BM-17 không đổi kỳ/bài đã nộp (kỳ cũ giữ `template_id` phiên bản 1 và số liệu); kỳ phát hành sau dùng phiên bản mới; cài lại biểu chuẩn không ghi đè phiên bản Cấp Tỉnh | `TestCNTSDesignEdit_FN07_192` | G1 |
+| ★ BR-02: mẫu KNQG (BM-01, BM-04, BM-05 I/II) từ chối thay cấu trúc qua API KN, REST `/v1/forms/templates` và `Publisher.DefineTemplate` — kể cả Admin; chỉ cài đúng cấu trúc chuẩn | `TestCNTSDesignEdit_FN07_192`, `TestCNTSDesignReadAndImport_BF_CN_FORM_DESIGN`, `TestCNTSDesignEditRules` | G1 |
+| ★ UR-TINH-07 "mẫu đang có dữ liệu chỉ thêm cột, không xóa": xóa/đổi kiểu chỉ tiêu bị chặn (API KN 422, cổng chung 403) | `TestCNTSDesignEdit_FN07_192`, `TestCNTSDesignEditRules`, `design.test.ts` | G1 |
+| ★ Ma trận quyền: chỉ Admin và cán bộ tổng hợp Cấp Tỉnh CNTS lưu phiên bản; viên chức, lãnh đạo phòng, TW, Xã 403, không ghi | `TestCNTSDesignEdit_FN07_192` | G1 |
+| ★ Luồng phụ: sao chép biểu (kể cả mẫu KNQG) thành biểu điều tra `CNTS-DT-<mã>` phiên bản 1; tạo biểu điều tra từ kết quả kiểm Excel hợp lệ bằng thao tác lưu tường minh; mã trùng 409; cấu trúc sai 422, không ghi | `TestCNTSDesignEdit_FN07_192`, `design.test.ts`, `CntsDesignScreen.test.tsx` | G1 |
+| ★ FN-21 B1: đợt điều tra chọn biểu và phiên bản; phát hành dùng đúng `template_id` của phiên bản đã chọn dù đã có phiên bản mới hơn; kết quả đợt theo phiên bản đã phát hành; phiên bản không có → 422 | `TestCNTSDesignEdit_FN07_192`, `TestDraftValidate`, `campaign.test.ts` | G1 |
+| B3–B4, AC-01, AC-02: phát hành đợt theo kỳ/nhóm xã, người phụ trách, xem trước số việc | Mục BF-CN-PUBLISH (UR-TINH-08) ở trên | G1 |
+| Mẫu nhật ký động (chỉ tiêu, tần suất, bắt buộc GPS/ảnh, chủ nhiệm chỉ chương trình mình), loại "lịch", biểu kỳ báo cáo mã mới | — | Gói con BF-CN-FORM-DESIGN-EDIT-DIARY (tách từ #192) |
+
+Giới hạn: quy tắc "chỉ thêm cột" áp cho mọi mẫu đã có phiên bản (cổng chung không có phép đọc "mẫu đã có dữ liệu" theo mã), chặt hơn câu chữ UR-TINH-07. Danh sách cột tiêm phòng BM-04 theo kỳ hiệu lực thuộc danh mục FN-06, không sửa qua FN-07 vì BM-04 là mẫu KNQG.

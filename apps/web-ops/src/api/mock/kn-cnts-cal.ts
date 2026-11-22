@@ -5,9 +5,11 @@
 import type { components } from "../generated/application";
 import { uuidv7 } from "../idempotency";
 import { ADMIN_UNITS, CATALOGS } from "./data";
-import { json, problem, validation, type Ctx, type Route } from "./http";
+import { isZip, json, problem, validation, type Ctx, type Route } from "./http";
+import { rowsOfXlsx, xlsxOf } from "./kn-cnts-cal-xlsx";
 import { knContext, personaForContext } from "./kn";
 import { AG_COMMUNES } from "./kn-reports/store";
+import { modelHouseholdInfo } from "./kn-cnts-model";
 
 type S = components["schemas"];
 type Roster = S["CNTSDutyRoster"];
@@ -16,11 +18,13 @@ type Batch = S["CNTSVaccinationBatchCore"];
 
 const ROSTERS = new Map<string, Roster[]>(); // tháng → phiên bản
 const BATCHES = new Map<string, Batch[]>(); // ref → phiên bản
+const CHECKINS = new Map<string, S["ExtWorkScheduleCheckin"]>(); // CNTS v4.0: item_id → check-in (kèm check-out) giả lập
 
 /** Xóa trạng thái (kiểm thử). */
 export function resetCntsCal() {
   ROSTERS.clear();
   BATCHES.clear();
+  CHECKINS.clear();
 }
 
 const OFFICER = "0190f1c4-7d3e-7000-8000-00000000a0c1";
@@ -52,7 +56,7 @@ function rosterProvince(ctx: Ctx, requested?: string, write = false): string | R
 const rosterKey = (month: string, province: string) => `${province}|${month}`;
 const facilities = (province: string) =>
   CATALOGS.cnts_slaughter_facility.filter(f => f.active && (province === "legacy" || provinceOf(f.attrs.commune_code ?? "") === province)).map(f => ({
-    ref: f.attrs.facility_ref!, code: f.code, name: f.name, commune_code: f.attrs.commune_code ?? "", kind: f.attrs.facility_kind ?? null,
+    ref: f.attrs.facility_ref!, code: f.code, name: f.name, commune_code: f.attrs.commune_code ?? "", kind: f.attrs.facility_kind ?? null, address: f.attrs.address ?? null,
   }));
 
 const daysIn = (month: string) => {
@@ -70,9 +74,107 @@ function emptyRoster(month: string, province: string): Roster {
   const fs = facilities(province);
   return {
     province_code: province === "legacy" ? null : province, legacy: province === "legacy", month, days_in_month: daysIn(month), version: 0, source: null, note: null, cells: [], facilities: fs,
-    officers: fs.length ? [{ ref: province === "91" ? OFFICER : `0190f1c4-7d3e-7000-8000-${province.padStart(12,"0")}`, display: "Viên chức KSGM (giả lập)", commune_codes: fs.map(f => f.commune_code), facility_refs: [] }] : [],
-    warnings: [], updated_at: null, updated_by: null, versions: [], can_edit: province !== "legacy", notified_officer_refs: [],
+    officers: fs.length ? [{ ref: province === "91" ? OFFICER : `0190f1c4-7d3e-7000-8000-${province.padStart(12,"0")}`, display: "Viên chức KSGM (giả lập)", commune_codes: fs.map(f => f.commune_code), facility_refs: [], phone_masked: null }] : [],
+    warnings: [], updated_at: null, updated_by: null, versions: [], can_edit: province !== "legacy", notified_officer_refs: [], can_view_phone: false,
   };
+}
+
+/** SĐT công vụ hư cấu của viên chức giả lập (máy chủ thật đọc từ pf/accounts lúc gọi). */
+const MOCK_PHONE = "0900000001";
+const maskPhone = (p: string) => `${p.slice(0, 4)}•••${p.slice(-3)}`;
+/** Người lập lịch (Admin, Cấp Tỉnh không chỉ xem) thấy cột ĐT: SĐT che của viên chức có ô trong lưới. */
+function withPhones(r: Roster, ctx: Ctx): Roster {
+  const w = who(ctx);
+  const can = (w.role === "admin" || w.role === "kn_tinh") && !w.readOnly;
+  const inGrid = new Set(r.cells.map((c) => c.officer_ref));
+  return { ...r, can_view_phone: can, officers: r.officers.map((o) => ({ ...o, phone_masked: can && inGrid.has(o.ref) ? maskPhone(MOCK_PHONE) : null })) };
+}
+
+const SHIFT_TEXT: Record<Cell["shift"], string> = { N: "N", D: "Đ", ND: "NĐ" };
+const DEFAULT_BASIS = "(theo thông báo số ……/SNNMT ngày …… của Sở Nông nghiệp và Môi trường và kèm theo danh sách phân công viên chức trực KSGM)";
+const fold = (s: string) => s.normalize("NFC").toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+
+/** Giả lập GET …/export.xlsx: bố cục BM-03 như máy chủ (tiêu đề tháng, căn cứ, ghi chú ca, dòng tiêu đề cột ở dòng 5). */
+function exportXlsx(r: Roster, basis: string, phones: boolean): Uint8Array {
+  const [y, m] = r.month.split("-").map(Number);
+  const n = r.days_in_month;
+  const width = 5 + n;
+  const blank = () => new Array<string | null>(width).fill(null);
+  const line = (s: string) => [s, ...new Array<string | null>(width - 1).fill(null)];
+  const rows: (string | null)[][] = [
+    line(`BẢNG PHÂN CÔNG LỊCH TRỰC KSGM VIÊN CHỨC TĂNG CƯỜNG XÃ, PHƯỜNG, ĐẶC KHU THÁNG ${m}/${y}`),
+    line(`(${(basis.trim() || DEFAULT_BASIS).replace(/^\(|\)$/g, "")})`),
+    line("(Ghi chú: N: ca ngày; Đ: ca đêm, qua nửa đêm thuộc ngày bắt đầu ca; NĐ: cả ngày đêm; ô trống: nghỉ)"),
+    blank(),
+    ["STT", "TÊN CƠ SỞ GIẾT MỔ", "ĐỊA CHỈ", "VIÊN CHỨC TRỰC KSGM", "ĐT viên chức", ...Array.from({ length: n }, (_, i) => String(i + 1))],
+  ];
+  const merges: string[] = [];
+  r.facilities.forEach((f, i) => {
+    const offs = [...new Set(r.cells.filter((c) => c.facility_ref === f.ref).map((c) => c.officer_ref))];
+    const start = rows.length + 1;
+    (offs.length ? offs : [""]).forEach((o, k) => {
+      const row = blank();
+      if (k === 0) [row[0], row[1], row[2]] = [String(i + 1), f.name, f.address ?? f.commune_code];
+      if (o) {
+        row[3] = r.officers.find((x) => x.ref === o)?.display ?? "";
+        if (phones) row[4] = MOCK_PHONE;
+        for (const c of r.cells) if (c.facility_ref === f.ref && c.officer_ref === o) row[4 + c.day] = SHIFT_TEXT[c.shift];
+      }
+      rows.push(row);
+    });
+    const end = rows.length;
+    if (end > start) for (const col of ["A", "B", "C"]) merges.push(`${col}${start}:${col}${end}`);
+  });
+  return xlsxOf(`LỊCH TRỰC KSGM T${m}${y}`, rows, merges);
+}
+
+/** Giả lập POST …/import: đọc tệp do giả lập xuất (ZIP không nén), ghép cơ sở theo mã/tên, viên chức theo tên/SĐT. */
+function importXlsx(r: Roster, body: unknown): Response {
+  const invalid = (d: string) => problem(422, "extension.cnts_roster_import_invalid", "Tệp không đúng mẫu Lịch trực KSGM (BM-03)", { detail: d });
+  if (!isZip(body)) return invalid("Chỉ nhận tệp Excel .xlsx");
+  if (body.length > 4 << 20) return invalid("Tệp vượt 4 MB");
+  const x = rowsOfXlsx(body);
+  if (!x) return invalid("Giả lập chỉ đọc tệp .xlsx do chính nó xuất — máy chủ thật đọc mọi tệp .xlsx đúng mẫu");
+  const at = x.rows.findIndex((row, i) => i < 30 && (row.find((c) => c.trim()) ?? "").trim().toUpperCase() === "STT" && row.some((c) => c.toUpperCase().includes("VIÊN CHỨC")));
+  if (at < 0) return invalid("Không thấy dòng tiêu đề cột STT | TÊN CƠ SỞ GIẾT MỔ | ĐỊA CHỈ | VIÊN CHỨC TRỰC KSGM | ĐT — dùng mẫu \"Lịch trực KSGM\"");
+  const title = x.rows.slice(0, at).flat().join(" ").toUpperCase();
+  const tm = /THÁNG\s*(\d{1,2})\s*\/\s*(\d{4})/.exec(title);
+  const [y, m] = r.month.split("-").map(Number);
+  if (tm && (Number(tm[1]) !== m || Number(tm[2]) !== y)) return invalid(`Tệp không có sheet tháng ${m}/${y} (tệp có tháng ${tm[1]}/${tm[2]})`);
+  const basis = x.rows.slice(0, at).flat().find((c) => /^\(?(theo|căn cứ)/i.test(c.trim())) ?? null;
+  const cells: Cell[] = [];
+  const issues: S["CNTSDutyRosterImport"]["issues"] = [];
+  let fac = "";
+  let count = 0;
+  for (let i = at + 1; i < x.rows.length; i++) {
+    const row = x.rows[i]!.map((c) => (c ?? "").trim());
+    if (["TC", "TỔNG", "TỔNG CỘNG"].includes((row[0] ?? "").toUpperCase())) break;
+    if (row[1]) fac = row[1];
+    const officer = row[3] ?? "", phone = row[4] ?? "";
+    const shifts = row.slice(5, 5 + 31).map((v, d) => [d + 1, v] as const).filter(([, v]) => v);
+    if (!officer && !phone && !shifts.length) continue;
+    count++;
+    const line = i + 1;
+    const fm = /^(.*\S)\s*\(([^()]+)\)$/.exec(fac);
+    const f = r.facilities.find((z) => z.code.toUpperCase() === fac.toUpperCase() || (fm && z.code.toUpperCase() === fm[2]!.toUpperCase())) ?? (r.facilities.filter((z) => fold(z.name) === fold(fac)).length === 1 ? r.facilities.find((z) => fold(z.name) === fold(fac)) : undefined);
+    const offName = fold(officer.replace(/\s*\([^()]*\)\s*$/, ""));
+    const digits = phone.replace(/\D/g, "");
+    const byPhone = (digits.length === 9 ? `0${digits}` : digits) === MOCK_PHONE ? r.officers[0] : undefined; // mọi viên chức giả lập cùng một số hư cấu
+    const o = byPhone ?? r.officers.find((z) => !!offName && fold(z.display ?? "") === offName);
+    if (!f) issues.push({ line, field: "facility", message: fac ? `Không khớp cơ sở giết mổ "${fac.slice(0, 60)}" (đang hoạt động trong tháng, thuộc tỉnh)` : "Thiếu tên cơ sở giết mổ" });
+    if (!o) issues.push({ line, field: "officer", message: officer ? `Không khớp viên chức "${officer.slice(0, 60)}" (tài khoản Cấp Xã CNTS của tỉnh, theo tên hoặc SĐT)` : "Thiếu viên chức trực" });
+    if (!f || !o) continue;
+    for (const [d, raw] of shifts) {
+      const v = raw.replace(/[\s.·,;]/g, "").toUpperCase();
+      const s = v === "N" ? "N" : v === "Đ" || v === "D" ? "D" : v === "NĐ" || v === "ND" ? "ND" : null;
+      if (d > r.days_in_month) issues.push({ line, field: `day:${d}`, message: `Ngày ${d} không có trong tháng ${m}/${y}` });
+      else if (!s) issues.push({ line, field: `day:${d}`, message: `Ngày ${d}: ký hiệu "${raw.slice(0, 10)}" lạ (chỉ N, Đ, NĐ hoặc để trống)` });
+      else if (cells.some((c) => c.facility_ref === f.ref && c.officer_ref === o.ref && c.day === d)) issues.push({ line, field: `day:${d}`, message: `Ngày ${d}: trùng ô (cùng cơ sở, viên chức)` });
+      else cells.push({ facility_ref: f.ref, officer_ref: o.ref, day: d, shift: s });
+    }
+  }
+  const draft: Roster = { ...r, cells };
+  return json({ month: r.month, province_code: r.province_code, sheet: x.sheet, basis, row_count: count, cells, issues, warnings: warnings(draft) } satisfies S["CNTSDutyRosterImport"]);
 }
 
 function warnings(r: Roster): Roster["warnings"] {
@@ -85,12 +187,47 @@ function warnings(r: Roster): Roster["warnings"] {
 
 const latestRoster = (month: string, province: string) => ROSTERS.get(rosterKey(month,province))?.at(-1) ?? emptyRoster(month,province);
 
-function batchView(b: Batch): S["CNTSVaccinationBatch"] {
+/** Hộ mô hình của lứa (BF-CN-VACC) từ giả lập W11.47. */
+function modelOf(b: Batch): S["CNTSVaccinationModel"] | null {
+  const m = b.household_ref ? modelHouseholdInfo(b.household_ref) : null;
+  if (!m) return null;
+  return { household_ref: m.household_ref, owner_label: m.owner_label, site_ref: m.site_ref, site_name: m.site_name, project_ref: m.project_ref,
+    project_code: m.project_code, project_name: m.project_name, officer_ref: m.officer_ref, officer_display: m.officer_display, active: m.active };
+}
+function batchView(b: Batch, w?: ReturnType<typeof who>): S["CNTSVaccinationBatch"] {
   const t = today();
   const doses = b.doses.map((d) => ({ ...d, overdue: !d.actual_date && d.expected_date < t }));
   const overdue = doses.filter((d) => d.overdue).length;
   const status = b.event === "cancelled" ? "cancelled" : overdue ? "overdue" : doses.every((d) => d.actual_date) ? "done" : "open";
-  return { ...b, doses, status, overdue_count: overdue, can_plan: b.event !== "cancelled", can_record: b.event !== "cancelled", next_dose: doses.find((d) => !d.actual_date) ?? null };
+  const plan = !w || ((w.role === "admin" || w.role === "kn_tinh") && !w.readOnly);
+  const record = !w || ((w.role === "admin" || w.role === "kn_tinh" || w.role === "kn_xa") && !w.readOnly);
+  return { ...b, doses, status, overdue_count: overdue, can_plan: plan && b.event !== "cancelled", can_record: record && b.event !== "cancelled",
+    next_dose: doses.find((d) => !d.actual_date) ?? null, model: modelOf(b) };
+}
+/** Lứa (bản hiện hành) trong phạm vi người gọi theo bộ lọc của danh sách/bảng BM-07. */
+function scopedBatches(ctx: Ctx) {
+  const w = who(ctx);
+  const q = ctx.url.searchParams;
+  return [...BATCHES.values()]
+    .map((vs) => batchView(vs.at(-1)!, w))
+    .filter((b) => (w.communes === null || w.communes.includes(b.commune_code)) && (!q.get("model_type_code") || b.model_type_code === q.get("model_type_code")) &&
+      (!q.get("project_ref") || b.model?.project_ref === q.get("project_ref")) && (!q.get("site_ref") || b.model?.site_ref === q.get("site_ref")));
+}
+/** Bảng BM-07 giả lập: cột = vaccine × lần (theo ngày tuổi), hàng = lứa chưa hủy. */
+function matrix(ctx: Ctx): S["CNTSVaccinationMatrix"] | Response {
+  const mt = ctx.url.searchParams.get("model_type_code");
+  if (!mt) return problem(422, "extension.cnts_vaccination_invalid", "Lịch tiêm phòng không hợp lệ");
+  const rows = scopedBatches(ctx).filter((b) => b.status !== "cancelled").sort((a, b) => a.commune_code.localeCompare(b.commune_code) || a.received_date.localeCompare(b.received_date));
+  const cols = new Map<string, S["CNTSVaccinationMatrixColumn"]>();
+  for (const b of rows) for (const d of b.doses) if (!cols.has(`${d.vaccine_code}/${d.shot}`)) cols.set(`${d.vaccine_code}/${d.shot}`, { vaccine_code: d.vaccine_code, vaccine_name: d.vaccine_name, shot: d.shot, age_days: d.age_days });
+  const first = new Map<string, number>();
+  for (const c of cols.values()) first.set(c.vaccine_code, Math.min(first.get(c.vaccine_code) ?? c.age_days, c.age_days));
+  const columns = [...cols.values()].sort((a, b) => (first.get(a.vaccine_code)! - first.get(b.vaccine_code)!) || a.vaccine_code.localeCompare(b.vaccine_code) || a.shot - b.shot);
+  return {
+    model_type_code: mt, model_type_name: CATALOGS.cnts_model_type.find((m) => m.code === mt)?.name ?? null, columns, truncated: false, max_rows: 500,
+    rows: rows.map((b) => ({ ...b, cells: columns.map((c) => b.doses.find((d) => d.vaccine_code === c.vaccine_code && d.shot === c.shot) ?? null),
+      household_text: b.model?.owner_label ?? b.locality, commune_name: AG_COMMUNES.find((c) => c.code === b.commune_code)?.name ?? ADMIN_UNITS.find((u) => u.code === b.commune_code)?.name ?? null })),
+  };
 }
 const detail = (ref: string) => {
   const vs = BATCHES.get(ref)!;
@@ -105,8 +242,37 @@ export const cntsCalRoutes: Route[] = [
       if (who(ctx).role === "kn_xa") return problem(403, "forbidden", "Cấp Xã xem lịch trực của mình (Lịch trực của tôi)");
       const province = rosterProvince(ctx, ctx.url.searchParams.get("province_code") ?? undefined);
       if (province instanceof Response) return province;
-      const r = latestRoster(ctx.params[0]!, province);
+      const r = withPhones(latestRoster(ctx.params[0]!, province), ctx);
       return json({ ...r, versions: [...(ROSTERS.get(rosterKey(r.month,province)) ?? [])].reverse().map((v) => ({ version: v.version, source: v.source ?? "grid", cell_count: v.cells.length, note: v.note, at: v.updated_at!, actor_ref: v.updated_by!, actor_display: null })) });
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/duty-rosters\/(\d{4}-\d{2})\/export\.xlsx$/,
+    handler: (ctx) => {
+      if (who(ctx).role === "kn_xa") return problem(403, "forbidden", "Cấp Xã xem lịch trực của mình (Lịch trực của tôi)");
+      const province = rosterProvince(ctx, ctx.url.searchParams.get("province_code") ?? undefined);
+      if (province instanceof Response) return province;
+      const basis = ctx.url.searchParams.get("basis") ?? "";
+      if (basis.length > 300) return validation([{ field: "basis", reason: "tối đa 300 ký tự" }]);
+      if (/\d{9,}/.test(basis.replace(/[\s.]/g, ""))) return validation([{ field: "basis", reason: "không ghi số điện thoại, CCCD" }]);
+      const r = withPhones(latestRoster(ctx.params[0]!, province), ctx);
+      const name = `lich-truc-ksgm-${province === "legacy" ? "" : `${province}-`}${r.month}.xlsx`;
+      return new Response(exportXlsx(r, basis, r.can_view_phone) as unknown as BodyInit, {
+        status: 200,
+        headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${name}"` },
+      });
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/cnts\/duty-rosters\/(\d{4}-\d{2})\/import$/,
+    handler: (ctx) => {
+      const w = who(ctx);
+      if (w.role === "kn_xa" || w.readOnly) return problem(403, "forbidden", "chỉ cán bộ tổng hợp Cấp Tỉnh (hoặc Admin) nạp lịch trực KSGM");
+      const province = rosterProvince(ctx, ctx.url.searchParams.get("province_code") ?? undefined, true);
+      if (province instanceof Response) return province;
+      return importXlsx(latestRoster(ctx.params[0]!, province), ctx.body);
     },
   },
   {
@@ -129,7 +295,7 @@ export const cntsCalRoutes: Route[] = [
       const next: Roster = { ...cur, version: cur.version + 1, cells, source: b.source ?? "grid", note: b.note ?? null, updated_at: new Date().toISOString(), updated_by: w.actor, notified_officer_refs: changed };
       next.warnings = warnings(next);
       ROSTERS.set(rosterKey(month,province), [...(ROSTERS.get(rosterKey(month,province)) ?? []), next]);
-      return json(next, 201);
+      return json(withPhones(next, ctx), 201);
     },
   },
   {
@@ -154,12 +320,31 @@ export const cntsCalRoutes: Route[] = [
     method: "GET",
     pattern: /^\/v1\/extension\/cnts\/vaccination-batches$/,
     handler: (ctx) => {
-      const w = who(ctx);
       const st = ctx.url.searchParams.get("status");
-      const items = [...BATCHES.values()]
-        .map((vs) => batchView(vs.at(-1)!))
-        .filter((b) => (w.communes === null || w.communes.includes(b.commune_code)) && (!st || b.status === st));
-      return json({ items });
+      return json({ items: scopedBatches(ctx).filter((b) => !st || b.status === st) });
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/vaccination-matrix$/,
+    handler: (ctx) => {
+      const m = matrix(ctx);
+      return m instanceof Response ? m : json(m);
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/v1\/extension\/cnts\/vaccination-matrix\/xlsx$/,
+    handler: (ctx) => {
+      const m = matrix(ctx);
+      if (m instanceof Response) return m;
+      // Giả lập: CSV UTF-8 (BOM) cùng cột với tệp .xlsx thật (STT, xã, hộ, CB theo dõi MH, ngày nhận, dự kiến/thực tế từng mũi).
+      const head = ["STT", "Địa chỉ (xã)", "Họ tên nông dân", "CB theo dõi MH", "Ngày nhận giống", ...m.columns.flatMap((c) => [`${c.vaccine_name ?? c.vaccine_code} L${c.shot} dự kiến`, `L${c.shot} thực tế`])];
+      const lines = m.rows.map((r, i) => [String(i + 1), r.commune_name ?? r.commune_code, r.household_text ?? "", r.model?.officer_display ?? "", r.received_date,
+        ...r.cells.flatMap((d) => [d?.expected_date ?? "", d?.actual_date ?? ""])].map((v) => `"${v.replace(/"/g, '""')}"`).join(","));
+      return new Response(`﻿${head.join(",")}\r\n${lines.join("\r\n")}\r\n`, {
+        status: 200, headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="lich-tiem-phong-bm07-gia-lap.csv"' },
+      });
     },
   },
   {
@@ -175,6 +360,16 @@ export const cntsCalRoutes: Route[] = [
         b.head_count !== undefined && b.head_count !== null && !(Number.isInteger(b.head_count) && b.head_count >= 1) && { field: "head_count", reason: "số con ≥ 1" },
       ].filter(Boolean) as { field: string; reason: string }[];
       if (numErrs.length) return validation(numErrs);
+      if (b.household_ref) {
+        // Như máy chủ (BF-CN-VACC): hộ mô hình của KN; xã, loại mô hình theo hộ/điểm.
+        const m = modelHouseholdInfo(b.household_ref);
+        if (!m || !m.active) return validation([{ field: "household_ref", reason: "không có hộ mô hình (FN-10) này trong phạm vi" }]);
+        if (b.commune_code && b.commune_code !== m.commune_code) return validation([{ field: "commune_code", reason: "khác xã của hộ mô hình" }]);
+        if (b.model_type_code && b.model_type_code !== m.model_type_code) return validation([{ field: "model_type_code", reason: "khác loại mô hình của điểm trình diễn" }]);
+        b.commune_code = m.commune_code;
+        b.model_type_code = m.model_type_code;
+      }
+      if (!b.commune_code || !b.model_type_code) return validation([{ field: !b.commune_code ? "commune_code" : "model_type_code", reason: "bắt buộc khi không chọn hộ mô hình" }]);
       const sc = CATALOGS.cnts_vaccination_schedule.find((x) => x.attrs.model_type === b.model_type_code);
       if (!sc) return problem(422, "extension.cnts_vaccination_no_procedure", "Không có quy trình tiêm cho loại mô hình/giống tại ngày nhận giống");
       const doses = (sc.attrs.doses ?? "")
@@ -229,13 +424,37 @@ export const cntsCalRoutes: Route[] = [
     method: "POST",
     pattern: /^\/v1\/extension\/work-schedules\/([^/]+)\/items\/([^/]+)\/checkin$/,
     handler: (ctx) => {
-      const b = (ctx.body ?? {}) as { lat: number; lon: number; accuracy_m?: number | null; captured_at: string; mock_location?: boolean };
+      const b = (ctx.body ?? {}) as { lat: number; lon: number; accuracy_m?: number | null; captured_at: string; mock_location?: boolean; photo?: string };
+      // CNTS v4.0 FN-12: check-in bắt buộc ảnh.
+      if (!b.photo) return validation([{ field: "photo", reason: "bắt buộc chụp ảnh tại chỗ" }]);
       const checkin: S["ExtWorkScheduleCheckin"] = {
         id: uuidv7(), item_id: ctx.params[1]!, day: b.captured_at.slice(0, 10), captured_at: b.captured_at, recorded_at: new Date().toISOString(),
         accuracy_m: b.accuracy_m ?? null, distance_m: null, far: false, weak_accuracy: (b.accuracy_m ?? 0) > 50, mock_location: !!b.mock_location,
-        point_stored: true, location: { lat: b.lat, lon: b.lon },
+        point_stored: true, location: { lat: b.lat, lon: b.lon }, photo: { content_type: "image/jpeg", size_bytes: Math.ceil((b.photo.length * 3) / 4) },
+        legacy_no_photo: false, checkout: null, no_checkout: false,
       };
+      CHECKINS.set(checkin.item_id, checkin);
       return json({ checkin, warnings: [{ code: "checkin_no_place", message: "Mục chưa có địa điểm trên bản đồ — không tính được khoảng cách", item_ids: [checkin.item_id] }] }, 201);
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/v1\/extension\/work-schedules\/([^/]+)\/items\/([^/]+)\/checkout$/,
+    handler: (ctx) => {
+      const b = (ctx.body ?? {}) as { lat: number; lon: number; accuracy_m?: number | null; captured_at: string; mock_location?: boolean; photo?: string };
+      const ci = CHECKINS.get(ctx.params[1]!);
+      if (!ci) return problem(409, "extension.checkout_no_checkin", "Chưa check-in mục công tác — check-out chỉ sau khi đã check-in");
+      if (ci.checkout) return problem(409, "extension.checkout_exists", "Mục công tác đã check-out (check-out không sửa được)");
+      if (!b.photo) return validation([{ field: "photo", reason: "bắt buộc chụp ảnh tại chỗ" }]);
+      const now = new Date().toISOString();
+      const checkout: S["ExtWorkScheduleCheckout"] = {
+        id: uuidv7(), checkin_id: ci.id, item_id: ci.item_id, day: ci.day, captured_at: b.captured_at, recorded_at: now, synced_at: now,
+        accuracy_m: b.accuracy_m ?? null, distance_m: null, far: false, weak_accuracy: (b.accuracy_m ?? 0) > 50, mock_location: !!b.mock_location,
+        point_stored: true, location: { lat: b.lat, lon: b.lon }, photo: { content_type: "image/jpeg", size_bytes: Math.ceil((b.photo.length * 3) / 4) },
+        stay_minutes: Math.max(0, Math.floor((Date.parse(b.captured_at) - Date.parse(ci.captured_at)) / 60_000)), synced_late: false,
+      };
+      CHECKINS.set(ci.item_id, { ...ci, checkout });
+      return json({ checkout, warnings: [] }, 201);
     },
   },
 ];

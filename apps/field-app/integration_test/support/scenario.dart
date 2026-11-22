@@ -57,7 +57,7 @@ nacl.PrivateKey seedServer(MockApiServer s) {
       'name': 'Phường Ninh Kiều',
       'level': 'commune',
     })
-    ..addChange('plot', plotRef, {
+    ..addChange('kn_plot', plotRef, {
       'ref': plotRef,
       'code': 'T-001',
       'name': 'Thửa bờ kênh',
@@ -207,7 +207,7 @@ Future<void> runOfflineFieldScenario({
     tick: tick,
     reason: 'pull khóa công khai hộ',
   );
-  expect(await s.refs.get('plot', plotRef), isNotNull);
+  expect(await s.refs.get('kn_plot', plotRef), isNotNull);
   expect(await s.inbox.unreadCount(), 1);
 
   // 2. Mất mạng: vẽ thửa mới, lưu vào hàng đợi.
@@ -222,7 +222,7 @@ Future<void> runOfflineFieldScenario({
   await s.sync.syncOnce(force: true);
   expect((await s.sync.status()).state, SyncState.offline);
   expect((await s.outbox.byId(rec.id))!.status, OutboxStatus.pending);
-  expect(server.recordsOf('plot_boundary'), isEmpty);
+  expect(server.recordsOf('kn_plot_boundary'), isEmpty);
 
   // 3. Có mạng lại; máy chủ gửi {kind: sync_now} → đồng bộ ngay.
   server.offline = false;
@@ -232,7 +232,7 @@ Future<void> runOfflineFieldScenario({
     tick: tick,
     reason: 'push ranh giới sau khi có mạng',
   );
-  final wire = server.recordsOf('plot_boundary').single;
+  final wire = server.recordsOf('kn_plot_boundary').single;
   final payload = wire['payload']! as Map;
   expect(payload['commune_code'], '31117');
   expect(payload['declared_area_ha'], '1.2000');

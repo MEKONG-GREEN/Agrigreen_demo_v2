@@ -35,6 +35,8 @@ const (
 	OpSectionRead  = "section_read"
 	// W11.23 (vault 20261013165158): đọc thẻ danh bạ theo lô (họ tên, SĐT, năm sinh, email — chỉ trường được hỏi).
 	OpCard = "card"
+	// CNTS-V4-HOUSEHOLD-LIST (#251, vault 20261106164139, ADR-0056): đọc nhãn che bớt của bản sửa họ tên/SĐT.
+	OpRevisionRead = "revision_read"
 )
 
 // Kết quả ghi vào sổ truy cập (vault.access_log.outcome).
@@ -202,11 +204,14 @@ var opPurposes = map[string]map[string]bool{
 	OpResolve: set("registry.admin", "extension.contact", "extension.field_support", PurposeHRMProfile, PurposePriceSurvey),
 	OpDisplay: set("registry.admin", "extension.contact", "extension.field_support",
 		"mechanization.owner", "mrv.evidence", PurposeHRMProfile, PurposePriceSurvey),
-	OpAmend:        set(PurposeHRMProfile, PurposeContactDirectory),
+	// #251 (ADR-0056 mục 4): extension.contact — sửa họ tên/SĐT chủ hộ chăn nuôi CNTS (lịch sử HCN-09).
+	OpAmend:        set(PurposeHRMProfile, PurposeContactDirectory, "extension.contact"),
 	OpSectionWrite: set(PurposeHRMProfile, PurposeHRMSensitive, PurposeContactDirectory),
 	OpSectionRead:  set(PurposeHRMProfile, PurposeHRMSensitive, PurposeContactDirectory),
 	// W11.23: thẻ danh bạ (pf/contact, FN-13) — CHỈ mục đích danh bạ.
 	OpCard: set(PurposeContactDirectory),
+	// #251: nhãn che bớt cũ → mới của bản sửa (màn lịch sử hộ chăn nuôi CNTS) — chỉ mục đích liên hệ hộ.
+	OpRevisionRead: set("extension.contact"),
 	// Unwrap (mở DEK ảnh): đúng tập mục đích tệp của pf/evidence (domain.Purposes). W11.24: tài liệu nhân sự (hr_records).
 	// W11.48: ảnh nhật ký nuôi khuyến nông (extension.diary, pf/extension).
 	OpUnwrap: set("mrv.evidence", "extension.field_support", "hr_records", "extension.diary"),
@@ -318,6 +323,9 @@ const (
 
 // MaxCardRefs là số chủ thể tối đa của một lần đọc thẻ.
 const MaxCardRefs = 200
+
+// MaxRevisionRefs là số bản sửa tối đa của một lần đọc nhãn bản sửa (#251).
+const MaxRevisionRefs = 200
 
 // ValidCardFields kiểm tập trường được hỏi (không rỗng, không lạ, không lặp).
 func ValidCardFields(fields []string) bool {

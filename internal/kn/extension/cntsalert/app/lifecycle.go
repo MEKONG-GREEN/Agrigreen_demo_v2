@@ -17,9 +17,10 @@ import (
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/cntsalert/store"
+	extdomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
-	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/txdeps"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/txdeps"
 )
 
 // ListFilter là bộ lọc danh sách cảnh báo.
@@ -412,12 +413,16 @@ func (s *Service) EscalateOverdue(ctx context.Context, tid uuid.UUID, now time.T
 // TenantLister trả các tenant cần chạy job tại at.
 type TenantLister func(ctx context.Context, at time.Time) ([]uuid.UUID, error)
 
-// JobTenants dùng pool vai ag_ops_jobs (BYPASSRLS, chỉ đọc cột tìm tenant): tenant có cảnh báo quá hạn xử lý hoặc có kỳ
-// native profile kn_cnts (nhắc nộp, trễ liên tiếp).
+// JobTenants dùng pool vai ag_ops_jobs (BYPASSRLS, chỉ đọc cột tìm tenant): tenant có cảnh báo quá hạn xử lý, có kỳ
+// native profile kn_cnts (nhắc nộp, trễ liên tiếp) hoặc có lịch tiêm BM-07 (mũi quá hạn — BF-CN-VACC).
 func JobTenants(pool *pgxpool.Pool) TenantLister {
 	return func(ctx context.Context, at time.Time) ([]uuid.UUID, error) {
 		rows, err := pool.Query(ctx, `SELECT tenant_id FROM pf_extension.cnts_alert_current WHERE status <> 'closed' AND overdue_at IS NULL AND due_at < $1
-		  UNION SELECT tenant_id FROM pf_forms.period WHERE profile = $2`, at.UTC(), ProfileCNTS)
+		  UNION SELECT tenant_id FROM pf_forms.period WHERE profile = $2
+		  UNION SELECT tenant_id FROM pf_extension.cnts_vaccination_batch
+		  UNION SELECT tenant_id FROM pf_extension.work_schedule_checkin WHERE day >= $3::date`, at.UTC(), ProfileCNTS,
+			// CNTS v4.0 dòng 13: check-in trong cửa sổ quét "Chưa check-out" (check-out gửi muộn tối đa 7 ngày).
+			vnDay(at).AddDate(0, 0, -(extdomain.CheckinMaxLateDays+1)).Format(time.DateOnly))
 		if err != nil {
 			return nil, err
 		}
@@ -435,7 +440,7 @@ func JobTenants(pool *pgxpool.Pool) TenantLister {
 }
 
 // JobResult là kết quả một lần chạy job.
-type JobResult struct{ Overdue, Reminders, Streaks int }
+type JobResult struct{ Overdue, Reminders, Streaks, Vaccines, NoCheckouts int }
 
 // RunJob là thân job extension_cnts_alert: quá hạn xử lý, nhắc nộp, trễ liên tiếp — mọi tenant.
 func (s *Service) RunJob(ctx context.Context, tenants TenantLister) (JobResult, error) {
@@ -451,6 +456,8 @@ func (s *Service) RunJob(ctx context.Context, tenants TenantLister) (JobResult, 
 		total.Overdue += r.Overdue
 		total.Reminders += r.Reminders
 		total.Streaks += r.Streaks
+		total.Vaccines += r.Vaccines
+		total.NoCheckouts += r.NoCheckouts
 		if err != nil {
 			errs = append(errs, fmt.Errorf("tenant %s: %w", tid, err))
 		}

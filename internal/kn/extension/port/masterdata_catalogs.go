@@ -3,9 +3,11 @@ package port
 import (
 	"context"
 	"errors"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	mdport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/masterdata/port"
 )
@@ -38,7 +40,9 @@ const (
 	// CatalogCNTSFishingGroup: nhóm khai thác (cá, tôm, mực, khác). attrs: unit, order, description.
 	CatalogCNTSFishingGroup = "cnts_fishing_group"
 	// CatalogCNTSIndicator: chỉ tiêu theo dõi (pH, oxy, tăng trọng, tỷ lệ chết…). attrs: unit, value_type
-	// (decimal|integer|percent), description. Ngưỡng mặc định: tham số có phiên bản IndicatorMinKey / IndicatorMaxKey.
+	// (decimal|integer|percent), threshold_min / threshold_max (ngưỡng mặc định, BF-CN-CATALOG #170), diary_metric (chỉ số
+	// nhật ký BM-19 mà ngưỡng áp vào), description. Tham số có phiên bản cnts.indicator_min/max:<mã>[:<loại mô hình>]
+	// (Cấp Tỉnh đặt, người khác duyệt) ghi đè ngưỡng mặc định của danh mục.
 	CatalogCNTSIndicator = "cnts_indicator"
 	// CatalogCNTSModelType: loại mô hình. attrs: sector (chan_nuoi|thuy_san), species (danh sách mã loài), description.
 	CatalogCNTSModelType = "cnts_model_type"
@@ -59,7 +63,29 @@ const (
 	AttrStampsGS     = "stamp_codes_gs"
 	AttrStampsGC     = "stamp_codes_gc"
 	AttrDoses        = "doses"
+	// Chỉ tiêu theo dõi (BF-CN-CATALOG #170).
+	AttrThresholdMin = "threshold_min"
+	AttrThresholdMax = "threshold_max"
+	AttrDiaryMetric  = "diary_metric"
 )
+
+// DiaryWaterMetrics là các chỉ số môi trường nước của nhật ký BM-19 (cntsdiary) gắn được với một chỉ tiêu theo dõi.
+var DiaryWaterMetrics = []string{"ph", "do_mgl", "temp_c", "salinity"}
+
+// ParseThreshold đọc một ngưỡng đã lưu (danh mục đã chuẩn hóa: số thập phân thường, ≤ 7 chữ số nguyên, ≤ 4 chữ số thập
+// phân). Rỗng hoặc sai dạng → nil; kiểm cú pháp TRƯỚC khi dựng decimal.
+func ParseThreshold(s string) *decimal.Decimal {
+	if len(s) == 0 || len(s) > 12 || !thresholdRe.MatchString(s) {
+		return nil
+	}
+	d, err := decimal.NewFromString(s)
+	if err != nil {
+		return nil
+	}
+	return &d
+}
+
+var thresholdRe = regexp.MustCompile(`^\d{1,7}(\.\d{1,4})?$`)
 
 // Loại cơ sở giết mổ.
 const (

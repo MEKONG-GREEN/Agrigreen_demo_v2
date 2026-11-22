@@ -1,0 +1,11 @@
+{
+  "id": "kn-cnts-bm11",
+  "source": "./kn-cnts-bm11",
+  "app": [
+    {
+      "export": "cntsBm11Routes",
+      "order": 1145
+    }
+  ],
+  "admin": []
+}

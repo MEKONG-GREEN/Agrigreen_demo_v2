@@ -33,6 +33,29 @@ func (h Handler) RegisterApp(rg *gin.RouterGroup) {
 	g.GET("/alert-config", h.config)
 	g.PUT("/alert-config/forms/:code", h.putForm)
 	g.PUT("/alert-config/kinds/:kind", h.putKind)
+	g.POST("/period-reminders", h.remindPeriod) // BF-CN-PUBLISH: nút Nhắc của màn theo dõi biểu kỳ
+}
+
+type remindReq struct {
+	PeriodID uuid.UUID `json:"period_id"`
+	Units    []string  `json:"units"`
+}
+
+func (h Handler) remindPeriod(c *gin.Context) {
+	var r remindReq
+	if !bind(c, &r) {
+		return
+	}
+	if r.PeriodID == uuid.Nil {
+		httpx.Fail(c, problem.Validation.WithField("period_id", "bắt buộc"))
+		return
+	}
+	out, err := h.Svc.RemindPeriod(c.Request.Context(), r.PeriodID, r.Units)
+	if err != nil {
+		httpx.Fail(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"reminded": out.Reminded, "skipped": out.Skipped})
 }
 
 func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }

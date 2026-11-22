@@ -53,6 +53,10 @@ func (c Control) ReopenPeriod(ctx context.Context, profile string, id uuid.UUID,
 
 // ChangeDue đổi hạn nộp của kỳ (cấp close_by của Nút phát hành; kỳ đang nhận bài).
 func (c Control) ChangeDue(ctx context.Context, profile string, id uuid.UUID, due time.Time, reason, idem string) error {
+	return c.changeDue(ctx, profile, id, due, reason, idem, nil)
+}
+
+func (c Control) changeDue(ctx context.Context, profile string, id uuid.UUID, due time.Time, reason, idem string, expect *controlCAS) error {
 	s := c.Svc
 	prof, a, err := s.resolve(ctx, profile)
 	if err != nil {
@@ -64,6 +68,21 @@ func (c Control) ChangeDue(ctx context.Context, profile string, id uuid.UUID, du
 	reason = strings.TrimSpace(reason)
 	if utf8.RuneCountInString(reason) > 500 {
 		return problem.Validation.WithField("reason", "tối đa 500 ký tự")
+	}
+	hash, hashErr := port.OperationHash(struct {
+		Due    time.Time
+		Reason string
+	}{due.UTC(), reason})
+	if hashErr != nil {
+		return hashErr
+	}
+	grant := false
+	if a.level != prof.CloseBy {
+		authorization, callErr := operationAllowed(ctx, prof, port.Operation{Action: port.OperationChangeDue, Profile: profile, PeriodID: id, PayloadHash: hash, IdemKey: idem})
+		if callErr != nil {
+			return callErr
+		}
+		grant = authorization.Allowed
 	}
 	now := s.Clock.Now().UTC()
 	err = s.tx(ctx, a.tenant, func(tx pgx.Tx) error {
@@ -77,16 +96,23 @@ func (c Control) ChangeDue(ctx context.Context, profile string, id uuid.UUID, du
 		if v == nil || v.Period.Profile != profile || !a.canSee(v.Period, v.Spec) {
 			return port.ErrPeriodNotFound
 		}
-		if !a.canClose(prof.CloseBy, v.Period, v.Spec, nil) {
+		if !a.canControlGranted(prof.CloseBy, v.Period, v.Spec, grant) {
 			return problem.Forbidden.WithDetail("đổi hạn nộp cần cấp " + prof.CloseBy + " của Nút phát hành")
+		}
+		if err := checkControlRevision(ctx, tx, a.tenant, profile, id, expect); err != nil {
+			return err
 		}
 		switch v.State.Status {
 		case domain.PeriodCancelled:
-			return port.ErrPeriodCancelled
+			return rejectControl(ctx, tx, expect, port.ErrPeriodCancelled)
 		case domain.PeriodClosed:
-			return port.ErrPeriodClosed
+			return rejectControl(ctx, tx, expect, port.ErrPeriodClosed)
 		}
-		return store.InsertDue(ctx, tx, a.tenant, id, due, reason, a.ref, now, idemOr(idem, "due"))
+		beginControlEffects(expect)
+		if err := store.InsertDue(ctx, tx, a.tenant, id, due, reason, a.ref, now, idemOr(idem, "due")); err != nil {
+			return err
+		}
+		return appliedControlRevision(ctx, tx, a.tenant, profile, id, expect)
 	})
 	return classify(err)
 }

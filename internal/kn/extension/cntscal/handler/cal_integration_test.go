@@ -36,9 +36,12 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/httpx"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/idempotency"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/objstore"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/pgtest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/telemetry"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/vault/identity/client/clienttest"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/migrations"
 )
 
@@ -101,7 +104,7 @@ func (catalogs) ListAt(_ context.Context, catalog string, _ time.Time) ([]mdport
 
 func (c catalogs) FacilitiesAt(context.Context, time.Time, []string) ([]knport.SlaughterFacility, error) {
 	out := []knport.SlaughterFacility{
-		{Ref: fac1, Code: "CS1", Name: "Lò mổ 1", CommuneCode: "30001", Kind: knport.FacilityConcentrated, Active: true},
+		{Ref: fac1, Code: "CS1", Name: "Lò mổ 1", CommuneCode: "30001", Kind: knport.FacilityConcentrated, Active: true, Address: "Ấp Hư Cấu"},
 		{Ref: fac2, Code: "CS2", Name: "Lò mổ 2", CommuneCode: "30002", Kind: knport.FacilitySmall, Active: true},
 	}
 	if c.multiProvince {
@@ -159,18 +162,46 @@ type fix struct {
 	mu     sync.Mutex
 	ctxs   map[uuid.UUID]*authz.KNContext
 	xa     *xaScopes
+	vault  *clienttest.Fake
+	mod    *extension.Module
+	phones *staffPhones
+	clk    *clock.Fixed
+}
+
+// staffPhones: SĐT công vụ giả của viên chức (pf/accounts StaffContacts) — số hư cấu.
+type staffPhones struct {
+	mu sync.Mutex
+	m  map[uuid.UUID]string
+}
+
+func (p *staffPhones) PhoneOf(_ context.Context, _ uuid.UUID, actor uuid.UUID) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if s, ok := p.m[actor]; ok {
+		return s, nil
+	}
+	return "", accport.ErrNoPhone
 }
 
 func newFix(t *testing.T, multi ...bool) *fix {
 	env := pgtest.Get(t)
-	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}}
+	f := &fix{t: t, iss: authztest.New(t), tenant: ids.New(), ctxs: map[uuid.UUID]*authz.KNContext{}, xa: &xaScopes{}, vault: clienttest.New(), phones: &staffPhones{m: map[uuid.UUID]string{}}}
 	f.pool = env.AdminPool(t, migrations.PF)
-	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), clock.NewFixed(t0), extension.Deps{Units: units{}, Orgs: provinceOrgs{}})
+	f.clk = clock.NewFixed(t0)
+	mod := extension.New(env.Pool(t, migrations.PF, dbadmin.AppPlatform), f.clk, extension.Deps{Units: units{}, Orgs: provinceOrgs{}})
+	st, err := objstore.NewLocal(t.TempDir(), objstore.LocalOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mod.UseObjectStore(st) // CNTS-V4-CHECKOUT-PHOTO: kho ảnh check-in/check-out
+	mod.UseContacts(f.phones)
 	mod.UseCNTSCatalogs(catalogs{multiProvince: len(multi) > 0 && multi[0]})
 	if len(multi) < 2 || multi[1] {
 		mod.UseXaScopes(f.xa)
 	}
 	mod.UseKNContext(knResolver{}, nil)
+	mod.UseCNTSModelVault(f.vault) // BF-CN-VACC: hộ mô hình, nhãn chủ hộ
+	f.mod = mod
 	ops := env.Pool(t, migrations.PF, "platform_api")
 	eng := httpx.NewEngine(telemetry.NewLogger("test", io.Discard), 4<<20)
 	mod.RegisterApp(eng.Group("/v1", httpx.Authenticate(f.iss.Verifier()), f.knMiddleware(), idempotency.Middleware(ops)))
@@ -219,7 +250,7 @@ type user struct {
 
 func (f *fix) user(kc authz.KNContext) user {
 	sub := ids.New()
-	tok := f.iss.Sign(f.t, authztest.Token{Subject: sub, TenantID: f.tenant, Roles: []string{"kn_user"}, MFA: true, TTL: 2 * time.Hour})
+	tok := f.iss.Sign(f.t, authztest.Token{Subject: sub, TenantID: f.tenant, Roles: []string{"kn_user", client.RoleRegistrar, client.RoleDisplay}, MFA: true, TTL: 2 * time.Hour})
 	kc.ID, kc.OrgRef = ids.New(), ids.New()
 	f.mu.Lock()
 	f.ctxs[kc.ID] = &kc
@@ -415,7 +446,7 @@ func TestWorkScheduleCheckin(t *testing.T) {
 		t.Fatalf("địa điểm: %s", d)
 	}
 	path := fmt.Sprintf("/v1/extension/work-schedules/%s/items/%s/checkin", sid, itemNear)
-	near := map[string]any{"lat": 10.001, "lon": 105.0, "accuracy_m": 12, "captured_at": "2027-10-13T09:55:00+07:00"}
+	near := map[string]any{"lat": 10.001, "lon": 105.0, "accuracy_m": 12, "captured_at": "2027-10-13T09:55:00+07:00", "photo": jpegB64}
 	want(t, officer.post(path, near), 409, "extension.checkin_not_registered", "lịch nháp chưa check-in")
 	want(t, officer.post("/v1/extension/work-schedules", map[string]any{"id": sid, "week_start": "2027-10-11", "action": "submit", "base_version": 1, "items": items}), 201, "", "gửi duyệt")
 	// Log bug TT-07/CN-06: lịch đã gửi nhưng chưa được duyệt → chưa check-in được.
@@ -439,13 +470,13 @@ func TestWorkScheduleCheckin(t *testing.T) {
 	}
 
 	want(t, officer.post(path, near), 409, "extension.checkin_exists", "check-in không sửa được")
-	far := map[string]any{"lat": 10.01, "lon": 105.0, "accuracy_m": 80, "captured_at": "2027-10-13T09:58:00+07:00", "mock_location": true}
+	far := map[string]any{"lat": 10.01, "lon": 105.0, "accuracy_m": 80, "captured_at": "2027-10-13T09:58:00+07:00", "mock_location": true, "photo": jpegB64}
 	fp := fmt.Sprintf("/v1/extension/work-schedules/%s/items/%s/checkin", sid, itemFar)
 	c = want(t, officer.post(fp, far), 201, "", "check-in xa")
 	if w := codes(list(c, "warnings")); w["checkin_far"] != 1 || w["checkin_weak_gps"] != 1 || w["checkin_mock_location"] != 1 {
 		t.Fatalf("cảnh báo xa: %s", c)
 	}
-	wrong := map[string]any{"lat": 10.0, "lon": 105.0, "captured_at": "2027-10-13T09:00:00+07:00"}
+	wrong := map[string]any{"lat": 10.0, "lon": 105.0, "captured_at": "2027-10-13T09:00:00+07:00", "photo": jpegB64}
 	want(t, officer.post(fmt.Sprintf("/v1/extension/work-schedules/%s/items/%s/checkin", sid, itemOffice), wrong), 422, "validation_failed", "khác ngày công tác")
 	m := want(t, officer.get("/v1/extension/work-schedules/mine?week_start=2027-10-11"), 200, "", "lịch của tôi")
 	sc := obj(m, "schedule")

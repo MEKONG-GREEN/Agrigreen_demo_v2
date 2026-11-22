@@ -1,0 +1,3 @@
+.entry :global(.pg-head > .row) {
+  margin-inline-start: auto;
+}

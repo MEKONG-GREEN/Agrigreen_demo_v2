@@ -39,8 +39,18 @@ type Service struct {
 	// W11.42: danh mục cơ sở (đơn vị lá UnitFacility — kiểm cơ sở thuộc xã) và quy tắc nghiệp vụ theo profile.
 	Facilities port.FacilityDirectory
 	Validators map[string]port.Validator
-	profiles   map[string]port.Profile
-	order      []string
+	// ReviewGuards: kiểm quyền rà soát thêm của bên dùng theo profile (gọi ngoài giao dịch, trước khi ghi).
+	ReviewGuards map[string]port.ReviewGuard
+	// DefinitionPolicies are registered before serving; owner callbacks run outside TX.
+	DefinitionPolicies map[string]port.TemplateDefinitionPolicy
+	// PeriodOperationPolicies are registered by owners before serving; nil disables receipts.
+	PeriodOperationPolicies map[string]port.PeriodOperationPolicy
+	// PublishOperationPolicies authorize the additive batch receipt capability before native TX.
+	PublishOperationPolicies map[string]port.PublishOperationPolicy
+	// RequiredDefinitionPolicies denies missing policies instead of falling back to DefineBy.
+	RequiredDefinitionPolicies map[string]bool
+	profiles                   map[string]port.Profile
+	order                      []string
 }
 
 var _ port.Freezer = (*Service)(nil)
@@ -53,7 +63,7 @@ func NewService(b tenant.Beginner, clk clock.Clock, approvals wfport.Approvals, 
 	if clk == nil {
 		clk = clock.System{}
 	}
-	s := &Service{DB: b, Clock: clk, Approvals: approvals, profiles: map[string]port.Profile{}}
+	s := &Service{DB: b, Clock: clk, Approvals: approvals, profiles: map[string]port.Profile{}, RequiredDefinitionPolicies: map[string]bool{}}
 	for _, p := range profiles {
 		if err := domain.ValidateProfile(p); err != nil {
 			return nil, err
@@ -62,6 +72,9 @@ func NewService(b tenant.Beginner, clk clock.Clock, approvals wfport.Approvals, 
 			return nil, fmt.Errorf("profile %s khai hai lần", p.Name)
 		}
 		s.profiles[p.Name] = p
+		if p.RequireDefinitionPolicy {
+			s.RequiredDefinitionPolicies[p.Name] = true
+		}
 		s.order = append(s.order, p.Name)
 	}
 	return s, nil
@@ -168,7 +181,26 @@ func (s *Service) tx(ctx context.Context, tid uuid.UUID, fn func(pgx.Tx) error) 
 	if s.DB == nil {
 		return errNoPool
 	}
-	return db.WithModuleTenantTx(ctx, s.DB, DBModule, tid, fn)
+	op, _ := ctx.Value(periodOperationContext{}).(*periodOperation)
+	stopped := false
+	err := db.WithModuleTenantTx(ctx, s.DB, DBModule, tid, func(tx pgx.Tx) error {
+		callErr := fn(tx)
+		if errors.Is(callErr, errReceiptStop) && op != nil && op.durable && !op.effects {
+			stopped = true
+			return nil // Only replay/rejection, never a partly executed mutation.
+		}
+		return callErr
+	})
+	if err != nil {
+		return err
+	} // Includes unknown COMMIT acknowledgement: never manufacture success.
+	if op != nil && op.durable {
+		op.acknowledged = true
+	}
+	if stopped {
+		return errReceiptStop
+	}
+	return nil
 }
 
 func idemOr(key, suffix string) string {

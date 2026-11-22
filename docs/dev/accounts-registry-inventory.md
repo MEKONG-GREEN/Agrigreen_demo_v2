@@ -1,23 +1,24 @@
-# KNSPLIT-2-ACCOUNTS-REGISTRY (#52): kiểm kê và thứ tự chuyển
+# Kiểm kê và rollout registry tài khoản — KNSPLIT-2-ACCOUNTS-REGISTRY
 
-Kiểm kê trên dev 407831bf. Tài liệu này chưa xác nhận đã đảo phụ thuộc hoặc gỡ bridge. #51 (SessionPolicies), #49 (grant scope) và #63 (ScopedDutyHolders) là các gói riêng, không làm trùng.
+## Nguồn gốc và phạm vi phần đầu
 
-| Nhóm | Điểm hiện tại | Bước shared cần làm | Bước chủ ứng dụng cần làm |
-| --- | --- | --- | --- |
-| Vai realm, MFA, loại tổ chức | port/grants.go; domain/account.go; app/service.go, users.go, mfa.go, orgstatus.go; handler/http.go catalog | Catalog bất biến theo instance; cả catalog HTTP và kiểm quyền ghi dùng cùng snapshot; giữ quyền nền tảng, HTX và MKG; không sửa map toàn cục khi đăng ký | KN cung cấp các định nghĩa vai và yêu cầu TOTP D24 qua adapter; không lấy quyền từ SelectedSession để cộng vào realm |
-| Assignment, node, thuộc tính | domain/kn.go, kn_attrs.go; app/kn.go, kn_attrs.go | Port chính sách kiểm/chuẩn hóa theo chủ ứng dụng; sổ, transaction tenant, kiểm node/phòng hiện hành vẫn do accounts kiểm; callback lỗi không fallback | KN sở hữu danh mục vai, nhóm, duty, cấp quản lý và luật phạm vi; chuyển trước khi gỡ luật legacy |
-| Đơn vị nội bộ, delegation | app/internal_unit.go, kn_attrs.go; store/kn_attrs.go | Giữ hiệu lực/thu hồi, cùng assignment/node/department; không biến delegated power thành duty | Adapter chủ ứng dụng định nghĩa allowed powers và ngữ nghĩa quản lý; scope CNTS thuộc #49 |
-| Job khóa không hoạt động | app/dormant.go; store/dormant.go | Đã dùng tenant tường minh, tham số theo tenant, không đọc Principal.KN; không thêm registry chỉ để đổi tên | Kiểm khi chuyển tenant: account projection, activity, reactivation và idempotency đi theo đúng tenant; thuộc các gói 4b |
+Khôi phục #52 từ dev `857934416860007cfb2e1b886f682dea27c3ec95` sau khi xác minh actual claim Codex cũ nhưng không có nhánh/WT/checkpoint trên máy mới; release/reclaim qua ticket.ps1 được ghi trên issue. Không reset/xóa. Đây là phần trọn vẹn đầu tiên, chưa đạt toàn bộ acceptance #52; phần còn lại ở child [#193 KNSPLIT-2-ACCOUNTS-REGISTRY-FINAL](https://github.com/MEKONG-GREEN/Agrigreen_demo_v2/issues/193).
 
-## Các ràng buộc chuyển hai bước
+## Hiện trạng và thay đổi
 
-1. Thêm cấu hình generic và consumer trước, giữ bridge khi chưa cấu hình. Cấu hình theo instance, không đăng ký KN vào global map hoặc làm nhiễm instance native khác.
-2. Không đồng nhất MFARoles (kiểm Admin API) với LoginTOTPRoles (yêu cầu đăng ký TOTP lúc đăng nhập). Các vai KN phải tiếp tục cần TOTP trong giai đoạn chuyển; không gỡ trước khi owner adapter và realm contract đã được kiểm.
-3. Không xóa mọi tham chiếu ttkn_province: account_admin_province và content_editor_province đang dùng loại tổ chức đó cho quy tắc nền tảng. Phải phân loại theo chủ hành vi, không thay chuỗi hàng loạt.
-4. Kiểm role catalog phải đồng bộ NormalizeRoles, ManagedOf, RolesFitOrg, Grantable, RequiredActions, MFAStatus, thay vai và catalog HTTP. Chỉ chuyển endpoint catalog sẽ tạo lệch giữa giao diện và quyền ghi.
-5. Callback không được tự cấp quyền quản trị nền tảng, bỏ MFA, đổi tenant hoặc ghép quyền từ các phiên khác. Các ca âm thu hồi/hết hạn/node/tenant cần chạy DB thật sau mỗi bước.
-6. Chỉ gỡ bridge sau khi chủ KN có adapter, assembly đã inject và Claude Review OK. Không tự sửa lane KN. Không thay HTTP/DDL hoặc ledger bytes nếu chưa có gói hợp đồng riêng.
+| Mảnh | Hợp đồng/owner hiện có | Phần này |
+|---|---|---|
+| Catalog thuộc tính/nhãn/CSV và cờ quyền | accounts/port.AttributeCatalog (#78), extension.AttributeCatalog (#79) | API assembly dựng owner snapshot, lỗi dừng startup, truyền Attributes tường minh |
+| Luật assignment/loại node | accounts/port.AssignmentRules (#68), extension.AssignmentRules (#72) | API truyền owner rules, giữ native normalization/scope checks |
+| Vai realm/TOTP/MFA | RoleCatalog (#66), NativeRoleCatalog (#96), owner declarations (#95) | Giữ Roles production hiện hành; exact ordering ManagedRoles/LoginTOTPRoles/Grantable thuộc #193 trước retire #57 |
+| Phiên/hỗ trợ/default unit | SessionRegistry/SessionProjection, AccountSessionPolicies (#60), Navigation/ScopedDutyHolders (#51/#63) | Giữ ghép nối hiện hành, không cộng quyền từ realm/phiên khác |
+| Đơn vị nội bộ/ủy quyền/read-only | Sổ accounts, cờ AttributeCatalog, consumer KN đang chuyển | #193 kiểm kê và nối owner còn thiếu; chưa xóa bridge |
+| Worker dormant/org-status | Luồng tenant/native hiện hành, không ghi assignment qua API | Không thêm registry giả/thay global lifecycle; membership KN/provenance còn #87/#90–94 |
 
-## Trạng thái
+Không thêm registry/module-specific branch/fallback; không sửa namespace/schema/migration, dữ liệu HTX, tenant/Principal, D2, golden, API/web hoặc bản khai KN. Cờ chỉ xem/đọc mọi phòng lấy từ catalog server, không suy từ nhãn. Giữ MFA D24 và thứ tự vai hiện hành; không sửa golden để che khác biệt.
 
-#52 đã claim và tạo worktree riêng; hiện mới kiểm kê. Chưa có thay đổi production, chưa có kiểm thử cho #52 và chưa ready. Nguồn dev hiện tại đã có Navigation #44; các thay đổi module.go/Service phải giữ trường đó cùng SessionPolicies #51 khi gộp sau này.
+## Nghiệm chứng và giới hạn
+
+Test mới TestBuildAccountOwnerCatalogThroughHTTP đi qua Build thật và HTTP Admin: metadata/nhãn/cờ catalog owner; native platform_admin có MFA thành công; thiếu MFA hoặc chỉ có kn_province_admin/kn_user bị từ chối. Suite accounts/handler + tests/knaccounts kiểm create/grant/change/CSV, node/tenant/role, readonly/delegation/thu hồi/hết hạn/D24 trên PostgreSQL thật; contextdata/notify/worker kiểm consumer. Kết quả migration/static/mutation/CI Linux race được ghi trên đúng SHA gửi review tại issue #52 sau khi runner xong, không dùng PASS cũ.
+
+Không coi #57/KNSPLIT-4b/G1 hoặc toàn acceptance #52 hoàn tất từ phần rollout snapshot này; role-order và remaining policies giữ ở child #193.

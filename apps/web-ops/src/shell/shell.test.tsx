@@ -6,7 +6,7 @@ import { KN_ACCOUNTS } from "@/api/mock/kn-accounts";
 import type { MenuTree } from "@/kn/contract";
 import type { KnSessionState } from "@/auth/AuthProvider";
 import { buildPrincipal } from "@/auth/principal";
-import { activeMenu, isAllowed, isBareRoute } from "@/components/AppShell";
+import { activeMenu, isAllowed, isBareRoute, isKnRemovedTool } from "@/components/AppShell";
 import { AccountMenu } from "./AccountMenu";
 import { Breadcrumb } from "./Breadcrumb";
 import { LoginCard } from "./LoginCard";
@@ -56,7 +56,10 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
       ["2 phòng khác", "not_open"],
     ]);
     const hrefs = menuLinks(admin).map((l) => l.node.href);
-    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/quan-tri/to-chuc", "/kn/phong-ban/trong_trot/danh-muc", "/quan-tri/mau-bao-cao"]));
+    expect(hrefs).toEqual(expect.arrayContaining(["/kn/tong-quan", "/kn/quan-tri/co-cau-to-chuc", "/kn/quan-tri/nguoi-dung", "/kn/phong-ban/trong_trot/danh-muc"]));
+    // KN-STANDALONE-1-ADMIN-TOOLS (#264): bỏ nhóm "Công cụ nền tảng (tạm)" (BRD 2.0 không có FN); Cơ cấu tổ chức chỉ còn /kn.
+    expect(hrefs.filter((h) => h !== undefined && isKnRemovedTool(h))).toEqual([]);
+    expect(menuLinks(admin).map((l) => l.node.label)).not.toContain("Công cụ nền tảng (tạm)");
     // BF-ACC-KN-MENU (#120, TT-13): Admin KN quản lý người dùng qua /kn/quan-tri/nguoi-dung; bỏ liên kết native cũ.
     expect(hrefs).not.toContain("/quan-tri/tai-khoan");
     expect(menuLinks(admin).map((l) => l.node.label)).not.toContain("Tài khoản cán bộ (G1)");
@@ -70,6 +73,52 @@ describe("menu theo vai trò (BRD v7.7 §6, Hình 3c–3f)", () => {
     expect(crumbsFor(tw, "/kn/dashboard")).toEqual(["Điều hành", "Dashboard"]);
     expect(menuAllows(tw, "/kn/nhiem-vu/phat-hanh")).toBe(false);
     expect(menuAllows(tinh, "/kn/nhiem-vu/phat-hanh")).toBe(true);
+  });
+
+  it("phiếu/rà soát KHTC dùng đúng mục cha đang mở, không cho phép cả prefix hoặc menu bị tắt", () => {
+    const id = "01963011-1234-7123-8123-123456789abc";
+    const form = "/kn/khtc/phieu/" + id, review = "/kn/khtc/ra-soat/" + id;
+    const only = (href: string, status?: "not_open" | "coming_soon"): MenuTree => ({
+      ...tinh, groups: [{ key: "test", label: "Báo cáo", items: [{ key: "entry", label: "Phiếu", icon: "file", href, status }] }],
+    });
+    const own = only("/kn/bao-cao-khtc"), manager = only("/kn/khtc/ky-bao-cao"), adhoc = only("/kn/khtc/bao-cao-phat-sinh");
+    expect(menuAllows(own, form)).toBe(true);
+    expect(menuAllows(own, review)).toBe(false);
+    for (const tree of [manager, adhoc]) {
+      expect(menuAllows(tree, form)).toBe(true);
+      expect(menuAllows(tree, review)).toBe(true);
+      expect(crumbsFor(tree, review)).toEqual(["Báo cáo", "Phiếu"]);
+    }
+    for (const tree of [tw, only("/kn/bao-cao-khtc", "not_open"), only("/kn/khtc/bao-cao-phat-sinh", "coming_soon")]) {
+      expect(menuAllows(tree, form)).toBe(false);
+      expect(menuAllows(tree, review)).toBe(false);
+    }
+    for (const route of ["/kn/khtc/phieu/other", form + "/sua", "/kn/khtc/ra-soat", "/kn/khtc/quan-tri/" + id]) {
+      expect(menuAllows(adhoc, route)).toBe(false);
+    }
+  });
+
+  it("lịch sử KHTC chỉ dùng hai dạng đường dẫn và mục cha reviewer được phép", () => {
+    const id = "01963011-1234-7123-8123-123456789abc";
+    const sub = "01963011-1234-7123-8123-abcdef123456";
+    const review = "/kn/khtc/ra-soat/" + id;
+    const history = review + "/lan-gui";
+    const only = (href: string, status?: "not_open" | "coming_soon"): MenuTree => ({
+      ...tinh, groups: [{ key: "test", label: "Báo cáo", items: [{ key: "entry", label: "Phiếu", icon: "file", href, status }] }],
+    });
+    const manager = only("/kn/khtc/ky-bao-cao"), adhoc = only("/kn/khtc/bao-cao-phat-sinh");
+    for (const tree of [manager, adhoc]) for (const path of [history, history + "/" + sub]) {
+      expect(menuAllows(tree, path)).toBe(true);
+      expect(crumbsFor(tree, path)).toEqual(["Báo cáo", "Phiếu"]);
+    }
+    for (const tree of [tw, xa, only("/kn/bao-cao-khtc"), only("/kn/khtc/ky-bao-cao", "not_open"), only("/kn/khtc/bao-cao-phat-sinh", "coming_soon")]) {
+      expect(menuAllows(tree, history)).toBe(false);
+      expect(menuAllows(tree, history + "/" + sub)).toBe(false);
+    }
+    const badIDs = ["other", "1e100000", "1e-100000", "9".repeat(10_000)];
+    const invalid = ["/kn/khtc/phieu/" + id + "/lan-gui", history + "/" + sub + "/sua", history + "/other", history + "-khac",
+      ...badIDs.map(bad => history + "/" + bad), ...badIDs.map(bad => "/kn/khtc/ra-soat/" + bad + "/lan-gui")];
+    for (const path of invalid) expect(menuAllows(manager, path)).toBe(false);
   });
 
   it("số đếm chỉ cho việc cần xử lý, ẩn khi bằng 0", () => {
@@ -247,7 +296,7 @@ describe("<LoginCard> (Hình 3a)", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Sai tài khoản hoặc mật khẩu.Kiểm tra lại thông tin. Còn 4 lần thử.");
     rerender(<LoginCard mode="password" error={{ kind: "locked", minutes: 15 }} onSubmit={() => undefined} />);
     expect(screen.getByRole("alert")).toHaveTextContent("tạm khóa 15 phút");
-    expect(screen.getByRole("link", { name: "Quên mật khẩu?" })).toHaveAttribute("href", "/login/lien-he?ly-do=quen-mat-khau");
+    expect(screen.getByRole("link", { name: "Quên mật khẩu?" })).toHaveAttribute("href", "/login/quen-mat-khau");
     expect(screen.getByRole("link", { name: "Liên hệ quản trị viên" })).toHaveAttribute("href", "/login/lien-he");
   });
 
@@ -304,9 +353,53 @@ describe("AppShell: nguồn menu và kiểm hiển thị", () => {
     expect(isAllowed("/quan-tri/tai-khoan", active, tinh, tinhPrincipal)).toBe(false);
   });
 
+  it("KN-STANDALONE-1-ADMIN-TOOLS (#264): phiên KN không vào 10 công cụ nền tảng dù có vai realm quản trị; phiên nền tảng giữ nguyên", () => {
+    const adminPrincipal = buildPrincipal({ sub: "a", amr: ["pwd", "otp"], realm_access: { roles: ["platform_admin", "param_setter", "param_approver", "registry_admin", "reports_admin", "sync_conflict_resolver", "device_admin", "api_client_admin", "metering_viewer"] } }, null);
+    const knAdmin: KnSessionState = { status: "active", assignments: [], context: null, menu: admin, badges: null };
+    const tools = ["/quan-tri/tham-so", "/quan-tri/to-chuc", "/quan-tri/mau-bao-cao", "/quan-tri/xung-dot", "/quan-tri/giam-sat-dong-bo", "/dong-bo",
+      "/quan-tri/khach-hang-api", "/quan-tri/su-dung-api", "/quan-tri/bang-ke", "/quan-tri/nhat-ky-xuat"];
+    for (const path of tools) {
+      expect(isAllowed(path, knAdmin, admin, adminPrincipal)).toBe(false);
+      expect(isAllowed(`${path}/x`, knAdmin, admin, adminPrincipal)).toBe(false);
+      expect(isAllowed(path, legacy, activeMenu(legacy, adminPrincipal), adminPrincipal)).toBe(true);
+    }
+    expect(isKnRemovedTool("/dong-bo-x")).toBe(false);
+    expect(isAllowed("/kn/quan-tri/co-cau-to-chuc", knAdmin, admin, adminPrincipal)).toBe(true);
+  });
+
   it("trang không khung: đăng nhập, chọn vai trò", () => {
     expect(isBareRoute("/login/lien-he")).toBe(true);
     expect(isBareRoute("/chon-vai-tro")).toBe(true);
     expect(isBareRoute("/kn/dashboard")).toBe(false);
   });
+});
+
+
+describe("HRM v4.0: gỡ tự đánh giá, giữ route lãnh đạo/HCTH",()=>{
+ const period="019abcde-0000-7000-8000-000000000001",staff="019abcde-0000-7000-8000-000000000002";
+ const canonical=`/kn/nhan-su/danh-gia/dot/${period}/phieu/${staff}`;
+ const center=():MenuTree=>({version:"test",role:"kn_tinh",department_code:"hanh_chinh_tong_hop",groups:[{key:"dieu_hanh",label:"Điều hành",items:[{key:"tinh.hcth.danh_gia",label:"Đánh giá",icon:"approve",href:"/kn/nhan-su/danh-gia",status:"active"}]}]});
+ it("chỉ ánh xạ URL UUID thực vào lá hiện có, giữ breadcrumb và các màn HCTH",()=>{
+  const tree=center();
+  expect(menuAllows(tree,canonical)).toBe(true);
+  expect(findActive(tree,canonical)?.node.href).toBe("/kn/nhan-su/danh-gia");
+  expect(crumbsFor(tree,canonical)).toEqual(["Điều hành","Đánh giá"]);
+  for(const tail of ["/dot/them-moi","/mau","/mau/them-moi"])expect(menuAllows(tree,"/kn/nhan-su/danh-gia"+tail)).toBe(true);
+  const admin=center();admin.role="admin";admin.department_code=null;expect(menuAllows(admin,canonical)).toBe(true);
+ });
+ it("URL cũ không được mở, kể cả menu cũ đã cache; Cấp Xã không dùng alias trung tâm",()=>{
+  const removed="/kn/nhan-su/danh-gia-cua-toi";
+  for(const role of ["kn_xa","kn_tinh","admin"] as const){
+   const tree=center();tree.role=role;tree.groups[0]!.items[0]!.href=removed;
+   for(const path of [removed,`${removed}/dot/${period}`,`${removed}/dot/${period}/phieu/${staff}`,canonical])expect(menuAllows(tree,path)).toBe(false);
+  }
+  const xa=center();xa.role="kn_xa";expect(menuAllows(xa,canonical)).toBe(false);
+ });
+ it("chặn vai/phòng sai, thiếu menu, URL hỏng và suffix ngoài trang hiện có",()=>{
+  for(const role of ["kn_tw",null] as const){const tree=center();tree.role=role;expect(menuAllows(tree,canonical)).toBe(false);}
+  const other=center();other.department_code="trong_trot";expect(menuAllows(other,canonical)).toBe(false);
+  const disabled=center();disabled.groups[0]!.items[0]!.status="coming_soon";expect(menuAllows(disabled,canonical)).toBe(false);
+  const absent=center();absent.groups[0]!.items=[];expect(menuAllows(absent,canonical)).toBe(false);
+  for(const path of [canonical+"/extra",canonical+"?x=1",canonical.replace(period,"not-a-uuid"),canonical.replace(staff,"%2F"),"/kn/nhan-su/danh-gia/unknown"])expect(menuAllows(center(),path)).toBe(false);
+ });
 });

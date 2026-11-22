@@ -26,3 +26,4 @@ KHTC khi gắn `program_ref`).
 | 409 | `extension.cnts_grant_version_conflict` | `base_version` khác phiên bản hiện hành của quyền |
 | 409 | `extension.cnts_grant_exists` | Người được cấp (hoặc người nhận việc) đã có quyền còn/chờ hiệu lực cùng vai trong tỉnh |
 | 409 | `extension.cnts_grant_revoked` | Sửa hoặc thu hồi quyền đã thu hồi |
+| 422 | `extension.cnts_import_invalid` | W11.53c nạp Excel điểm, hộ: tệp rỗng, không phải `.xlsx` (hoặc `.xls` cũ), vượt 2 MB, không mở được, thiếu sheet "Điểm trình diễn"/"Hộ tham gia", sai tên/thứ tự cột, quá 200 điểm/2000 hộ; khi ghi: tệp còn lỗi theo dòng (trường mở rộng `issues`: sheet, row, column, message — không ghi gì) |

@@ -5,3 +5,5 @@
 *.ttf binary
 # Golden byte-cho-byte của tệp xuất kế toán (CSV CRLF, XML LF) — không chuẩn hóa xuống dòng.
 internal/mkg/acctbridge/domain/testdata/** -text
+# Golden tệp mẫu vật tư (BOM + CSV CRLF, web và Go đọc chung) — không chuẩn hóa xuống dòng.
+internal/kn/extension/material/app/testdata/** -text

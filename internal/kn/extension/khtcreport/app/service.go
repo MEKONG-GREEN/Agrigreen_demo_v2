@@ -12,12 +12,14 @@ import (
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcreport/store"
 	source "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtcsource/app"
+	templatedomain "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/khtctemplate/domain"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension/port"
 	exportport "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/export/port"
 	forms "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/forms/port"
 	party "github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/platform/party/port"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/authz"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/clock"
+	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/ids"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/meter"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/problem"
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/shared/tenant"
@@ -35,9 +37,12 @@ var (
 	ErrInvalid     = problem.New(http.StatusUnprocessableEntity, "extension.khtc_report_invalid", "Nội dung bản soạn không hợp lệ")
 	ErrDependency  = problem.New(http.StatusServiceUnavailable, "extension.dependency_unavailable", "Dịch vụ phụ thuộc chưa sẵn sàng")
 	ErrCancelled   = problem.New(http.StatusConflict, "extension.khtc_period_terminal", "Kỳ báo cáo đã hủy")
+	// ErrCancelling: kỳ đang được hủy (ý định hủy còn hạn — DB khtc_report_cancelling; P0-POOL-SHARED-2).
+	ErrCancelling = problem.New(http.StatusConflict, "extension.khtc_period_cancelling", "Kỳ đang được hủy — thử lại sau")
 )
 
 type Service struct {
+	Templates  port.KHTCFixedTemplates
 	DB         tenant.Beginner
 	Clock      clock.Clock
 	Plans      port.KHTCPlans
@@ -47,6 +52,8 @@ type Service struct {
 	EgressMode meter.Mode
 	// Exporter: pf/export (`cap/export`, W10.17) — xuất Word từ bản Excel đã đóng băng; nil → 503.
 	Exporter exportport.Exporter
+	// CancelLease: hạn ý định hủy kỳ (giây nguyên); 0 → DefaultCancelLease (kiểm thử đặt ngắn).
+	CancelLease time.Duration
 }
 type caller struct {
 	principal authz.Principal
@@ -67,6 +74,12 @@ func (s *Service) reader(ctx context.Context) (caller, error) {
 	return caller{principal: p, kn: k}, nil
 }
 func writer(c caller, p pstore.Period) error {
+	if p.Type == period.TypeAdhoc && c.kn.Role == port.SessionRoleAdmin && !c.kn.ReadOnly() {
+		if !c.principal.MFA {
+			return problem.MFARequired
+		}
+		return nil
+	}
 	if c.kn.Role != port.SessionRoleProvince || c.kn.Department != party.DeptKeHoachTaiChinh || c.kn.ReadOnly() {
 		return problem.Forbidden
 	}
@@ -112,8 +125,12 @@ func classify(err error) error {
 			return ErrFinal
 		case "khtc_report_cancelled":
 			return ErrCancelled
+		case "khtc_report_cancelling":
+			return ErrCancelling
 		case "khtc_report_export_draft":
 			return ErrVersion
+		case "khtc_adhoc_request_pending":
+			return ErrProvisional.WithDetail("Còn yêu cầu bổ sung chưa hoàn tất")
 		case "khtc_report_final_export":
 			return ErrProvisional
 		}
@@ -136,9 +153,63 @@ func (s *Service) HasFinal(ctx context.Context, id string) (bool, error) {
 	return found, err
 }
 
-// GuardCancel serializes the entire cancellation workflow, including the cap/forms side effect.
-// The cancellation event uses this transaction so its trigger can reacquire the lock safely.
-func (s *Service) GuardCancel(ctx context.Context, id uuid.UUID, fn func(pgx.Tx) error) error {
+// DefaultCancelLease là hạn ý định hủy kỳ: đủ cho lời gọi cap/forms CancelPeriod của một yêu cầu HTTP; tiến trình chết
+// giữa chừng → hết hạn thì Bản cuối/đóng kỳ chạy lại được.
+const DefaultCancelLease = 2 * time.Minute
+
+// maxCancelMargin: biên an toàn tối đa giữa hạn lời gọi cap/forms và hạn ý định hủy.
+const maxCancelMargin = 15 * time.Second
+
+func (s *Service) cancelLease() time.Duration {
+	if s.CancelLease >= time.Second {
+		return s.CancelLease.Truncate(time.Second) // hạn DB tính bằng giây nguyên
+	}
+	return DefaultCancelLease
+}
+
+// BeginCancel (P0-POOL-SHARED-2, #143 — thay GuardCancel): giao dịch NGẮN giữ khóa khtc_snapshot, kỳ chưa có Bản cuối →
+// ghi ý định hủy (khtc_cancel_intent) rồi commit. Trong lúc ý định còn hạn, trigger chặn Bản cuối và đóng kỳ — nên bên gọi
+// hủy kỳ native ở cap/forms NGOÀI giao dịch mà Bản cuối vẫn không chen vào được. Đã có Bản cuối → period.ErrHasFinal; ý
+// định khác còn hạn → period.ErrCancelling.
+//
+// deadline (review #143 C1): hạn lời gọi cap/forms = thời điểm TRƯỚC giao dịch nhận + hạn − biên (¼ hạn, tối đa 15 s).
+// Ý định hết hạn (giờ DB) không sớm hơn lúc giao dịch nhận bắt đầu + hạn, nên lời gọi bị cắt trước khi ý định hết dù
+// giao dịch nhận phải chờ kết nối/khóa lâu.
+func (s *Service) BeginCancel(ctx context.Context, id uuid.UUID) (token uuid.UUID, deadline time.Time, err error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return uuid.Nil, time.Time{}, problem.Unauthenticated
+	}
+	lease := s.cancelLease()
+	start := time.Now()
+	token = ids.New()
+	err = s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		if err := store.Lock(ctx, tx, p.TenantID, id); err != nil {
+			return err
+		}
+		f, err := store.GetFinal(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if f != nil {
+			return period.ErrHasFinal
+		}
+		claimed, err := store.ClaimCancel(ctx, tx, p.TenantID, id, token, lease)
+		if err != nil {
+			return err
+		}
+		if !claimed {
+			return period.ErrCancelling
+		}
+		return nil
+	})
+	return token, start.Add(lease - min(lease/4, maxCancelMargin)), err
+}
+
+// FinishCancel ghi kết quả hủy kỳ (fn — sự kiện 'cancelled' trong giao dịch này, trigger lấy lại khóa an toàn) và bỏ ý
+// định hủy, trong một giao dịch ngắn giữ khóa khtc_snapshot. Token phải CÒN giữ ý định CÒN HẠN (kiểm trước khi ghi sự kiện,
+// dưới khóa) — không thì period.ErrCancelLost, không ghi gì (review #143 C1).
+func (s *Service) FinishCancel(ctx context.Context, id, token uuid.UUID, fn func(pgx.Tx) error) error {
 	p, ok := authz.FromContext(ctx)
 	if !ok {
 		return problem.Unauthenticated
@@ -147,8 +218,43 @@ func (s *Service) GuardCancel(ctx context.Context, id uuid.UUID, fn func(pgx.Tx)
 		if err := store.Lock(ctx, tx, p.TenantID, id); err != nil {
 			return err
 		}
+		released, err := store.ReleaseCancel(ctx, tx, p.TenantID, id, token, true)
+		if err != nil {
+			return err
+		}
+		if !released {
+			return period.ErrCancelLost
+		}
 		return fn(tx)
 	})
+}
+
+// AbortCancel bỏ ý định hủy (hủy ở cap/forms lỗi, hoặc ghi sự kiện hủy lỗi). Token không còn giữ ý định (đã hết hạn / người
+// khác nhận) → không có gì để bỏ, không lỗi.
+func (s *Service) AbortCancel(ctx context.Context, id, token uuid.UUID) error {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return problem.Unauthenticated
+	}
+	return s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		_, err := store.ReleaseCancel(ctx, tx, p.TenantID, id, token, false)
+		return err
+	})
+}
+
+// CancelPending: kỳ đang có ý định hủy còn hạn ("Đóng kỳ" kiểm trước khi chốt kỳ native ở cap/forms).
+func (s *Service) CancelPending(ctx context.Context, id uuid.UUID) (bool, error) {
+	p, ok := authz.FromContext(ctx)
+	if !ok {
+		return false, problem.Unauthenticated
+	}
+	pending := false
+	err := s.tx(ctx, p.TenantID, func(tx pgx.Tx) error {
+		var err error
+		pending, err = store.CancelPending(ctx, tx, p.TenantID, id)
+		return err
+	})
+	return pending, err
 }
 
 type Detail struct {
@@ -162,6 +268,9 @@ type Detail struct {
 	SourceChanged bool
 	SourceError   string
 	Terminal      string
+	Sections      []domain.Section
+	Document      *templatedomain.Rendered
+	LockedAdmin   []string
 }
 
 func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
@@ -177,6 +286,12 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 		var e error
 		if p, term, e = loadPeriod(ctx, tx, id); e != nil {
 			return e
+		}
+		if p.Type == period.TypeAdhoc && c.kn.Role == port.SessionRoleAdmin && !c.principal.MFA {
+			return problem.MFARequired
+		}
+		if p.Type == period.TypeAdhoc && (c.kn.Role == port.SessionRoleNational || c.kn.ReadOnly()) {
+			return problem.Forbidden
 		}
 		if draft, e = store.LatestDraft(ctx, tx, id); e != nil {
 			return e
@@ -201,11 +316,17 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 		if e != nil {
 			return Detail{}, e
 		}
+		if e = s.pinNewTemplate(ctx, &out.Content, term); e != nil {
+			return Detail{}, e
+		}
 	} else {
 		out.Content = draft.Content
 		out.Version = draft.Version
 		did := draft.ID
 		out.DraftID = &did
+	}
+	if err = decorateFixedDetail(&out); err != nil {
+		return Detail{}, err
 	}
 	changed, reason := s.changed(ctx, c, p, out.Content.Data)
 	out.SourceChanged, out.SourceError = changed, reason
@@ -221,7 +342,7 @@ func (s *Service) changed(ctx context.Context, c caller, p pstore.Period, data d
 	if current.InputHash != data.InputHash {
 		return true, ""
 	}
-	if s.Sources != nil {
+	if s.Sources != nil && (p.Type != "adhoc" || data.Sources != nil) {
 		state, e := s.Sources.Status(ctx, p.ID)
 		if e != nil {
 			return false, "Không kiểm tra được nguồn module"

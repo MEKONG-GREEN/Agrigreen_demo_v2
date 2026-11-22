@@ -5,9 +5,11 @@ import 'package:agrigreen_mobile/core/ids.dart';
 import 'package:agrigreen_mobile/data/actions/action_queue.dart';
 import 'package:agrigreen_mobile/data/db/local_db.dart';
 import 'package:agrigreen_mobile/data/photo/location_source.dart';
+import 'package:agrigreen_mobile/data/photo/photo_pipeline.dart';
 import 'package:agrigreen_mobile/data/sync/sync_api.dart';
 
 import '../domain/work_schedule.dart';
+import 'visit_photo.dart';
 
 /// Quyền thao tác máy chủ trả (`ExtWorkScheduleDetail.can`).
 class WsCan {
@@ -73,6 +75,17 @@ class WeekSchedule {
   /// nhưng còn bản đã duyệt hiệu lực — log bug TT-07/CN-06, như máy chủ), mục có
   /// trong bản đã duyệt đó, và theo dữ liệu ĐÃ DUYỆT (không theo bản điều chỉnh):
   /// ngoài cơ quan, của hôm nay; chưa check-in.
+  /// Mục được check-out lúc [now] (CNTS v4.0 FN-12 B4b): đã check-in (kể cả
+  /// đang chờ đồng bộ), chưa check-out, trong ngày công tác theo bản đã duyệt
+  /// (BR-08: thời điểm check-out thuộc ngày công tác).
+  bool canCheckout(WsItem i, DateTime now) {
+    final c = i.checkin;
+    if (!checkinEnabled || scheduleId == null || c == null) return false;
+    if (c.checkout != null) return false;
+    final a = approvedOf(i);
+    return a != null && ymd(a.day) == ymd(now);
+  }
+
   bool canCheckin(WsItem i, DateTime now) {
     if (!checkinEnabled || scheduleId == null || i.checkin != null) {
       return false;
@@ -228,6 +241,7 @@ class WorkScheduleService {
     this.deviceId,
     this.syncNow,
     this.location,
+    this.camera,
   }) : _db = db,
        _api = api,
        _actions = actions,
@@ -244,6 +258,10 @@ class WorkScheduleService {
   /// Nguồn GPS cho check-in (W11.46). null → không check-in được.
   final LocationSource? location;
 
+  /// Camera chụp ảnh tại chỗ khi check-in/check-out (CNTS v4.0 FN-12: bắt buộc
+  /// ảnh). null → không check-in/check-out được.
+  final CameraSource? camera;
+
   /// Đồng bộ ngay sau khi xếp lệnh (app: `SyncService.syncOnce(force: true)`).
   Future<void> Function()? syncNow;
 
@@ -252,6 +270,7 @@ class WorkScheduleService {
   static const _srvKind = 'ext_work_schedule';
   static const _draftKind = 'ext_work_schedule_draft';
   static const _checkinKind = 'ext_work_schedule_checkin';
+  static const _checkoutKind = 'ext_work_schedule_checkout';
   static const _base = '/v1/extension/work-schedules';
 
   DateTime defaultWeek() => nextWeekStart(_clock.now());
@@ -343,7 +362,12 @@ class WorkScheduleService {
       fetchedAt: cached?.$2,
       loadError: srv == null ? loadError : null,
     );
-    return _withCheckins(v, srv, await _get(_checkinKind, week));
+    return _withCheckins(
+      v,
+      srv,
+      await _get(_checkinKind, week),
+      await _get(_checkoutKind, week),
+    );
   }
 
   // ------------------------------------------------------------ check-in (W11.46)
@@ -353,6 +377,7 @@ class WorkScheduleService {
     WeekSchedule v,
     Map<String, Object?>? srv,
     (Map<String, Object?>, DateTime)? pending,
+    (Map<String, Object?>, DateTime)? pendingOut,
   ) {
     final detail = _map(srv?['schedule']);
     final enabled =
@@ -375,6 +400,20 @@ class WorkScheduleService {
         final ck = WsCheckin.fromJson(m);
         if (ck != null && m['item_id'] is String) {
           byItem[m['item_id']! as String] = ck;
+        }
+      }
+    }
+    // Check-out bấm khi mất mạng (chờ đồng bộ) — máy chủ chưa có thì hiện bản chờ.
+    if (pendingOut != null) {
+      for (final e in pendingOut.$1.entries) {
+        final at = e.value is String
+            ? DateTime.tryParse(e.value! as String)
+            : null;
+        final ck = byItem[e.key];
+        if (at != null && ck != null && ck.checkout == null) {
+          byItem[e.key] = ck.withCheckout(
+            WsCheckout(capturedAt: at, pending: true),
+          );
         }
       }
     }
@@ -416,9 +455,9 @@ class WorkScheduleService {
     );
   }
 
-  /// Bấm "Check-in" tại địa điểm công tác (CV-07): lấy GPS (độ chính xác, thời điểm thiết bị), xếp lệnh idempotent
-  /// [CntsActionKind.workScheduleCheckin] (phát lại khi có mạng, máy chủ nhận bản gửi muộn tối đa 7 ngày). Tọa độ chỉ
-  /// nằm trong thân lệnh chờ gửi — không lưu riêng trên máy.
+  /// Bấm "Check-in" tại địa điểm công tác (CV-07): lấy GPS (độ chính xác, thời điểm thiết bị), chụp ảnh tại chỗ (bắt
+  /// buộc từ CNTS v4.0, nén ≤ 500 KB), xếp lệnh idempotent [CntsActionKind.workScheduleCheckin] (phát lại khi có mạng,
+  /// máy chủ nhận bản gửi muộn tối đa 7 ngày). Tọa độ, ảnh chỉ nằm trong thân lệnh chờ gửi — không lưu riêng trên máy.
   Future<WeekSchedule> checkin(DateTime week, WsItem item) async {
     week = mondayOf(week);
     final v = await load(week, refresh: false);
@@ -429,6 +468,41 @@ class WorkScheduleService {
         v.checkinBlockedReason(item, now) ?? 'Chỉ check-in mục công tác ngoài cơ quan của hôm nay, theo lịch đã duyệt.',
       );
     }
+    final body = await _visitBody('check-in', now);
+    await _actions.enqueue(
+      CntsActionKind.workScheduleCheckin,
+      target: '${v.scheduleId}/items/${item.id}',
+      body: body,
+    );
+    return _afterVisit(_checkinKind, week, item, now);
+  }
+
+  /// Bấm "Check-out" khi rời địa điểm (CNTS v4.0 CV-08, FN-12 B4b): chỉ sau check-in, chụp ảnh tại chỗ (bắt buộc,
+  /// AC-09), GPS. Mất mạng → lệnh chờ trên máy, đồng bộ đúng thời điểm, vị trí lúc bấm (AC-11, BR-08).
+  Future<WeekSchedule> checkout(DateTime week, WsItem item) async {
+    week = mondayOf(week);
+    final v = await load(week, refresh: false);
+    final now = _clock.now();
+    final cur = v.items.where((i) => i.id == item.id).firstOrNull ?? item;
+    if (!v.canCheckout(cur, now)) {
+      throw WorkScheduleError(
+        'checkout',
+        cur.checkin == null
+            ? 'Chưa check-in mục này — check-out chỉ sau khi đã check-in.'
+            : 'Chỉ check-out một lần, trong ngày công tác của mục.',
+      );
+    }
+    final body = await _visitBody('check-out', now);
+    await _actions.enqueue(
+      CntsActionKind.workScheduleCheckout,
+      target: '${v.scheduleId}/items/${item.id}',
+      body: body,
+    );
+    return _afterVisit(_checkoutKind, week, item, now);
+  }
+
+  /// Thân lệnh check-in/check-out: GPS lúc bấm và ảnh chụp tại chỗ (base64).
+  Future<Map<String, Object?>> _visitBody(String what, DateTime now) async {
     final src = location;
     if (src == null) throw WorkScheduleError('gps', 'Thiết bị không có GPS.');
     final r = await src.current();
@@ -437,24 +511,45 @@ class WorkScheduleService {
       throw WorkScheduleError(
         'gps',
         r.status == GpsStatus.denied
-            ? 'Cần cho phép truy cập vị trí để check-in.'
+            ? 'Cần cho phép truy cập vị trí để $what.'
             : 'Không lấy được vị trí GPS — bật định vị rồi thử lại.',
       );
     }
-    await _actions.enqueue(
-      CntsActionKind.workScheduleCheckin,
-      target: '${v.scheduleId}/items/${item.id}',
-      body: {
-        'lat': fix.lat,
-        'lon': fix.lon,
-        'accuracy_m': fix.accuracyM,
-        'captured_at': now.toUtc().toIso8601String(),
-        'mock_location': false,
-        'device_id': deviceId,
-      },
-    );
-    final pending = (await _get(_checkinKind, week))?.$1 ?? <String, Object?>{};
-    await _put(_checkinKind, week, {
+    final cam = camera;
+    if (cam == null) {
+      throw WorkScheduleError(
+        'photo',
+        'Thiết bị không có camera để chụp ảnh $what.',
+      );
+    }
+    final shot = await cam.capture();
+    if (shot == null) {
+      throw WorkScheduleError('photo', 'Cần chụp ảnh tại chỗ để $what.');
+    }
+    final photo = await compressVisitPhoto(shot.bytes);
+    if (photo == null) {
+      throw WorkScheduleError('photo', 'Không đọc được ảnh — chụp lại.');
+    }
+    return {
+      'lat': fix.lat,
+      'lon': fix.lon,
+      'accuracy_m': fix.accuracyM,
+      'captured_at': now.toUtc().toIso8601String(),
+      'mock_location': false,
+      'device_id': deviceId,
+      'photo': base64Encode(photo),
+    };
+  }
+
+  /// Ghi "chờ đồng bộ" cho mục rồi thử đồng bộ ngay.
+  Future<WeekSchedule> _afterVisit(
+    String kind,
+    DateTime week,
+    WsItem item,
+    DateTime now,
+  ) async {
+    final pending = (await _get(kind, week))?.$1 ?? <String, Object?>{};
+    await _put(kind, week, {
       ...pending,
       item.id: now.toUtc().toIso8601String(),
     });
@@ -977,10 +1072,11 @@ class _Draft {
 }
 
 /// Lệnh API riêng của App hiện trường KN (W11.46): check-in lịch công tác
-/// `POST /v1/extension/work-schedules/{id}/items/{item_id}/checkin` — đăng ký qua
-/// `ActionQueue(extraKinds: CntsActionKind.values)`.
+/// `POST /v1/extension/work-schedules/{id}/items/{item_id}/checkin`, check-out
+/// (CNTS v4.0) `…/checkout` — đăng ký qua `ActionQueue(extraKinds: CntsActionKind.values)`.
 enum CntsActionKind implements ActionKind {
-  workScheduleCheckin('work_schedule_checkin');
+  workScheduleCheckin('work_schedule_checkin'),
+  workScheduleCheckout('work_schedule_checkout');
 
   const CntsActionKind(this.code);
   @override
@@ -993,5 +1089,7 @@ enum CntsActionKind implements ActionKind {
   String pathFor(String? target) => switch (this) {
     CntsActionKind.workScheduleCheckin =>
       '/v1/extension/work-schedules/$target/checkin',
+    CntsActionKind.workScheduleCheckout =>
+      '/v1/extension/work-schedules/$target/checkout',
   };
 }

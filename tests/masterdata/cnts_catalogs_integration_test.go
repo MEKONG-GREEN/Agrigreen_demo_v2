@@ -2,7 +2,9 @@ package masterdata_test
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/MEKONG-GREEN/Agrigreen_demo_v2/internal/kn/extension"
@@ -140,10 +142,203 @@ func TestW1141_CNTSCatalogs(t *testing.T) {
 	communes, lookupErr := cnts.FacilityCommunes(ctx, []uuid.UUID{uuid.MustParse(ref), other}, day("2026-10-01"))
 	contract.check("communes", communes, lookupErr)
 
+	// BF-CN-SLAUGHTER #169: dữ liệu nền có 4 CSGM mẫu, mỗi cơ sở thuộc một xã có trong danh mục ĐVHC của tenant.
+	seededFacilities(t, admin)
+	// Xã không có trong ĐVHC bị từ chối cả khi nạp tệp (FN-01 AC-02): dòng đó bị loại kèm lý do, dòng hợp lệ vẫn tạo.
+	csv := "catalog,code,name,valid_from,commune_code,facility_kind\n" +
+		"cnts_slaughter_facility,CS_NHAP_OK,Cơ sở nhập hợp lệ,2026-10-01,30316,nho_le\n" +
+		"cnts_slaughter_facility,CS_NHAP_LA,Cơ sở xã lạ,2026-10-01,99999,nho_le\n"
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte(csv))
+	rows, _ := body["rows"].([]any)
+	if st != http.StatusOK || body["created"] != 1.0 || body["rejected"] != 1.0 || len(rows) != 2 ||
+		rows[1].(map[string]any)["code"] != "CS_NHAP_LA" || rows[1].(map[string]any)["reason"] != "Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng" {
+		t.Fatalf("nạp tệp có xã lạ: %d %v", st, body)
+	}
+	if st, _ := reader.get("/v1/masterdata/catalogs/cnts_slaughter_facility/CS_NHAP_LA"); st != http.StatusNotFound {
+		t.Fatalf("dòng xã lạ không được tạo: %d", st)
+	}
+	if st, body := reader.get("/v1/masterdata/catalogs/cnts_slaughter_facility/CS_NHAP_OK"); st != http.StatusOK || body["attrs"].(map[string]any)["commune_code"] != "30316" {
+		t.Fatalf("dòng xã hợp lệ được tạo: %d %v", st, body)
+	}
+	// Mã tỉnh (không phải cấp xã) và xã đã hết hiệu lực tại ngày áp dụng cũng bị từ chối.
+	for _, tc := range []struct{ commune, from string }{{"91", "2026-10-01"}, {"30289", "2026-10-01"}, {"30289", "2025-07-01"}} {
+		st, body := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_slaughter_facility/items", map[string]any{
+			"code": "CS_SAI_XA", "name": "Cơ sở sai xã", "valid_from": tc.from,
+			"attrs": map[string]string{"commune_code": tc.commune, "facility_kind": "nho_le"}})
+		constraintIssue(t, st, body, http.StatusUnprocessableEntity, "masterdata.cnts_commune_invalid",
+			"Cơ sở giết mổ phải thuộc một xã/phường/đặc khu có hiệu lực tại ngày áp dụng", "attrs.commune_code", tc.commune)
+	}
+
 	// valid_from chỉ nhận ở danh mục CNTS.
 	if st, _ := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/material/items", map[string]any{
 		"code": "VT_X", "name": "Vật tư X", "attrs": map[string]string{"unit": "kg"}, "valid_from": "2026-10-01",
 	}); st != http.StatusUnprocessableEntity {
 		t.Fatalf("valid_from ở danh mục không theo hiệu lực: %d", st)
+	}
+}
+
+// BF-CN-CATALOG #170 (CN-11): ngưỡng mặc định gắn từng chỉ tiêu theo dõi (theo ngày hiệu lực), tệp "Xuất danh mục" nạp lại
+// được (cột trang_thai bỏ qua), dữ liệu nền có giống, loại mô hình gà chuyên trứng / vịt xiêm, vaccine và quy trình BM-07.
+func TestBFCNCatalog_IndicatorThresholdsSeedsExport(t *testing.T) {
+	f := newFixture(t)
+	tid := f.seeded()
+	admin := f.caller(tid, port.RoleMasterdataAdmin)
+	reader := knOfficer(t, f, tid)
+	cnts := extension.NewCNTSCatalogs(f.mod.EffectiveCatalogs(), clock.System{})
+	ctx := admin.ctx()
+
+	// Dữ liệu nền BM-07.
+	on := day("2026-10-28")
+	for _, s := range []struct{ code, model, first string }{{"QT_GA_CHUYEN_TRUNG", "GA_CHUYEN_TRUNG", "VX_ND_F"}, {"QT_VIT_XIEM", "VIT_XIEM", "VX_VIEM_GAN_VIT"}} {
+		sch, err := cnts.ScheduleAt(ctx, s.code, on)
+		if err != nil || sch.ModelType != s.model || len(sch.Doses) < 5 || sch.Doses[0].Vaccine != s.first {
+			t.Fatalf("quy trình %s: %+v %v", s.code, sch, err)
+		}
+	}
+	for _, it := range []struct{ catalog, code string }{{knport.CatalogCNTSBreed, "VIT_XIEM_PHAP"}, {knport.CatalogCNTSBreed, "GA_TRUNG_ISA_BROWN"},
+		{knport.CatalogCNTSVaccine, "VX_IB"}, {knport.CatalogCNTSVaccine, "VX_DICH_TA_VIT"}, {knport.CatalogCNTSVaccine, "VX_THT_VIT"},
+		{knport.CatalogCNTSIndicator, "DO_MAN"}} {
+		if _, err := cnts.ItemAt(ctx, it.catalog, it.code, on); err != nil {
+			t.Fatalf("dữ liệu nền %s/%s: %v", it.catalog, it.code, err)
+		}
+	}
+	ph, err := cnts.ItemAt(ctx, knport.CatalogCNTSIndicator, "PH", on)
+	if err != nil || ph.Attrs[knport.AttrThresholdMin] != "7.5" || ph.Attrs[knport.AttrThresholdMax] != "8.5" || ph.Attrs[knport.AttrDiaryMetric] != "ph" {
+		t.Fatalf("ngưỡng mặc định pH: %+v %v", ph, err)
+	}
+
+	// Chỉ tiêu mới kèm ngưỡng, sửa ngưỡng theo ngày hiệu lực (BR-03); số mũ, số âm, chuỗi dài, tối thiểu > tối đa bị từ chối.
+	create := func(code, lo, hi, from string) (int, map[string]any) {
+		return admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_indicator/items", map[string]any{"code": code, "name": "Nhiệt độ ao " + code,
+			"valid_from": from, "attrs": map[string]string{"value_type": "decimal", "unit": "°C", "diary_metric": "temp_c", "threshold_min": lo, "threshold_max": hi}})
+	}
+	for _, bad := range [][2]string{{"1e100000", "32"}, {"-1", "32"}, {"25", strings.Repeat("9", 5000)}, {"33", "32"}, {"25", "1.23456"}} {
+		if st, body := create("NHIET_DO_SAI", bad[0], bad[1], "2026-10-01"); st != http.StatusUnprocessableEntity {
+			t.Fatalf("ngưỡng %v phải bị từ chối: %d %v", bad, st, body)
+		}
+	}
+	if st, body := create("NHIET_DO_AO", "25,0", "32", "2026-10-01"); st != http.StatusCreated || body["attrs"].(map[string]any)["threshold_min"] != "25" {
+		t.Fatalf("chỉ tiêu mới có ngưỡng: %d %v", st, body)
+	}
+	if st, body := admin.adm(http.MethodPut, "/v1/masterdata/catalogs/cnts_indicator/items/NHIET_DO_AO", map[string]any{"name": "Nhiệt độ ao NHIET_DO_AO",
+		"valid_from": "2026-11-01", "attrs": map[string]string{"value_type": "decimal", "unit": "°C", "diary_metric": "temp_c", "threshold_min": "26", "threshold_max": "31"}}); st != http.StatusOK {
+		t.Fatalf("sửa ngưỡng từ 01/11: %d %v", st, body)
+	}
+	for at, want := range map[string]string{"2026-10-15": "32", "2026-11-02": "31"} {
+		it, err := cnts.ItemAt(ctx, knport.CatalogCNTSIndicator, "NHIET_DO_AO", day(at))
+		if err != nil || it.Attrs[knport.AttrThresholdMax] != want {
+			t.Fatalf("ngưỡng theo ngày %s: %+v %v", at, it, err)
+		}
+	}
+
+	// Tệp xuất (cùng cột tệp mẫu + trang_thai) nạp lại: mục đã có cùng nội dung → bỏ qua; dòng mới → tạo.
+	csv := "catalog,code,name,valid_from,unit,value_type,threshold_min,threshold_max,diary_metric,description,trang_thai\n" +
+		"cnts_indicator,PH,pH,2000-01-01,,decimal,7.5,8.5,ph,\"Ngưỡng mặc định 7,5–8,5 (tham số cnts.indicator_min/max:PH)\",Đang dùng\n" +
+		"cnts_indicator,DO_TRONG,Độ trong,2026-10-01,cm,decimal,30,60,,,Ngừng dùng\n"
+	st, body := admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte(csv))
+	if st != http.StatusOK || body["skipped"] != 1.0 || body["created"] != 1.0 || body["rejected"] != 0.0 {
+		t.Fatalf("nạp lại tệp xuất: %d %v", st, body)
+	}
+	if st, body := reader.get("/v1/masterdata/catalogs/cnts_indicator/DO_TRONG"); st != http.StatusOK || body["attrs"].(map[string]any)["trang_thai"] != nil {
+		t.Fatalf("cột trạng thái không thành thuộc tính: %d %v", st, body)
+	}
+
+	// Review Codex 7e29: nút Xuất (toCsv) thêm dấu nháy trước ô bắt đầu bằng = + - @; nạp lại chính tệp đó vẫn bỏ qua
+	// (kể cả tên 200 ký tự thành 201 ký tự sau dấu nháy), còn ô có nội dung khác vẫn bị từ chối.
+	long := "-" + strings.Repeat("x", 199)
+	for _, it := range []struct{ code, name, desc string }{{"RT_DASH", "- Chỉ tiêu gạch", "- Theo dõi nhiệt độ ao mỗi ngày"},
+		{"RT_AT", "@Chỉ tiêu a", "=1+1"}, {"RT_PLUS", "+ Chỉ tiêu b", "@ghi chú"}, {"RT_LONG", long, "+ đo sáng"}} {
+		if st, body := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_indicator/items", map[string]any{"code": it.code, "name": it.name,
+			"valid_from": "2026-10-01", "attrs": map[string]string{"value_type": "decimal", "unit": "°C", "description": it.desc}}); st != http.StatusCreated {
+			t.Fatalf("tạo %s: %d %v", it.code, st, body)
+		}
+	}
+	csv = "catalog,code,name,valid_from,unit,value_type,threshold_min,threshold_max,diary_metric,description,trang_thai\r\n" +
+		"cnts_indicator,RT_DASH,'- Chỉ tiêu gạch,2026-10-01,°C,decimal,,,,'- Theo dõi nhiệt độ ao mỗi ngày,Đang dùng\r\n" +
+		"cnts_indicator,RT_AT,'@Chỉ tiêu a,2026-10-01,°C,decimal,,,,'=1+1,Đang dùng\r\n" +
+		"cnts_indicator,RT_PLUS,'+ Chỉ tiêu b,2026-10-01,°C,decimal,,,,'@ghi chú,Đang dùng\r\n" +
+		"cnts_indicator,RT_LONG,'" + long + ",2026-10-01,°C,decimal,,,,'+ đo sáng,Đang dùng\r\n"
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte("\xef\xbb\xbf"+csv))
+	if st != http.StatusOK || body["skipped"] != 4.0 || body["created"] != 0.0 || body["rejected"] != 0.0 {
+		t.Fatalf("nạp lại tệp xuất có dấu nháy chống công thức: %d %v", st, body)
+	}
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte("catalog,code,name,unit,value_type,description\n"+
+		"cnts_indicator,RT_DASH,'- Chỉ tiêu gạch,°C,decimal,'- Mô tả khác\n"))
+	if st != http.StatusOK || body["rejected"] != 1.0 || body["skipped"] != 0.0 {
+		t.Fatalf("ô có dấu nháy nhưng nội dung khác vẫn phải bị từ chối: %d %v", st, body)
+	}
+
+	// Review Codex 7058 [P2-1]: "Nạp Excel" áp cùng ràng buộc ngưỡng như thêm/sửa từng mục — số mũ, chuỗi rất dài, quá phần
+	// nguyên/thập phân, số âm, tối thiểu > tối đa đều bị từ chối theo dòng, không tạo mục nào.
+	huge := strings.Repeat("9", 100000)
+	bad := [][2]string{{"1e100000", "32"}, {"25", "1e-100000"}, {huge, "32"}, {"25", huge}, {"32", "25"}, {"12345678", ""}, {"", "1.23456"}, {"-1", "32"}}
+	csv = "catalog,code,name,value_type,unit,threshold_min,threshold_max,diary_metric\n"
+	for i, b := range bad {
+		csv += fmt.Sprintf("cnts_indicator,NGUONG_SAI_%d,Ngưỡng sai %d,decimal,°C,%s,%s,temp_c\n", i, i, b[0], b[1])
+	}
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte(csv))
+	if st != http.StatusOK || body["rejected"] != float64(len(bad)) || body["created"] != 0.0 {
+		t.Fatalf("nạp ngưỡng sai phải bị từ chối từng dòng: %d %v", st, body["rejected"])
+	}
+	for i, r := range body["rows"].([]any) {
+		if reason, _ := r.(map[string]any)["reason"].(string); !strings.HasPrefix(reason, "attrs.threshold_") {
+			t.Fatalf("dòng %d (%v) phải bị từ chối vì ngưỡng: %q", i, bad[i][0][:min(len(bad[i][0]), 12)], reason)
+		}
+	}
+
+	// Review Codex 7058 [P2-2]: mô tả nhiều dòng (LF, CRLF, kèm ký tự công thức) — tệp xuất (ô ngoặc kép có xuống dòng) nạp
+	// lại được, mô tả nhiều dòng khác nội dung vẫn bị từ chối.
+	for _, it := range []struct{ code, desc string }{{"RT_ML_LF", "Dòng 1\nDòng 2"}, {"RT_ML_CRLF", "Dòng 1\r\nDòng 2, \"trích\""}, {"RT_ML_DASH", "- Dòng 1\nDòng 2"}} {
+		if st, body := admin.adm(http.MethodPost, "/v1/masterdata/catalogs/cnts_indicator/items", map[string]any{"code": it.code, "name": "Nhiều dòng " + it.code,
+			"valid_from": "2026-10-01", "attrs": map[string]string{"value_type": "decimal", "description": it.desc}}); st != http.StatusCreated {
+			t.Fatalf("tạo %s: %d %v", it.code, st, body)
+		}
+	}
+	csv = "catalog,code,name,valid_from,unit,value_type,threshold_min,threshold_max,diary_metric,description,trang_thai\r\n" +
+		"cnts_indicator,RT_ML_LF,Nhiều dòng RT_ML_LF,2026-10-01,,decimal,,,,\"Dòng 1\nDòng 2\",Đang dùng\r\n" +
+		"cnts_indicator,RT_ML_CRLF,Nhiều dòng RT_ML_CRLF,2026-10-01,,decimal,,,,\"Dòng 1\r\nDòng 2, \"\"trích\"\"\",Đang dùng\r\n" +
+		"cnts_indicator,RT_ML_DASH,Nhiều dòng RT_ML_DASH,2026-10-01,,decimal,,,,\"'- Dòng 1\nDòng 2\",Đang dùng\r\n"
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte("\xef\xbb\xbf"+csv))
+	if st != http.StatusOK || body["total"] != 3.0 || body["skipped"] != 3.0 || body["rejected"] != 0.0 {
+		t.Fatalf("nạp lại tệp xuất có mô tả nhiều dòng: %d %v", st, body)
+	}
+	st, body = admin.adm(http.MethodPost, "/v1/masterdata/catalog-imports", []byte("catalog,code,name,value_type,description\r\n"+
+		"cnts_indicator,RT_ML_LF,Nhiều dòng RT_ML_LF,decimal,\"Dòng 1\nDòng 3\"\r\n"))
+	if st != http.StatusOK || body["rejected"] != 1.0 || body["skipped"] != 0.0 {
+		t.Fatalf("mô tả nhiều dòng khác nội dung vẫn phải bị từ chối: %d %v", st, body)
+	}
+}
+
+// seededFacilities: 4 CSGM mẫu của dữ liệu nền (BF-CN-SLAUGHTER #169) có đủ trường CN-10 và mã xã là xã An Giang còn hiệu lực.
+func seededFacilities(t *testing.T, admin caller) {
+	t.Helper()
+	want := map[string]string{"CSGM_MAU_01": "30316", "CSGM_MAU_02": "30742", "CSGM_MAU_03": "30628", "CSGM_MAU_04": "30463"}
+	st, body := admin.adm(http.MethodGet, "/v1/masterdata/catalogs/cnts_slaughter_facility/items?at=2026-10-28", nil)
+	items, _ := body["items"].([]any)
+	if st != http.StatusOK {
+		t.Fatalf("danh sách CSGM: %d %v", st, body)
+	}
+	seen := 0
+	for _, raw := range items {
+		it := raw.(map[string]any)
+		commune, ok := want[it["code"].(string)]
+		if !ok {
+			continue
+		}
+		seen++
+		attrs := it["attrs"].(map[string]any)
+		if attrs["commune_code"] != commune || attrs["facility_kind"] == nil || attrs["species"] == nil || attrs["address"] == nil || attrs["facility_ref"] == nil {
+			t.Fatalf("CSGM mẫu thiếu trường: %v", it)
+		}
+		if attrs["stamp_codes_gs"] == nil && attrs["stamp_codes_gc"] == nil {
+			t.Fatalf("CSGM mẫu không có mộc dấu: %v", it)
+		}
+		st, unit := admin.get("/v1/masterdata/admin-units/" + commune)
+		if st != http.StatusOK || unit["level"] != "commune" || unit["parent_code"] != "91" {
+			t.Fatalf("xã của CSGM mẫu %s: %d %v", commune, st, unit)
+		}
+	}
+	if seen != len(want) {
+		t.Fatalf("dữ liệu nền phải có %d CSGM mẫu, thấy %d", len(want), seen)
 	}
 }

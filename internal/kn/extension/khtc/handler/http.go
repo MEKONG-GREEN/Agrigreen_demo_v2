@@ -376,29 +376,29 @@ func (h Handler) versions(c *gin.Context) {
 }
 
 type entryReq struct {
-	Ref            string           `json:"ref"`
-	Tab            string           `json:"tab"`
-	Kind           string           `json:"kind"`
-	ParentRef      *string          `json:"parent_ref"`
-	ProgramRef     *string          `json:"program_ref"`
-	SortOrder      int              `json:"sort_order"`
-	Code           string           `json:"code"`
-	Name           string           `json:"name"`
-	UnitCode       string           `json:"unit_code"`
-	PlannedQty     *decimal.Decimal `json:"planned_qty"`
-	ScaleNote      string           `json:"scale_note"`
-	Budget         *decimal.Decimal `json:"budget"`
-	FundingCode    string           `json:"funding_code"`
-	FieldCode      string           `json:"field_code"`
-	DepartmentCode string           `json:"department_code"`
-	Communes       []string         `json:"communes"`
-	PointsCount    *int             `json:"points_count"`
-	DataSource     string           `json:"data_source"`
-	SourceKey      string           `json:"source_key"`
-	Tracking       string           `json:"tracking"`
-	StoppedFrom    *string          `json:"stopped_from"`
-	StopDecision   string           `json:"stop_decision"`
-	Note           string           `json:"note"`
+	Ref            string       `json:"ref"`
+	Tab            string       `json:"tab"`
+	Kind           string       `json:"kind"`
+	ParentRef      *string      `json:"parent_ref"`
+	ProgramRef     *string      `json:"program_ref"`
+	SortOrder      int          `json:"sort_order"`
+	Code           string       `json:"code"`
+	Name           string       `json:"name"`
+	UnitCode       string       `json:"unit_code"`
+	PlannedQty     *planDecimal `json:"planned_qty"`
+	ScaleNote      string       `json:"scale_note"`
+	Budget         *planDecimal `json:"budget"`
+	FundingCode    string       `json:"funding_code"`
+	FieldCode      string       `json:"field_code"`
+	DepartmentCode string       `json:"department_code"`
+	Communes       []string     `json:"communes"`
+	PointsCount    *int         `json:"points_count"`
+	DataSource     string       `json:"data_source"`
+	SourceKey      string       `json:"source_key"`
+	Tracking       string       `json:"tracking"`
+	StoppedFrom    *string      `json:"stopped_from"`
+	StopDecision   string       `json:"stop_decision"`
+	Note           string       `json:"note"`
 }
 
 type saveReq struct {
@@ -433,7 +433,7 @@ func (r saveReq) entries() ([]domain.Entry, error) {
 			p, bad = p.WithField(f("ref"), "phải là UUID"), true
 		}
 		d := domain.Entry{Ref: ref, Tab: e.Tab, Kind: e.Kind, SortOrder: e.SortOrder, Code: e.Code, Name: e.Name, UnitCode: e.UnitCode,
-			PlannedQty: e.PlannedQty, ScaleNote: e.ScaleNote, Budget: e.Budget, FundingCode: e.FundingCode, FieldCode: e.FieldCode,
+			PlannedQty: e.PlannedQty.value(), ScaleNote: e.ScaleNote, Budget: e.Budget.value(), FundingCode: e.FundingCode, FieldCode: e.FieldCode,
 			Department: e.DepartmentCode, Communes: e.Communes, PointsCount: e.PointsCount, DataSource: e.DataSource,
 			SourceKey: e.SourceKey, Tracking: e.Tracking, StopDecision: e.StopDecision, Note: e.Note}
 		d.ParentRef = optUUID(&p, &bad, f("parent_ref"), e.ParentRef)

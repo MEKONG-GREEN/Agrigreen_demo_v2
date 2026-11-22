@@ -255,6 +255,21 @@ func TestHTTPClientEndToEnd(t *testing.T) {
 		t.Fatalf("pubkeys: %v %v", keys, err)
 	}
 
+	// #251: amend qua HTTP trả revision_ref; nhãn bản sửa chỉ ở dạng che bớt.
+	rv, ok := client.AsRevisions(vc)
+	if !ok {
+		t.Fatal("client HTTP phải hỗ trợ bản sửa")
+	}
+	rev, err := rv.AmendRevision(ctx, client.PurposeContact, c.Ref, client.Identity{FullName: "Trần Văn Hùng", Phone: "0903 000 001"})
+	if err != nil || rev.Version() != 7 {
+		t.Fatalf("amend qua HTTP: %v %v", rev, err)
+	}
+	revs, err := rv.Revisions(ctx, client.PurposeContact, []uuid.UUID{rev})
+	if err != nil || len(revs) != 1 || revs[0].PrevLabel != "Phạm V. H." || revs[0].NextLabel != "Trần V. H." ||
+		revs[0].PrevPhone != "0903•••001" || revs[0].NextPhone != "0903•••001" || revs[0].SubjectRef != c.Ref {
+		t.Fatalf("revisions qua HTTP: %+v %v", revs, err)
+	}
+
 	// Tenant khác, cùng vai: không thấy (R-16: tenant chỉ từ token).
 	other := f.user(ids.New(), true, everything...)
 	if _, err := vc.Resolve(other.ctx(), client.PurposeRegistryAdmin, c.Ref); !errors.Is(err, client.ErrNotFound) {
@@ -287,7 +302,7 @@ func TestHTTPClientEndToEnd(t *testing.T) {
 	if !strings.Contains(logs, "http.request") {
 		t.Fatal("phải có log truy cập")
 	}
-	for _, pii := range []string{"Phạm", "84903000001", "086123456789", "Ấp 2", u.token} {
+	for _, pii := range []string{"Phạm", "Trần", "84903000001", "086123456789", "Ấp 2", u.token} {
 		if strings.Contains(logs, pii) {
 			t.Fatalf("log chứa dữ liệu cá nhân hoặc token: %q", pii)
 		}

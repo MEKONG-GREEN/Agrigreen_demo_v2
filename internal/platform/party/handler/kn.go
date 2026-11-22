@@ -1,8 +1,11 @@
 package handler
 
-// HTTP của KN v7.7 gói P2: phòng ban, khu vực, cây 3 cấp, bảng ảnh hưởng, menu theo cấu hình.
-// Admin API (MFA): /v1/departments*, /v1/regions*, /v1/orgs/{ref}/region|impact|communes/ensure|departments/seed.
-// Application API: GET /v1/departments, /v1/departments/{code}/modules, /v1/menu, /v1/regions, /v1/orgs/tree.
+// HTTP của KN v7.7 gói P2: khu vực, cây 3 cấp, bảng ảnh hưởng.
+// Admin API (MFA): /v1/regions*, /v1/orgs/tree, /v1/orgs/{ref}/region|impact|communes/ensure.
+// Application API: /v1/regions, /v1/orgs/tree.
+// Danh mục phòng ban (/v1/departments, /v1/departments/{id}*, #118), menu (/v1/menu), cây module phòng ban
+// (/v1/departments/{code}/modules) và nạp phòng ban mặc định (/v1/orgs/{ref}/departments/seed, #222) do chủ KN
+// (internal/kn/extension/departments) đăng ký qua port.DepartmentAdmin.
 
 import (
 	"context"
@@ -26,15 +29,9 @@ import (
 // KN gói app.KN cho HTTP.
 type KN struct{ Svc *app.KN }
 
-// RegisterAdmin gắn route Admin API.
+// RegisterAdmin gắn route Admin API. Danh mục phòng ban /v1/departments, /v1/departments/{id}* (#118) và nạp phòng ban
+// /v1/orgs/{ref}/departments/seed (#222) do chủ KN (internal/kn/extension/departments, qua port.DepartmentAdmin) đăng ký.
 func (h KN) RegisterAdmin(rg *gin.RouterGroup) {
-	rg.GET("/departments", h.adminListDepartments)
-	rg.POST("/departments", h.createDepartment)
-	rg.GET("/departments/:id", h.getDepartment)
-	rg.PUT("/departments/:id", h.updateDepartment)
-	rg.POST("/departments/:id/status", h.departmentStatus)
-	rg.POST("/departments/:id/retire", h.retireDepartment)
-	rg.GET("/departments/:id/log", h.departmentLog)
 	rg.GET("/regions", h.listRegions)
 	rg.POST("/regions", h.createRegion)
 	rg.POST("/regions/seed", h.seedRegions)
@@ -48,14 +45,11 @@ func (h KN) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.GET("/orgs/:ref/region-log", h.orgRegionLog)
 	rg.POST("/orgs/:ref/communes/ensure", h.ensureCommunes)
 	rg.GET("/orgs/:ref/impact", h.impact)
-	rg.POST("/orgs/:ref/departments/seed", h.seedDepartments)
 }
 
-// RegisterApp gắn route Application API (đọc).
+// RegisterApp gắn route Application API (đọc). GET /v1/departments (#118), GET /v1/menu và
+// GET /v1/departments/{code}/modules (#222) do chủ KN đăng ký.
 func (h KN) RegisterApp(rg *gin.RouterGroup) {
-	rg.GET("/departments", h.appListDepartments)
-	rg.GET("/departments/:code/modules", h.modules)
-	rg.GET("/menu", h.menu)
 	rg.GET("/regions", h.listRegions)
 	rg.GET("/orgs/tree", h.tree)
 }
@@ -63,35 +57,6 @@ func (h KN) RegisterApp(rg *gin.RouterGroup) {
 // ---------------------------------------------------------------------------
 // DTO
 // ---------------------------------------------------------------------------
-
-type departmentDTO struct {
-	ID           string  `json:"id"`
-	OrgRef       string  `json:"org_ref"`
-	Code         string  `json:"code"`
-	Name         string  `json:"name"`
-	Description  *string `json:"description"`
-	SortOrder    int     `json:"sort_order"`
-	Status       string  `json:"status"`
-	StatusLabel  string  `json:"status_label"`
-	MenuProfile  string  `json:"menu_profile"`
-	Retired      bool    `json:"retired"`
-	Selectable   bool    `json:"selectable"`
-	AccountCount *int    `json:"account_count"`
-	RecordCount  *int    `json:"record_count"`
-	UpdatedBy    string  `json:"updated_by"`
-	UpdatedAt    string  `json:"updated_at"`
-}
-
-func toDepartmentDTO(d port.Department, u *port.Usage) departmentDTO {
-	out := departmentDTO{ID: d.ID.String(), OrgRef: d.OrgRef.String(), Code: d.Code, Name: d.Name, Description: strPtr(d.Description),
-		SortOrder: d.SortOrder, Status: d.Status, StatusLabel: domain.StatusLabel(d.Status), MenuProfile: d.MenuProfile, Retired: d.Retired,
-		Selectable: d.Selectable(), UpdatedBy: d.UpdatedBy.String(), UpdatedAt: d.UpdatedAt.UTC().Format(time.RFC3339Nano)}
-	if u != nil {
-		a, r := u.Accounts, u.Records
-		out.AccountCount, out.RecordCount = &a, &r
-	}
-	return out
-}
 
 type logEntryDTO struct {
 	Seq          int64                `json:"seq"`
@@ -156,186 +121,15 @@ func pathID(c *gin.Context, name string, nf error) (uuid.UUID, bool) {
 	return id, true
 }
 
-func optRefQuery(c *gin.Context, name string) (uuid.UUID, bool) {
-	s := c.Query(name)
-	if s == "" {
-		return uuid.Nil, true
-	}
-	id, err := uuid.Parse(s)
-	if err != nil {
-		httpx.Fail(c, problem.Validation.WithField(name, "phải là UUID"))
-		return uuid.Nil, false
-	}
-	return id, true
-}
-
 func idemKey(c *gin.Context) string { return idempotency.KeyFromContext(c.Request.Context()) }
-
-// ---------------------------------------------------------------------------
-// Phòng ban
-// ---------------------------------------------------------------------------
-
-func (h KN) listDepartments(c *gin.Context, admin bool) {
-	unit, ok := optRefQuery(c, "org_ref")
-	if !ok {
-		return
-	}
-	vs, resolved, err := h.Svc.ListDepartments(c.Request.Context(), unit, c.Query("include_retired") == "true", admin)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	items := make([]departmentDTO, 0, len(vs))
-	for _, v := range vs {
-		items = append(items, toDepartmentDTO(v.Department, v.Usage))
-	}
-	c.JSON(http.StatusOK, gin.H{"org_ref": resolved.String(), "items": items})
-}
-
-func (h KN) adminListDepartments(c *gin.Context) { h.listDepartments(c, true) }
-func (h KN) appListDepartments(c *gin.Context)   { h.listDepartments(c, false) }
-
-type departmentReq struct {
-	OrgRef      string `json:"org_ref"`
-	Code        string `json:"code"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	SortOrder   int    `json:"sort_order"`
-	Status      string `json:"status"`
-	MenuProfile string `json:"menu_profile"`
-}
-
-func (h KN) createDepartment(c *gin.Context) {
-	var req departmentReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	in := app.DepartmentInput{Code: req.Code, Name: req.Name, Description: req.Description, SortOrder: req.SortOrder, Status: req.Status,
-		MenuProfile: req.MenuProfile}
-	if ref, err := uuid.Parse(req.OrgRef); err == nil {
-		in.OrgRef = ref
-	}
-	d, replayed, err := h.Svc.CreateDepartment(c.Request.Context(), in, idemKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.Header("Location", "/v1/departments/"+d.ID.String())
-	written(c, replayed, toDepartmentDTO(d, nil))
-}
-
-func (h KN) getDepartment(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	v, err := h.Svc.GetDepartment(c.Request.Context(), id)
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toDepartmentDTO(v.Department, v.Usage))
-}
-
-func (h KN) updateDepartment(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	var req departmentReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	d, err := h.Svc.UpdateDepartment(c.Request.Context(), id, app.DepartmentInput{Name: req.Name, Description: req.Description,
-		SortOrder: req.SortOrder, MenuProfile: req.MenuProfile})
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, toDepartmentDTO(d, nil))
-}
-
-type deptStatusReq struct {
-	Status string `json:"status"`
-	Reason string `json:"reason"`
-}
-
-func (h KN) departmentStatus(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	var req deptStatusReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	res, err := h.Svc.ChangeDepartmentStatus(c.Request.Context(), id, req.Status, req.Reason, idemKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	warnings := res.Warnings
-	if warnings == nil {
-		warnings = []string{}
-	}
-	written(c, res.Replayed, gin.H{"department": toDepartmentDTO(res.Department, res.Usage), "warnings": warnings})
-}
-
-type reasonReq struct {
-	Reason string `json:"reason"`
-}
-
-func (h KN) retireDepartment(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	var req reasonReq
-	if !bindJSON(c, &req) {
-		return
-	}
-	d, replayed, err := h.Svc.RetireDepartment(c.Request.Context(), id, req.Reason, idemKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	written(c, replayed, toDepartmentDTO(d, nil))
-}
-
-func (h KN) departmentLog(c *gin.Context) {
-	id, ok := pathID(c, "id", app.ErrDepartmentNotFound)
-	if !ok {
-		return
-	}
-	after, ok := afterSeq(c)
-	if !ok {
-		return
-	}
-	es, err := h.Svc.DepartmentLog(c.Request.Context(), id, after, limitOf(c))
-	writeLog(c, es, err)
-}
-
-func (h KN) seedDepartments(c *gin.Context) {
-	ref, ok := pathID(c, "ref", app.ErrOrgNotFound)
-	if !ok {
-		return
-	}
-	res, err := h.Svc.SeedDepartments(c.Request.Context(), ref, idemKey(c))
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	items := make([]departmentDTO, 0, len(res.Created))
-	for _, d := range res.Created {
-		items = append(items, toDepartmentDTO(d, nil))
-	}
-	c.JSON(http.StatusOK, gin.H{"created": items, "existing": res.Existing, "status": res.Status,
-		"legacy_retired": res.LegacyRetired, "legacy_kept": res.LegacyKept})
-}
 
 // ---------------------------------------------------------------------------
 // Khu vực
 // ---------------------------------------------------------------------------
+
+type reasonReq struct {
+	Reason string `json:"reason"`
+}
 
 type regionDTO struct {
 	ID                 string  `json:"id"`
@@ -638,97 +432,4 @@ func withRegions(ctx context.Context, svc *app.KN, items []orgDTO, orgs []port.O
 			items[i].Region = &regionRefDTO{Code: r.RegionCode, Name: r.RegionName}
 		}
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Menu theo cấu hình (UR-KT-02)
-// ---------------------------------------------------------------------------
-
-type menuItemDTO struct {
-	Key         string        `json:"key"`
-	Label       string        `json:"label"`
-	Route       *string       `json:"route"`
-	Icon        string        `json:"icon"`
-	BadgeSource *string       `json:"badge_source"`
-	Enabled     bool          `json:"enabled"`
-	Status      *string       `json:"status,omitempty"`
-	StatusLabel *string       `json:"status_label,omitempty"`
-	Children    []menuItemDTO `json:"children"`
-}
-
-type menuGroupDTO struct {
-	Key   string        `json:"key"`
-	Label string        `json:"label"`
-	Items []menuItemDTO `json:"items"`
-}
-
-type menuDeptDTO struct {
-	Code        string `json:"code"`
-	Name        string `json:"name"`
-	Status      string `json:"status"`
-	MenuProfile string `json:"menu_profile"`
-}
-
-func toMenuItems(items []app.MenuItemView) []menuItemDTO {
-	out := make([]menuItemDTO, 0, len(items))
-	for _, it := range items {
-		out = append(out, menuItemDTO{Key: it.Key, Label: it.Label, Route: strPtr(it.Route), Icon: it.Icon, BadgeSource: strPtr(it.BadgeSource),
-			Enabled: it.Enabled, Status: strPtr(it.Status), StatusLabel: strPtr(it.StatusLabel), Children: toMenuItems(it.Children)})
-	}
-	return out
-}
-
-func writeMenu(c *gin.Context, v app.MenuView, err error) {
-	if err != nil {
-		httpx.Fail(c, err)
-		return
-	}
-	// Menu đổi ngay khi Admin đổi trạng thái phòng ban — không lưu đệm phía trung gian.
-	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, menuBody(v))
-}
-
-// menuBody là thân JSON của KNMenu (contracts/openapi/application.yaml) — dùng chung với ca vàng web.
-func menuBody(v app.MenuView) gin.H {
-	groups := make([]menuGroupDTO, 0, len(v.Groups))
-	for _, g := range v.Groups {
-		groups = append(groups, menuGroupDTO{Key: g.Key, Label: g.Label, Items: toMenuItems(g.Items)})
-	}
-	var dept *menuDeptDTO
-	if v.Department != nil {
-		dept = &menuDeptDTO{Code: v.Department.Code, Name: v.Department.Name, Status: v.Department.Status, MenuProfile: v.Department.MenuProfile}
-	}
-	return gin.H{"menu_version": v.Version, "audience": v.Audience, "org_ref": refPtr(v.UnitRef), "department": dept,
-		"default_route": v.DefaultRoute, "groups": groups}
-}
-
-func menuQuery(c *gin.Context) (app.MenuQuery, bool) {
-	unit, ok := optRefQuery(c, "org_ref")
-	if !ok {
-		return app.MenuQuery{}, false
-	}
-	// "role" là tên cũ của "audience" (hợp đồng tạm P6 trước KN-fix) — nhận thêm một đợt, "audience" thắng.
-	aud := c.Query("audience")
-	if aud == "" {
-		aud = c.Query("role")
-	}
-	return app.MenuQuery{Audience: aud, Department: c.Query("department"), UnitRef: unit}, true
-}
-
-func (h KN) menu(c *gin.Context) {
-	q, ok := menuQuery(c)
-	if !ok {
-		return
-	}
-	v, err := h.Svc.Menu(c.Request.Context(), q)
-	writeMenu(c, v, err)
-}
-
-func (h KN) modules(c *gin.Context) {
-	q, ok := menuQuery(c)
-	if !ok {
-		return
-	}
-	v, err := h.Svc.DepartmentModules(c.Request.Context(), c.Param("code"), q)
-	writeMenu(c, v, err)
 }
